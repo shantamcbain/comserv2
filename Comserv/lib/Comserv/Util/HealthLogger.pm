@@ -304,16 +304,17 @@ sub prune_old_records {
                 localtime($now - $retention_days{$lvl} * 86400));
         }
 
+        my $batch_size = 1000;
         eval {
+            my $scan_limit = $batch_size * 4;
             my $sel = $dbh->prepare(
-                "SELECT id, level, timestamp FROM system_log ORDER BY id ASC LIMIT 2000"
+                "SELECT id, level, timestamp FROM system_log ORDER BY id ASC LIMIT $scan_limit"
             );
             $sel->execute;
             my @to_delete;
             while (my ($id, $level, $ts) = $sel->fetchrow_array) {
                 my $cutoff = $cutoffs{lc($level // '')} // $cutoffs{debug};
                 push @to_delete, $id if defined $cutoff && ($ts // '') lt $cutoff;
-                last if @to_delete >= 500;
             }
             if (@to_delete) {
                 my $ph = join(',', ('?') x scalar @to_delete);
@@ -323,7 +324,7 @@ sub prune_old_records {
                 $deleted += $n;
                 push @detail_msgs, "retention_prune: found=" . scalar(@to_delete) . " deleted=$n";
             } else {
-                push @detail_msgs, "retention_prune: no eligible rows in oldest 2000";
+                push @detail_msgs, "retention_prune: no eligible rows in oldest $scan_limit";
             }
         };
         if ($@) {
@@ -336,29 +337,33 @@ sub prune_old_records {
         # --- Phase 2: max-records cap ---
         # Use information_schema estimate (fast) to decide whether culling is needed.
         # Exact COUNT(*) on a 3M-row InnoDB table under active writes can take 10-20s.
+        # Loops in batches until the table is at or below max_records.
         eval {
             my ($total) = $dbh->selectrow_array(
                 "SELECT TABLE_ROWS FROM information_schema.TABLES
                  WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'system_log'"
             );
             push @detail_msgs, "total_count=$total max_records=$max_records";
-            if (($total // 0) > $max_records) {
-                my $to_delete = $total - $max_records;
-                $to_delete = 500 if $to_delete > 500;
+            my $remaining = ($total // 0) - $max_records;
+            my $cap_deleted = 0;
+            while ($remaining > 0) {
+                my $this_batch = $remaining > $batch_size ? $batch_size : $remaining;
                 my $sel = $dbh->prepare(
                     "SELECT id FROM system_log ORDER BY id ASC LIMIT ?"
                 );
-                $sel->execute($to_delete);
+                $sel->execute($this_batch);
                 my @ids = map { $_->[0] } @{ $sel->fetchall_arrayref // [] };
-                if (@ids) {
-                    my $ph = join(',', ('?') x scalar @ids);
-                    my $n  = $dbh->do("DELETE FROM system_log WHERE id IN ($ph)",
-                                       undef, @ids) // 0;
-                    $n = 0 unless $n =~ /^\d+$/;
-                    $deleted += $n;
-                    push @detail_msgs, "cap_prune: cap=$to_delete deleted=$n";
-                }
+                last unless @ids;
+                my $ph = join(',', ('?') x scalar @ids);
+                my $n  = $dbh->do("DELETE FROM system_log WHERE id IN ($ph)",
+                                   undef, @ids) // 0;
+                $n = 0 unless $n =~ /^\d+$/;
+                $cap_deleted += $n;
+                $deleted     += $n;
+                $remaining   -= $n;
+                last if $n == 0;
             }
+            push @detail_msgs, "cap_prune: target=${\(($total//0)-$max_records)} deleted=$cap_deleted" if $cap_deleted;
         };
         if ($@) {
             my $e = $@;

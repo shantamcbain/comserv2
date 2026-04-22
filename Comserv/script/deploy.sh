@@ -14,11 +14,13 @@ echo "=== Comserv Production Deploy Check at $(date) ==="
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
 
-# ── Routine cleanup (runs every time, not just on deploy) ────────────────────
+# ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
 echo "Running routine Docker cleanup..."
-docker container prune -f  --filter "until=1h"  2>&1 | grep -v "^$" || true
-docker image prune -f                                   2>&1 | grep -v "^$" || true
-docker builder prune -f    --keep-storage 2GB           2>&1 | grep -v "^$" || true
+docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
+docker image prune -f                          2>&1 | grep -v "^$" || true
+docker volume prune -f                         2>&1 | grep -v "^$" || true
+docker network prune -f                        2>&1 | grep -v "^$" || true
+docker builder prune -f --keep-storage 2GB     2>&1 | grep -v "^$" || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
@@ -103,6 +105,43 @@ docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+
+echo "3b. Ensuring SearXNG container is running..."
+SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
+if ! docker ps --format '{{.Names}}' | grep -q '^searxng$'; then
+    echo "  SearXNG not running — starting..."
+    mkdir -p "$SEARXNG_CONFIG_DIR"
+    if [ ! -f "$SEARXNG_CONFIG_DIR/settings.yml" ]; then
+        SECRET=$(openssl rand -hex 32)
+        cat > "$SEARXNG_CONFIG_DIR/settings.yml" << SEARXNG_EOF
+use_default_settings: true
+
+server:
+  secret_key: "$SECRET"
+  bind_address: "0.0.0.0:8080"
+  public_instance: false
+
+search:
+  formats:
+    - html
+    - json
+
+general:
+  instance_name: "Comserv Search"
+  donation_url: false
+SEARXNG_EOF
+        echo "  Created SearXNG config at $SEARXNG_CONFIG_DIR/settings.yml"
+    fi
+    docker run -d \
+        --name searxng \
+        -p 127.0.0.1:8080:8080 \
+        --restart unless-stopped \
+        -v "$SEARXNG_CONFIG_DIR:/etc/searxng:ro" \
+        searxng/searxng
+    echo "  SearXNG started on 127.0.0.1:8080"
+else
+    echo "  SearXNG already running — OK"
+fi
 
 echo "4. Waiting for health check (up to 90s)..."
 ATTEMPT=0

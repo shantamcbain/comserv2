@@ -57,6 +57,21 @@
     .header-nav-links a:hover {
         background-color: var(--bg-secondary);
     }
+
+    .dl-btn {
+        display: inline-block;
+        padding: 4px 10px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.82em;
+        font-weight: bold;
+        transition: opacity .15s;
+    }
+    .dl-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .dl-btn-start { background: #2a7a2a; color: #fff; }
+    .dl-btn-end   { background: #7a2a00; color: #fff; }
+    #dl-feedback  { font-size: .82em; margin-left: 6px; }
     
     /* Tab Styles */
     .tab-navigation {
@@ -80,7 +95,7 @@
     
     .tab-button:hover {
         color: var(--text-color);
-        background-color: var(--secondary-color);
+        background-color: rgba(255,255,255,0.12);
     }
     
     .tab-button.active {
@@ -128,12 +143,63 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
+                [% IF open_log_entry %]
+                <button class="dl-btn dl-btn-start" id="dl-start-btn"
+                        style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;"
+                        onclick="toggleLogPanel()"
+                        oncontextmenu="event.preventDefault();dailyLogAction('end')"
+                        title="Day log active — click to view, right-click to close">
+                  🌅 Start Day
+                </button>
+                <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
+                [% ELSE %]
+                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
+                <button class="dl-btn dl-btn-end"   id="dl-end-btn"   onclick="dailyLogAction('end')">🌙 End Day</button>
+                [% END %]
+                <span id="dl-feedback"></span>
+                &nbsp;|&nbsp;
                 <a href="/Documentation/DailyPlan/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
                 <a href="/Documentation/DailyPlan/[% next_date %]" class="next-day-link">Next Day →</a>
             </div>
         </div>
     </div>
+
+    <!-- Daily Log Entry Panel (shown when day is active) -->
+    [% IF open_log_entry %]
+    <div id="log-panel" style="display:none;background:#f0fff0;border:1px solid #2a7a2a;border-radius:6px;
+         padding:14px 18px;margin:8px 0;position:relative;">
+      <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:220px;">
+          <div style="font-weight:bold;color:#1a5a1a;margin-bottom:6px;">🌅 Today's Log Entry</div>
+          <div style="font-size:.9em;margin-bottom:4px;"><strong>Started:</strong> [% open_log_entry.start_date %] [% open_log_entry.start_time %]</div>
+          <div style="font-size:.9em;margin-bottom:8px;"><strong>Title:</strong>
+            <input id="log-title-edit" type="text" value="[% open_log_entry.abstract | html %]"
+                   style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;">
+          </div>
+          <div style="font-size:.9em;"><strong>Notes:</strong>
+            <textarea id="log-desc-edit" rows="3"
+                      style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;resize:vertical;">[% open_log_entry.details | html %]</textarea>
+          </div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">
+          <button onclick="saveLogEntry([% open_log_entry.record_id %])"
+                  style="padding:7px 14px;background:#2a7a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
+            💾 Save Notes
+          </button>
+          <button onclick="dailyLogAction('end')"
+                  style="padding:7px 14px;background:#555;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
+            🌙 Close Day
+          </button>
+          <button onclick="document.getElementById('log-panel').style.display='none'"
+                  style="padding:7px 14px;background:#eee;color:#333;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
+            ✖ Dismiss
+          </button>
+        </div>
+      </div>
+      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color:#555;"></div>
+    </div>
+    [% END %]
 
     <!-- Tab Navigation -->
     <div class="tab-navigation">
@@ -161,9 +227,6 @@
         [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
-        </button>
-        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
-            ZENCODER PROMPT
         </button>
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
@@ -409,7 +472,7 @@
     <div id="daily-plan-guide" class="tab-content">
         <h2>Instructions for Admin Working on The Daily Plan</h2>
         [%  INCLUDE 'admin/documentation/DailyAuditGuide.tt' %]
-        <div style="background: var(--light-color); border: 1px solid var(--info-color); border-radius: 4px; padding: 20px; margin: 20px 0;">
+        <div style="background: rgba(255,255,255,0.15); border: 1px solid var(--info-color); border-radius: 4px; padding: 20px; margin: 20px 0;">
             <h3>How to Update This Daily Plan</h3>
             <ol style="line-height: 1.8;">
                 <li><strong>Read First:</strong> Always read the entire DailyPlan.tt file before making changes. Understand the tab structure and container relationships.</li>
@@ -467,14 +530,15 @@
         [%# ── Data from controller stash (fetched in Documentation.pm::daily_plan) ── %]
         [% SET view_sitename = filter_site || plan_sitename %]
 
-        [%# ── Branch server launcher (admin only) ── %]
-        [% IF is_admin %]
+        [%# ── Branch server launcher (CSC admin only) ── %]
+        [% IF is_admin && is_csc %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = c.req.uri.host %]
         [% SET scheme     = c.req.uri.scheme %]
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
+            'main'                                     => 3001,
             'planningsystem-59ae'                      => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
@@ -503,6 +567,7 @@
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
+            { name => 'main',                                  port => 3001, label => 'MAIN',                 url => '/Documentation/DailyPlan' },
             { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
             { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
@@ -529,6 +594,9 @@
             { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
         ] %]
 
+        [%# workstation.local gets full table; other domains get dropdown only %]
+        [% SET is_workstation = (host.match('^workstation') || host == 'localhost') ? 1 : 0 %]
+
         <details style="margin-bottom:14px;border:1px solid #fd7e14;border-radius:6px;font-size:0.85em;">
             <summary style="padding:8px 14px;cursor:pointer;background:color-mix(in srgb,#fd7e14 10%,var(--bg-color));border-radius:6px;display:flex;justify-content:space-between;align-items:center;">
                 <span style="font-weight:bold;color:#fd7e14;">🌿 Branch Servers
@@ -540,24 +608,39 @@
             </summary>
             <div style="padding:10px 14px;">
 
-                [%# Current branch start command %]
+                [%# Quick-open dropdown — shown on ALL hosts %]
+                [%# On workstation.local: opens branch on workstation using the branch port %]
+                [%# On other hosts: opens branch on workstation.local (dev machine) using branch port %]
+                [% SET open_host = is_workstation ? host : 'workstation.local' %]
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;">
+                    <label for="bs-select" style="font-weight:bold;color:#fd7e14;white-space:nowrap;">Open branch:</label>
+                    <select id="bs-select" style="flex:1;min-width:180px;padding:4px 8px;border:1px solid #fd7e14;border-radius:4px;font-family:monospace;font-size:0.9em;">
+                        <option value="">— select a branch —</option>
+                        [% FOREACH b IN all_branches %]
+                        <option value="[% scheme %]://[% open_host %]:[% b.port %][% b.url %]"
+                            [% IF b.name == cur_branch %]selected[% END %]>
+                            [% b.label %] :[% b.port %][% IF b.name == cur_branch %] ←[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                    <button onclick="(function(){var s=document.getElementById('bs-select');if(s&&s.value)window.open(s.value,'_blank');})()"
+                            style="padding:5px 14px;background:#fd7e14;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;white-space:nowrap;">
+                        Open →
+                    </button>
+                </div>
+
+                [%# Full branch table — workstation.local only %]
+                [% IF is_workstation %]
                 [% IF cur_branch && cur_branch != 'main' %]
-                [% SET cur_port     = bp.$cur_branch || '????' %]
-                [% SET worktree_dir = '/home/shanta/.zenflow/worktrees/' _ cur_branch _ '/Comserv' %]
-                [% SET start_cmd    = 'cd ' _ worktree_dir _ ' && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' _ cur_port _ ' -r' %]
-                <div style="margin-bottom:10px;padding:8px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;">
-                    <div style="margin-bottom:6px;font-weight:bold;color:#fd7e14;">▶ Start current branch server (port [% cur_port %]):</div>
-                    <div style="display:flex;align-items:center;gap:8px;">
-                        <code id="branch-start-cmd" style="flex:1;padding:4px 8px;background:var(--bg-color);border:1px solid var(--border-color);border-radius:3px;font-size:0.88em;word-break:break-all;">[% start_cmd %]</code>
-                        <button onclick="navigator.clipboard.writeText(document.getElementById('branch-start-cmd').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋 Copy',1500);"
-                            style="padding:3px 10px;border:1px solid #fd7e14;border-radius:3px;background:transparent;color:#fd7e14;cursor:pointer;white-space:nowrap;">📋 Copy</button>
-                        <a href="[% scheme %]://[% host %]:[% cur_port %]/Documentation/DailyPlan" target="_blank"
-                           style="padding:3px 10px;background:#fd7e14;color:#fff;border-radius:3px;text-decoration:none;white-space:nowrap;">Open →</a>
-                    </div>
+                [% SET cur_port = bp.$cur_branch || '????' %]
+                <div style="margin-bottom:10px;padding:6px 10px;background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));border-radius:4px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                    <span style="font-weight:bold;color:#fd7e14;">▶ Current branch:</span>
+                    <code>[% cur_branch %]</code>
+                    <span style="color:var(--text-muted-color);">port [% cur_port %]</span>
+                    <a href="[% scheme %]://[% host %]:[% cur_port %]/Documentation/DailyPlan" target="_blank"
+                       style="padding:3px 10px;background:#fd7e14;color:#fff;border-radius:3px;text-decoration:none;">Open →</a>
                 </div>
                 [% END %]
-
-                [%# All branch servers table %]
                 <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
@@ -566,23 +649,26 @@
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
-                    [% SET b_cmd = 'cd /home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
+                    [% SET b_worktree = (b.name == 'main') ? '/home/shanta/PycharmProjects/comserv2/Comserv' : ('/home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv') %]
+                    [% SET b_cmd = 'cd ' _ b_worktree _ ' && perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
                         <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
-                        <td style="padding:5px 8px;max-width:320px;">
-                            <code id="cmd-[% b.port %]" style="font-size:0.82em;word-break:break-all;">[% b_cmd %]</code></td>
-                        <td style="padding:5px 8px;white-space:nowrap;">
+                        <td style="padding:5px 8px;max-width:340px;">
+                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b_cmd %]</code>
                             <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
-                                style="padding:2px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-right:4px;">📋</button>
+                                style="padding:1px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-left:4px;font-size:0.85em;">📋</button>
+                        </td>
+                        <td style="padding:5px 8px;white-space:nowrap;">
                             <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
                                style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
                         </td>
                     </tr>
                     [% END %]
                 </table>
+                [% END %]
             </div>
         </details>
         [% END %]
@@ -662,13 +748,18 @@
         [% END %]
         <div id="project-sortable-list">
         [% SET current_site_label = '' %]
+        [% SET in_site_group = 0 %]
         [% FOREACH proj IN planning_projects %]
-            [%# Site group header for CSC all-sites view %]
+            [%# Site group collapsible container for CSC all-sites view %]
             [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% IF in_site_group %]</details>[% END %]
             [% SET current_site_label = proj.sitename %]
-            <div class="site-group-header" style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
-                🌐 [% proj.sitename %]
-            </div>
+            [% SET in_site_group = 1 %]
+            <details class="site-group" style="margin-bottom:6px;">
+                <summary style="padding:4px 10px;background:var(--primary-color);color:var(--primary-text-color, var(--button-text-color, #fff));border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
+                    <span>🌐 [% proj.sitename %]</span>
+                    <span style="font-size:0.9em;opacity:0.8;">▾</span>
+                </summary>
             [% END %]
 
             [%# Project card %]
@@ -773,6 +864,7 @@
                 </div>
             </details>
         [% END %]
+        [% IF in_site_group %]</details>[% END %]
         </div>[%# end #project-sortable-list %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
@@ -994,12 +1086,7 @@
     </div>
 
     [% IF is_csc %]
-    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
-    <div id="zencoder-prompt" class="tab-content">
-        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
-    </div>
-
-    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
+    <!-- TAB: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
@@ -1556,4 +1643,74 @@
         });
     }
 
+</script>
+
+<script>
+function dailyLogAction(action) {
+    var startBtn = document.getElementById('dl-start-btn');
+    var endBtn   = document.getElementById('dl-end-btn');
+    var feedback = document.getElementById('dl-feedback');
+    if (startBtn) startBtn.disabled = true;
+    if (endBtn)   endBtn.disabled   = true;
+    feedback.textContent = action === 'start' ? 'Starting…' : 'Closing…';
+    feedback.style.color = '';
+
+    fetch('/ai/daily_log', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'action=' + encodeURIComponent(action)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            feedback.textContent = d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
+            feedback.style.color = '#2a7a2a';
+            setTimeout(function() { window.location.reload(); }, 800);
+        } else {
+            feedback.textContent = d.error || 'Error';
+            feedback.style.color = '#9b0000';
+            if (startBtn) startBtn.disabled = false;
+            if (endBtn)   endBtn.disabled   = false;
+        }
+    })
+    .catch(function(e) {
+        feedback.textContent = 'Request failed';
+        feedback.style.color = '#9b0000';
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+    });
+}
+
+function toggleLogPanel() {
+    var panel = document.getElementById('log-panel');
+    if (!panel) return;
+    panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+}
+
+function saveLogEntry(entryId) {
+    var title = (document.getElementById('log-title-edit') || {}).value || '';
+    var desc  = (document.getElementById('log-desc-edit')  || {}).value || '';
+    var statusEl = document.getElementById('log-save-status');
+    if (statusEl) statusEl.textContent = 'Saving…';
+
+    fetch('/ai/update_log_entry', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'entry_id=' + encodeURIComponent(entryId)
+            + '&title='    + encodeURIComponent(title)
+            + '&description=' + encodeURIComponent(desc)
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (statusEl) {
+            statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
+            statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000';
+        }
+    })
+    .catch(function(e) {
+        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
+    });
+}
 </script>

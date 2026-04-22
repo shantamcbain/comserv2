@@ -22,7 +22,7 @@ __PACKAGE__->add_columns(
     },
     service => {
         data_type => 'enum',
-        extra => { list => ['grok', 'openai', 'claude', 'gemini', 'anthropic', 'cohere'] },
+        extra => { list => ['grok', 'ollama', 'brave', 'searxng', 'openai', 'claude', 'gemini', 'anthropic', 'cohere'] },
         is_nullable => 0,
     },
     api_key_encrypted => {

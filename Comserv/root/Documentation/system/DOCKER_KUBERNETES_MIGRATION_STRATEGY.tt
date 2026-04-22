@@ -18,7 +18,7 @@
     <h1 style="color: var(--text-color); font-family: var(--header-font);">Docker & Kubernetes Migration Strategy for Comserv</h1>
 
 <!-- Local navigation for quick access -->
-<nav id="nav-menu" style="margin: 10px 0; padding: 10px; background: var(--light-color); border: 1px solid var(--border-color);">
+<nav id="nav-menu" style="margin: 10px 0; padding: 10px; background: rgba(255,255,255,0.15); border: 1px solid var(--border-color);">
     <strong>On this page:</strong>
     <ul style="list-style: none; padding-left: 0; margin: 8px 0; column-count: 2; column-gap: 24px;">
         <li><a href="#database-setup"><strong>🔥 Database Setup & Container Startup</strong></a></li>
@@ -154,7 +154,7 @@ sudo docker volume rm comserv2_comserv-logs comserv2_workshop_files_nfs
 
     <h4 style="color: var(--text-color); font-family: var(--header-font);">Configuration Mismatch</h4>
     <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-        <tr style="background-color: var(--light-color);">
+        <tr style="background-color: rgba(255,255,255,0.15);">
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Component</strong></th>
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Configured For</strong></th>
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Actually Using</strong></th>
@@ -195,7 +195,7 @@ sudo docker volume rm comserv2_comserv-logs comserv2_workshop_files_nfs
 
     <h4 style="color: #d32f2f; font-family: var(--header-font);">Why Docker Still Can't Connect to Production MySQL</h4>
     <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-        <tr style="background-color: var(--light-color);">
+        <tr style="background-color: rgba(255,255,255,0.15);">
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Factor</strong></th>
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Details</strong></th>
         </tr>
@@ -248,7 +248,7 @@ docker compose -f docker-compose.prod.yml config
         
         <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 15px;"><strong>Attempted Solutions & Their Limits:</strong></p>
         <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Solution</th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Port Access</th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">External DB</th>
@@ -440,7 +440,7 @@ DB_PASS: ${DB_PASS_PROD:-UA=nPF8*m+T#}</pre>
 
         <h4 style="color: #ff6f00; font-family: var(--header-font); margin-top: 15px;">Critical Files to Review and Fix</h4>
         <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>File</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Issue</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Action</strong></th>
@@ -604,7 +604,7 @@ docker compose -f docker-compose.dev.yml logs | grep -i "dbi\|database\|connecti
 
     <h4 style="color: var(--text-color); font-family: var(--header-font);">Common Commands Reference</h4>
     <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-        <tr style="background-color: var(--light-color);">
+        <tr style="background-color: rgba(255,255,255,0.15);">
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Task</th>
             <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Command</th>
         </tr>
@@ -658,7 +658,7 @@ docker compose -f docker-compose.dev.yml logs | grep -i "dbi\|database\|connecti
         <h2 id="current-state" style="color: var(--text-color); font-family: var(--header-font);">Current State Analysis</h2>
 
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Existing Deployment Workflow</h3>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Developer Machines (Multiple)
 ↓ [git clone + local changes]GitHub Repository
     ↓ [git push from developer machine]
@@ -697,7 +697,7 @@ Live Application
         <h2 id="target-state" style="color: var(--text-color); font-family: var(--header-font);">Target State Vision</h2>
 
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">End Goal: Production-Ready Kubernetes</h3>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Developer Machines → Standardized Docker Dev Environment
 ↓GitHub Repository → Automated via CI/CD
     ↓
@@ -742,7 +742,7 @@ Live Application (Zero-Downtime Deployments)
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Current</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Reference only</td>
             </tr>
-            <tr style="background-color: var(--secondary-color);">
+            <tr style="background-color: rgba(255,255,255,0.12);">
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>0.5</strong></td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">CI/CD Readiness & DBI Security Fix</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">1-2 days</td>
@@ -754,7 +754,7 @@ Live Application (Zero-Downtime Deployments)
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Developer Workstations</td>
             </tr>
-            <tr style="background-color: var(--secondary-color);">
+            <tr style="background-color: rgba(255,255,255,0.12);">
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>2</strong></td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">All Components Containerized</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3-4 weeks</td>
@@ -766,7 +766,7 @@ Live Application (Zero-Downtime Deployments)
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GitHub + Registry</td>
             </tr>
-            <tr style="background-color: var(--secondary-color);">
+            <tr style="background-color: rgba(255,255,255,0.12);">
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>4</strong></td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Testing Environment Deployment</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
@@ -778,7 +778,7 @@ Live Application (Zero-Downtime Deployments)
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-3 weeks</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production Server</td>
             </tr>
-            <tr style="background-color: var(--secondary-color);">
+            <tr style="background-color: rgba(255,255,255,0.12);">
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>6</strong></td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Single-Node Kubernetes Setup</td>
                 <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">3-4 weeks</td>
@@ -802,19 +802,19 @@ Live Application (Zero-Downtime Deployments)
     <div class="col-100">
         <h2 id="decisions" style="color: var(--text-color); font-family: var(--header-font);">Key Decisions - TEAM CONSENSUS RECORDED</h2>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
             <h3 style="color: var(--success-color); font-family: var(--header-font);">Container Registry</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Decision</strong>: GitHub Container Registry (GHCR)</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Rationale</strong>: Already integrated with GitHub, free tier available, simplest implementation path</p>
         </div>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
             <h3 style="color: var(--success-color); font-family: var(--header-font);">CI/CD Platform</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Decision</strong>: GitHub Actions</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Rationale</strong>: Already using GitHub for source control, minimal setup, cost-effective</p>
         </div>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
             <h3 style="color: var(--success-color); font-family: var(--header-font);">Database Strategy & DBI Management</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Decision</strong>: Separate database server (not containerized) for performance and persistence. Use Kubernetes Secrets for DBI (database connection info) storage in production/staging. For local dev, use secure .env files with placeholders.</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Rationale</strong>: Secrets provide encryption at rest, RBAC access control, and integration with external managers. Avoids plaintext files like db_config.json in git or exposed envs.</p>
@@ -827,7 +827,7 @@ Live Application (Zero-Downtime Deployments)
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Backup Plan</strong>: Document current backups; adapt for Secrets rotation (e.g., kubectl create secret with new values).</p>
         </div>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
             <h3 style="color: var(--info-color); font-family: var(--header-font);">Developer/Git Workflow Notes</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Current Status</strong>: Single developer, no feature branches, all work to main branch</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Plan for Multiple Developers</strong>: Once additional developers join, will implement Git Flow with feature branches and pull request reviews</p>
@@ -916,7 +916,7 @@ docker logs comserv-web-dev      # Check if MySQL connection succeeds</pre>
                 </div>
 
                 <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Current Git Status</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>Staged for commit (9 files):   Comserv/root/Documentation/config/scan_state.json
    Comserv/root/Documentation/environment/*.tt (5 new files)
    Comserv/root/admin/documentation/manage_config.tt
@@ -937,7 +937,7 @@ Commits ahead of origin/main: 8
                 <h4 style="color: #d32f2f; font-family: var(--header-font);"> CRITICAL: DBI Credential Exposures</h4>
 
                 <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Issue</th>
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Location</th>
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Risk</th>
@@ -973,7 +973,7 @@ Commits ahead of origin/main: 8
                 <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Step-by-Step: Fix DBI Security & Safe Push</h3>
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">STEP 1: Create Kubernetes Secrets (One-time setup)</h4>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Create Secrets from existing db_config.json:</strong></p>
                     <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;"># Create K8s Secret from db_config.json
 kubectl create secret generic dbi-secrets --from-file=config=db_config.json -n default
@@ -989,7 +989,7 @@ kubectl create secret generic dbi-secrets \
 kubectl get secrets
 kubectl describe secret dbi-secrets</pre>
                     </div>                <h4 style="color: var(--text-color); font-family: var(--header-font);">STEP 2: Mount Secrets in Application (Kubernetes)</h4>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p style="color: var(--text-color); font-family: var(--body-font);">In Kubernetes deployment manifests, mount the dbi-secrets Secret as environment variables or volume:</p>
                     <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;"># Option 1: Mount as environment variables (recommended)
 apiVersion: apps/v1
@@ -1040,7 +1040,7 @@ close $fh;</pre>
                     </div>
 
                 <h4 style="color: #4caf50; font-family: var(--header-font); margin-top: var(--spacing-medium);"> Testing Docker-Entrypoint Fallback (Non-K8s Environments)</h4>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Test File Created</strong>: <code>t/docker-entrypoint_non_k8s.t</code></p>
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Validates docker-entrypoint.sh behavior when kubectl is unavailable (non-Kubernetes environment). Ensures db_config.json is preserved and used directly as fallback.</p>
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Test Coverage</strong>:</p>
@@ -1053,7 +1053,7 @@ close $fh;</pre>
                     </ul>
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Run Test</strong>: <code>perl -t t/docker-entrypoint_non_k8s.t</code></p>
                 </div>                <h4 style="color: var(--text-color); font-family: var(--header-font);">STEP 3: Configure Zerotier for Database Access (One-Time, 20 minutes)</h4>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Prerequisites</strong>: DB server must be reachable via Zerotier virtual IP (already configured per db_config.json references).</p>
                     <ol style="color: var(--text-color); font-family: var(--body-font);">
                         <li><strong>For new/off-site machines</strong>: Install Zerotier client
@@ -1109,7 +1109,7 @@ docker compose -f docker-compose.dev.yml logs | grep -i "dbi\|database"
                 </div>
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">STEP 5: Verify No Credentials in Git & Push (5 minutes)</h4>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Before committing, verify no credentials are exposed:</strong></p>
                     <pre style="background:#f7f7f7; padding:8px; white-space:pre-wrap; color: var(--text-color); font-family: monospace;"># Check for common credential patterns
 git diff --cached | grep -iE "(password|secret|api_key|db_pass)" || echo "✅ No credentials found"
@@ -1133,7 +1133,7 @@ git push origin main</pre>
                     </div>                <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Configure GitHub Secrets for DBI</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font); background-color: #e3f2fd; padding: var(--spacing-medium); border-left: 4px solid #1976d2;"><strong>Note</strong>: Add DBI-related secrets post-push.</p>
                 <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Secret Name</th>
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Value</th>
                         <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Used By</th>
@@ -1194,7 +1194,7 @@ git push origin main</pre>
         </ul>
         
         <h4 style="color: var(--text-color); font-family: var(--header-font); margin-top: 15px;">Step 1: Clone Repository</h4>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>git clone https://github.com/your-org/comserv.git
 cd comserv
 cp .env.example .env
@@ -1203,7 +1203,7 @@ nano .env</code></pre>
         </div>
         
         <h4 style="color: var(--text-color); font-family: var(--header-font); margin-top: 15px;">Step 2: Build and Start Docker Containers</h4>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>docker compose build
 docker compose up -d web-dev
 docker compose logs web-dev  # Check startup logs</code></pre>
@@ -1219,7 +1219,7 @@ docker compose logs web-dev  # Check startup logs</code></pre>
         </ul>
         
         <h4 style="color: var(--text-color); font-family: var(--header-font); margin-top: 15px;">Step 4: Test Your Setup</h4>
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>curl http://localhost:3000  # Should return HTML
 docker compose exec web-dev perl -v  # Check Perl installation</code></pre>
         </div>
@@ -1280,7 +1280,7 @@ docker compose exec web-dev perl -v  # Check Perl installation</code></pre>
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Key Success Metrics</h3>
         
         <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Metric</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Current</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Target (Phase 7)</strong></th>
@@ -1336,7 +1336,7 @@ docker compose exec web-dev perl -v  # Check Perl installation</code></pre>
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Quick Reference: When to Rebuild</h3>
         
         <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Modification Type</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Action Required</strong></th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Restart Required</strong></th>
@@ -1372,7 +1372,7 @@ docker compose exec web-dev perl -v  # Check Perl installation</code></pre>
         
         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Use Case</strong>: You modified Perl code or template files. These are typically mounted as volumes in docker-compose.yml.</p>
         
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Step 1: Verify your changes are saved
 git status
 
@@ -1397,7 +1397,7 @@ docker compose up -d web-dev</pre>
         
         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Use Case</strong>: You updated the Dockerfile to install new Perl modules, change the base image, or modify build steps.</p>
         
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Step 1: Review Dockerfile changes
 git diff Dockerfile
 
@@ -1428,7 +1428,7 @@ curl http://localhost:3000</code></pre>
         
         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Use Case</strong>: You changed environment variables, port mappings, volume mounts, or service definitions in docker-compose.yml.</p>
         
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Step 1: Review compose changes
 git diff docker-compose.yml
 
@@ -1464,7 +1464,7 @@ docker compose logs web-dev</code></pre>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ WARNING</strong>: This removes all containers and images. Make sure you don't have unsaved data in volumes.</p>
         </div>
         
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
             <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Step 1: Backup any important data
 docker compose logs web-dev > backup_logs.txt
 
@@ -1564,7 +1564,7 @@ docker compose exec web-dev env | grep COMSERV</code></pre>
             <li><strong>Proceed to Phase 1</strong>: Docker local dev with Secrets import.</li>
         </ol>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
             <h3 style="color: var(--info-color); font-family: var(--header-font);">Recommendation</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">With DBI security fixed and Zerotier in place, Phase 1 will enable secure local Docker runs without credential risks.</p>
         </div>
@@ -1582,7 +1582,7 @@ docker compose exec web-dev env | grep COMSERV</code></pre>
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Issue Matrix</h3>
 
         <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-medium) 0;">
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Issue #</th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Title</th>
                 <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Severity</th>
@@ -1760,7 +1760,7 @@ Priority 3: $FindBin::Bin/../db_config.json (local development)</pre>
 
         <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Remediation Roadmap</h3>
 
-        <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-medium) 0;">
+        <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-medium) 0;">
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Phase 0.5 (Immediate - Next 3 days)</strong>:</p>
             <ol style="color: var(--text-color); font-family: var(--body-font);">
                 <li>Fix ISSUE 2 & 3: Remove hardcoded credentials from files, use placeholders or .env</li>
@@ -1928,7 +1928,7 @@ Priority 3: $FindBin::Bin/../db_config.json (local development)</pre>
             
             <h4 style="color: #d32f2f; font-family: var(--header-font);">Files Involved in the Gap</h4>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>File</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Responsibility</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Current Status</strong></th>
@@ -1988,7 +1988,7 @@ Priority 3: $FindBin::Bin/../db_config.json (local development)</pre>
 
 <div class="row">
     <div class="col-100">
-        <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+        <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
             <h2 style="color: var(--success-color); font-family: var(--header-font);">Document Status</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status</strong>: Phase 0.5 In Progress (DBI Security Fix)</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Review Status</strong>: Updated for K8s Secrets + Zerotier.</p>

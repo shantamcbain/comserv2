@@ -33,13 +33,18 @@
         activeModel: null,
         isGuest: true,
         isAdmin: false,
+        isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
             small:  null,   // fastest/smallest Ollama model
             medium: null,   // mid-size Ollama model
             large:  null,   // largest Ollama model
             grok:   null    // Grok model (premium users)
-        }
+        },
+        supportMode: false,         // true when user is in live support chat mode
+        supportConvId: null,        // conversation_id for current support chat
+        supportLastMsgId: 0,        // last message id seen in support chat
+        supportPollTimer: null      // setInterval handle for support chat polling
     };
     
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
@@ -188,6 +193,165 @@
             });
     }
     
+    // Populate the agent picker dropdown from agentsConfig, respecting local_only + isDevMode
+    function populateAgentPicker() {
+        var sel = document.getElementById('ai-agent-select');
+        if (!sel || !state.agentsConfig || !state.agentsConfig.agents) return;
+        var agents = state.agentsConfig.agents;
+        // Keep the Auto option, then add one per eligible agent
+        sel.innerHTML = '<option value="auto">⚡ Auto</option>';
+        Object.entries(agents).forEach(function([key, agent]) {
+            if (agent.local_only  && !state.isDevMode) return;
+            if (agent.admin_only  && !state.isAdmin)   return;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
+            sel.appendChild(opt);
+        });
+        // Restore previously saved agent selection
+        var saved = localStorage.getItem('ai_widget_agent');
+        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+            sel.value = saved;
+            if (saved !== 'auto') _applyAgentOverride(saved);
+        }
+        sel.addEventListener('change', function() {
+            var chosen = sel.value;
+            localStorage.setItem('ai_widget_agent', chosen);
+            if (chosen === 'auto') {
+                state.agentOverride = null;
+                state.pageContext = detectPageContext();
+                _updateAgentBanner('auto');
+            } else {
+                _applyAgentOverride(chosen);
+            }
+        });
+        sel.dataset.populated = '1';
+    }
+
+    function _applyAgentOverride(agentKey) {
+        if (!state.agentsConfig || !state.agentsConfig.agents) return;
+        var agent = state.agentsConfig.agents[agentKey];
+        if (!agent) return;
+        state.agentOverride = agentKey;
+        var ctx = detectPageContext() || {};
+        ctx.agent_id   = agent.id;
+        ctx.agent_name = agent.display_name;
+        if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
+        state.pageContext = ctx;
+        _updateAgentBanner(agentKey);
+    }
+
+    function _updateAgentBanner(agentKey) {
+        var banner = document.getElementById('chat-agent-banner');
+        if (!banner) return;
+        if (agentKey === 'template_editor') {
+            banner.innerHTML = '✏️ <strong>Template Editor</strong> — Use the dedicated form to load, edit, and apply template changes: ' +
+                '<a href="/ai/template_editor" target="_blank" style="color:#1a73e8;font-weight:bold;">Open Template Editor →</a>';
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    // ── _collectPageErrors ────────────────────────────────────────────────────
+    // Scans the current page DOM for visible error messages and returns a
+    // formatted string to prepend to coding-agent prompts.
+    function _collectPageErrors() {
+        var errors = [];
+        var seen = {};
+
+        var selectors = [
+            '.error-message', '.alert-danger', '.alert-error',
+            '#error-message', '.flash-error', '.catalyst-error',
+            '.exception-title', '.exception-message',
+            '[class*="error"]', '[id*="error"]'
+        ];
+
+        selectors.forEach(function(sel) {
+            try {
+                document.querySelectorAll(sel).forEach(function(el) {
+                    var txt = (el.innerText || '').trim();
+                    if (txt && txt.length > 5 && txt.length < 2000 && !seen[txt]) {
+                        seen[txt] = 1;
+                        errors.push(txt);
+                    }
+                });
+            } catch(e) {}
+        });
+
+        // Also check page title for Catalyst error pages
+        if (document.title && /error|exception|500|404/i.test(document.title)) {
+            var bodySnippet = (document.body && document.body.innerText || '').substring(0, 800).trim();
+            if (bodySnippet && !seen[bodySnippet.substring(0, 50)]) {
+                errors.push('Page title: ' + document.title + '\n' + bodySnippet);
+            }
+        }
+
+        if (!errors.length) return '';
+
+        return '[PAGE ERROR DETECTED]\n' + errors.slice(0, 3).join('\n---\n') + '\n[/PAGE ERROR]';
+    }
+
+    // ── _getTemplatePathForPage ────────────────────────────────────────────────
+    // Maps the current page URL to its TT2 template file path (relative to project root).
+    function _getTemplatePathForPage(pathname) {
+        var map = {
+            '/':              'root/CSC/CSC.tt',
+            '/CSC':           'root/CSC/CSC.tt',
+            '/hosting':       'root/CSC/proxy_manager.tt',
+            '/BMaster':       'root/BMaster/index.tt',
+            '/ENCY':          'root/ENCY/index.tt',
+            '/workshop':      'root/Workshops/index.tt',
+            '/HelpDesk':      'root/HelpDesk/index.tt',
+            '/membership':    'root/membership/index.tt',
+            '/marketplace':   'root/marketplace/index.tt',
+            '/shop':          'root/shop/index.tt',
+            '/Documentation': 'root/Documentation/index.tt',
+            '/ai':            'root/ai/index.tt',
+            '/admin':         'root/admin/index.tt',
+        };
+        var clean = pathname.replace(/\/$/, '') || '/';
+        if (map[clean]) return map[clean];
+        for (var key in map) {
+            if (clean.startsWith(key + '/')) return map[key];
+        }
+        var parts = clean.replace(/^\//, '').split('/');
+        if (parts.length >= 2) {
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/' + parts[1].toLowerCase() + '.tt';
+        } else if (parts[0]) {
+            // Convention: site homepages use {Ctrl}/{Ctrl}.tt (e.g. Shanta/Shanta.tt, CSC/CSC.tt)
+            // Fall back to {Ctrl}/index.tt when the controller-name variant is not in the static map
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/' + ctrl + '.tt';
+        }
+        return null;
+    }
+
+    // ── _handleReadFileRequest ─────────────────────────────────────────────────
+    // Called when the AI response contains [READ_FILE: path] tokens.
+    // Fetches the file content and sends it back as a follow-up context message.
+    function _handleReadFileRequest(path) {
+        var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var ctx = '[FILE: ' + data.path + ' (lines ' + (data.offset + 1)
+                            + '-' + (data.offset + data.lines) + ' of ' + data.total + ')]\n'
+                            + '```\n' + data.content + '\n```\n[/FILE]';
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) {
+                        msgInput.value = ctx + '\n\n(File loaded. Please continue your analysis.)';
+                    }
+                } else {
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) msgInput.value = '[Could not read file: ' + data.error + ']';
+                }
+            })
+            .catch(function(e) { console.error('read_file error', e); });
+    }
+
     // Match page URL against agent patterns and select appropriate agent
     function selectAgentForPage() {
         const pathname = window.location.pathname;
@@ -202,6 +366,7 @@
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.local_only && !state.isDevMode) continue;
             
             // Check if any URL pattern matches the current pathname (case-insensitive)
             const pathLower = pathname.toLowerCase();
@@ -442,7 +607,11 @@
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
         providerSelector.innerHTML =
-            '<label for="ai-provider">AI Model:</label>' +
+            '<label for="ai-agent-select" style="font-size:0.82em;color:#555;">Agent:</label>' +
+            '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="auto">⚡ Auto</option>' +
+            '</select>' +
+            '<label for="ai-provider">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -450,6 +619,12 @@
               '</label>' +
             '</span>' +
             '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
+
+        // Agent-specific banner (shown when a special agent needs a dedicated page)
+        const agentBanner = document.createElement('div');
+        agentBanner.id = 'chat-agent-banner';
+        agentBanner.style.cssText = 'display:none;padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;' +
+            'border-bottom:1px solid #f0c000;font-size:0.82em;color:#555;';
 
         // Status indicator
         const statusIndicator = document.createElement('div');
@@ -461,8 +636,13 @@
         const chatInput = document.createElement('div');
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
-            '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
-            '<button id="send-message">Send</button>';
+            '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
+            '<div style="display:flex;gap:3px;align-items:stretch;">' +
+            '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
+            '<div style="display:flex;flex-direction:column;gap:3px;">' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<button id="send-message" style="flex:1;">Send</button>' +
+            '</div></div>';
 
         // Resize handle (bottom-right corner)
         const resizeHandle = document.createElement('div');
@@ -475,6 +655,7 @@
         chatPanel.appendChild(historyDrawer);
         chatPanel.appendChild(chatMessages);
         chatPanel.appendChild(providerSelector);
+        chatPanel.appendChild(agentBanner);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
         chatPanel.appendChild(resizeHandle);
@@ -484,9 +665,10 @@
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
-                    if (data.username)  state.username = data.username;
-                    if (data.is_admin)  state.isAdmin  = !!data.is_admin;
-                    if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+                    if (data.username)  state.username   = data.username;
+                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
+                    if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+                    if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
@@ -503,9 +685,10 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                    { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
+                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
+                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
+                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -577,6 +760,19 @@
                 _firePreload();
                 // Re-fire every 110 minutes to keep model warm (keep_alive is 2h)
                 state._preloadTimer = setInterval(_firePreload, 110 * 60 * 1000);
+
+                // Populate agent picker now that is_dev is known
+                if (state.agentsConfig) {
+                    populateAgentPicker();
+                } else {
+                    loadAgentsConfig().then(function() { populateAgentPicker(); });
+                }
+
+                // Show/hide image attach based on admin role
+                var attachBtn = document.getElementById('attach-image-btn');
+                if (attachBtn) {
+                    attachBtn.style.display = state.isAdmin ? '' : 'none';
+                }
             })
             .catch(function() {});
 
@@ -695,6 +891,33 @@
             document.getElementById('widget-history-drawer').style.display = 'none';
         });
 
+        // ── Image attachment helpers ──────────────────────────────────────────
+        function _setPendingImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const dataUrl = ev.target.result;
+                const mime = file.type || 'image/jpeg';
+                const b64  = dataUrl.split(',')[1];
+                state.pendingImage = { data: b64, mime: mime, dataUrl: dataUrl };
+                const prev = document.getElementById('chat-img-preview');
+                if (prev) {
+                    prev.style.display = 'block';
+                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
+                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
+                        ' <small style="color:#666;">' + (file.name || 'image') + '</small>';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        window._clearPendingImage = function() {
+            state.pendingImage = null;
+            const prev = document.getElementById('chat-img-preview');
+            if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+            const fi = document.getElementById('image-file-input');
+            if (fi) fi.value = '';
+        };
+        window._handleReadFileRequest = _handleReadFileRequest;
+
         // ── Other events ──────────────────────────────────────────────────────
         chatButton.addEventListener('click', function() { openChat(); });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
@@ -703,6 +926,22 @@
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+        });
+        document.getElementById('message-input').addEventListener('paste', function(e) {
+            if (!state.isAdmin) return;
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    _setPendingImage(items[i].getAsFile());
+                    break;
+                }
+            }
+        });
+        document.getElementById('image-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _setPendingImage(e.target.files[0]);
+            }
         });
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
@@ -923,9 +1162,10 @@
         .then(data => {
             if (!data.success) return;
 
-            if (data.username)              state.username = data.username;
-            if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
-            if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+            if (data.username)              state.username   = data.username;
+            if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
+            if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+            if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
             // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
@@ -1118,6 +1358,82 @@
         labelEl.title = 'Assisting page: ' + pagePath;
     }
 
+    // ── Form Fill Button ─────────────────────────────────────────────────────
+    // When the page has fillable form fields, adds a "🪄 Fill Form" button
+    // next to the Send button. User types description in the normal message
+    // input, then clicks Fill Form — AI fills the form fields directly.
+    function injectFormFillStrip() {
+        if (document.getElementById('lc-ff-btn')) return;
+        if (typeof window._getPageFormFields !== 'function') return;
+        const fields = window._getPageFormFields();
+        if (!fields || fields.length === 0) return;
+
+        const sendBtn = document.getElementById('send-message');
+        if (!sendBtn) return;
+
+        // Build field description for the AI system prompt
+        const fieldDesc = fields.map(function(f) {
+            if (f.type === 'radio' && f.options) return f.name + ' (one of: ' + f.options.join(', ') + ')';
+            if (f.tagName === 'select') return f.name + ' (' + (f.label || 'select') + ')';
+            return f.name + (f.label && f.label !== f.name ? ' (' + f.label + ')' : '');
+        }).join(', ');
+
+        const ffBtn = document.createElement('button');
+        ffBtn.id = 'lc-ff-btn';
+        ffBtn.textContent = '🪄 Fill Form';
+        ffBtn.title = 'Describe what to fill in the message box, then click here to fill the form with AI';
+        ffBtn.style.cssText = 'padding:4px 8px;background:#f0c000;color:#333;border:none;border-radius:4px;' +
+            'cursor:pointer;font-size:.8em;font-weight:bold;white-space:nowrap;flex-shrink:0;';
+
+        // Insert after Send button
+        sendBtn.parentNode.insertBefore(ffBtn, sendBtn.nextSibling);
+
+        ffBtn.addEventListener('click', function() {
+            const msgInput = document.getElementById('message-input');
+            const desc = (msgInput ? msgInput.value : '').trim();
+            if (!desc) {
+                alert('Type a description of what to fill in the message box first, then click Fill Form.');
+                if (msgInput) msgInput.focus();
+                return;
+            }
+            ffBtn.disabled = true; ffBtn.textContent = '⏳';
+
+            const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
+                'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
+
+            const selProvider = document.getElementById('ai-provider');
+            const provider = (selProvider && selProvider.value) || 'ollama';
+
+            fetch('/ai/generate', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form';
+                if (!data.success) { alert('AI error: ' + (data.error || 'unknown')); return; }
+                const raw = (data.response || '').trim();
+                const js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { alert('AI returned no JSON. Try rephrasing your description.'); return; }
+                let parsed;
+                try { parsed = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { alert('JSON parse error: ' + e.message + '\n\nAI said:\n' + raw.substring(0, 300)); return; }
+                let filled = 0;
+                Object.keys(parsed).forEach(function(k) {
+                    if (window._applyFieldValue && window._applyFieldValue(k, parsed[k])) filled++;
+                });
+                // Show brief success in status bar
+                const si = document.getElementById('chat-status');
+                if (si) { si.textContent = '✅ Filled ' + filled + ' form field(s) — review and save.'; }
+                // Clear message input
+                if (msgInput) msgInput.value = '';
+            })
+            .catch(function(e) { ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form'; alert('Request failed: ' + e); });
+        });
+    }
+
     // Open chat panel
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
@@ -1162,6 +1478,8 @@
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
 
+        // Inject form-fill strip if the page has fillable form fields
+        injectFormFillStrip();
     }
     
     // Reset conversation - clear session and UI
@@ -1210,7 +1528,7 @@
     }
     
     // Function to query AI and get response
-    function queryAI(prompt) {
+    function queryAI(prompt, imageData) {
         const _siQ = document.getElementById('chat-status');
         const statusIndicator = _siQ || { textContent: '', className: '' };
         statusIndicator.textContent = 'AI is thinking...';
@@ -1249,20 +1567,52 @@
                 });
 
             docPromise.then(function() {
-                sendAIRequest(prompt, statusIndicator, loadingMessage);
+                var effectivePrompt = prompt;
+
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var pageErrors = _collectPageErrors();
+                    if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
+                        effectivePrompt = pageErrors + '\n\n' + prompt;
+                    }
+                }
+
+                if (state.pageContext && state.pageContext.agent_id === 'template_editor'
+                        && !prompt.includes('[FILE:')) {
+                    var tplPath = _getTemplatePathForPage(window.location.pathname);
+                    if (tplPath) {
+                        fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
+                              { credentials: 'include' })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.success) {
+                                    var fileBlock = '[FILE: ' + data.path + ']\n```\n'
+                                                  + data.content + '\n```\n[/FILE]\n\n';
+                                    sendAIRequest(fileBlock + effectivePrompt,
+                                                  statusIndicator, loadingMessage, imageData);
+                                } else {
+                                    sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                                }
+                            })
+                            .catch(function() {
+                                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                            });
+                        return;
+                    }
+                }
+
+                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
-            // Fallback: still send request with default context
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+            sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
         });
     }
     
     // Helper function to send AI request after context is ready
-    function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+    function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -1307,6 +1657,12 @@
             agent_name: state.pageContext.agent_name,
             page_content: extractPageContent()
         };
+
+        // Include image data if present (for Grok vision models)
+        if (imageData && imageData.data) {
+            requestPayload.image_data = imageData.data;
+            requestPayload.image_mime = imageData.mime || 'image/jpeg';
+        }
         
         // Include selected model for Grok
         if (modelName) {
@@ -1658,11 +2014,25 @@
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
 
-                // Add AI response — strip any embedded [ACTION: ...] blocks before display
-                const { cleanText, actions } = extractActions(data.response || '');
+                // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
+                const { cleanText: _rawClean, actions } = extractActions(data.response || '');
+                const _needsSupport = _detectSupportNeeded(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean);
                 addMessage(cleanText, 'ai-message');
 
+                if (_needsSupport && !state.supportMode) {
+                    _showEscalationButtons();
+                }
+
                 persistMessages();
+
+                // Coding agent: intercept [READ_FILE: path] requests automatically
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
+                    if (rfMatch) {
+                        _handleReadFileRequest(rfMatch[1].trim());
+                    }
+                }
 
                 // Execute any in-app actions the AI embedded
                 if (actions.length > 0) {
@@ -1924,7 +2294,7 @@
         { label: 'todo list',                  url: '/todo' },
         { label: 'todos',                      url: '/todo' },
         { label: 'projects',                   url: '/project' },
-        { label: 'daily plan',                 url: '/Documentation/DailyPlan' },
+        { label: 'daily plan',                 url: '/planning/daily' },
         { label: 'documentation',              url: '/Documentation' },
         { label: 'encyclopedia',               url: '/ENCY' },
         { label: 'ency',                       url: '/ENCY' },
@@ -2070,11 +2440,181 @@
         return true;
     }
 
+    // ── Support Chat ──────────────────────────────────────────────────────────
+
+    function _showEscalationButtons(afterEl) {
+        var strip = document.createElement('div');
+        strip.className = 'support-escalation-strip';
+        strip.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:6px 10px 4px;border-top:1px solid #e0e0e0;margin-top:4px;';
+        strip.innerHTML =
+            '<span style="font-size:.82em;color:#666;align-self:center;">Need more help?</span>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.ticket();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#eee;border:1px solid #ccc;border-radius:4px;cursor:pointer;">📋 Create Ticket</button>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.startChat();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;">💬 Chat with Support</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(strip); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _detectSupportNeeded(text) {
+        if (/\[SUPPORT_NEEDED\]/i.test(text)) return true;
+        var phrases = [
+            /i\s+(don'?t|do not|cannot|can'?t)\s+(have|access|provide|help|answer|assist)/i,
+            /outside\s+(my|the AI'?s?)\s+(capabilities|knowledge|scope|ability)/i,
+            /please\s+contact\s+support/i,
+            /you\s+('?ll?\s+)?need\s+to\s+contact/i,
+            /i\s+am\s+unable\s+to\s+assist/i,
+        ];
+        return phrases.some(function(re) { return re.test(text); });
+    }
+
+    function _stripSupportTag(text) {
+        return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
+    }
+
+    function _enterSupportMode(convId, lastMsgId) {
+        state.supportMode   = true;
+        state.supportConvId = convId;
+        state.supportLastMsgId = lastMsgId || 0;
+        var header = document.getElementById('chat-header');
+        if (header) {
+            header.style.background = '#1a6bb5';
+            header.textContent = '💬 Support Chat (live)';
+        }
+        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message to support…';
+        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        _startSupportPolling();
+    }
+
+    function _exitSupportMode() {
+        if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        state.supportMode   = false;
+        state.supportConvId = null;
+        state.supportLastMsgId = 0;
+        var header = document.getElementById('chat-header');
+        if (header) { header.style.background = ''; header.textContent = state.currentAgent ? (state.currentAgent.display_name || 'AI Assistant') : 'AI Assistant'; }
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message…';
+    }
+
+    function _addSupportSystemMsg(text) {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
+        el.textContent = text;
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _startSupportPolling() {
+        if (state.supportPollTimer) clearInterval(state.supportPollTimer);
+        state.supportPollTimer = setInterval(function() {
+            if (!state.supportMode || !state.supportConvId) { clearInterval(state.supportPollTimer); return; }
+            fetch('/chat/get_messages?conversation_id=' + state.supportConvId + '&last_id=' + state.supportLastMsgId, {
+                credentials: 'include'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success || !d.messages) return;
+                d.messages.forEach(function(msg) {
+                    if (msg.id > state.supportLastMsgId) {
+                        state.supportLastMsgId = msg.id;
+                        if (msg.role === 'assistant') {
+                            addMessage(msg.content, 'ai-message');
+                        }
+                    }
+                });
+            })
+            .catch(function() {});
+        }, 5000);
+    }
+
+    function _initSupportChat(contextMsg) {
+        _addSupportSystemMsg('⏳ Connecting to support…');
+        var body = new URLSearchParams({
+            message: contextMsg || 'User requested live support',
+            agent_type: 'support',
+            title: 'Support Chat - ' + (document.title || window.location.pathname)
+        });
+        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success && d.conversation_id) {
+                state.supportLastMsgId = d.message_id || 0;
+                _enterSupportMode(d.conversation_id, d.message_id);
+            } else {
+                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+            }
+        })
+        .catch(function() {
+            _addSupportSystemMsg('❌ Network error. Please try again.');
+        });
+    }
+
+    function _createTicketFromSupport() {
+        var lastAiMsg = '';
+        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
+        var body = new URLSearchParams({
+            action: 'create_helpdesk_ticket',
+            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
+            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
+            category: 'General',
+            priority: 'normal'
+        });
+        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var url = d.ticket_url || '/HelpDesk';
+                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
+            } else {
+                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
+            }
+        })
+        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+    }
+
+    window.__aiChatSupportFns = {
+        ticket:    _createTicketFromSupport,
+        startChat: function() {
+            var lastUserMsg = '';
+            document.querySelectorAll('#chat-messages .user-message').forEach(function(el) { lastUserMsg = el.textContent; });
+            _initSupportChat(lastUserMsg.slice(-200) || 'User requested live support');
+        },
+        exit:      _exitSupportMode
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
-        if (!message) return;
+        if (!message && !state.pendingImage) return;
+
+        // Support chat mode: route message to Chat controller, not AI
+        if (state.supportMode && state.supportConvId) {
+            messageInput.value = '';
+            addMessage(message, 'user-message');
+            var _spBody = new URLSearchParams({
+                message: message,
+                conversation_id: state.supportConvId,
+                agent_type: 'support'
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: _spBody })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.message_id > state.supportLastMsgId) {
+                    state.supportLastMsgId = d.message_id;
+                }
+            })
+            .catch(function() {});
+            return;
+        }
 
         // Ensure page context is ready so navigation map is populated
         if (!state.pageContext) {
@@ -2088,9 +2628,56 @@
             return;
         }
 
-        // Client-side navigation interception — no AI round-trip needed
+        // Early keyword interceptor: daily log actions bypass all AI routing
+        {
+            const _lcMsg = message.toLowerCase().trim().replace(/[!.]+$/, '').replace(/\s+/g, ' ');
+            const _isMorning = /^(good morning|start day|begin day|start of day)$/.test(_lcMsg);
+            const _isNight   = /^(good night|end day|finish day|end of day)$/.test(_lcMsg);
+            if (_isMorning || _isNight) {
+                const _action = _isMorning ? 'start' : 'end';
+                messageInput.value = '';
+                addMessage(message, 'user-message');
+                const _chatMsgs = document.getElementById('chat-messages');
+                const _loadEl = document.createElement('div');
+                _loadEl.className = 'message ai-message';
+                _loadEl.textContent = '⏳ ' + (_isMorning ? 'Starting your day…' : 'Closing your day…');
+                if (_chatMsgs) { _chatMsgs.appendChild(_loadEl); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                fetch('/ai/daily_log', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=' + encodeURIComponent(_action)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    var resp = d.response || d.error || (_isMorning ? 'Day started.' : 'Day closed.');
+                    addMessage(resp, 'ai-message');
+                    if (d.success && window.location.pathname.includes('/planning/daily')) {
+                        setTimeout(function() { window.location.reload(); }, 800);
+                    }
+                })
+                .catch(function(e) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    addMessage('❌ Request failed: ' + e, 'ai-message');
+                });
+                return;
+            }
+        }
+
+        // Template editor agent: open the dedicated form page with the file + request pre-loaded
+        if (state.pageContext && state.pageContext.agent_id === 'template_editor' && message) {
+            var tplPath = _getTemplatePathForPage(window.location.pathname);
+            var params = new URLSearchParams();
+            if (tplPath) params.set('file', tplPath);
+            params.set('request', message);
+            messageInput.value = '';
+            window.open('/ai/template_editor?' + params.toString(), '_blank');
+            return;
+        }
+
+        // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message.match(NAV_RE);
+        const navMatch = message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -2103,8 +2690,8 @@
         // 2. Bare page-name navigation (voice-control ready): short message (≤5 words)
         //    that resolves to EXACTLY ONE navigation entry with high confidence.
         //    Prevents accidental interception of regular questions.
-        const wordCount = message.trim().split(/\s+/).length;
-        if (wordCount <= 5) {
+        const wordCount = message ? message.trim().split(/\s+/).length : 0;
+        if (message && wordCount <= 5) {
             const bareMatches = resolveNavIntent(message);
             if (bareMatches && bareMatches.length === 1) {
                 // Only auto-navigate on an exact or strong label match — not a loose partial
@@ -2117,10 +2704,22 @@
             }
         }
 
-        addMessage(message, 'user-message');
+        // Build display message (text + optional thumbnail)
+        let displayHtml = message ? _escapeHtml(message) : '';
+        if (state.pendingImage) {
+            displayHtml += (displayHtml ? '<br>' : '') +
+                '<img src="' + state.pendingImage.dataUrl + '" style="max-height:120px;max-width:160px;border-radius:4px;margin-top:4px;display:block;">';
+        }
+        addMessage(displayHtml, 'user-message', true);
         messageInput.value = '';
+        const imgForRequest = state.pendingImage || null;
+        window._clearPendingImage();
         persistMessages();
-        queryAI(message);
+        queryAI(message || '(image attached)', imgForRequest);
+    }
+
+    function _escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
     
     // Function to add a message to the chat with sender label
@@ -2359,7 +2958,7 @@
         });
     }
 
-    function addMessage(text, className) {
+    function addMessage(text, className, isHtml) {
         const chatMessages = document.getElementById('chat-messages');
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
@@ -2378,7 +2977,9 @@
 
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
-        if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
+        if (isHtml) {
+            messageElement.innerHTML = text;
+        } else if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
             messageElement.innerHTML = AIUtils.formatMessageContent(text);
         } else {
             messageElement.textContent = text;

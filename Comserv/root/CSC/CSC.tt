@@ -20,29 +20,20 @@
 <tr>
 	<td>
  
-<p>Here at computersystemconsulting.ca we develop, host and support Web based applications for your distributed organization.
+<p>Here at computersystemconsulting.ca we develop, host and support Web based applications for your distributed organization.</p>
 
-<p>We are in the need of Perl programmers and graphic designers. Be sure to check the jobs link in the top links.
-<p> Services provided: Click The product link in the main links group.
+<p>We are looking for Perl programmers and graphic designers. Post or browse opportunities on our <a href='/marketplace?type=job'>Marketplace &rarr; Jobs &amp; Gigs</a>.</p>
+
+<h2>Services</h2>
 <ul>
-<li><a href='/hosting'>Website hosting</a></li>
-<li> <a href='http://www.computersystemconsulting.ca/domains'>Register your domain with us.</a></li>
-<li> Check out our <a href='http://demo.computersystemconsulting.ca' target='_blank'>Demo</a> </li>
-<li> <a href='/CSC/email_test'><strong>Email Test Form</strong></a> - Test the email functionality</li>
-<li><a href='/workshop'>Workshops</a></li>
-<li>
-<h1>Join our VOIP services</h1>
-<p> <a href='/voip'>Learn more</a>
-<li>We now offer over 1000 new communities to our phone options. Get one from your target community.</li>
-</li>
+  <li><a href='/shop'>Online Store</a> &mdash; Website &amp; Cloud Hosting plans (Starter, Business, Pro, Enterprise) available for direct order. <a href='/hosting_signup'>Apply now</a>.</li>
+  <li><a href='/marketplace'>Marketplace</a> &mdash; Buy, sell or post services. Members can pay with <strong>points</strong>.</li>
+  <li><a href='/workshop'>Workshops</a></li>
+  <li><strong>Domain names</strong> &mdash; Available as an add-on for members with an associated domain. <a href='/membership'>Join as a member</a> to get started.</li>
 </ul>
-<h2>Crypto currency</h2>
-<p>BitCoin and other coins are in the news a lot lately. The air is filled with. Wallets. Exchanges. <a href='https://computersystemconsulting.ca/MigratingToCrypto' target='_blank'>Join us in that adventure.</a> of fingerling it out.</p>
-<strong>
-New</strong>Pay for your services with us. Two BitCoin exchanges
-</p>
-<h2> <a href='/vpn' target='_blank' name='Our VPN Services'>vpn </a></h2>
-<p>We now offer several choices of Virtual Private Network option. Click the VPN link on the left for more information.</p>
+
+<h2>Payments</h2>
+<p>Pay for services with PayPal. Members may also use <strong>CSC Points</strong> &mdash; earn points by contributing and redeem them for services or marketplace items.</p>
 
 
 
@@ -51,3 +42,4 @@ New</strong>Pay for your services with us. Two BitCoin exchanges
 </td></tr>
 </table>
 [% END %]
+

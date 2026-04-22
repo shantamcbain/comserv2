@@ -15,6 +15,7 @@ use strict;
 use warnings;
 use namespace::autoclean;
 use File::Copy;
+use Scalar::Util qw(blessed);
 use FindBin;
 use File::Path qw(make_path);
 use File::Spec;
@@ -378,7 +379,7 @@ sub log_with_details {
     my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s%s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message, $_req_suffix);
 
     # Add to debug_errors in stash only when debug_mode is active
-    if ($c && ref($c) && ref($c->stash) eq 'HASH'
+    if ($c && blessed($c) && ref($c->stash) eq 'HASH'
         && $c->can('session') && $c->session
         && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
@@ -393,7 +394,7 @@ sub log_with_details {
     # DEBUG/INFO messages go to file log only.
     my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
     my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
-    if ($c && ref($c) && $c->can('model') && $level_prio >= $db_min_prio) {
+    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");
@@ -457,7 +458,7 @@ sub log_error {
     log_to_file($log_message, undef, 'ERROR');
 
     # Add to debug_errors in stash only when debug_mode is active
-    if ($c && ref($c) && ref($c->stash) eq 'HASH'
+    if ($c && blessed($c) && ref($c->stash) eq 'HASH'
         && $c->can('session') && $c->session
         && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
@@ -501,7 +502,7 @@ sub send_error_notification {
     my $site_admin_email;
     my $sitename = 'CSC';
 
-    if ($c && ref($c) && $c->can('model')) {
+    if ($c && blessed($c) && $c->can('model')) {
         eval { # Use eval instead of try if Try::Tiny is not explicitly imported or available
             $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
             my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
@@ -749,7 +750,7 @@ sub get_log_file_size {
 # Refresh settings from database
 sub refresh_settings {
     my ($self, $c) = @_;
-    return unless $c && ref($c) && $c->can('model');
+    return unless $c && blessed($c) && $c->can('model');
     
     eval {
         my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
@@ -783,7 +784,7 @@ sub refresh_settings {
 
 sub log_access {
     my ($self, $c, $status_code) = @_;
-    return unless $c && ref($c) && $c->can('model');
+    return unless $c && blessed($c) && $c->can('model');
 
     my $now = time();
     if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
@@ -834,7 +835,7 @@ sub _classify_request {
 sub extract_request_info {
     my ($c) = @_;
     my %info;
-    return %info unless $c && ref($c) && $c->can('req');
+    return %info unless $c && blessed($c) && $c->can('req');
     eval {
         $info{ip_address}     = $c->req->address // '';
         $info{user_agent}     = substr($c->req->user_agent // '', 0, 512);

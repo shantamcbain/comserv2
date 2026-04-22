@@ -423,7 +423,7 @@
     .changelog-links li {
         margin-bottom: 15px;
         padding: 10px;
-        background-color: white;
+        background-color: rgba(255,255,255,0.88);
         border-left: 4px solid #2196F3;
         border-radius: 3px;
     }
