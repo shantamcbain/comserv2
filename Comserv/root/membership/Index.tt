@@ -147,6 +147,18 @@
       </div>
       [% END %][%# /IF is_admin AND !site_is_csc %]
 
+      [%# CSC account management link for logged-in members on non-CSC sites %]
+      [% IF !site_is_csc AND c.session.username AND hosting_account AND hosting_account.status == 'active' %]
+      <div class="content-section" style="border:1px solid #c8e6c9;border-radius:6px;padding:1rem 1.2rem;background:#f9fff9;margin-bottom:1rem;">
+        <h3 style="margin:0 0 0.4em">&#127760; My CSC Account</h3>
+        <p style="color:var(--text-muted-color);font-size:0.9em;margin:0 0 0.75em">
+          View your CSC hosting subscription, point balance, and renewal options.
+        </p>
+        <a href="[% c.uri_for('/membership/csc_account') %]" class="btn btn-primary">Manage CSC Account</a>
+        <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary" style="margin-left:0.5rem">My Local Account</a>
+      </div>
+      [% END %]
+
       [%# CSC hosting plan cards — visible to all users when site is an active hosting partner %]
       [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
       <div class="content-section">
