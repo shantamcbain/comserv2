@@ -5390,6 +5390,25 @@ sub generate_result_file_content {
 
 =cut
 
+sub _docker_env {
+    my $home = $ENV{HOME} || '/home/shanta';
+    my @candidates = (
+        '/var/run/docker.sock',
+        "$home/.docker/desktop/docker.sock",
+        '/run/user/1000/docker.sock',
+    );
+    for my $sock (@candidates) {
+        return "DOCKER_HOST=unix://$sock" if -S $sock;
+    }
+    return '';
+}
+
+sub _docker_bin {
+    return '/usr/local/bin/docker' if -x '/usr/local/bin/docker';
+    return '/usr/bin/docker'       if -x '/usr/bin/docker';
+    return 'docker';
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
@@ -5454,12 +5473,16 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    # Run docker compose ps to get container status
-    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $denv  = _docker_env();
+    my $docker = _docker_bin();
+    my $home  = $ENV{HOME} || '/home/shanta';
+    my $compose_dir = "$home/PycharmProjects/comserv2";
+
+    my $output = `$denv $docker compose -f '$compose_dir/docker-compose.yml' ps --format json 2>&1`;
     my $exit_code = $? >> 8;
     
     if ($exit_code != 0) {
-        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker compose ps: $output" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5505,7 +5528,10 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $names_out = `docker volume ls -q 2>&1`;
+    my $denv_v  = _docker_env();
+    my $docker_v = _docker_bin();
+
+    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
     my $names_exit = $? >> 8;
 
     if ($names_exit != 0) {
@@ -5523,7 +5549,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
     my $inspect_exit = $? >> 8;
 
     my @volumes;
@@ -5577,24 +5603,24 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
 
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
+    my $denv_r   = _docker_env();
+    my $docker_r = _docker_bin();
+    my $home_r   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
 
     my ($output, $exit_code);
     if ($service eq 'all') {
-        my $home = $ENV{HOME} || '/home/shanta';
-        my $compose_dir = "$home/PycharmProjects/comserv2";
-        $output = `cd '$compose_dir' && $docker compose restart 2>&1`;
+        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
         $exit_code = $? >> 8;
     } else {
-        $output = `$docker restart '$service' 2>&1`;
+        $output = `$denv_r $docker_r restart '$service' 2>&1`;
         $exit_code = $? >> 8;
         if ($exit_code != 0) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
                 "docker restart $service failed (exit $exit_code): $output");
         }
     }
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5626,16 +5652,16 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_s   = _docker_env();
+    my $docker_s = _docker_bin();
+    my $home_s   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && $docker compose start 2>&1"
-        : "$docker start '$service' 2>&1";
+        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
+        : "$denv_s $docker_s start '$service' 2>&1";
 
     my $output    = `$cmd`;
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -5668,16 +5694,16 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_st   = _docker_env();
+    my $docker_st = _docker_bin();
+    my $home_st   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && $docker compose stop 2>&1"
-        : "$docker stop '$service' 2>&1";
+        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
+        : "$denv_st $docker_st stop '$service' 2>&1";
 
     my $output    = `$cmd`;
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
