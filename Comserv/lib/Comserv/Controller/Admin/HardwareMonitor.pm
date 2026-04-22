@@ -349,6 +349,8 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $action_result;
     my $ssh_hint;
 
+    my $TIMEOUT = 20;  # seconds before giving up on du
+
     my $run_cmd = sub {
         my (@cmd) = @_;
         if ($is_local) {
@@ -362,9 +364,17 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
                 close $fh;
                 return (\@lines, undef);
             }
-            my @lines = <$out>;
+            my @lines;
+            my $timed_out = 0;
+            eval {
+                local $SIG{ALRM} = sub { $timed_out = 1; kill 'TERM', $pid; die "timeout\n" };
+                alarm($TIMEOUT);
+                @lines = <$out>;
+                alarm(0);
+            };
+            alarm(0);
             waitpid($pid, 0);
-            return (\@lines, undef);
+            return (\@lines, $timed_out ? "Scan timed out after ${TIMEOUT}s — directory may be very large" : undef);
         } else {
             my $ssh_user = $ENV{HW_SSH_USER} // 'root';
             my @ssh = ('ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
@@ -483,12 +493,49 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         return ($1 // 0) * ($mul{uc($2||'B')} // 1);
     };
 
-    my ($lines, $err);
+    my $calc_sizes = $c->req->param('calc_sizes') ? 1 : 0;
+
     if ($is_local) {
-        my @children = glob("$path/*");
-        ($lines, $err) = @children
-            ? $run_cmd->('du', '-shx', '--', @children)
-            : ([], undef);
+        my @children = sort glob("$path/*"), glob("$path/.*");
+        @children = grep { my $n = (split '/', $_)[-1]; $n ne '.' && $n ne '..' } @children;
+        for my $entry_path (@children) {
+            my $name   = (split '/', $entry_path)[-1];
+            my $is_dir = -d $entry_path;
+            my $fstype = $mount_fstype{$entry_path} // '';
+            my $is_net = $NET_FS{$fstype} ? 1 : 0;
+            my ($size, $bytes);
+            if ($is_dir) {
+                if ($calc_sizes && !$is_net) {
+                    my ($lines2, undef) = $run_cmd->('du', '-shx', '--', $entry_path);
+                    if ($lines2 && @$lines2) {
+                        ($size) = ($lines2->[0] =~ /^(\S+)/);
+                        $bytes = $to_bytes->($size);
+                    }
+                }
+                $size  //= '?';
+                $bytes //= -1;
+            } else {
+                $bytes = (stat $entry_path)[7] // 0;
+                $size  = $bytes >= 1073741824 ? sprintf('%.1fG', $bytes/1073741824)
+                       : $bytes >= 1048576    ? sprintf('%.1fM', $bytes/1048576)
+                       : $bytes >= 1024       ? sprintf('%.1fK', $bytes/1024)
+                       : "${bytes}B";
+            }
+            push @entries, {
+                size     => $size,
+                bytes    => $is_net ? 0 : $bytes,
+                raw_size => $bytes,
+                path     => $entry_path,
+                name     => $name,
+                is_dir   => $is_dir,
+                fstype   => $fstype || 'local',
+                is_net   => $is_net,
+            };
+        }
+        @entries = sort {
+            ($b->{is_dir} // 0) <=> ($a->{is_dir} // 0)
+            || ($b->{bytes} // 0) <=> ($a->{bytes} // 0)
+        } @entries;
     } else {
         my $ssh_user = $ENV{HW_SSH_USER} // 'root';
         if (open my $fh, '-|', 'ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
@@ -497,38 +544,26 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
             my @lines_arr = <$fh>;
             close $fh;
             if ($? != 0 && !@lines_arr) {
-                $err = "SSH to $hostname failed. Ensure SSH keys are configured for $ssh_user\@$hostname.";
+                $error = "SSH to $hostname failed. Ensure SSH keys are configured for $ssh_user\@$hostname.";
+                $ssh_hint = "ssh root\@$hostname du -sh $path/*";
             } else {
-                $lines = \@lines_arr;
+                for my $line (@lines_arr) {
+                    chomp $line;
+                    next unless $line =~ /^(\S+)\s+(.+)$/;
+                    my ($size, $entry_path) = ($1, $2);
+                    my $name = (split '/', $entry_path)[-1];
+                    push @entries, {
+                        size => $size, bytes => $to_bytes->($size),
+                        raw_size => $to_bytes->($size),
+                        path => $entry_path, name => $name,
+                        is_dir => 1, fstype => 'remote', is_net => 0,
+                    };
+                }
+                @entries = sort { $b->{bytes} <=> $a->{bytes} } @entries;
             }
         } else {
-            $err = "Cannot open SSH to $hostname: $!";
+            $error = "Cannot open SSH to $hostname: $!";
         }
-    }
-    if ($err) {
-        $error    = $err;
-        $ssh_hint = !$is_local ? "ssh root\@$hostname du -sh $path/*" : undef;
-    } else {
-        for my $line (@{ $lines // [] }) {
-            chomp $line;
-            next unless $line =~ /^(\S+)\s+(.+)$/;
-            my ($size, $entry_path) = ($1, $2);
-            my $name = (split '/', $entry_path)[-1];
-            my $is_dir = $is_local ? (-d $entry_path) : 1;
-            my $fstype = $mount_fstype{$entry_path} // '';
-            my $is_net  = $NET_FS{$fstype} ? 1 : 0;
-            push @entries, {
-                size     => $size,
-                bytes    => $is_net ? 0 : $to_bytes->($size),
-                raw_size => $to_bytes->($size),
-                path     => $entry_path,
-                name     => $name,
-                is_dir   => $is_dir,
-                fstype   => $fstype || 'local',
-                is_net   => $is_net,
-            };
-        }
-        @entries = sort { $b->{bytes} <=> $a->{bytes} } @entries;
     }
 
     my @crumb_parts;
@@ -550,6 +585,7 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
         ssh_hint      => $ssh_hint,
         action_result => $action_result,
         nfs_base      => $NFS_BASE,
+        calc_sizes    => $calc_sizes,
     );
 }
 
