@@ -1,0 +1,326 @@
+[%
+  META
+    title       = 'Theme Compliance Audit — Working Log'
+    description = 'Persistent log of every .tt file audited for CSS theme compliance. Used by AI agents to resume work without re-checking completed files.'
+    roles       = 'admin,developer'
+    TemplateType = 'Documentation'
+    category    = 'developer'
+    page_version = '0.01'
+    last_updated = 'Tue Apr 22 2026'
+%]
+[% PageVersion = 'Documentation/developer/ThemeAuditWorkingLog.tt,v 0.01 2026/04/22 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+  <h1 style="color: var(--text-color); font-family: var(--header-font);">Theme Compliance Audit — Working Log</h1>
+
+  <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--accent-color); padding: 16px; border-radius: 4px; margin-bottom: 20px;">
+    <p style="color: var(--text-color); margin: 0;">
+      <strong>Purpose:</strong> AI agents MUST consult this file before starting any session on the theme audit.
+      Files listed as <code>DONE</code> must NOT be re-checked — skip them to avoid wasting resources.<br>
+      <strong>DB Project:</strong> Project ID 221 — "Theme Compliance Audit - All TT Files"<br>
+      <strong>Total .tt files:</strong> 1308 &nbsp;|&nbsp;
+      <strong>Rules reference:</strong> <a href="/Documentation/ApplicationTtTemplate" style="color: var(--link-color);">ApplicationTtTemplate</a>
+    </p>
+  </div>
+
+  <!-- TABLE OF CONTENTS -->
+  <div style="background-color: rgba(255,255,255,0.15); padding: 12px; border-radius: 4px; margin-bottom: 20px;">
+    <strong style="color: var(--text-color);">Jump to Phase:</strong>
+    <a href="#p1" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">P1 Wrappers</a>
+    <a href="#p2" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">P2 CSS Naming</a>
+    <a href="#p3" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">P3 Menus</a>
+    <a href="#p4" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">P4 Admin</a>
+    <a href="#p5" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">P5 SiteNames</a>
+    <a href="#rules" style="color: var(--nav-text); background-color: var(--nav-bg); padding: 3px 8px; border-radius: 3px; margin: 2px; display: inline-block; text-decoration: none;">Compliance Rules</a>
+  </div>
+
+  <!-- COMPLIANCE RULES QUICK REFERENCE -->
+  <div id="rules" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 24px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Compliance Rules Quick Reference</h2>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; text-align: left; border: 1px solid var(--border-color);">Rule</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; text-align: left; border: 1px solid var(--border-color);">Correct</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; text-align: left; border: 1px solid var(--border-color);">Wrong</th>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Section background</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>rgba(255,255,255,0.12)</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>var(--secondary-color)</code>, <code>#f8f9fa</code>, <code>white</code></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Content card background</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>rgba(255,255,255,0.88)</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>background-color: white</code>, <code>#fff</code>, <code>#ffffff</code></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Code block / info box</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>rgba(255,255,255,0.15)</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>var(--light-color)</code> (undefined!)</td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">TOC / nav buttons</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>background: var(--nav-bg); color: var(--nav-text)</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>var(--secondary-color)</code> bg with <code>var(--link-color)</code> text</td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Page wrappers</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>background-color: transparent</code> or rely on theme-overrides.css</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>overflow: hidden</code> on page-level divs, <code>backdrop-filter</code> on wrappers</td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Background attachment</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>background-attachment: scroll</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>background-attachment: fixed</code></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Text / heading colour</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"><code>color: var(--text-color)</code>, <code>var(--accent-color)</code></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">hardcoded <code>#333</code>, <code>#000</code>, <code>black</code></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- PHASE 1 -->
+  <div id="p1" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Phase 1 — Wrapper Files (DB Project 222)</h2>
+    <p style="color: var(--text-color);">These files wrap every page. Must be perfect before any other audit work.</p>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">File</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Status</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Notes</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Date</th>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">layout.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Header.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">pagetop.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">footer.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">AdminNotes.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">SiteAdminNotes.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div id="p2" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Phase 2 — CSS Naming Standards (DB Project 223)</h2>
+    <p style="color: var(--text-color);">Define canonical CSS variable names; update template guides before auditing individual files.</p>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Task</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Status</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Notes</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Date</th>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Document canonical CSS variable names from all themes/*.css</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Normalise CSS element naming in base.css</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Update ApplicationTtTemplate.tt v0.03</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">v0.02 done 2026-04-13</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Update DocumentationTtTemplate.tt v0.07</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">v0.06 done 2026-04-13</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div id="p3" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Phase 3 — Menu System (DB Project 224)</h2>
+    <p style="color: var(--text-color);">All Navigation/ files and admintopmenu.tt — appear on every page.</p>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">File</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Status</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Notes</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Date</th>
+      </tr>
+      [% FOREACH nav_file IN ['Navigation/TopDropListMain.tt','Navigation/TopDropListCoop.tt','Navigation/TopDropListENCY.tt','Navigation/TopDropListGlobal.tt','Navigation/TopDropLisGlobal.tt','Navigation/TopDropListHelpDesk.tt','Navigation/TopDropListHosted.tt','Navigation/TopDropListIT.tt','Navigation/TopDropListLogin.tt','Navigation/TopDropListMember.tt','Navigation/TopDropListPlanning.tt','Navigation/TopDropListShop.tt','Navigation/TopDropListWeather.tt','Navigation/TopDropListWorkshop.tt','Navigation/admintopmenu.tt','Navigation/navigation.tt'] %]
+      <tr[% IF loop.index % 2 %] style="background-color: rgba(255,255,255,0.08);"[% END %]>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">[% nav_file %]</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      [% END %]
+    </table>
+  </div>
+
+  <!-- PHASE 4 -->
+  <div id="p4" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Phase 4 — Admin Endpoints (DB Project 225)</h2>
+    <p style="color: var(--text-color);">
+      All files under <code>admin/</code>. Grouped into sub-todos P4.1–P4.5.
+      Update Status below as each batch completes.
+    </p>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Batch</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Files</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Status</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Date</th>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P4.1</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">admin/index.tt + admin/documentation/*.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P4.2</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">admin/theme/*.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P4.3</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">admin/HardwareMonitor/*.tt + admin/Logging/*.tt + admin/backup/*.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P4.4</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">admin/environment_variables/*.tt + admin/database*.tt + admin/schema*.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P4.5</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">All remaining admin/*.tt root-level files</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- PHASE 5 -->
+  <div id="p5" class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Phase 5 — SiteName Templates (DB Project 226)</h2>
+    <p style="color: var(--text-color);">Work through each SiteName folder and shared application folders.</p>
+    <table style="width: 100%; border-collapse: collapse; font-family: var(--body-font);">
+      <tr>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Batch</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Folders</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Status</th>
+        <th style="background-color: var(--table-header-bg); color: var(--text-color); padding: 8px; border: 1px solid var(--border-color);">Date</th>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.1</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">BMaster/ + Apiary/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.2</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">CSC/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.3</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Shanta/ + WeaverBeck/ + weaverbeck/ + ve7tit/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.4</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Forager/ + USBM/ + SB/ + coop/ + ENCY/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.5</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">WorkShops/ + todo/ + marketplace/ + file/ + ai/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.6</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Shop/ + Cart/ + membership/ + Accounting/ + Inventory/ + NetworkMap/ + Navigation/ + mail/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.7</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">Documentation/</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+      <tr style="background-color: rgba(255,255,255,0.08);">
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">P5.8</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">setup/ + include/ + email/ + root-level *.tt</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);">PENDING</td>
+        <td style="color: var(--text-color); padding: 6px 8px; border: 1px solid var(--border-color);"></td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ALREADY DONE (global fixes applied 2026-04-19) -->
+  <div class="content-section" style="background-color: rgba(255,255,255,0.12); border-radius: 6px; padding: 16px; margin-bottom: 20px;">
+    <h2 style="color: var(--text-color); margin-top: 0;">Global Fixes Applied (2026-04-19) — All 1308 Files</h2>
+    <p style="color: var(--text-color);">
+      The following global <code>sed</code> passes were run on ALL .tt files on 2026-04-19 (commit 255aefdf).
+      Individual file audits still required to catch file-specific issues.
+    </p>
+    <ul style="color: var(--text-color); font-family: var(--body-font);">
+      <li><strong>var(--light-color) → rgba(255,255,255,0.15)</strong> — eliminated undefined variable in 115 files</li>
+      <li><strong>background: var(--secondary-color) → background: var(--nav-bg)</strong> — fixed summary/button elements</li>
+      <li><strong>background-color: var(--secondary-color) → rgba(255,255,255,0.12)</strong> — fixed boxes and table rows</li>
+      <li><strong>background-color: white/  #fff / #ffffff → rgba(255,255,255,0.88)</strong> — key application files</li>
+      <li><strong>#f8f9fa → rgba(255,255,255,0.12)</strong> — FAQ and database_mode files</li>
+      <li><strong>CSC combobox</strong> — converted to CSS variables</li>
+    </ul>
+  </div>
+
+  <p style="color: var(--text-color); font-size: var(--font-size-small); text-align: right;">
+    <a href="/Documentation/developer/css_theme_system_rules" style="color: var(--link-color);">CSS Theme Rules</a> |
+    <a href="/Documentation/ApplicationTtTemplate" style="color: var(--link-color);">ApplicationTtTemplate</a> |
+    <a href="/project/view/221" style="color: var(--link-color);">DB Project 221</a>
+  </p>
+</div>
