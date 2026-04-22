@@ -456,6 +456,25 @@ sub auto :Private {
                     $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
                 }
             }
+
+            # Apply per-user service grants from membership_service_access
+            # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
+            if ($c->session->{user_id}) {
+                my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
+                    { name => $mod_site }, { rows => 1 }
+                )->single;
+                if ($svc_site) {
+                    my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
+                        user_id   => $c->session->{user_id},
+                        site_id   => $svc_site->id,
+                        is_active => 1,
+                    })->all;
+                    for my $sg (@svc_grants) {
+                        next if $sg->is_expired;
+                        $enabled{ $sg->service_name } = 1;
+                    }
+                }
+            }
             $c->stash->{enabled_modules} = \%enabled;
         };
         if ($@) {
