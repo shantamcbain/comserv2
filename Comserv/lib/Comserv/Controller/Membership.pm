@@ -251,7 +251,9 @@ sub hosting_signup :Local :Args(0) {
         domains           => $domains,
         csc_hosting_plans => $csc_hosting_plans,
         hosting_account   => $hosting_account,
-        selected_plan     => $c->req->query_parameters->{plan} || '',
+        selected_plan     => $c->req->query_parameters->{plan}
+                            || ($hosting_account ? $hosting_account->plan_slug : '')
+                            || '',
     );
     $c->forward($c->view('TT'));
 }
