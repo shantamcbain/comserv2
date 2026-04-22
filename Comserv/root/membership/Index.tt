@@ -99,6 +99,17 @@
             </tr>
           </table>
         </div>
+        [% IF user_membership.plan %]
+        [% SET p = user_membership.plan %]
+        <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
+          [% IF p.has_beekeeping %]<span class="badge badge-success">&#128027; Beekeeping Access</span>[% END %]
+          [% IF p.has_planning %]<span class="badge badge-success">&#128203; Planning Tools</span>[% END %]
+          [% IF p.has_hosting %]<span class="badge badge-success">&#127760; Hosting</span>[% END %]
+          [% IF p.has_email %]<span class="badge badge-success">&#128231; Email</span>[% END %]
+          [% IF p.has_currency %]<span class="badge badge-success">&#128176; Coins</span>[% END %]
+          [% IF p.ai_requests_per_day > 0 %]<span class="badge badge-success">&#129302; AI ([% p.ai_requests_per_day %]/day)</span>[% END %]
+        </div>
+        [% END %]
       </div>
       [% END %]
 

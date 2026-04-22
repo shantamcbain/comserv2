@@ -155,3 +155,11 @@ Implement all missing inspection CRUD actions in `Apiary.pm`:
 - Create `Apiary/inspection_calendar.tt`: calendar view
 - Frame color scheme: brood=orange, honey=yellow, pollen=green, empty=white, foundation=grey, drone=blue, comb=tan
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Navigation, Membership Workflow and 500 Error Fixes
+<!-- chat-id: db2f0d4a-aa79-4665-ada2-dc13e077b480 -->
+- Added `TopDropListBeekeeping.tt` to `pagetop.tt` (was missing — menu never displayed)
+- Fixed `debug.tt`: replaced crash-prone `Dumper(array)` calls with TRY/CATCH blocks — was causing 500 for users with `debug_mode=1` on pages with arrays in stash
+- Fixed `hosting_signup.tt` checkbox restoration: replaced `search()` (returns 0 for first match = falsy) with `saved_addons.grep('^key$').size`
+- Enhanced `membership/Index.tt` current plan section: added feature badges (Beekeeping, Planning, Hosting, AI, etc.)
+- Run verification: syntax OK
