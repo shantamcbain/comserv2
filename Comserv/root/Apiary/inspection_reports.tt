@@ -64,20 +64,21 @@
                             </table>
                         </div>
 
+                        [% max_count = 1 %]
+                        [% FOREACH k IN by_month.keys %]
+                            [% v = by_month.$k %]
+                            [% IF v > max_count %][% max_count = v %][% END %]
+                        [% END %]
                         <div class="chart-bar-group">
                             [% FOREACH i IN [1..12] %]
                                 [% mon_key = i < 10 ? "0$i" : "$i" %]
                                 [% count = by_month.$mon_key || 0 %]
-                                [% max_count = 1 %]
-                                [% FOREACH k IN by_month.keys %]
-                                    [% v = by_month.$k %]
-                                    [% max_count = v IF v > max_count %]
-                                [% END %]
                                 [% pct = max_count > 0 ? (count / max_count * 100) : 0 %]
+                                [% idx = i - 1 %]
                                 <div class="chart-bar-col">
                                     <div class="chart-bar-fill" style="height: [% pct %]%;"
-                                         title="[% months.item(i - 1) %]: [% count %] inspection(s)"></div>
-                                    <div class="chart-bar-label">[% months.item(i - 1) %]</div>
+                                         title="[% months.$idx %]: [% count %] inspection(s)"></div>
+                                    <div class="chart-bar-label">[% months.$idx %]</div>
                                 </div>
                             [% END %]
                         </div>
@@ -212,46 +213,3 @@
 
 </div>
 
-<style>
-.inline-form {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.5rem;
-}
-.chart-bar-group {
-    display: flex;
-    align-items: flex-end;
-    gap: 4px;
-    height: 120px;
-    margin-top: 1rem;
-    padding: 0 0.5rem;
-    border-bottom: 2px solid var(--border-color, #ccc);
-}
-.chart-bar-col {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    height: 100%;
-    justify-content: flex-end;
-}
-.chart-bar-fill {
-    width: 100%;
-    background-color: var(--primary-color, #F5A623);
-    border-radius: 3px 3px 0 0;
-    min-height: 2px;
-    transition: height 0.3s ease;
-}
-.chart-bar-label {
-    font-size: 0.7rem;
-    color: var(--text-color, #555);
-    margin-top: 4px;
-}
-.cell-active {
-    font-weight: bold;
-    color: var(--primary-color, #c07000);
-}
-.cell-empty {
-    color: #aaa;
-}
-</style>
