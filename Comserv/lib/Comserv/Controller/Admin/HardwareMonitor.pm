@@ -351,30 +351,20 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
 
     my $TIMEOUT = 20;  # seconds before giving up on du
 
+    my $timeout_bin = (-x '/usr/bin/timeout') ? '/usr/bin/timeout'
+                    : (-x '/bin/timeout')     ? '/bin/timeout'
+                    : '';
+
     my $run_cmd = sub {
         my (@cmd) = @_;
         if ($is_local) {
-            require IPC::Open3;
-            my ($in, $out, $err_fh);
-            open $err_fh, '>', '/dev/null';
-            my $pid = eval { IPC::Open3::open3($in, $out, $err_fh, @cmd) };
-            if ($@ || !$pid) {
-                open my $fh, '-|', @cmd or return (undef, "Cannot run: $cmd[0]: $!");
-                my @lines = <$fh>;
-                close $fh;
-                return (\@lines, undef);
-            }
-            my @lines;
-            my $timed_out = 0;
-            eval {
-                local $SIG{ALRM} = sub { $timed_out = 1; kill 'TERM', $pid; die "timeout\n" };
-                alarm($TIMEOUT);
-                @lines = <$out>;
-                alarm(0);
-            };
-            alarm(0);
-            waitpid($pid, 0);
-            return (\@lines, $timed_out ? "Scan timed out after ${TIMEOUT}s — directory may be very large" : undef);
+            my @exec = $timeout_bin ? ($timeout_bin, $TIMEOUT, @cmd) : @cmd;
+            my $shell_cmd = join(' ', map { quotemeta($_) } @exec) . ' 2>/dev/null';
+            open my $fh, '-|', $shell_cmd
+                or return (undef, "Cannot run: $cmd[0]: $!");
+            my @lines = <$fh>;
+            close $fh;
+            return (\@lines, undef);
         } else {
             my $ssh_user = $ENV{HW_SSH_USER} // 'root';
             my @ssh = ('ssh', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=5',
