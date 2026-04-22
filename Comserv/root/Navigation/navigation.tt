@@ -56,17 +56,8 @@
             </li>
         [% END %]
 
-        <!-- Apiary Menu (site_modules enabled_modules.apiary or BMaster fallback) -->
-        [% IF c.stash.enabled_modules.apiary || (!c.stash.enabled_modules.defined && c.session.SiteName == 'BMaster') %]
-            <li class="horizontal-dropdown">
-                <a href="/Apiary" class="dropbtn"><i class="icon-apiary"></i>Apiary</a>
-                <div class="dropdown-content">
-                    <a href="/Apiary"><i class="icon-hive"></i>Hive Management</a>
-                    <a href="/Apiary/inspection"><i class="icon-inspect"></i>Inspections</a>
-                    <a href="/Apiary/harvest"><i class="icon-honey"></i>Harvest Records</a>
-                </div>
-            </li>
-        [% END %]
+        <!-- Beekeeping Menu (beekeeping/apiary module or BMaster site) -->
+        [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
         
         <!-- Manager Menu (role-specific) -->
         [% IF user_roles.grep('manager').size || cached_nav.manager_menu.defined %]
