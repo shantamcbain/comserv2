@@ -3,8 +3,11 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::EmailNotification;
 use JSON ();
 use Scalar::Util qw(looks_like_number);
+use List::Util ();
+use POSIX qw(strftime mktime);
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -615,8 +618,92 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ingest',
         "Ingested $count metrics from $hostname");
+
+    $self->_check_disk_alerts($c, $hostname, $body->{metrics} // []);
+
     $c->response->content_type('application/json');
     $c->response->body(JSON::encode_json({ ok => 1, count => $count, hostname => $hostname }));
+}
+
+sub _check_disk_alerts {
+    my ($self, $c, $hostname, $metrics) = @_;
+
+    my $schema = eval { $c->model('DBEncy') };
+    return unless $schema;
+
+    my $alert_rs = eval { $schema->resultset('HealthAlert') };
+    return unless $alert_rs;
+
+    my $email_util = Comserv::Util::EmailNotification->new();
+    my $admin_email = 'helpdesk@computersystemconsulting.ca';
+
+    for my $m (@$metrics) {
+        next unless ref($m) eq 'HASH';
+        my $name  = $m->{name} // '';
+        next unless $name =~ /^disk_used_pct/;
+        my $val   = $m->{value} // 0;
+        next unless looks_like_number($val);
+
+        my $level = _metric_level($name, $val);
+        next unless $level eq 'warn' || $level eq 'critical';
+
+        my $mount_text = $m->{text} // $name;
+        my $db_level   = uc($level eq 'critical' ? 'CRITICAL' : 'HIGH');
+        my $category   = 'DISK_SPACE';
+        my $description = sprintf(
+            "Disk usage on %s mount %s is at %.1f%% (%s)",
+            $hostname, $mount_text, $val, $db_level
+        );
+
+        eval {
+            my $existing = $alert_rs->search({
+                category          => $category,
+                system_identifier => "$hostname:$name",
+                status            => 'OPEN',
+            }, { order_by => { -desc => 'last_seen' }, rows => 1 })->single;
+
+            my $now_str = strftime('%Y-%m-%d %H:%M:%S', localtime);
+
+            if ($existing) {
+                my $last_seen_epoch = do {
+                    my $ls = $existing->last_seen // '';
+                    $ls =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+                    $1 ? mktime($6,$5,$4,$3,$2-1,$1-1900) : 0;
+                };
+                $existing->update({
+                    last_seen        => $now_str,
+                    level            => $db_level,
+                    description      => $description,
+                    occurrence_count => $existing->occurrence_count + 1,
+                });
+                if ($level eq 'critical' && (time() - $last_seen_epoch) > 14400) {
+                    $email_util->send_error_notification($c, $admin_email,
+                        "CRITICAL: Disk space on $hostname",
+                        "$description\n\nCheck /admin/hardware_monitor/disk_health for cleanup options.");
+                }
+            } else {
+                $alert_rs->create({
+                    first_seen        => $now_str,
+                    last_seen         => $now_str,
+                    level             => $db_level,
+                    category          => $category,
+                    description       => $description,
+                    occurrence_count  => 1,
+                    status            => 'OPEN',
+                    system_identifier => "$hostname:$name",
+                });
+                $email_util->send_error_notification($c, $admin_email,
+                    "$db_level: Disk space alert on $hostname",
+                    "$description\n\nView details: /admin/hardware_monitor/disk_diagnose?hostname=$hostname\nCleanup options: /admin/hardware_monitor/disk_health");
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ingest',
+                    "Disk alert created: $description");
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_check_disk_alerts',
+                "Alert check failed for $hostname $name: $@");
+        }
+    }
 }
 
 sub drive_detail :Path('/admin/hardware_monitor/drive_detail') :Args(0) {
@@ -735,6 +822,159 @@ sub drive_detail :Path('/admin/hardware_monitor/drive_detail') :Args(0) {
         files        => \@files_in_root,
         can_browse   => $can_browse,
         file_browser_url => $c->uri_for('/file/admin_browser', { dir_path => $local_mount }),
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub disk_health :Path('/admin/hardware_monitor/disk_health') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->get_admin_type($c) ne 'none') {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'disk_health',
+        'Disk health page accessed');
+
+    my $schema = $c->model('DBEncy');
+    my %data;
+
+    # ── 1. Open disk-space health alerts ─────────────────────────────
+    my @open_alerts;
+    eval {
+        @open_alerts = $schema->resultset('HealthAlert')->search(
+            { category => 'DISK_SPACE', status => 'OPEN' },
+            { order_by => { -desc => 'last_seen' } }
+        )->all;
+    };
+
+    # ── 2. Local df snapshot ─────────────────────────────────────────
+    my @df_rows;
+    eval {
+        my $df_out = `df -h --output=source,target,size,used,avail,pcent 2>/dev/null || df -h 2>/dev/null`;
+        for my $line (split /\n/, $df_out) {
+            next if $line =~ /^Filesystem|^tmpfs|^udev|^overlay|^shm/i;
+            my @f = split /\s+/, $line;
+            next unless @f >= 6;
+            my ($dev, $mount, $size, $used, $avail, $pct) = @f[0..5];
+            $pct =~ s/%//;
+            my $level = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            push @df_rows, {
+                device => $dev, mount => $mount,
+                size   => $size, used => $used, avail => $avail,
+                pct    => $pct,  level => $level,
+            };
+        }
+    };
+
+    # ── 3. NFS disk usage ─────────────────────────────────────────────
+    my $nfs_root = '/data/nfs';
+    $nfs_root = $ENV{NFS_ROOT} if $ENV{NFS_ROOT};
+    my %nfs_usage;
+    if (-d $nfs_root) {
+        eval {
+            my $out = `df -h --output=size,used,avail,pcent \Q$nfs_root\E 2>/dev/null | tail -1`;
+            if ($out =~ /(\S+)\s+(\S+)\s+(\S+)\s+(\d+)%/) {
+                $nfs_usage{size} = $1; $nfs_usage{used} = $2;
+                $nfs_usage{avail} = $3; $nfs_usage{pct} = $4;
+                $nfs_usage{level} = $4 >= 90 ? 'critical' : $4 >= 80 ? 'warn' : 'ok';
+            }
+        };
+    }
+
+    # ── 4. Duplicate files ────────────────────────────────────────────
+    my ($dup_count, $dup_size_mb) = (0, 0);
+    eval {
+        my @dups = $schema->resultset('File')->search(
+            { is_duplicate => 1 },
+            { columns => ['file_size'] }
+        )->all;
+        $dup_count = scalar @dups;
+        $dup_size_mb = int(
+            (List::Util::sum(map { $_->file_size // 0 } @dups) // 0) / 1_048_576
+        );
+    };
+
+    # ── 5. Orphaned DB records ────────────────────────────────────────
+    my $orphaned_count = 0;
+    eval {
+        $orphaned_count = $schema->resultset('File')->search(
+            { file_status => 'orphaned' }
+        )->count;
+    };
+
+    # ── 6. Application log sizes ──────────────────────────────────────
+    my @log_files;
+    my $log_dir = $c->config->{home} . '/logs';
+    if (-d $log_dir) {
+        opendir(my $dh, $log_dir);
+        while (my $f = readdir $dh) {
+            next if $f =~ /^\./;
+            my $path = "$log_dir/$f";
+            next unless -f $path;
+            my $sz = (stat $path)[7] // 0;
+            push @log_files, {
+                name    => $f,
+                path    => $path,
+                size_mb => sprintf('%.1f', $sz / 1_048_576),
+            };
+        }
+        closedir $dh;
+        @log_files = sort { $b->{size_mb} <=> $a->{size_mb} } @log_files;
+    }
+
+    # ── 7. Docker disk usage ──────────────────────────────────────────
+    my $docker_df = '';
+    eval { $docker_df = `docker system df 2>/dev/null` // ''; };
+
+    # ── 8. Acknowledge alert action ───────────────────────────────────
+    if ($c->req->method eq 'POST') {
+        my $action   = $c->req->param('action')   // '';
+        my $alert_id = $c->req->param('alert_id') // '';
+
+        if ($action eq 'acknowledge' && $alert_id =~ /^\d+$/) {
+            eval {
+                my $alert = $schema->resultset('HealthAlert')->find($alert_id);
+                if ($alert) {
+                    $alert->update({ status => 'ACKNOWLEDGED' });
+                    $c->flash->{success_msg} = "Alert #$alert_id acknowledged.";
+                }
+            };
+        } elsif ($action eq 'resolve' && $alert_id =~ /^\d+$/) {
+            eval {
+                my $alert = $schema->resultset('HealthAlert')->find($alert_id);
+                if ($alert) {
+                    $alert->update({
+                        status      => 'RESOLVED',
+                        resolved_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
+                    });
+                    $c->flash->{success_msg} = "Alert #$alert_id resolved.";
+                }
+            };
+        } elsif ($action eq 'purge_orphaned') {
+            eval {
+                my $n = $schema->resultset('File')->search({ file_status => 'orphaned' })->delete;
+                $c->flash->{success_msg} = "Purged $n orphaned database records.";
+            };
+        }
+        $c->response->redirect($c->uri_for('/admin/hardware_monitor/disk_health'));
+        return;
+    }
+
+    $c->stash(
+        open_alerts    => \@open_alerts,
+        df_rows        => \@df_rows,
+        nfs_root       => $nfs_root,
+        nfs_usage      => \%nfs_usage,
+        dup_count      => $dup_count,
+        dup_size_mb    => $dup_size_mb,
+        orphaned_count => $orphaned_count,
+        log_files      => \@log_files,
+        docker_df      => $docker_df,
+        template       => 'admin/HardwareMonitor/DiskHealth.tt',
     );
     $c->forward($c->view('TT'));
 }
