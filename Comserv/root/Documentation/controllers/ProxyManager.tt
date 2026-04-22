@@ -25,19 +25,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#docker" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Docker</a>
-                <a href="#proxy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proxy (NPM)</a>
-                <a href="#kubernetes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Kubernetes</a>
-                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#docker" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Docker</a>
+                <a href="#proxy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Proxy (NPM)</a>
+                <a href="#kubernetes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Kubernetes</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -107,7 +107,7 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Base Routes</h3>
             <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; color: var(--text-color);">Method</th>
                     <th style="text-align: left; color: var(--text-color);">Path</th>
                     <th style="text-align: left; color: var(--text-color);">Purpose</th>
@@ -131,7 +131,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Installation Methods</h3>
             <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; color: var(--text-color);">Method</th>
                     <th style="text-align: left; color: var(--text-color);">Purpose</th>
                 </tr>
@@ -155,7 +155,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Proxy Management Methods</h3>
             <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; color: var(--text-color);">Method</th>
                     <th style="text-align: left; color: var(--text-color);">Purpose</th>
                 </tr>
@@ -175,7 +175,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: var(--spacing-large);">Monitoring Methods</h3>
             <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; color: var(--text-color);">Method</th>
                     <th style="text-align: left; color: var(--text-color);">Purpose</th>
                 </tr>
@@ -215,7 +215,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font);">The <code>npm_api</code> attribute manages Nginx Proxy Manager connection with API URL, key management, and environment-aware scope.</p>
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Configuration Sources</h3>
             <table border="1" cellpadding="8" style="width: 100%; color: var(--text-color); font-family: var(--body-font);">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; color: var(--text-color);">Source</th>
                     <th style="text-align: left; color: var(--text-color);">Priority</th>
                     <th style="text-align: left; color: var(--text-color);">Format</th>

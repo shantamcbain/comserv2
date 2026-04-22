@@ -87,7 +87,7 @@
                         <td>auto_increment</td>
                         <td>Primary key - auto-generated conversation ID</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>user_id</td>
                         <td>INTEGER</td>
                         <td>NO</td>
@@ -101,7 +101,7 @@
                         <td>NULL</td>
                         <td>Human-readable conversation title/subject (optional, "New Conversation" if NULL)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>created_at</td>
                         <td>TIMESTAMP</td>
                         <td>NO</td>
@@ -115,7 +115,7 @@
                         <td>CURRENT_TIMESTAMP ON UPDATE</td>
                         <td>Timestamp when conversation was last modified (auto-updated)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>status</td>
                         <td>ENUM('active', 'archived')</td>
                         <td>NO</td>
@@ -201,7 +201,7 @@
                 <h2>API Methods & Helpers</h2>
                 
                 <h3>Standard DBIx::Class Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Creating Conversations:</strong></p>
                     <pre><code>my $conversation = $schema->resultset('AiConversation')->create({
     user_id => 42,
@@ -211,7 +211,7 @@
 });</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Retrieving Conversations:</strong></p>
                     <pre><code>my $conv = $schema->resultset('AiConversation')->find(5);
 my @active = $schema->resultset('AiConversation')->search({
@@ -226,7 +226,7 @@ my @recent = $schema->resultset('AiConversation')->search({
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Updating Conversations:</strong></p>
                     <pre><code>$conversation->update({
     status => 'archived',
@@ -239,19 +239,19 @@ $conversation->update;</code></pre>
                 </div>
 
                 <h3>Helper Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_display_title():</strong> Get conversation title or default</p>
                     <pre><code>my $title = $conversation->get_display_title();
 # Returns: $conversation->title if set, else 'New Conversation'</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_message_count():</strong> Count messages in conversation</p>
                     <pre><code>my $count = $conversation->get_message_count();
 # Returns: Number of AiMessage rows with this conversation_id</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_latest_message():</strong> Retrieve most recent message</p>
                     <pre><code>my $last_msg = $conversation->get_latest_message();
 if ($last_msg) {
@@ -261,7 +261,7 @@ if ($last_msg) {
                 </div>
 
                 <h3>Relationship Queries</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Access Messages:</strong></p>
                     <pre><code>my @messages = $conversation->ai_messages->all;
 my @sorted = $conversation->ai_messages->search(
@@ -271,7 +271,7 @@ my @sorted = $conversation->ai_messages->search(
 my $msg_count = $conversation->ai_messages->count;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Access Owner:</strong></p>
                     <pre><code>my $owner = $conversation->user;
 my $owner_name = $conversation->user->username;</code></pre>
@@ -282,7 +282,7 @@ my $owner_name = $conversation->user->username;</code></pre>
                 <h2>Usage Examples</h2>
                 
                 <h3>Example 1: Create New Conversation for User</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $user = $schema->resultset('User')->find(42);
 my $conversation = $schema->resultset('AiConversation')->create({
     user_id => $user->id,
@@ -299,7 +299,7 @@ print "Created conversation #" . $conversation->id . "\n";</code></pre>
                 </div>
 
                 <h3>Example 2: Retrieve User's Active Conversations</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $user = $schema->resultset('User')->find(42);
 my @active = $schema->resultset('AiConversation')->search({
     user_id => $user->id,
@@ -316,7 +316,7 @@ foreach my $conv (@active) {
                 </div>
 
                 <h3>Example 3: Display Conversation History</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $conversation = $schema->resultset('AiConversation')->find(5);
 
 print "Conversation: " . $conversation->get_display_title() . "\n";
@@ -336,7 +336,7 @@ foreach my $msg (@messages) {
                 </div>
 
                 <h3>Example 4: Archive Completed Conversation</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $conversation = $schema->resultset('AiConversation')->find(5);
 
 if ($conversation->status eq 'active') {
@@ -348,7 +348,7 @@ if ($conversation->status eq 'active') {
                 </div>
 
                 <h3>Example 5: Update Conversation Metadata</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use JSON::MaybeXS;
 
 my $conversation = $schema->resultset('AiConversation')->find(5);
@@ -365,7 +365,7 @@ print "Metadata updated\n";</code></pre>
                 </div>
 
                 <h3>Example 6: List Recent Conversations with Preview</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $user = $schema->resultset('User')->find(42);
 my @recent = $schema->resultset('AiConversation')->search({
     user_id => $user->id
@@ -391,7 +391,7 @@ foreach my $conv (@recent) {
             <section id="troubleshooting">
                 <h2>Troubleshooting</h2>
                 
-                <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--warning-color); margin-top: 0;">Problem: Conversation Has No Title</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> Conversation.title is NULL, causing display issues</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> Always use get_display_title() helper:
@@ -403,7 +403,7 @@ foreach my $conv (@recent) {
                     </p>
                 </div>
 
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--info-color); margin-top: 0;">Problem: Messages Not Appearing</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> get_message_count() returns 0 even though messages were added</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> Check message-conversation association:
@@ -415,7 +415,7 @@ foreach my $conv (@recent) {
                     </p>
                 </div>
 
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--info-color); margin-top: 0;">Problem: Invalid Status Value</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> Database error when setting status to invalid value</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> Status is ENUM with only 2 valid values:
@@ -427,7 +427,7 @@ foreach my $conv (@recent) {
                     </p>
                 </div>
 
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--info-color); margin-top: 0;">Problem: Metadata Storage Issues</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> Metadata not saved or causes charset errors</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> Metadata field is flexible but requires proper encoding:
@@ -440,7 +440,7 @@ foreach my $conv (@recent) {
                     </p>
                 </div>
 
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--info-color); margin-top: 0;">Problem: Cascade Delete Not Working</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> Deleting conversation leaves orphaned messages in ai_messages table</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> Cascade delete IS configured and should work automatically:
@@ -452,7 +452,7 @@ foreach my $conv (@recent) {
                     </p>
                 </div>
 
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                     <h3 style="color: var(--info-color); margin-top: 0;">Problem: Timestamps Not Auto-Updating</h3>
                     <p style="margin: 5px 0;"><strong>Symptoms:</strong> updated_at not changing when conversation is modified</p>
                     <p style="margin: 5px 0;"><strong>Solution:</strong> MySQL triggers handle auto-update:
@@ -466,7 +466,7 @@ foreach my $conv (@recent) {
             </section>
 
             <section id="see-also">
-                <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+                <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                     <h2 style="color: var(--success-color); margin-top: 0;">See Also</h2>
                     <ul style="margin: 10px 0 0 20px;">
                         <li><a href="/Documentation/models/AiMessage">AiMessage Model</a> - Individual messages in conversations</li>

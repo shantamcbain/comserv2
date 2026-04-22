@@ -24,19 +24,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#process" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Mail Account Process</a>
-                <a href="#codeflow" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Code Flow</a>
-                <a href="#configuration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Configuration</a>
-                <a href="#error-handling" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Error Handling</a>
-                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
-                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
-                <a href="#related" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Related Components</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#process" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Mail Account Process</a>
+                <a href="#codeflow" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Code Flow</a>
+                <a href="#configuration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Configuration</a>
+                <a href="#error-handling" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Error Handling</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Logging</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Troubleshooting</a>
+                <a href="#related" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Related Components</a>
             </div>
         </div>
     </div>
@@ -58,7 +58,7 @@
             <ol style="color: var(--text-color); font-family: var(--body-font);">
                 <li>User provides their email address, password, and domain name in the signup form</li>
                 <li>After successful user and site creation, the system attempts to create a mail account</li>
-                <li>The Mail model's <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">create_mail_account</code> method is called with the user's email, password, and domain</li>
+                <li>The Mail model's <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">create_mail_account</code> method is called with the user's email, password, and domain</li>
                 <li>The Virtualmin API is used to create the mail account on the mail server</li>
                 <li>A welcome email is sent to the user if mail account creation is successful</li>
             </ol>
@@ -71,7 +71,7 @@
         <div class="col-100">
             <h2 id="codeflow" style="color: var(--text-color); font-family: var(--header-font);">3. Code Flow</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">The following example shows the mail account creation flow in HostingSignup.pm:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code># In HostingSignup.pm
 try {
     # Create mail account using Virtualmin API
@@ -98,8 +98,8 @@ try {
     <div class="row">
         <div class="col-100">
             <h2 id="configuration" style="color: var(--text-color); font-family: var(--header-font);">4. Configuration</h2>
-            <p style="color: var(--text-color); font-family: var(--body-font);">The mail integration requires the following configuration in <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">comserv.conf</code>:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <p style="color: var(--text-color); font-family: var(--body-font);">The mail integration requires the following configuration in <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">comserv.conf</code>:</p>
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>&lt;Virtualmin&gt;
     host        192.168.1.129
     username    admin
@@ -116,8 +116,8 @@ try {
             <h2 id="error-handling" style="color: var(--text-color); font-family: var(--header-font);">5. Error Handling</h2>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li>If mail account creation fails, the signup process continues</li>
-                <li>Errors are logged using <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">log_with_details</code></li>
-                <li>Error messages are added to <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">debug_msg</code> for display in the UI</li>
+                <li>Errors are logged using <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">log_with_details</code></li>
+                <li>Error messages are added to <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">debug_msg</code> for display in the UI</li>
                 <li>The user is still created and can access the site even if mail account creation fails</li>
             </ul>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -129,7 +129,7 @@ try {
         <div class="col-100">
             <h2 id="logging" style="color: var(--text-color); font-family: var(--header-font);">6. Logging</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">The mail integration uses comprehensive logging:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; overflow-x: auto;"><code>$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'process_signup', 
     "Creating mail account for " . $params->{email} . " on domain " . $params->{domain_name});</code></pre>
             </div>
@@ -143,11 +143,11 @@ try {
             <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">If mail account creation fails, follow these steps:</p>
             
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 0 4px 4px 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 0 4px 4px 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Troubleshooting Steps</h3>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Check the application logs for detailed error messages</li>
-                    <li>Verify Virtualmin API credentials in <code style="background-color: var(--light-color); padding: 2px 4px;">comserv.conf</code></li>
+                    <li>Verify Virtualmin API credentials in <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">comserv.conf</code></li>
                     <li>Ensure the Virtualmin server is accessible from the application server</li>
                     <li>Verify that the domain exists on the Virtualmin server</li>
                     <li>Check that the email format is valid</li>
@@ -160,11 +160,11 @@ try {
     <!-- RELATED COMPONENTS SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="related" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
+            <div id="related" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 0 4px 4px 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. Related Components</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
-                    <li><strong>Mail Model</strong>: Provides the <code style="background-color: var(--light-color); padding: 2px 4px;">create_mail_account</code> method</li>
-                    <li><strong>Mail Controller</strong>: Provides the <code style="background-color: var(--light-color); padding: 2px 4px;">send_welcome_email</code> method</li>
+                    <li><strong>Mail Model</strong>: Provides the <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">create_mail_account</code> method</li>
+                    <li><strong>Mail Controller</strong>: Provides the <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">send_welcome_email</code> method</li>
                     <li><strong>Virtualmin API</strong>: Used to create mail accounts on the mail server</li>
                     <li><strong>Root Controller</strong>: Provides fallback email sending functionality</li>
                 </ul>

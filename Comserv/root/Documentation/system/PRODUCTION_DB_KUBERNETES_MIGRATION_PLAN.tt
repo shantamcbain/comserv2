@@ -37,23 +37,23 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#current-state" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Current State</a>
-                <a href="#network-topology" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Network Topology</a>
-                <a href="#routing-diagnostics" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Routing & Diagnostics</a>
-                <a href="#k8s-rebuild-strategy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">K8s Rebuild</a>
-                <a href="#target-architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Target Architecture</a>
-                <a href="#proxmox-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proxmox Setup</a>
-                <a href="#opnsense-dns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">OPNsense DNS</a>
-                <a href="#kubectl-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">kubectl Config</a>
-                <a href="#phase-1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 1</a>
-                <a href="#phase-2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 2</a>
-                <a href="#phase-3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 3</a>
-                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Rollback</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#current-state" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Current State</a>
+                <a href="#network-topology" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Network Topology</a>
+                <a href="#routing-diagnostics" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Routing & Diagnostics</a>
+                <a href="#k8s-rebuild-strategy" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">K8s Rebuild</a>
+                <a href="#target-architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Target Architecture</a>
+                <a href="#proxmox-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Proxmox Setup</a>
+                <a href="#opnsense-dns" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">OPNsense DNS</a>
+                <a href="#kubectl-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">kubectl Config</a>
+                <a href="#phase-1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 1</a>
+                <a href="#phase-2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 2</a>
+                <a href="#phase-3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 3</a>
+                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Rollback</a>
             </div>
         </div>
     </div>
@@ -81,7 +81,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Production Database Setup (Bare Metal)</h3>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Component</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Current Configuration</strong></th>
                 </tr>
@@ -121,7 +121,7 @@
 
             <h3 id="actual-k8s-topology" style="color: var(--text-color); font-family: var(--header-font);">Existing Proxmox & Kubernetes Infrastructure (VERIFIED Dec 23, 2025)</h3>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Proxmox Host</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>K8s VMs on This Host</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Status</strong></th>
@@ -213,7 +213,7 @@
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Physical Infrastructure Layout</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                          PHYSICAL INFRASTRUCTURE                             │
 ├─────────────────────────────────────────────────────────────────────────────┤
@@ -282,7 +282,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">OPNsense Gateway Role (proxmoxt210 VM 103)</h3>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Function</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Implementation</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Impact on Migration</strong></th>
@@ -340,7 +340,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Current Routing State (Dec 23, 2025)</h3>
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Machine</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>IP Address</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Routing to 192.168.1.0/24</strong></th>
@@ -491,7 +491,7 @@ root@proxmoxt210:~# ping -c 3 192.168.123.75
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Making Routes Persistent (Permanent)</h3>
             <p style="color: var(--text-color); font-family: var(--body-font); margin: 10px 0;">On Proxmox hosts, edit <code>/etc/network/interfaces</code> to add permanent static routes:</p>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code># /etc/network/interfaces on proxmox720 and proxmoxt210
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code># /etc/network/interfaces on proxmox720 and proxmoxt210
 # Add these lines at the end:
 
 auto vmbr0
@@ -559,7 +559,7 @@ iface vmbr0 inet static
             </div>
 
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Role</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>VM ID</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Host Proxmox</strong></th>
@@ -806,7 +806,7 @@ root@proxmoxws:~# ping -c 2 192.168.1.103  # k8s-worker3-prod (on proxmox720)
             <h2 id="target-architecture" style="color: var(--text-color); font-family: var(--header-font);">3. Target Architecture</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Current Kubernetes Architecture (Multi-Node Distributed Cluster)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace; overflow-x: auto;"><code>
 Current K8s Setup (EXISTING - Multi-Node Distributed)
 ├── Control Plane (VM 100 on proxmoxws)
 │   ├── API Server
@@ -1881,7 +1881,7 @@ kubectl get storageclass
             <h2 id="phase-2" style="color: var(--text-color); font-family: var(--header-font);">6. Phase 2: Deploy & Test Database in Kubernetes (Week 3-4)</h2>
 
             <h3 id="step-6-1" style="color: var(--text-color); font-family: var(--header-font);">Step 6.1: Create Kubernetes Namespace for Comserv</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create namespace
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create namespace
 kubectl create namespace comserv-prod
 
 # Label for easy reference
@@ -1892,7 +1892,7 @@ kubectl get namespaces
                 </code></pre>
 
             <h3 id="step-6-2" style="color: var(--text-color); font-family: var(--header-font);">Step 6.2: Create Kubernetes Secrets for Database Credentials</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create secrets in Kubernetes (avoid hardcoding passwords)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Create secrets in Kubernetes (avoid hardcoding passwords)
 kubectl create secret generic comserv-db-credentials \
   --from-literal=username=shanta_forager \
   --from-literal=password='UA=nPF8*m+T#' \
@@ -2085,7 +2085,7 @@ exit
             </div>
 
             <h3 id="step-6-5" style="color: var(--text-color); font-family: var(--header-font);">Step 6.5: Verify Galera Replication & Data Consistency</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check Galera cluster status on all nodes
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check Galera cluster status on all nodes
 for i in 0 1 2; do
   echo "=== mariadb-$i ==="
   kubectl exec -it mariadb-$i -n comserv-prod -- \
@@ -2292,7 +2292,7 @@ kubectl apply -f comserv-ingress.yaml
             </div>
 
             <h3 id="step-7-3" style="color: var(--text-color); font-family: var(--header-font);">Step 7.3: Verify Application Connectivity to Database</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check application pod logs for database connection
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Check application pod logs for database connection
 kubectl logs -n comserv-prod deployment/comserv-app --tail=50
 
 # Test database connectivity from app pod
@@ -2328,7 +2328,7 @@ kubectl port-forward -n comserv-prod svc/comserv-service 8080:80 &
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.1: Verify Both Systems Are Healthy</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Test bare-metal database
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Test bare-metal database
 mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SHOW DATABASES; SHOW STATUS LIKE 'Uptime';"
 
 # Test Kubernetes database
@@ -2340,7 +2340,7 @@ kubectl logs -n comserv-prod deployment/comserv-app --tail=20
                 </code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.2: Final Data Sync (Zero-Second Downtime Approach)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># 1. Set bare-metal database to read-only (prepared state, not yet active)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># 1. Set bare-metal database to read-only (prepared state, not yet active)
 mysql -h 192.168.1.198 -u shanta_forager -p'UA=nPF8*m+T#' -e "SET GLOBAL read_only=1;"
 
 # 2. Wait for K8s Galera cluster to catch up (should be < 1 second for small transactions)
@@ -2355,7 +2355,7 @@ kubectl exec mariadb-0 -n comserv-prod -- mysql -u root -p$MYSQL_ROOT_PASSWORD e
                 </code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.3: Switch DNS/Load Balancer to K8s</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Option 1: If using DNS (internal DNS/Kubernetes coredns)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Option 1: If using DNS (internal DNS/Kubernetes coredns)
 # Update application configuration to use K8s service hostname:
 # Old: COMSERV_DB_PRODUCTION_SERVER_HOST=192.168.1.198
 # New: COMSERV_DB_PRODUCTION_SERVER_HOST=mariadb.comserv-prod.svc.cluster.local
@@ -2370,7 +2370,7 @@ dig comserv.yourdomain.com  # Should resolve to K8s LB IP, not 192.168.1.198
                 </code></pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Step 8.4: Monitor for Issues (30 minutes after switch)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Monitor K8s application logs
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># Monitor K8s application logs
 watch kubectl logs -n comserv-prod deployment/comserv-app -f
 
 # Monitor database replication
@@ -2401,7 +2401,7 @@ back Procedure (Days 1-3 After Cutover)</h2>
             <h3 id="step-9-1" style="color: var(--text-color); font-family: var(--header-font);">Step 9.1: Full Rollback Procedure</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If critical issues occur after cutover, rollback to bare-metal database within minutes.</p>
 
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># STEP 1: Disable Kubernetes application (immediately)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; color: var(--text-color); font-family: monospace;"><code># STEP 1: Disable Kubernetes application (immediately)
 kubectl scale deployment comserv-app --replicas=0 -n comserv-prod
 
 # STEP 2: Set bare-metal database to read-write
@@ -2434,7 +2434,7 @@ kubectl exec mariadb-0 -n comserv-prod -- tail -f /var/log/mysql/error.log
             <h2 id="validation" style="color: var(--text-color); font-family: var(--header-font);">10. Pre-Cutover Validation Checklist</h2>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color); width: 5%;"><strong>✓</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Validation Task</th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Success Criteria</th>
@@ -2506,7 +2506,7 @@ kubectl exec mariadb-0 -n comserv-prod -- tail -f /var/log/mysql/error.log
             <h2 style="color: var(--text-color); font-family: var(--header-font);">11. Timeline Summary</h2>
             
             <table style="width: 100%; border-collapse: collapse; margin: var(--spacing-small) 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Phase</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Duration</strong></th>
                     <th style="text-align: left; padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><strong>Key Deliverables</strong></th>

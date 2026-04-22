@@ -18,7 +18,7 @@
         Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators &amp; Accounting
     </div>
 
-    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
         <div class="col-100">
             <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
             <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">

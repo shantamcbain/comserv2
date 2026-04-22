@@ -53,7 +53,7 @@
         </ul>
       </div>
       <div class="card-footer">
-        <a href="/contact" class="btn btn-success btn-block">Contact Sales</a>
+        <a href="/marketplace/add?listing_type=wanted" class="btn btn-success btn-block">Request a Quote</a>
       </div>
     </div>
   </div>
@@ -74,7 +74,7 @@
         </ul>
       </div>
       <div class="card-footer">
-        <a href="/contact" class="btn btn-info btn-block">Contact Sales</a>
+        <a href="/marketplace/add?listing_type=wanted" class="btn btn-info btn-block">Request a Quote</a>
       </div>
     </div>
   </div>
@@ -85,7 +85,7 @@
     <h2>Ready to Get Started?</h2>
     <p class="lead">Choose the plan that's right for you and launch your website today.</p>
     <a href="/hosting_signup" class="btn btn-primary btn-lg me-3">Sign Up for Basic Hosting</a>
-    <a href="/contact" class="btn btn-outline-secondary btn-lg">Contact Sales</a>
+    <a href="/marketplace?q=hosting&type=job" class="btn btn-outline-secondary btn-lg">Browse Hosting Services on Marketplace</a>
   </div>
 </div>
 

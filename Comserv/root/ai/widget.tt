@@ -187,7 +187,7 @@
 
         <div id="ff-override-row">
             <label><input type="checkbox" id="ff-override"> Override existing values</label>
-            <label><input type="checkbox" id="ff-web-search"> Live web search (Grok only)</label>
+            <label><input type="checkbox" id="ff-web-search"> Live web search (Grok or Ollama w/ API key)</label>
         </div>
 
         <div id="ff-fields-info"></div>
@@ -327,6 +327,45 @@
         }
     }
 
+    var FF_ALL_MODELS = { grok: [], ollama: [] };
+
+    // Model size score — lower = smaller/faster
+    function ffModelScore(id) {
+        var s = id.toLowerCase();
+        if (s.match(/0\.5b|1b|1\.5b|tiny|nano/))  return 1;
+        if (s.match(/3b|4b|mini/))                 return 2;
+        if (s.match(/7b|8b/))                      return 3;
+        if (s.match(/13b|14b|20b/))                return 4;
+        if (s.match(/30b|34b|70b|large/))          return 5;
+        if (s.match(/grok-4.*fast/))               return 6;
+        if (s.match(/grok-3-mini|grok-3-fast/))    return 6;
+        if (s.match(/grok-4|grok-3/))              return 7;
+        return 3; // unknown → treat as medium
+    }
+
+    // Pick the smallest Ollama model that can reliably return JSON (~3b+)
+    function ffAutoModel(fieldCount, useSearch) {
+        if (useSearch && !FF_ALL_MODELS.ollama.length) {
+            // No local Ollama models — fall back to Grok for search
+            var grokModel = FF_ALL_MODELS.grok[0];
+            return grokModel ? { model: grokModel, provider: 'grok' }
+                             : { model: 'gemma3:4b', provider: 'ollama' };
+        }
+        if (!FF_ALL_MODELS.ollama.length) {
+            var grokModel = FF_ALL_MODELS.grok[0];
+            return grokModel ? { model: grokModel, provider: 'grok' }
+                             : { model: 'gemma3:4b', provider: 'ollama' };
+        }
+        // Sort ollama models by size score
+        var ranked = FF_ALL_MODELS.ollama.slice().sort(function(a,b){ return ffModelScore(a)-ffModelScore(b); });
+        // Simple fill (few fields): use smallest model that scores ≥ 2 (3b+)
+        // More fields or complex form: use first model that scores ≥ 3 (7b+)
+        var minScore = fieldCount <= 6 ? 2 : 3;
+        var chosen = ranked.find(function(m){ return ffModelScore(m) >= minScore; });
+        if (!chosen) chosen = ranked[ranked.length - 1]; // fallback to largest available
+        return { model: chosen, provider: 'ollama' };
+    }
+
     function ffLoadModels() {
         var sel = document.getElementById('ff-model-sel');
         if (!sel || sel.dataset.loaded) return;
@@ -334,46 +373,61 @@
             .then(function(r){ return r.json(); })
             .then(function(data) {
                 if (!data.success || !data.providers) return;
-                var opts = [];
+                var opts = [{ val: 'auto|auto', label: '⚡ Auto (recommended)' }];
                 data.providers.forEach(function(p) {
                     if (p.service === 'grok' && p.models) {
                         p.models.filter(function(m){ return m.id && !m.id.match(/imagine|video/i); })
                             .forEach(function(m) {
+                                FF_ALL_MODELS.grok.push(m.id);
                                 var lbl = m.id.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
                                 opts.push({ val: m.id+'|grok', label: lbl+' (Grok)' });
                             });
                     }
                     if (p.service === 'ollama' && p.models) {
-                        p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank/i); })
+                        p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank|tinyllama|phi:2|llava|whisper|tts/i); })
                             .forEach(function(m) {
+                                FF_ALL_MODELS.ollama.push(m.id);
                                 opts.push({ val: m.id+'|ollama', label: m.id+' (Ollama)' });
                             });
                     }
                 });
-                if (!opts.length) opts = [
-                    { val:'mistral:latest|ollama', label:'mistral:latest (Ollama)' }
-                ];
+                if (opts.length <= 1) opts.push({ val:'mistral:latest|ollama', label:'mistral:latest (Ollama)' });
                 sel.innerHTML = '';
+                // Restore previously saved model selection
+                var saved = localStorage.getItem('ai_widget_ff_model');
+                var defaultIdx = 0;
+                if (saved) {
+                    for (var i = 0; i < opts.length; i++) {
+                        if (opts[i].val === saved) { defaultIdx = i; break; }
+                    }
+                }
                 opts.forEach(function(o, i) {
                     var opt = document.createElement('option');
                     opt.value = o.val; opt.textContent = o.label;
-                    if (i === 0) opt.selected = true;
+                    if (i === defaultIdx) opt.selected = true;
                     sel.appendChild(opt);
                 });
                 sel.dataset.loaded = '1';
+                // Save on change
+                sel.addEventListener('change', function() {
+                    localStorage.setItem('ai_widget_ff_model', sel.value);
+                });
             })
             .catch(function() {
-                sel.innerHTML = '<option value="mistral:latest|ollama">mistral:latest (Ollama)</option>';
+                sel.innerHTML = '<option value="auto|auto">⚡ Auto (recommended)</option>'
+                              + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>'
+                              + '<option value="qwen2.5:7b|ollama">qwen2.5:7b (Ollama)</option>';
             });
     }
 
-    function ffGetMP() {
+    function ffGetMP(fieldCount, useSearch) {
         var sel = document.getElementById('ff-model-sel');
-        if (sel && sel.value) {
+        if (sel && sel.value && sel.value !== 'auto|auto') {
             var p = sel.value.split('|');
             return { model: p[0], provider: p[1] || 'ollama' };
         }
-        return { model:'mistral:latest', provider:'ollama' };
+        // Auto mode — pick minimum capable model
+        return ffAutoModel(fieldCount || FF_PAGE_FIELDS.length || 5, useSearch || false);
     }
 
     function ffNormalise(v) {
@@ -397,7 +451,7 @@
         var targetFields = targetRaw
             ? targetRaw.split(/[\s,;]+/).map(function(f){ return f.trim().toLowerCase(); }).filter(Boolean)
             : [];
-        var mp = ffGetMP();
+        var mp = ffGetMP(FF_PAGE_FIELDS.length, useSearch);
 
         var allNames = FF_PAGE_FIELDS.map(function(f){ return f.name; });
         var fieldList = targetFields.length ? targetFields.join(', ') : allNames.join(', ');
@@ -594,7 +648,7 @@
         results.innerHTML = '';
         statusEl.textContent = 'Reviewing…';
 
-        var mp  = ffGetMP();
+        var mp  = ffGetMP(FF_PAGE_FIELDS.length, false);
         var currentValues = {};
         FF_PAGE_FIELDS.forEach(function(f){ if (f.value && f.value.trim()) currentValues[f.name] = f.value.trim(); });
 
