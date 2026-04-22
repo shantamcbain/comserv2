@@ -43,6 +43,14 @@
 
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
     <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
+    <script>
+    window.AI_CHAT_USER_CONFIG = {
+        username: '[% c.session.username || 'Guest' %]',
+        isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
+        isAdmin:  [% (c.check_user_roles('admin') || c.check_user_roles('developer')) ? 'true' : 'false' %],
+        siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
+    };
+    </script>
     <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
