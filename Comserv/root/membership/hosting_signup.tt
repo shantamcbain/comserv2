@@ -1,20 +1,58 @@
 [% META
-   title = "Register with CSC Hosting"
+   title = "CSC Hosting Registration"
    TemplateType = "Application"
 %]
+[% SET is_update = hosting_account ? 1 : 0 %]
 
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
   <div class="page-header">
+    [% IF is_update %]
+    <h1>&#127760; Update CSC Hosting &mdash; [% site_name | html %]</h1>
+    <p>Update your hosting settings for <strong>[% site_name | html %]</strong>. Changes will be reviewed by CSC admin.</p>
+    [% ELSE %]
     <h1>&#127760; Register [% site_name | html %] with CSC Hosting</h1>
     <p>Complete this form to register <strong>[% site_name | html %]</strong> as a CSC hosting partner.
     Once approved, your members will be able to purchase hosting plans directly from this site.</p>
+    [% END %]
   </div>
 
   <div class="content-container">
     <div class="content-primary">
+
+      [% IF is_update %]
+      <div class="content-section">
+        <h2>Current Account Status</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr>
+              <th>Status</th>
+              <td><span class="status-[% hosting_account.status | html %]">[% hosting_account.status | ucfirst | html %]</span></td>
+            </tr>
+            [% IF hosting_account.plan_slug %]
+            <tr><th>Plan</th><td>[% hosting_account.plan_slug | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.domain %]
+            <tr><th>Domain</th><td><code>[% hosting_account.domain | html %]</code></td></tr>
+            [% END %]
+            [% IF hosting_account.monthly_cost %]
+            <tr><th>Monthly Cost</th><td>CAD [% hosting_account.monthly_cost | format('%.2f') %]/mo</td></tr>
+            [% END %]
+            [% IF hosting_account.next_renewal_date %]
+            <tr><th>Next Renewal</th><td>[% hosting_account.next_renewal_date %]</td></tr>
+            [% END %]
+            [% IF hosting_account.requested_addons %]
+            <tr><th>Active Add-ons</th><td>[% hosting_account.requested_addons | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.contact_email %]
+            <tr><th>Billing Email</th><td>[% hosting_account.contact_email | html %]</td></tr>
+            [% END %]
+          </table>
+        </div>
+      </div>
+      [% END %]
 
       <form method="post" action="[% c.uri_for('/membership/hosting_signup') %]" class="form-standard">
 
@@ -79,10 +117,11 @@
           <div class="form-row">
             <div class="form-field">
               <label for="domain_type">Domain Type</label>
+              [% SET cur_dtype = hosting_account.domain_type || 'subdomain' %]
               <select name="domain_type" id="domain_type" onchange="toggleDomainFields(this.value)">
-                <option value="subdomain">Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
-                <option value="custom">Custom domain (bring your own)</option>
-                <option value="subpath">CSC sub-path (e.g. csc.ca/yoursite)</option>
+                <option value="subdomain" [% IF cur_dtype == 'subdomain' %]selected[% END %]>Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
+                <option value="custom"    [% IF cur_dtype == 'custom'    %]selected[% END %]>Custom domain (bring your own)</option>
+                <option value="subpath"   [% IF cur_dtype == 'subpath'   %]selected[% END %]>CSC sub-path (e.g. csc.ca/yoursite)</option>
               </select>
             </div>
           </div>
@@ -150,7 +189,9 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Submit Registration →</button>
+          <button type="submit" class="btn btn-primary">
+            [% IF is_update %]Update Settings[% ELSE %]Submit Registration &rarr;[% END %]
+          </button>
           <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
         </div>
 
@@ -175,5 +216,5 @@ function toggleDomainFields(type) {
         labelDomain.textContent = 'Desired Sub-path (e.g. beemaster)';
     }
 }
-toggleDomainFields('subdomain');
+toggleDomainFields('[% hosting_account.domain_type || 'subdomain' %]');
 </script>
