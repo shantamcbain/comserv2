@@ -43,9 +43,9 @@
     display: inline-block; padding: 2px 8px; border-radius: 3px;
     font-size: 0.75em; font-weight: bold; white-space: nowrap;
 }
-.badge-active   { background: #28a745; color: #fff; }
-.badge-paused   { background: #ffc107; color: #333; }
-.badge-completed{ background: #6c757d; color: #fff; }
+.badge-active   { background: var(--success-color, #28a745); color: #fff; }
+.badge-paused   { background: #ffc107; color: var(--text-color, #333); }
+.badge-completed{ background: var(--secondary-color, #6c757d); color: #fff; }
 .badge-archived { background: #343a40; color: #fff; }
 .badge-site     { background: var(--primary-color); color: #fff; margin-left: 6px; }
 .plan-meta { font-size: 0.82em; color: var(--text-muted-color); margin-top: 4px; }

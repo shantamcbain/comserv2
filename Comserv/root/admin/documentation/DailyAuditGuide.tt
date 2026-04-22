@@ -149,12 +149,12 @@
                     <h5 style="margin-top: 20px; margin-bottom: 10px; color: var(--text-color);">📋 Configuration Settings & Enforcement Rules</h5>
                     <p style="color: var(--text-muted-color); font-size: 0.95em; margin: 10px 0;">To tune the agent for routine documentation updates, configure these key enforcement rules and validation settings:</p>
                     
-                    <div style="background: #fff; padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
+                    <div style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
                         <p style="margin: 5px 0;"><strong>🔴 PRIORITY 1: File Format Enforcement</strong></p>
                         <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> All files in /Comserv/root/Documentation/ MUST be .tt format (Template Toolkit). <strong>Detect:</strong> .md files in documentation directory (violations). <strong>Action:</strong> When violations found, verify .tt equivalents exist, check content parity, confirm .tt is current, then delete .md with confirmation. Configure agent to scan on daily audit trigger.</p>
                     </div>
                     
-                    <div style="background: #fff; padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
+                    <div style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 10px; margin: 8px 0; border-left: 3px solid #d32f2f; border-radius: 3px;">
                         <p style="margin: 5px 0;"><strong>🔴 PRIORITY 2: Template Conformance Validation</strong></p>
                         <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> Every .tt file MUST conform to DocumentationTtTemplate.tt. <strong>Mandatory elements:</strong> (1) META block with title, description, page_version, last_updated; (2) PageVersion line with version+timestamp; (3) Debug mode guard; (4) CSS variables only (no inline colors like #123456 - use var(--text-color) instead); (5) Layout classes (.container, .row, .col-*). <strong>Validation:</strong> Agent scans each .tt for these elements before accepting changes. If FAIL: Report specific violations + line numbers, refuse to process file. If PASS: Proceed with updates.</p>
                     </div>
@@ -174,7 +174,7 @@
                         <p style="margin: 5px 0 10px 0; font-size: 0.9em; color: var(--text-muted-color);"><strong>Rule:</strong> Track documentation currency. <strong>Settings:</strong> (1) Update page_version with minor bumps (1.00 → 1.01) on each edit; (2) Update last_updated in META block with system date (format: 'Day Mon DD HH:MM:SS UTC YYYY'); (3) Update PageVersion line with new version + timestamp; (4) Add "Recent Changes" section to document what changed in each update. <strong>Monitoring:</strong> Flag files not updated in >30 days for review. Configure notifications when version increments are missing.</p>
                     </div>
                     
-                    <p style="margin-top: 15px; padding: 10px; background: #f5f5f5; border-left: 3px solid #9e9e9e; border-radius: 3px;">
+                    <p style="margin-top: 15px; padding: 10px; background: var(--bg-secondary, #f5f5f5); border-left: 3px solid #9e9e9e; border-radius: 3px;">
                         <strong>Configuration Sources:</strong><br/>
                         • <strong>Workflow & Responsibilities:</strong> <a href="/Documentation/CodingStandards" style="color: var(--primary-color);">CodingStandards.yaml</a> - agents:documentation-sync-agent (lines 1812-1910)<br/>
                         • <strong>Enforcement Rules & Validation:</strong> Archived agent spec - documentation-synchronization-agent.md (sections on File Format Enforcement, Template Conformance, Sync Monitoring, Duplicate Detection, Cleanup Scheduler)<br/>
@@ -185,12 +185,12 @@
                 <div style="background: var(--nav-bg); padding: 10px; border-radius: 3px; margin: 15px 0;">
                     <p><strong>Step 3: Update the Master Plan</strong></p>
                     <p>Run the Master Plan Coordination update to consolidate all system status based on documentation updates from Step 2 and audit findings from Step 1:</p>
-                    <p><code style="background: #fff; padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Update MASTER_PLAN"</code></p>
+                    <p><code style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Update MASTER_PLAN"</code></p>
                 </div>
                 <div style="background: var(--nav-bg); padding: 10px; border-radius: 3px; margin: 15px 0;">
                     <p><strong>Step 4: Update the Daily Plans</strong></p>
                     <p>Generate or update daily plans for the week with latest priorities:</p>
-                    <p><code style="background: #fff; padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Generate Daily Plans"</code></p>
+                    <p><code style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 5px; border-radius: 3px;">perl .zencoder/scripts/updateprompt.pl --action "Generate Daily Plans"</code></p>
                 </div>
                 <div style="background: #fff3e0; padding: 12px; border-left: 4px solid #ff9800; border-radius: 3px; margin: 15px 0;">
                     <p style="margin: 0 0 10px 0;"><strong>📝 Finish: Close Log (Record 320)</strong></p>

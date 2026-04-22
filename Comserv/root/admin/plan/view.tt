@@ -20,7 +20,7 @@
     <div style="display:flex;gap:8px;align-items:center;">
         [% IF plan.priority %]<span style="font-size:0.85em;color:var(--text-muted-color);">P[% plan.priority %]</span>[% END %]
         <span style="padding:3px 10px;border-radius:4px;font-size:0.85em;font-weight:bold;
-            [% IF plan.status == 'active' %]background:#28a745;color:#fff[% ELSIF plan.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+            [% IF plan.status == 'active' %]background:#28a745;color:#fff[% ELSIF plan.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
             [% plan.status || 'active' %]
         </span>
         [% IF is_admin %]
