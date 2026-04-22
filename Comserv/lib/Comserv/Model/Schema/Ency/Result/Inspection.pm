@@ -44,7 +44,7 @@ __PACKAGE__->add_columns(
     inspection_type => {
         data_type => 'enum',
         extra => {
-            list => [qw/routine disease_check harvest treatment emergency/]
+            list => [qw/routine disease_check harvest treatment emergency queen_check/]
         },
         default_value => 'routine',
     },
@@ -113,6 +113,28 @@ __PACKAGE__->add_columns(
         data_type => 'date',
         is_nullable => 1,
     },
+    feeding_done => {
+        data_type     => 'boolean',
+        default_value => 0,
+        comment       => 'Whether feeding was performed during this inspection',
+    },
+    feed_type => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'Type of feed provided (syrup, fondant, pollen substitute, etc.)',
+    },
+    feed_amount => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+        comment     => 'Amount of feed provided (e.g. 1L, 500g)',
+    },
+    boosted_from_hive => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → hives — hive from which frames/bees were donated to boost this hive',
+    },
     created_at => {
         data_type => 'timestamp',
         default_value => \'CURRENT_TIMESTAMP',
@@ -145,6 +167,20 @@ __PACKAGE__->has_many(
     'Comserv::Model::Schema::Ency::Result::InspectionDetail',
     'inspection_id',
     { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'inspection_feedings',
+    'Comserv::Model::Schema::Ency::Result::InspectionFeeding',
+    'inspection_id',
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->belongs_to(
+    'boosted_hive',
+    'Comserv::Model::Schema::Ency::Result::Hive',
+    'boosted_from_hive',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 # Custom methods

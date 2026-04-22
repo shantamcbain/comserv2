@@ -117,7 +117,8 @@ Design and implement the canonical queen data model. Keep `queens` as the canoni
 - All schema changes via Result class edits + `/admin/schema_comparison` — NOT direct SQL apply
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
-### [ ] Step: Hive Inspection — Schema Updates
+### [x] Step: Hive Inspection — Schema Updates
+<!-- chat-id: ec2fe9ff-1523-481a-bb4d-af937a20d65d -->
 Complete gap analysis documented in `spec.md` (Hive Inspection Feature section). Apply the following schema changes:
 - Fix `Inspection.inspection_type` enum: add `queen_check` value (in DB and Result class)
 - Add `configuration_id` FK to `hives` table → `hive_configurations` (DB ALTER + Hive.pm update)
