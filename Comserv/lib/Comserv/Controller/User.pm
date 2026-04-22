@@ -118,7 +118,8 @@ sub login :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Session referer: " . ($c->session->{referer} || 'undefined'));
 
     # Store the referer in the stash for the template
-    $c->stash->{return_to} = $c->session->{referer};
+    my $return_to = $c->session->{referer} // '';
+    $c->stash->{return_to} = $return_to;
     
     # Check if admin access is required (from URL parameter)
     my $admin_required = $c->req->param('admin_required');
