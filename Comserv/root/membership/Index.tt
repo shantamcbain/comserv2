@@ -113,12 +113,22 @@
           <p style="margin:0.4rem 0 0;">Your site is registered and active with CSC hosting.
           Members can now purchase hosting plans.
           Monthly cost: <strong>CAD [% hosting_account.monthly_cost %]/mo</strong>.</p>
+          <div style="margin-top:0.6rem;">
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="font-size:0.85rem;">
+              &#9998; Edit Hosting Registration
+            </a>
+          </div>
         </div>
         [% ELSIF hosting_account AND hosting_account.status == 'pending' %]
         <div style="border:2px solid #e67e22;border-radius:6px;padding:1rem 1.2rem;background:#fff8f0;margin-bottom:1rem;">
           <strong style="color:#e67e22;">&#8987; CSC Hosting Registration Pending</strong>
           <p style="margin:0.4rem 0 0;">Your registration was submitted and is awaiting CSC approval.
           You will receive an email at <strong>[% hosting_account.contact_email | html %]</strong> when approved.</p>
+          <div style="margin-top:0.6rem;">
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="font-size:0.85rem;">
+              &#9998; Edit Hosting Registration
+            </a>
+          </div>
         </div>
         [% END %]
 
@@ -136,11 +146,21 @@
         </div>
         [% ELSIF hosting_account %]
           [% IF hosting_account.status == 'active' %]
-          <p style="color:#27ae60;margin:0 0 0.8rem;"><strong>&#10003; [% site_name | html %] is a registered CSC hosting partner.</strong>
-          Members of this site can purchase hosting plans below.</p>
+          <p style="color:#27ae60;margin:0 0 0.8rem;">
+            <strong>&#10003; [% site_name | html %] is a registered CSC hosting partner.</strong>
+            Members of this site can purchase hosting plans below.
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="margin-left:0.8rem;font-size:0.85rem;">
+              &#9998; Edit Registration
+            </a>
+          </p>
           [% ELSIF hosting_account.status == 'pending' %]
-          <p style="color:#e67e22;margin:0 0 0.8rem;"><strong>&#8987; Registration pending CSC approval.</strong>
-          Hosting plans will be available once CSC activates your account.</p>
+          <p style="color:#e67e22;margin:0 0 0.8rem;">
+            <strong>&#8987; Registration pending CSC approval.</strong>
+            Hosting plans will be available once CSC activates your account.
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="margin-left:0.8rem;font-size:0.85rem;">
+              &#9998; Edit Registration
+            </a>
+          </p>
           [% END %]
         [% END %]
 
