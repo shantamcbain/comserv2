@@ -205,7 +205,7 @@ sub order_status :Path('/CustomerOrder/status') :Args(1) {
 sub customer_list :Path('/CustomerOrder/customers') :Args(0) {
     my ($self, $c) = @_;
     unless ($self->_is_admin($c)) {
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
     my $sitename = $self->_sitename($c);
@@ -277,7 +277,7 @@ sub customer_list :Path('/CustomerOrder/customers') :Args(0) {
 sub customer_view :Path('/CustomerOrder/customer') :Args(0) {
     my ($self, $c) = @_;
     unless ($self->_is_admin($c)) {
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
     my $sitename = $self->_sitename($c);

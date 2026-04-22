@@ -154,7 +154,7 @@ sub hosting_signup :Local :Args(0) {
     my ($self, $c) = @_;
 
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
-    return $c->response->redirect($c->uri_for('/user/login'))
+    return $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }))
         unless $c->session->{username};
     return $c->response->redirect($c->uri_for('/membership'))
         unless $self->_is_admin($c);
@@ -295,7 +295,7 @@ sub account :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "Please log in to view your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -350,7 +350,7 @@ sub autopay_settings :Local :Args(0) {
     my ($self, $c) = @_;
 
     unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -414,7 +414,7 @@ sub subscribe :Local :Args(0) {
     unless ($c->session->{username}) {
         $c->session->{post_login_redirect} = $c->req->uri->as_string;
         $c->flash->{error_msg} = "Please log in to subscribe.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -482,7 +482,7 @@ sub cancel :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "Please log in to manage your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -541,7 +541,7 @@ sub upgrade :Local :Args(0) {
     unless ($c->session->{username}) {
         $c->session->{post_login_redirect} = $c->req->uri->as_string;
         $c->flash->{error_msg} = "Please log in to upgrade your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -594,7 +594,7 @@ sub csc_account :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "Please log in to manage your CSC membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 

@@ -498,7 +498,7 @@ sub orders :Path('/Cart/orders') :Args(0) {
 
     unless ($self->_require_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -532,7 +532,7 @@ sub order_view :Path('/Cart/order') :Args(1) {
 
     unless ($self->_require_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -563,7 +563,7 @@ sub order_status :Path('/Cart/order_status') :Args(1) {
 
     unless ($self->_require_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
