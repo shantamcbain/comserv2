@@ -44,7 +44,8 @@
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
-        supportPollTimer: null      // setInterval handle for support chat polling
+        supportPollTimer: null,     // setInterval handle for support chat polling
+        siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
@@ -208,11 +209,25 @@
             opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
             sel.appendChild(opt);
         });
-        // Restore previously saved agent selection
+        // Site-name → default agent map (when no saved preference)
+        var siteAgentMap = {
+            'BMaster':    'bmaster',
+            'ENCY':       'ency',
+            'CSC':        'csc',
+            'HelpDesk':   'helpdesk',
+        };
+
+        // Restore previously saved agent selection, or auto-select by site
         var saved = localStorage.getItem('ai_widget_agent');
         if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
+        } else if (state.siteName && siteAgentMap[state.siteName]) {
+            var siteAgent = siteAgentMap[state.siteName];
+            if (sel.querySelector('option[value="' + siteAgent + '"]')) {
+                sel.value = siteAgent;
+                _applyAgentOverride(siteAgent);
+            }
         }
         sel.addEventListener('change', function() {
             var chosen = sel.value;
@@ -3026,6 +3041,7 @@
             if (cfg.username) state.username = cfg.username;
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
+            if (cfg.siteName) state.siteName = cfg.siteName;
         }
 
         // If this /ai page was opened by detaching the widget, honour the original
