@@ -30,8 +30,8 @@
 }
 
 .db-env-production {
-    background-color: #dc3545;
-    color: white;
+    background-color: var(--warning-color, #dc3545);
+    color: #fff;
 }
 
 .db-env-staging {
@@ -40,8 +40,8 @@
 }
 
 .db-env-dev {
-    background-color: #28a745;
-    color: white;
+    background-color: var(--success-color, #28a745);
+    color: #fff;
 }
 
 .k8s-migration-banner {

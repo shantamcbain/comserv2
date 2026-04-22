@@ -1,0 +1,182 @@
+[% PageVersion = 'ThemeAuditWorkingLog.tt,v 0.01 2026/04/22 shanta Exp shanta ' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="documentation-container">
+    <header class="documentation-header">
+        <h1><i class="fas fa-clipboard-list"></i> Theme Audit Working Log</h1>
+        <div class="user-context">
+            <span class="context-item"><strong>Project:</strong> CSS Themes System — Systematic TT Audit</span>
+            <span class="context-item"><strong>Status:</strong> <span class="status-active">In Progress</span></span>
+        </div>
+    </header>
+
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i>
+        <div>
+            <p>This log tracks the systematic theme compliance audit across all <code>.tt</code> templates.
+            Each phase audits a category of files for hardcoded colours, missing CSS-var usage, and non-compliant inline styles.</p>
+            <p>Canonical CSS variable reference: <a href="/documentation/developer/css_theme_guidelines">CSS Theme Guidelines</a></p>
+        </div>
+    </div>
+
+    <!-- ============================================================
+         PHASE 1 — WRAPPER FILES
+         ============================================================ -->
+    <section class="doc-section">
+        <h2 class="section-toggle"><i class="fas fa-check-circle" style="color:var(--success-color)"></i> Phase 1 — Wrapper Files <small>(COMPLETE 2026-04-22)</small></h2>
+        <div class="section-content">
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>Files Audited</h3></div>
+                <div class="feature-content">
+                    <ul class="feature-list">
+                        <li><code>root/layout.tt</code></li>
+                        <li><code>root/Header.tt</code></li>
+                        <li><code>root/pagetop.tt</code></li>
+                        <li><code>root/footer.tt</code></li>
+                        <li><code>root/AdminNotes.tt</code></li>
+                        <li><code>root/SiteAdminNotes.tt</code></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>P1.1 — layout.tt</h3></div>
+                <div class="feature-content">
+                    <p><strong>Finding:</strong> Inline <code>[% USE date; date.format(date.now, '%s') %]</code> used for cache-busting <code>ai-chat.css</code> and <code>local-chat.js</code> in both the popup-mode and main-mode branches — inconsistent with the <code>c.stash.css_v</code> approach used everywhere else.</p>
+                    <p><strong>Fix applied:</strong> Replaced all four occurrences with <code>[%- SET _cv = c.stash.css_v || '1' -%]</code> / <code>[% _cv %]</code>.</p>
+                    <p><strong>Status:</strong> <span class="status-active">Fixed</span></p>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>P1.2 — Header.tt</h3></div>
+                <div class="feature-content">
+                    <p><strong>Finding 1:</strong> Duplicate <code>&lt;meta charset="utf-8"&gt;</code>, <code>&lt;meta name="viewport"&gt;</code>, <code>&lt;meta name="REVISIT-AFTER"&gt;</code>, and <code>&lt;meta name="ROBOTS"&gt;</code> tags (each appeared twice).</p>
+                    <p><strong>Fix applied:</strong> Removed the four duplicate meta tags; kept one canonical set above the <code>&lt;title&gt;</code>.</p>
+                    <p><strong>Finding 2:</strong> <code>back-to-top.css</code>, <code>back-to-top.js</code>, and <code>ai-common.js</code> used inline <code>USE date</code> for cache-busting even though <code>cv = c.stash.css_v || '20260412'</code> was already set earlier in the same file.</p>
+                    <p><strong>Fix applied:</strong> Replaced all three with <code>[% cv %]</code>.</p>
+                    <p><strong>Status:</strong> <span class="status-active">Fixed</span></p>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>P1.3 — pagetop.tt</h3></div>
+                <div class="feature-content">
+                    <p><strong>Finding 1:</strong> <code>.db-env-production</code> used hardcoded <code>#dc3545</code> (Bootstrap danger red). No <code>--danger-color</code> variable exists in <code>base.css</code> yet.</p>
+                    <p><strong>Fix applied:</strong> Changed to <code>var(--warning-color, #dc3545)</code> — nearest available semantic red. Will require a proper <code>--danger-color</code> variable in Phase 2 (CSS Naming Standards).</p>
+                    <p><strong>Finding 2:</strong> <code>.db-env-staging</code> uses <code>#ffc107</code> (amber). No matching CSS var exists (Phase 2 will add <code>--caution-color</code> or similar).</p>
+                    <p><strong>Status:</strong> Partially fixed — staging colour left as hardcoded until <code>--caution-color</code> is defined in Phase 2.</p>
+                    <p><strong>Finding 3:</strong> <code>.db-env-dev</code> used hardcoded <code>#28a745</code> (green).</p>
+                    <p><strong>Fix applied:</strong> Changed to <code>var(--success-color, #28a745)</code>.</p>
+                    <p><strong>Note:</strong> The entire inline <code>&lt;style&gt;</code> block in <code>pagetop.tt</code> technically violates the "no inline CSS" guideline, but moving it to a dedicated CSS file requires a larger refactor (Phase 3+). Logged as a deferred item.</p>
+                    <p><strong>Status:</strong> <span class="status-active">Partially fixed</span> — remaining items deferred to Phase 2</p>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>P1.4 — footer.tt</h3></div>
+                <div class="feature-content">
+                    <p><strong>Finding 1:</strong> Copyright footer div used <code>color: #666</code> and <code>border-top: 1px solid #ddd</code> — hardcoded colours.</p>
+                    <p><strong>Fix applied:</strong> Changed to <code>color: var(--text-muted-color, #666)</code> and <code>border-top: 1px solid var(--border-color, #ddd)</code>.</p>
+                    <p><strong>Finding 2:</strong> <code>PageVersion</code> was assigned twice (lines 1 and 11) with different dates.</p>
+                    <p><strong>Fix applied:</strong> Removed the duplicate assignment; kept one at the top, bumped to v0.05.</p>
+                    <p><strong>Status:</strong> <span class="status-active">Fixed</span></p>
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-header"><h3>P1.5 — AdminNotes.tt + SiteAdminNotes.tt</h3></div>
+                <div class="feature-content">
+                    <p><strong>Finding:</strong> No CSS or styling present. Both files contain only TT logic (session/group checks and DBI queries). No theme compliance changes required.</p>
+                    <p><strong>Deferred refactor note:</strong> <code>AdminNotes.tt</code> uses a 20-entry explicit group allowlist instead of the centralised <code>is_admin</code> flag available in <code>pagetop.tt</code>. Simplification (replacing with <code>[% IF is_admin %]</code>) should be considered in a future maintenance pass — not a theme audit concern.</p>
+                    <p><strong>Status:</strong> <span class="status-active">No changes needed</span></p>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ============================================================
+         PHASE 2 — CSS NAMING STANDARDS (planned)
+         ============================================================ -->
+    <section class="doc-section">
+        <h2 class="section-toggle">Phase 2 — CSS Naming Standards <small>(Planned)</small></h2>
+        <div class="section-content">
+            <div class="feature-card">
+                <div class="feature-header"><h3>Deferred Items from Phase 1</h3></div>
+                <div class="feature-content">
+                    <ul class="feature-list">
+                        <li>Define <code>--danger-color</code> in <code>base.css</code> and all theme CSS files (needed for <code>.db-env-production</code> in <code>pagetop.tt</code>)</li>
+                        <li>Define <code>--caution-color</code> (amber) in <code>base.css</code> and theme files (needed for <code>.db-env-staging</code>)</li>
+                        <li>Document all canonical CSS variable names</li>
+                        <li>Normalise element naming in <code>base.css</code></li>
+                        <li>Update <code>ApplicationTtTemplate.tt</code> to v0.03</li>
+                        <li>Update <code>DocumentationTtTemplate.tt</code> to v0.07</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         PHASE 3 — MENU SYSTEM (planned)
+         ============================================================ -->
+    <section class="doc-section">
+        <h2 class="section-toggle">Phase 3 — Menu System <small>(Planned)</small></h2>
+        <div class="section-content">
+            <div class="feature-card">
+                <div class="feature-content">
+                    <ul class="feature-list">
+                        <li>All <code>Navigation/TopDropList*.tt</code> files</li>
+                        <li><code>Navigation/admintopmenu.tt</code> + <code>navigation.tt</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         PHASE 4 — ADMIN ENDPOINTS (planned)
+         ============================================================ -->
+    <section class="doc-section">
+        <h2 class="section-toggle">Phase 4 — Admin Endpoints <small>(Planned)</small></h2>
+        <div class="section-content">
+            <div class="feature-card">
+                <div class="feature-content">
+                    <ul class="feature-list">
+                        <li><code>admin/index.tt</code> + <code>admin/documentation/*.tt</code></li>
+                        <li><code>admin/theme/*.tt</code></li>
+                        <li><code>admin/HardwareMonitor</code> + <code>Logging</code> + <code>backup</code></li>
+                        <li><code>admin/environment_variables</code> + <code>database</code> + <code>schema</code> files</li>
+                        <li>Remaining <code>admin/*.tt</code> root-level files</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ============================================================
+         PHASE 5 — SITENAME TEMPLATES (planned)
+         ============================================================ -->
+    <section class="doc-section">
+        <h2 class="section-toggle">Phase 5 — SiteName Templates <small>(Planned)</small></h2>
+        <div class="section-content">
+            <div class="feature-card">
+                <div class="feature-content">
+                    <ul class="feature-list">
+                        <li>BMaster/ + Apiary/</li>
+                        <li>CSC/</li>
+                        <li>Shanta/ + WeaverBeck/ + weaverbeck/ + ve7tit/</li>
+                        <li>Forager/ + USBM/ + SB/ + coop/ + ENCY/</li>
+                        <li>WorkShops/ + todo/ + marketplace/ + file/ + ai/</li>
+                        <li>Shop/ + Cart/ + membership/ + Accounting/ + Inventory/ + NetworkMap/ + mail/</li>
+                        <li>Documentation/</li>
+                        <li>setup/ + include/ + email/ + root-level <code>*.tt</code></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </section>
+
+</div>
