@@ -1,0 +1,97 @@
+[%#
+    TopDropListBeekeeping.tt — Beekeeping / Apiary management dropdown menu.
+
+    Visibility rules:
+      - enabled_modules.beekeeping  (member opted into beekeeping feature)
+      - enabled_modules.apiary      (site-level apiary module enabled)
+      - SiteName == 'BMaster'       (always show on BMaster site)
+
+    All routes in this file correspond to existing controller actions.
+%]
+[% PageVersion = 'Navigation/TopDropListBeekeeping.tt,v 0.01 2026/04/21 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    <!-- [% PageVersion %] -->
+[% END %]
+
+[% SET site = c.stash.SiteName || c.session.SiteName || '' %]
+[% SET mods = c.stash.enabled_modules %]
+[% SET can_beekeep = mods.beekeeping || mods.apiary || (site == 'BMaster') %]
+
+[% IF can_beekeep %]
+<li class="horizontal-dropdown">
+    <a href="/BMaster" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
+    <div class="dropdown-content">
+
+        <!-- BMaster Home -->
+        <a href="/BMaster" class="menu-item"><i class="icon-home"></i>BMaster Home</a>
+
+        <div class="dropdown-divider"></div>
+
+        <!-- Bee Pasture & Forage -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-plant"></i>Bee Pasture &amp; Forage</span>
+            <div class="submenu">
+                <a href="/ENCY/BeePastureView" class="submenu-link"><i class="icon-pollinator"></i>Browse Bee Pasture Plants</a>
+                <a href="/ENCY/search" class="submenu-link"><i class="icon-search"></i>Search Encyclopedia</a>
+                <a href="/BMaster/environment" class="submenu-link"><i class="icon-ecology"></i>Environmental Planning</a>
+            </div>
+        </div>
+
+        <!-- Apiary Management -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-apiary"></i>Apiary Management</span>
+            <div class="submenu">
+                <a href="/Apiary" class="submenu-link"><i class="icon-home"></i>Apiary Overview</a>
+                <a href="/BMaster/apiary" class="submenu-link"><i class="icon-manage"></i>My Apiary</a>
+                <a href="/Apiary/HiveManagement" class="submenu-link"><i class="icon-hive"></i>Hive Management</a>
+                <a href="/BMaster/beehealth" class="submenu-link"><i class="icon-medical"></i>Bee Health Monitoring</a>
+                <a href="/BMaster/honey" class="submenu-link"><i class="icon-honey"></i>Honey &amp; Harvest</a>
+            </div>
+        </div>
+
+        <!-- Inspections -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-inspect"></i>Hive Inspections</span>
+            <div class="submenu">
+                <a href="/Apiary/inspections" class="submenu-link"><i class="icon-list"></i>All Inspections</a>
+                [% IF c.session.username %]
+                <a href="/Apiary/inspections/new" class="submenu-link"><i class="icon-add"></i>New Inspection</a>
+                [% END %]
+                <a href="/Apiary/inspections/calendar" class="submenu-link"><i class="icon-calendar"></i>Inspection Calendar</a>
+                <a href="/Apiary/inspections/reports" class="submenu-link"><i class="icon-report"></i>Inspection Reports</a>
+            </div>
+        </div>
+
+        <!-- Queen Rearing -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-insect"></i>Queen Rearing</span>
+            <div class="submenu">
+                <a href="/Apiary/QueenRearing" class="submenu-link"><i class="icon-insect"></i>Queen Rearing System</a>
+                <a href="/BMaster/Queens" class="submenu-link"><i class="icon-list"></i>Queen Records</a>
+                <a href="/Apiary/BeeHealth" class="submenu-link"><i class="icon-medical"></i>Colony Health</a>
+            </div>
+        </div>
+
+        <!-- Education -->
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-workshop"></i>Education &amp; Resources</span>
+            <div class="submenu">
+                <a href="/BMaster/education" class="submenu-link"><i class="icon-docs"></i>Beekeeping Education</a>
+                <a href="/workshop" class="submenu-link"><i class="icon-workshop"></i>Workshops</a>
+                <a href="/Documentation/BMaster" class="submenu-link"><i class="icon-documentation"></i>BMaster Documentation</a>
+            </div>
+        </div>
+
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/add_link?menu=Beekeeping" class="menu-item"><i class="icon-add"></i>Add Beekeeping Link</a>
+        [% END %]
+
+        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        <div class="dropdown-divider"></div>
+        <a href="/navigation/manage_links?menu=Beekeeping" class="menu-item"><i class="icon-manage"></i>Manage Beekeeping Menu</a>
+        [% END %]
+
+    </div>
+</li>
+[% END %]
