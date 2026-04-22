@@ -1,0 +1,116 @@
+[% PageVersion = 'CustomerOrder/customer.tt,v 0.01 2026/04/22 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+<div class="content-container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">
+    <i class="fas fa-user"></i> [% cust_name | html %]
+  </h1>
+  <div style="display:flex;gap:0.5em">
+    <a href="/CustomerOrder/customers" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      &larr; All Customers
+    </a>
+    <a href="/CustomerOrder/new" style="padding:6px 14px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-family:var(--body-font)">
+      <i class="fas fa-plus"></i> New Order
+    </a>
+  </div>
+</div>
+
+[% IF cust_email %]
+<p style="font-family:var(--body-font);color:var(--text-muted-color);margin-bottom:1.5em">
+  <i class="fas fa-envelope"></i>
+  <a href="mailto:[% cust_email | html %]" style="color:var(--link-color)">[% cust_email | html %]</a>
+</p>
+[% END %]
+
+<h2 style="font-family:var(--header-font);color:var(--text-color);margin:0 0 0.6em">Orders ([% orders.size %])</h2>
+[% IF orders.size %]
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:2em">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 10px;text-align:left">#</th>
+      <th style="padding:8px 10px;text-align:left">Date</th>
+      <th style="padding:8px 10px;text-align:right">Total</th>
+      <th style="padding:8px 10px;text-align:left">Status</th>
+      <th style="padding:8px 10px;text-align:left">Notes</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH o IN orders %]
+  <tr style="border-bottom:1px solid var(--border-color)">
+    <td style="padding:7px 10px;color:var(--text-muted-color)">[% o.id %]</td>
+    <td style="padding:7px 10px">[% o.created_at %]</td>
+    <td style="padding:7px 10px;text-align:right;font-weight:bold">
+      [% o.total_amount ? ('$' _ o.total_amount | format('%.2f')) : '—' %]
+    </td>
+    <td style="padding:7px 10px">
+      [% IF o.status == 'pending' %]<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px;font-size:0.85em">pending</span>
+      [% ELSIF o.status == 'confirmed' %]<span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px;font-size:0.85em">confirmed</span>
+      [% ELSIF o.status == 'completed' %]<span style="background:#e8f5e9;color:#2e7d32;border-radius:3px;padding:2px 8px;font-size:0.85em">completed</span>
+      [% ELSIF o.status == 'cancelled' %]<span style="background:#ffebee;color:#c62828;border-radius:3px;padding:2px 8px;font-size:0.85em">cancelled</span>
+      [% ELSE %]<span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px;font-size:0.85em">[% o.status | html %]</span>[% END %]
+    </td>
+    <td style="padding:7px 10px;color:var(--text-muted-color);font-size:0.85em">[% o.notes | html %]</td>
+    <td style="padding:7px 10px">
+      <a href="/CustomerOrder/view/[% o.id %]"
+         style="padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-size:0.85em">View</a>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font);margin-bottom:2em">No orders found.</p>
+[% END %]
+
+<h2 style="font-family:var(--header-font);color:var(--text-color);margin:0 0 0.6em">Invoices ([% invoices.size %])</h2>
+[% IF invoices.size %]
+[% SET grand_total = 0 %]
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:2em">
+  <thead>
+    <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+      <th style="padding:8px 10px;text-align:left">Invoice #</th>
+      <th style="padding:8px 10px;text-align:left">Date</th>
+      <th style="padding:8px 10px;text-align:left">Due</th>
+      <th style="padding:8px 10px;text-align:right">Total</th>
+      <th style="padding:8px 10px;text-align:left">Payment</th>
+      <th style="padding:8px 10px"></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH inv IN invoices %]
+  [% grand_total = grand_total + (inv.total_amount || 0) %]
+  <tr style="border-bottom:1px solid var(--border-color)">
+    <td style="padding:7px 10px;font-family:'Courier New',monospace;font-size:0.85em">[% inv.invoice_number || ('INV-' _ inv.id) | html %]</td>
+    <td style="padding:7px 10px">[% inv.invoice_date %]</td>
+    <td style="padding:7px 10px;color:var(--text-muted-color)">[% inv.due_date || '—' %]</td>
+    <td style="padding:7px 10px;text-align:right;font-weight:bold">$[% inv.total_amount | format('%.2f') %]</td>
+    <td style="padding:7px 10px">
+      [% IF inv.payment_status == 'paid' %]<span style="background:#e8f5e9;color:#2e7d32;border-radius:3px;padding:2px 8px;font-size:0.85em">Paid</span>
+      [% ELSIF inv.payment_status == 'partial' %]<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px;font-size:0.85em">Partial</span>
+      [% ELSE %]<span style="background:#ffebee;color:#c62828;border-radius:3px;padding:2px 8px;font-size:0.85em">Unpaid</span>[% END %]
+    </td>
+    <td style="padding:7px 10px">
+      <a href="/Cart/order/[% inv.id %]"
+         style="padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-size:0.85em">View</a>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+  <tfoot>
+    <tr style="border-top:2px solid var(--border-color);background:var(--secondary-color)">
+      <td colspan="3" style="padding:8px 10px;font-weight:bold">Total</td>
+      <td style="padding:8px 10px;text-align:right;font-weight:bold">$[% grand_total | format('%.2f') %]</td>
+      <td colspan="2"></td>
+    </tr>
+  </tfoot>
+</table>
+[% ELSE %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font)">No invoices found.</p>
+[% END %]
+
+</div>
+</div>
