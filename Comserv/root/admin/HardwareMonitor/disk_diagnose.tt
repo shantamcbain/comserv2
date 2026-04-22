@@ -179,7 +179,7 @@
 </thead>
 <tbody>
 [% FOR e IN entries %]
-[%  pct = (e.bytes > 0 && max_bytes > 0) ? (e.bytes / max_bytes * 100).int : 0 %]
+[%  pct = (e.bytes > 0 && max_bytes > 0) ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
 <tr id="row-[% loop.index %]" data-bytes="[% e.bytes %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
   <td class="dd-cb-col">
     [% UNLESS e.is_net %]
