@@ -496,9 +496,11 @@ sub disk_diagnose :Path('/admin/hardware_monitor/disk_diagnose') :Args(0) {
     my $calc_sizes = $c->req->param('calc_sizes') ? 1 : 0;
 
     if ($is_local) {
-        my @children = sort glob("$path/*"), glob("$path/.*");
+        (my $path_clean = $path) =~ s{/+}{/}g;
+        my @children = sort glob("$path_clean/*"), glob("$path_clean/.*");
         @children = grep { my $n = (split '/', $_)[-1]; $n ne '.' && $n ne '..' } @children;
         for my $entry_path (@children) {
+            $entry_path =~ s{/+}{/}g;
             my $name   = (split '/', $entry_path)[-1];
             my $is_dir = -d $entry_path;
             my $fstype = $mount_fstype{$entry_path} // '';
