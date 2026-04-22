@@ -146,7 +146,8 @@ Implement all missing inspection CRUD actions in `Apiary.pm`:
 - `api_hive_frame_layout` GET `/Apiary/api/hive_frame_layout/:id`: JSON frame layout for diagram
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
-### [ ] Step: Hive Inspection — Templates and Visual Diagram
+### [x] Step: Hive Inspection — Templates and Visual Diagram
+<!-- chat-id: db2f0d4a-aa79-4665-ada2-dc13e077b480 -->
 - Fix `Apiary/new_inspection.tt`: remove `<head>` tag at line 2, add `[% META title = "New Hive Inspection" %]`
 - Create `Apiary/inspection_view.tt`: display full inspection record with visual hive diagram
 - Create `Apiary/_hive_diagram.tt`: reusable color-coded frame layout component (box rows, frame cells by type)
