@@ -1,85 +1,67 @@
 [% META
    title = "My CSC Membership"
+   description = "Manage your CSC hosting subscription and account"
+   roles = "user,admin"
    TemplateType = "Application"
    category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-22"
 %]
+[% PageVersion = 'membership/csc_account.tt,v 0.01 2026/04/22 shanta Exp' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
   <div class="page-header">
     <h1>&#127760; My CSC Membership</h1>
-    <p style="color:var(--text-muted-color)">
-      Managing your CSC account from <strong>[% site_name | html %]</strong>
-    </p>
+    <p>Managing your CSC account from <strong>[% site_name | html %]</strong></p>
   </div>
 
   <div class="content-container">
     <div class="content-primary">
 
-      <!-- ── Points Balance ─────────────────────────── -->
+      <!-- ── Points Balance ───────────────────────── -->
       <div class="content-section">
         <h2>CSC Points Balance</h2>
-        <p>Balance: <strong style="font-size:1.15em;color:var(--success-color,#27ae60)">[% point_balance | format('%.2f') %] points</strong></p>
-        <p style="font-size:0.85em;color:#888">1 point = 1 CAD — use points for hosting payments and renewals.</p>
+        <p>Balance: <strong class="balance-amount">[% point_balance | format('%.2f') %] points</strong></p>
+        <p class="help-text">1 point = 1 CAD &mdash; use points for hosting payments and renewals.</p>
         <div class="form-actions">
           <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Points</a>
           <a href="[% c.uri_for('/payment/balance') %]" class="btn btn-secondary">Transaction History</a>
         </div>
       </div>
 
-      <!-- ── Hosting Account Status ──────────────────── -->
+      <!-- ── Hosting Account Status ────────────────── -->
       [% IF hosting_account %]
       <div class="content-section">
-        <h2>Hosting Account — [% site_name | html %]</h2>
-        <table style="border-collapse:collapse;font-size:0.92em;width:100%;max-width:500px">
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color);width:140px">Status</th>
-            <td style="padding:5px 0">
-              [% IF hosting_account.status == 'active' %]
-                <span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 10px">Active</span>
-              [% ELSIF hosting_account.status == 'pending' %]
-                <span style="background:#fff3cd;color:#856404;border-radius:3px;padding:2px 10px">Pending</span>
-              [% ELSIF hosting_account.status == 'suspended' %]
-                <span style="background:#ffebee;color:#c62828;border-radius:3px;padding:2px 10px">Suspended</span>
-              [% ELSE %]
-                <span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 10px">[% hosting_account.status | ucfirst | html %]</span>
-              [% END %]
-            </td>
-          </tr>
-          [% IF hosting_account.plan_sku %]
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color)">Plan</th>
-            <td style="padding:5px 0">[% hosting_account.plan_sku | html %]</td>
-          </tr>
-          [% END %]
-          [% IF hosting_account.domain %]
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color)">Domain</th>
-            <td style="padding:5px 0;font-family:'Courier New',monospace">[% hosting_account.domain | html %]</td>
-          </tr>
-          [% END %]
-          [% IF hosting_account.monthly_cost %]
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color)">Monthly Cost</th>
-            <td style="padding:5px 0">CAD [% hosting_account.monthly_cost | format('%.2f') %]/mo</td>
-          </tr>
-          [% END %]
-          [% IF hosting_account.next_renewal_date %]
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color)">Next Renewal</th>
-            <td style="padding:5px 0">[% hosting_account.next_renewal_date %]</td>
-          </tr>
-          [% END %]
-          [% IF hosting_account.notes %]
-          <tr>
-            <th style="text-align:left;padding:5px 12px 5px 0;color:var(--text-muted-color);vertical-align:top">Notes</th>
-            <td style="padding:5px 0;color:var(--text-muted-color);font-size:0.9em">[% hosting_account.notes | html %]</td>
-          </tr>
-          [% END %]
-        </table>
+        <h2>Hosting Account &mdash; [% site_name | html %]</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr>
+              <th>Status</th>
+              <td><span class="status-[% hosting_account.status | html %]">[% hosting_account.status | ucfirst | html %]</span></td>
+            </tr>
+            [% IF hosting_account.plan_sku %]
+            <tr><th>Plan</th><td>[% hosting_account.plan_sku | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.domain %]
+            <tr><th>Domain</th><td><code>[% hosting_account.domain | html %]</code></td></tr>
+            [% END %]
+            [% IF hosting_account.monthly_cost %]
+            <tr><th>Monthly Cost</th><td>CAD [% hosting_account.monthly_cost | format('%.2f') %]/mo</td></tr>
+            [% END %]
+            [% IF hosting_account.next_renewal_date %]
+            <tr><th>Next Renewal</th><td>[% hosting_account.next_renewal_date %]</td></tr>
+            [% END %]
+            [% IF hosting_account.notes %]
+            <tr><th>Notes</th><td>[% hosting_account.notes | html %]</td></tr>
+            [% END %]
+          </table>
+        </div>
         [% IF hosting_account.status == 'active' %]
-        <div class="form-actions" style="margin-top:1em">
+        <div class="form-actions">
           <a href="[% c.uri_for('/hosting/renew') %]" class="btn btn-primary">Renew Hosting</a>
           <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary">Update Settings</a>
         </div>
@@ -88,9 +70,9 @@
       [% ELSE %]
       <div class="content-section">
         <h2>Hosting Account</h2>
-        <p style="color:var(--text-muted-color)">
-          <strong>[% site_name | html %]</strong> is not yet registered with CSC hosting.
-        </p>
+        <div class="empty-state">
+          <p><strong>[% site_name | html %]</strong> is not yet registered with CSC hosting.</p>
+        </div>
         <div class="form-actions">
           <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-primary">Register for CSC Hosting</a>
         </div>
@@ -106,24 +88,15 @@
         [% SET renewal_cost = m.billing_cycle == 'annual' ? m.plan.price_annual : m.plan.price_monthly %]
         [% SET coin_ok = point_balance >= renewal_cost %]
 
-        <div style="border:1px solid var(--border-color,#ddd);border-radius:6px;padding:1rem;margin-bottom:1rem">
-          <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:0.5rem">
-            <div>
-              <strong style="font-size:1.05em">[% m.plan.name | html %]</strong>
-              <span style="margin-left:0.5rem;padding:2px 8px;border-radius:10px;font-size:0.8em;
-                           background:[% m.status == 'active' ? '#d4edda' : '#fff3cd' %];
-                           color:[% m.status == 'active' ? '#155724' : '#856404' %]">
-                [% m.status | html %]
-              </span>
-            </div>
-            <div style="font-size:0.88em;color:#666;text-align:right">
-              [% m.billing_cycle | ucfirst | html %] &bull;
-              Expires: <strong>[% m.expires_at ? m.expires_at : 'Never' | html %]</strong>
-            </div>
+        <div class="content-section">
+          <div class="membership-card-header">
+            <strong>[% m.plan.name | html %]</strong>
+            <span class="status-[% m.status | html %]">[% m.status | html %]</span>
+            <span class="help-text">[% m.billing_cycle | ucfirst | html %] &bull; Expires: <strong>[% m.expires_at || 'Never' | html %]</strong></span>
           </div>
 
           [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
-          <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background:#fffde7;font-size:0.9em">
+          <div class="alert alert-warning">
             <strong>Low balance warning:</strong>
             Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
             next renewal of <strong>CAD [% renewal_cost %]</strong>.
@@ -131,38 +104,34 @@
           </div>
           [% END %]
 
-          <div style="margin-top:0.6rem;font-size:0.88em;color:#555">
-            Started: [% m.started_at | html %] &bull;
-            Provider: [% m.payment_provider | html %]
-          </div>
+          <p class="help-text">Started: [% m.started_at | html %] &bull; Provider: [% m.payment_provider | html %]</p>
 
-          <div class="form-actions" style="margin-top:0.75rem">
+          <div class="form-actions">
             [% IF m.status == 'active' %]
-            <a href="[% c.uri_for('/membership/cancel', { membership_id => m.id }) %]"
-               class="btn btn-secondary" style="font-size:0.88em">Cancel</a>
+            <a href="[% c.uri_for('/membership/cancel', { membership_id => m.id }) %]" class="btn btn-secondary">Cancel</a>
             [% ELSE %]
-            <a href="[% c.uri_for('/membership/subscribe') %]"
-               class="btn btn-primary" style="font-size:0.88em">Reactivate</a>
+            <a href="[% c.uri_for('/membership/subscribe') %]" class="btn btn-primary">Reactivate</a>
             [% END %]
           </div>
         </div>
         [% END %]
 
         [% ELSE %]
-        <p style="color:var(--text-muted-color)">You have no CSC subscriptions.</p>
+        <div class="empty-state">
+          <p>You have no CSC subscriptions.</p>
+        </div>
 
         [% IF csc_plans.size %]
-        <h3 style="margin-top:1rem">Available CSC Plans</h3>
+        <h3>Available CSC Plans</h3>
         [% FOREACH plan IN csc_plans %]
-        <div style="border:1px solid #c8e6c9;border-radius:6px;padding:0.85rem 1rem;margin-bottom:0.6rem;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:0.5rem">
-          <div>
-            <strong>[% plan.name | html %]</strong> —
-            <span style="color:#555;font-size:0.9em">[% plan.description | html %]</span>
+        <div class="content-section">
+          <div class="membership-card-header">
+            <strong>[% plan.name | html %]</strong>
+            <span>[% plan.price_currency | html %] [% plan.price_monthly %]/mo</span>
           </div>
-          <div style="display:flex;align-items:center;gap:0.75rem">
-            <span style="font-weight:bold">[% plan.price_currency | html %] [% plan.price_monthly %]/mo</span>
-            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
-               class="btn btn-primary" style="padding:0.3rem 0.9rem;font-size:0.88em">Subscribe</a>
+          [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
+          <div class="form-actions">
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]" class="btn btn-primary">Subscribe</a>
           </div>
         </div>
         [% END %]
@@ -171,7 +140,7 @@
         [% END %]
       </div>
 
-      <!-- ── Navigation ────────────────────────────── -->
+      <!-- ── Navigation ──────────────────────────── -->
       <div class="form-actions">
         <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">&larr; Back to Membership</a>
         <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">My Local Account</a>
