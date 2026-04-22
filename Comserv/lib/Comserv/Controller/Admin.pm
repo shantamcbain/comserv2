@@ -5475,31 +5475,42 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
     
     my $denv  = _docker_env();
     my $docker = _docker_bin();
-    my $home  = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
 
-    my $output = `$denv $docker compose -f '$compose_dir/docker-compose.yml' ps --format json 2>&1`;
+    my $output = `$denv $docker ps --all --format json 2>&1`;
     my $exit_code = $? >> 8;
     
     if ($exit_code != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker compose ps: $output" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
         $c->response->content_type('application/json');
         return;
     }
     
-    # Parse JSON output (one JSON object per line)
+    # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
         next unless $line =~ /^\{/;
         eval {
             my $container = decode_json($line);
+            my $name = $container->{Names} || $container->{Name} || '';
+            $name =~ s{^/}{};
+            # Extract service name from compose label if present
+            my $service = '';
+            if (my $labels = $container->{Labels}) {
+                ($service) = $labels =~ /com\.docker\.compose\.service=([^,]+)/;
+            }
+            $service ||= $name;
+            # Parse ports string "0.0.0.0:3000->3000/tcp, ..." into array
+            my @ports;
+            if (my $ports_str = $container->{Ports}) {
+                @ports = grep { /\d+:\d+/ } split(/,\s*/, $ports_str);
+            }
             push @containers, {
-                name => $container->{Name} || '',
-                service => $container->{Service} || '',
-                state => $container->{State} || 'unknown',
-                status => $container->{Status} || '',
-                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
-                image => $container->{Image} || ''
+                name    => $name,
+                service => $service,
+                state   => $container->{State} || 'unknown',
+                status  => $container->{Status} || '',
+                ports   => \@ports,
+                image   => $container->{Image} || ''
             };
         };
     }
