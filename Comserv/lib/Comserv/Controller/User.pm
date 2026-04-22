@@ -357,6 +357,12 @@ sub do_login :Local {
             }
         }
 
+        # Rotate the session ID on successful login to discard any stale/corrupted
+        # pre-login session data and prevent session fixation attacks.
+        eval { $c->change_session_id() };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+            "Session rotated for user '$username'" . ($@ ? " (change_session_id not available: $@)" : ''));
+
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;
         $c->session->{user_id}  = $user->id;
