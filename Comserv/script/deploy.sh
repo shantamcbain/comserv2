@@ -14,11 +14,13 @@ echo "=== Comserv Production Deploy Check at $(date) ==="
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
 
-# ── Routine cleanup (runs every time, not just on deploy) ────────────────────
+# ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
 echo "Running routine Docker cleanup..."
-docker container prune -f  --filter "until=1h"  2>&1 | grep -v "^$" || true
-docker image prune -f                                   2>&1 | grep -v "^$" || true
-docker builder prune -f    --keep-storage 2GB           2>&1 | grep -v "^$" || true
+docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
+docker image prune -f                          2>&1 | grep -v "^$" || true
+docker volume prune -f                         2>&1 | grep -v "^$" || true
+docker network prune -f                        2>&1 | grep -v "^$" || true
+docker builder prune -f --keep-storage 2GB     2>&1 | grep -v "^$" || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
