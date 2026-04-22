@@ -1,0 +1,121 @@
+[%#
+    _hive_diagram.tt — reusable hive frame layout diagram
+    Include this partial with a frame_layout variable:
+        [% INCLUDE 'Apiary/_hive_diagram.tt' frame_layout=frame_layout %]
+
+    frame_layout is an array of { box => $box_obj, frames => [$frame_obj, ...] }
+    Each frame object should have a .frame_type attribute.
+
+    Frame colour scheme:
+        brood      → orange   (#FF8C00)
+        honey      → yellow   (#FFD700)
+        pollen     → green    (#4CAF50)
+        empty      → white    (#FFFFFF)
+        foundation → grey     (#9E9E9E)
+        drone      → blue     (#4169E1)
+        comb       → tan      (#D2B48C)
+%]
+
+<div class="hive-diagram">
+
+    <div class="hive-diagram-legend">
+        <span class="frame-legend-item"><span class="frame-cell frame-brood"></span> Brood</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-honey"></span> Honey</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-pollen"></span> Pollen</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-drone"></span> Drone</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-comb"></span> Comb</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-foundation"></span> Foundation</span>
+        <span class="frame-legend-item"><span class="frame-cell frame-empty"></span> Empty</span>
+    </div>
+
+    [% IF frame_layout && frame_layout.size %]
+        [% FOREACH box_data IN frame_layout %]
+            [% box = box_data.box %]
+            [% frames = box_data.frames %]
+            <div class="hive-box">
+                <div class="hive-box-label">
+                    Box [% box.box_position || loop.count %]
+                    [% IF box.box_type %] — [% box.box_type | ucfirst %][% END %]
+                    ([% frames.size %] frames)
+                </div>
+                <div class="hive-box-frames">
+                    [% FOREACH frame IN frames %]
+                        [% frame_type = frame.frame_type || 'empty' %]
+                        <div class="frame-cell frame-[% frame_type %]"
+                             title="Frame [% frame.frame_position || loop.count %]: [% frame_type | ucfirst %]">
+                            <span class="frame-number">[% frame.frame_position || loop.count %]</span>
+                        </div>
+                    [% END %]
+                    [% IF !frames.size %]
+                        <p class="info-text">No frame data recorded.</p>
+                    [% END %]
+                </div>
+            </div>
+        [% END %]
+    [% ELSE %]
+        <p class="info-text">No hive configuration data available for this inspection.</p>
+    [% END %]
+
+</div>
+
+<style>
+.hive-diagram {
+    margin: 1rem 0;
+}
+.hive-diagram-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255,255,255,0.80);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #ccc);
+}
+.frame-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+.hive-box {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.80);
+    border: 2px solid var(--border-color, #bbb);
+    border-radius: 6px;
+}
+.hive-box-label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: var(--text-color, #333);
+}
+.hive-box-frames {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.frame-cell {
+    width: 36px;
+    height: 52px;
+    border: 1px solid rgba(0,0,0,0.25);
+    border-radius: 3px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: default;
+    position: relative;
+}
+.frame-cell .frame-number {
+    font-size: 0.65rem;
+    color: rgba(0,0,0,0.55);
+    padding-bottom: 2px;
+}
+.frame-brood      { background-color: #FF8C00; }
+.frame-honey      { background-color: #FFD700; }
+.frame-pollen     { background-color: #4CAF50; }
+.frame-empty      { background-color: #FFFFFF; }
+.frame-foundation { background-color: #9E9E9E; }
+.frame-drone      { background-color: #4169E1; }
+.frame-comb       { background-color: #D2B48C; }
+</style>

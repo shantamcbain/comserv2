@@ -1,0 +1,299 @@
+[% META title = "Hive Inspection Record" %]
+[% PageVersion = 'Apiary/inspection_view.tt,v 0.01 2026/04/21 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1><i class="fas fa-search"></i> Hive Inspection Record</h1>
+        [% IF inspection %]
+            <p class="page-subtitle">
+                Inspection #[% inspection.id %] &mdash;
+                [% inspection.inspection_date %]
+                [% IF inspection.inspection_type %]
+                    &mdash; [% inspection.inspection_type.replace('_', ' ') | ucfirst %]
+                [% END %]
+            </p>
+        [% END %]
+    </div>
+
+    <div class="feature-actions">
+        <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> All Inspections
+        </a>
+        [% IF inspection %]
+            <a href="[% c.uri_for('/Apiary/inspections/edit', [inspection.id]) %]" class="btn btn-primary">
+                <i class="fas fa-edit"></i> Edit
+            </a>
+        [% END %]
+        <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-info">
+            <i class="fas fa-plus"></i> New Inspection
+        </a>
+    </div>
+
+    [% IF inspection %]
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="feature-grid">
+
+                <!-- Basic Inspection Details -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-info-circle feature-icon"></i> Inspection Details</h3>
+                    </div>
+                    <div class="feature-content">
+                        <table class="data-table">
+                            <tbody>
+                                <tr>
+                                    <th>Date</th>
+                                    <td>[% inspection.inspection_date %]</td>
+                                </tr>
+                                <tr>
+                                    <th>Type</th>
+                                    <td>[% inspection.inspection_type.replace('_', ' ') | ucfirst %]</td>
+                                </tr>
+                                [% IF inspection.start_time %]
+                                <tr>
+                                    <th>Start Time</th>
+                                    <td>[% inspection.start_time %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.end_time %]
+                                <tr>
+                                    <th>End Time</th>
+                                    <td>[% inspection.end_time %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.temperature %]
+                                <tr>
+                                    <th>Temperature</th>
+                                    <td>[% inspection.temperature %] &deg;C</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.weather_conditions %]
+                                <tr>
+                                    <th>Weather</th>
+                                    <td>[% inspection.weather_conditions.replace('_', ' ') | ucfirst %]</td>
+                                </tr>
+                                [% END %]
+                                <tr>
+                                    <th>Overall Status</th>
+                                    <td>
+                                        <span class="status-badge status-[% inspection.overall_status %]">
+                                            [% inspection.overall_status | ucfirst %]
+                                        </span>
+                                    </td>
+                                </tr>
+                                [% IF inspection.next_inspection_date %]
+                                <tr>
+                                    <th>Next Inspection</th>
+                                    <td>[% inspection.next_inspection_date %]</td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Queen Assessment -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-crown feature-icon"></i> Queen Assessment</h3>
+                    </div>
+                    <div class="feature-content">
+                        [% IF inspection.queen %]
+                            <p><strong>Queen Tag:</strong> [% inspection.queen.tag_number | html %]</p>
+                            [% IF inspection.queen.color_marking %]
+                                <p><strong>Colour:</strong> [% inspection.queen.color_marking | html %]</p>
+                            [% END %]
+                        [% END %]
+                        <table class="data-table">
+                            <tbody>
+                                <tr>
+                                    <th>Queen Seen</th>
+                                    <td>[% inspection.queen_seen ? 'Yes' : 'No' %]</td>
+                                </tr>
+                                <tr>
+                                    <th>Queen Marked</th>
+                                    <td>[% inspection.queen_marked ? 'Yes' : 'No' %]</td>
+                                </tr>
+                                <tr>
+                                    <th>Eggs Seen</th>
+                                    <td>[% inspection.eggs_seen ? 'Yes' : 'No' %]</td>
+                                </tr>
+                                <tr>
+                                    <th>Larvae Seen</th>
+                                    <td>[% inspection.larvae_seen ? 'Yes' : 'No' %]</td>
+                                </tr>
+                                <tr>
+                                    <th>Capped Brood</th>
+                                    <td>[% inspection.capped_brood_seen ? 'Yes' : 'No' %]</td>
+                                </tr>
+                                [% IF inspection.supersedure_cells %]
+                                <tr>
+                                    <th>Supersedure Cells</th>
+                                    <td>[% inspection.supersedure_cells %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.swarm_cells %]
+                                <tr>
+                                    <th>Swarm Cells</th>
+                                    <td>[% inspection.swarm_cells %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.queen_cells %]
+                                <tr>
+                                    <th>Other Queen Cells</th>
+                                    <td>[% inspection.queen_cells %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.population_estimate %]
+                                <tr>
+                                    <th>Population</th>
+                                    <td>[% inspection.population_estimate.replace('_', ' ') | ucfirst %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.temperament %]
+                                <tr>
+                                    <th>Temperament</th>
+                                    <td>[% inspection.temperament.replace('_', ' ') | ucfirst %]</td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Feeding -->
+                [% IF inspection.feeding_done %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-tint feature-icon"></i> Feeding</h3>
+                    </div>
+                    <div class="feature-content">
+                        <table class="data-table">
+                            <tbody>
+                                [% IF inspection.feed_type %]
+                                <tr>
+                                    <th>Feed Type</th>
+                                    <td>[% inspection.feed_type | html %]</td>
+                                </tr>
+                                [% END %]
+                                [% IF inspection.feed_amount %]
+                                <tr>
+                                    <th>Amount</th>
+                                    <td>[% inspection.feed_amount | html %]</td>
+                                </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                [% END %]
+
+                <!-- Notes and Actions -->
+                [% IF inspection.general_notes || inspection.action_required %]
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-clipboard-check feature-icon"></i> Notes and Actions</h3>
+                    </div>
+                    <div class="feature-content">
+                        [% IF inspection.general_notes %]
+                            <div class="content-section">
+                                <h4>General Notes</h4>
+                                <p>[% inspection.general_notes | html %]</p>
+                            </div>
+                        [% END %]
+                        [% IF inspection.action_required %]
+                            <div class="content-section">
+                                <h4><i class="fas fa-exclamation-triangle"></i> Action Required</h4>
+                                <p>[% inspection.action_required | html %]</p>
+                            </div>
+                        [% END %]
+                    </div>
+                </div>
+                [% END %]
+
+            </div>
+
+            <!-- Box-by-Box Details -->
+            [% IF inspection.inspection_details && inspection.inspection_details.count %]
+            <div class="app-section">
+                <h2><i class="fas fa-layer-group"></i> Box-by-Box Inspection</h2>
+                <div class="feature-grid">
+                    [% FOREACH detail IN inspection.inspection_details %]
+                        <div class="feature-card">
+                            <div class="feature-header">
+                                <h3>
+                                    Box [% detail.box_position || loop.count %]
+                                    [% IF detail.box_type %] — [% detail.box_type | ucfirst %][% END %]
+                                </h3>
+                            </div>
+                            <div class="feature-content">
+                                <table class="data-table">
+                                    <tbody>
+                                        [% IF detail.brood_pattern %]
+                                        <tr>
+                                            <th>Brood Pattern</th>
+                                            <td>[% detail.brood_pattern | ucfirst %]</td>
+                                        </tr>
+                                        [% END %]
+                                        [% IF detail.honey_stores %]
+                                        <tr>
+                                            <th>Honey Stores</th>
+                                            <td>[% detail.honey_stores | ucfirst %]</td>
+                                        </tr>
+                                        [% END %]
+                                        [% IF detail.frames_of_bees %]
+                                        <tr>
+                                            <th>Frames of Bees</th>
+                                            <td>[% detail.frames_of_bees %]</td>
+                                        </tr>
+                                        [% END %]
+                                        [% IF detail.notes %]
+                                        <tr>
+                                            <th>Notes</th>
+                                            <td>[% detail.notes | html %]</td>
+                                        </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+            [% END %]
+
+            <!-- Visual Hive Diagram -->
+            <div class="app-section">
+                <h2><i class="fas fa-th"></i> Hive Frame Layout</h2>
+                <div class="content-section">
+                    [% INCLUDE 'Apiary/_hive_diagram.tt' %]
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    [% ELSE %]
+        <div class="content-section">
+            <div class="empty-state">
+                <p>Inspection record not found.</p>
+                <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-primary">Back to Inspections</a>
+            </div>
+        </div>
+    [% END %]
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">All Inspections</a>
+            <a href="[% c.uri_for('/Apiary') %]" class="btn btn-secondary">Apiary Home</a>
+        </div>
+    </div>
+
+</div>

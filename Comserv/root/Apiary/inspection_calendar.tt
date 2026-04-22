@@ -1,0 +1,213 @@
+[% META title = "Inspection Calendar" %]
+[% PageVersion = 'Apiary/inspection_calendar.tt,v 0.01 2026/04/21 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1><i class="fas fa-calendar-alt"></i> Inspection Calendar</h1>
+        <p class="page-subtitle">Scheduled and recent hive inspections</p>
+    </div>
+
+    <div class="feature-actions">
+        <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Inspections
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Inspection
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/reports') %]" class="btn btn-info">
+            <i class="fas fa-chart-bar"></i> Reports
+        </a>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <!-- Upcoming Inspections -->
+            <div class="app-section">
+                <h2><i class="fas fa-clock"></i> Upcoming Inspections</h2>
+                <div class="content-section">
+                    [% IF upcoming_inspections && upcoming_inspections.size %]
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Scheduled Date</th>
+                                        <th>Hive</th>
+                                        <th>Days Away</th>
+                                        <th>Last Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH insp IN upcoming_inspections %]
+                                        [% next_date = insp.next_inspection_date %]
+                                        <tr>
+                                            <td>
+                                                <strong>[% next_date %]</strong>
+                                            </td>
+                                            <td>
+                                                [% IF insp.hive %]
+                                                    [% insp.hive.hive_code || insp.hive.id %]
+                                                [% ELSE %]
+                                                    &mdash;
+                                                [% END %]
+                                            </td>
+                                            <td>
+                                                [% IF next_date > today %]
+                                                    <span class="status-badge status-good">Upcoming</span>
+                                                [% ELSIF next_date == today %]
+                                                    <span class="status-badge status-active">Today</span>
+                                                [% ELSE %]
+                                                    <span class="status-badge status-critical">Overdue</span>
+                                                [% END %]
+                                            </td>
+                                            <td>
+                                                [% IF insp.overall_status %]
+                                                    <span class="status-badge status-[% insp.overall_status %]">
+                                                        [% insp.overall_status | ucfirst %]
+                                                    </span>
+                                                [% ELSE %]
+                                                    &mdash;
+                                                [% END %]
+                                            </td>
+                                            <td class="action-cell">
+                                                <a href="[% c.uri_for('/Apiary/inspections/view', [insp.id]) %]"
+                                                   class="btn btn-sm btn-edit">View</a>
+                                                <a href="[% c.uri_for('/Apiary/inspections/new') %]?hive_id=[% insp.hive_id %]"
+                                                   class="btn btn-sm btn-primary">Inspect Now</a>
+                                            </td>
+                                        </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    [% ELSE %]
+                        <div class="empty-state">
+                            <p>No upcoming inspections scheduled.</p>
+                            <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-primary">
+                                Schedule an Inspection
+                            </a>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+
+            <!-- Past 30 Days -->
+            <div class="app-section">
+                <h2><i class="fas fa-history"></i> Inspections — Past 30 Days</h2>
+                <div class="content-section">
+                    [% IF past_inspections && past_inspections.size %]
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Type</th>
+                                        <th>Hive</th>
+                                        <th>Status</th>
+                                        <th>Action Required</th>
+                                        <th>Next Inspection</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    [% FOREACH insp IN past_inspections %]
+                                        <tr>
+                                            <td>[% insp.inspection_date %]</td>
+                                            <td>[% insp.inspection_type.replace('_', ' ') | ucfirst %]</td>
+                                            <td>
+                                                [% IF insp.hive %]
+                                                    [% insp.hive.hive_code || insp.hive.id %]
+                                                [% ELSE %]
+                                                    &mdash;
+                                                [% END %]
+                                            </td>
+                                            <td>
+                                                <span class="status-badge status-[% insp.overall_status %]">
+                                                    [% insp.overall_status | ucfirst %]
+                                                </span>
+                                            </td>
+                                            <td>
+                                                [% IF insp.action_required %]
+                                                    <i class="fas fa-exclamation-triangle" style="color: #c0392b;"
+                                                       title="[% insp.action_required | html %]"></i>
+                                                    Yes
+                                                [% ELSE %]
+                                                    &mdash;
+                                                [% END %]
+                                            </td>
+                                            <td>[% insp.next_inspection_date || '&mdash;' %]</td>
+                                            <td class="action-cell">
+                                                <a href="[% c.uri_for('/Apiary/inspections/view', [insp.id]) %]"
+                                                   class="btn btn-sm btn-edit">View</a>
+                                                <a href="[% c.uri_for('/Apiary/inspections/edit', [insp.id]) %]"
+                                                   class="btn btn-sm btn-secondary">Edit</a>
+                                            </td>
+                                        </tr>
+                                    [% END %]
+                                </tbody>
+                            </table>
+                        </div>
+                    [% ELSE %]
+                        <div class="empty-state">
+                            <p>No inspections recorded in the past 30 days.</p>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+
+            <!-- Quick Tip -->
+            <div class="app-section">
+                <div class="content-section">
+                    <h3><i class="fas fa-lightbulb"></i> Inspection Frequency Guide</h3>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Season</th>
+                                    <th>Recommended Frequency</th>
+                                    <th>Key Focus</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>Spring</strong></td>
+                                    <td>Every 7–10 days</td>
+                                    <td>Swarm prevention, colony buildup, food stores</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Summer</strong></td>
+                                    <td>Every 10–14 days</td>
+                                    <td>Honey flow, Varroa monitoring, queen health</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Fall</strong></td>
+                                    <td>Every 14–21 days</td>
+                                    <td>Winter prep, food stores, Varroa treatment</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>Winter</strong></td>
+                                    <td>Monthly heft check only</td>
+                                    <td>Food stores, ventilation — minimal disturbance</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">Back to Inspections</a>
+            <a href="[% c.uri_for('/Apiary') %]" class="btn btn-secondary">Apiary Home</a>
+        </div>
+    </div>
+
+</div>
