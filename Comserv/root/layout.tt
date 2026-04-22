@@ -22,8 +22,9 @@
 [% IF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
+    [%- SET _cv = c.stash.css_v || '1' -%]
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% _cv %]">
+    <script src="/static/js/local-chat.js?v=[% _cv %]"></script>
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
@@ -42,8 +43,9 @@
     [% END %]
 
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
+    [%- SET _cv = c.stash.css_v || '1' -%]
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% _cv %]">
+    <script src="/static/js/local-chat.js?v=[% _cv %]"></script>
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
     <script>
