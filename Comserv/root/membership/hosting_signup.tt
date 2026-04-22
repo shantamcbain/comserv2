@@ -1,5 +1,5 @@
 [% META
-   title = hosting_account ? "Edit CSC Hosting Registration" : "Register with CSC Hosting"
+   title = "CSC Hosting Registration"
    TemplateType = "Application"
 %]
 [% SET is_edit = hosting_account ? 1 : 0 %]
