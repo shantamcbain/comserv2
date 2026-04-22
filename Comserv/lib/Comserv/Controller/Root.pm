@@ -2042,7 +2042,14 @@ sub end : ActionClass('RenderView') {
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
     # show its full error page so developers can see the real stack trace.
-    if (@{$c->error || []} && !$c->response->body && !$c->debug) {
+    #
+    # NOTE: $c->debug is a class method set by the -Debug plugin flag, NOT by
+    # the 'debug' config key.  We therefore also check the config hash and the
+    # CATALYST_DEBUG env var so that CATALYST_DEBUG=1 works without recompiling.
+    my $catalyst_debug = $c->debug || $c->config->{debug} || $ENV{CATALYST_DEBUG} || 0;
+    my $app_debug      = $c->session->{debug_mode} || 0;   # session-level admin debug
+
+    if (@{$c->error || []} && !$c->response->body && !$catalyst_debug) {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
 
@@ -2060,12 +2067,19 @@ sub end : ActionClass('RenderView') {
 
         $c->clear_errors;
         $c->response->status(500);
+
+        # Show the real error text to admins who have session debug_mode on —
+        # production visitors always see the generic friendly message.
+        my $user_msg = $app_debug
+            ? "Application error: $err_text"
+            : 'We encountered an error processing your request. '
+            . 'The system administrator has been notified. '
+            . 'Please try again in a few minutes, or use the Back button.';
+
         $c->stash(
             template    => 'error.tt',
             error_title => 'Temporary Service Issue',
-            error_msg   => 'We encountered an error processing your request. '
-                         . 'The system administrator has been notified. '
-                         . 'Please try again in a few minutes, or use the Back button.',
+            error_msg   => $user_msg,
         );
     }
 
