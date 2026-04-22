@@ -273,6 +273,47 @@
 
         <div class="admin-section theme-section">
             <div class="section-header">
+                <h3><i class="fas fa-id-card"></i> Membership</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/membership') %]" class="admin-link">
+                        <i class="fas fa-users"></i>
+                        <span>Member Overview</span>
+                    </a>
+                    <a href="[% c.uri_for('/membership/admin/subscribers') %]" class="admin-link">
+                        <i class="fas fa-list-ul"></i>
+                        <span>All Subscribers</span>
+                    </a>
+                    <a href="[% c.uri_for('/membership/admin/manage_plans') %]" class="admin-link">
+                        <i class="fas fa-tags"></i>
+                        <span>Manage Plans</span>
+                    </a>
+                    <a href="[% c.uri_for('/membership/admin') %]" class="admin-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Membership Dashboard</span>
+                    </a>
+                    [% IF c.stash.SiteName == 'CSC' OR c.session.SiteName == 'CSC' %]
+                    <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="admin-link">
+                        <i class="fas fa-server"></i>
+                        <span>Hosting Accounts</span>
+                    </a>
+                    [% ELSE %]
+                    <a href="[% c.uri_for('/membership/hosting_signup') %]" class="admin-link">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <span>CSC Hosting Setup</span>
+                    </a>
+                    [% END %]
+                    <a href="[% c.uri_for('/membership/admin/cost_tracking') %]" class="admin-link">
+                        <i class="fas fa-chart-line"></i>
+                        <span>Cost Tracking</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
+            <div class="section-header">
                 <h3><i class="fas fa-shopping-bag"></i> Shop &amp; eCommerce</h3>
             </div>
             <div class="section-content">
