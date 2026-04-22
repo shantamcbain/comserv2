@@ -554,8 +554,8 @@
     <style>
     .stat-item-link { text-decoration:none; color:inherit; display:block; transition:box-shadow .15s, border-color .15s; }
     .stat-item-link:hover { box-shadow:0 0 0 2px var(--primary-color,#1976d2); border-color:var(--primary-color,#1976d2); }
-    .stat-sub { font-size:.55em; color:#888; font-weight:normal; }
-    .stat-sub-detail { font-size:.75rem; color:#888; margin-top:2px; }
+    .stat-sub { font-size:.55em; color: var(--text-muted-color, #888); font-weight:normal; }
+    .stat-sub-detail { font-size:.75rem; color: var(--text-muted-color, #888); margin-top:2px; }
     .stat-bar-wrap { height:8px; background:#e0e0e0; border-radius:4px; margin:4px 0 2px; overflow:hidden; }
     .stat-bar { height:8px; border-radius:4px; }
     .stat-bar-ok       { background:#4caf50; }
