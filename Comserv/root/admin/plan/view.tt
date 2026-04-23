@@ -78,7 +78,51 @@
 [% ELSE %]
 <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:20px;margin-bottom:20px;text-align:center;color:var(--text-muted-color);font-size:0.9em;">
     No projects linked to this plan yet.
-    [% IF is_admin %]<br><a href="/project" style="color:var(--primary-color);">Browse Projects</a> to link one.[% END %]
+</div>
+[% END %]
+
+[% IF is_admin %]
+<div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:16px;margin-bottom:20px;">
+    <h3 style="margin:0 0 10px;font-size:0.95em;">🔗 Link a Project to this Plan</h3>
+    [% IF available_projects && available_projects.size %]
+    <form id="link-project-form" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="hidden" name="plan_id" value="[% plan.id %]">
+        <select name="project_id" id="link-project-select"
+                style="flex:1;min-width:200px;padding:6px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.9em;">
+            <option value="">— select a project —</option>
+            [% FOREACH p IN available_projects %]
+            <option value="[% p.id %]">[% p.name %][% IF p.project_code %] ([% p.project_code %])[% END %]</option>
+            [% END %]
+        </select>
+        <button type="submit"
+                style="padding:6px 16px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.9em;">
+            Link
+        </button>
+        <span id="link-project-msg" style="font-size:0.85em;"></span>
+    </form>
+    <script>
+    document.getElementById('link-project-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        var pid = document.getElementById('link-project-select').value;
+        var msg = document.getElementById('link-project-msg');
+        if (!pid) { msg.textContent = 'Please select a project.'; msg.style.color='#c00'; return; }
+        msg.textContent = 'Linking…'; msg.style.color='var(--text-muted-color)';
+        fetch('/admin/plan/link_project', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: 'plan_id=[% plan.id %]&project_id=' + encodeURIComponent(pid)
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.success) { location.reload(); }
+            else { msg.textContent = d.error || 'Error.'; msg.style.color='#c00'; }
+        })
+        .catch(function(){ msg.textContent = 'Request failed.'; msg.style.color='#c00'; });
+    });
+    </script>
+    [% ELSE %]
+    <p style="font-size:0.88em;color:var(--text-muted-color);margin:0;">All projects for this site are already linked, or no projects exist. <a href="/project" style="color:var(--primary-color);">Create a project</a></p>
+    [% END %]
 </div>
 [% END %]
 

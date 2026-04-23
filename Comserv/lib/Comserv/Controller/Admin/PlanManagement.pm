@@ -178,12 +178,26 @@ sub details :Path('/admin/plan') :Args(1) {
             $c->stash->{json} = { success => 1, plan => \%plan_data };
             $c->forward('View::JSON');
         } else {
+            my @available_projects;
+            if ($c->stash->{is_admin}) {
+                my $site = $plan->sitename || $c->stash->{plan_sitename} || 'CSC';
+                my %linked_ids = map { $_->{id} => 1 } @projects;
+                eval {
+                    my @all_proj = $schema->resultset('Project')->search(
+                        { sitename => $site, -or => [ status => undef, status => { '!=' => 'archived' } ] },
+                        { order_by => { -asc => 'name' } }
+                    )->all;
+                    @available_projects = map { { id => $_->id, name => $_->name, project_code => $_->project_code } }
+                                         grep { !$linked_ids{$_->id} } @all_proj;
+                };
+            }
             $c->stash(
-                plan         => \%plan_data,
-                is_admin     => $c->stash->{is_admin},
-                is_csc_admin => $c->stash->{is_csc_admin},
-                plan_sitename => $c->stash->{plan_sitename},
-                template     => 'admin/plan/view.tt',
+                plan               => \%plan_data,
+                is_admin           => $c->stash->{is_admin},
+                is_csc_admin       => $c->stash->{is_csc_admin},
+                plan_sitename      => $c->stash->{plan_sitename},
+                available_projects => \@available_projects,
+                template           => 'admin/plan/view.tt',
             );
             $c->forward($c->view('TT'));
         }
