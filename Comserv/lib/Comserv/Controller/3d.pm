@@ -195,7 +195,7 @@ sub index :Path :Args(0) {
             $printer_count = $schema->resultset('Printing3dPrinter')->search(
                 { sitename => $sitename, status => 'idle' })->count;
             $store_item_count = $schema->resultset('InventoryItem')->search(
-                { sitename => $sitename, category => '3d_printed_item', status => 'active' }
+                { sitename => $sitename, show_in_shop => 1, status => 'active' }
             )->count;
             if ($c->session->{user_id}) {
                 $my_open_jobs = $schema->resultset('Printing3dJob')->search(
@@ -223,42 +223,8 @@ sub index :Path :Args(0) {
 
 sub store :Path('/3d/store') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_module($c);
-
-    my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'store',
-        "3D store site=$sitename");
-
-    my @items;
-    eval {
-        @items = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, category => '3d_printed_item', status => 'active' },
-            {
-                prefetch => 'stock_levels',
-                order_by => { -asc => 'name' },
-            }
-        )->all;
-    };
-    push @{$c->stash->{debug_errors}}, "Error loading store items: $@" if $@;
-
-    # Build available-quantity map per item
-    my %available;
-    for my $item (@items) {
-        my $avail = 0;
-        for my $sl ($item->stock_levels->all) {
-            $avail += ($sl->quantity_on_hand - $sl->quantity_reserved);
-        }
-        $available{ $item->id } = $avail > 0 ? $avail : 0;
-    }
-
-    $c->stash(
-        sitename  => $sitename,
-        items     => \@items,
-        available => \%available,
-        template  => '3d/store.tt',
-    );
+    $c->res->redirect($c->uri_for('/shop', { category => '3dStock' }));
+    $c->detach;
 }
 
 # ============================================================
@@ -268,78 +234,14 @@ sub store :Path('/3d/store') :Args(0) {
 
 sub buy :Path('/3d/buy') :Args(0) {
     my ($self, $c) = @_;
-    $self->_require_module($c);
-    $self->_require_login($c);
-
-    my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
     my $item_id  = $c->req->params->{item_id};
     my $quantity = $c->req->params->{quantity} || 1;
-
-    unless ($item_id) {
-        $c->res->redirect($c->uri_for('/3d/store'));
-        $c->detach;
-    }
-
-    my $item;
-    eval {
-        $item = $schema->resultset('InventoryItem')->find(
-            { id => $item_id, sitename => $sitename, category => '3d_printed_item', status => 'active' }
-        );
-    };
-    unless ($item) {
-        $c->flash->{error_msg} = 'Item not found or not available.';
-        $c->res->redirect($c->uri_for('/3d/store'));
-        $c->detach;
-    }
-
-    # Check available stock
-    my $total_available = 0;
-    eval {
-        for my $sl ($item->stock_levels->all) {
-            $total_available += ($sl->quantity_on_hand - $sl->quantity_reserved);
-        }
-    };
-
-    if ($total_available < $quantity) {
-        $c->flash->{error_msg} =
-            "Sorry, only $total_available unit(s) available. "
-            . "Please reduce quantity or contact us for custom order.";
-        $c->res->redirect($c->uri_for('/3d/store'));
-        $c->detach;
-    }
-
-    # Get first stock level location for transaction
-    my $first_stock = eval { ($item->stock_levels->all)[0] };
-    my $location_id = $first_stock ? $first_stock->location_id : undef;
-    my $ref_num     = '3D-SALE-' . time();
-
-    eval {
-        $self->_inventory_transaction($c,
-            schema           => $schema,
-            sitename         => $sitename,
-            item_id          => $item_id,
-            location_id      => $location_id,
-            transaction_type => 'issue',
-            quantity         => $quantity,
-            unit_cost        => $item->unit_price || $item->unit_cost || 0,
-            reference_number => $ref_num,
-            notes            => "Customer sale: qty=$quantity, user=" . ($c->session->{username} || 'guest'),
-            performed_by     => $c->session->{username} || 'system',
-        );
-    };
-    if ($@) {
-        $c->flash->{error_msg} = "Purchase could not be completed: $@";
+    if ($item_id) {
+        $c->res->redirect($c->uri_for('/Cart/add',
+            { item_id => $item_id, quantity => $quantity, return_to => '/shop' }));
     } else {
-        my $price = $item->unit_price || $item->unit_cost || 0;
-        $c->flash->{success_msg} =
-            "Purchase recorded! $quantity x " . $item->name
-            . sprintf(" (\$%.2f each)", $price)
-            . " — Ref: $ref_num. "
-            . "Our team will confirm your order shortly.";
+        $c->res->redirect($c->uri_for('/shop'));
     }
-
-    $c->res->redirect($c->uri_for('/3d/store'));
     $c->detach;
 }
 
