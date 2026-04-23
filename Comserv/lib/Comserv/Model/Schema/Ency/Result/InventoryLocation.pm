@@ -65,6 +65,7 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
+__PACKAGE__->add_unique_constraint('sitename_name', ['sitename', 'name']);
 
 __PACKAGE__->has_many(
     'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',

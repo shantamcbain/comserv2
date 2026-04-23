@@ -25,17 +25,17 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
-                <a href="#phase3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 3: K3s Setup</a>
-                <a href="#phase4" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 4: Galera</a>
-                <a href="#phase5" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Phase 5: Migration</a>
-                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Rollback</a>
-                <a href="#monitoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Monitoring</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Prerequisites</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Architecture</a>
+                <a href="#phase3" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 3: K3s Setup</a>
+                <a href="#phase4" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 4: Galera</a>
+                <a href="#phase5" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Phase 5: Migration</a>
+                <a href="#rollback" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Rollback</a>
+                <a href="#monitoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Monitoring</a>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
             </ul>
 
             <h3>Pre-Migration Checklist</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>[ ] Backup production database (mysqldump to external storage)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>[ ] Backup production database (mysqldump to external storage)
 [ ] Document current DB schema and data size
 [ ] Verify network connectivity: ping 192.168.1.198 from all Proxmox hosts
 [ ] Test MySQL credentials: mysql -h 192.168.1.198 -u user -p
@@ -73,7 +73,7 @@
             <h2 id="architecture" style="color: var(--text-color); font-family: var(--header-font);">Target Architecture</h2>
             
             <h3>Cluster Topology</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>┌─────────────────────────────────────────────────────────────┐
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>┌─────────────────────────────────────────────────────────────┐
 │                    Proxmox Cluster (LAN: 192.168.1.0/24)      │
 ├─────────────────────────────────────────────────────────────┤
 │                                                               │
@@ -96,7 +96,7 @@
 └─────────────────────────────────────────────────────────────┘</code></pre>
 
             <h3>Galera Cluster Setup</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>K3s Namespace: production-db
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>K3s Namespace: production-db
 Service: mariadb-galera (headless for Galera)
 StatefulSet: mariadb-galera (3 replicas)
 ├─ Pod 0: Primary (sync-full)
@@ -117,7 +117,7 @@ LoadBalancer Service: mariadb-lb (external access, IP 192.168.1.200)</code></pre
             <h2 id="phase3" style="color: var(--text-color); font-family: var(--header-font);">Phase 3: K3s Cluster Rebuild (Week 1)</h2>
 
             <h3>Step 3.1: Delete Old K3s VMs (If Existing)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmoxws (backup old config first)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmoxws (backup old config first)
 qm stop 100 && qm destroy 100 --purge 2>/dev/null || echo "VM 100 not found"
 qm stop 103 && qm destroy 103 --purge 2>/dev/null || echo "VM 103 not found"
 
@@ -129,7 +129,7 @@ qm stop 202 && qm destroy 202 --purge 2>/dev/null || echo "VM 202 not found"
 qm list | grep -E "k3s|100|101|102|103|104|105"</code></pre>
 
             <h3>Step 3.2: Create Master VM on proxmox720</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmox720 (IMPORTANT: Master on stable hardware)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On proxmox720 (IMPORTANT: Master on stable hardware)
 qm create 100 --name k3s-master --memory 8192 --cores 4 --net0 virtio,bridge=vmbr0
 qm set 100 --scsi0 local-lvm:50  # 50GB for master with etcd
 qm set 100 --ide2 local:cloudinit
@@ -142,7 +142,7 @@ qm start 100
 sleep 60 && ssh ubuntu@192.168.1.10 "echo 'Master SSH OK'"</code></pre>
 
             <h3>Step 3.3: Clone Worker VMs</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Clone workers on proxmox720 (2 workers)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Clone workers on proxmox720 (2 workers)
 qm clone 100 101 --name k3s-worker-1 --full
 qm set 101 --ipconfig0 ip=192.168.1.11/24,gw=192.168.1.1
 qm start 101
@@ -167,7 +167,7 @@ ssh root@proxmoxt210 "qm create 105 --name k3s-worker-light --memory 4096 --core
   qm start 105"</code></pre>
 
             <h3>Step 3.4: Prepare All Nodes</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Script to run on ALL nodes (create as prep-nodes.sh)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Script to run on ALL nodes (create as prep-nodes.sh)
 for IP in 192.168.1.10 192.168.1.11 192.168.1.12 192.168.1.13 192.168.1.14 192.168.1.15; do
   ssh ubuntu@$IP 'bash -x << EOF'
     sudo apt update && sudo apt upgrade -y
@@ -183,7 +183,7 @@ EOF
 done</code></pre>
 
             <h3>Step 3.5: Install K3s</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On Master (VM 100)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On Master (VM 100)
 ssh ubuntu@192.168.1.10 'curl -sfL https://get.k3s.io | \
   INSTALL_K3S_VERSION=v1.28.4+k3s2 \
   sh -s - server --node-ip=192.168.1.10 \
@@ -208,7 +208,7 @@ done
 ssh ubuntu@192.168.1.10 'kubectl get nodes'</code></pre>
 
             <h3>Step 3.6: Install MetalLB (External LoadBalancer)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On master
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On master
 ssh ubuntu@192.168.1.10 'kubectl apply -f \
   https://raw.githubusercontent.com/metallb/metallb/v0.14.8/config/manifests/metallb-native.yaml'
 
@@ -243,7 +243,7 @@ kubectl get pods -n metallb-system</code></pre>
             <h2 id="phase4" style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Deploy MariaDB Galera StatefulSet (Week 2)</h2>
 
             <h3>Step 4.1: Create Namespace & Secrets</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -272,7 +272,7 @@ EOF
 kubectl get secrets -n production-db</code></pre>
 
             <h3>Step 4.2: Create Persistent Volumes (NFS Backend)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
 apiVersion: v1
 kind: PersistentVolume
 metadata:
@@ -316,7 +316,7 @@ EOF
 kubectl get pv</code></pre>
 
             <h3>Step 4.3: Deploy Galera StatefulSet</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>ssh ubuntu@192.168.1.10 'kubectl apply -f - << EOF'
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
@@ -415,12 +415,12 @@ kubectl get svc -n production-db</code></pre>
             <h2 id="phase5" style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Zero-Downtime Data Migration (Week 2-3)</h2>
 
             <h3>Step 5.1: Verify K3s Galera is Healthy</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>kubectl get pods -n production-db
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code>kubectl get pods -n production-db
 kubectl exec -it mariadb-galera-0 -n production-db -- \
   mysql -u root -p$ROOT_PASSWORD -e "SHOW STATUS LIKE 'wsrep%';"</code></pre>
 
             <h3>Step 5.2: Set Bare-Metal as Master, K3s as Slave</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On bare-metal (192.168.1.198)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On bare-metal (192.168.1.198)
 mysql -u root -p << EOF
 RESET MASTER;
 SHOW MASTER STATUS;  # Note File & Position
@@ -439,7 +439,7 @@ SHOW SLAVE STATUS\G
 EOF</code></pre>
 
             <h3>Step 5.3: Wait for Replication Sync (Critical)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Monitor sync progress
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Monitor sync progress
 for i in {1..300}; do
   SECONDS_BEHIND=$(kubectl exec -it mariadb-galera-0 -n production-db -- \
     mysql -u root -p'YourSecureRootPassword123!' -e \
@@ -455,7 +455,7 @@ for i in {1..300}; do
 done</code></pre>
 
             <h3>Step 5.4: Verify Data Integrity</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Compare row counts
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Compare row counts
 echo "Bare-metal row counts:"
 mysql -h 192.168.1.198 -u root -p << EOF | grep -E "^[0-9]+" | awk '{s+=$1} END {print "Total:", s}'
 SELECT COUNT(*) FROM ency.table1;
@@ -470,7 +470,7 @@ SELECT COUNT(*) FROM ency.table2;
 EOF</code></pre>
 
             <h3>Step 5.5: Final Cutover (During Maintenance Window)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># 1. Stop application (if containerized in K3s)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># 1. Stop application (if containerized in K3s)
 kubectl scale deployment/comserv-app --replicas=0 -n default
 
 # 2. Verify no writes to bare-metal
@@ -505,12 +505,12 @@ echo "✅ Cutover Complete - Application now on K3s Galera"</code></pre>
         <div class="col-100">
             <h2 id="rollback" style="color: var(--text-color); font-family: var(--header-font);">Rollback Procedure (3-Day Window)</h2>
 
-            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <strong>⚠️ Critical</strong>: Keep bare-metal database online and updated for 3 days post-cutover. If issues arise, revert to bare-metal within 72 hours.
             </div>
 
             <h3>Rollback Step 1: Reverse Replication</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On K3s (now master)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># On K3s (now master)
 kubectl exec -it mariadb-galera-0 -n production-db -- \
   mysql -u root -p'YourSecureRootPassword123!' << EOF
 RESET MASTER;
@@ -529,7 +529,7 @@ START SLAVE;
 EOF</code></pre>
 
             <h3>Rollback Step 2: Update Application Config</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Stop K3s deployment
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Stop K3s deployment
 kubectl scale deployment/comserv-app --replicas=0 -n default
 
 # Update to bare-metal IP (or use DNS)
@@ -554,7 +554,7 @@ echo "✅ Rolled back to bare-metal"</code></pre>
             <h2 id="monitoring" style="color: var(--text-color); font-family: var(--header-font);">Monitoring & Maintenance</h2>
 
             <h3>Health Checks</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Galera cluster status
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Galera cluster status
 kubectl exec -it mariadb-galera-0 -n production-db -- \
   mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_%';"
 
@@ -571,7 +571,7 @@ kubectl exec -it deployment/comserv-app -n default -- \
   mysql -h mariadb-lb.production-db -u comserv_user -p -e "SELECT 1;"</code></pre>
 
             <h3>Backup Strategy</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Daily backup (run in K3s CronJob)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); color: var(--text-color); font-family: monospace;"><code># Daily backup (run in K3s CronJob)
 apiVersion: batch/v1
 kind: CronJob
 metadata:

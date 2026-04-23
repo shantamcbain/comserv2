@@ -40,3 +40,8 @@ CREATE TABLE IF NOT EXISTS `ai_messages` (
 -- ALTER TABLE `ai_conversations` ADD INDEX IF NOT EXISTS `idx_project_id` (`project_id`);
 -- ALTER TABLE `ai_conversations` ADD INDEX IF NOT EXISTS `idx_task_id` (`task_id`);
 -- ALTER TABLE `ai_conversations` ADD INDEX IF NOT EXISTS `idx_updated_at` (`updated_at`);
+
+-- Migration 2026-04-15: convert agent_type from ENUM to VARCHAR(100)
+-- Required to support new agents: accounting, 3dprint, bmaster, inventory, etc.
+-- Run on every DB instance (production, local, zerotier):
+ALTER TABLE `ai_messages` MODIFY COLUMN `agent_type` VARCHAR(100) DEFAULT 'documentation';

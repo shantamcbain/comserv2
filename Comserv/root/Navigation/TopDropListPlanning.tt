@@ -1,5 +1,5 @@
 
-[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.0 2026/03/24 Planning top-menu dropdown — role-gated, SiteName-aware' %]
+[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.1 2026/04/22 P3.1 theme-audit: inline style verified CSS-var compliant' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
 [% END %]
@@ -24,20 +24,21 @@
     [% END %]
 [% END %]
 [% SET base_can_plan = c.session.username && !is_guest %]
-[%# If enabled_modules is available, honour it; otherwise use the session-based check %]
-[% IF c.stash.enabled_modules.defined %]
-    [% SET can_plan = base_can_plan && c.stash.enabled_modules.planning %]
-[% ELSE %]
-    [% SET can_plan = base_can_plan %]
+[%# Planning defaults to ON for all non-guest users.
+    Only disable if site_modules explicitly sets planning = 0 (disabled).
+    If the table doesn't exist or has no 'planning' entry, fall back to base_can_plan. %]
+[% SET can_plan = base_can_plan %]
+[% IF c.stash.enabled_modules.defined && c.stash.enabled_modules.planning.defined && !c.stash.enabled_modules.planning %]
+    [% SET can_plan = 0 %]
 [% END %]
 
 [% IF can_plan %]
 <li class="horizontal-dropdown">
-    <a href="/Documentation/DailyPlan" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
+    <a href="/planning/daily" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
     <div class="dropdown-content">
 
         [%# Core planning links %]
-        <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+        <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
         <a href="/todo"><i class="icon-check-square"></i>Todo System</a>
         <a href="/log"><i class="icon-log"></i>Logs</a>
 

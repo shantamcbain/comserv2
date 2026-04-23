@@ -127,3 +127,49 @@ VALUES
  '["llama3.2","mistral","codellama","gemma2","deepseek-r1","llava","phi3","qwen2.5","solar"]', 9999,
  1, 5, 1, 'enterprise', 1, 1, 1, 1, 1, 1000.00,
  99, 1, 1, 0);
+
+-- ============================================================
+-- CSC Hosting Plans (site_id=1)
+-- Available to members of any SiteName whose site is
+-- registered with CSC.  These plans appear in the membership
+-- index of every SiteName, with a CTA to register with CSC.
+-- ============================================================
+INSERT INTO membership_plans
+    (site_id, name, slug, description,
+     price_monthly, price_annual, price_currency,
+     ai_models_allowed, ai_requests_per_day,
+     has_email, email_addresses,
+     has_hosting, hosting_tier,
+     has_subdomain, has_custom_domain,
+     has_beekeeping, has_planning, has_currency, currency_bonus,
+     max_services, sort_order, is_active, is_featured)
+VALUES
+-- Subdomain Hosting: app served under a SiteName parent domain
+(1, 'Subdomain Hosting', 'hosting-subdomain',
+ 'Get your own subdomain on any registered SiteName domain (e.g. you.forager.com). '
+ 'Your site runs as an app on the CSC platform — no cPanel required. '
+ 'Includes full access to ENCY, AI tools, and planning modules.',
+ 10.00, 100.00, 'CAD',
+ '["llama3.2","mistral"]', 20,
+ 0, 0, 1, 'app-subdomain', 1, 0, 0, 1, 1, 25.00,
+ 3, 10, 1, 0),
+
+-- App-Only Hosting: standalone app site, no cPanel, no subdomain on partner domain
+(1, 'App-Only Hosting', 'hosting-app',
+ 'Host your own standalone application on the CSC platform. '
+ 'Bring your own domain or use a CSC sub-path. '
+ 'Ideal for co-ops, clubs, or small businesses that need a managed web presence '
+ 'without the overhead of a cPanel account.',
+ 15.00, 150.00, 'CAD',
+ '["llama3.2","mistral","codellama"]', 30,
+ 0, 0, 1, 'app-only', 0, 1, 0, 1, 1, 50.00,
+ 5, 11, 1, 1)
+ON DUPLICATE KEY UPDATE
+    description    = VALUES(description),
+    price_monthly  = VALUES(price_monthly),
+    price_annual   = VALUES(price_annual),
+    hosting_tier   = VALUES(hosting_tier),
+    has_subdomain  = VALUES(has_subdomain),
+    has_custom_domain = VALUES(has_custom_domain),
+    is_active      = VALUES(is_active),
+    is_featured    = VALUES(is_featured);

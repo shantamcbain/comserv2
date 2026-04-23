@@ -66,7 +66,7 @@
 <h2>Herbs in Formula</h2>
 [% IF herb_links && herb_links.size %]
 <table border="1" cellpadding="4" cellspacing="0">
-    <tr style="background:#f5f5f5;">
+    <tr style="background: var(--bg-secondary, #f5f5f5);">
         <th>Quantity</th>
         <th>Herb (Botanical)</th>
         <th>Common Name</th>
@@ -90,7 +90,7 @@
     [% END %]
 </table>
 [% ELSIF formula.herbs_raw %]
-<pre style="background:#f9f9f9;padding:0.5em;border:1px solid #ddd;font-size:0.9em;">[% formula.herbs_raw | html %]</pre>
+<pre style="background:#f9f9f9;padding:0.5em;border:1px solid var(--border-color, #ddd);font-size:0.9em;">[% formula.herbs_raw | html %]</pre>
 [% ELSE %]
 <p><em>No herbs recorded.</em></p>
 [% END %]

@@ -650,7 +650,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         my $form_data = $c->request->body_parameters;
 
         # Use the existing logging system to log the form data
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_herb', "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Form data received: " . join(", ", map { "$_: $form_data->{$_}" } keys %$form_data));
 
         my $new_herb = {
             therapeutic_action => $form_data->{therapeutic_action},
@@ -663,9 +663,12 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             ident_character => $form_data->{ident_character},
             image => $form_data->{image},
             stem => $form_data->{stem},
-            nectar => $form_data->{nectar},
-            pollinator => $form_data->{pollinator},
-            pollen => $form_data->{pollen},
+            nectar => (ref($form_data->{nectar}) eq 'ARRAY' ? $form_data->{nectar}[-1] : ($form_data->{nectar} // 0)),
+            nectarnotes => $form_data->{nectarnotes} // '',
+            pollinator => (ref($form_data->{pollinator}) eq 'ARRAY' ? join(', ', grep { length } @{$form_data->{pollinator}}) : ($form_data->{pollinator} // '')),
+            pollen => (ref($form_data->{pollen}) eq 'ARRAY' ? $form_data->{pollen}[-1] : ($form_data->{pollen} // 0)),
+            pollennotes => $form_data->{pollennotes} // '',
+            apis => $form_data->{apis} // '',
             leaves => $form_data->{leaves},
             flowers => $form_data->{flowers},
             fruit => $form_data->{fruit},
@@ -689,20 +692,32 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             non_med => $form_data->{non_med},
             history => $form_data->{history},
             reference => $form_data->{reference},
+            preparation => $form_data->{preparation} // '',
+            share => $form_data->{share} // 0,
             username_of_poster => $c->session->{username},
             group_of_poster => $c->session->{group},
-            date_time_posted => \'NOW()',  # Assuming you want to set this to the current timestamp
+            date_time_posted => \'NOW()',
         };
 
         # Use the existing logging system to log the new herb data
-        $self->logging->log_with_details($c, __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
 
         # Save the new herb using the ENCYModel
-        $c->model('ENCYModel')->add_herb($new_herb);
+        my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
-        # Redirect or display a success message
-        $c->flash->{success_msg} = 'Herb added successfully';
-        $c->res->redirect($c->uri_for($self->action_for('index')));
+        if ($ok) {
+            $c->flash->{success_msg} = 'Herb added successfully';
+            $c->res->redirect($c->uri_for($self->action_for('index')));
+        } else {
+            $c->stash(
+                error_msg      => "Failed to add herb: $result",
+                template       => 'ENCY/add_herb_form.tt',
+                user_role      => $c->session->{roles},
+                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+                form_data      => $form_data,
+            );
+            $self->_stash_image_files($c);
+        }
     } else {
         # Display the form
         $self->_stash_image_files($c);
@@ -2324,10 +2339,10 @@ sub add_drug : Path('/ENCY/Drug/add') : Args(0) {
 
         my ($ok, $msg, $new_id) = $c->model('ENCYModel')->add_drug($c, $data);
         $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'add_drug',
-            ($ok ? "Drug added: " : "Drug add FAILED: ") . ($data->{brand_name} || $data->{generic_name}));
+            ($ok ? "Drug added: " : "Drug add FAILED: ") . ($data->{brand_name} || $data->{generic_name}) . ($ok ? '' : " — $msg"));
         unless ($ok) {
             $c->stash(
-                error_msg => "Could not save drug: $msg",
+                error_msg => "Could not save drug. Please check the form and try again.",
                 drug      => $data,
                 edit_mode => 1,
                 ency_ai_prompt => q{brand_name, generic_name},

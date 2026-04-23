@@ -26,7 +26,7 @@
         .then(function(r) { return r.json(); })
         .then(function(data) {
             if (!data.references || !data.references.length) return;
-            var html = '<h3 style="margin-top:1.5em;border-top:1px solid #ddd;padding-top:0.8em;">Cited References</h3>';
+            var html = '<h3 style="margin-top:1.5em;border-top:1px solid var(--border-color, #ddd);padding-top:0.8em;">Cited References</h3>';
             html += '<div style="display:flex;flex-wrap:wrap;gap:0.4em;margin-top:0.5em;">';
             data.references.forEach(function(ref) {
                 html += '<a href="/ENCY/Reference/' + ref.reference_id + '" target="_blank" '
@@ -35,7 +35,7 @@
                     + 'title="' + escHtml(ref.author) + (ref.year ? ' (' + escHtml(ref.year) + ')' : '') + '">'
                     + '[' + ref.reference_id + '] ' + escHtml(ref.title)
                     + (ref.author ? ' <em style="font-weight:normal;">— ' + escHtml(ref.author) + '</em>' : '')
-                    + (ref.year   ? ' <span style="color:#555;">(' + escHtml(ref.year) + ')</span>' : '')
+                    + (ref.year   ? ' <span style="color: var(--text-muted-color, #555);">(' + escHtml(ref.year) + ')</span>' : '')
                     + '</a>';
             });
             html += '</div>';

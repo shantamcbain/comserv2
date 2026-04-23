@@ -1,0 +1,228 @@
+[% META
+    title = "Managing Inventory Items"
+    description = "Admin guide to creating and managing inventory items"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/items.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Managing Inventory Items</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#fields"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Item Fields</a>
+                <a href="#coa"          style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">COA Account Fields</a>
+                <a href="#shop-fields"  style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Shop Fields</a>
+                <a href="#adding"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Adding an Item</a>
+                <a href="#tips"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Tips</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The inventory item is the central entity of the system. A single <strong>InventoryItem</strong> record covers any kind of good or material:
+                3D-printed objects, filament spools, honey, office supplies, equipment, 
+                printed labels, or overhead cost centres. Every item belongs to a <strong>SiteName</strong>
+                — each site manages its own inventory independently.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="fields" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Item Fields</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;text-align:left;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;text-align:left;color:var(--text-color)">Description</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;text-align:left;color:var(--text-color)">Example</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>SKU</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Unique stock-keeping unit code. Must be unique per site.</td><td style="border:1px solid var(--border-color);padding:6px 10px">PLA-BLUE-1KG</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Name</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Display name for the item. Shown in shop, invoices, and BOM.</td><td style="border:1px solid var(--border-color);padding:6px 10px">PLA Blue 1kg Spool</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Category</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Groups items for filtering and reporting (free text).</td><td style="border:1px solid var(--border-color);padding:6px 10px">Filament, Garden, 3dStock</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Origin / How Made</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">How the item is produced or obtained.</td><td style="border:1px solid var(--border-color);padding:6px 10px">3d_printed, grown, foraged, purchased, manufactured, overhead</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Description</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Shown to customers in the shop.</td><td style="border:1px solid var(--border-color);padding:6px 10px">High-quality PLA, great for general prints.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Unit of Measure</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">The quantity unit: each, kg, g, m, l, kWh, hr.</td><td style="border:1px solid var(--border-color);padding:6px 10px">each</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Unit Cost</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">What you paid per unit (purchase cost). Used in BOM cost calculations.</td><td style="border:1px solid var(--border-color);padding:6px 10px">$28.00</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Unit Price</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">What you charge customers. Shown in shop and on price list.</td><td style="border:1px solid var(--border-color);padding:6px 10px">$2.00</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Barcode</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">UPC/EAN barcode for POS scanning compatibility (Square).</td><td style="border:1px solid var(--border-color);padding:6px 10px">012345678901</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Discount %</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Default discount percentage for this item in the shop.</td><td style="border:1px solid var(--border-color);padding:6px 10px">10</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Condition</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">new, used, refurbished, etc.</td><td style="border:1px solid var(--border-color);padding:6px 10px">new</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Purchase Date</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">When the item or batch was acquired.</td><td style="border:1px solid var(--border-color);padding:6px 10px">2026-01-15</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Warranty Expiry</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Equipment warranty end date.</td><td style="border:1px solid var(--border-color);padding:6px 10px">2029-01-15</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Status</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">active (in use) or inactive (discontinued/removed).</td><td style="border:1px solid var(--border-color);padding:6px 10px">active</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Is Assemblable</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Check to enable a Bill of Materials for this item. Marks it as a product built from components.</td><td style="border:1px solid var(--border-color);padding:6px 10px">✓ for 3D prints</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Reorder Point</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Stock quantity below which a low-stock alert appears on the dashboard.</td><td style="border:1px solid var(--border-color);padding:6px 10px">100 g</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Reorder Quantity</strong></td><td style="border:1px solid var(--border-color);padding:6px 10px">Suggested quantity to order when restocking.</td><td style="border:1px solid var(--border-color);padding:6px 10px">1000 g</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="coa" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. COA Account Fields</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                These four fields link the item to your Chart of Accounts for automatic GL posting.
+                Seed the default accounts at <a href="/Accounting" style="color:var(--link-color)">/Accounting</a> first.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Account Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Example Account</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">When Used</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">inventory_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Asset</td><td style="border:1px solid var(--border-color);padding:6px 10px">1300 Inventory Asset</td><td style="border:1px solid var(--border-color);padding:6px 10px">Stock value tracking</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">income_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Income</td><td style="border:1px solid var(--border-color);padding:6px 10px">4000 Sales Revenue</td><td style="border:1px solid var(--border-color);padding:6px 10px">When item is sold</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">expense_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Expense / COGS</td><td style="border:1px solid var(--border-color);padding:6px 10px">5000 Cost of Goods Sold</td><td style="border:1px solid var(--border-color);padding:6px 10px">Supplier invoice posted</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">returns_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Income (contra)</td><td style="border:1px solid var(--border-color);padding:6px 10px">4100 Sales Returns</td><td style="border:1px solid var(--border-color);padding:6px 10px">Customer returns/refunds</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="shop-fields" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Shop Fields</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Show in Shop</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Toggle to make item visible to public customers. Only admin can change this. Default: hidden.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Hide Stock Count</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Shows "Available to order" instead of a stock number. Use for print-on-demand or made-to-order items where the count is meaningless to customers.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Image Path</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Path to product image. Use FileManager to browse and select from existing files on the server, or paste a URL directly.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Shop Options (JSON)</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">
+                            Configurable options shown to the customer at purchase time. Stored as JSON array.<br>
+                            Examples:<br>
+                            <code>[{"label":"Filament","type":"filament_stock"}]</code> — dropdown populated from filaments in stock<br>
+                            <code>[{"label":"Colour","type":"select","options":["Red","Blue","Green"]}]</code> — fixed dropdown<br>
+                            <code>[{"label":"Custom text","type":"text"}]</code> — free-text field for customer
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="adding" class="row">
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Adding an Item</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/item/add" style="color:var(--link-color)">/Inventory/item/add</a></li>
+                <li>Enter SKU (required, unique per site), Name (required), Category, Origin</li>
+                <li>Set Unit of Measure (e.g. <em>each</em>, <em>g</em>, <em>kg</em>)</li>
+                <li>Enter Unit Cost (purchase price) and Unit Price (selling price)</li>
+                <li>Assign COA accounts if you have them seeded</li>
+                <li>Set Status to <em>active</em></li>
+                <li>Click <strong>Save Item</strong></li>
+                <li>To make it visible in the shop: open <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a>, click <strong>Toggle</strong> or <strong>Edit</strong> the item</li>
+            </ol>
+        </div>
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Editing an Item</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Inventory fields:</strong> <a href="/Inventory/items" style="color:var(--link-color)">/Inventory/items</a> → click item → Edit</li>
+                <li><strong>Shop/price fields:</strong> <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a> → click Edit next to item</li>
+                <li><strong>BOM (components):</strong> item view → click BOM link (only if Is Assemblable is checked)</li>
+                <li><strong>Stock levels:</strong> <a href="/Inventory/stock" style="color:var(--link-color)">/Inventory/stock</a> → Adjust</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="tips" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Tips</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Filament spools</strong> are raw materials — set <em>Show in Shop = No</em> so customers don't see them. They appear in BOM dropdowns for 3D print cost calculations.</li>
+                <li><strong>Print-on-demand items</strong> (e.g. 3D prints, custom orders) — enable <em>Hide Stock Count</em> so customers see "Available to order" instead of a confusing stock number.</li>
+                <li><strong>Cost centres</strong> (electricity, printer depreciation) — create them as inventory items with category <em>Cost Centre</em>, unit = kWh or hr, unit cost = your BC Hydro rate or depreciation per hour. Add them to BOM as components.</li>
+                <li><strong>Equipment</strong> — use the <a href="/Inventory/equipment" style="color:var(--link-color)">Equipment</a> sub-module for assets with wattage, purchase cost, depreciation. Equipment generates cost-centre rates automatically.</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Error / Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Cause &amp; Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">"Field 'hide_stock_count' doesn't have a default value"</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">The DB column was added without a default. Fixed in current version. If you still see this, run schema_compare to update the column default.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">"Column 'is_assemblable' is ambiguous"</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">BOM join query needs table prefix. Fixed in current version (uses <code>me.is_assemblable</code>).</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">SKU already exists error</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Each SKU must be unique per SiteName. Choose a different SKU.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Item visible in shop when show_in_shop = 0</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Clear browser cache; verify via /shop/admin filter=hidden that show_in_shop is off.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Level Management</a></li>
+            <li><a href="/Documentation/Inventory/bom" style="color:var(--link-color)">Bill of Materials</a></li>
+            <li><a href="/Documentation/Inventory/shop" style="color:var(--link-color)">Shop &amp; Marketplace</a></li>
+            <li><a href="/Documentation/Accounting/index" style="color:var(--link-color)">Accounting Overview</a></li>
+        </ul>
+    </div>
+</div>

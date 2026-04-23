@@ -1,0 +1,296 @@
+[% META
+    title = "Shop & Marketplace"
+    description = "Admin guide to the SiteName shop, marketplace listings, and cart system"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/shop.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Shop &amp; Marketplace</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#enabling"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Enabling the Shop</a>
+                <a href="#visibility" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Item Visibility</a>
+                <a href="#shop-admin" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Shop Admin</a>
+                <a href="#options"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Shop Options</a>
+                <a href="#images"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Images</a>
+                <a href="#pricelist"  style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Price List</a>
+                <a href="#cart"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Cart &amp; Checkout</a>
+                <a href="#marketplace" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Marketplace</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                There are two public-facing selling channels:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>SiteName Shop</strong> (<a href="/shop" style="color:var(--link-color)">/shop</a>) — shows only this site's items that have been made visible. Customers browse, add to cart, and check out.</li>
+                <li><strong>Marketplace</strong> (<a href="/marketplace" style="color:var(--link-color)">/marketplace</a>) — cross-site listings. Any SiteName can list items here for cross-promotion.</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The <strong>Price List</strong> (<a href="/Cart/price_list" style="color:var(--link-color)">/Cart/price_list</a>) is the printable/PDF product catalogue — equivalent to a printed price sheet.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="enabling" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Enabling the Shop</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/admin" style="color:var(--link-color)">Admin</a> → <strong>Site Modules</strong></li>
+                <li>Find the <em>Commerce</em> module and set it to <strong>Active</strong></li>
+                <li>A <strong>Shop</strong> link appears in the site navigation</li>
+                <li>Admin users also see a <strong>Shop Admin</strong> link to manage inventory visibility</li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="visibility" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Item Visibility</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Setting</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Customer sees</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Use for</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">show_in_shop = No (default)</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Item hidden — not visible at all</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Raw materials (filament), internal cost centres, discontinued items</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">show_in_shop = Yes</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Item visible in shop</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Items available for sale to the public</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">show_in_shop = Yes + hide_stock_count = Yes</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Visible, shows "Available to order" instead of qty</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">3D prints (printed on order), custom items, anything where stock count is meaningless</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+                <strong>Policy:</strong> Public customers can NEVER see hidden items (show_in_shop = No). Only admin users see hidden items in /shop/admin. This is enforced at the controller level.
+            </div>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="shop-admin" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Shop Admin</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a> to manage item visibility and shop fields.
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Filter</strong> by status (active/inactive) and visibility (visible/hidden/all)</li>
+                <li><strong>Toggle</strong> button — instantly switches show_in_shop on/off for an item</li>
+                <li><strong>Hide All</strong> — sets all items to hidden (show_in_shop = No)</li>
+                <li><strong>Edit</strong> — opens full shop edit form for the item (price, image, options, description, discount)</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="options" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Shop Options (Configurable Options)</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The <strong>Shop Options</strong> field accepts a JSON array. Options are shown to the customer on the item page, letting them customise the order (e.g. choose filament colour).
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">JSON Example</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Customer Sees</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">filament_stock</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><code>[{"label":"Filament","type":"filament_stock"}]</code></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Dropdown auto-populated with filaments currently in stock (type PLA/PETG/etc + colour + supplier)</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">select</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><code>[{"label":"Colour","type":"select","options":["Red","Blue","Green"]}]</code></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Fixed dropdown with listed choices</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">text</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><code>[{"label":"Custom text","type":"text"}]</code></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Free-text input (e.g. personalisation, special instructions)</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Combine multiple options in the array, e.g.:</p>
+            <pre style="background-color:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:var(--spacing-medium);color:var(--text-color);font-size:var(--font-size-small);overflow-x:auto">[{"label":"Filament","type":"filament_stock"},{"label":"Custom text","type":"text"}]</pre>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="images" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Product Images</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a> and click <strong>Edit</strong> on the item to reach the shop edit form.
+                Each item currently supports <strong>one image</strong> (the <em>image_path</em> field). There are three ways to set it:
+            </p>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 1 — Upload from your computer (simplest)</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>On the shop edit form, find the <strong>Upload New Image</strong> section</li>
+                <li>Click the file input and select a photo from your computer (JPG, PNG, WebP, GIF supported)</li>
+                <li>Click <strong>Save</strong> — the image is uploaded to the server and the path is saved automatically</li>
+                <li>A live preview of the image appears on the edit form as soon as you select it</li>
+            </ol>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 2 — FileManager (browse server files)</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>On the shop edit form, click the <strong>Browse</strong> button next to the Image Path field</li>
+                <li>The <strong>FilePicker</strong> popup opens at <code>/file/file_picker?type=image</code></li>
+                <li>Use the search box to find an image by filename, or leave blank and click <strong>Search</strong> to browse recent files</li>
+                <li>Choose the source: <em>Database</em> (files previously uploaded) or <em>NFS filesystem</em> (files on the server's NFS share)</li>
+                <li>Image thumbnails are shown — click <strong>✓ Use</strong> on the image you want</li>
+                <li>The popup closes and the Image Path field is filled in automatically</li>
+                <li>Click <strong>Save</strong> on the edit form to apply</li>
+            </ol>
+
+            <h3 style="color:var(--text-color);font-family:var(--header-font);margin-top:1em">Method 3 — Paste a URL or path directly</h3>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Type or paste a full URL (e.g. <code>https://example.com/photo.jpg</code>) or an absolute server path (e.g. <code>/static/shop_images/gnome.jpg</code>) into the <strong>Image Path</strong> text field</li>
+                <li>A preview appears immediately</li>
+                <li>Click <strong>Save</strong></li>
+            </ol>
+
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small);margin-top:0.5em">
+                <strong>Current limitation — one image per item:</strong> The system stores a single <em>image_path</em> per inventory item.
+                Multiple product photos (gallery) are not yet supported. As a workaround, create a collage image outside the system and upload that as the single product image.
+                Multi-image/gallery support is a planned future feature.
+            </div>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="pricelist" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Price List</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The price list at <a href="/Cart/price_list" style="color:var(--link-color)">/Cart/price_list</a> is a printable/PDF product catalogue.
+                It is NOT the same as the shop — it is designed for printing and handing out (e.g. at a market stall, arts council, or workshop).
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Admin sees all active items (hidden and visible)</li>
+                <li>Public only sees show_in_shop items</li>
+                <li>Filter by category using <code>?category=3dStock</code></li>
+                <li>Click Print in browser (Ctrl+P) — print CSS is applied for clean output</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="cart" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Cart &amp; Checkout</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Customer browses <a href="/shop" style="color:var(--link-color)">/shop</a>, selects options, clicks <strong>Add to Cart</strong></li>
+                <li>Cart page shows items, quantities, subtotals</li>
+                <li>Customer clicks <strong>Checkout</strong></li>
+                <li>Checkout collects contact info and payment preference</li>
+                <li>Payment options (depending on site config): <em>Points</em> (deducted from customer's point balance), <em>Cash</em> (pay in person), <em>AP</em> (account/invoice)</li>
+                <li>Order is saved as a <strong>Cart Order</strong> and optionally as a <strong>Customer Order</strong></li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Admin views orders at <a href="/CustomerOrder" style="color:var(--link-color)">/CustomerOrder</a> and updates their status (pending → processing → fulfilled → completed).
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="marketplace" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">9. Marketplace Listings</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The Marketplace at <a href="/marketplace" style="color:var(--link-color)">/marketplace</a> shows items from all SiteNames.
+                To list an item in the marketplace:
+            </p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Edit the item (either via /Inventory/item/edit or /shop/admin/edit)</li>
+                <li>Check <strong>List in Marketplace</strong></li>
+                <li>Save</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The item is then visible to visitors on other SiteNames via the Marketplace. Clicking a marketplace listing redirects to the item's home SiteName shop page.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">10. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Filament/printer showing in public shop</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Go to /shop/admin, filter=all, set show_in_shop=No for those items. Use "Hide All" to reset all to hidden, then selectively show only saleable items.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Toggle redirect goes to "page not found"</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Fixed in current version (%3F encoding bug resolved). Update from current branch.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Shop module not available</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Activate Commerce in Admin → Site Modules.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">filament_stock option shows wrong name format</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Filament names auto-format as "{type} {colour} {supplier}" from the item category/name. Rename inventory items to match desired display format (e.g. "PLA Blue Matter 3d").</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/items" style="color:var(--link-color)">Managing Inventory Items</a></li>
+            <li><a href="/Documentation/Inventory/consignment" style="color:var(--link-color)">Consignment Tracking</a></li>
+            <li><a href="/shop/admin" style="color:var(--link-color)">Shop Admin</a></li>
+            <li><a href="/Cart/price_list" style="color:var(--link-color)">Price List</a></li>
+        </ul>
+    </div>
+</div>

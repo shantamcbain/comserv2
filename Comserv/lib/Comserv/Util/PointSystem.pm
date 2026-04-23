@@ -464,6 +464,48 @@ sub ledger_for_user {
 use constant DEFAULT_POINT_RATE => 60;
 
 # ---------------------------------------------------------------------------
+# resolve_rate(rule_type => '...', sitename => '...', role => '...') -> DECIMAL
+#
+# Returns the rate from the best matching point_rules row.
+# Match priority: highest priority value wins.
+# Falls back to DEFAULT_POINT_RATE for rule_type=hourly_rate if no rule found.
+# ---------------------------------------------------------------------------
+sub resolve_rate {
+    my ($self, %args) = @_;
+    my $rule_type = $args{rule_type} or return DEFAULT_POINT_RATE;
+    my $sitename  = $args{sitename};
+    my $role      = $args{role};
+    my $today     = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my @where = (
+        rule_type => $rule_type,
+        is_active => 1,
+        [ effective_from => undef, effective_from => { '<=' => $today } ],
+        [ effective_to   => undef, effective_to   => { '>=' => $today } ],
+    );
+
+    my $rs = $self->_schema->resultset('PointRule')->search(
+        {
+            rule_type => $rule_type,
+            is_active => 1,
+            -and => [
+                [ { effective_from => undef }, { effective_from => { '<=' => $today } } ],
+                [ { effective_to   => undef }, { effective_to   => { '>=' => $today } } ],
+            ],
+        },
+        { order_by => { -desc => 'priority' } },
+    );
+
+    while (my $rule = $rs->next) {
+        next if defined $rule->sitename && $rule->sitename ne ($sitename // '');
+        next if defined $rule->role     && $rule->role     ne ($role     // '');
+        return $rule->rate + 0;
+    }
+
+    return DEFAULT_POINT_RATE;
+}
+
+# ---------------------------------------------------------------------------
 # bill_time_log($log_row) -> ($ok, $error_message)
 #
 # Called when a log entry is closed (status=3/DONE).

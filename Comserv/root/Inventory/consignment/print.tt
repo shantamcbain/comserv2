@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Consignment Slip — [% consignment.reference_number || ('C-' _ consignment.id) %]</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: rgba(255,255,255,0.88); padding: 12mm; }
+h1 { font-size: 14pt; font-weight: bold; }
+table { border-collapse: collapse; width: 100%; }
+th, td { padding: 5px 8px; text-align: left; vertical-align: top; }
+.border-box { border: 1px solid #888; }
+.border-box td { border: 1px solid #888; }
+tfoot tr td { border-top: 2px solid #333; font-weight: bold; }
+thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
+.section { margin-bottom: 1.2em; }
+.slip-header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 0.8em; margin-bottom: 1em; }
+.slip-header .left h1 { font-size: 15pt; }
+.slip-header .right { text-align: right; }
+.slip-header .right h2 { font-size: 13pt; letter-spacing: 1px; }
+.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 1.2em; }
+.party { border: 1px solid #999; padding: 6px 10px; }
+.party + .party { border-left: none; }
+.items-table thead th { background: #ececec; font-size: 9pt; }
+.items-table tbody tr:nth-child(even) { background: var(--bg-secondary, #fafafa); }
+.items-table tfoot td { background: #ececec; }
+.text-right { text-align: right !important; }
+.totals { text-align: right; margin-top: 0.5em; font-size: 10pt; }
+.sign-block { margin-top: 2.5em; display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
+.sign-line { border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 9pt; }
+.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: var(--text-muted-color, #555); border-top: 1px solid #ccc; padding-top: 0.5em; }
+@media print {
+  body { padding: 8mm; }
+  .no-print { display: none; }
+}
+</style>
+</head>
+<body onload="window.print()">
+
+[% SET con = consignment %]
+[% SET comm_pct = con.partner.commission_percent || 0 %]
+
+<div class="slip-header">
+  <div class="left">
+    <h1>[% site_info.display_name || sitename | html %]</h1>
+    [% IF site_info.business_address %]<div>[% site_info.business_address | html %]</div>[% END %]
+    [% IF site_info.business_phone %]<div>Tel: [% site_info.business_phone | html %]</div>[% END %]
+    [% IF site_info.email %]<div>[% site_info.email | html %]</div>[% END %]
+  </div>
+  <div class="right">
+    <h2>CONSIGNMENT SLIP</h2>
+    <div>Ref: <strong>[% con.reference_number || ('C-' _ con.id) | html %]</strong></div>
+    <div>Date: [% con.date_sent %]</div>
+    <div>Status: [% con.status | html %]</div>
+    <div>Commission: [% comm_pct %]%</div>
+  </div>
+</div>
+
+<div class="parties section">
+  <div class="party">
+    <strong>From:</strong><br>
+    [% site_info.display_name || sitename | html %]
+  </div>
+  <div class="party">
+    <strong>To (Consignment Partner):</strong><br>
+    [% con.partner.name | html %]<br>
+    [% IF con.partner.address %][% con.partner.address | html %][% END %]
+    [% IF con.partner.phone %]<br>Tel: [% con.partner.phone | html %][% END %]
+    [% IF con.partner.email %]<br>[% con.partner.email | html %][% END %]
+  </div>
+</div>
+
+[% IF con.notes %]
+<div class="section" style="font-size:9pt;color: var(--text-muted-color, #555);font-style:italic">Notes: [% con.notes | html %]</div>
+[% END %]
+
+[% SET grand_gross = 0; SET grand_net = 0; SET grand_comm = 0 %]
+<table class="items-table section">
+  <thead>
+    <tr>
+      <th>Item / SKU</th>
+      <th class="text-right">Sent</th>
+      <th class="text-right">Sold</th>
+      <th class="text-right">Returned</th>
+      <th class="text-right">Outstanding</th>
+      <th class="text-right">Retail $</th>
+      <th class="text-right">Gross</th>
+      <th class="text-right">Commission ([% comm_pct %]%)</th>
+      <th class="text-right">Our Net</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH line IN con.lines %]
+  [% SET outstanding = line.quantity_sent - line.quantity_sold - line.quantity_returned %]
+  [% SET gross   = line.quantity_sold * (line.retail_price || 0) %]
+  [% SET comm    = gross * comm_pct / 100 %]
+  [% SET net     = gross - comm %]
+  [% grand_gross = grand_gross + gross %]
+  [% grand_net   = grand_net   + net   %]
+  [% grand_comm  = grand_comm  + comm  %]
+  <tr>
+    <td><strong>[% line.item.name | html %]</strong>[% IF line.item.sku %] <small>([% line.item.sku | html %])</small>[% END %][% IF line.notes %]<br><small>[% line.notes | html %]</small>[% END %]</td>
+    <td class="text-right">[% line.quantity_sent %]</td>
+    <td class="text-right">[% line.quantity_sold %]</td>
+    <td class="text-right">[% line.quantity_returned %]</td>
+    <td class="text-right"><strong>[% outstanding %]</strong></td>
+    <td class="text-right">[% IF line.retail_price %]$[% line.retail_price | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td class="text-right">[% IF gross > 0 %]$[% gross | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td class="text-right">[% IF comm > 0 %]$[% comm | format('%.2f') %][% ELSE %]—[% END %]</td>
+    <td class="text-right"><strong>[% IF net > 0 %]$[% net | format('%.2f') %][% ELSE %]—[% END %]</strong></td>
+  </tr>
+  [% END %]
+  </tbody>
+  [% IF grand_gross > 0 %]
+  <tfoot>
+    <tr>
+      <td colspan="6"><strong>Totals</strong></td>
+      <td class="text-right">$[% grand_gross | format('%.2f') %]</td>
+      <td class="text-right">$[% grand_comm | format('%.2f') %]</td>
+      <td class="text-right"><strong>$[% grand_net | format('%.2f') %]</strong></td>
+    </tr>
+  </tfoot>
+  [% END %]
+</table>
+
+<div class="footer-note">
+  Commission rate: [% comm_pct %]% — Items remain the property of [% site_info.display_name || sitename | html %] until sold. This slip serves as the record of goods transferred under consignment agreement.
+</div>
+
+<div class="sign-block">
+  <div class="sign-line">
+    Received by (Partner)<br><strong>[% con.partner.name | html %]</strong><br>
+    Signature: ________________________________ &nbsp; Date: _______________
+  </div>
+  <div class="sign-line">
+    Released by ([% site_info.display_name || sitename | html %])<br>
+    Date sent: [% con.date_sent %]<br>
+    Signature: ________________________________
+  </div>
+</div>
+
+<div class="no-print" style="margin-top:2em;text-align:center">
+  <button onclick="window.print()" style="padding:8px 20px;font-size:10pt;cursor:pointer">Print</button>
+  <button onclick="window.close()" style="padding:8px 20px;font-size:10pt;cursor:pointer;margin-left:1em">Close</button>
+</div>
+
+</body>
+</html>

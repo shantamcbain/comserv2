@@ -24,7 +24,7 @@
     </div>
 
     <!-- QUICK SUMMARY SECTION -->
-    <div id="summary" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="summary" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Audit Summary</h2>
             <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0;">
@@ -41,7 +41,7 @@
         <div class="col-100">
             <h2 id="audit-data" style="color: var(--text-color); font-family: var(--header-font);">Detailed Audit Report (JSON)</h2>
             <p style="color: var(--text-color); font-family: var(--body-font); font-style: italic;">This JSON data is the authoritative source for which documentation files need updates. Use DocumentationSyncAgent workflow to process each item.</p>
-            <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>{
+            <pre style="background-color: rgba(255,255,255,0.12); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>{
    "files_changed" : 20,
    "audit_timestamp" : "2026-01-10T23:55:11Z",
    "documentation_files_needing_update" : [
@@ -236,8 +236,8 @@
                 <li><strong>Review Audit Data:</strong> Examine the JSON above to see which documentation files need updating</li>
                 <li><strong>For Each Item:</strong>
                     <ul>
-                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": true</code> → Update existing .tt file (bump version as shown in "action" field)</li>
-                        <li>If <code style="background-color: var(--light-color); padding: 2px 4px;">"exists": null</code> → Create new documentation file using DocumentationTtTemplate.tt</li>
+                        <li>If <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">"exists": true</code> → Update existing .tt file (bump version as shown in "action" field)</li>
+                        <li>If <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">"exists": null</code> → Create new documentation file using DocumentationTtTemplate.tt</li>
                     </ul>
                 </li>
                 <li><strong>Version Numbering:</strong> Follow format from "action" field (e.g., bump 1.12 → 1.13)</li>

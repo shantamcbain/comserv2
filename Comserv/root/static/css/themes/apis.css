@@ -1,7 +1,12 @@
 /* Theme: apis */
 :root {
   --accent-color: #FF9900;
+  --background-attachment: scroll;
   --background-color: #f9f06b;
+  --background-image: url(/static/images/BMaster/honey2.jpg);
+  --background-position: top left;
+  --background-repeat: repeat;
+  --background-size: auto;
   --body-font: Arial, sans-serif;
   --border-color: #e5a50a;
   --button-bg: #e5a50a;
@@ -14,12 +19,14 @@
   --font-size-xlarge: 28px;
   --header-color: #000000;
   --header-font: Arial, sans-serif;
-  --link-color: #f9f06b;
+  --link-color: #7a3b00;
   --link-decoration: none;
-  --link-hover-color: #f8e45c;
+  --link-hover-color: #5a2a00;
   --nav-bg: #ff9900;
   --nav-hover-bg: #f6d32d;
   --nav-text: #000000;
+  --nav-link-color: #000000;
+  --dropdown-bg: #fff8e1;
   --primary-color: #ccffff;
   --secondary-color: #4A4A4A;
   --site-name-color: #000000;
@@ -32,10 +39,6 @@
   --warning-color: red;
 }
 
-:root {
-  --background-image: url(../images/BMaster/honey2.jpg);
-  --background-repeat: repeat-x;
-  --background-position: top center;
-  --background-attachment: scroll;
-  --background-size: auto;
+body {
+  background-image: url(/static/images/BMaster/honey2.jpg);
 }

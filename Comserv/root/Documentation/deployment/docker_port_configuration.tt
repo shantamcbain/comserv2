@@ -28,10 +28,10 @@
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Configuration Summary</h2>
             <table style="width: 100%; border-collapse: collapse; color: var(--text-color); font-family: var(--body-font);">
                 <tr style="border-bottom: 2px solid var(--border-color);">
-                    <th style="padding: 10px; text-align: left; background-color: var(--light-color);">Environment</th>
-                    <th style="padding: 10px; text-align: left; background-color: var(--light-color);">Port</th>
-                    <th style="padding: 10px; text-align: left; background-color: var(--light-color);">Debug</th>
-                    <th style="padding: 10px; text-align: left; background-color: var(--light-color);">Access Method</th>
+                    <th style="padding: 10px; text-align: left; background-color: rgba(255,255,255,0.15);">Environment</th>
+                    <th style="padding: 10px; text-align: left; background-color: rgba(255,255,255,0.15);">Port</th>
+                    <th style="padding: 10px; text-align: left; background-color: rgba(255,255,255,0.15);">Debug</th>
+                    <th style="padding: 10px; text-align: left; background-color: rgba(255,255,255,0.15);">Access Method</th>
                 </tr>
                 <tr style="border-bottom: 1px solid var(--border-color);">
                     <td style="padding: 10px;">Development</td>
@@ -52,7 +52,7 @@
     <div class="row">
         <div class="col-50">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Development Setup (.env.development)</h2>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>CATALYST_ENV=development
 CATALYST_DEBUG=1
 WEB_PORT=3000
@@ -62,7 +62,7 @@ APP_MOUNT=.
         </div>
         <div class="col-50">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Production Setup (.env.production)</h2>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>CATALYST_ENV=production
 CATALYST_DEBUG=0
 WEB_PORT=5000
@@ -132,7 +132,7 @@ APP_MOUNT=/opt/comserv
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Build &amp; Test Instructions</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Development Test (Port 3000)</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>cd /home/shanta/PycharmProjects/comserv2
 
 # Build container
@@ -153,7 +153,7 @@ docker-compose down
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Production Test (Port 5000)</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>cd /home/shanta/PycharmProjects/comserv2
 
 # Run with production environment (same image as dev)
@@ -259,7 +259,7 @@ docker-compose down
             </ol>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Build Execution Command</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Using docker-compose (simplest - handles all orchestration)
 cd /home/shanta/PycharmProjects/comserv2
 docker-compose build
@@ -302,7 +302,7 @@ docker build --build-arg PERL_VERSION=5.40.0 -t comserv:latest .
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Build &amp; Test Execution Log</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Environment Verification (2025-10-26 10:46)</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>$ docker --version
 Docker version 28.2.2, build 28.2.2-0ubuntu1~24.04.1
 
@@ -329,7 +329,7 @@ Sun Oct 26 10:46:03 AM PDT 2025
             <p style="color: var(--text-color); font-family: var(--body-font);">To complete the Docker build and testing process:</p>
             <ol style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>Grant Docker Permissions:</strong>
-                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
+                    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
                         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code># Option 1: Add user to docker group (recommended)
 sudo usermod -aG docker $USER
 newgrp docker
@@ -340,14 +340,14 @@ sudo docker-compose build
                     </div>
                 </li>
                 <li><strong>Execute Build:</strong>
-                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
+                    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
                         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>cd /home/shanta/PycharmProjects/comserv2
 docker-compose build
 </code></pre>
                     </div>
                 </li>
                 <li><strong>Test Development (Port 3000):</strong>
-                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
+                    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
                         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>docker-compose --env-file .env.development up -d
 docker-compose logs -f web
 curl http://localhost:3000/
@@ -355,7 +355,7 @@ curl http://localhost:3000/
                     </div>
                 </li>
                 <li><strong>Test Production (Port 5000):</strong>
-                    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
+                    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: 5px 0;">
                         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>docker-compose --env-file .env.production up -d
 docker-compose logs -f web
 curl http://localhost:5000/
@@ -379,7 +379,7 @@ curl http://localhost:5000/
             </ol>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Environment Variable Pattern</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>COMSERV_DB_&lt;CONNECTION_NAME&gt;_&lt;FIELD&gt;=value
 
 Examples:
@@ -390,7 +390,7 @@ COMSERV_DB_LOCAL_ENCY_USERNAME=comserv
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">db_config.json Structure</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "connection_name": {
     "db_type": "mysql",
@@ -406,7 +406,7 @@ COMSERV_DB_LOCAL_ENCY_USERNAME=comserv
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Compose Environment Setup</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>services:
   web:
     environment:
@@ -427,7 +427,7 @@ COMSERV_DB_LOCAL_ENCY_USERNAME=comserv
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Kubernetes Deployment Example</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color);">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -452,7 +452,7 @@ spec:
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Security Best Practices</h3>
-            <div style="background-color: #fff3cd; color: #856404; padding: var(--spacing-medium); border: 1px solid #ffeeba; border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); color: #856404; padding: var(--spacing-medium); border: 1px solid #ffeeba; border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <p style="margin: 0; font-family: var(--body-font);"><strong>✓ Do's:</strong></p>
                 <ul style="margin: 5px 0; padding-left: 20px;">
                     <li>Store credentials in environment variables</li>

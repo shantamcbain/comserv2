@@ -23,7 +23,7 @@
         Status: Active
     </div>
 
-    <div style="background-color: #fff3e0; border: 1px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
+    <div style="background-color: var(--caution-bg, #fff3e0); border: 1px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
         <h3 style="color: #d84315; margin-top: 0;">⚠️ Note: Document Updated for Current Infrastructure</h3>
         <p style="color: var(--text-color); margin: 10px 0;"><strong>This document was originally written for Dell R710 hardware.</strong> It has been updated to reflect the <strong>current production infrastructure</strong> (Dec 23, 2025):</p>
         <ul style="color: var(--text-color); margin: 10px 0; padding-left: 20px;">
@@ -67,7 +67,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Critical Warnings</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Lab Testing Required:</strong> Test in isolated environment—misconfiguring CARP can lock you out</li>
@@ -86,7 +86,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Prepare Boot Media</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Download Proxmox VE 8.2 ISO and create bootable USB media.</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # On Linux - create bootable USB
 dd if=proxmox-ve_8.2-1.iso of=/dev/sdX bs=1M status=progress
@@ -107,7 +107,7 @@ dd if=proxmox-ve_8.2-1.iso of=/dev/sdX bs=1M status=progress
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Post-Install Configuration</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Access web UI at <code>https://192.168.1.10:8006</code> and perform initial setup:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Update system
 apt update && apt full-upgrade -y && reboot
@@ -140,7 +140,7 @@ update-grub && reboot
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">100</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">OPNsense firewall VM</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Memory</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2048 MiB</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Sufficient for routing/firewall</td>
@@ -150,7 +150,7 @@ update-grub && reboot
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">2-4 cores (host type)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Network processing power</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Storage</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">32GB qcow2</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">OS and configuration</td>
@@ -171,10 +171,10 @@ update-grub && reboot
                 <li>Access web UI: https://192.168.1.1 (root/opnsense)</li>
             </ul>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--info-color); font-family: var(--header-font);">PCI Passthrough (Optional - for Low Latency)</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">For maximum network performance, consider PCI passthrough of dedicated network cards:</p>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Identify PCIe cards
 lspci | grep -i ethernet
@@ -199,7 +199,7 @@ update-initramfs -u -k all && reboot
             <p style="color: var(--text-color); font-family: var(--body-font);">Create VM ID 101 with Ubuntu 24.04, 8GB RAM, 4 CPU cores, 64GB storage.</p>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Installation</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Install Docker
 apt update && apt install -y docker.io containerd.io
@@ -216,7 +216,7 @@ systemctl restart docker && systemctl enable docker
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Kubernetes Cluster Setup</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Disable swap
 swapoff -a
@@ -274,7 +274,7 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
                 <li>Enable Config Sync and State Sync</li>
             </ul>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--success-color); font-family: var(--header-font);">CARP Status Verification</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">After configuration, verify CARP status:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -293,7 +293,7 @@ kubectl taint nodes --all node-role.kubernetes.io/control-plane-
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">OPNsense Readiness Probe</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Deploy monitoring pod to watch OPNsense VM health and trigger failover:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Create opnsense-monitor.yaml
 cat > opnsense-monitor.yaml << EOF
@@ -344,7 +344,7 @@ kubectl apply -f opnsense-monitor.yaml
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
             
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: CARP Not Syncing</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Both nodes show MASTER or BACKUP, no automatic failover</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
@@ -356,11 +356,11 @@ kubectl apply -f opnsense-monitor.yaml
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: Kubernetes Pods Not Starting</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Pods stuck in Pending or ContainerCreating state</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Check node status
 kubectl get nodes -o wide
@@ -377,7 +377,7 @@ journalctl -u kubelet -f
                 </div>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large);">Problem: VM Network Performance Issues</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> High latency, packet drops, low throughput</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
@@ -411,7 +411,7 @@ journalctl -u kubelet -f
                 <li><strong>MetalLB:</strong> Implement for K8s load balancing behind OPNsense</li>
             </ul>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Monitor CARP status
 watch -n 5 'ifconfig | grep carp'
@@ -428,7 +428,7 @@ pvesh get /nodes/pve-r710/status
 
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/proxmox_administration" style="color: var(--link-color);">Proxmox Administration Guide</a></li>

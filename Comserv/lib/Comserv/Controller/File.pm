@@ -3093,6 +3093,183 @@ sub dir_sync_submit :Path('/file/dir_sync_submit') :Args(0) {
     $c->response->redirect($c->uri_for('/file/admin_browser', { dir_path => $dir_path }));
 }
 
+sub search :Path('/file/search') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->session->{user_id}) {
+        $c->response->body('{"error":"Not authenticated"}');
+        return;
+    }
+
+    my $q          = $c->req->param('q')          // '';
+    my $type_f     = $c->req->param('type')       // '';
+    my $sname_f    = $c->req->param('sitename')   // '';
+    my $source     = $c->req->param('source')     // 'db';
+    my $limit      = int($c->req->param('limit')  // 50);
+    $limit = 200 if $limit > 200;
+
+    my @results;
+
+    if ($source eq 'db' || $source eq 'all') {
+        eval {
+            my $schema = $c->model('DBEncy');
+            my %where;
+            $where{file_name} = { 'like', "%$q%" } if length $q;
+            $where{file_type} = { 'like', "%$type_f%" } if length $type_f;
+            unless ($is_csc) {
+                $where{sitename} = $sitename;
+            } else {
+                $where{sitename} = $sname_f if length $sname_f;
+            }
+            $where{file_status} = 'active';
+
+            my @rows = $schema->resultset('File')->search(
+                \%where,
+                { order_by => { -desc => 'upload_date' }, rows => $limit }
+            )->all;
+
+            for my $r (@rows) {
+                my $fp = $r->nfs_path || $r->file_path || '';
+                my $preview_url = '';
+                if ($fp && -f $fp) {
+                    $preview_url = $c->uri_for('/file/fs_preview', { path => $fp })->as_string;
+                } elsif ($r->external_url) {
+                    $preview_url = $r->external_url;
+                } elsif ($r->file_url) {
+                    $preview_url = $r->file_url;
+                }
+                push @results, {
+                    id           => $r->id,
+                    source       => 'db',
+                    file_name    => $r->file_name    // '',
+                    file_type    => $r->file_type    // '',
+                    file_format  => $r->file_format  // '',
+                    file_size    => $r->file_size    // 0,
+                    sitename     => $r->sitename     // '',
+                    description  => $r->description  // '',
+                    nfs_path     => $r->nfs_path     // '',
+                    file_path    => $fp,
+                    external_url => $r->external_url // '',
+                    file_url     => $r->file_url     // '',
+                    preview_url  => $preview_url,
+                    access_level => $r->access_level // '',
+                };
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'file_search', "DB search error: $@");
+        }
+    }
+
+    if (($source eq 'nfs' || $source eq 'all') && $is_admin) {
+        my $nfs_root = $self->_nfs_root_for_sync();
+        my $search_root = $is_csc ? $nfs_root : undef;
+        unless ($search_root) {
+            eval {
+                my $schema = $c->model('DBEncy');
+                my @allocs = $schema->resultset('NfsDirectory')->search(
+                    { sitename => $sitename, is_active => 1 }
+                )->all;
+                if (@allocs) {
+                    $search_root = $allocs[0]->nfs_path;
+                }
+            };
+        }
+        if ($search_root && -d $search_root) {
+            my $found = 0;
+            eval {
+                require File::Find;
+                File::Find::find({
+                    wanted => sub {
+                        return if $found >= $limit;
+                        my $fname = $_;
+                        return unless -f $File::Find::name;
+                        return if length($q) && $fname !~ /\Q$q\E/i;
+                        my $ext = ($fname =~ /\.(\w+)$/) ? lc($1) : '';
+                        if (length $type_f) {
+                            my $ft_check = lc($type_f);
+                            return unless (
+                                ($ft_check eq 'image'  && $ext =~ /^(jpg|jpeg|png|gif|webp|svg|bmp)$/) ||
+                                ($ft_check eq 'video'  && $ext =~ /^(mp4|mkv|avi|mov|webm)$/) ||
+                                ($ft_check eq 'pdf'    && $ext eq 'pdf') ||
+                                ($ft_check eq 'text'   && $ext =~ /^(txt|md|csv|log|sh|pl|pm|py|js|css|html?|json|yaml|yml|conf|rst)$/) ||
+                                ($fname =~ /\Q$type_f\E/i)
+                            );
+                        }
+                        my $fp   = $File::Find::name;
+                        my $sz   = (stat $fp)[7] // 0;
+                        my $mime = $self->_classify_file($fname);
+                        my $preview_url = '';
+                        my $is_img = ($ext =~ /^(jpg|jpeg|png|gif|webp|bmp)$/);
+                        $preview_url = $c->uri_for('/file/fs_preview', { path => $fp })->as_string if $is_img;
+                        push @results, {
+                            id           => undef,
+                            source       => 'nfs',
+                            file_name    => $fname,
+                            file_type    => $ext ? ".$ext" : 'unknown',
+                            file_format  => $mime,
+                            file_size    => $sz,
+                            sitename     => '',
+                            description  => '',
+                            nfs_path     => $fp,
+                            file_path    => $fp,
+                            external_url => '',
+                            file_url     => '',
+                            preview_url  => $preview_url,
+                            access_level => '',
+                        };
+                        $found++;
+                    },
+                    no_chdir => 1,
+                }, $search_root);
+            };
+        }
+    }
+
+    require JSON;
+    $c->response->body(JSON::encode_json(\@results));
+}
+
+sub file_picker :Path('/file/file_picker') :Args(0) {
+    my ($self, $c) = @_;
+    my ($is_admin, $is_csc, $sitename) = $self->_resolve_roles($c);
+
+    unless ($c->session->{user_id}) {
+        $c->response->body('<p>Not authenticated</p>');
+        return;
+    }
+
+    my $target_field = $c->req->param('target_field') || 'image_path';
+    my $type_filter  = $c->req->param('type')         || '';
+    my $q            = $c->req->param('q')            || '';
+    my $nfs_root     = $self->_nfs_root_for_sync();
+
+    my @sites;
+    if ($is_csc) {
+        eval {
+            @sites = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name', columns => ['name'] }
+            )->all;
+        };
+    }
+
+    $c->stash(
+        target_field => $target_field,
+        type_filter  => $type_filter,
+        search_q     => $q,
+        is_admin     => $is_admin,
+        is_csc       => $is_csc,
+        sitename     => $sitename,
+        sites        => \@sites,
+        nfs_root     => $nfs_root,
+        template     => 'file/FilePicker.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub _is_path_allowed {
     my ($self, $c, $path, $is_csc, $sitename, $nfs_root) = @_;
     

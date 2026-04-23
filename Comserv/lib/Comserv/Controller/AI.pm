@@ -157,9 +157,10 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-3',          provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',     provider => 'grok', label => 'Grok 3 Mini (xAI)' };
-                    push @external_models, { name => 'grok-3-fast',     provider => 'grok', label => 'Grok 3 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
                 }
             }
         } catch {
@@ -189,6 +190,26 @@ sub index :Path :Args(0) {
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
         'index', "AI interface loaded for user: $username (host: $current_host, model: $current_model, can_select: " . ($can_select_model ? 'yes' : 'no') . ", external_models: " . scalar(@external_models) . ")");
+}
+
+=head2 template_editor
+
+Admin-only page for reviewing and applying AI-proposed TT2 template edits.
+
+=cut
+
+sub template_editor :Local :Args(0) {
+    my ($self, $c) = @_;
+    my $_te_roles = $c->session->{roles} || [];
+    $_te_roles = [$_te_roles] unless ref $_te_roles eq 'ARRAY';
+    unless (grep { /^admin$/i } @$_te_roles) {
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+    $c->stash(
+        template   => 'ai/template_editor.tt',
+        page_title => 'Template Editor',
+    );
 }
 
 =head2 widget
@@ -388,6 +409,12 @@ sub generate :Local :Args(0) {
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
             $history_items = (ref($json_data->{history}) eq 'ARRAY') ? $json_data->{history} : [];
+            $c->stash->{skip_role_prompt} = $json_data->{skip_role_prompt} ? 1 : 0;
+            # Image attachment (base64) for vision models
+            my $image_data_b64 = $json_data->{image_data} || '';
+            my $image_mime     = $json_data->{image_mime} || 'image/jpeg';
+            $c->stash->{ai_image_data} = $image_data_b64;
+            $c->stash->{ai_image_mime} = $image_mime;
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'generate', "Extracted from JSON: prompt='" . substr($prompt, 0, 100) . "', provider='$provider', conversation_id=" . ($conversation_id || 'NEW') . ", use_search=$use_search");
         } else {
@@ -424,8 +451,8 @@ sub generate :Local :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
         'generate', "BEFORE_VALIDATION: conversation_id is " . (defined($conversation_id) ? "'$conversation_id'" : "undef"));
     
-    # Validate prompt
-    unless ($prompt && length($prompt) > 0) {
+    # Validate prompt — allow empty if image is attached
+    unless (($prompt && length($prompt) > 0) || ($c->stash->{ai_image_data} && length($c->stash->{ai_image_data}) > 0)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
             'generate', "Empty prompt provided by user: $username");
         
@@ -437,7 +464,22 @@ sub generate :Local :Args(0) {
         $c->response->status(400);
         return;
     }
-    
+    $prompt ||= '(describe this image)';
+
+    # ── Keyword interceptors: handle well-known phrases without calling the AI model ──
+    # "good morning" / "start day" → create a daily log start-of-day entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    # "good night" / "end day" → close the daily log entry
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Log the query with preview
     my $prompt_preview = substr($prompt, 0, 100);
     $prompt_preview .= '...' if length($prompt) > 100;
@@ -452,7 +494,7 @@ sub generate :Local :Args(0) {
     # Normalize agent_type to database enum values
     # Normalize agent_type for dynamic storage (was database enum)
     my $normalized_agent_type = $agent_id || 'general';
-    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|prompt-logging|general)$/i) {
+    if ($agent_id && $agent_id =~ /^(documentation|helpdesk|ency|beekeeping|hamradio|chat|cleanup|cleanup-agent|docker|master-plan-updater|daily-audit|daily-plan-automator|master-plan-manager|daily-plans-generator|daily-plans|documentation-sync|main|MainAgent|planning|3dprint|accounting|prompt-logging|general)$/i) {
         $normalized_agent_type = lc($agent_id);
         # Special case for MainAgent which is camelcase in enum
         $normalized_agent_type = 'MainAgent' if lc($agent_id) eq 'mainagent';
@@ -498,6 +540,49 @@ sub generate :Local :Args(0) {
             'generate', "3DPrint agent: injected system prompt");
     }
 
+    if (lc($normalized_agent_type) eq 'accounting' && !$system) {
+        $system = $self->_build_accounting_system_prompt($c);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'generate', "Accounting agent: injected system prompt");
+    }
+
+    if (lc($normalized_agent_type) eq 'template_editor') {
+        my $_ta_roles = $c->session->{roles} || [];
+        $_ta_roles = [$_ta_roles] unless ref $_ta_roles eq 'ARRAY';
+        my $is_admin = grep { /^admin$/i } @$_ta_roles;
+        unless ($is_admin) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Template Editor is only available to admin users.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        if (!$system) {
+            $system = $self->_build_template_editor_system_prompt($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Template Editor agent: injected system prompt (admin)");
+        }
+    }
+
+    if (lc($normalized_agent_type) eq 'coding') {
+        unless ($self->_is_dev_mode($c)) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Coding Assistant is only available in development mode.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        if (!$system) {
+            $system = $self->_build_coding_system_prompt($c);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'generate', "Coding agent: injected system prompt (dev mode)");
+        }
+    }
+
     # Require login for external AI models (Grok etc.) before entering try block
     if (lc($provider) eq 'grok' && $is_guest) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -519,12 +604,14 @@ sub generate :Local :Args(0) {
         $can_select_model_gen = grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles_gen;
     }
 
-    # Role-based capability injection into system prompt
-    my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
-    if ($role_prompt && $system) {
-        $system .= "\n\n" . $role_prompt;
-    } elsif ($role_prompt) {
-        $system = $role_prompt;
+    # Role-based capability injection into system prompt (skip when caller supplies a precise system prompt)
+    unless ($c->stash->{skip_role_prompt}) {
+        my $role_prompt = $self->_build_role_system_prompt($c, $user_roles_gen, $provider, $page_path, $page_title);
+        if ($role_prompt && $system) {
+            $system .= "\n\n" . $role_prompt;
+        } elsif ($role_prompt) {
+            $system = $role_prompt;
+        }
     }
 
     # Only admins/editors may use web search (costs money per call)
@@ -545,6 +632,9 @@ sub generate :Local :Args(0) {
     my $inject_prompt = $prompt;
     if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
         $inject_prompt = "project todo $prompt";
+    }
+    if ($normalized_agent_type =~ /^accounting$/i) {
+        $inject_prompt = "inventory accounting gl coa invoice $prompt";
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
@@ -626,10 +716,9 @@ sub generate :Local :Args(0) {
             }
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
-            my %GROK_DEAD = map { $_ => 'grok-3' } qw(
+            # Only add models here that are confirmed permanently retired by xAI
+            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-0709
-                grok-4-fast-non-reasoning
             );
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -691,7 +780,21 @@ sub generate :Local :Args(0) {
                 my $hcontent = $h->{content} || '';
                 push @grok_messages, { role => $hrole, content => $hcontent } if $hcontent;
             }
-            push @grok_messages, { role => 'user', content => $prompt };
+            # Build user message — multimodal if image attached
+            my $img_b64  = $c->stash->{ai_image_data} || '';
+            my $img_mime = $c->stash->{ai_image_mime} || 'image/jpeg';
+            if ($img_b64) {
+                push @trace, sprintf("🖼️ Image attached (%s, %d bytes base64)", $img_mime, length($img_b64));
+                push @grok_messages, {
+                    role    => 'user',
+                    content => [
+                        { type => 'text',      text      => $prompt },
+                        { type => 'image_url', image_url => { url => "data:${img_mime};base64,${img_b64}", detail => 'high' } },
+                    ],
+                };
+            } else {
+                push @grok_messages, { role => 'user', content => $prompt };
+            }
             $response = $grok->chat(
                 messages   => \@grok_messages,
                 use_search => $use_search,
@@ -958,8 +1061,18 @@ sub generate :Local :Args(0) {
             # Pass 1: trim history messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content from system.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS = $normalized_agent_type eq 'planning' ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $_gen_is_admin = !$is_guest && do {
+                my $_gr = $c->session->{roles} || [];
+                $_gr = [split /,/, $_gr] unless ref $_gr;
+                grep { /^(admin|developer|editor)$/i } @$_gr;
+            };
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+                              : $_gen_is_admin ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                        ? 10_000
+                               : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
             if ($raw_total_gen > $BUDGET_CHARS) {
@@ -997,9 +1110,12 @@ sub generate :Local :Args(0) {
                     $ollama_msgs[0]{content} = $sys;
                     push @trace, "⚠️ Stripped page_content from system prompt (still over budget)";
 
-                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS
+                    # Pass 3: hard-cap system prompt to SYS_MAX_CHARS (snap to newline to avoid mid-URL cuts)
                     if (length($sys) > $SYS_MAX_CHARS) {
-                        $ollama_msgs[0]{content} = substr($sys, 0, $SYS_MAX_CHARS) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS);
+                        $ollama_msgs[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS);
                     }
                 }
@@ -1013,6 +1129,19 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "Pre-request: model=$use_model msgs=" . scalar(@ollama_msgs) .
                 " chars=$total_chars est_tokens=$est_tokens timeout=300s host=$current_host");
+
+            # ── Web search injection (when use_search=1 for Ollama provider) ──
+            if ($use_search) {
+                my ($search_ctx, $search_provider) = $self->_do_web_search($c, $prompt, $agent_id, \@trace);
+                if ($search_ctx) {
+                    if (@ollama_msgs && $ollama_msgs[-1]{role} eq 'user') {
+                        $ollama_msgs[-1]{content} = $search_ctx . "\n" . $ollama_msgs[-1]{content};
+                    } else {
+                        push @ollama_msgs, { role => 'user', content => $search_ctx };
+                    }
+                    push @trace, sprintf("🌐 Web search (%s): injected %d chars", $search_provider, length($search_ctx));
+                }
+            }
 
             # ── Tier 1 query ─────────────────────────────────────────────────
             my $query_start = time();
@@ -1122,8 +1251,13 @@ sub generate :Local :Args(0) {
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
         my $ai_response = $response->{response} || '';
+        # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
+        my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
+            ? $response->{usage}{total_tokens}
+            : ($response->{eval_count} || undef);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
-            'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars");
+            'generate', "Query successful for user '$username' - Model: $model_used, Response length: $response_length chars" .
+            ($tokens_used ? ", tokens=$tokens_used" : ''));
         
         # Save conversation and messages to database
         try {
@@ -1267,7 +1401,8 @@ sub generate :Local :Args(0) {
                 model_used => $model_used,
                 metadata => encode_json($ai_metadata),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'user',
+                ($tokens_used ? (tokens_used => $tokens_used) : ()),
             });
             
             unless ($ai_msg) {
@@ -1780,7 +1915,19 @@ sub chat :Local :Args(0) {
         $c->response->status(400);
         return;
     }
-    
+
+    # ── Keyword interceptors (chat endpoint) ──────────────────────────────────
+    if (!$is_guest && $prompt =~ /^\s*(good\s+morning|start\s+day|begin\s+day|start\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'start', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+    if (!$is_guest && $prompt =~ /^\s*(good\s+night|end\s+day|finish\s+day|end\s+of\s+day)\s*[!.]?\s*$/i) {
+        my $kw_resp = $c->controller("Planning")->_daily_log_action($c, 'end', $username, $user_id);
+        $c->response->body(encode_json($kw_resp));
+        return;
+    }
+
     # Inject project/task context into system prompt if provided
     if ($project_id || $task_id) {
         my $ctx = $self->_build_project_context($c, $project_id, $task_id);
@@ -1860,6 +2007,38 @@ sub chat :Local :Args(0) {
 
     if (lc($chat_agent_id) eq '3dprint' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_3dprint_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'accounting' && !$chat_agent_system) {
+        $chat_agent_system = $self->_build_accounting_system_prompt($c);
+    }
+
+    if (lc($chat_agent_id) eq 'template_editor') {
+        my $_ct_roles = $c->session->{roles} || [];
+        $_ct_roles = [$_ct_roles] unless ref $_ct_roles eq 'ARRAY';
+        unless (grep { /^admin$/i } @$_ct_roles) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Template Editor is only available to admin users.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        $chat_agent_system = $self->_build_template_editor_system_prompt($c) unless $chat_agent_system;
+    }
+
+    if (lc($chat_agent_id) eq 'coding') {
+        unless ($self->_is_dev_mode($c)) {
+            $c->response->body(encode_json({
+                success => JSON::false,
+                error   => 'The Coding Assistant is only available in development mode.',
+            }));
+            $c->response->content_type('application/json');
+            $c->response->status(403);
+            return;
+        }
+        $chat_agent_system = $self->_build_coding_system_prompt($c) unless $chat_agent_system;
     }
 
     # Build combined system prompt: agent-specific prompt + role prompt + live module data + shared KB
@@ -1977,10 +2156,8 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-3' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-0709
-                grok-4-fast-non-reasoning
             );
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
@@ -2070,9 +2247,15 @@ sub chat :Local :Args(0) {
             }
 
             $model_used = $response->{model} || $grok->model;
+            # Capture Grok token usage for billing
+            $response_eval_count = ($response->{usage} && $response->{usage}{total_tokens})
+                ? $response->{usage}{total_tokens}
+                : 0;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
-            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars", $model_used, length($ai_response));
+                'chat', "Grok chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars" .
+                ($response_eval_count ? ", tokens=$response_eval_count" : ''));
+            push @chat_trace, sprintf("✅ Grok responded — model=%s %d chars%s", $model_used, length($ai_response),
+                $response_eval_count ? " ($response_eval_count tokens)" : '');
 
         } else {
             # ── Ollama 3-Tier Escalation ──────────────────────────────────────
@@ -2163,8 +2346,13 @@ sub chat :Local :Args(0) {
             # Pass 1: trim messages.  Pass 1.5: drop oldest history pairs.
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000 : 8_000;
-            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning' ? 12_000 : 6_000;
+            # Admin users have larger nav guides — raise limits so admin links are not truncated.
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+                              : $can_select_model_perm ? 14_000
+                              : 8_000;
+            my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
+                                   : $can_select_model_perm             ? 10_000
+                                   : 6_000;
             my $raw_total = 0;
             $raw_total += length($_->{content} || '') for @ollama_messages;
             if ($raw_total > $BUDGET_CHARS) {
@@ -2201,7 +2389,10 @@ sub chat :Local :Args(0) {
                     push @chat_trace, "⚠️ Stripped page_content from system prompt (still over budget)";
                     # Pass 3: hard-cap system prompt
                     if (length($sys) > $SYS_MAX_CHARS_CHAT) {
-                        $ollama_messages[0]{content} = substr($sys, 0, $SYS_MAX_CHARS_CHAT) . "\n[system prompt truncated to fit context budget]";
+                        my $cut = substr($sys, 0, $SYS_MAX_CHARS_CHAT);
+                        my $nl  = rindex($cut, "\n");
+                        $cut    = substr($cut, 0, $nl > 0 ? $nl : $SYS_MAX_CHARS_CHAT);
+                        $ollama_messages[0]{content} = $cut . "\n[system prompt truncated to fit context budget]";
                         push @chat_trace, sprintf("⚠️ System prompt truncated from %d to %d chars", length($sys), $SYS_MAX_CHARS_CHAT);
                     }
                 }
@@ -2432,7 +2623,8 @@ sub chat :Local :Args(0) {
                     thinking_trace   => \@chat_trace,
                 }),
                 ip_address => $c->request->address,
-                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
+                user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal',
+                ($response_eval_count ? (tokens_used => $response_eval_count) : ()),
             });
             
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -3165,7 +3357,10 @@ sub unload_model :Local :Args(0) {
     }
 
     my $json_data  = {};
-    my $body_text  = $c->request->content || '';
+    my $body_text;
+    if ($c->req->can('content')) { $body_text = $c->req->content }
+    else { my $b = $c->req->body; $body_text = ref($b) ? do { seek($b,0,0); local $/; <$b> } : $b; }
+    $body_text //= '';
     eval { $json_data = decode_json($body_text) if $body_text; };
 
     my $model_name  = $json_data->{model}  || '';
@@ -3995,16 +4190,207 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 
 =cut
 
+# ── _do_web_search ─────────────────────────────────────────────────────────────
+# Unified web search helper.  Tries providers in priority order and returns
+# a formatted context string ready to inject into the model prompt.
+#
+# Provider priority (per agent):
+#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
+#   all others      →  ollama-cloud (if key) → ddg → brave → searxng
+#
+# Returns: (context_string, provider_used) or ('', '') on failure.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _do_web_search {
+    my ($self, $c, $query, $agent_id, $trace_ref) = @_;
+    $trace_ref //= [];
+
+    require LWP::UserAgent;
+    require HTTP::Request;
+    require JSON;
+
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    $ua->agent('Comserv/2.0');
+
+    # ── helper: format result list into context string ──
+    my $format_results = sub {
+        my ($results, $provider) = @_;
+        return ('', '') unless @$results;
+        my $ctx = "Web search results ($provider) for: \"$query\"\n";
+        for my $r (@$results) {
+            $ctx .= "\n## " . ($r->{title}   || '') . "\n"
+                 .  "URL: " . ($r->{url}     || '') . "\n"
+                 .  ($r->{snippet} || $r->{content} || $r->{description} || '') . "\n";
+        }
+        $ctx .= "\nUse the above search results to answer accurately.\n";
+        return ($ctx, $provider);
+    };
+
+    # ── load all stored API keys once ──
+    my (%keys);
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $rows = $schema->resultset('UserApiKeys')->search({ is_active => '1' });
+        while (my $k = $rows->next) {
+            $keys{$k->service} = $k->get_api_key() unless $keys{$k->service};
+        }
+    };
+
+    # ── determine provider order ──
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my @order = $is_precise_agent
+        ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
+        : ('ollama_cloud', 'ddg', 'brave', 'searxng');
+
+    for my $provider (@order) {
+
+        # ── Brave Search ───────────────────────────────────────────────────
+        if ($provider eq 'brave' && $keys{brave}) {
+            eval {
+                my $url  = 'https://api.search.brave.com/res/v1/web/search?q='
+                         . URI::Escape::uri_escape($query) . '&count=5';
+                my $req  = HTTP::Request->new(GET => $url);
+                $req->header('Accept'               => 'application/json');
+                $req->header('Accept-Encoding'      => 'gzip');
+                $req->header('X-Subscription-Token' => $keys{brave});
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}       || '',
+                        url     => $_->{url}          || '',
+                        snippet => $_->{description}  || '',
+                    } } @{ $data->{web}{results} || [] };
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 Brave search: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'Brave');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ Brave search HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ Brave search error: $@" if $@;
+            next;
+        }
+
+        # ── SearXNG ────────────────────────────────────────────────────────
+        if ($provider eq 'searxng') {
+            my $cfg      = $c->config->{SearXNG} || {};
+            my $host     = $cfg->{host} || '';
+            next unless $host;
+            eval {
+                require URI::Escape;
+                my $url  = "$host/search?q=" . URI::Escape::uri_escape($query)
+                         . '&format=json&categories=general&language=en';
+                my $req  = HTTP::Request->new(GET => $url);
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}   || '',
+                        url     => $_->{url}     || '',
+                        snippet => $_->{content} || '',
+                    } } @{ $data->{results} || [] }[0..4];
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 SearXNG: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'SearXNG');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ SearXNG HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ SearXNG error: $@" if $@;
+            next;
+        }
+
+        # ── Ollama cloud web search ────────────────────────────────────────
+        if ($provider eq 'ollama_cloud' && $keys{ollama}) {
+            eval {
+                my $req = HTTP::Request->new(POST => 'https://ollama.com/api/web_search');
+                $req->header('Authorization' => "Bearer $keys{ollama}");
+                $req->header('Content-Type'  => 'application/json');
+                $req->content(JSON::encode_json({ query => $query, max_results => 5 }));
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results = map { {
+                        title   => $_->{title}   || '',
+                        url     => $_->{url}     || '',
+                        snippet => $_->{content} || '',
+                    } } @{ $data->{results} || [] };
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 Ollama cloud search: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'Ollama');
+                        return ($ctx, $p);
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ Ollama cloud search HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ Ollama cloud search error: $@" if $@;
+            next;
+        }
+
+        # ── DuckDuckGo Instant Answer (free, no key) ───────────────────────
+        if ($provider eq 'ddg') {
+            eval {
+                require URI::Escape;
+                my $url  = 'https://api.duckduckgo.com/?q='
+                         . URI::Escape::uri_escape($query)
+                         . '&format=json&no_html=1&skip_disambig=1';
+                my $req  = HTTP::Request->new(GET => $url);
+                my $resp = $ua->request($req);
+                if ($resp->is_success) {
+                    my $data    = JSON::decode_json($resp->decoded_content);
+                    my @results;
+                    # Abstract (best single result)
+                    if ($data->{AbstractText} && $data->{AbstractURL}) {
+                        push @results, {
+                            title   => $data->{Heading} || $query,
+                            url     => $data->{AbstractURL},
+                            snippet => $data->{AbstractText},
+                        };
+                    }
+                    # Related topics
+                    for my $t (@{ $data->{RelatedTopics} || [] }) {
+                        next unless ref($t) eq 'HASH' && $t->{Text} && $t->{FirstURL};
+                        push @results, {
+                            title   => $t->{Text},
+                            url     => $t->{FirstURL},
+                            snippet => $t->{Text},
+                        };
+                        last if @results >= 5;
+                    }
+                    if (@results) {
+                        push @$trace_ref, sprintf("🌐 DuckDuckGo: %d results", scalar @results);
+                        my ($ctx, $p) = $format_results->(\@results, 'DuckDuckGo');
+                        return ($ctx, $p);
+                    } else {
+                        push @$trace_ref, "⚠️ DuckDuckGo: no results for this query (instant-answer API only)";
+                    }
+                } else {
+                    push @$trace_ref, "⚠️ DuckDuckGo HTTP " . $resp->code;
+                }
+            };
+            push @$trace_ref, "⚠️ DuckDuckGo error: $@" if $@;
+            next;
+        }
+    }
+
+    push @$trace_ref, "⚠️ All web search providers exhausted — no results";
+    return ('', '');
+}
+
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to local chat-capable models only.
-    # Exclude: embedding/reranker models, code-only models, and :cloud models
-    # (cloud-routed Ollama models need external API keys and will timeout).
+    # Filter to chat-capable models only.
+    # Exclude: embedding/reranker models, code-only models.
+    # :cloud models (Ollama-routed cloud) are allowed — they work through the same endpoint.
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /:cloud$/i
            && $n !~ /starcoder|coder|codellama/i;
     } @$installed_models;
 
@@ -4018,9 +4404,11 @@ sub _pick_ollama_tier {
         'llama3.2'   => 3,
         'llama3.1'   => 8, 'llama3'   => 8, 'llama2' => 7,
         'mistral'    => 7, 'mixtral'  => 47,
-        'qwen2.5'    => 7, 'qwen2'    => 7,
-        'phi3'       => 4, 'phi'      => 2,
-        'gemma2'     => 9, 'gemma'    => 7,
+        'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
+        'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
+        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'deepseek'   => 7, 'command'  => 7,
+        'kimi-k2'    => 232, 'kimi'   => 72,
     );
     for my $n (@names) {
         my $score;
@@ -4049,8 +4437,8 @@ sub _pick_ollama_tier {
     my @usable = grep { ($size_score{$_} // 7) >= 3 } @sorted;
     @usable = @sorted unless @usable;  # fallback if ALL models are tiny
 
-    my $small = $usable[0]  || $default_model || 'llama3.1:latest';
-    my $large = $usable[-1] || $default_model || 'llama3.1:latest';
+    my $small = $usable[0]  || $default_model || 'gemma3:4b';
+    my $large = $usable[-1] || $default_model || 'phi4:14b';
 
     # Only escalate if large model is meaningfully bigger (2x+).
     # If both tiers are similar size, keep them the same to avoid loading two models.
@@ -4116,6 +4504,8 @@ Supported actions:
 - Mark a todo done:      [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
 - Mark todo in-progress: [ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 2}}]
 - Reschedule a todo:     [ACTION: {"action": "reschedule_todo",    "params": {"todo_id": N, "due_date": "YYYY-MM-DD"}}]
+- Edit todo content:     [ACTION: {"action": "update_todo", "params": {"todo_id": N, "subject": "new title", "description": "new body", "comments": "optional notes"}}]
+  (Include only the fields you want to change. subject, description, and comments are all optional.)
 - Add a comment:         [ACTION: {"action": "add_todo_comment",   "params": {"todo_id": N, "comment": "text"}}]
 - Create a log entry:    [ACTION: {"action": "create_log_entry",   "params": {"todo_id": N, "abstract": "title", "details": "description"}}]
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
@@ -4131,6 +4521,8 @@ Rules:
 - ALWAYS use the real numeric todo_id from the LIVE TODO DATA above — never make up an ID.
 - Include the action block in addition to your normal response text, not instead of it.
 - The application will automatically execute the action and show the user a confirmation.
+
+SUPPORT ESCALATION: If you genuinely cannot help the user (question requires a human, account-specific access you don't have, or is truly outside your capabilities), add [SUPPORT_NEEDED] on its own line at the very end of your response. The widget will then offer the user options to create a support ticket or start a live chat with support staff. Only use [SUPPORT_NEEDED] when you truly cannot help — not for questions you can answer.
 ACTION
 
     if ($is_admin) {
@@ -4173,7 +4565,8 @@ ACTION
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
              . "If a user asks about the admin panel or any admin feature, say: "
-             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.'"
+             . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
+             . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
              . $guest_knowledge
              . $page_nav
              . $nav_guide;
@@ -4220,47 +4613,57 @@ sub _build_navigation_command_guide {
     # Each section: [ section_name, min_role, [ [label, path], ... ] ]
     # min_role: 'guest' | 'user' | 'admin'
     my @sections = (
-        [ 'Home', 'guest', [
-            [ 'Main menu / home',           '/'                         ],
+        # ── High-priority: put admin sections FIRST so they survive truncation ──
+        [ 'Admin', 'admin', [
+            [ 'Admin panel',                '/admin'                    ],
+            [ 'User management',            '/admin/users'              ],
+            [ 'Application logs',           '/admin/logs'               ],
+            [ 'Git pull',                   '/admin/git_pull'           ],
+            [ 'Docker containers',          '/admin/docker-containers'  ],
+            [ 'Theme management',           '/themeadmin'               ],
+            [ 'Planning',                   '/admin/planning'           ],
+            [ 'System info',                '/admin/system_info'        ],
+            [ 'Admin settings',             '/admin/settings'           ],
+            [ 'Log viewer',                 '/log'                      ],
+            [ 'File management',            '/file/list'                ],
+            [ 'Duplicate files',            '/file/duplicates'          ],
         ]],
-        [ 'Workshops', 'guest', [
-            [ 'Workshops home',             '/workshop'                 ],
-            [ 'Add a workshop',             '/workshop/add'             ],
+        [ 'Inventory', 'admin', [
+            [ 'Inventory dashboard',        '/Inventory'                ],
+            [ 'Inventory items',            '/Inventory/items'          ],
+            [ 'Add inventory item',         '/Inventory/item/add'       ],
+            [ 'Suppliers',                  '/Inventory/suppliers'      ],
+            [ 'Add supplier',               '/Inventory/supplier/add'   ],
+            [ 'Supplier invoices',          '/Inventory/invoice'        ],
+            [ 'New supplier invoice',       '/Inventory/invoice/new'    ],
+            [ 'Stock transactions',         '/Inventory/stock/transactions' ],
+            [ 'Customer sales',             '/Inventory/sales'          ],
+            [ 'Consignments',               '/Inventory/consignment'    ],
+            [ 'New consignment',            '/Inventory/consignment/new' ],
+            [ 'Consignment partners',       '/Inventory/consignment/partners' ],
         ]],
-        [ 'Workshops (logged in)', 'user', [
-            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        [ 'Accounting', 'admin', [
+            [ 'Accounting dashboard',       '/Accounting'               ],
+            [ 'Chart of accounts',          '/Accounting/coa'           ],
+            [ 'Seed / import COA',          '/Accounting/coa/seed'      ],
+            [ 'Merge COA seed',             '/Accounting/coa/seed_merge'],
+            [ 'General ledger',             '/Accounting/gl'            ],
         ]],
-        [ 'Workshops (admin/leader)', 'admin', [
-            [ 'Workshop resources',         '/workshop/resources'       ],
-        ]],
-        [ 'Documentation', 'guest', [
-            [ 'Documentation home',         '/Documentation'            ],
-            [ 'Daily plan',                 '/Documentation/DailyPlan'  ],
-        ]],
-        [ 'Encyclopedia (ENCY)', 'guest', [
-            [ 'Encyclopedia home',          '/ENCY'                     ],
-            [ 'Encyclopedia search',        '/ENCY/search'              ],
-            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
-        ]],
-        [ 'HelpDesk', 'guest', [
-            [ 'HelpDesk home',              '/HelpDesk'                 ],
-            [ 'Submit a ticket',            '/HelpDesk/ticket/new'      ],
-            [ 'Check ticket status',        '/HelpDesk/ticket/status'   ],
-            [ 'Knowledge base',             '/HelpDesk/kb'              ],
-            [ 'Contact',                    '/HelpDesk/contact'         ],
-        ]],
-        [ 'AI Assistant', 'guest', [
-            [ 'AI chat',                    '/ai'                       ],
-            [ 'AI query form',              '/ai/query_form'            ],
-        ]],
-        [ 'AI Assistant (logged in)', 'user', [
-            [ 'AI conversations / chat history', '/ai/conversations'    ],
-            [ 'Manage API keys',            '/ai/manage_api_keys'       ],
-            [ 'AI in-app action endpoint',  '/ai/action'                ],
+        [ 'Site management (admin)', 'admin', [
+            [ 'Site list / setup',          '/site'                     ],
+            [ 'Add a new site',             '/site/add_site'            ],
+            [ 'Add a domain to a site',     '/site/add_domain'          ],
+            [ 'Site details',               '/site/details'             ],
+            [ 'Modify site',                '/site/modify'              ],
         ]],
         [ 'AI Assistant (admin)', 'admin', [
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
+            [ 'Support chat admin',         '/chat/admin'               ],
+        ]],
+        # ── Common sections ───────────────────────────────────────────────────
+        [ 'Home', 'guest', [
+            [ 'Main menu / home',           '/'                         ],
         ]],
         [ 'Tasks / Todos', 'user', [
             [ 'Todo list',                  '/todo'                     ],
@@ -4283,26 +4686,48 @@ sub _build_navigation_command_guide {
             [ 'Account settings',           '/user/settings'            ],
             [ 'Logout',                     '/user/logout'              ],
         ]],
-        [ 'Admin', 'admin', [
-            [ 'Admin panel',                '/admin'                    ],
-            [ 'User management',            '/admin/users'              ],
-            [ 'Application logs',           '/admin/logs'               ],
-            [ 'Git pull',                   '/admin/git_pull'           ],
-            [ 'Docker containers',          '/admin/docker-containers'  ],
-            [ 'Theme management',           '/themeadmin'               ],
-            [ 'Planning',                   '/admin/planning'           ],
-            [ 'System info',                '/admin/system_info'        ],
-            [ 'Admin settings',             '/admin/settings'           ],
-            [ 'Log viewer',                 '/log'                      ],
-            [ 'File management',            '/file/list'                ],
-            [ 'Duplicate files',            '/file/duplicates'          ],
+        [ 'HelpDesk', 'guest', [
+            [ 'HelpDesk home',              '/HelpDesk'                 ],
+            [ 'Submit a ticket',            '/HelpDesk/ticket/new'      ],
+            [ 'Check ticket status',        '/HelpDesk/ticket/status'   ],
+            [ 'Knowledge base',             '/HelpDesk/kb'              ],
+            [ 'Contact',                    '/HelpDesk/contact'         ],
         ]],
-        [ 'Site management (admin)', 'admin', [
-            [ 'Site list / setup',          '/site'                     ],
-            [ 'Add a new site',             '/site/add_site'            ],
-            [ 'Add a domain to a site',     '/site/add_domain'          ],
-            [ 'Site details',               '/site/details'             ],
-            [ 'Modify site',                '/site/modify'              ],
+        [ 'AI Assistant', 'guest', [
+            [ 'AI chat',                    '/ai'                       ],
+            [ 'AI query form',              '/ai/query_form'            ],
+        ]],
+        [ 'AI Assistant (logged in)', 'user', [
+            [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'Manage API keys',            '/ai/manage_api_keys'       ],
+            [ 'AI in-app action endpoint',  '/ai/action'                ],
+        ]],
+        [ 'Marketplace', 'guest', [
+            [ 'Marketplace / buy and sell', '/marketplace'              ],
+            [ 'Browse listings',            '/marketplace/browse'       ],
+        ]],
+        [ 'Marketplace (logged in)', 'user', [
+            [ 'Post a listing / sell item', '/marketplace/add'          ],
+            [ 'My listings',                '/marketplace/my_listings'  ],
+        ]],
+        [ 'Documentation', 'guest', [
+            [ 'Documentation home',         '/Documentation'            ],
+            [ 'Daily plan',                 '/planning/daily'  ],
+        ]],
+        [ 'Encyclopedia (ENCY)', 'guest', [
+            [ 'Encyclopedia home',          '/ENCY'                     ],
+            [ 'Encyclopedia search',        '/ENCY/search'              ],
+            [ 'Bee pasture / plant forage', '/ENCY/BeePastureView'      ],
+        ]],
+        [ 'Workshops', 'guest', [
+            [ 'Workshops home',             '/workshop'                 ],
+            [ 'Add a workshop',             '/workshop/add'             ],
+        ]],
+        [ 'Workshops (logged in)', 'user', [
+            [ 'My workshop dashboard',      '/workshop/dashboard'       ],
+        ]],
+        [ 'Workshops (admin/leader)', 'admin', [
+            [ 'Workshop resources',         '/workshop/resources'       ],
         ]],
     );
 
@@ -4333,6 +4758,14 @@ sub _build_navigation_command_guide {
          . "Present the full list as a numbered or bulleted list so nothing is missed.\n"
          . "Only use URLs from this list; do not invent others. "
          . "If no match exists for a navigation request, say: 'I don't know that page — visit $base_url to browse available options.'\n"
+         . "CONSIGNMENT QUICK REFERENCE (for consignment questions from any page):\n"
+         . "Consignment = sending items to a partner store to sell on your behalf.\n"
+         . "  List:      $base_url/Inventory/consignment\n"
+         . "  New batch: $base_url/Inventory/consignment/new\n"
+         . "  Partners:  $base_url/Inventory/consignment/partners\n"
+         . "  Docs:      $base_url/Documentation/Inventory/consignment\n"
+         . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
+         . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
 }
 
@@ -4386,7 +4819,7 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Documentation section (admin):\n"
                    . "- You may edit or create documentation pages.\n"
                    . "- Related sections: Daily Plans, Master Plan, Architecture docs.\n"
-                   . "- To manage plans: $base_url/Documentation/DailyPlan\n"
+                   . "- To manage plans: $base_url/planning/daily\n"
                    . "- To view all docs: $base_url/Documentation\n";
         } elsif ($role eq 'user') {
             $hint .= "Navigation context — Documentation section:\n"
@@ -4440,6 +4873,40 @@ sub _build_page_navigation_hint {
             $hint .= "Navigation context — Projects (guest):\n"
                    . "- Log in to view project information.\n";
         }
+    } elsif ($page_path =~ m{/Inventory/consignment}i) {
+        $hint .= "Navigation context — Consignment Tracking:\n"
+               . "Consignment = sending items to a partner store; partner sells them and keeps a commission.\n"
+               . "- Consignment list:        $base_url/Inventory/consignment\n"
+               . "- Create new consignment:  $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:    $base_url/Inventory/consignment/partners\n"
+               . "- View/settle:             $base_url/Inventory/consignment/view/<id>\n"
+               . "- Full docs:               $base_url/Documentation/Inventory/consignment\n"
+               . "WORKFLOW: 1) Set up a partner at /Inventory/consignment/partners\n"
+               . "2) Create batch at /Inventory/consignment/new — select partner, enter items + qty + retail price\n"
+               . "3) View consignment to print slip or settle when partner pays\n"
+               . "4) On settlement: enter qty sold and qty returned per line; optionally post GL entry\n"
+               . "Partners: Monashee Arts Council (Lumby), Monashee Coop (30% commission)\n";
+    } elsif ($page_path =~ m{/Inventory}i) {
+        $hint .= "Navigation context — Inventory:\n"
+               . "- Inventory dashboard:    $base_url/Inventory\n"
+               . "- Items list:             $base_url/Inventory/items\n"
+               . "- Add item:               $base_url/Inventory/item/add\n"
+               . "- Suppliers:              $base_url/Inventory/suppliers\n"
+               . "- Supplier invoices:      $base_url/Inventory/invoice\n"
+               . "- New invoice:            $base_url/Inventory/invoice/new\n"
+               . "- Stock transactions:     $base_url/Inventory/stock/transactions\n"
+               . "- Customer sales:         $base_url/Inventory/sales\n"
+               . "- Consignments:           $base_url/Inventory/consignment\n"
+               . "- New consignment:        $base_url/Inventory/consignment/new\n"
+               . "- Consignment partners:   $base_url/Inventory/consignment/partners\n"
+               . "- Consignment docs:       $base_url/Documentation/Inventory/consignment\n";
+    } elsif ($page_path =~ m{/Accounting}i) {
+        $hint .= "Navigation context — Accounting:\n"
+               . "- Accounting dashboard:   $base_url/Accounting\n"
+               . "- Chart of accounts:      $base_url/Accounting/coa\n"
+               . "- General ledger:         $base_url/Accounting/gl\n"
+               . "- Consignment settlement posts GL: DR AR + Commission / CR Sales Revenue\n"
+               . "- For consignment management go to: $base_url/Inventory/consignment\n";
     } elsif ($page_path =~ m{/ency}i) {
         $hint .= "Navigation context — Encyclopedia:\n"
                 . "- Search for information: $base_url/ency/search?q=TERM\n";
@@ -5076,6 +5543,7 @@ sub session_details :Local :Args(0) {
         conversation_id => $conversation_id,
         hostname => $hostname,
         roles => $c->session->{roles} || [],
+        is_dev => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
 }
 
@@ -5707,9 +6175,10 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
+                        { id => 'grok-4-fast-reasoning' },
+                        { id => 'grok-4-fast-non-reasoning' },
                         { id => 'grok-3' },
                         { id => 'grok-3-mini' },
-                        { id => 'grok-3-fast' },
                     ];
                 }
 
@@ -5759,6 +6228,7 @@ sub get_user_providers :Local :Args(0) {
         is_guest           => $is_guest  ? JSON::true : JSON::false,
         is_admin           => $is_admin  ? JSON::true : JSON::false,
         can_access_history => $is_admin  ? JSON::true : JSON::false,
+        is_dev             => $self->_is_dev_mode($c) ? JSON::true : JSON::false,
     }));
 }
 
@@ -6489,9 +6959,20 @@ sub action :Local :Args(0) {
     }
 
     # Parse JSON body
-    my $body_text = $c->request->content;
+    my $body_text;
+    if ($c->req->can('content')) {
+        $body_text = $c->req->content;
+    } else {
+        my $body = $c->req->body;
+        if (ref($body) && $body->can('seek')) {
+            seek($body, 0, 0);
+            $body_text = do { local $/; <$body> };
+        } else {
+            $body_text = $body;
+        }
+    }
     my $req;
-    eval { $req = decode_json($body_text) };
+    eval { $req = decode_json($body_text) } if $body_text;
     if ($@ || !ref $req) {
         $c->response->status(400);
         $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON body' }));
@@ -6539,6 +7020,45 @@ sub action :Local :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
             "AI action update_todo_status: todo=$todo_id status=$new_status by=$current_user");
         $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id status updated to $new_status" }));
+        return;
+    }
+
+    # ── update_todo ───────────────────────────────────────────────────────────
+    if ($action_name eq 'update_todo') {
+        my $todo_id = $params->{todo_id} or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'todo_id required' }));
+            return;
+        };
+        my $todo = eval { $schema->resultset('Todo')->find($todo_id) };
+        unless ($todo) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => JSON::false, error => "Todo #$todo_id not found" }));
+            return;
+        }
+        my %changes = (last_mod_by => $current_user, last_mod_date => $today);
+        $changes{subject}     = $params->{subject}     if defined $params->{subject}     && $params->{subject}     ne '';
+        $changes{description} = $params->{description} if defined $params->{description};
+        $changes{comments}    = $params->{comments}    if defined $params->{comments};
+        $changes{due_date}    = $params->{due_date}    if defined $params->{due_date}    && $params->{due_date} =~ /^\d{4}-\d{2}-\d{2}$/;
+        $changes{priority}    = $params->{priority}    if defined $params->{priority}    && $params->{priority} =~ /^\d+$/;
+
+        if (keys(%changes) <= 2) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'No updatable fields provided (subject, description, comments, due_date, priority)' }));
+            return;
+        }
+        eval { $todo->update(\%changes) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action', "update_todo failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Update failed' }));
+            return;
+        }
+        my @updated = grep { $_ ne 'last_mod_by' && $_ ne 'last_mod_date' } keys %changes;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action update_todo: todo=$todo_id fields=@updated by=$current_user");
+        $c->response->body(encode_json({ success => JSON::true, message => "Todo #$todo_id updated (" . join(', ', @updated) . ")" }));
         return;
     }
 
@@ -6678,28 +7198,29 @@ sub action :Local :Args(0) {
             $c->response->body(encode_json({ success => JSON::false, error => 'subject required' }));
             return;
         }
-        my $project_id = $params->{project_id};
-        unless ($project_id && $project_id =~ /^\d+$/) {
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'project_id (numeric) required' }));
-            return;
+        my $project_id = ($params->{project_id} && $params->{project_id} =~ /^\d+$/)
+                       ? $params->{project_id} : undef;
+
+        # Look up project_code from project_id (optional)
+        my $project_code = '';
+        if ($project_id) {
+            eval {
+                my $proj = $schema->resultset('Project')->find($project_id);
+                $project_code = $proj->project_code if $proj && $proj->project_code;
+            };
         }
 
-        # Look up project_code from project_id
-        my $project_code = 'default_code';
-        eval {
-            my $proj = $schema->resultset('Project')->find($project_id);
-            $project_code = $proj->project_code if $proj && $proj->project_code;
-        };
-
-        my $due_date   = $params->{due_date} || do {
+        my $due_date = $params->{due_date} || do {
             my $dt = DateTime->now->add(days => 7); $dt->ymd;
         };
         unless ($due_date =~ /^\d{4}-\d{2}-\d{2}$/) {
-            $c->response->status(400);
-            $c->response->body(encode_json({ success => JSON::false, error => 'due_date must be YYYY-MM-DD' }));
-            return;
+            $due_date = DateTime->now->add(days => 7)->ymd;
         }
+
+        # Map numeric status codes to DB text values
+        my %status_map = ( 1 => 'NEW', 2 => 'IN PROGRESS', 3 => 'COMPLETED', 4 => 'CANCELLED' );
+        my $raw_status  = $params->{status} // 1;
+        my $todo_status = $status_map{$raw_status} || ($raw_status =~ /^[A-Z ]/ ? $raw_status : 'NEW');
 
         my $priority    = $params->{priority} // 3;
         my $description = $params->{description} || '';
@@ -6726,14 +7247,14 @@ sub action :Local :Args(0) {
                 project_code        => $project_code,
                 developer           => $current_user,
                 username_of_poster  => $current_user,
-                status              => 'NEW',
+                status              => $todo_status,
                 priority            => $priority,
                 share               => 0,
                 last_mod_by         => $current_user,
                 last_mod_date       => $today,
                 user_id             => $user_id,
                 group_of_poster     => $group,
-                project_id          => $project_id,
+                ($project_id ? (project_id => $project_id) : ()),
                 date_time_posted    => $today,
                 ($parent_id ? (parent_id => $parent_id) : ()),
             });
@@ -6803,6 +7324,11 @@ sub action :Local :Args(0) {
                 group_of_poster    => $group,
                 date_time_posted   => $today,
                 developer_name     => $current_user,
+                record_id           => 0,
+                project_size        => 0,
+                estimated_man_hours => 0,
+                client_name         => '',
+                comments            => '',
                 ($parent_id ? (parent_id => $parent_id) : ()),
             });
         };
@@ -6833,23 +7359,30 @@ sub action :Local :Args(0) {
             return;
         }
         my $description = $params->{description} || '';
-        my $page_url    = $params->{page_url}    || $c->request->referer || '';
-        my $priority    = $params->{priority}    // 2;
-        my $sitename    = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
-        my $user_id     = $c->session->{user_id} || 1;
-        my $roles       = $c->session->{roles}   || [];
-        my $group       = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : 'user';
+        my $category    = $params->{category}    || 'General';
+        my $priority    = $params->{priority}    || 'normal';
+        my $email       = $params->{email}       || $c->session->{email} || '';
+        my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+        my $user_id     = $c->session->{user_id} || undef;
+        my $username    = $current_user;
+
+        my $ticket_number = uc($site_name) . '-' . DateTime->now->strftime('%Y%m%d') . '-' . sprintf('%04d', int(rand(9999)) + 1);
+        my $now_str = DateTime->now->strftime('%Y-%m-%d %H:%M:%S');
 
         my $new_ticket;
         eval {
-            $new_ticket = $schema->resultset('AiSupportSession')->create({
-                user_id          => $user_id,
-                sitename         => $sitename,
-                status           => 'pending',
-                subject          => $subject,
-                user_description => $description,
-                page_url         => $page_url,
-                conversation_id  => do { my $cid = $params->{conversation_id} || $c->session->{current_conversation_id}; ($cid && $cid =~ /^\d+$/) ? $cid : undef },
+            $new_ticket = $schema->resultset('SupportTicket')->create({
+                ticket_number => $ticket_number,
+                site_name     => $site_name,
+                user_id       => $user_id,
+                username      => $username,
+                email         => $email,
+                subject       => $subject,
+                description   => $description,
+                category      => $category,
+                priority      => $priority,
+                status        => 'open',
+                created_at    => $now_str,
             });
         };
         if ($@ || !$new_ticket) {
@@ -6859,14 +7392,16 @@ sub action :Local :Args(0) {
             $c->response->body(encode_json({ success => JSON::false, error => 'Ticket creation failed' }));
             return;
         }
-        my $ticket_id = $new_ticket->id // '?';
+        my $ticket_id  = $new_ticket->id // '?';
+        my $ticket_num = $new_ticket->ticket_number // $ticket_number;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
-            "AI action create_helpdesk_ticket: id=$ticket_id sitename=$sitename by=$current_user subject='$subject'");
+            "AI action create_helpdesk_ticket: id=$ticket_id num=$ticket_num sitename=$site_name by=$username subject='$subject'");
         $c->response->body(encode_json({
-            success    => JSON::true,
-            message    => "Support ticket #$ticket_id created: \"$subject\". An admin will be notified.",
-            ticket_id  => $ticket_id + 0,
-            ticket_url => "/ai/support/$ticket_id",
+            success       => JSON::true,
+            message       => "Support ticket $ticket_num created: \"$subject\". An admin will be notified.",
+            ticket_id     => $ticket_id + 0,
+            ticket_number => $ticket_num,
+            ticket_url    => "/HelpDesk/ticket/$ticket_num",
         }));
         return;
     }
@@ -7426,9 +7961,26 @@ sub _build_planning_system_prompt {
         $projects_list = "No existing projects found for $site_name.\n";
     }
 
+    my $today = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
     return <<END_PROMPT;
-You are the AI Project Planning Agent for $site_name. Your role is to help users design and
-create new features, projects, and sub-projects through a structured interactive conversation.
+You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## DAILY LOG ENTRIES — handle immediately with NO extra questions:
+When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
+→ Emit: [ACTION: {"action": "create_todo", "params": {"subject": "🌅 Good Morning - Daily Log - $today", "description": "Daily start-of-day log entry", "status": 2, "priority": 3}}]
+Then say: "Good morning! I've created your daily log entry as In Progress. Close it at end of day by saying 'close the log'."
+
+When the user says "good evening", "end of day", "close the log", "wrap up" or similar:
+→ First find the open daily log todo from the injected todo data, then:
+→ Emit: [ACTION: {"action": "update_todo_status", "params": {"todo_id": FIND_THE_LOG_ID, "status": 3}}]
+Then say: "Good evening! Daily log closed. Have a great rest of your day."
+
+## IN-APP ACTIONS — general:
+[ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "...", "project_id": N_OR_OMIT, "due_date": "YYYY-MM-DD_OR_OMIT", "status": 2, "priority": 3}}]
+[ACTION: {"action": "update_todo_status", "params": {"todo_id": N, "status": 3}}]
+[ACTION: {"action": "create_project", "params": {"name": "...", "description": "..."}}]
+Always use real todo_id values from the injected todo data — never invent IDs.
 
 PHILOSOPHY:
 - Ask before you act — always confirm the user's intent before creating anything in the DB
@@ -7594,6 +8146,604 @@ NAVIGATION URLS (use ONLY these relative URLs):
 $editor_section
 The current user is: $username
 END_PROMPT
+}
+
+=head2 _build_accounting_system_prompt
+
+Agent for admin/accounting users working with the Inventory accounting integration,
+Chart of Accounts, General Ledger, supplier invoices, and inventory-GL linkage.
+
+=cut
+
+sub _build_accounting_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'unknown';
+    my $editor_section = $self->_build_ai_editor_section($c);
+
+    return <<END_PROMPT;
+You are the Accounting Agent for the Comserv application.  You help admin and
+accounting users manage the Chart of Accounts, General Ledger, supplier invoices,
+inventory-accounting integration, and the Points Ledger.
+
+## YOUR ROLE
+- Answer questions about double-entry bookkeeping as it applies to this system.
+- Guide users through creating / editing COA accounts, posting GL entries, and
+  reconciling inventory movements with the ledger.
+- Explain how inventory items link to COA accounts (inventory, income, COGS, returns).
+- Help interpret GL entries generated by stock receives, adjustments, and point transactions.
+- Assist with supplier invoice entry and approval workflow.
+- Suggest correct account numbers for new items or categories.
+
+## DOUBLE-ENTRY BASICS (for context injection)
+Every financial event creates one gl_entries header + two or more gl_entry_lines
+whose amounts sum to zero (debit = positive, credit = negative).
+
+account categories:
+  A = Asset      (1xxx — Cash, Inventory, AR)
+  L = Liability  (2xxx — AP, GST/HST Payable)
+  Q = Equity     (3xxx — Retained Earnings)
+  I = Income     (4xxx — Sales, Point Income)
+  E = Expense    (5xxx/6xxx — COGS, Operating Expenses)
+
+## DATABASE SCHEMA
+
+### coa_accounts
+  id, accno (varchar 30), description, category (A/L/Q/I/E),
+  heading_id → coa_account_headings, is_contra (0/1), is_tax (0/1),
+  obsolete (0/1), link (varchar — comma-separated module tags)
+
+### coa_account_headings
+  id, accno, description, category
+
+### gl_entries
+  id, reference (unique per entry_type), description, entry_type
+  (general|inventory|point|sale|purchase|adjustment),
+  post_date, approved (0/1), is_template (0/1), currency (CAD),
+  created_by (user_id), notes
+
+### gl_entry_lines
+  id, gl_entry_id → gl_entries, account_id → coa_accounts,
+  amount (decimal — positive=debit, negative=credit),
+  memo, reconciled (0/1)
+
+### inventory_items (accounting-relevant columns)
+  id, sitename, sku, name, category,
+  inventory_accno_id → coa_accounts (asset account for stock value),
+  income_accno_id    → coa_accounts (income when sold),
+  expense_accno_id   → coa_accounts (COGS / expense when consumed),
+  returns_accno_id   → coa_accounts (contra-income for returns),
+  unit_cost, unit_price, is_consumable, is_assemblable
+
+### inventory_transactions
+  id, sitename, item_id → inventory_items,
+  transaction_type (receive|consume|adjust|transfer|assemble|disassemble),
+  quantity, unit_cost, total_cost, location_id, reference_id, notes,
+  gl_entry_id → gl_entries, created_at, created_by
+
+### inventory_supplier_invoices
+  id, sitename, supplier_id, invoice_number, invoice_date, due_date,
+  subtotal, tax_amount, shipping_amount, discount_amount, total_amount,
+  status (draft|approved|paid|voided), notes, created_at, created_by
+
+### inventory_supplier_invoice_lines
+  id, invoice_id, item_id, description, quantity, unit_cost, total_cost,
+  account_id → coa_accounts, location_id
+
+### point_ledger (Points System)
+  id, account_id → point_accounts, entry_type (earn|spend|adjust|expire),
+  points, description, reference_id, gl_entry_id → gl_entries, created_at
+
+## NAVIGATION URLS (use ONLY these relative URLs)
+- Accounting dashboard:       /Accounting
+- Chart of Accounts list:     /Accounting/coa
+- View COA account:           /Accounting/coa/view/<id>
+- Seed / import COA:          /Accounting/coa/seed
+- Merge COA seed:             /Accounting/coa/seed_merge
+- GL journal list:            /Accounting/gl
+- View GL entry:              /Accounting/gl/view/<id>
+- GL API (JSON):              /Accounting/api/gl
+- Inventory items list:       /Inventory/items
+- Add inventory item:         /Inventory/item/add
+- Edit inventory item:        /Inventory/item/edit/<id>
+- Inventory transactions:     /Inventory/stock/transactions
+- Stock adjustment:           /Inventory/stock/adjust/<id>
+- Supplier invoice list:      /Inventory/invoice
+- New supplier invoice:       /Inventory/invoice/new
+- Customer sales list:        /Inventory/sales
+- Suppliers list:             /Inventory/suppliers
+- Add supplier:               /Inventory/supplier/add
+- Consignment list:           /Inventory/consignment
+- New consignment form:       /Inventory/consignment/new
+- View consignment:           /Inventory/consignment/view/<id>
+- Settle consignment:         /Inventory/consignment/settle/<id>  (POST from view page)
+- Delete consignment:         /Inventory/consignment/delete/<id>
+- Consignment partners:       /Inventory/consignment/partners
+- Consignment docs:           /Documentation/Inventory/consignment
+- AI usage cost allocation:   /Accounting/ai_usage
+- Accounting docs overview:   /Documentation/Accounting
+- COA documentation:          /Documentation/Accounting/coa
+- GL documentation:           /Documentation/Accounting/gl
+- Supplier invoices docs:     /Documentation/Accounting/invoices
+
+## ACCOUNTING SYSTEM DOCUMENTATION
+
+### Overview
+The Comserv Accounting system is a double-entry bookkeeping engine modelled on SQL-Ledger/LedgerSMB.
+Each site has its own Chart of Accounts (COA) and General Ledger (GL). Only admin users can access /Accounting.
+The system is tightly integrated with Inventory: supplier invoices auto-post GL entries; each inventory
+item carries four COA account links (inventory_accno, income_accno, expense_accno, returns_accno).
+
+### First-Time Setup
+1. Go to /Accounting
+2. Click "Seed Default Accounts" — creates a standard COA (idempotent, safe to re-run)
+3. Review accounts at /Accounting/coa
+4. Edit inventory items at /Inventory/item/edit/<id> to assign the 4 COA fields per item
+5. Record supplier invoices at /Inventory/invoice/new — GL entries post automatically on save
+
+### Account Number Ranges
+1000–1999 Assets:      Cash/Bank=1000, AR=1100, Prepaid=1200, Inventory Asset=1300, Equipment=1400, Accum Depr=1500
+2000–2999 Liabilities: AP=2000, GST/Sales Tax Payable=2100, Credit Card Payable=2200
+3000–3999 Equity:      Owner/Member Equity=3000, Retained Earnings=3100
+4000–4999 Income:      Sales Revenue=4000, Sales Returns=4100, Service Revenue=4200
+5000–5999 COGS/Exp:    COGS=5000, Office Supplies=5100, Printing/Materials=5200, Electricity/Utilities=5300,
+                       Depreciation=5400, Shipping/Freight=5500, Commission=5600, Bank Fees=5700
+Debit increases Assets and Expenses; Credit increases Liabilities, Equity, Income.
+
+### Inventory Item COA Fields (4 fields per item, assign on item edit form)
+- inventory_accno → Asset (1300 Inventory Asset) — tracks stock value on balance sheet
+- income_accno    → Income (4000 Sales Revenue) — credited when item is sold
+- expense_accno   → Expense/COGS (5000 COGS) — debited on supplier invoice purchase
+- returns_accno   → Contra-income (4100 Sales Returns) — debited on customer returns
+Warning: system does not enforce correct account type — admin must choose correctly.
+
+## CONSIGNMENT WORKFLOW
+
+Consignment means sending your items to a partner store who sells them on your behalf.
+The partner keeps a commission percentage; you receive the remainder. You retain ownership until sold or returned.
+
+### Step 1 — Set up a consignment partner (one-time per partner)
+Go to /Inventory/consignment/partners or click "Consignment partners" in the Inventory nav.
+Fill in: Partner Name, Address, Commission % (e.g. 30 for Monashee Coop), Contact info.
+Current partners for 3D: Monashee Arts Council (Vernon St, Lumby), Monashee Coop (30% commission).
+
+### Step 2 — Create a new consignment batch
+Go to /Inventory/consignment/new or click "New consignment" in the Inventory nav.
+Form fields:
+- Partner (required) — select from your partner list; shows commission % automatically
+- Date Sent (required) — defaults to today
+- Reference # — optional internal reference
+- Notes — any notes about the batch
+- Line items: select Item, enter Quantity Sent, set Retail Price per unit
+  - Click "Add Item" to add more rows; use the × button to remove a row
+  - Items must already exist in /Inventory/items before they can be consigned
+On save: stock is reduced by the consigned quantity (transaction_type = consignment_out).
+You are redirected to the consignment list at /Inventory/consignment.
+
+### Step 3 — View and print a consignment
+Click any consignment in the list at /Inventory/consignment to open /Inventory/consignment/view/<id>.
+The view page shows all lines, partner, dates, and a Print Slip button for a physical record.
+
+### Step 4 — Settle a consignment (when partner pays you)
+From the view page (/Inventory/consignment/view/<id>), enter qty sold and qty returned for each line, then click Settle.
+The system calculates: gross revenue, commission deducted, net revenue to you.
+Stock is reduced further by qty_sold (transaction_type = consignment_sold) and returned qty goes back to stock.
+If "Post GL entry" is checked on the settlement form, a journal entry posts automatically:
+  DR 1100 AR (net revenue) + DR 5600 Commission / CR 4000 Sales Revenue (gross)
+
+### Automatic GL Posting
+- Supplier invoice saved → DR expense/inventory accounts + DR tax + DR shipping; CR AP (fully automatic)
+- Consignment settlement → DR AR + commission expense; CR sales revenue (optional checkbox on settlement form)
+Example: $100 item + $5 GST + $8 shipping, AP=2000:
+  DR 5000 COGS $100, DR 2100 GST $5, DR 5500 Shipping $8 / CR 2000 AP $113
+
+### Common Journal Entry Examples
+Purchase on credit:    DR 5000 COGS / CR 2000 AP
+Pay supplier by bank:  DR 2000 AP / CR 1000 Bank
+Sale on account:       DR 1100 AR / CR 4000 Sales Revenue; also DR 5000 COGS / CR 1300 Inventory Asset
+Consignment:           DR 1100 AR + DR 5600 Commission / CR 4000 Sales Revenue
+Depreciation:          DR 5400 Depreciation / CR 1500 Accumulated Depreciation
+Shanta pays invoice:   DR 2000 AP / CR 3000 Owner Equity (or Points Payable)
+GST remittance:        DR 2100 GST Payable / CR 1000 Bank
+
+### Manual GL Entry
+Go to /Accounting/gl/new. Enter date, description, reference, then add debit and credit lines.
+System validates debits = credits before saving. Use for bank payments, payroll, corrections.
+
+### Supplier Invoice Form Fields (/Inventory/invoice/new)
+Supplier (required), Invoice Number (required), Invoice Date (required), Due Date,
+AP Account (required — select liability, typically 2000), Tax Amount + Account,
+Shipping Amount + Account, Notes.
+Line items: Item selector (description + unit cost auto-fill), Qty, Unit Cost, Expense Account, Location.
+Tax and shipping are entered at invoice-header level, not per line.
+Popup buttons: "+ Add Supplier" and "+ Add Item" — create without leaving the form.
+AI Invoice Parser panel: paste bill text → AI parses → auto-fills all fields including account selection.
+
+### Reconciliation Tips
+- AP balance: GL credits to 2000 minus debits should equal total outstanding unpaid invoices.
+- Inventory asset: 1300 balance should match total stock value (qty × unit_cost) from /Inventory/stock.
+- Bank reconciliation: compare 1000 Bank GL entries to bank statement monthly.
+- Monthly close: enter all supplier invoices, post consignment settlements, record depreciation.
+
+### Troubleshooting
+- "No accounts in dropdown" → run Seed Default Accounts at /Accounting
+- "GL entry not posted" → check that AP Account was selected on the invoice
+- "Stock not updated after invoice" → ensure line items have a Location selected
+- "Debits ≠ Credits error on manual entry" → verify all lines balance before saving
+- "Unknown column auto_pay" → run migration sql/migrations/007_inventory_supplier_invoice_autopay.sql
+
+## INVOICE PARSING (AI Invoice Parser on /Inventory/invoice/new)
+When the user pastes an invoice or bill on the new invoice form, extract and return
+ONLY a raw JSON object with these keys (omit any you cannot find):
+  supplier_name   — exact company name as printed on the bill
+  invoice_number  — bill/invoice number
+  invoice_date    — YYYY-MM-DD
+  due_date        — YYYY-MM-DD
+  notes           — brief description e.g. "Phone service 250-549-0126 Apr 2026"
+  tax_amount      — total GST+PST+HST (decimal, NOT individual lines)
+  shipping_amount — decimal if applicable
+  discount_amount — positive decimal (will be subtracted from total)
+  lines           — array of line objects: [{description, quantity, unit_cost}]
+                    Use negative unit_cost for credits/discounts applied per-line.
+                    Do NOT include tax lines here — they go in tax_amount.
+
+For phone bills: each plan charge, add-on, and promotional discount is a separate line.
+For utility bills: each service component is a separate line.
+
+If the supplier is not in the system, note it in your plain-text response and suggest
+the user open /Inventory/supplier/add to add them first.
+
+## CHART OF ACCOUNTS — COMMON MAPPINGS
+Phone/telecom bills → 6500 Telephone & Internet (Expense)
+Utilities (hydro, gas, water) → 6100 Utilities (Expense)
+Office supplies → 6200 Office Supplies (Expense)
+Purchased inventory stock → 1200 Inventory Asset (Asset) / 5000 COGS (Expense when sold)
+AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
+GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
+PST paid → 2320 PST Payable
+
+## ACTIONS YOU CAN PERFORM
+When the user asks you to create or update data, respond with a JSON action block:
+
+To post a manual GL entry:
+{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+
+Only use actions when the user explicitly requests a data change.  Always confirm
+the details before executing.
+
+$editor_section
+The current user is: $username
+END_PROMPT
+}
+
+# ── _is_dev_mode ──────────────────────────────────────────────────────────────
+# Returns true when running on a developer/local machine.
+# Checks (in order):
+#   1. comserv.conf developer_mode flag
+#   2. CATALYST_DEBUG env var
+#   3. Hostname contains 'workstation' or 'localhost'
+# Production servers should have none of these.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _is_dev_mode {
+    my ($self, $c) = @_;
+    return 1 if $c->config->{developer_mode};
+    return 1 if $ENV{CATALYST_DEBUG};
+    my $hostname = eval { require Comserv::Util::SystemInfo;
+                          Comserv::Util::SystemInfo::get_server_hostname() } || '';
+    return 1 if $hostname =~ /workstation|localhost/i;
+    return 0;
+}
+
+# ── _build_template_editor_system_prompt ──────────────────────────────────────
+# Admin-only TT2 template improvement assistant.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _build_template_editor_system_prompt {
+    my ($self, $c) = @_;
+    my $username  = $c->session->{username} || 'admin';
+    my $page_path = $c->req->referer || '';
+    $page_path    =~ s{https?://[^/]+}{};
+
+    return <<END_PROMPT;
+You are a Template Editor for the Comserv2 web application.
+Admin: $username | Current page: $page_path
+
+## DEDICATED TOOL
+There is a purpose-built Template Editor form at /ai/template_editor where the admin can:
+  - Select any template file from a dropdown
+  - Load its current content
+  - Describe what to change
+  - Get the AI-proposed rewrite in a side-by-side preview
+  - Click Apply to save the file
+
+If the user has not yet used that page, tell them: "Please open /ai/template_editor to
+make and apply changes to this file."
+
+## HOW THIS WORKS (when a [FILE: ...] block is present in this message)
+The widget has ALREADY fetched the current page's template file and included it as a
+[FILE: root/path/to/file.tt] block. You do NOT need to request it.
+
+CRITICAL RULE: You MUST NEVER describe fixes in prose. You MUST ALWAYS respond with:
+  1. A short bullet list of what you changed and why.
+  2. A complete ## FIX: block with the entire rewritten file.
+
+If you produce prose instructions instead of a ## FIX: block, you have failed.
+
+## RESPONSE FORMAT — use EXACTLY this structure, nothing else:
+
+  - Change 1: what and why
+  - Change 2: what and why
+
+  ## FIX: root/path/to/file.tt
+  \`\`\`html
+  ... COMPLETE new file content (every line) ...
+  \`\`\`
+
+Rules:
+- Provide the ENTIRE file — never a partial snippet or diff.
+- Preserve [% META title = '...' %] and [% PageVersion = '...' %] at the top (bump the version number).
+- Preserve all working [% TT2 %] logic, INCLUDE, WRAPPER, IF/ELSE blocks exactly.
+- Only use verified relative URLs from this list:
+    /shop  /marketplace  /workshop  /HelpDesk  /membership  /BMaster
+    /ENCY  /Accounting  /Inventory  /hosting  /hosting_signup  /ai
+    /Documentation  /project  /todo  /marketplace?type=job
+- Never use absolute URLs with hostnames or port numbers.
+- Do not add code comments unless explicitly asked.
+
+PAYMENTS: The application accepts PayPal and CSC Points (member points).
+  Crypto is a planned future feature — do NOT list it as a current payment option.
+
+ACTIVE SERVICES (mention only these):
+- Website & Cloud Hosting — sold through /shop and /hosting_signup
+- Marketplace — /marketplace (buy/sell/services, members pay with points)
+- Workshops — /workshop
+- Domain names — add-on for members with an associated domain (/membership)
+- Encyclopedia (ENCY) — /ENCY
+- BMaster beekeeping — /BMaster
+
+NOT OFFERED (remove any mention of):
+- VOIP services
+- VPN services
+- Standalone domain registration (not a separate service)
+- Bitcoin / crypto / cryptocurrency as a current payment method
+
+TECH:
+- TT2 tags: [% ... %]  |  wrapper: root/wrapper.tt  |  CSS vars: --nav-bg, --text-color, etc.
+END_PROMPT
+}
+
+# ── _build_coding_system_prompt ───────────────────────────────────────────────
+# Coding assistant — available only in dev mode.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _build_coding_system_prompt {
+    my ($self, $c) = @_;
+    my $username = $c->session->{username} || 'developer';
+
+    return <<END_PROMPT;
+You are a Coding Assistant for the Comserv2 Catalyst/Perl web application.
+Developer: $username
+
+TECH STACK:
+- Backend : Perl 5, Catalyst MVC, DBIx::Class ORM, Template Toolkit (TT2)
+- Database: MariaDB via DBIx::Class schema (Comserv::Model::Schema::Ency)
+- Frontend: HTML/CSS, vanilla JavaScript (no framework), some jQuery
+- AI layer: Comserv::Model::Ollama (local), Comserv::Model::Grok (xAI cloud)
+- Config  : comserv.conf (Catalyst), db_config.json (database connections)
+
+DIRECTORY LAYOUT:
+  lib/Comserv/Controller/              — Catalyst controllers
+  lib/Comserv/Model/                   — Models (DBEncy, Ollama, Grok, …)
+  lib/Comserv/Model/Schema/Ency/Result — DBIx::Class result classes
+  root/                                — TT2 templates
+  root/static/js/                      — JavaScript (local-chat.js, etc.)
+  root/static/config/agents.json       — agent definitions
+  sql/migrations/                      — DB migration SQL files
+
+CONVENTIONS (follow exactly):
+- Controllers: Try::Tiny try/catch; \$self->logging->log_with_details(\$c,…)
+- DB access  : \$c->model('DBEncy')->schema->resultset('ClassName')
+- New columns: Result class update + sql/migrations/NNN_description.sql
+- TT2 tags   : [% ... %]; wrapper at root/wrapper.tt
+- Agent prompts: private _build_X_system_prompt() methods in AI.pm
+- No code comments unless explicitly requested
+
+YOUR ROLE:
+- Explain, fix, refactor, and write Perl/Catalyst, TT2, SQL, JavaScript
+- Spot security issues: SQL injection, XSS, CSRF, auth gaps
+- When suggesting DB changes, always provide both Result class and migration SQL
+- Point out when something will break production before committing
+
+## ERROR ANALYSIS WORKFLOW
+When the user reports an error or a [PAGE ERROR DETECTED] block is present:
+1. Identify the file and line number from the error message.
+2. Request the relevant file: [READ_FILE: lib/Comserv/Controller/AI.pm]
+   The widget will fetch it and inject it into the next message automatically.
+3. Once you have the code, diagnose the root cause and explain it clearly.
+4. Propose a fix. For small files or single functions, use the fix format below.
+5. If the user approves, they will click "Apply Fix" — you do not need to repeat it.
+
+## REQUESTING FILES
+To ask the widget to load a file, write exactly:
+  [READ_FILE: relative/path/to/file.pm]
+Only one file per response. Use relative paths from the project root (e.g. lib/Comserv/Controller/AI.pm).
+
+## PROPOSING FIXES
+When you have diagnosed an issue and want to provide an applicable fix, use this exact format
+so the "Apply Fix" button appears:
+
+  ## FIX: lib/path/to/file.pm
+  ```perl
+  ... corrected content (full function or complete file for small files) ...
+  ```
+
+Rules for fixes:
+- For small files (<200 lines): provide the complete new file content.
+- For large files: provide only the corrected function/method/block. The user will need to
+  manually splice it in, or use the find/replace mode (provide FIND: and REPLACE WITH: sections).
+- Always show the fixed code in a single fenced code block immediately after the ## FIX: line.
+- Never output ## FIX: without a code block following it.
+- Only propose a fix when you are confident it is correct.
+- Do not add code comments unless the user asks.
+
+RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
+END_PROMPT
+}
+
+# ── read_file ──────────────────────────────────────────────────────────────────
+# Dev + admin only.  Returns lines from a project file as JSON.
+# GET/POST /ai/read_file?path=lib/Comserv/Controller/AI.pm&offset=0&limit=200
+# ──────────────────────────────────────────────────────────────────────────────
+sub read_file :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $_rf_roles = $c->session->{roles} || [];
+    $_rf_roles = [$_rf_roles] unless ref $_rf_roles eq 'ARRAY';
+    my $is_admin  = grep { /^admin$/i } @$_rf_roles;
+    my $is_dev    = $self->_is_dev_mode($c);
+
+    unless ($is_admin) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $rel = $c->request->params->{path} || '';
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    # Non-dev admins may only read template files
+    if (!$is_dev && $rel !~ /\.tt$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only read .tt files' }));
+        return;
+    }
+
+    my $root = $c->config->{home}
+            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $full = "$root/$rel";
+
+    unless (-f $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
+        return;
+    }
+
+    my $offset = int($c->request->params->{offset} || 0);
+    my $limit  = int($c->request->params->{limit}  || 300);
+    $limit = 500 if $limit > 500;
+
+    open(my $fh, '<:utf8', $full) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Cannot read: $!" }));
+        return;
+    };
+    my @lines = <$fh>;
+    close $fh;
+
+    my $total = scalar @lines;
+    my $end   = $offset + $limit - 1;
+    $end = $total - 1 if $end >= $total;
+    my @chunk = $offset <= $end ? @lines[$offset..$end] : ();
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        content => join('', @chunk),
+        offset  => $offset,
+        lines   => scalar @chunk,
+        total   => $total,
+    }));
+}
+
+# ── apply_fix ─────────────────────────────────────────────────────────────────
+# Dev + admin only.  Writes a corrected file after backing up the original.
+# POST /ai/apply_fix   { path: "lib/...", content: "..." }
+# For partial replacements supply find + replace params instead of content.
+# ──────────────────────────────────────────────────────────────────────────────
+sub apply_fix :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $_af_roles = $c->session->{roles} || [];
+    $_af_roles = [$_af_roles] unless ref $_af_roles eq 'ARRAY';
+    my $is_admin_fix = grep { /^admin$/i } @$_af_roles;
+    my $is_dev_fix   = $self->_is_dev_mode($c);
+
+    unless ($is_admin_fix) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin only' }));
+        return;
+    }
+
+    my $rel = $c->request->params->{path} || '';
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+
+    # Non-dev admins may only write template files
+    if (!$is_dev_fix && $rel !~ /\.tt$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only edit .tt files' }));
+        return;
+    }
+
+    my $root = $c->config->{home}
+            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $full = "$root/$rel";
+
+    unless (-f $full) {
+        $c->response->body(encode_json({ success => JSON::false, error => "Not found: $rel" }));
+        return;
+    }
+
+    require File::Copy;
+    my $bak = $full . '.bak';
+    File::Copy::copy($full, $bak) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Backup failed: $!" }));
+        return;
+    };
+
+    my $content = $c->request->body_parameters->{content}
+               // $c->request->params->{content}
+               // '';
+
+    # Optional partial replacement mode: find + replace strings
+    if (!$content) {
+        my $find    = $c->request->body_parameters->{find}    // $c->request->params->{find}    // '';
+        my $replace = $c->request->body_parameters->{replace} // $c->request->params->{replace} // '';
+        if ($find) {
+            open(my $rfh, '<:utf8', $full) or do {
+                $c->response->body(encode_json({ success => JSON::false, error => "Read failed: $!" }));
+                return;
+            };
+            local $/;
+            $content = <$rfh>;
+            close $rfh;
+            my $count = ($content =~ s/\Q$find\E/$replace/g);
+            unless ($count) {
+                $c->response->body(encode_json({ success => JSON::false, error => "Search string not found in file" }));
+                unlink $bak;
+                return;
+            }
+        }
+    }
+
+    unless ($content) {
+        $c->response->body(encode_json({ success => JSON::false, error => "No content or find/replace params supplied" }));
+        unlink $bak;
+        return;
+    }
+
+    open(my $wfh, '>:utf8', $full) or do {
+        $c->response->body(encode_json({ success => JSON::false, error => "Write failed: $!" }));
+        return;
+    };
+    print $wfh $content;
+    close $wfh;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'apply_fix', "Applied fix to $rel (backup: $bak)");
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        path    => $rel,
+        backup  => "$rel.bak",
+        message => "File updated. Original backed up as $rel.bak",
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;

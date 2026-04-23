@@ -700,7 +700,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .error-item.critical .error-level {
-    background-color: #dc3545;
+    background-color: var(--danger-color, #dc3545);
     color: white;
 }
 
@@ -874,7 +874,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .error-detail-item.critical .error-detail-level {
-    background-color: #dc3545;
+    background-color: var(--danger-color, #dc3545);
     color: white;
 }
 

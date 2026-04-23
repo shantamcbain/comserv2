@@ -75,7 +75,7 @@ __PACKAGE__->add_columns(
     },
     atc_code => {
         data_type   => 'varchar',
-        size        => 30,
+        size        => 100,
         is_nullable => 1,
     },
     manufacturer => {

@@ -1,0 +1,90 @@
+[% PageVersion = 'Inventory/bom/list.tt,v 0.01 2026/04/14 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Bill of Materials — Assemblable Items</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory/item/add">Add Item</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/items">All Items</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+[% IF assemblable_items.size == 0 %]
+<p>No assemblable items found for site <strong>[% sitename %]</strong>.</p>
+<p>To create a BOM, <a href="/Inventory/item/add">add an item</a> and check the
+   <em>Has BOM / Is Assemblable</em> checkbox.</p>
+[% ELSE %]
+
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%;">
+  <thead style="background:#f0f0f0;">
+    <tr>
+      <th>SKU</th>
+      <th>Name</th>
+      <th>Origin</th>
+      <th>Category</th>
+      <th>Unit Cost</th>
+      <th>Components</th>
+      <th>Assembled Cost</th>
+      <th>Actions</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH ai IN assemblable_items %]
+    [% assembled_cost = 0 %]
+    [% comp_count = 0 %]
+    [% FOREACH comp IN ai.bom_components %]
+      [% comp_count = comp_count + 1 %]
+      [% ci = comp.component_item %]
+      [% IF ci && ci.unit_cost && !comp.is_optional %]
+        [% eff_qty = comp.quantity * (1 + (comp.scrap_factor || 0)) %]
+        [% assembled_cost = assembled_cost + (ci.unit_cost * eff_qty) %]
+      [% END %]
+    [% END %]
+    <tr>
+      <td>[% ai.sku %]</td>
+      <td><a href="/Inventory/bom/[% ai.id %]">[% ai.name | html %]</a></td>
+      <td>[% ai.item_origin || '-' %]</td>
+      <td>[% ai.category || '-' %]</td>
+      <td style="text-align:right">[% ai.unit_cost || '—' %]</td>
+      <td style="text-align:center">
+        [% IF comp_count > 0 %]
+          [% comp_count %]
+        [% ELSE %]
+          <em style="color:#999">none</em>
+        [% END %]
+      </td>
+      <td style="text-align:right">
+        [% IF assembled_cost > 0 %]
+          [% assembled_cost %]
+          [% IF ai.unit_cost && assembled_cost > ai.unit_cost %]
+            <span style="color: var(--danger-color, #dc3545);font-size:0.8em;" title="Assembled cost exceeds listed unit cost">&#9650;</span>
+          [% ELSIF ai.unit_cost && assembled_cost < ai.unit_cost %]
+            <span style="color: var(--success-color, #28a745);font-size:0.8em;" title="Assembled cost is under listed unit cost">&#9660;</span>
+          [% END %]
+        [% ELSE %]
+          —
+        [% END %]
+      </td>
+      <td>
+        <a href="/Inventory/bom/[% ai.id %]">Manage BOM</a>
+        &nbsp;|&nbsp;
+        <a href="/Inventory/item/view/[% ai.id %]">Item</a>
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">
+  [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
+</div>
+[% END %]

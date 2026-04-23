@@ -159,3 +159,15 @@
     font-size: var(--font-size-small);
     color: var(--text-muted-color);
 }
+
+/* ── Transparent containers so site background image shows through ─── */
+form,
+table,
+.apiary-container,
+.apiary-header,
+.stat-card,
+.ency-admin-card,
+.ency-admin-grid > *,
+.context-item {
+    background: transparent !important;
+}

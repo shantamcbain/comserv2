@@ -3,6 +3,7 @@ use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::PointSystem;
+use Comserv::Util::EmailNotification;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -60,13 +61,17 @@ sub index :Path :Args(0) {
     my $user_membership = undef;
     my $is_admin  = $self->_is_admin($c);
     my $all_members = [];
+    my $site_is_csc      = (lc($site_name) eq 'csc');
+    my $csc_hosting_plans = [];
+    my $hosting_account   = undef;
+    my $csc_not_registered = 0;
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
         if ($site) {
             my @rows = $c->model('DBEncy')->resultset('MembershipPlan')->search(
                 { site_id => $site->id, is_active => 1 },
-                { order_by => 'sort_order' }
+                { order_by => 'sort_order', prefetch => 'inventory_item' }
             )->all;
             $plans = \@rows;
 
@@ -93,6 +98,7 @@ sub index :Path :Args(0) {
                 $all_members = \@members;
             }
         }
+
     };
     if ($@) {
         my $err = "$@";
@@ -100,16 +106,153 @@ sub index :Path :Args(0) {
             "Could not load membership plans (table may not exist yet): $err");
     }
 
+    unless ($site_is_csc) {
+        eval {
+            my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+            if ($csc_site) {
+                my @hosting = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                    { site_id => $csc_site->id, has_hosting => 1, is_active => 1 },
+                    { order_by => 'sort_order' }
+                )->all;
+                $csc_hosting_plans = \@hosting;
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "CSC hosting plans query failed: $@") if $@;
+
+        eval {
+            $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { sitename => $site_name },
+                { rows => 1 }
+            )->single;
+        };
+
+        if ($is_admin && !$hosting_account) {
+            $csc_not_registered = 1;
+        }
+    }
+
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
 
     $c->stash(
-        template        => 'membership/Index.tt',
-        plans           => $plans,
-        user_membership => $user_membership,
-        site_name       => $site_name,
-        is_admin        => $is_admin,
-        all_members     => $all_members,
-        patreon_cfg     => $patreon_cfg,
+        template           => 'membership/Index.tt',
+        plans              => $plans,
+        user_membership    => $user_membership,
+        site_name          => $site_name,
+        is_admin           => $is_admin,
+        all_members        => $all_members,
+        patreon_cfg        => $patreon_cfg,
+        site_is_csc        => $site_is_csc,
+        csc_hosting_plans  => $csc_hosting_plans,
+        hosting_account    => $hosting_account,
+        csc_not_registered => $csc_not_registered,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub hosting_signup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    return $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }))
+        unless $c->session->{username};
+    return $c->response->redirect($c->uri_for('/membership'))
+        unless $self->_is_admin($c);
+    return $c->response->redirect($c->uri_for('/membership'))
+        if lc($site_name) eq 'csc';
+
+    my ($site, $domains, $csc_hosting_plans, $hosting_account) = (undef, [], [], undef);
+
+    eval {
+        $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
+
+        if ($site) {
+            my @d = $c->model('DBEncy')->resultset('SiteDomain')->search(
+                { site_id => $site->id },
+                { order_by => 'domain' }
+            )->all;
+            $domains = \@d;
+        }
+
+        my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $csc_site->id, has_hosting => 1, is_active => 1 },
+                { order_by => 'sort_order' }
+            )->all;
+            $csc_hosting_plans = \@plans;
+        }
+
+        $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { sitename => $site_name }, { rows => 1 }
+        )->single;
+    };
+
+    my %plan_price = map { $_->slug => ($_->price_monthly || 0) } @$csc_hosting_plans;
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership);
+        my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
+        my $monthly_cost = $plan_price{ $p->{plan_slug} } // 0;
+        eval {
+            if ($hosting_account) {
+                $hosting_account->update({
+                    plan_slug          => $p->{plan_slug},
+                    domain             => $p->{domain},
+                    domain_type        => $p->{domain_type} || 'subdomain',
+                    parent_domain      => $p->{parent_domain},
+                    referring_sitename => $p->{referring_sitename},
+                    contact_email      => $p->{contact_email},
+                    monthly_cost       => $monthly_cost,
+                    notes              => $p->{notes},
+                    requested_addons   => $addons_str,
+                    updated_at         => \'NOW()',
+                });
+            } else {
+                $c->model('DBEncy')->resultset('HostingAccount')->create({
+                    sitename           => $site_name,
+                    plan_slug          => $p->{plan_slug},
+                    domain             => $p->{domain},
+                    domain_type        => $p->{domain_type} || 'subdomain',
+                    parent_domain      => $p->{parent_domain},
+                    referring_sitename => $p->{referring_sitename} || $site_name,
+                    contact_email      => $p->{contact_email},
+                    status             => 'pending',
+                    monthly_cost       => $monthly_cost,
+                    notes              => $p->{notes},
+                    requested_addons   => $addons_str,
+                    created_by         => $c->session->{username},
+                });
+            }
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Registration failed: $@";
+        } else {
+            $c->flash->{success_msg} = "$site_name has been submitted for CSC hosting registration. Status: pending.";
+            my $new_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+                { sitename => $site_name }, { rows => 1 }
+            )->single;
+            eval {
+                my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                $notifier->send_hosting_signup_notification($c, $new_account);
+                $notifier->send_hosting_signup_confirmation($c, $new_account);
+            };
+            return $c->response->redirect($c->uri_for('/membership'));
+        }
+    }
+
+    $c->session->{return_url} = $c->uri_for('/membership')->as_string;
+
+    $c->stash(
+        template          => 'membership/hosting_signup.tt',
+        site              => $site,
+        site_name         => $site_name,
+        domains           => $domains,
+        csc_hosting_plans => $csc_hosting_plans,
+        hosting_account   => $hosting_account,
+        selected_plan     => $c->req->query_parameters->{plan}
+                              || ($hosting_account ? $hosting_account->plan_slug : ''),
     );
     $c->forward($c->view('TT'));
 }
@@ -152,7 +295,7 @@ sub account :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "Please log in to view your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -207,7 +350,7 @@ sub autopay_settings :Local :Args(0) {
     my ($self, $c) = @_;
 
     unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -271,7 +414,7 @@ sub subscribe :Local :Args(0) {
     unless ($c->session->{username}) {
         $c->session->{post_login_redirect} = $c->req->uri->as_string;
         $c->flash->{error_msg} = "Please log in to subscribe.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -339,7 +482,7 @@ sub cancel :Local :Args(0) {
 
     unless ($c->session->{username}) {
         $c->flash->{error_msg} = "Please log in to manage your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -398,7 +541,7 @@ sub upgrade :Local :Args(0) {
     unless ($c->session->{username}) {
         $c->session->{post_login_redirect} = $c->req->uri->as_string;
         $c->flash->{error_msg} = "Please log in to upgrade your membership.";
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         return;
     }
 
@@ -440,6 +583,69 @@ sub upgrade :Local :Args(0) {
         plans              => $plans,
         current_membership => $current_membership,
         patreon_cfg        => $patreon_cfg,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub csc_account :Local :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'csc_account',
+        "CSC account management page called");
+
+    unless ($c->session->{username}) {
+        $c->flash->{error_msg} = "Please log in to manage your CSC membership.";
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        return;
+    }
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $user_id   = $c->session->{user_id};
+    my $csc_memberships  = [];
+    my $csc_plans        = [];
+    my $point_balance    = 0;
+    my $hosting_account  = undef;
+
+    eval {
+        my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @rows = $c->model('DBEncy')->resultset('UserMembership')->search(
+                { 'me.user_id' => $user_id, 'me.site_id' => $csc_site->id },
+                { order_by => { -desc => 'me.created_at' }, prefetch => 'plan' }
+            )->all;
+            $csc_memberships = \@rows;
+
+            my @plans = $c->model('DBEncy')->resultset('MembershipPlan')->search(
+                { site_id => $csc_site->id, is_active => 1 },
+                { order_by => 'sort_order' }
+            )->all;
+            $csc_plans = \@plans;
+        }
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'csc_account',
+        "CSC membership query failed: $@") if $@;
+
+    eval {
+        $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { sitename => $site_name },
+            { rows => 1 }
+        )->single;
+    };
+
+    eval {
+        require Comserv::Util::PointSystem;
+        my $ps = Comserv::Util::PointSystem->new(c => $c);
+        $point_balance = $ps->balance($user_id);
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'csc_account',
+        "Point balance query failed: $@") if $@;
+
+    $c->stash(
+        template         => 'membership/csc_account.tt',
+        csc_memberships  => $csc_memberships,
+        csc_plans        => $csc_plans,
+        hosting_account  => $hosting_account,
+        point_balance    => $point_balance,
+        site_name        => $site_name,
     );
     $c->forward($c->view('TT'));
 }

@@ -90,12 +90,30 @@ const AIUtils = {
         // Split by triple backticks
         const parts = content.split(/```/);
         let html = '';
+        let pendingFixPath = null;
+        let pendingReadPath = null;
         
         for (let i = 0; i < parts.length; i++) {
             if (i % 2 === 0) {
                 // Text part — strip style tags, then render links and newlines
                 let text = this.stripStyles(parts[i]);
-                html += this.renderTextWithLinks(text);
+
+                // Detect ## FIX: path/to/file before next code block
+                const fixMatch = text.match(/##\s*FIX:\s*([^\n\r]+)/i);
+                pendingFixPath = fixMatch ? fixMatch[1].trim() : null;
+
+                // Render text first (escapes HTML, converts URLs to links)
+                let rendered = this.renderTextWithLinks(text);
+
+                // Then replace [READ_FILE: path] tokens in the rendered output
+                rendered = rendered.replace(/\[READ_FILE:\s*([^\]]+)\]/gi, function(_, p) {
+                    const path = p.trim();
+                    return `<a href="#" class="ai-read-file-link" data-path="${this.escapeHtml(path)}"
+                               onclick="if(window._handleReadFileRequest)window._handleReadFileRequest('${path.replace(/'/g,"\\'")}');return false;"
+                               title="Load file into next message">📂 ${this.escapeHtml(path)}</a>`;
+                }.bind(this));
+
+                html += rendered;
             } else {
                 // Code block — language specifier on first line is stripped
                 let code = parts[i];
@@ -103,7 +121,36 @@ const AIUtils = {
                 if (firstNewLine !== -1 && firstNewLine < 20) {
                     code = code.substring(firstNewLine + 1);
                 }
-                html += `<code class="code-block">${this.escapeHtml(code.trim())}</code>`;
+                const escapedCode = this.escapeHtml(code.trim());
+
+                if (pendingFixPath) {
+                    const fixPath = pendingFixPath;
+                    const rawCode = code.trim();
+                    const escapedPath = this.escapeHtml(fixPath);
+                    html += `<div class="ai-fix-block">` +
+                            `<div class="ai-fix-header">` +
+                              `<span>📝 Fix for: <code>${escapedPath}</code></span>` +
+                              `<button class="ai-apply-fix-btn" ` +
+                                `onclick="(function(btn){` +
+                                  `if(!confirm('Apply fix to ${escapedPath}?'))return;` +
+                                  `btn.disabled=true;btn.textContent='Applying…';` +
+                                  `fetch('/ai/apply_fix',{method:'POST',credentials:'include',` +
+                                    `headers:{'Content-Type':'application/x-www-form-urlencoded'},` +
+                                    `body:'path='+encodeURIComponent('${fixPath.replace(/'/g,"\\'")}')+'&content='+encodeURIComponent(atob(btn.dataset.code))` +
+                                  `}).then(r=>r.json()).then(d=>{` +
+                                    `btn.textContent=d.success?'✅ Applied':'❌ '+d.error;` +
+                                    `btn.style.background=d.success?'#2a7a2a':'#9b0000';` +
+                                  `}).catch(e=>{btn.textContent='❌ Error';btn.disabled=false;});` +
+                                `})(this)" ` +
+                                `data-code="${btoa(unescape(encodeURIComponent(rawCode)))}" ` +
+                                `title="Apply this fix to ${escapedPath}">✅ Apply Fix</button>` +
+                            `</div>` +
+                            `<code class="code-block">${escapedCode}</code>` +
+                            `</div>`;
+                    pendingFixPath = null;
+                } else {
+                    html += `<code class="code-block">${escapedCode}</code>`;
+                }
             }
         }
         

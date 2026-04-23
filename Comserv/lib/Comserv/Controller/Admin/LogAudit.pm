@@ -14,6 +14,17 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub auto :Private {
+    my ($self, $c) = @_;
+    unless ($c->session->{username} && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @{ $c->session->{roles} // [] })) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+            "Unauthenticated access attempt to LogAudit from IP " . ($c->req->address || 'unknown'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path }));
+        $c->detach;
+    }
+    return 1;
+}
+
 # GET /admin/logging/audit
 # Main audit dashboard — renders instantly; heavy stats loaded async via /audit/stats
 sub index :Path('/admin/logging/audit') :Args(0) {
@@ -190,6 +201,7 @@ sub prune :Path('/admin/logging/audit/prune') :Args(0) {
         $c->flash->{success_msg} = "Pruned $deleted records from system_log.";
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 # POST /admin/logging/audit/alert_action
@@ -219,6 +231,7 @@ sub alert_action :Path('/admin/logging/audit/alert_action') :Args(0) {
         $c->flash->{error_msg} = "Error updating alert: $@" if $@;
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

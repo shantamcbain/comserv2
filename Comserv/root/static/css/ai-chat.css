@@ -473,3 +473,55 @@ a.chat-header-icon-btn { display: inline-flex; align-items: center; text-decorat
 .ai-thinking-live summary {
     font-style: italic;
 }
+
+/* ── Coding Agent: Fix block ─────────────────────────────────────────────── */
+.ai-fix-block {
+    border: 2px solid #2a7a2a;
+    border-radius: 6px;
+    margin: 8px 0;
+    overflow: hidden;
+}
+.ai-fix-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #d4edda;
+    padding: 5px 10px;
+    font-size: 0.85em;
+    gap: 8px;
+}
+.ai-fix-header code {
+    background: transparent;
+    font-size: 0.9em;
+    word-break: break-all;
+}
+.ai-apply-fix-btn {
+    flex-shrink: 0;
+    background: #2a7a2a;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    padding: 3px 10px;
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: bold;
+    white-space: nowrap;
+}
+.ai-apply-fix-btn:disabled { opacity: 0.6; cursor: default; }
+.ai-apply-fix-btn:hover:not(:disabled) { background: #1e5c1e; }
+
+/* ── Read-file link ──────────────────────────────────────────────────────── */
+.ai-read-file-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    background: #e8f0fe;
+    border: 1px solid #7baaf7;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.85em;
+    text-decoration: none;
+    color: #1a56db;
+    cursor: pointer;
+}
+.ai-read-file-link:hover { background: #c5d8fd; }

@@ -1,9 +1,7 @@
 body {
-  font-family: Verdana, Helvetica, sans-serif;
-  font-size: 20px;
-  background-image : url("static/images/BMaster/honey2.jpg");
-  color: black;
-  background-color: #ccffff;
+  font-family: var(--body-font, Verdana, Helvetica, sans-serif);
+  font-size: var(--font-size-base, 20px);
+  color: var(--text-color, black);
 }
 header {
     /* Site Greeting */
@@ -17,9 +15,9 @@ h1 {
 .debug-content {
 
 }
-/* Main Menu */
+/* Main Menu — let theme system control nav background */
 nav {
-    background-color: #ccffff;
+    background-color: var(--nav-bg, #ccffff);
 }
 
 .horizontal-menu {

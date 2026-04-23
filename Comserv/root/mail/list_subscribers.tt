@@ -1,4 +1,4 @@
-[% META title = 'Subscribers — ' _ list_name %]
+[% SET title = 'Subscribers - ' _ list_name %]
 
 <div class="admin-content">
     <div class="admin-header">

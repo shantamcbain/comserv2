@@ -325,7 +325,7 @@
     
     .apis-note {
         font-size: 0.9em;
-        color: #555;
+        color: var(--text-muted-color, #555);
         margin-top: 5px;
     }
 </style>

@@ -157,7 +157,7 @@ document.getElementById('ency-ai-query').addEventListener('keypress', function(e
 [% IF is_editor %]
 <div class="ency-admin-bar">
   <strong>Admin:</strong>
-  <a href="[% c.uri_for('/ENCY/Herb/add') %]">+ Herb</a> |
+  <a href="[% c.uri_for('/ENCY/add_herb') %]">+ Herb</a> |
   <a href="[% c.uri_for('/ENCY/Animal/add') %]">+ Animal</a> |
   <a href="[% c.uri_for('/ENCY/Insect/add') %]">+ Insect</a> |
   <a href="[% c.uri_for('/ENCY/Disease/add') %]">+ Disease</a> |

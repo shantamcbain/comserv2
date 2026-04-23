@@ -12,12 +12,12 @@
 .sm-table th { background:var(--bg-secondary); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border-color); }
 .sm-table td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:middle; }
 .sm-table tr:hover td { background:var(--bg-secondary); }
-.badge-on  { display:inline-block; padding:2px 8px; border-radius:3px; background:#28a745; color:#fff; font-size:0.78em; font-weight:bold; }
-.badge-off { display:inline-block; padding:2px 8px; border-radius:3px; background:#6c757d; color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-on  { display:inline-block; padding:2px 8px; border-radius:3px; background: var(--success-color, #28a745); color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-off { display:inline-block; padding:2px 8px; border-radius:3px; background: var(--secondary-color, #6c757d); color:#fff; font-size:0.78em; font-weight:bold; }
 .btn-sm { padding:3px 10px; font-size:0.82em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; }
 .btn-primary   { background:var(--primary-color); color:#fff; }
 .btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
-.btn-danger    { background:#dc3545; color:#fff; }
+.btn-danger    { background: var(--danger-color, #dc3545); color:#fff; }
 .add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:16px; margin-top:24px; }
 .add-form h2 { margin-top:0; font-size:1.1em; }
 .add-form label { display:inline-block; width:120px; font-size:0.9em; }

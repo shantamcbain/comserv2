@@ -31,7 +31,7 @@
                 The goal is to ensure consistent structure, maintainability, and adherence to established patterns.
             </p>
             
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Status:</strong> Currently 631 .tt files identified requiring standardization</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Priority:</strong> High - Essential for project maintainability</p>
             </div>
@@ -71,14 +71,14 @@
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Required Standards for All .tt Files</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">1. Mandatory PageVersion Header</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 [% PageVersion = 'path/to/filename.tt,v X.XX YYYY/MM/DD author Exp author ' %]
                 </code></pre>
             </div>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2. Debug Mode Support</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -87,7 +87,7 @@
             </div>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">3. Documentation Files: META Block</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 [% META 
    title = "Document Title"
@@ -284,7 +284,7 @@ Comserv/root/
     
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font);">Next Steps</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     Use this guide to systematically standardize .tt files across the project. 
