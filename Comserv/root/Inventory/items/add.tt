@@ -17,8 +17,24 @@
     </tr>
     <tr>
       <th><label for="category">Category</label></th>
-      <td><input type="text" id="category" name="category" maxlength="100"
-                 placeholder="Apiary, Garden, Hardware, 3D Print, Craft…"></td>
+      <td>
+        <input type="text" id="category" name="category" maxlength="100"
+               list="category-suggestions"
+               placeholder="Apiary, Garden, Hardware, 3D Print, Craft…">
+        <datalist id="category-suggestions">
+          <option value="3d_filament">3D Filament</option>
+          <option value="3d_supply">3D Supply</option>
+          <option value="3d_printed_item">3D Printed Item (for sale)</option>
+          <option value="Hardware">Hardware</option>
+          <option value="Apiary">Apiary</option>
+          <option value="Garden">Garden</option>
+          <option value="Craft">Craft</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Office">Office</option>
+          <option value="Service">Service</option>
+        </datalist>
+        <small>3D types: <code>3d_filament</code>, <code>3d_supply</code>, <code>3d_printed_item</code></small>
+      </td>
     </tr>
     <tr>
       <th><label for="item_origin">Origin / How Made</label></th>
@@ -39,7 +55,7 @@
     <tr>
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
-        [% SET uom_opts = ['each','month','year','hour','g','kg','ml','L','cm','m','sheet','box','case','lb','litre','metre'] %]
+        [% SET uom_opts = ['each','spool','g','kg','ml','L','cm','m','metre','sheet','box','case','lb','litre','hour','month','year'] %]
         <select id="unit_of_measure" name="unit_of_measure">
           [% FOREACH u IN uom_opts %]
           <option value="[% u %]">[% u %]</option>
