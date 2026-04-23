@@ -31,7 +31,16 @@
     </select>
   </label>
   <label>Category:
-    <input type="text" name="category" value="[% category %]">
+    <input type="text" name="category" value="[% category %]" list="cat-list-filter">
+    <datalist id="cat-list-filter">
+      <option value="">All</option>
+      <option value="3d_filament">3D Filament</option>
+      <option value="3d_supply">3D Supply</option>
+      <option value="3d_printed_item">3D Printed Item</option>
+      [% FOREACH cat IN categories %]
+      <option value="[% cat | html %]">[% cat | html %]</option>
+      [% END %]
+    </datalist>
   </label>
   <input type="submit" value="Filter">
 </form>
