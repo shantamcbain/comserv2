@@ -644,8 +644,50 @@ sub queue :Path('/3d/queue') :Args(0) {
                 }
 
             } elsif ($action eq 'complete') {
-                my $printer = $job->printer;
-                $job->update({ status => 'completed', completed_at => _now() });
+                my $printer     = $job->printer;
+                my $print_hours = $c->req->params->{print_hours} || undef;
+                $print_hours    = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+
+                # ---- Cost calculation ----
+                my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
+
+                # Filament cost: quantity * unit_cost from inventory
+                if ($job->filament_item_id) {
+                    my $fil = eval { $job->filament_item };
+                    if ($fil && $fil->unit_cost) {
+                        $filament_cost = ($job->filament_quantity || 1) * $fil->unit_cost;
+                    }
+                }
+
+                # Printer depreciation cost: hours * depreciation_per_hour from equipment
+                if ($printer && $print_hours && $printer->inventory_item_id) {
+                    my $inv_item = eval { $printer->inventory_item };
+                    if ($inv_item) {
+                        my $eq = eval { $inv_item->equipment };
+                        if ($eq) {
+                            if ($eq->depreciation_per_hour) {
+                                $printer_cost = $print_hours * $eq->depreciation_per_hour;
+                            }
+                            if ($eq->wattage) {
+                                my $kwh_rate = 0.15;
+                                $elec_cost   = $print_hours * $eq->wattage * $kwh_rate / 1000;
+                            }
+                        }
+                    }
+                }
+
+                $total_cost = ($filament_cost || 0) + ($printer_cost || 0) + ($elec_cost || 0);
+                $total_cost = undef unless $total_cost;
+
+                $job->update({
+                    status           => 'completed',
+                    completed_at     => _now(),
+                    print_hours      => $print_hours,
+                    filament_cost    => $filament_cost,
+                    printer_cost     => $printer_cost,
+                    electricity_cost => $elec_cost,
+                    total_cost       => $total_cost,
+                });
 
                 if ($printer) {
                     $printer->update({
@@ -667,6 +709,7 @@ sub queue :Path('/3d/queue') :Args(0) {
                             location_id      => $fsl ? $fsl->location_id : undef,
                             transaction_type => 'issue',
                             quantity         => $job->filament_quantity || 1,
+                            unit_cost        => $filament_cost ? ($filament_cost / ($job->filament_quantity || 1)) : undef,
                             reference_number => '3D-JOB-' . $job->id,
                             notes            => 'Filament consumed — print job #' . $job->id . ' completed',
                             performed_by     => $c->session->{username} || 'system',
@@ -674,6 +717,25 @@ sub queue :Path('/3d/queue') :Args(0) {
                     };
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
                         "Filament issue transaction failed for job $job_id: $@") if $@;
+                }
+
+                # Inventory accounting: record printer depreciation against asset
+                if ($printer && $printer->inventory_item_id && $printer_cost) {
+                    eval {
+                        $self->_inventory_transaction($c,
+                            schema           => $schema,
+                            sitename         => $sitename,
+                            item_id          => $printer->inventory_item_id,
+                            transaction_type => 'depreciation',
+                            quantity         => $print_hours || 1,
+                            unit_cost        => $printer_cost / ($print_hours || 1),
+                            reference_number => '3D-JOB-' . $job->id,
+                            notes            => sprintf('Printer depreciation: %.2fh @ job #%d', $print_hours || 0, $job->id),
+                            performed_by     => $c->session->{username} || 'system',
+                        );
+                    };
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                        "Depreciation transaction failed for job $job_id: $@") if $@;
                 }
 
             } elsif ($action eq 'cancel') {
@@ -718,7 +780,7 @@ sub queue :Path('/3d/queue') :Args(0) {
         $c->detach;
     }
 
-    my (@queued_jobs, @active_jobs, @idle_printers);
+    my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
     eval {
         @queued_jobs = $schema->resultset('Printing3dJob')->search(
             { sitename => $sitename, status => 'queued' },
@@ -731,14 +793,19 @@ sub queue :Path('/3d/queue') :Args(0) {
         @idle_printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename, status => 'idle' }
         )->all;
+        @recent_completed = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => 'completed' },
+            { prefetch => ['model', 'printer'], order_by => { -desc => 'completed_at' }, rows => 10 }
+        )->all;
     };
 
     $c->stash(
-        sitename      => $sitename,
-        queued_jobs   => \@queued_jobs,
-        active_jobs   => \@active_jobs,
-        idle_printers => \@idle_printers,
-        template      => '3d/queue.tt',
+        sitename          => $sitename,
+        queued_jobs       => \@queued_jobs,
+        active_jobs       => \@active_jobs,
+        idle_printers     => \@idle_printers,
+        recent_completed  => \@recent_completed,
+        template          => '3d/queue.tt',
     );
 }
 
@@ -758,15 +825,54 @@ sub printers :Path('/3d/printers') :Args(0) {
         my $action = $c->req->params->{action} || '';
         eval {
             if ($action eq 'add') {
-                $schema->resultset('Printing3dPrinter')->create({
-                    sitename        => $sitename,
-                    name            => $c->req->params->{name},
-                    model           => $c->req->params->{model}           || '',
-                    status          => 'idle',
-                    nozzle_diameter => $c->req->params->{nozzle_diameter} || '0.40',
-                    bed_size        => $c->req->params->{bed_size}        || '',
-                    notes           => $c->req->params->{notes}           || '',
-                    created_at      => _now(),
+                my $name              = $c->req->params->{name}              || '';
+                my $model_name        = $c->req->params->{model}             || '';
+                my $nozzle            = $c->req->params->{nozzle_diameter}   || '0.40';
+                my $bed               = $c->req->params->{bed_size}          || '';
+                my $notes             = $c->req->params->{notes}             || '';
+                my $purchase_price    = $c->req->params->{purchase_price}    || undef;
+                my $depr_per_hour     = $c->req->params->{depreciation_per_hour} || undef;
+                my $wattage           = $c->req->params->{wattage}           || undef;
+                my $inv_item_id       = $c->req->params->{inventory_item_id} || undef;
+
+                $schema->txn_do(sub {
+                    # Auto-create inventory asset if cost details supplied and no existing item linked
+                    unless ($inv_item_id) {
+                        if ($purchase_price || $depr_per_hour) {
+                            my $sku = '3DPRINTER-' . uc($sitename) . '-' . time();
+                            my $inv_item = $schema->resultset('InventoryItem')->create({
+                                sitename        => $sitename,
+                                sku             => $sku,
+                                name            => $name . ($model_name ? " ($model_name)" : ''),
+                                category        => '3d_printer',
+                                item_origin     => 'purchased',
+                                unit_of_measure => 'each',
+                                unit_cost       => $purchase_price || 0,
+                                status          => 'active',
+                                notes           => "3D Printer: $model_name. $notes",
+                                created_by      => $c->session->{username} || 'system',
+                            });
+                            $schema->resultset('InventoryEquipment')->create({
+                                item_id              => $inv_item->id,
+                                purchase_price       => $purchase_price  || undef,
+                                depreciation_per_hour => $depr_per_hour  || undef,
+                                wattage              => $wattage         || undef,
+                            });
+                            $inv_item_id = $inv_item->id;
+                        }
+                    }
+
+                    $schema->resultset('Printing3dPrinter')->create({
+                        sitename          => $sitename,
+                        name              => $name,
+                        model             => $model_name,
+                        status            => 'idle',
+                        nozzle_diameter   => $nozzle,
+                        bed_size          => $bed,
+                        notes             => $notes,
+                        inventory_item_id => $inv_item_id || undef,
+                        created_at        => _now(),
+                    });
                 });
             } elsif ($action eq 'update_status') {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(

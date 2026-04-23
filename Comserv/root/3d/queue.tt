@@ -123,7 +123,7 @@
         <thead>
             <tr>
                 <th>#</th><th>Model</th><th>User</th><th>Printer</th>
-                <th>Status</th><th>Started</th><th>Actions</th>
+                <th>Status</th><th>Started</th><th>Complete / Cancel</th>
             </tr>
         </thead>
         <tbody>
@@ -136,9 +136,13 @@
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
                 <td>[% job.started_at || job.created_at %]</td>
                 <td>
-                    <form method="post" action="/3d/queue" style="display:inline;">
+                    <form method="post" action="/3d/queue" style="display:inline-flex;gap:0.4em;align-items:center;flex-wrap:wrap;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="complete">
+                        <label style="font-size:0.82em;color:var(--text-color);">Hours:</label>
+                        <input type="number" name="print_hours" step="0.25" min="0.25" max="999"
+                               style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
+                               placeholder="0.0" title="Print time in hours — used to calculate cost">
                         <button type="submit" class="btn-action btn-complete">Complete</button>
                     </form>
                     <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
@@ -156,3 +160,36 @@
     <p style="color:var(--muted-color,#888);">No active print jobs.</p>
     [% END %]
 </div>
+
+[% IF recent_completed && recent_completed.size %]
+<div class="queue-section">
+    <h2>Recently Completed — Cost Summary (last 10)</h2>
+    <table class="queue-table">
+        <thead>
+            <tr>
+                <th>#</th><th>Model</th><th>User</th><th>Printer</th>
+                <th>Hours</th><th>Filament $</th><th>Printer $</th><th>Electricity $</th><th>Total $</th>
+                <th>Completed</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH job IN recent_completed %]
+        <tr>
+            <td>[% job.id %]</td>
+            <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+            <td>[% job.username | html %]</td>
+            <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.print_hours %][% job.print_hours %]h[% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.filament_cost %]$[% job.filament_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.printer_cost %]$[% job.printer_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.electricity_cost %]$[% job.electricity_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
+            <td style="font-weight:bold;">
+                [% IF job.total_cost %]$[% job.total_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]
+            </td>
+            <td>[% job.completed_at %]</td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]

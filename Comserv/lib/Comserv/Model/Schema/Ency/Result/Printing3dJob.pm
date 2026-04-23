@@ -69,6 +69,31 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => 0,
     },
+    print_hours => {
+        data_type   => 'decimal',
+        size        => [6, 2],
+        is_nullable => 1,
+    },
+    filament_cost => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    printer_cost => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    electricity_cost => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
+    total_cost => {
+        data_type   => 'decimal',
+        size        => [10, 2],
+        is_nullable => 1,
+    },
     created_at => {
         data_type     => 'datetime',
         default_value => \'CURRENT_TIMESTAMP',

@@ -45,6 +45,10 @@ __PACKAGE__->add_columns(
         data_type   => 'integer',
         is_nullable => 1,
     },
+    inventory_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     created_at => {
         data_type     => 'datetime',
         default_value => \'CURRENT_TIMESTAMP',
@@ -64,5 +68,27 @@ __PACKAGE__->has_many(
     'printer_id',
     { cascade_delete => 0 }
 );
+
+__PACKAGE__->belongs_to(
+    inventory_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'inventory_item_id',
+    { join_type => 'left', on_delete => 'SET NULL' }
+);
+
+sub depreciation_per_hour {
+    my $self = shift;
+    my $item = eval { $self->inventory_item };
+    return undef unless $item;
+    my $eq = eval { $item->equipment };
+    return $eq ? $eq->depreciation_per_hour : undef;
+}
+
+sub wattage {
+    my $self = shift;
+    my $item = eval { $self->inventory_item };
+    return undef unless $item;
+    my $eq = eval { $item->equipment };
+    return $eq ? $eq->wattage : undef;
+}
 
 1;
