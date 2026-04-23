@@ -48,6 +48,8 @@
                 </select>
             </label>
             <span id="hw-refresh-countdown" style="font-size:.8em;color:#888;min-width:50px;"></span>
+            <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="btn btn-secondary"
+               title="View disk space alerts and cleanup opportunities">&#128202; Disk Health</a>
             <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">&#128203; System Logs</a>
         </div>
     </div>
@@ -321,6 +323,7 @@
                         }
                     }
                 },
+                onClick: onClickCb || null,
                 scales: {
                     x: {
                         type: 'time',
@@ -340,6 +343,7 @@
         h4.innerHTML = title + '<span>drag bottom edge to resize</span>';
         if (onClickCb) { box.style.cursor = 'pointer'; }
         box.appendChild(h4);
+        if (onClickCb) { box.style.cursor = 'pointer'; }
         var wrap = document.createElement('div');
         wrap.className = 'hw-chart-wrap';
         var canvas = document.createElement('canvas');

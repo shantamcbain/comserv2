@@ -237,61 +237,71 @@ sub index :Path :Args(0) {
         "Completed Admin index action");
 }
 
-sub docker_containers :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->res->redirect($c->uri_for('/admin/infrastructure'));
-}
-
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
     
     my $stats = {
-        user_count => 0,
-        content_count => 0,
-        comment_count => 0,
-        disk_usage => '0 MB',
-        db_size => '0 MB',
-        uptime => '0 days',
+        user_count        => 0,
+        active_user_count => 0,
+        file_count        => 0,
+        disk_usage        => 'Unknown',
+        disk_pct          => 0,
+        disk_used         => '',
+        disk_total        => '',
+        disk_level        => 'ok',
+        nfs_pct           => 0,
+        nfs_used          => '',
+        nfs_total         => '',
+        nfs_level         => 'ok',
+        uptime            => 'Unknown',
     };
-    
-    # Try to get user count
+
     eval {
-        $stats->{user_count} = $c->model('DBEncy::User')->count();
+        my $schema = $c->model('DBEncy');
+        $stats->{user_count}        = $schema->resultset('User')->count;
+        $stats->{active_user_count} = $schema->resultset('User')->search({ status => 'active' })->count;
     };
-    
-    # Try to get content count (pages, posts, etc.)
+
     eval {
-        $stats->{content_count} = $c->model('DBEncy::Content')->count();
+        $stats->{file_count} = $c->model('DBEncy')->resultset('File')->search({ file_status => 'active' })->count;
     };
-    
-    # Try to get comment count
+
     eval {
-        $stats->{comment_count} = $c->model('DBEncy::Comment')->count();
-    };
-    
-    # Get disk usage (this is a simplified example)
-    eval {
-        my $df_output = `df -h . | tail -1`;
-        if ($df_output =~ /(\d+)%/) {
-            $stats->{disk_usage} = "$1%";
+        my $df = `df -P -BM . 2>/dev/null | tail -1`;
+        if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+            my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+            $stats->{disk_pct}   = $pct;
+            $stats->{disk_used}  = $used >= 1024 ? sprintf('%.1f GB', $used/1024) : "${used} MB";
+            $stats->{disk_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+            $stats->{disk_usage} = "$pct%";
+            $stats->{disk_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
         }
     };
-    
-    # Get database size (this would need to be customized for your DB)
+
     eval {
-        # This is just a placeholder - you'd need to implement actual DB size checking
-        $stats->{db_size} = "Unknown";
+        my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
+        if (-d $nfs_root) {
+            my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
+            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+                my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+                $stats->{nfs_pct}   = $pct;
+                $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
+                $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+                $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            }
+        }
     };
-    
-    # Get system uptime
+
     eval {
-        my $uptime_output = `uptime`;
-        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+users/) {
+        my $uptime_output = `uptime 2>/dev/null`;
+        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+user/) {
             $stats->{uptime} = $1;
+        } elsif ($uptime_output =~ /up\s+(.+)/) {
+            ($stats->{uptime} = $1) =~ s/,\s*\d+\s*user.*//;
         }
     };
-    
+
     return $stats;
 }
 
@@ -4117,7 +4127,7 @@ sub generate_result_file {
     
     try {
         my $db_schema = $self->get_database_table_schema($c, $table_name);
-        my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
+        my $result_file_content = $self->_generate_result_file_content_basic($table_name, $db_schema);
         
         # Save the Result file
         my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
@@ -4132,8 +4142,8 @@ sub generate_result_file {
     };
 }
 
-# Generate Result file content from database schema
-sub generate_result_file_content {
+# Generate Result file content from database schema (basic/legacy version)
+sub _generate_result_file_content_basic {
     my ($self, $table_name, $db_schema) = @_;
     
     my $class_name = ucfirst($table_name);
@@ -6572,6 +6582,11 @@ sub end : Private {
         return;
     }
     
+    # Skip rendering for redirects and no-content responses
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+
     # Normal template rendering for other requests
     $c->forward($c->view('TT')) unless $c->response->body;
 }
