@@ -505,7 +505,7 @@ echo "✅ Cutover Complete - Application now on K3s Galera"</code></pre>
         <div class="col-100">
             <h2 id="rollback" style="color: var(--text-color); font-family: var(--header-font);">Rollback Procedure (3-Day Window)</h2>
 
-            <div style="background-color: #fff3cd; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <strong>⚠️ Critical</strong>: Keep bare-metal database online and updated for 3 days post-cutover. If issues arise, revert to bare-metal within 72 hours.
             </div>
 

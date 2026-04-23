@@ -63,9 +63,9 @@
         [% IF assembled_cost > 0 %]
           [% assembled_cost %]
           [% IF ai.unit_cost && assembled_cost > ai.unit_cost %]
-            <span style="color:#dc3545;font-size:0.8em;" title="Assembled cost exceeds listed unit cost">&#9650;</span>
+            <span style="color: var(--danger-color, #dc3545);font-size:0.8em;" title="Assembled cost exceeds listed unit cost">&#9650;</span>
           [% ELSIF ai.unit_cost && assembled_cost < ai.unit_cost %]
-            <span style="color:#28a745;font-size:0.8em;" title="Assembled cost is under listed unit cost">&#9660;</span>
+            <span style="color: var(--success-color, #28a745);font-size:0.8em;" title="Assembled cost is under listed unit cost">&#9660;</span>
           [% END %]
         [% ELSE %]
           —

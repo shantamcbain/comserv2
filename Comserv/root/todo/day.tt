@@ -609,27 +609,27 @@
     <table style="width:100%; border-collapse:collapse;">
         <thead>
             <tr style="background:#f2f2f2;">
-                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Conversation</th>
-                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Project</th>
-                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Model</th>
-                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Updated</th>
-                <th style="padding:8px; border:1px solid #ddd; text-align:left;">Action</th>
+                <th style="padding:8px; border:1px solid var(--border-color, #ddd); text-align:left;">Conversation</th>
+                <th style="padding:8px; border:1px solid var(--border-color, #ddd); text-align:left;">Project</th>
+                <th style="padding:8px; border:1px solid var(--border-color, #ddd); text-align:left;">Model</th>
+                <th style="padding:8px; border:1px solid var(--border-color, #ddd); text-align:left;">Updated</th>
+                <th style="padding:8px; border:1px solid var(--border-color, #ddd); text-align:left;">Action</th>
             </tr>
         </thead>
         <tbody>
             [% FOREACH conv IN ai_daily_conversations %]
             <tr>
-                <td style="padding:8px; border:1px solid #ddd;">
+                <td style="padding:8px; border:1px solid var(--border-color, #ddd);">
                     <a href="/ai/conversation/[% conv.id %]">[% conv.get_display_title | html %]</a>
                 </td>
-                <td style="padding:8px; border:1px solid #ddd;">
+                <td style="padding:8px; border:1px solid var(--border-color, #ddd);">
                     [% IF conv.project %]
                         <a href="/project/details?project_id=[% conv.project.id %]">[% conv.project.name | html %]</a>
                     [% ELSE %]—[% END %]
                 </td>
-                <td style="padding:8px; border:1px solid #ddd;">[% conv.model | html %]</td>
-                <td style="padding:8px; border:1px solid #ddd;">[% conv.updated_at %]</td>
-                <td style="padding:8px; border:1px solid #ddd;">
+                <td style="padding:8px; border:1px solid var(--border-color, #ddd);">[% conv.model | html %]</td>
+                <td style="padding:8px; border:1px solid var(--border-color, #ddd);">[% conv.updated_at %]</td>
+                <td style="padding:8px; border:1px solid var(--border-color, #ddd);">
                     <a href="/ai?conversation_id=[% conv.id %]" style="font-size:0.85em;">Continue</a>
                 </td>
             </tr>

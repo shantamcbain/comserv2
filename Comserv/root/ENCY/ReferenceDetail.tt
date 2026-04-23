@@ -142,7 +142,7 @@
       [% IF edit_mode %]
       <input type="text" name="physical_location" value="[% reference.physical_location | html %]" style="width:98%;"
              placeholder="e.g. Library shelf B-3, Office bookcase, NFS storage box 4" />
-      <div style="font-size:0.82em;color:#666;margin-top:2px;">Where is the physical copy held?</div>
+      <div style="font-size:0.82em;color: var(--text-muted-color, #666);margin-top:2px;">Where is the physical copy held?</div>
       [% ELSE %]
       [% reference.physical_location | html %]
       [% END %]
@@ -154,7 +154,7 @@
       [% IF edit_mode %]
       <input type="text" name="digital_path" value="[% reference.digital_path | html %]" style="width:98%;"
              placeholder="e.g. /mnt/nfs/library/herbs.pdf or https://archive.org/..." />
-      <div style="font-size:0.82em;color:#666;margin-top:2px;">NFS path, local file path, or public URL to digital copy.</div>
+      <div style="font-size:0.82em;color: var(--text-muted-color, #666);margin-top:2px;">NFS path, local file path, or public URL to digital copy.</div>
       [% ELSE %]
       [% IF reference.digital_path %]
         [% IF reference.digital_path.match('^https?://') %]
@@ -172,7 +172,7 @@
       [% IF edit_mode %]
       <input type="text" name="url" value="[% reference.url | html %]" style="width:98%;"
              placeholder="https://archive.org/details/... or publisher URL" />
-      <div style="font-size:0.82em;color:#666;margin-top:2px;">
+      <div style="font-size:0.82em;color: var(--text-muted-color, #666);margin-top:2px;">
         Use <a href="https://archive.org" target="_blank">archive.org</a> for public domain books,
         <a href="https://www.gutenberg.org" target="_blank">gutenberg.org</a> for classic texts.
       </div>
@@ -191,13 +191,13 @@
     <td>
       [% IF edit_mode %]
       <textarea name="notes" rows="8" style="width:98%;">[% reference.notes | html %]</textarea>
-      <div style="font-size:0.82em;color:#666;margin-top:2px;">
+      <div style="font-size:0.82em;color: var(--text-muted-color, #666);margin-top:2px;">
         Include: page numbers, edition, chapter, and a short excerpt of the passage where the herb/treatment is mentioned.
         Example: <em>p. 422 — "Huang Lian (Coptis chinensis) is used for Heat in the Lower Burner…"</em>
       </div>
       [% ELSE %]
       [% IF reference.notes %]
-      <div style="background:#fffde7;padding:0.6em;border-left:3px solid #ffc107;white-space:pre-wrap;">[% reference.notes | html %]</div>
+      <div style="background: var(--caution-bg, #fffde7);padding:0.6em;border-left:3px solid var(--caution-color, #ffc107);white-space:pre-wrap;">[% reference.notes | html %]</div>
       [% END %]
       [% END %]
     </td>
@@ -238,7 +238,7 @@
 [%# ── Entities citing this reference ─────────────────────── %]
 <h2 style="margin-top:1.5em;">Where Reference #[% ref_id %] is Cited</h2>
 [% IF entity_links && entity_links.size %]
-<p style="color:#666;font-size:0.9em;">[% entity_links.size %] formally linked record(s):</p>
+<p style="color: var(--text-muted-color, #666);font-size:0.9em;">[% entity_links.size %] formally linked record(s):</p>
 <table style="border-collapse:collapse;width:100%;font-size:0.95em;">
   <thead>
   <tr style="background:#e8f0f8;">
@@ -259,7 +259,7 @@
   </tbody>
 </table>
 [% ELSE %]
-<p style="color:#666;font-size:0.9em;">No formally linked records yet.
+<p style="color: var(--text-muted-color, #666);font-size:0.9em;">No formally linked records yet.
   <a href="[% c.uri_for('/ENCY/search', { search_string => ref_id }) %]">Search ENCY for text citations of #[% ref_id %]</a>
 </p>
 [% END %]

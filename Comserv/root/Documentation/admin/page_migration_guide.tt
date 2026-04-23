@@ -260,7 +260,7 @@
 
 .table th,
 .table td {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     padding: 8px;
     text-align: left;
 }
@@ -284,7 +284,7 @@ code {
 .doc-footer {
     margin-top: 40px;
     padding-top: 20px;
-    border-top: 1px solid #ddd;
+    border-top: 1px solid var(--border-color, #ddd);
     color: #7f8c8d;
     font-style: italic;
 }

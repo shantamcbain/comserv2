@@ -149,7 +149,7 @@
     
     .search-button {
         padding: 12px 24px;
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
         border: none;
         border-radius: 0 4px 4px 0;
@@ -169,20 +169,20 @@
     }
     
     .category-card {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .category-card h3 {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         margin-top: 0;
         margin-bottom: 10px;
     }
     
     .category-card p {
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         margin-bottom: 15px;
     }
     
@@ -207,7 +207,7 @@
     
     .article-list li {
         padding: 12px 0;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -218,7 +218,7 @@
     }
     
     .article-views {
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         font-size: 0.875rem;
     }
     

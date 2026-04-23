@@ -27,7 +27,7 @@
   </thead>
   <tbody>
   [% FOREACH inv IN auto_pay_invoices %]
-  <tr style="background:#fff3cd;">
+  <tr style="background: var(--caution-bg, #fff3cd);">
     <td><a href="/Inventory/invoice/view/[% inv.id %]">[% inv.invoice_number || inv.id %]</a></td>
     <td>[% inv.supplier.name | html %]</td>
     <td>[% inv.due_date %]</td>
@@ -36,7 +36,7 @@
     <td>
       <form method="post" action="/Inventory/invoice/process_auto_pay" style="display:inline;">
         <input type="hidden" name="invoice_id" value="[% inv.id %]">
-        <button type="submit" style="background:#28a745;color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;"
+        <button type="submit" style="background: var(--success-color, #28a745);color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;"
                 onclick="return confirm('Confirm the auto-pay charge for [% inv.invoice_number | html %] has posted?')">
           ✓ Confirm Paid
         </button>

@@ -93,7 +93,7 @@
                 <p style="color: var(--text-color); font-family: var(--body-font); margin-top: 10px;"><strong>Action</strong>: No K8s VMs here. This server acts as cluster gateway/control point.</p>
             </div>
 
-            <div style="background-color: #fff3cd; padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: #d84315; margin-top: 0;">proxmox720 (192.168.100.2) - Production DB + K8s Worker</h4>
                 <table style="width: 100%; border-collapse: collapse;">
                     <tr style="background-color: rgba(255,255,255,0.15);">

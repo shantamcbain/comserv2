@@ -21,7 +21,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         var fillTab = document.createElement('div');
         fillTab.id = 'widget-fill-tab';
-        fillTab.style.cssText = 'padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;font-size:0.85em;';
+        fillTab.style.cssText = 'padding:6px 10px;background: var(--caution-bg, #fffbe6);border-top:1px solid #f0c000;font-size:0.85em;';
         fillTab.innerHTML =
             '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
                 '<span style="font-weight:bold;">🏷️ Fill Listing with AI:</span>' +
@@ -30,7 +30,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 '<button id="wf-btn" style="padding:5px 12px;background:var(--primary-color,#007bff);color:#fff;' +
                     'border:none;border-radius:4px;cursor:pointer;font-size:.85em;white-space:nowrap;">🤖 Fill</button>' +
             '</div>' +
-            '<div id="wf-status" style="font-size:.8em;margin-top:4px;color:#555;"></div>';
+            '<div id="wf-status" style="font-size:.8em;margin-top:4px;color: var(--text-muted-color, #555);"></div>';
 
         var chatInput = chatPanel.querySelector('.chat-input');
         if (chatInput) chatPanel.insertBefore(fillTab, chatInput);
@@ -119,7 +119,7 @@ document.addEventListener('DOMContentLoaded', function() {
                        border:none;border-radius:5px;cursor:pointer;font-size:.9rem;font-weight:bold;">
           🤖 Fill Form
         </button>
-        <span id="ai-fill-status" style="font-size:.85rem;color:#555;"></span>
+        <span id="ai-fill-status" style="font-size:.85rem;color: var(--text-muted-color, #555);"></span>
       </div>
       <pre id="ai-fill-raw" style="display:none;margin-top:8px;padding:8px;background:#f0f0f0;
            border-radius:4px;font-size:.78rem;white-space:pre-wrap;max-height:120px;overflow:auto;"></pre>
@@ -242,7 +242,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% error_msg | html %]</div>
   [% END %]
 
-  <form method="POST" action="/marketplace/add" style="background:var(--bg-color,#fff);border:1px solid #ddd;border-radius:8px;padding:24px;">
+  <form method="POST" action="/marketplace/add" style="background:var(--bg-color,#fff);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:24px;">
 
     <div style="margin-bottom:16px;">
       <label style="display:block;font-weight:bold;margin-bottom:8px;">Listing Type <span style="color:red;">*</span></label>
@@ -252,14 +252,14 @@ document.addEventListener('DOMContentLoaded', function() {
             {val => 'wanted', icon => '🔍', label => 'Wanted',     desc => 'I am looking for something'},
             {val => 'job',    icon => '💼', label => 'Job / Gig',  desc => 'Offering or seeking work'},
         ] %]
-        <label style="flex:1;min-width:140px;border:2px solid #dee2e6;border-radius:6px;padding:10px;cursor:pointer;text-align:center;
+        <label style="flex:1;min-width:140px;border:2px solid var(--border-color, #dee2e6);border-radius:6px;padding:10px;cursor:pointer;text-align:center;
                [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]border-color:var(--primary-color,#007bff);background:#f0f7ff;[% END %]">
           <input type="radio" name="listing_type" value="[% t.val %]"
                  [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]checked[% END %]
                  style="display:none;">
           <div style="font-size:1.4rem;">[% t.icon %]</div>
           <div style="font-weight:bold;font-size:0.95rem;">[% t.label %]</div>
-          <div style="font-size:0.75rem;color:#666;">[% t.desc %]</div>
+          <div style="font-size:0.75rem;color: var(--text-muted-color, #666);">[% t.desc %]</div>
         </label>
         [% END %]
       </div>
@@ -284,7 +284,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <label style="display:block;font-weight:bold;margin-bottom:5px;">Price</label>
         <input type="number" name="price" value="[% form.price || '0.00' %]" min="0" step="0.01"
                style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
-        <small style="color:#666;">Leave 0 for free or negotiable</small>
+        <small style="color: var(--text-muted-color, #666);">Leave 0 for free or negotiable</small>
       </div>
       <div>
         <label style="display:block;font-weight:bold;margin-bottom:5px;">Currency</label>
@@ -306,15 +306,15 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-weight:bold;margin-bottom:5px;">Order / Contact URL <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Order / Contact URL <small style="font-weight:normal;color: var(--text-muted-color, #666);">(optional)</small></label>
       <input type="url" name="order_url" value="[% form.order_url | html %]"
              placeholder="https://... or leave blank"
              style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
-      <small style="color:#666;">Link to your ordering page or contact form</small>
+      <small style="color: var(--text-muted-color, #666);">Link to your ordering page or contact form</small>
     </div>
 
     <div style="margin-bottom:16px;">
-      <label style="display:block;font-weight:bold;margin-bottom:5px;">Expires On <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Expires On <small style="font-weight:normal;color: var(--text-muted-color, #666);">(optional)</small></label>
       <input type="date" name="expires_at" value="[% form.expires_at | html %]"
              style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
     </div>
