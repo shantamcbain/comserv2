@@ -912,13 +912,16 @@ sub printers :Path('/3d/printers') :Args(0) {
     }
 
     my (@printers, @unregistered_inv_printers);
+
     eval {
         @printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename },
-            { prefetch => { inventory_item => 'equipment' }, order_by => { -asc => 'name' } }
+            { order_by => { -asc => 'name' } }
         )->all;
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Farm query error: $@") if $@;
 
-        # Inventory items with category '3d_printer' not yet in the farm
+    eval {
         my %already_linked = map { $_->inventory_item_id => 1 }
                              grep { $_->inventory_item_id } @printers;
 
@@ -938,9 +941,10 @@ sub printers :Path('/3d/printers') :Args(0) {
 
         @unregistered_inv_printers = $schema->resultset('InventoryItem')->search(
             \%inv_where,
-            { prefetch => 'equipment', order_by => 'name' }
+            { order_by => 'name' }
         )->all;
     };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Unregistered query error: $@") if $@;
 
     $c->stash(
         sitename                   => $sitename,

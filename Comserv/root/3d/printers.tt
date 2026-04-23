@@ -95,7 +95,7 @@
     </thead>
     <tbody>
         [% FOREACH p IN printers %]
-        [% SET eq = p.inventory_item.equipment IF p.inventory_item %]
+        [% SET eq = p.inventory_item ? p.inventory_item.equipment : undef %]
         <tr>
             <td>
                 [% p.name | html %]
