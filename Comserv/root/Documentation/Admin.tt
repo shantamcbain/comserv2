@@ -668,6 +668,6 @@
     }
     
     strong {
-        color: #333;
+        color: var(--text-color, #333);
     }
 </style>

@@ -17,7 +17,7 @@
   </a>
 </div>
 
-<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:8px 14px;margin-bottom:16px;font-size:0.88em;color:#5d4037">
+<div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffe082;border-radius:4px;padding:8px 14px;margin-bottom:16px;font-size:0.88em;color:#5d4037">
   Equipment details are separate from the inventory item record.
   Fields here drive the <strong>3D Print Wizard</strong> cost calculations in the BOM.
 </div>

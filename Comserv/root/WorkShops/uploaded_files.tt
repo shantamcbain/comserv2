@@ -189,14 +189,14 @@
     }
     
     .file-types h2 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-top: 0;
         padding-bottom: 10px;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
     }
     
     .file-types > p {
-        color: #666;
+        color: var(--text-muted-color, #666);
         margin-bottom: 20px;
     }
     
@@ -209,7 +209,7 @@
     }
     
     .files-table th, .files-table td {
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         padding: 12px;
         text-align: left;
     }
@@ -224,7 +224,7 @@
     }
     
     .files-table tr:hover {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
     }
     
     .status {
@@ -309,7 +309,7 @@
         padding: 30px;
         background-color: rgba(255,255,255,0.88);
         border-radius: 8px;
-        color: #666;
+        color: var(--text-muted-color, #666);
         margin-top: 20px;
     }
     
@@ -321,15 +321,15 @@
     .admin-debug {
         margin: 20px 0;
         padding: 15px;
-        background-color: #f8f9fa;
-        border: 1px solid #ddd;
+        background-color: var(--bg-secondary, #f8f9fa);
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
     }
     
     .admin-debug h3 {
         margin-top: 0;
-        color: #333;
-        border-bottom: 1px solid #ddd;
+        color: var(--text-color, #333);
+        border-bottom: 1px solid var(--border-color, #ddd);
         padding-bottom: 8px;
         margin-bottom: 10px;
     }

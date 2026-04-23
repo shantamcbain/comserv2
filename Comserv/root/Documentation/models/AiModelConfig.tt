@@ -534,7 +534,7 @@ if ($caps->{web_search}) {
             </section>
 
             <hr style="margin: 40px 0;">
-            <footer style="color: #666; font-size: 12px;">
+            <footer style="color: var(--text-muted-color, #666); font-size: 12px;">
                 <p>
                     <strong>File:</strong> Comserv/lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm<br>
                     <strong>Documentation Version:</strong> 1.00 (2026-01-08)<br>

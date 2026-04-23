@@ -151,7 +151,7 @@
       [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
       <div class="content-section">
         <h2>&#127760; CSC Hosting Plans</h2>
-        <p style="color:#555;margin-bottom:1rem;">
+        <p style="color: var(--text-muted-color, #555);margin-bottom:1rem;">
           [% site_name | html %] is a CSC hosting partner. Members can purchase hosting plans directly through CSC.
         </p>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1rem;">
@@ -165,7 +165,7 @@
               [% IF hplan.price_monthly == 0 %]Free[% ELSE %][% hplan.price_currency | html %]&nbsp;[% hplan.price_monthly %]/mo[% END %]
             </div>
             [% IF hplan.description %]
-            <p style="font-size:0.85rem;color:#555;margin:0.4rem 0;">[% hplan.description | html %]</p>
+            <p style="font-size:0.85rem;color: var(--text-muted-color, #555);margin:0.4rem 0;">[% hplan.description | html %]</p>
             [% END %]
             <ul style="font-size:0.85rem;padding-left:1.2em;margin:0.4rem 0;">
               [% IF hplan.has_subdomain %]<li>Subdomain on partner SiteName</li>[% END %]

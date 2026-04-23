@@ -20,23 +20,23 @@
 
         <div class="content-section">
           <h2>Site Information</h2>
-          <p style="color:#666;font-size:0.9rem;">Pre-filled from your site record. Edit if needed before submitting.</p>
+          <p style="color: var(--text-muted-color, #666);font-size:0.9rem;">Pre-filled from your site record. Edit if needed before submitting.</p>
 
           <div class="form-row">
             <div class="form-field">
               <label>SiteName</label>
-              <input type="text" value="[% site_name | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site_name | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
             <div class="form-field">
               <label>Display Name</label>
-              <input type="text" value="[% site.site_display_name | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site.site_display_name | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-field" style="flex:2;">
               <label>Description</label>
-              <input type="text" value="[% site.description | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site.description | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
             <div class="form-field">
               <label for="contact_email">Contact Email <span style="color:#888;font-size:0.85em;">(for CSC billing notices)</span></label>
@@ -48,7 +48,7 @@
           [% IF domains.size %]
           <div class="form-field">
             <label>Registered Domains</label>
-            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:0.5rem 0.75rem;font-family:monospace;font-size:0.9rem;">
+            <div style="background: var(--bg-secondary, #f5f5f5);border:1px solid var(--border-color, #ddd);border-radius:4px;padding:0.5rem 0.75rem;font-family:monospace;font-size:0.9rem;">
               [% FOREACH d IN domains %][% d.domain | html %][% UNLESS loop.last %],  [% END %][% END %]
             </div>
           </div>
@@ -67,7 +67,7 @@
               <strong>[% hplan.name | html %]</strong>
               — [% hplan.price_currency | html %] [% hplan.price_monthly %]/mo
               [% IF hplan.price_annual %]<span style="color:#888;font-size:0.85em;">(or [% hplan.price_currency | html %] [% hplan.price_annual %]/yr)</span>[% END %]<br>
-              <span style="font-size:0.88rem;color:#555;">[% hplan.description | html %]</span>
+              <span style="font-size:0.88rem;color: var(--text-muted-color, #555);">[% hplan.description | html %]</span>
             </div>
           </label>
           [% END %]
@@ -112,7 +112,7 @@
 
         <div class="content-section">
           <h2>Feature Add-ons</h2>
-          <p style="color:#666;font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
+          <p style="color: var(--text-muted-color, #666);font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
           [% SET current_addons = hosting_account.requested_addons || '' %]
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
             [% FOREACH addon IN [
@@ -126,13 +126,13 @@
                 { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
                 { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
             ] %]
-            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid #ddd;border-radius:6px;padding:0.75rem;cursor:pointer;background:#fafafa;">
+            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid var(--border-color, #ddd);border-radius:6px;padding:0.75rem;cursor:pointer;background: var(--bg-secondary, #fafafa);">
               <input type="checkbox" name="addon_[% addon.key %]" value="1"
                 [% IF current_addons.search(addon.key) %]checked[% END %]
                 style="margin-top:0.2rem;flex-shrink:0;">
               <div>
                 <strong>[% addon.label %]</strong><br>
-                <small style="color:#666;">[% addon.hint %]</small>
+                <small style="color: var(--text-muted-color, #666);">[% addon.hint %]</small>
               </div>
             </label>
             [% END %]

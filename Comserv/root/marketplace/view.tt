@@ -12,7 +12,7 @@
     </div>
   [% END %]
 
-  <div style="border:1px solid #ddd;border-radius:8px;background:var(--bg-color,#fff);overflow:hidden;">
+  <div style="border:1px solid var(--border-color, #ddd);border-radius:8px;background:var(--bg-color,#fff);overflow:hidden;">
 
     <div style="padding:24px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;">
@@ -41,7 +41,7 @@
           Free / Negotiable
         [% END %]
         [% IF listing.accepts_points %]
-          <span style="font-size:0.85rem;background:#fff3cd;color:#856404;border:1px solid #ffc107;border-radius:4px;padding:3px 8px;margin-left:10px;">★ Points Accepted</span>
+          <span style="font-size:0.85rem;background: var(--caution-bg, #fff3cd);color:#856404;border:1px solid var(--caution-color, #ffc107);border-radius:4px;padding:3px 8px;margin-left:10px;">★ Points Accepted</span>
         [% END %]
       </div>
 
@@ -68,14 +68,14 @@
         [% IF c.session.username == listing.seller_username || c.stash.is_admin %]
           [% IF listing.status == 'active' %]
           <form method="POST" action="/marketplace/sold/[% listing.id %]" style="display:inline;">
-            <button type="submit" style="padding:10px 20px;background:#28a745;color:#fff;border:none;border-radius:5px;cursor:pointer;">
+            <button type="submit" style="padding:10px 20px;background: var(--success-color, #28a745);color:#fff;border:none;border-radius:5px;cursor:pointer;">
               <i class="fas fa-check"></i> Mark Sold
             </button>
           </form>
           [% END %]
           <form method="POST" action="/marketplace/delete/[% listing.id %]" style="display:inline;"
                 onsubmit="return confirm('Delete this listing?')">
-            <button type="submit" style="padding:10px 20px;background:#dc3545;color:#fff;border:none;border-radius:5px;cursor:pointer;">
+            <button type="submit" style="padding:10px 20px;background: var(--danger-color, #dc3545);color:#fff;border:none;border-radius:5px;cursor:pointer;">
               <i class="fas fa-trash"></i> Delete
             </button>
           </form>

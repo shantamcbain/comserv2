@@ -110,10 +110,10 @@
             font-size: 0.88em; border: 1px solid transparent;
         }
         #ff-ask-btn    { background: #0077cc; color: #fff; border-color: #005fa3; }
-        #ff-review-btn { background: #fff3cd; color: #856404; border-color: #ffc107; }
-        #ff-status { color: #555; font-style: italic; font-size: 0.85em; }
+        #ff-review-btn { background: var(--caution-bg, #fff3cd); color: #856404; border-color: var(--caution-color, #ffc107); }
+        #ff-status { color: var(--text-muted-color, #555); font-style: italic; font-size: 0.85em; }
         #ff-no-form-warning {
-            background: #fff3cd; border: 1px solid #ffc107; border-radius:4px;
+            background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107); border-radius:4px;
             padding: 0.6em 0.8em; font-size: 0.85em; color: #856404; margin-bottom: 0.6em;
             display: none;
         }
@@ -140,16 +140,16 @@
         }
         .ff-val-existing { background:#fff8f8; border:1px solid #f5c6cb; }
         .ff-val-ai       { background:#f0fff4; border:1px solid #a3d9a5; }
-        .ff-val-box em   { display:block; font-size:0.85em; color:#666; margin-bottom:0.15em; }
+        .ff-val-box em   { display:block; font-size:0.85em; color: var(--text-muted-color, #666); margin-bottom:0.15em; }
         #ff-review-panel {
             display:none; margin-top:0.7em;
-            border-top:2px solid #ffc107; padding-top:0.5em;
+            border-top:2px solid var(--caution-color, #ffc107); padding-top:0.5em;
         }
         .ff-correction-item {
             margin:0.4em 0; padding:0.5em;
-            background:#fffbe6; border:1px solid #ffc107; border-radius:4px; font-size:0.85em;
+            background: var(--caution-bg, #fffbe6); border:1px solid var(--caution-color, #ffc107); border-radius:4px; font-size:0.85em;
         }
-        #ff-override-row { font-size:0.82em; color:#555; margin-bottom:0.4em; display:flex; flex-wrap:wrap; gap:0.8em; }
+        #ff-override-row { font-size:0.82em; color: var(--text-muted-color, #555); margin-bottom:0.4em; display:flex; flex-wrap:wrap; gap:0.8em; }
         #ff-override-row label { font-weight: normal; display:flex; align-items:center; gap:0.3em; cursor:pointer; }
         #ff-fields-info { font-size:0.8em; color:#888; margin-bottom:0.4em; }
     </style>
@@ -200,8 +200,8 @@
         <div id="ff-staged-panel">
             <div style="display:flex;align-items:center;gap:0.7em;margin-bottom:0.4em;flex-wrap:wrap;">
                 <strong style="color:#1a4a7a;font-size:0.9em;">Fields With Existing Content — Choose Action:</strong>
-                <button type="button" id="ff-stage-all-btn" style="padding:3px 9px;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;font-size:0.82em;">Append All</button>
-                <button type="button" id="ff-skip-all-btn"  style="padding:3px 9px;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;font-size:0.82em;">Skip All</button>
+                <button type="button" id="ff-stage-all-btn" style="padding:3px 9px;cursor:pointer;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:3px;font-size:0.82em;">Append All</button>
+                <button type="button" id="ff-skip-all-btn"  style="padding:3px 9px;cursor:pointer;background: var(--bg-secondary, #f8f9fa);border:1px solid #aaa;border-radius:3px;font-size:0.82em;">Skip All</button>
             </div>
             <div id="ff-staged-items"></div>
         </div>
@@ -685,7 +685,7 @@
                 div.innerHTML = '<strong>' + c.field + '</strong>: '
                     + '<span style="color:#c00;text-decoration:line-through;">' + (c.current||'').substring(0,100).replace(/</g,'&lt;') + '</span>'
                     + ' → <span style="color:#155724;">' + (c.suggested||'').substring(0,200).replace(/</g,'&lt;') + '</span>'
-                    + '<br><em style="color:#666;">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
+                    + '<br><em style="color: var(--text-muted-color, #666);">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
                 var pf = FF_PAGE_FIELDS.find(function(f){ return f.name === c.field; });
                 if (pf) {
                     var ab = document.createElement('button');

@@ -149,7 +149,7 @@
 [% END %]
 
 [% SET task_id = record.get_column('record_id') %]
-<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid var(--border-color, #ddd); border-radius:4px; padding:16px; background: var(--bg-secondary, #fafafa);">
     <h3 style="margin-top:0;">AI Chat Activity</h3>
     <div id="ai-task-conversations" data-task-id="[% task_id %]">
         <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>

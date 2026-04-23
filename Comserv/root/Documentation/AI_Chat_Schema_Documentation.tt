@@ -114,7 +114,7 @@
             <h2 id="table-specs" style="color: var(--text-color); font-family: var(--header-font);">3. Table Specifications</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">✅ Implementation Status - COMPLETE (Dec 25, 2025)</h3>
-            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; margin: var(--spacing-small) 0; border-left: 4px solid var(--success-color); border-radius: 4px;">
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid var(--success-color, #28a745); margin: var(--spacing-small) 0; border-left: 4px solid var(--success-color); border-radius: 4px;">
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>✅ All AI Chat database tables created and automated startup initialization implemented</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0;">
                     <li>✅ <strong>ai_messages</strong> - Result class with all fields and relationships</li>

@@ -24,30 +24,30 @@
                 <div class="form-group">
                     <label><input type="radio" name="group" value="all" checked onchange="updateCount(this)">
                         All site users <strong>([% user_count %])</strong>
-                        <small style="color:#666;"> — everyone with a role on this site</small>
+                        <small style="color: var(--text-muted-color, #666);"> — everyone with a role on this site</small>
                     </label>
                 </div>
                 <div class="form-group">
                     <label><input type="radio" name="group" value="paid" onchange="updateCount(this)">
                         Paid / active members <strong>([% paid_count %])</strong>
-                        <small style="color:#666;"> — active or grace-period memberships</small>
+                        <small style="color: var(--text-muted-color, #666);"> — active or grace-period memberships</small>
                     </label>
                 </div>
                 <div class="form-group">
                     <label><input type="radio" name="group" value="custom" onchange="updateCount(this)">
                         Custom addresses only
-                        <small style="color:#666;"> — use the field below, no DB users</small>
+                        <small style="color: var(--text-muted-color, #666);"> — use the field below, no DB users</small>
                     </label>
                 </div>
 
                 [% IF mailing_lists.size %]
                 <div style="margin-top:8px;padding:10px;background:#f0f4ff;border:1px solid #c5d0e8;border-radius:4px;">
-                    <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color:#666;">(check any to add their members)</small>:</strong>
+                    <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color: var(--text-muted-color, #666);">(check any to add their members)</small>:</strong>
                     [% FOREACH list IN mailing_lists %]
                     <div class="form-group" style="margin:4px 0;">
                         <label><input type="checkbox" name="list_ids" value="[% list.id %]" onchange="updateListCount()"> 
                             [% list.name | html %] <strong>([% list.count %])</strong>
-                            <small style="color:#666;"> — named mailing list subscribers</small>
+                            <small style="color: var(--text-muted-color, #666);"> — named mailing list subscribers</small>
                         </label>
                     </div>
                     [% END %]
@@ -59,7 +59,7 @@
                     <textarea name="custom_addresses" id="custom_addresses" rows="3"
                               placeholder="extra@example.com, another@example.com"
                               style="width:100%;padding:6px;"></textarea>
-                    <small style="color:#666;">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
+                    <small style="color: var(--text-muted-color, #666);">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
                 </div>
             </div>
 
@@ -80,9 +80,9 @@
 
                     <div style="border:1px solid #ccc;border-radius:4px;overflow:hidden;">
                         <!-- Tab bar -->
-                        <div style="display:flex;background:#f5f5f5;border-bottom:1px solid #ccc;">
+                        <div style="display:flex;background: var(--bg-secondary, #f5f5f5);border-bottom:1px solid #ccc;">
                             <button type="button" id="tab-visual" onclick="switchTab('visual')"
-                                style="padding:6px 14px;border:none;border-bottom:2px solid #0d6efd;background:#fff;font-weight:bold;cursor:pointer;">
+                                style="padding:6px 14px;border:none;border-bottom:2px solid #0d6efd;background: rgba(255,255,255,0.88);font-weight:bold;cursor:pointer;">
                                 Visual
                             </button>
                             <button type="button" id="tab-source" onclick="switchTab('source')"
@@ -110,18 +110,18 @@
                         <!-- Visual editor panel -->
                         <div id="panel-visual">
                             <div id="body-editor" contenteditable="true"
-                                 style="min-height:280px;padding:10px;background:#fff;outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;"></div>
+                                 style="min-height:280px;padding:10px;background: rgba(255,255,255,0.88);outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;"></div>
                         </div>
 
                         <!-- HTML source panel -->
                         <div id="panel-source" style="display:none;">
-                            <div style="padding:6px;background:#fffde7;border-bottom:1px solid #eee;font-size:12px;color:#666;">
+                            <div style="padding:6px;background: var(--caution-bg, #fffde7);border-bottom:1px solid #eee;font-size:12px;color: var(--text-muted-color, #666);">
                                 Paste or type raw HTML here, then click <strong>Apply HTML</strong> to render it in the visual editor.
                             </div>
                             <textarea id="source-editor"
                                 style="width:100%;min-height:280px;padding:10px;border:none;outline:none;font-family:monospace;font-size:12px;line-height:1.4;box-sizing:border-box;resize:vertical;"
                                 placeholder="Paste your HTML email source here..."></textarea>
-                            <div style="padding:6px;background:#f5f5f5;border-top:1px solid #eee;display:flex;gap:8px;">
+                            <div style="padding:6px;background: var(--bg-secondary, #f5f5f5);border-top:1px solid #eee;display:flex;gap:8px;">
                                 <button type="button" onclick="applySource()" class="btn btn-primary" style="padding:4px 16px;">
                                     Apply HTML &#10003;
                                 </button>
@@ -131,7 +131,7 @@
                     </div>
 
                     <input type="hidden" name="body" id="body-hidden">
-                    <small style="color:#666;margin-top:4px;display:block;">
+                    <small style="color: var(--text-muted-color, #666);margin-top:4px;display:block;">
                         Personalisation tags: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
                         <code>[EMAIL]</code> <code>[USERNAME]</code> — replaced per recipient.
                         Use <strong>HTML Source</strong> tab to paste a full HTML email template.
@@ -139,7 +139,7 @@
                 </div>
             </div>
 
-            <div class="form-section" style="margin-top:20px;background:#fff8e1;border:1px solid #ffc107;padding:14px;border-radius:6px;">
+            <div class="form-section" style="margin-top:20px;background: var(--caution-bg, #fff8e1);border:1px solid var(--caution-color, #ffc107);padding:14px;border-radius:6px;">
                 <p id="confirm-text" style="margin:0 0 8px;">
                     You are about to send to <strong id="recipient-count">[% user_count %]</strong> recipient(s).
                 </p>

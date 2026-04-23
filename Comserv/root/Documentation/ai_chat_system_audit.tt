@@ -24,7 +24,7 @@
     </div>
 
     <!-- RECENT CHANGES -->
-    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0;">
+    <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 15px; margin: 15px 0;">
         <h3 style="margin-top: 0; color: #856404;">Recent Changes (Jan 2, 2026)</h3>
         <ul style="margin: 10px 0; color: #856404;">
             <li><strong>Schema Fix Applied</strong>: Missing metadata column added to ai_conversations table. Production database at 192.168.1.198:3306 updated with: ALTER TABLE ai_conversations ADD COLUMN metadata longtext NULL AFTER status;</li>

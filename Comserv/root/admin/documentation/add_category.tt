@@ -8,7 +8,7 @@
 }
 
 .section {
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -17,7 +17,7 @@
 
 .section h2 {
     margin-top: 0;
-    color: #333;
+    color: var(--text-color, #333);
     border-bottom: 2px solid #667eea;
     padding-bottom: 10px;
 }
@@ -36,7 +36,7 @@
 .form-group textarea {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 4px;
     font-size: 14px;
 }
@@ -67,7 +67,7 @@
 }
 
 .btn-success {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
@@ -81,7 +81,7 @@
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--secondary-color, #6c757d);
     color: white;
 }
 
@@ -92,9 +92,9 @@
 }
 
 .category-item {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 8px;
-    background: #f9f9f9;
+    background: var(--bg-secondary, #f8f9fa);
     overflow: hidden;
 }
 
@@ -108,7 +108,7 @@
 }
 
 .category-header:hover {
-    background: #f0f0f0;
+    background: var(--nav-hover-bg, rgba(255,255,255,0.15));
 }
 
 .toggle-icon {
@@ -118,8 +118,8 @@
 
 .category-details {
     padding: 0 15px 15px 15px;
-    border-top: 1px solid #eee;
-    background: white;
+    border-top: 1px solid var(--border-color, #eee);
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .category-item.expanded .toggle-icon {
@@ -137,17 +137,17 @@
                 <div class="category-item">
                     <div class="category-header" onclick="toggleCategory('cat_[% cat_key %]')">
                         <i class="[% cat.icon || 'fas fa-file-alt' %]" style="margin-right: 8px; color: #667eea;"></i>
-                        <strong style="color: #333;">[% cat.title %]</strong>
-                        <span style="margin-left: auto; font-size: 12px; color: #666;">([% cat_key %])</span>
+                        <strong style="color: var(--text-color, #333);">[% cat.title %]</strong>
+                        <span style="margin-left: auto; font-size: 12px; color: var(--text-muted-color, #666);">([% cat_key %])</span>
                         <i class="fas fa-chevron-down toggle-icon" id="icon_cat_[% cat_key %]"></i>
                     </div>
                     <div class="category-details" id="cat_[% cat_key %]" style="display: none;">
                         [% IF cat.description %]
-                            <p style="margin: 8px 0; color: #555; font-size: 14px;">[% cat.description %]</p>
+                            <p style="margin: 8px 0; color: var(--text-color, #555); font-size: 14px;">[% cat.description %]</p>
                         [% END %]
                         [% IF cat.roles && cat.roles.size > 0 %]
                             <div style="margin-top: 8px;">
-                                <small style="color: #666;">Roles: [% cat.roles.join(', ') %]</small>
+                                <small style="color: var(--text-muted-color, #666);">Roles: [% cat.roles.join(', ') %]</small>
                             </div>
                         [% END %]
                         <div style="margin-top: 15px;">

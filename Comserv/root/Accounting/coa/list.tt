@@ -12,12 +12,12 @@
 <p>
 [% IF accounts.size == 0 && !list_error %]
   <a href="/Accounting/coa/seed"
-     style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">
+     style="background: var(--primary-color, #007bff);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">
     Seed Default Chart of Accounts
   </a>
 [% ELSE %]
   <a href="/Accounting/coa/seed_merge"
-     style="background:#28a745;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;"
+     style="background: var(--success-color, #28a745);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;"
      onclick="return confirm('Add any missing standard accounts to your COA?')">
     Add Missing Accounts
   </a>

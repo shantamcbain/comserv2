@@ -11,14 +11,14 @@
     font-weight: bold;
     color: #fff;
 }
-.ml-section-title.green  { background: #28a745; }
-.ml-section-title.blue   { background: #007bff; }
+.ml-section-title.green  { background: var(--success-color, #28a745); }
+.ml-section-title.blue   { background: var(--primary-color, #007bff); }
 
 details.ml-box {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 0 0 5px 5px;
     margin-bottom: 8px;
-    background: #fff;
+    background: rgba(255,255,255,0.88);
 }
 details.ml-box + details.ml-box { border-top: none; border-radius: 0; }
 details.ml-box:last-child { border-radius: 0 0 5px 5px; }
@@ -74,7 +74,7 @@ details[open] .ml-chevron { transform: rotate(90deg); }
     border: 1px solid #d1d5db;
     border-radius: 5px;
     padding: 12px;
-    background: #fafafa;
+    background: var(--bg-secondary, #fafafa);
     display: none;
 }
 .ml-compose.open { display: block; }

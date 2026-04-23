@@ -23,12 +23,12 @@
 <style>
 .dm-table     { width:100%; border-collapse:collapse; font-size:.85rem; }
 .dm-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
-                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
-.dm-table tbody tr:nth-child(even) { background:#fafafa; }
+                     font-weight:600; border-bottom:2px solid var(--border-color, #ddd); white-space:nowrap; }
+.dm-table tbody tr:nth-child(even) { background: var(--bg-secondary, #fafafa); }
 .dm-table tbody tr:hover { background:#f0f5ff; }
 .dm-table td  { padding:6px 10px; vertical-align:top; border-bottom:1px solid #f0f0f0; }
 .dm-rel       { word-break:break-all; max-width:280px; }
-.dm-num       { text-align:right; color:#555; font-size:.8rem; white-space:nowrap; }
+.dm-num       { text-align:right; color: var(--text-muted-color, #555); font-size:.8rem; white-space:nowrap; }
 
 .dm-badge     { display:inline-block; padding:2px 8px; border-radius:3px;
                 font-size:.72rem; font-weight:bold; color:#fff; white-space:nowrap; }
@@ -59,7 +59,7 @@
        vertical-align:middle; font-weight:500; }
 .btn:hover { opacity:.86; text-decoration:none; }
 .btn-sm        { padding:2px 8px !important; font-size:.75rem !important; }
-.btn-primary   { background:#007bff !important; color:#fff !important; }
+.btn-primary   { background: var(--primary-color, #007bff) !important; color:#fff !important; }
 .btn-secondary { background:#6c757d !important; color:#fff !important; }
 </style>
 
@@ -219,7 +219,7 @@
         <button type="submit" class="btn btn-primary">&#128256; Execute Merge</button>
         <a href="[% c.uri_for('/file/admin_browser', { dir_path => back }) %]"
            class="btn btn-secondary">Cancel</a>
-        <span id="dm-summary" style="font-size:.82rem;color:#666"></span>
+        <span id="dm-summary" style="font-size:.82rem;color: var(--text-muted-color, #666)"></span>
       </div>
     </form>
     [% END %]

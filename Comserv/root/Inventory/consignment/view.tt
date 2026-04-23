@@ -75,10 +75,10 @@
         <td style="padding:4px 0">[% con.reference_number || ('C-' _ con.id) %]</td></tr>
     <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Status</th>
         <td style="padding:4px 0">
-          [% IF con.status == 'open' %]<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px">Open</span>
+          [% IF con.status == 'open' %]<span style="background: var(--caution-bg, #fff3e0);color:#e65100;border-radius:3px;padding:2px 8px">Open</span>
           [% ELSIF con.status == 'partially_settled' %]<span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px">Partially Settled</span>
           [% ELSIF con.status == 'settled' %]<span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px">Settled</span>
-          [% ELSE %]<span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px">[% con.status | html %]</span>[% END %]
+          [% ELSE %]<span style="background: var(--bg-secondary, #f5f5f5);color: var(--text-muted-color, #555);border-radius:3px;padding:2px 8px">[% con.status | html %]</span>[% END %]
         </td></tr>
     [% IF con.notes %]
     <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color);vertical-align:top">Notes</th>
@@ -147,7 +147,7 @@
 </table>
 
 <div class="print-only" style="margin-top:2em;font-family:Arial,sans-serif;font-size:9pt">
-  <p style="margin:0 0 0.4em;color:#555">Commission rate: [% comm_pct %]% — Items remain property of [% site_info.display_name || sitename | html %] until sold.</p>
+  <p style="margin:0 0 0.4em;color: var(--text-muted-color, #555)">Commission rate: [% comm_pct %]% — Items remain property of [% site_info.display_name || sitename | html %] until sold.</p>
   <table style="width:100%;border-collapse:collapse;margin-top:1.5em">
     <tr>
       <td style="width:48%;padding-top:2em;border-top:1px solid #333;text-align:center">

@@ -12,9 +12,9 @@
 
 <style>
 .dh-grid      { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:20px; }
-.dh-card      { border:1px solid #e0e0e0; border-radius:6px; padding:16px; background:#fff; }
+.dh-card      { border:1px solid #e0e0e0; border-radius:6px; padding:16px; background: var(--card-bg, rgba(255,255,255,0.88)); }
 .dh-card h3   { margin:0 0 12px; font-size:1rem; display:flex; align-items:center; gap:8px; }
-.dh-bar-wrap  { height:14px; background:#e0e0e0; border-radius:3px; margin:6px 0; position:relative; overflow:hidden; }
+.dh-bar-wrap  { height:14px; background: var(--nav-hover-bg, rgba(255,255,255,0.15)); border-radius:3px; margin:6px 0; position:relative; overflow:hidden; }
 .dh-bar       { height:14px; border-radius:3px; }
 .dh-bar.ok       { background:#4caf50; }
 .dh-bar.warn     { background:#ff9800; }
@@ -26,19 +26,19 @@
 .dh-badge.open     { background:#ffe082; color:#7d4e00; }
 .dh-badge.ack      { background:#e3f2fd; color:#0d47a1; }
 .dh-badge.resolved { background:#e8f5e9; color:#1b5e20; }
-.dh-alert-row { border-left:4px solid; padding:10px 14px; margin-bottom:8px; border-radius:0 4px 4px 0; background:#fafafa; }
+.dh-alert-row { border-left:4px solid; padding:10px 14px; margin-bottom:8px; border-radius:0 4px 4px 0; background: var(--bg-secondary, #f9f9f9); }
 .dh-alert-row.CRITICAL { border-color:#f44336; background:#fff5f5; }
 .dh-alert-row.HIGH     { border-color:#ff9800; background:#fff8f0; }
-.dh-section   { background:#fff; border:1px solid #e0e0e0; border-radius:6px; padding:16px; margin-bottom:20px; }
+.dh-section   { background: var(--card-bg, rgba(255,255,255,0.88)); border:1px solid #e0e0e0; border-radius:6px; padding:16px; margin-bottom:20px; }
 .dh-section h2 { margin:0 0 14px; font-size:1.05rem; border-bottom:1px solid #eee; padding-bottom:8px; }
 .dh-table     { width:100%; border-collapse:collapse; font-size:.88rem; }
-.dh-table th  { background:#f5f5f5; text-align:left; padding:6px 10px; border-bottom:2px solid #ddd; white-space:nowrap; }
+.dh-table th  { background: var(--bg-secondary, #f5f5f5); text-align:left; padding:6px 10px; border-bottom: 2px solid var(--border-color, #ddd); white-space:nowrap; }
 .dh-table td  { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
 .dh-cleanup-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee; }
 .dh-cleanup-row:last-child { border-bottom:none; }
 .dh-cleanup-info { font-size:.9rem; }
 .dh-cleanup-info strong { display:block; margin-bottom:2px; }
-.dh-cleanup-info span { color:#666; font-size:.82rem; }
+.dh-cleanup-info span { color: var(--text-muted-color, #666); font-size:.82rem; }
 pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px; font-size:.8rem; overflow-x:auto; margin:0; }
 </style>
 
@@ -77,7 +77,7 @@ pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px;
             [% alert.level | html %]
           </span>
           <strong style="margin-left:6px">[% alert.description | html %]</strong><br>
-          <span style="font-size:.78rem;color:#666">
+          <span style="font-size:.78rem;color: var(--text-muted-color, #666)">
             First seen: [% alert.first_seen | html %] &nbsp;|&nbsp;
             Last seen: [% alert.last_seen | html %] &nbsp;|&nbsp;
             Occurrences: [% alert.occurrence_count | html %]
@@ -248,7 +248,7 @@ pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px;
       </a>
     </div>
 
-    <div style="margin-top:14px;padding:12px;background:#f5f5f5;border-radius:4px;font-size:.82rem;color:#555">
+    <div style="margin-top:14px;padding:12px;background:#f5f5f5;border-radius:4px;font-size:.82rem;color: var(--text-color, #555)">
       <strong>What eats disk space most often:</strong>
       <ul style="margin:6px 0 0 16px">
         <li>Duplicate files across NFS directories — use the <a href="/file/duplicates">Duplicates page</a></li>

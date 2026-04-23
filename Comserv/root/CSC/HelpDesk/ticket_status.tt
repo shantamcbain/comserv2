@@ -146,7 +146,7 @@
     }
 
     .ticket-search {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px 20px;
         border-radius: 5px;
         margin-bottom: 25px;
@@ -179,23 +179,23 @@
     .tickets-table th, .tickets-table td {
         padding: 12px;
         text-align: left;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
     }
 
     .tickets-table th {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         font-weight: bold;
     }
 
-    .status-open        { color: #28a745; font-weight: bold; }
+    .status-open        { color: var(--success-color, #28a745); font-weight: bold; }
     .status-in-progress { color: #fd7e14; font-weight: bold; }
     .status-resolved    { color: #17a2b8; font-weight: bold; }
-    .status-closed      { color: #6c757d; }
+    .status-closed      { color: var(--text-muted-color, #6c757d); }
 
-    .priority-critical  { color: #dc3545; font-weight: bold; }
+    .priority-critical  { color: var(--danger-color, #dc3545); font-weight: bold; }
     .priority-high      { color: #fd7e14; font-weight: bold; }
     .priority-medium    { color: #ffc107; }
-    .priority-low       { color: #6c757d; }
+    .priority-low       { color: var(--text-muted-color, #6c757d); }
 
     .badge-admin {
         background-color: #6f42c1;
@@ -215,7 +215,7 @@
     }
 
     .ticket-detail {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 20px;
         border-radius: 5px;
         margin-top: 30px;
@@ -227,7 +227,7 @@
 
     .description-box {
         background-color: rgba(255,255,255,0.88);
-        border: 1px solid #dee2e6;
+        border: 1px solid var(--border-color, #dee2e6);
         border-radius: 4px;
         padding: 10px;
         white-space: pre-wrap;
@@ -261,8 +261,8 @@
         font-size: 0.875rem;
     }
 
-    .btn-primary   { background-color: #007bff; color: white; }
-    .btn-secondary { background-color: #6c757d; color: white; }
+    .btn-primary   { background-color: var(--primary-color, #007bff); color: white; }
+    .btn-secondary { background-color: var(--text-muted-color, #6c757d); color: white; }
 
     .debug-message {
         background-color: #f8d7da;

@@ -8,7 +8,7 @@
 [% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
 
 <div class="actions">
-  <a href="/Inventory/stock/receive" style="background:#28a745;color:white;padding:4px 12px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
+  <a href="/Inventory/stock/receive" style="background: var(--success-color, #28a745);color:white;padding:4px 12px;border-radius:4px;text-decoration:none;">&#x2B07; Receive Stock</a>
   &nbsp;|&nbsp;
   <a href="/Inventory/stock/adjust">Adjust Stock</a>
   &nbsp;|&nbsp;
@@ -84,7 +84,7 @@
     [% qty_reserved = sl ? sl.quantity_reserved : 0 %]
     [% qty_on_order = sl ? sl.quantity_on_order : 0 %]
     [% available = qty_on_hand - qty_reserved %]
-    <tr[% IF row.is_low %] style="background:#fff3cd"[% ELSIF !sl %] style="color:#aaa"[% END %]>
+    <tr[% IF row.is_low %] style="background: var(--caution-bg, #fff3cd)"[% ELSIF !sl %] style="color:#aaa"[% END %]>
       <td>[% item.sku %]</td>
       <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
       <td>[% loc ? loc.name : '—' %]</td>

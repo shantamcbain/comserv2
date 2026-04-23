@@ -115,7 +115,7 @@
 
             <div class="content-section">
                 <h3>Message Body</h3>
-                <pre style="white-space:pre-wrap;background:#f5f5f5;padding:12px;border:1px solid #ddd;border-radius:4px;">[% email_record.body | html %]</pre>
+                <pre style="white-space:pre-wrap;background: var(--bg-secondary, #f5f5f5);padding:12px;border:1px solid var(--border-color, #ddd);border-radius:4px;">[% email_record.body | html %]</pre>
             </div>
 
             <div class="page-footer">

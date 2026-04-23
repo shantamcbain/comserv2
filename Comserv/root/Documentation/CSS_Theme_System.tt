@@ -91,7 +91,7 @@ The Comserv CSS Theme System provides a unified approach to styling across all m
     font-size: 1.2em;
     transition: all 0.3s ease;
     display: inline-block !important;
-    color: #007bff !important;
+    color: var(--link-color, #007bff) !important;
     margin-left: 10px;
     font-weight: bold;
     cursor: pointer;
