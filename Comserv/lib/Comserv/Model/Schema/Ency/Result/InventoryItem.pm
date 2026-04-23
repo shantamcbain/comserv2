@@ -140,11 +140,6 @@ __PACKAGE__->add_columns(
         is_nullable   => 0,
         default_value => 'active',
     },
-    selling_price => {
-        data_type   => 'decimal',
-        size        => [10, 2],
-        is_nullable => 1,
-    },
     notes => {
         data_type   => 'text',
         is_nullable => 1,

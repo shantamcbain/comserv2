@@ -322,7 +322,7 @@ sub buy :Path('/3d/buy') :Args(0) {
             location_id      => $location_id,
             transaction_type => 'issue',
             quantity         => $quantity,
-            unit_cost        => $item->selling_price || $item->unit_cost || 0,
+            unit_cost        => $item->unit_price || $item->unit_cost || 0,
             reference_number => $ref_num,
             notes            => "Customer sale: qty=$quantity, user=" . ($c->session->{username} || 'guest'),
             performed_by     => $c->session->{username} || 'system',
@@ -331,7 +331,7 @@ sub buy :Path('/3d/buy') :Args(0) {
     if ($@) {
         $c->flash->{error_msg} = "Purchase could not be completed: $@";
     } else {
-        my $price = $item->selling_price || $item->unit_cost || 0;
+        my $price = $item->unit_price || $item->unit_cost || 0;
         $c->flash->{success_msg} =
             "Purchase recorded! $quantity x " . $item->name
             . sprintf(" (\$%.2f each)", $price)
