@@ -922,15 +922,20 @@ sub printers :Path('/3d/printers') :Args(0) {
         my %already_linked = map { $_->inventory_item_id => 1 }
                              grep { $_->inventory_item_id } @printers;
 
+        my %inv_where = (
+            sitename => $sitename,
+            status   => 'active',
+            -or => [
+                { category => { -like => '%printer%' } },
+                { category => { -like => '%3d_print%' } },
+                { category => '3d_printer' },
+            ],
+        );
+        $inv_where{id} = { -not_in => [ keys %already_linked ] }
+            if %already_linked;
+
         @unregistered_inv_printers = $schema->resultset('InventoryItem')->search(
-            {
-                sitename => $sitename,
-                category => '3d_printer',
-                status   => 'active',
-                ( %already_linked
-                    ? ( id => { -not_in => [ keys %already_linked ] } )
-                    : () ),
-            },
+            \%inv_where,
             { prefetch => 'equipment', order_by => 'name' }
         )->all;
     };
