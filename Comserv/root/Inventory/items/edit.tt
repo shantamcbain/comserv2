@@ -17,7 +17,20 @@
     </tr>
     <tr>
       <th><label for="category">Category</label></th>
-      <td><input type="text" id="category" name="category" maxlength="100" value="[% item.category | html %]"></td>
+      <td><input type="text" id="category" name="category" maxlength="100"
+                 list="category_options" value="[% item.category | html %]">
+          <datalist id="category_options">
+            <option value="3d_printer">
+            <option value="3d_printed_item">
+            <option value="3d_filament">
+            <option value="Apiary">
+            <option value="Garden">
+            <option value="Hardware">
+            <option value="Craft">
+            <option value="Equipment">
+            <option value="Supplies">
+            <option value="3dStock">
+          </datalist></td>
     </tr>
     <tr>
       <th><label for="item_origin">Origin / How Made</label></th>
