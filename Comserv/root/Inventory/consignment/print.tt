@@ -5,7 +5,7 @@
 <title>Consignment Slip — [% consignment.reference_number || ('C-' _ consignment.id) %]</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 12mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: rgba(255,255,255,0.88); padding: 12mm; }
 h1 { font-size: 14pt; font-weight: bold; }
 table { border-collapse: collapse; width: 100%; }
 th, td { padding: 5px 8px; text-align: left; vertical-align: top; }
@@ -22,13 +22,13 @@ thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
 .party { border: 1px solid #999; padding: 6px 10px; }
 .party + .party { border-left: none; }
 .items-table thead th { background: #ececec; font-size: 9pt; }
-.items-table tbody tr:nth-child(even) { background: #fafafa; }
+.items-table tbody tr:nth-child(even) { background: var(--bg-secondary, #fafafa); }
 .items-table tfoot td { background: #ececec; }
 .text-right { text-align: right !important; }
 .totals { text-align: right; margin-top: 0.5em; font-size: 10pt; }
 .sign-block { margin-top: 2.5em; display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
 .sign-line { border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 9pt; }
-.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: #555; border-top: 1px solid #ccc; padding-top: 0.5em; }
+.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: var(--text-muted-color, #555); border-top: 1px solid #ccc; padding-top: 0.5em; }
 @media print {
   body { padding: 8mm; }
   .no-print { display: none; }
@@ -71,7 +71,7 @@ thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
 </div>
 
 [% IF con.notes %]
-<div class="section" style="font-size:9pt;color:#555;font-style:italic">Notes: [% con.notes | html %]</div>
+<div class="section" style="font-size:9pt;color: var(--text-muted-color, #555);font-style:italic">Notes: [% con.notes | html %]</div>
 [% END %]
 
 [% SET grand_gross = 0; SET grand_net = 0; SET grand_comm = 0 %]

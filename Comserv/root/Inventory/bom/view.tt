@@ -39,9 +39,9 @@
       <strong>[% assembled_cost > 0 ? assembled_cost : '—' %]</strong>
       [% IF assembled_cost > 0 && item.unit_cost %]
         [% IF assembled_cost > item.unit_cost %]
-          <span style="color:#dc3545;font-size:0.85em;">&#9650; over listed cost</span>
+          <span style="color: var(--danger-color, #dc3545);font-size:0.85em;">&#9650; over listed cost</span>
         [% ELSE %]
-          <span style="color:#28a745;font-size:0.85em;">&#9660; under listed cost</span>
+          <span style="color: var(--success-color, #28a745);font-size:0.85em;">&#9660; under listed cost</span>
         [% END %]
       [% END %]
     </td>
@@ -110,11 +110,11 @@
               style="display:inline;">
           <input type="hidden" name="from" value="bom">
           <input type="submit" value="Remove"
-                 style="background:#dc3545;color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
+                 style="background: var(--danger-color, #dc3545);color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
         </form>
       </td>
     </tr>
-    <tr id="edit-row-[% comp.id %]" style="display:none;background:#fffbe6;">
+    <tr id="edit-row-[% comp.id %]" style="display:none;background: var(--caution-bg, #fffbe6);">
       <td colspan="11">
         <form method="POST" action="/Inventory/bom/edit/[% comp.id %]"
               style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px;">
@@ -147,7 +147,7 @@
             <input type="text" name="notes" value="[% comp.notes | html %]" style="width:180px;">
           </label>
           <input type="submit" value="Save"
-                 style="background:#28a745;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+                 style="background: var(--success-color, #28a745);color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
           <button type="button" onclick="toggleEditRow([% comp.id %])"
                   style="padding:4px 10px;cursor:pointer;">Cancel</button>
         </form>
@@ -186,7 +186,7 @@
 <form method="POST" action="/Inventory/bom/add/[% item.id %]"
       onsubmit="patchRedirectToBom(this)">
   <input type="hidden" name="redirect_to" value="bom">
-  <table cellpadding="4" style="border:1px solid #ccc;background:#fafafa;padding:8px;">
+  <table cellpadding="4" style="border:1px solid #ccc;background: var(--bg-secondary, #fafafa);padding:8px;">
     <tr>
       <th><label for="component_item_id">Component Item *</label></th>
       <td>
@@ -199,7 +199,7 @@
           </option>
           [% END %]
         </select>
-        <span id="cost-preview" style="margin-left:8px;color:#555;font-size:0.9em;"></span>
+        <span id="cost-preview" style="margin-left:8px;color: var(--text-muted-color, #555);font-size:0.9em;"></span>
       </td>
     </tr>
     <tr>
@@ -249,7 +249,7 @@
     <tr>
       <td colspan="2">
         <input type="submit" value="Add to BOM"
-               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+               style="background: var(--success-color, #28a745);color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
       </td>
     </tr>
   </table>
@@ -261,9 +261,9 @@
 
 <hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
 
-<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color:#666">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
+<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color: var(--text-muted-color, #666)">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
 
-<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color: var(--text-color, #333)">
   <strong>Filament note:</strong> Add filament using <em>Add Component</em> above — select your filament item, qty = grams used (e.g. 407.73), unit = g.
   The filament is a placeholder for cost calculation; actual stock of the chosen colour is deducted manually when you fulfil the order.
 </div>
@@ -302,7 +302,7 @@
       <td>
         <input type="number" id="cost_unit_cost" name="cost_unit_cost" step="0.0001" min="0.0001"
                required style="width:90px;" placeholder="0.17">
-        <span id="cost-line-preview" style="margin-left:10px;color:#555;font-size:0.9em;"></span>
+        <span id="cost-line-preview" style="margin-left:10px;color: var(--text-muted-color, #555);font-size:0.9em;"></span>
       </td>
     </tr>
     <tr>
@@ -327,8 +327,8 @@
 
 [% IF printers && printers.size > 0 %]
 <hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
-<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color:#666">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
-<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color: var(--text-muted-color, #666)">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
+<div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color: var(--text-color, #333)">
   <strong>How it works:</strong> Enter slicer output (grams &amp; print time). The wizard adds filament (cost placeholder),
   electricity (based on printer wattage), and printer depreciation as BOM lines automatically.
   Actual colour stock deduction happens when you fulfil the order.
@@ -348,7 +348,7 @@
                   data-depr="[% peq.depreciation_per_hour IF peq %][% '0' UNLESS peq && peq.depreciation_per_hour %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %][% IF peq && peq.wattage %] — [% peq.wattage %]W[% END %]</option>
           [% END %]
         </select>
-        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color:#555"></span>
+        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color: var(--text-muted-color, #555)"></span>
       </td>
     </tr>
     <tr>
@@ -414,7 +414,7 @@
   </table>
 </form>
 [% ELSE %]
-<div style="background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color:#555">
+<div style="background: var(--bg-secondary, #f5f5f5);border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color: var(--text-muted-color, #555)">
   <strong>3D Print Wizard:</strong> No printer items found. Add an item with "printer" in its name, category, or origin — and set its Wattage and Depreciation/hr — to enable the wizard.
   <a href="/Inventory/item/add">Add item</a>
 </div>

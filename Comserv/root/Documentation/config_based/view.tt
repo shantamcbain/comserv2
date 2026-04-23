@@ -189,7 +189,7 @@
     }
     
     .markdown-content code {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 2px 4px;
         border-radius: 3px;
         font-family: monospace;
@@ -197,7 +197,7 @@
     }
     
     .markdown-content pre {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         overflow-x: auto;
@@ -232,15 +232,15 @@
     }
     
     .markdown-content th {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         text-align: left;
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
     }
     
     .markdown-content td {
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
     }
     
     .markdown-content tr:nth-child(even) {
@@ -248,7 +248,7 @@
     }
     
     .raw-content {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         overflow-x: auto;

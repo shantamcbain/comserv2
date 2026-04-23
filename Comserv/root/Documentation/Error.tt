@@ -111,7 +111,7 @@
     }
     
     h1 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-bottom: 20px;
     }
     
@@ -126,12 +126,12 @@
     
     .error-message p {
         margin: 0;
-        color: #333;
+        color: var(--text-color, #333);
         font-size: 1.1em;
     }
     
     .error-help {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         margin: 20px 0;
         text-align: left;
@@ -139,7 +139,7 @@
     }
     
     .error-help h2 {
-        color: #333;
+        color: var(--text-color, #333);
         font-size: 1.2em;
         margin-top: 0;
     }
@@ -151,7 +151,7 @@
     
     .error-help li {
         margin-bottom: 8px;
-        color: #555;
+        color: var(--text-muted-color, #555);
     }
     
     .error-actions {
@@ -180,9 +180,9 @@
     }
     
     .action-button.secondary {
-        background-color: #f8f9fa;
-        color: #333;
-        border: 1px solid #ddd;
+        background-color: var(--bg-secondary, #f8f9fa);
+        color: var(--text-color, #333);
+        border: 1px solid var(--border-color, #ddd);
     }
     
     .action-button.secondary:hover {
@@ -210,7 +210,7 @@
     .label {
         font-weight: bold;
         margin-right: 5px;
-        color: #555;
+        color: var(--text-muted-color, #555);
     }
 
     .value {
@@ -220,7 +220,7 @@
     }
 
     .debug-section {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-left: 4px solid #17a2b8;
         padding: 15px;
         margin: 20px 0;
@@ -310,8 +310,8 @@
     }
     
     .error-message {
-        background-color: #fff3cd;
-        border-left: 4px solid #ffc107;
+        background-color: var(--caution-bg, #fff3cd);
+        border-left: 4px solid var(--caution-color, #ffc107);
         padding: 15px;
         margin-top: 20px;
     }
@@ -379,7 +379,7 @@
     }
     
     h1 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-bottom: 20px;
     }
 </style>

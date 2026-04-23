@@ -42,7 +42,7 @@
   <form method="POST" action="/shop/setup">
     [% IF ecommerce_enabled %]
     <input type="hidden" name="enabled" value="0">
-    <button type="submit" style="padding:8px 18px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font)">
+    <button type="submit" style="padding:8px 18px;background: var(--danger-color, #dc3545);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font)">
       <i class="fas fa-times"></i> Disable eCommerce for [% sitename %]
     </button>
     [% ELSE %]

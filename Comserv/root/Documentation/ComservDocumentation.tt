@@ -3,7 +3,7 @@
 [% PageVersion -%]
 [% END %]
 
-<div style="background-color: #f8f9fa; border: 1px solid #ddd; padding: 15px; margin-bottom: 20px; border-radius: 5px;">
+<div style="background-color: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border-color, #ddd); padding: 15px; margin-bottom: 20px; border-radius: 5px;">
     <p style="font-weight: bold; color: #0056b3;">⚠️ Legacy Documentation Notice</p>
     <p>This is the legacy documentation page. Please use our <a href="[% c.uri_for('/Documentation') %]" style="color: #0056b3; text-decoration: underline;">new documentation system</a> for the most up-to-date information.</p>
 </div>
@@ -146,7 +146,7 @@
 
 <p>We are committed to evolving the Comserv application to meet the needs of our users. Please contribute by keeping this documentation up to date and following the guidelines provided.</p>
 
-<div style="margin-top: 30px; padding: 15px; background-color: #f8f9fa; border: 1px solid #ddd; border-radius: 5px;">
+<div style="margin-top: 30px; padding: 15px; background-color: var(--bg-secondary, #f8f9fa); border: 1px solid var(--border-color, #ddd); border-radius: 5px;">
     <p><a href="[% c.uri_for('/Documentation') %]" style="font-weight: bold; color: #0056b3;">Return to the new Documentation System</a></p>
     <p><a href="#top">Back to top of this page</a></p>
 </div>

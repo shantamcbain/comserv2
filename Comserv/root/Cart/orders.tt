@@ -24,7 +24,7 @@
   <p>No orders found.</p>
 [% ELSE %]
 <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <thead style="background:#f5f5f5">
+  <thead style="background: var(--bg-secondary, #f5f5f5)">
     <tr>
       <th>Invoice #</th>
       <th>Date</th>

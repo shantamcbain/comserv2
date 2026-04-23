@@ -298,7 +298,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .todos-header {
     margin: 10px 0;
     padding: 8px;
-    background-color: #f5f5f5;
+    background-color: var(--bg-secondary, #f5f5f5);
     border-radius: 4px;
     cursor: pointer;
     display: flex;
@@ -314,19 +314,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .project-details-table th,
 .project-details-table td {
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     padding: 8px;
     text-align: left;
 }
 
 .project-details-table th {
-    background-color: #f5f5f5;
+    background-color: var(--bg-secondary, #f5f5f5);
     position: sticky;
     top: 0;
 }
 
 .todo-row:hover {
-    background-color: #f5f5f5;
+    background-color: var(--bg-secondary, #f5f5f5);
 }
 
 .status-badge, .priority-badge {
@@ -371,7 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
 .project-actions {
     margin: 15px 0 0 0;
     padding: 10px;
-    background: #f5f5f5;
+    background: var(--bg-secondary, #f5f5f5);
     border-radius: 4px;
     display: flex;
     flex-wrap: wrap;
