@@ -52,6 +52,9 @@
             <td><input type="number" name="priority" value="[% record.get_column('priority') %]" size="4"></td></tr>
         <tr><td><label>Est. Hours:</label></td>
             <td><input type="number" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" size="6"></td></tr>
+        <tr><td><label>Accumulated Time:</label></td>
+            <td><input type="text" name="accumulative_time" value="[% accumulative_time | html %]" size="10" placeholder="HH:MM">
+                <small style="color:#888;">(auto-calculated from logs; override if needed)</small></td></tr>
         <tr><td><label>Group:</label></td>
             <td><input type="text" name="group_of_poster" value="[% record.get_column('group_of_poster') | html %]"></td></tr>
         <tr><td><label>Project:</label></td>
