@@ -52,7 +52,7 @@
                 [% m.status | html %]
               </span>
             </div>
-            <div style="font-size:0.88em;color:#666;text-align:right">
+            <div style="font-size:0.88em;color: var(--text-muted-color, #666);text-align:right">
               [% m.billing_cycle | ucfirst | html %] &bull;
               Expires: <strong>[% m.expires_at ? m.expires_at : 'Never' | html %]</strong>
             </div>
@@ -60,7 +60,7 @@
 
           [%# Low-balance warning %]
           [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
-          <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background:#fffde7;font-size:0.9em">
+          <div style="margin-top:0.75rem;padding:0.6rem 0.9rem;border:1px solid #f0ad4e;border-radius:5px;background: var(--caution-bg, #fffde7);font-size:0.9em">
             <strong>Low balance warning:</strong>
             Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
             next renewal cost of <strong>[% m.plan.price_currency | html %] [% renewal_cost %]</strong>.
@@ -68,7 +68,7 @@
           </div>
           [% END %]
 
-          <div style="margin-top:0.6rem;font-size:0.88em;color:#555">
+          <div style="margin-top:0.6rem;font-size:0.88em;color: var(--text-muted-color, #555)">
             Provider: [% m.payment_provider | html %] &bull;
             Started: [% m.started_at | html %]
           </div>

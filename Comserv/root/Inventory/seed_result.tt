@@ -25,6 +25,6 @@
 [% END %]
 
 <p style="margin-top:16px;">
-  <a href="/Inventory/items?sitename=[% sitename | uri %]" style="background:#007bff;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">View [% sitename | html %] Inventory</a>
+  <a href="/Inventory/items?sitename=[% sitename | uri %]" style="background: var(--primary-color, #007bff);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">View [% sitename | html %] Inventory</a>
   <a href="/Inventory/seed_filaments?sitename=[% sitename | uri %]" style="margin-left:1em;background:#6c757d;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">Run Again</a>
 </p>

@@ -54,9 +54,9 @@
     </div>
 
     <!-- REMEDIATION STATUS -->
-    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: #d4edda; border-left: 4px solid #28a745; border-radius: 4px;">
+    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); border-radius: 4px;">
         <div class="col-100">
-            <h2 style="color: #28a745; font-family: var(--header-font);">✅ REMEDIATION STATUS - CRITICAL #1 FIXED</h2>
+            <h2 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ REMEDIATION STATUS - CRITICAL #1 FIXED</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <strong>Issue:</strong> Weak Cryptographic Implementation for Proxmox Credentials<br>
                 <strong>Status:</strong> ✅ FIXED AND VERIFIED<br>
@@ -84,15 +84,15 @@
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 <strong>Risk Level: CRITICAL</strong> - The application should not be deployed to production until critical vulnerabilities are addressed.
             </p>
-            <p style="color: #28a745; font-family: var(--body-font); margin-top: var(--spacing-small);">
+            <p style="color: var(--success-color, #28a745); font-family: var(--body-font); margin-top: var(--spacing-small);">
                 <strong>Update (Dec 18, 2025):</strong> ✅ 1 of 4 CRITICAL vulnerabilities has been remediated (Weak Cryptographic Implementation - now using AES-256 encryption).
             </p>
         </div>
     </div>
 
     <div class="row">
-        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
-            <h3 style="color: #dc3545; font-family: var(--header-font);">⚠️ CRITICAL VULNERABILITIES: 4 Issues (1 Fixed ✅, 3 Remaining ❌)</h3>
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--danger-color, #dc3545); padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <h3 style="color: var(--danger-color, #dc3545); font-family: var(--header-font);">⚠️ CRITICAL VULNERABILITIES: 4 Issues (1 Fixed ✅, 3 Remaining ❌)</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>✅ FIXED - Weak Cryptographic Implementation:</strong> Proxmox credentials now encrypted with AES-256-CBC</li>
                 <li><strong>❌ Plaintext Database Passwords:</strong> DB credentials in JSON with hardcoded fallbacks</li>
@@ -120,19 +120,19 @@
     <!-- CRITICAL VULNERABILITIES SECTION -->
     <div class="row" style="margin-top: var(--spacing-large);">
         <div class="col-100">
-            <h2 id="critical-vulnerabilities" style="color: #dc3545; font-family: var(--header-font);">🔴 CRITICAL SEVERITY VULNERABILITIES</h2>
+            <h2 id="critical-vulnerabilities" style="color: var(--danger-color, #dc3545); font-family: var(--header-font);">🔴 CRITICAL SEVERITY VULNERABILITIES</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">These vulnerabilities must be fixed before any production deployment. Timeline: 24-48 hours.</p>
         </div>
     </div>
 
     <!-- Critical Issue 1: Weak Cryptography - FIXED -->
     <div class="row">
-        <div class="col-100" style="background-color: #d4edda; border-left: 6px solid #28a745; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
-            <h3 style="color: #28a745; font-family: var(--header-font);">✅ 1. Weak Cryptographic Implementation for Proxmox Credentials - FIXED</h3>
+        <div class="col-100" style="background-color: #d4edda; border-left: 6px solid var(--success-color, #28a745); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <h3 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ 1. Weak Cryptographic Implementation for Proxmox Credentials - FIXED</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>Comserv/lib/Comserv/Util/ProxmoxCredentials.pm</code> | <strong>CVSS:</strong> 9.1 | <strong>OWASP:</strong> A02:2021 | <strong>Status:</strong> ✅ RESOLVED</p>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">🚨 Previous Problem (VULNERABLE)</h4>
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">🚨 Previous Problem (VULNERABLE)</h4>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>SHA256 is NOT encryption:</strong> Previous code stored passwords in format <code>OBFS:hash:PASSWORD_HERE</code> - plaintext was visible</li>
                 <li><strong>Hardcoded salt:</strong> Single static salt "ComservProxmoxSalt2025" - if source compromised, all passwords exposed</li>
@@ -140,7 +140,7 @@
                 <li><strong>Git history exposure:</strong> All historical passwords in repository history</li>
             </ul>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">✅ Current Solution (SECURE)</h4>
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ Current Solution (SECURE)</h4>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>✅ AES-256-CBC encryption:</strong> Industry-standard encryption (not obfuscation)</li>
                 <li><strong>✅ Random IV:</strong> randomiv => 1 ensures unique ciphertext for same plaintext</li>
@@ -150,9 +150,9 @@
                 <li><strong>✅ Legacy data support:</strong> Automatic detection and handling of plaintext credentials (graceful migration)</li>
             </ul>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">✅ Implementation Code</h4>
-            <div style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
-                <pre style="color: var(--text-color); font-family: monospace; background-color: #f5f5f5; padding: var(--spacing-small); overflow-x: auto; font-size: 11px;"><code>use Crypt::CBC;
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ Implementation Code</h4>
+            <div style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; background-color: var(--bg-secondary, #f5f5f5); padding: var(--spacing-small); overflow-x: auto; font-size: 11px;"><code>use Crypt::CBC;
 use Crypt::OpenSSL::AES;
 
 sub _encrypt {
@@ -195,7 +195,7 @@ sub _decrypt {
 </code></pre>
             </div>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">✅ Remediation Actions Completed</h4>
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ Remediation Actions Completed</h4>
             <ol style="color: var(--text-color); font-family: var(--body-font);">
                 <li>✅ Added Crypt::CBC to cpanfile (line 67)</li>
                 <li>✅ Added Crypt::OpenSSL::AES to cpanfile (line 68)</li>
@@ -207,9 +207,9 @@ sub _decrypt {
                 <li>✅ Committed: eede88cd - "Fix: Add missing Perl crypto dependencies to cpanfile"</li>
             </ol>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">✅ Deployment Instructions</h4>
-            <div style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
-                <pre style="color: var(--text-color); font-family: monospace; background-color: #f5f5f5; padding: var(--spacing-small); overflow-x: auto; font-size: 11px;"><code># 1. Install dependencies
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ Deployment Instructions</h4>
+            <div style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; background-color: var(--bg-secondary, #f5f5f5); padding: var(--spacing-small); overflow-x: auto; font-size: 11px;"><code># 1. Install dependencies
 cd Comserv
 carton install
 
@@ -229,7 +229,7 @@ script/comserv_server.pl
 </code></pre>
             </div>
 
-            <h4 style="color: #28a745; font-family: var(--header-font);">✅ Verification Results</h4>
+            <h4 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ Verification Results</h4>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li>✅ Application starts without "Can't locate Crypt::*" errors</li>
                 <li>✅ ProxmoxCredentials.pm compiles successfully</li>
@@ -238,7 +238,7 @@ script/comserv_server.pl
                 <li>✅ Catalyst loads all models without errors</li>
             </ul>
 
-            <p style="color: #28a745; font-family: var(--body-font); font-weight: bold; margin-top: var(--spacing-medium);">
+            <p style="color: var(--success-color, #28a745); font-family: var(--body-font); font-weight: bold; margin-top: var(--spacing-medium);">
                 ✅ STATUS: FIXED, VERIFIED, AND READY FOR PRODUCTION DEPLOYMENT
             </p>
         </div>
@@ -246,8 +246,8 @@ script/comserv_server.pl
 
     <!-- Critical Issue 2: Database Passwords -->
     <div class="row">
-        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
-            <h3 style="color: #dc3545; font-family: var(--header-font);">2. Plaintext Database Passwords</h3>
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid var(--danger-color, #dc3545); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <h3 style="color: var(--danger-color, #dc3545); font-family: var(--header-font);">2. Plaintext Database Passwords</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>db_config.template.json, ConfigDatabaseInit.pm:27-30</code> | <strong>CVSS:</strong> 9.3 | <strong>OWASP:</strong> A02:2021</p>
 
@@ -260,8 +260,8 @@ script/comserv_server.pl
             </ul>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">✅ Solution: Mandatory Environment Variables</h4>
-            <div style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
-                <pre style="color: var(--text-color); font-family: monospace; background-color: #f5f5f5; padding: var(--spacing-small); overflow-x: auto;"><code># NO FALLBACKS - MANDATORY env vars
+            <div style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; background-color: var(--bg-secondary, #f5f5f5); padding: var(--spacing-small); overflow-x: auto;"><code># NO FALLBACKS - MANDATORY env vars
 my $host = $ENV{CONFIG_DB_HOST} or die "CONFIG_DB_HOST not set";
 my $port = $ENV{CONFIG_DB_PORT} or die "CONFIG_DB_PORT not set";
 my $user = $ENV{CONFIG_DB_USER} or die "CONFIG_DB_USER not set";
@@ -294,8 +294,8 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
 
     <!-- Critical Issue 3: Cookie Security -->
     <div class="row">
-        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
-            <h3 style="color: #dc3545; font-family: var(--header-font);">3. Cookie Security Misconfiguration</h3>
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid var(--danger-color, #dc3545); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <h3 style="color: var(--danger-color, #dc3545); font-family: var(--header-font);">3. Cookie Security Misconfiguration</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>Comserv/lib/Comserv.pm:56-61</code> | <strong>CVSS:</strong> 8.8 | <strong>OWASP:</strong> A04:2021</p>
 
@@ -309,8 +309,8 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
             </ul>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">✅ Solution: Secure Session Configuration</h4>
-            <div style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
-                <pre style="color: var(--text-color); font-family: monospace; background-color: #f5f5f5; padding: var(--spacing-small); overflow-x: auto;"><code>'Plugin::Session' => {
+            <div style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; background-color: var(--bg-secondary, #f5f5f5); padding: var(--spacing-small); overflow-x: auto;"><code>'Plugin::Session' => {
     expires => 1800,              # Reduce to 30 minutes
     cookie_name => 'comserv_session',
     cookie_secure => 1,           # HTTPS ONLY
@@ -345,8 +345,8 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
 
     <!-- Critical Issue 4: Hardcoded User Bypass -->
     <div class="row">
-        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #dc3545; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
-            <h3 style="color: #dc3545; font-family: var(--header-font);">4. Hardcoded Special User Bypass</h3>
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid var(--danger-color, #dc3545); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <h3 style="color: var(--danger-color, #dc3545); font-family: var(--header-font);">4. Hardcoded Special User Bypass</h3>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>Comserv/lib/Comserv/Util/AdminAuth.pm:56-62</code> | <strong>CVSS:</strong> 8.0 | <strong>OWASP:</strong> A01:2021</p>
 
@@ -360,8 +360,8 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
             </ul>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">✅ Solution: Database-Only Role Checking</h4>
-            <div style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
-                <pre style="color: var(--text-color); font-family: monospace; background-color: #f5f5f5; padding: var(--spacing-small); overflow-x: auto;"><code>sub check_admin_access {
+            <div style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); margin: var(--spacing-small) 0; border-radius: 4px;">
+                <pre style="color: var(--text-color); font-family: monospace; background-color: var(--bg-secondary, #f5f5f5); padding: var(--spacing-small); overflow-x: auto;"><code>sub check_admin_access {
     my ($self, $c, $action_name) = @_;
     
     # REMOVE all hardcoded special user checks
@@ -430,7 +430,7 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <div class="row">
-        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid #ffc107; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 6px solid var(--caution-color, #ffc107); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
             <h3 style="color: #ffc107; font-family: var(--header-font);">1. Missing Security Headers</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>CVSS:</strong> 6.2 | <strong>Timeline:</strong> 2-4 weeks</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Missing:</strong> Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Strict-Transport-Security</p>
@@ -488,9 +488,9 @@ my $db = $ENV{CONFIG_DB_NAME} or die "CONFIG_DB_NAME not set";
     </div>
 
     <!-- NEXT STEPS -->
-    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: rgba(255,255,255,0.15); border-left: 6px solid #28a745; border-radius: 4px;">
+    <div class="row" style="margin-top: var(--spacing-large); padding: var(--spacing-medium); background-color: rgba(255,255,255,0.15); border-left: 6px solid var(--success-color, #28a745); border-radius: 4px;">
         <div class="col-100">
-            <h2 style="color: #28a745; font-family: var(--header-font);">✅ NEXT STEPS</h2>
+            <h2 style="color: var(--success-color, #28a745); font-family: var(--header-font);">✅ NEXT STEPS</h2>
             <ol style="color: var(--text-color); font-family: var(--body-font);">
                 <li>Share this audit with development team and stakeholders</li>
                 <li>Create security tickets for each issue (CRITICAL first)</li>

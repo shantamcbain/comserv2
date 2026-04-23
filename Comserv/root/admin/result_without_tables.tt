@@ -187,7 +187,7 @@
 
                                 <!-- Metadata Summary (__PACKAGE__) -->
                                 [% IF result_file.primary_keys.size > 0 || result_file.relationships.size > 0 || result_file.raw_package_calls.size > 0 %]
-                                    <div class="schema-metadata-summary" style="margin-top: 15px; padding: 15px; background: #f9f9f9; border-radius: 6px; border-left: 4px solid #ccffff; color: #000000;">
+                                    <div class="schema-metadata-summary" style="margin-top: 15px; padding: 15px; background: var(--bg-secondary, #f8f9fa); border-radius: 6px; border-left: 4px solid #ccffff; color: #000000;">
                                         <h4 style="margin-top: 0; color: #000000; font-size: 14px;"><i class="fas fa-info-circle"></i> Result File Metadata (__PACKAGE__)</h4>
                                         
                                         [% IF result_file.primary_keys.size > 0 %]
@@ -218,7 +218,7 @@
                                         [% IF result_file.raw_package_calls.size > 0 %]
                                             <div style="margin-top: 10px;">
                                                 <strong>Raw __PACKAGE__ Calls:</strong>
-                                                <pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: #333; border: 1px solid #ccc;">[% FOREACH call IN result_file.raw_package_calls %][% IF call.method != 'add_columns' && call.method != 'table' %][% call.full | html %][% "\n" %][% END %][% END %]</pre>
+                                                <pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: var(--text-color, #333); border: 1px solid #ccc;">[% FOREACH call IN result_file.raw_package_calls %][% IF call.method != 'add_columns' && call.method != 'table' %][% call.full | html %][% "\n" %][% END %][% END %]</pre>
                                             </div>
                                         [% END %]
                                     </div>

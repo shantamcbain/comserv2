@@ -212,12 +212,12 @@
         align-items: center;
         margin-bottom: 20px;
         padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
     }
     
     .changelog-header h3 {
         margin: 0;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .view-all-link {
@@ -237,7 +237,7 @@
     }
     
     .changelog-summary {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-left: 4px solid #0066cc;
         padding: 15px;
         margin-bottom: 20px;
@@ -246,11 +246,11 @@
     
     .changelog-summary h3 {
         margin-top: 0;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .changelog-meta {
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.9em;
         margin-bottom: 10px;
     }
@@ -323,7 +323,7 @@
         margin: 0 auto;
         padding: 20px;
         font-family: Arial, sans-serif;
-        background: #f8f9fa;
+        background: var(--bg-secondary, #f8f9fa);
     }
     
     /* Quick Access Links styling */
@@ -354,7 +354,7 @@
         border-radius: 6px;
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         text-decoration: none;
-        color: #333;
+        color: var(--text-color, #333);
         transition: transform 0.2s, box-shadow 0.2s;
         border-left: 4px solid #2196F3;
     }
@@ -372,7 +372,7 @@
     
     .quick-link-card p {
         margin-bottom: 10px;
-        color: #555;
+        color: var(--text-muted-color, #555);
     }
     
     .admin-badge {
@@ -392,7 +392,7 @@
     
     .doc-card.featured {
         border-left: 4px solid #E91E63;
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         box-shadow: 0 3px 6px rgba(0,0,0,0.16);
     }
     

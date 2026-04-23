@@ -27,7 +27,7 @@
     </div>
 
     <!-- RECENT CHANGES -->
-    <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+    <div style="background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
         <h3 style="margin-top: 0; color: #155724;">Recent Changes (Jan 6, 2026)</h3>
         <ul style="margin: 10px 0; color: #155724;">
             <li><strong>NEW: Grok API Integration (Phase 2)</strong>: Added LLMGrok service for Grok API calls. Grok model support added to model selection dropdown alongside Ollama and XAI.</li>

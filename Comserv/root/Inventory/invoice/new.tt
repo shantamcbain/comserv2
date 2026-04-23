@@ -9,7 +9,7 @@
 <div id="ai-invoice-parser"
      style="margin:0 0 1.4em;padding:1em;border:1px solid #acd;background:#f0f7ff;border-radius:6px;">
   <strong style="font-size:1.05em;">📄 AI Invoice Parser</strong>
-  <span style="font-size:0.85em;color:#555;margin-left:0.5em;">
+  <span style="font-size:0.85em;color: var(--text-muted-color, #555);margin-left:0.5em;">
     Paste any invoice text — AI will extract and fill the form fields automatically.
   </span>
 
@@ -28,7 +28,7 @@
             style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
       Parse Invoice with AI
     </button>
-    <span id="invoice-parse-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+    <span id="invoice-parse-status" style="color: var(--text-muted-color, #555);font-style:italic;font-size:0.9em;"></span>
   </div>
 
   <div id="invoice-parse-raw" style="display:none;margin-top:0.6em;">
@@ -322,7 +322,7 @@
           placeholder="e.g. RBC Debit card auto-pay, Visa ending 4321…"
           value="[% submitted.auto_pay_method | html %]"
           style="width:100%;max-width:420px;">
-        <small style="display:block;color:#666;margin-top:2px;">
+        <small style="display:block;color: var(--text-muted-color, #666);margin-top:2px;">
           The system will alert you when the due date passes so you can confirm the charge posted.
         </small>
       </div>
@@ -420,7 +420,7 @@
 </table>
 
 <p>
-  <input type="submit" value="Save Invoice" style="background:#007bff;color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
+  <input type="submit" value="Save Invoice" style="background: var(--primary-color, #007bff);color:white;padding:8px 18px;border:none;border-radius:4px;cursor:pointer;">
   <a href="/Inventory/invoice" style="margin-left:1em;">Cancel</a>
 </p>
 </form>

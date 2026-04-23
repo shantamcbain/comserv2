@@ -184,7 +184,7 @@
 }
 
 .file-info {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 16px;
     border-radius: 4px;
     margin-bottom: 20px;
@@ -198,7 +198,7 @@
 }
 
 .no-roles {
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
     font-style: italic;
 }
 
@@ -207,7 +207,7 @@
 }
 
 .help-text {
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
     margin-bottom: 16px;
 }
 
@@ -217,10 +217,10 @@
 }
 
 .role-option {
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     padding: 16px;
     border-radius: 4px;
-    background: #fff;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .role-option label {
@@ -237,7 +237,7 @@
 
 .role-description {
     margin: 0;
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
     font-size: 0.9em;
     margin-left: 24px;
 }
@@ -259,7 +259,7 @@
 }
 
 .btn-primary {
-    background-color: #007bff;
+    background-color: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -268,7 +268,7 @@
 }
 
 .btn-secondary {
-    background-color: #6c757d;
+    background-color: var(--secondary-color, #6c757d);
     color: white;
 }
 
@@ -341,7 +341,7 @@
 .field-group label {
     font-weight: 600;
     margin-bottom: 6px;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .form-control {
@@ -349,7 +349,7 @@
     border: 1px solid #ced4da;
     border-radius: 4px;
     font-size: 14px;
-    background: #fff;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
 }
 
@@ -366,7 +366,7 @@
 
 .field-help {
     font-size: 0.8em;
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
     margin-top: 4px;
     font-style: italic;
 }
@@ -382,8 +382,8 @@
     display: flex;
     align-items: center;
     padding: 6px 10px;
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
     font-size: 0.9em;
     cursor: pointer;
@@ -391,7 +391,7 @@
 }
 
 .category-checkbox:hover {
-    background: #e9ecef;
+    background: var(--bg-secondary, #e9ecef);
 }
 
 .category-checkbox input {

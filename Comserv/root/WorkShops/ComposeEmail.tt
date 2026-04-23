@@ -96,7 +96,7 @@
                             &nbsp;&nbsp;
                             <strong>Selected: <span id="sel-count">[% all_recipients.size %]</span> of [% all_recipients.size %]</strong>
                         </p>
-                        <div style="max-height:300px;overflow-y:auto;border:1px solid #ddd;padding:8px;border-radius:4px;">
+                        <div style="max-height:300px;overflow-y:auto;border:1px solid var(--border-color, #ddd);padding:8px;border-radius:4px;">
                         [% FOREACH r IN all_recipients %]
                         <label style="display:block;margin-bottom:4px;">
                             <input type="checkbox" name="selected_recipient"

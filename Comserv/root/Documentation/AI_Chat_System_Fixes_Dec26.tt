@@ -45,7 +45,7 @@
         <h2 id="issue-summary">Issue Summary</h2>
         
         <h3>Problem Description</h3>
-        <p style="background-color: #fff3cd; padding: 12px; border-radius: 4px; margin: 10px 0;">
+        <p style="background-color: var(--caution-bg, #fff3cd); padding: 12px; border-radius: 4px; margin: 10px 0;">
             <strong>AI Chat database tables were not being automatically created on application startup.</strong>
         </p>
         
@@ -76,7 +76,7 @@
         <h3>The Problem</h3>
         <p>The <code>@result_files</code> array (lines 779-786) contained only 5 Result file references:</p>
         
-        <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 10px 0;">
+        <div style="background-color: var(--bg-secondary, #f8f9fa); padding: 15px; border-radius: 4px; margin: 10px 0;">
             <pre><code>my @result_files = (
     # Only 5 files - MISSING AiConversation and AiMessage!
     "$app_root/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
@@ -129,7 +129,7 @@
         <h3>Solution</h3>
         <p>Added the 2 missing Result classes to the <code>@result_files</code> array in the correct order (parent before child):</p>
         
-        <div style="background-color: #d4edda; padding: 15px; border-radius: 4px; margin: 10px 0; border: 2px solid #28a745;">
+        <div style="background-color: #d4edda; padding: 15px; border-radius: 4px; margin: 10px 0; border: 2px solid var(--success-color, #28a745);">
             <pre><code>my @result_files = (
     # NEW: AiConversation MUST be first (parent table)
     "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
@@ -224,7 +224,7 @@
         </table>
         
         <h3>December 27 Testing Plan</h3>
-        <div style="background-color: #d4edda; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #28a745;">
+        <div style="background-color: #d4edda; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid var(--success-color, #28a745);">
             <strong>🟢 BLOCKING ISSUE RESOLVED</strong>
             <ul>
                 <li>✅ Application restart will now auto-create all 7 AI Chat tables</li>
@@ -286,7 +286,7 @@ SHOW TABLES LIKE 'web_search%';</code></pre>
     <div class="content-section">
         <h2 id="recent-changes" style="border-bottom: 2px solid var(--primary-color); padding-bottom: 10px;">Recent Changes - December 30-31, 2025</h2>
         
-        <div style="background-color: #fff3cd; padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #ff9800;">
+        <div style="background-color: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 4px; margin: 15px 0; border-left: 4px solid #ff9800;">
             <strong>v0.02 (Dec 31 20:28 UTC):</strong> Added documentation for authentication and UI/UX fixes
         </div>
         
@@ -305,13 +305,13 @@ SHOW TABLES LIKE 'web_search%';</code></pre>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Comserv/lib/Comserv/Controller/AI.pm</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Auth blocks removed from all 6 AI endpoints</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Endpoints now accessible without login; guest user auto-assigned</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); color: #28a745;"><strong>✅ Applied</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--success-color, #28a745);"><strong>✅ Applied</strong></td>
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>Comserv/root/static/js/local-chat.js</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Widget UI/UX improvements</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Fixed DOM stacking context, increased dimensions (380px × 500px), improved visibility</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); color: #28a745;"><strong>✅ Applied</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); color: var(--success-color, #28a745);"><strong>✅ Applied</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -370,7 +370,7 @@ SELECT COUNT(*) FROM users WHERE id = 199;</code></pre>
         <p><strong>Endpoints Updated:</strong> 6 (all AI endpoints)</p>
         <p><strong>Critical Blocker:</strong> Database table verification needed; conversation creation failing silently</p>
         <p><strong>Next Step:</strong> Jan 2 - Run database verification queries, debug conversation creation</p>
-        <p style="font-size: 12px; color: #666;">
+        <p style="font-size: 12px; color: var(--text-muted-color, #666);">
             <strong>Related Documentation:</strong><br/>
             - <a href="/Documentation/AI_Chat_Schema_Documentation">AI Chat Schema Documentation</a><br/>
             - <a href="/Documentation/Daily_Plans-2025-12-26">Daily Plan Dec 26</a><br/>

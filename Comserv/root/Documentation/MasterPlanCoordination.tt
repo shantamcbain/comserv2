@@ -189,7 +189,7 @@
 
         <h3>Individual Plan File Structure Template</h3>
         <p>When creating a new plan file (e.g., Plans/A1ConfigurationInfrastructure.tt), follow this structure:</p>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0; overflow-x: auto; font-size: 12px;"><code>[% META
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; margin: 20px 0; overflow-x: auto; font-size: 12px;"><code>[% META
    title = "Plan A.1: Configuration Infrastructure"
    description = "Configuration management, Zencoder setup, IDE integration, agent specifications"
    page_version = "1.00"
@@ -934,7 +934,7 @@
                     <td style="border: 1px solid var(--border-color);">Conversation storage, message threading, model configuration, searchable indexes for documentation and code.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="/Documentation/AiConversation" class="doc-link">✅ AiConversation.tt</a> | <a href="/Documentation/AiModelConfig" class="doc-link">✅ AiModelConfig.tt</a> | <a href="/Documentation/CodeSearchIndex" class="doc-link">✅ CodeSearchIndex.tt</a> | <a href="/Documentation/WebSearchResult" class="doc-link">✅ WebSearchResult.tt</a> | <a href="/Documentation/models/AiMessage.tt" class="doc-link">📄 AiMessage</a></td>
                 </tr>
-                <tr style="background-color: #fff3e0;">
+                <tr style="background-color: var(--caution-bg, #fff3e0);">
                     <td style="border: 1px solid var(--border-color);"><strong>📋 Task Management</strong></td>
                     <td style="border: 1px solid var(--border-color);">Todo, Project, ProjectSite</td>
                     <td style="border: 1px solid var(--border-color);">Task tracking, hierarchical projects, milestone management, site-specific project assignment.</td>
@@ -958,7 +958,7 @@
                     <td style="border: 1px solid var(--border-color);">Theme definitions, site theme assignment, CSS variable customization.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="Documentation/models/Theme.tt" class="doc-link">📄 MISSING</a></td>
                 </tr>
-                <tr style="background-color: #fff3e0;">
+                <tr style="background-color: var(--caution-bg, #fff3e0);">
                     <td style="border: 1px solid var(--border-color);"><strong>⚙️ Configuration</strong></td>
                     <td style="border: 1px solid var(--border-color);">EnvVariable, EnvVariableAuditLog</td>
                     <td style="border: 1px solid var(--border-color);">Environment variables, runtime configuration, audit trail for configuration changes.</td>
@@ -970,7 +970,7 @@
                     <td style="border: 1px solid var(--border-color);">Herbal database, ecological content, citations, taxonomy organization.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="Documentation/models/Herb.tt" class="doc-link">📄 MISSING</a></td>
                 </tr>
-                <tr style="background-color: #fff3e0;">
+                <tr style="background-color: var(--caution-bg, #fff3e0);">
                     <td style="border: 1px solid var(--border-color);"><strong>🐝 BMaster Apiary</strong></td>
                     <td style="border: 1px solid var(--border-color);">Pallet, Queen, Yard, Forager</td>
                     <td style="border: 1px solid var(--border-color);">Bee frame tracking, queen genetics, yard locations, nectar/forage availability.</td>
@@ -988,7 +988,7 @@
                     <td style="border: 1px solid var(--border-color);">Application logs, calendar events, event attendance tracking.</td>
                     <td style="border: 1px solid var(--border-color);"><a href="Documentation/models/Log.tt" class="doc-link">📄 MISSING</a></td>
                 </tr>
-                <tr style="background-color: #fff3e0;">
+                <tr style="background-color: var(--caution-bg, #fff3e0);">
                     <td style="border: 1px solid var(--border-color);"><strong>📄 Files & Media</strong></td>
                     <td style="border: 1px solid var(--border-color);">File, Media</td>
                     <td style="border: 1px solid var(--border-color);">File storage metadata, image/video asset management.</td>
@@ -1102,7 +1102,7 @@
     <div class="content-section">
         <h2 id="systems-container">2.5. Systems & Projects Container</h2>
         <details>
-            <summary style="cursor: pointer; font-size: 1.1em; padding: 10px; background: #f5f5f5; border-radius: 4px; border-left: 4px solid #2196f3;">
+            <summary style="cursor: pointer; font-size: 1.1em; padding: 10px; background: var(--bg-secondary, #f5f5f5); border-radius: 4px; border-left: 4px solid #2196f3;">
                 <strong>📦 Click to expand: All Systems with Project Mappings</strong>
             </summary>
             <div style="padding: 20px; margin-top: 10px;">

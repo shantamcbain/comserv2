@@ -60,7 +60,7 @@
     [% FOREACH sl IN item.stock_levels %]
       [% total_stock = total_stock + sl.quantity_on_hand %]
     [% END %]
-    <tr[% IF item.reorder_point && total_stock <= item.reorder_point %] style="background:#fff3cd"[% END %]>
+    <tr[% IF item.reorder_point && total_stock <= item.reorder_point %] style="background: var(--caution-bg, #fff3cd)"[% END %]>
       <td>[% item.sku %]</td>
       <td><a href="/Inventory/item/view/[% item.id %]">[% item.name %]</a></td>
       <td>[% item.category || '-' %]</td>
