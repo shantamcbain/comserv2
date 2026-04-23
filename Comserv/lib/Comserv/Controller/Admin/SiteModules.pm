@@ -15,7 +15,12 @@ has 'logging' => (
 sub begin :Private {
     my ($self, $c) = @_;
 
-    unless ($c->stash->{is_admin}) {
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = $c->session->{is_admin}
+                || (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles)
+                || (!ref($roles) && $roles =~ /\badmin\b/i);
+
+    unless ($is_admin) {
         $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
