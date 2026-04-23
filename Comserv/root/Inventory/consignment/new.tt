@@ -76,37 +76,7 @@
     Items visible in the shop for <strong>[% source_sitename | html %]</strong> are listed. Set the retail price (what the partner charges customers).
   </div>
 
-  <div id="consign-lines">
-    <div class="consign-line" style="display:grid;gap:0.5em;margin-bottom:0.7em;background:var(--secondary-color);padding:10px 12px;border-radius:4px;border:1px solid var(--border-color)">
-      <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap">
-        <select name="item_id_0" onchange="onItemChange(this,0)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-          <option value="">— select item —</option>
-          [% FOREACH item IN items %]
-          [% SET opts_json = item.shop_options ? item.shop_options : '' %]
-          <option value="[% item.id %]"
-                  data-price="[% item.unit_price || item.unit_cost || '' %]"
-                  data-unit="[% item.unit_of_measure | html %]"
-                  data-options="[% opts_json | html %]">
-            [% item.name | html %][% IF item.sku %] ([% item.sku | html %])[% END %]
-            [% IF item.unit_price %] — $[% item.unit_price %][% END %]
-          </option>
-          [% END %]
-        </select>
-        <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Qty:
-          <input type="number" name="quantity_0" min="1" step="1" value="1"
-                 style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-        </label>
-        <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Retail $:
-          <input type="number" name="retail_price_0" min="0" step="0.01" placeholder="0.00"
-                 style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-        </label>
-        <input type="text" name="line_notes_0" placeholder="Notes (optional)" maxlength="255"
-               style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-      </div>
-      <div class="item-options-row" id="opts-0" style="display:none;gap:0.6em;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border-color);margin-top:4px"></div>
-      <input type="hidden" name="options_selected_0" id="options-val-0">
-    </div>
-  </div>
+  <div id="consign-lines"></div>
 
   <button type="button" onclick="addLine()"
           style="margin-bottom:1.2em;padding:5px 14px;border:1px dashed var(--border-color);background:var(--secondary-color);color:var(--text-color);border-radius:4px;cursor:pointer;font-family:var(--body-font)">
@@ -126,13 +96,56 @@
 </div>
 </div>
 
+<script id="line-tpl" type="text/x-row-template">
+<div class="consign-line" style="display:grid;gap:0.5em;margin-bottom:0.7em;background:var(--secondary-color);padding:10px 12px;border-radius:4px;border:1px solid var(--border-color)">
+  <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap">
+    <select name="item_id_N" onchange="onItemChange(this,N)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      <option value="">-- select item --</option>
+      [% FOREACH item IN items %][% SET opts_json = item.shop_options ? item.shop_options : '' %]<option value="[% item.id %]" data-price="[% item.unit_price || item.unit_cost || '' %]" data-unit="[% item.unit_of_measure | html %]" data-options="[% opts_json | html %]">[% item.name | html %][% IF item.sku %] ([% item.sku | html %])[% END %][% IF item.unit_price %] - $[% item.unit_price %][% END %]</option>
+      [% END %]
+    </select>
+    <label style="font-size:0.85rem">Qty: <input type="number" name="quantity_N" min="1" step="1" value="1" style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>
+    <label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price_N" min="0" step="0.01" placeholder="0.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>
+    <input type="text" name="line_notes_N" placeholder="Notes (optional)" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+    <button type="button" onclick="removeLine(this)" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.2rem;padding:0 4px">x</button>
+  </div>
+  <div class="item-options-row" id="opts-N" style="display:none;gap:0.6em;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border-color);margin-top:4px"></div>
+  <input type="hidden" name="options_selected_N" id="options-val-N">
+</div>
+</script>
+
 <script>
+var lineCount = 0;
+
+function addLine() {
+  var tpl = document.getElementById('line-tpl');
+  if (!tpl) { alert('Template not found'); return; }
+  var container = document.getElementById('consign-lines');
+  if (!container) { alert('Container not found'); return; }
+  var html = tpl.textContent || tpl.innerHTML;
+  var n = lineCount++;
+  html = html.replace(/\bN\b/g, n);
+  var wrap = document.createElement('div');
+  wrap.innerHTML = html;
+  var row = wrap.firstElementChild;
+  if (!row) { alert('Row parse failed'); return; }
+  container.appendChild(row);
+}
+
+function removeLine(btn) {
+  var el = btn;
+  while (el && el.className.indexOf('consign-line') === -1) { el = el.parentNode; }
+  if (el && el.parentNode) el.parentNode.removeChild(el);
+}
+
 function updateCommission(sel) {
   var opt = sel.options[sel.selectedIndex];
   var comm = opt.getAttribute('data-comm');
   var info = document.getElementById('comm-info');
   if (info && comm) info.textContent = comm + '% commission';
 }
+
+addLine();
 
 function unitStep(unit) {
   unit = (unit || '').toLowerCase();
