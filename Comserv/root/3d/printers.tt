@@ -108,7 +108,7 @@
                 [% p.name | html %]
                 [% IF p.inventory_item %]
                 <br><small style="color:var(--text-muted-color);">
-                    <a href="/Inventory/items/view/[% p.inventory_item.id %]" title="View inventory asset">asset #[% p.inventory_item.id %]</a>
+                    <a href="/Inventory/item/view/[% p.inventory_item.id %]" title="View inventory asset">asset #[% p.inventory_item.id %]</a>
                 </small>
                 [% END %]
             </td>
@@ -177,7 +177,7 @@
         <tr>
             <td>
                 [% item.name | html %]
-                <br><small><a href="/Inventory/items/view/[% item.id %]">asset #[% item.id %]</a></small>
+                <br><small><a href="/Inventory/item/view/[% item.id %]">asset #[% item.id %]</a></small>
             </td>
             <td>[% item.sku | html %]</td>
             <td>[% IF item.unit_cost %]$[% item.unit_cost %][% ELSE %]—[% END %]</td>
