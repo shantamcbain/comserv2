@@ -624,8 +624,11 @@ sub _daily_log_action {
             )->all;
         };
 
-        # System errors in last 24h
+        # ── Audit: DB SystemLog + application.log for unreported errors ──
         my ($error_count, $todo_created) = (0, 0);
+        my @audit_lines;
+
+        # 1. DB SystemLog errors in last 24h
         eval {
             my $since = do {
                 my @t = localtime(time - 86400);
@@ -634,39 +637,85 @@ sub _daily_log_action {
             my @errs = $schema->resultset('SystemLog')->search(
                 { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
                   timestamp => { '>=' => $since } },
-                { order_by => { -desc => 'timestamp' }, rows => 10 }
+                { order_by => { -desc => 'timestamp' }, rows => 20 }
             )->all;
-            if (@errs) {
-                $error_count = scalar @errs;
-                my $max_show = $error_count > 5 ? 5 : $error_count;
-                my $todo_desc = "Errors found during morning log check ($today):\n" .
-                    join("\n", map { "[" . $_->level . "] " . $_->timestamp . " — " . substr($_->message, 0, 200) }
-                         @errs[0..$max_show-1]);
-                eval {
-                    $schema->resultset('Todo')->create({
-                        subject            => "\x{26A0}\x{FE0F} Morning Check: $error_count system error(s) need review ($today)",
-                        description        => $todo_desc,
-                        status             => 2,
-                        priority           => 1,
-                        sitename           => $sitename,
-                        developer          => $username,
-                        username_of_poster => $username,
-                        last_mod_by        => $username,
-                        last_mod_date      => $today,
-                        date_time_posted   => $today . ' 00:00:00',
-                        start_date         => $today,
-                        due_date           => $today,
-                        parent_todo        => '',
-                        estimated_man_hours => 0,
-                        accumulative_time  => '00:00:00',
-                        group_of_poster    => 'admin',
-                        project_code       => 'system',
-                        share              => 0,
-                    });
-                    $todo_created = 1;
-                };
+            for my $e (@errs) {
+                push @audit_lines, "[DB/" . uc($e->level) . "] " . $e->timestamp . " — " . substr($e->message || '', 0, 200);
             }
         };
+
+        # 2. application.log file — scan last 24h for error:/critical: lines
+        eval {
+            my $log_path = $c->path_to('logs', 'application.log')->stringify;
+            if (-f $log_path) {
+                my $cutoff = time - 86400;
+                open(my $fh, '<', $log_path) or die "Cannot open $log_path: $!";
+
+                # Read last 8000 bytes to avoid scanning huge file
+                my $size = -s $log_path;
+                if ($size > 8000) {
+                    seek($fh, -8000, 2);
+                    <$fh>; # discard partial first line
+                }
+
+                my %seen_patterns;
+                while (my $line = <$fh>) {
+                    chomp $line;
+                    next unless $line =~ /^(?:error|critical):\s*\[(\d{4}-\d{2}-\d{2}[T ][\d:]+)\]/i;
+                    my $ts_str = $1;
+                    # Parse timestamp
+                    my $ts_epoch = 0;
+                    eval {
+                        (my $ts_clean = $ts_str) =~ s/T/ /;
+                        my ($y,$mo,$d,$h,$mi,$s) = $ts_clean =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
+                        require Time::Local;
+                        $ts_epoch = Time::Local::timelocal($s,$mi,$h,$d,$mo-1,$y-1900) if $y;
+                    };
+                    next if $ts_epoch && $ts_epoch < $cutoff;
+
+                    # Deduplicate by condensed pattern (strip timestamp/pid noise)
+                    (my $pattern = $line) =~ s/\[\d{4}-\d{2}-\d{2}[^\]]+\]//g;
+                    $pattern =~ s/\[\d+\]//g;
+                    $pattern = substr($pattern, 0, 120);
+                    next if $seen_patterns{$pattern}++;
+
+                    push @audit_lines, "[FILE/" . uc(($line =~ /^(\w+):/)[0] || 'ERROR') . "] $ts_str — " . substr($line, 0, 200);
+                }
+                close($fh);
+            }
+        };
+
+        $error_count = scalar @audit_lines;
+
+        if ($error_count) {
+            my $max_show  = $error_count > 10 ? 10 : $error_count;
+            my $todo_desc = "Errors found during Start Day audit ($today):\n\n"
+                . join("\n", @audit_lines[0..$max_show-1])
+                . ($error_count > $max_show ? "\n\n(+" . ($error_count - $max_show) . " more — check /log and application.log)" : '');
+            eval {
+                $schema->resultset('Todo')->create({
+                    subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count error(s) need review ($today)",
+                    description         => $todo_desc,
+                    status              => 2,
+                    priority            => 1,
+                    sitename            => $sitename,
+                    developer           => $username,
+                    username_of_poster  => $username,
+                    last_mod_by         => $username,
+                    last_mod_date       => $today,
+                    date_time_posted    => $today . ' 00:00:00',
+                    start_date          => $today,
+                    due_date            => $today,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => 'system',
+                    share               => 0,
+                });
+                $todo_created = 1;
+            };
+        }
 
         # Build log details
         my $details = "=== Daily Log - $today ===\n\n";
