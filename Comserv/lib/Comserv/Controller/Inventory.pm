@@ -3775,7 +3775,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
             my %lines_by_idx;
             for my $key (keys %$p) {
-                if ($key =~ /^(item_id|quantity|retail_price|line_notes)_(\d+)$/) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes|options_selected)_(\d+)$/) {
                     $lines_by_idx{$2}{$1} = $p->{$key};
                 }
             }
@@ -3786,7 +3786,11 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $item_id      = $l->{item_id};
                 my $qty          = $l->{quantity};
                 my $retail_price = $l->{retail_price};
-                my $line_note    = $l->{line_notes};
+                my $opts_str     = $l->{options_selected} || '';
+                my $user_note    = $l->{line_notes}       || '';
+                my $line_note    = $opts_str
+                    ? ($user_note ? "$opts_str | $user_note" : $opts_str)
+                    : $user_note || undef;
                 $schema->resultset('InventoryConsignmentLine')->create({
                     consignment_id    => $consignment->id,
                     item_id           => $item_id,
@@ -3830,7 +3834,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
         @items = $schema->resultset('InventoryItem')->search(
             { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
-            { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure'], order_by => 'name' })->all;
+            { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure','shop_options'], order_by => 'name' })->all;
         my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
         @all_sitenames = map { $_->name } @sites;
     };
