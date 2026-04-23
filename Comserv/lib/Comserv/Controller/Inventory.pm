@@ -3833,7 +3833,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
         @partners = $schema->resultset('InventoryConsignmentPartner')->search(
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
         @items = $schema->resultset('InventoryItem')->search(
-            { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
+            { sitename => $source_sitename, status => 'active' },
             { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure','shop_options'], order_by => 'name' })->all;
         my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
         @all_sitenames = map { $_->name } @sites;
