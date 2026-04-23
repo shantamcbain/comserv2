@@ -148,6 +148,54 @@
 </div>
 [% END %]
 
+[% IF unregistered_inv_printers && unregistered_inv_printers.size %]
+<div style="background:var(--secondary-color);border:2px solid var(--accent-color,#007bff);border-radius:6px;padding:1.2em;margin-bottom:1.5em;">
+    <h2 style="margin:0 0 0.6em 0;font-size:1.05em;color:var(--heading-color,var(--text-color));">
+        Printers in Inventory — Not Yet in Farm
+    </h2>
+    <p style="font-size:0.9em;color:var(--text-muted-color);margin:0 0 0.8em 0;">
+        The following items exist in the Inventory system with category <code>3d_printer</code>
+        but are not yet registered in the printer farm. Click <strong>Add to Farm</strong> to register one.
+    </p>
+    <table class="printer-table">
+        <thead>
+            <tr>
+                <th>Inventory Name</th><th>SKU</th><th>Purchase Price</th>
+                <th>Depr/hr</th><th>Watts</th><th>Action</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH item IN unregistered_inv_printers %]
+        [% SET eq = item.equipment %]
+        <tr>
+            <td>
+                [% item.name | html %]
+                <br><small><a href="/Inventory/items/view/[% item.id %]">asset #[% item.id %]</a></small>
+            </td>
+            <td>[% item.sku | html %]</td>
+            <td>[% IF item.unit_cost %]$[% item.unit_cost %][% ELSE %]—[% END %]</td>
+            <td>[% IF eq && eq.depreciation_per_hour %]$[% eq.depreciation_per_hour %][% ELSE %]—[% END %]</td>
+            <td>[% IF eq && eq.wattage %][% eq.wattage %]W[% ELSE %]—[% END %]</td>
+            <td>
+                <form method="post" action="/3d/printers">
+                    <input type="hidden" name="action" value="import_from_inventory">
+                    <input type="hidden" name="inventory_item_id" value="[% item.id %]">
+                    <input type="hidden" name="name" value="[% item.name | html %]">
+                    <input type="number" name="nozzle_diameter" value="0.40" step="0.01" min="0.1" max="2.0"
+                           style="width:4.5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;"
+                           title="Nozzle diameter (mm)">
+                    <input type="text" name="bed_size" placeholder="Bed size"
+                           style="width:7em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;">
+                    <button type="submit" class="btn-sm btn-idle">Add to Farm</button>
+                </form>
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
 <div class="add-printer-form">
     <h2>Add a Printer</h2>
     <form method="post" action="/3d/printers">
