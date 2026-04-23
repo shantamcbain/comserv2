@@ -5,7 +5,7 @@
 
 <style>
     .chunk-row {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-left: 3px solid #ffc107;
     }
     .badge.badge-warning {

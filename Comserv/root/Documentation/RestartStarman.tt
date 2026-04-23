@@ -115,7 +115,7 @@ www-data ALL=(ALL) NOPASSWD: /bin/systemctl status starman
     nav {
         margin: 20px 0;
         padding: 10px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
     }
     h2 {
@@ -140,7 +140,7 @@ www-data ALL=(ALL) NOPASSWD: /bin/systemctl status starman
         border-color: #bce8f1;
     }
     pre {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 10px;
         border-radius: 4px;
         overflow-x: auto;

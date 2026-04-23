@@ -1,5 +1,5 @@
 
-[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.0 2026/03/24 Planning top-menu dropdown — role-gated, SiteName-aware' %]
+[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.1 2026/04/22 P3.1 theme-audit: inline style verified CSS-var compliant' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
 [% END %]

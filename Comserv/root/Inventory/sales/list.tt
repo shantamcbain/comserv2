@@ -38,7 +38,7 @@
       <td>
         [% IF inv.status == 'posted' %]<span style="color:green;font-weight:bold">Posted</span>
         [% ELSIF inv.status == 'void' %]<span style="color:red">Void</span>
-        [% ELSE %]<span style="color:#666">Draft</span>
+        [% ELSE %]<span style="color: var(--text-muted-color, #666)">Draft</span>
         [% END %]
       </td>
       <td style="text-align:center">
@@ -62,7 +62,7 @@
           <form method="POST" action="/Inventory/sales/post/[% inv.id %]" style="display:inline"
                 onsubmit="return confirm('Post this invoice? This will update stock and create GL entries.');">
             <input type="submit" value="Post"
-                   style="background:#28a745;color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;">
+                   style="background: var(--success-color, #28a745);color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;">
           </form>
         [% END %]
       </td>

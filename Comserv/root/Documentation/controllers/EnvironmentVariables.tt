@@ -276,7 +276,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin: 15px 0; border-radius: 4px;">
+            <div class="success" style="background: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 12px; margin: 15px 0; border-radius: 4px;">
                 <h3 id="see-also" style="margin-top: 0; color: var(--text-color);">See Also</h3>
                 <ul style="color: var(--text-color);">
                     <li><a href="/Documentation/models/EnvVariable" style="color: var(--link-color);">EnvVariable Model Documentation</a></li>

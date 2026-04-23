@@ -62,13 +62,13 @@
     </td>
     <td style="padding:7px 10px;text-align:center">
       [% IF con.status == 'open' %]
-        <span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px;font-size:0.8rem">Open</span>
+        <span style="background: var(--caution-bg, #fff3e0);color:#e65100;border-radius:3px;padding:2px 8px;font-size:0.8rem">Open</span>
       [% ELSIF con.status == 'partially_settled' %]
         <span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px;font-size:0.8rem">Part. Settled</span>
       [% ELSIF con.status == 'settled' %]
         <span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px;font-size:0.8rem">Settled</span>
       [% ELSE %]
-        <span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px;font-size:0.8rem">[% con.status | html %]</span>
+        <span style="background: var(--bg-secondary, #f5f5f5);color: var(--text-muted-color, #555);border-radius:3px;padding:2px 8px;font-size:0.8rem">[% con.status | html %]</span>
       [% END %]
     </td>
     <td style="padding:7px 10px;text-align:center;white-space:nowrap">

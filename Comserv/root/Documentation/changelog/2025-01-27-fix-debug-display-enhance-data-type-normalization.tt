@@ -308,12 +308,12 @@ varchar(255) binary → varchar</code></pre>
 }
 
 .changelog-type.fix {
-    background: #28a745 !important;
+    background: var(--success-color, #28a745) !important;
 }
 
 .issue-card, .solution-card, .technical-card, .usage-card {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -347,7 +347,7 @@ varchar(255) binary → varchar</code></pre>
     padding: 10px;
     margin: 5px 0;
     border-radius: 5px;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--primary-color, #007bff);
 }
 
 .type-mapping-grid {
@@ -358,10 +358,10 @@ varchar(255) binary → varchar</code></pre>
 }
 
 .type-category {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 15px;
     border-radius: 5px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .testing-checklist .checklist {
@@ -371,7 +371,7 @@ varchar(255) binary → varchar</code></pre>
 
 .testing-checklist .checklist li {
     padding: 8px 0;
-    color: #28a745;
+    color: var(--success-color, #28a745);
 }
 
 .impact-grid {
@@ -384,18 +384,18 @@ varchar(255) binary → varchar</code></pre>
 .impact-card {
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .impact-card.positive {
     background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
-    border-color: #28a745;
+    border-color: var(--success-color, #28a745);
 }
 
 .changelog-footer {
     margin-top: 40px;
     padding-top: 20px;
-    border-top: 2px solid #dee2e6;
+    border-top: 2px solid var(--border-color, #dee2e6);
 }
 
 .changelog-navigation {
@@ -419,7 +419,7 @@ varchar(255) binary → varchar</code></pre>
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 

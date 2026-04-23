@@ -138,7 +138,7 @@
                 <span><strong>Today:</strong> [% current_display %]</span>
                 <span>|</span>
                 <a href="/Documentation/DailyPlan/[% current_date_str %]">[Jump to Today]</a>
-                <a href="/Documentation/MasterPlanCoordination" target="_blank">Master Plans</a>
+                <a href="/todo" >Master Plans</a>
                 <a href="/Documentation">All Docs</a>
                 <a href="/todo">Todo System</a>
             </div>
@@ -192,12 +192,12 @@
             🌙 Close Day
           </button>
           <button onclick="document.getElementById('log-panel').style.display='none'"
-                  style="padding:7px 14px;background:#eee;color:#333;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
+                  style="padding:7px 14px;background:#eee;color: var(--text-color, #333);border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
             ✖ Dismiss
           </button>
         </div>
       </div>
-      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color:#555;"></div>
+      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color: var(--text-color, #555);"></div>
     </div>
     [% END %]
 
@@ -227,12 +227,6 @@
         [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
-        </button>
-        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
-            ZENCODER PROMPT
-        </button>
-        <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
-            MASTER PLAN COORDINATION
         </button>
         [% END %]
     </div>
@@ -304,10 +298,10 @@
                             [%# Priority badge %]
                             [% IF ap.priority %]
                             <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
-                                [% IF ap.priority <= 2 %]background:#dc3545;color:#fff
+                                [% IF ap.priority <= 2 %]background: var(--danger-color, #dc3545);color:#fff
                                 [% ELSIF ap.priority <= 4 %]background:#fd7e14;color:#fff
-                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color:#333
-                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color: var(--text-color, #333)
+                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                 P[% ap.priority %]
                             </span>
                             [% END %]
@@ -315,7 +309,7 @@
                             [%# Status badge %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
                                 [% IF ap.status == 2 %]background:#17a2b8;color:#fff
-                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                 [% IF ap.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
                             </span>
 
@@ -326,7 +320,7 @@
 
                             [%# Blocking badge %]
                             [% IF ap.is_blocking %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
                             [% END %]
 
                             [%# Cross-project blocker badge %]
@@ -336,7 +330,7 @@
 
                             [%# Blocked badge %]
                             [% IF is_blocked %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color:#333;" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color: var(--text-color, #333);" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
                             [% END %]
 
                             [%# Site label (CSC all-sites view) %]
@@ -503,7 +497,7 @@
                 <a href="/project/details?project_id=138" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">Planning System Project</a>
                 <a href="/todo?project_id=186" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">Phase 1 Todos</a>
                 <a href="/todo?project_id=187" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">Phase 2 Todos</a>
-                <a href="/Documentation/MasterPlanCoordination" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">Master Plan</a>
+                <a href="/todo" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">Master Plan Todos</a>
                 <a href="/todo" style="font-size:0.83em;padding:3px 10px;border:1px solid var(--border-color);border-radius:3px;text-decoration:none;color:var(--primary-color);">All Todos</a>
             </div>
         </div>
@@ -778,8 +772,8 @@
                         [% IF proj.status %]
                         <span style="padding:1px 7px;border-radius:3px;font-size:0.75em;font-weight:bold;
                             [% IF proj.status == 'In-Process' || proj.status == 'active' %]background:#17a2b8;color:#fff
-                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background:#28a745;color:#fff
-                            [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                            [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                             [% proj.status %]
                         </span>
                         [% END %]
@@ -807,8 +801,8 @@
                                 [% IF sub.status %]
                                 <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
                                     [% IF sub.status == 'In-Process' || sub.status == 'active' %]background:#17a2b8;color:#fff
-                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background:#28a745;color:#fff
-                                    [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                                    [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                     [% sub.status %]
                                 </span>
                                 [% END %]
@@ -830,7 +824,7 @@
                             <div style="display:flex;gap:6px;align-items:center;">
                                 [% IF pln.priority %]<span style="font-size:0.78em;color:var(--text-muted-color);">P[% pln.priority %]</span>[% END %]
                                 <span style="padding:1px 6px;border-radius:3px;font-size:0.72em;font-weight:bold;
-                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
                                     [% pln.status || 'active' %]
                                 </span>
                                 <a href="/admin/plan/[% pln.id %]" style="font-size:0.78em;color:var(--primary-color);">View</a>
@@ -881,7 +875,7 @@
                 </div>
                 <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
                     <span style="padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;
-                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
                         [% pln.status || 'active' %]
                     </span>
                     <a href="/admin/plan/[% pln.id %]" style="font-size:0.82em;color:var(--primary-color);">View</a>
@@ -914,7 +908,7 @@
         <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
             Projects that cannot proceed until their dependency delivers. Resolve blockers in order.
             [% IF dep_auto_resolved %]
-            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background:#28a745;color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
+            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background: var(--success-color, #28a745);color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
             [% END %]
             [% IF dep_auto_detected %]
             <span style="margin-left:6px;padding:1px 7px;border-radius:3px;background:#17a2b8;color:#fff;">+ [% dep_auto_detected %] auto-detected</span>
@@ -941,7 +935,7 @@
                 </td>
                 <td style="padding:7px 4px;text-align:center;">
                     [% IF dep.dependency_type == 'blocks' %]
-                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
                     [% ELSE %]
                     <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="Soft requirement">⚠ requires</span>
                     [% END %]
@@ -974,9 +968,9 @@
             <h2 style="margin:0;font-size:1.2em;">📊 Project Timeline — [% IF is_csc && !filter_site %]All Sites[% ELSE %][% plan_sitename %][% END %]</h2>
             <div style="display:flex;gap:8px;align-items:center;font-size:0.8em;">
                 <span style="display:inline-block;width:12px;height:12px;background:#17a2b8;border-radius:2px;"></span>In-Process
-                <span style="display:inline-block;width:12px;height:12px;background:#28a745;border-radius:2px;margin-left:6px;"></span>Completed
-                <span style="display:inline-block;width:12px;height:12px;background:#6c757d;border-radius:2px;margin-left:6px;"></span>Pending
-                <span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;margin-left:6px;"></span>On Hold
+                <span style="display:inline-block;width:12px;height:12px;background: var(--success-color, #28a745);border-radius:2px;margin-left:6px;"></span>Completed
+                <span style="display:inline-block;width:12px;height:12px;background: var(--secondary-color, #6c757d);border-radius:2px;margin-left:6px;"></span>Pending
+                <span style="display:inline-block;width:12px;height:12px;background: var(--danger-color, #dc3545);border-radius:2px;margin-left:6px;"></span>On Hold
             </div>
         </div>
 
@@ -1086,353 +1080,6 @@
         [% END %]
     </div>
 
-    [% IF is_csc %]
-    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
-    <div id="zencoder-prompt" class="tab-content">
-        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
-    </div>
-
-    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
-    <div id="master-plan-coordination" class="tab-content">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
-            <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
-            <div style="display:flex;gap:8px;">
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">→ DB Planning Tab</a>
-                <a href="/Documentation/MasterPlanCoordination" target="_blank"
-                   style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Full Legacy Doc ↗</a>
-            </div>
-        </div>
-
-        <div style="background:color-mix(in srgb,#ffc107 15%,var(--bg-color));border:1px solid #ffc107;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:0.88em;">
-            <strong>⚠️ Migration Status:</strong> This master plan is being migrated from text-based files to the DB-driven planning system.
-            All active work is tracked as <a href="/todo" style="color:var(--primary-color);">Todos</a> and
-            <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="color:var(--primary-color);">Projects</a> in the database.
-            The text below is an archived reference (last updated Jan 2026).
-        </div>
-
-        [%# ── Key Dependencies (blocking items) ── %]
-        <div style="margin-bottom:20px;">
-            <h3 style="font-size:1em;margin-bottom:8px;">🔒 Known Blocking Dependencies</h3>
-            <div style="display:grid;gap:6px;">
-                <div style="background:var(--bg-secondary);border-left:4px solid #dc3545;border-radius:4px;padding:8px 12px;font-size:0.87em;">
-                    <strong>#11 Architecture Phase 2</strong> — blocks: Docker HA, K8s deployment, Catalyst multi-instance
-                    <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ See DB project</a>
-                </div>
-                <div style="background:var(--bg-secondary);border-left:4px solid #fd7e14;border-radius:4px;padding:8px 12px;font-size:0.87em;">
-                    <strong>#4 Refactor Master Plan</strong> — blocks: all text→DB migration validation
-                    <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ See Planning tab</a>
-                </div>
-                <div style="background:var(--bg-secondary);border-left:4px solid #ffc107;border-radius:4px;padding:8px 12px;font-size:0.87em;">
-                    <strong>Unified Mail / SMTP</strong> — blocks: Workshop mailing list feature
-                    <a href="/todo" style="margin-left:8px;color:var(--primary-color);font-size:0.85em;">→ Todo system</a>
-                </div>
-            </div>
-        </div>
-
-        [%# ── Quick links to active DB projects by area ── %]
-        <div style="margin-bottom:20px;">
-            <h3 style="font-size:1em;margin-bottom:8px;">📁 Active Work Areas (DB Projects)</h3>
-            <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;font-size:0.85em;">
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    📅 Planning System
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    🐳 Docker &amp; K8s
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    🏗️ Architecture
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    🤖 AI Systems
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    👥 Users &amp; Roles
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    🎓 Workshops
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    ✅ Todo System
-                </a>
-                <a href="/Documentation/DailyPlan#planning" onclick="switchTab(event,'planning');return false;"
-                   style="display:block;padding:8px 12px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;">
-                    📁 File Management
-                </a>
-            </div>
-        </div>
-
-        [%# ── Legacy archived content (collapsed) ── %]
-        <details style="border:1px solid var(--border-color);border-radius:4px;margin-top:20px;">
-            <summary style="padding:10px 14px;cursor:pointer;font-size:0.85em;color:var(--text-muted-color);background:var(--bg-secondary);">
-                📋 Legacy Master Plan Document (text-based — archived, Jan 2026) — click to expand
-            </summary>
-            <div style="padding:14px;max-height:600px;overflow-y:auto;">
-                [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
-            </div>
-        </details>
-    </div>
-
-    <div id="implementation-plan" class="tab-content" style="display:none!important;">
-        <!-- Static text migrated to DB todos 502-516 under Planning System project 138 -->
-        <h2>Planning System Migration - Implementation Plan</h2>
-        <p style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; border-radius: 4px; margin: 15px 0;">
-            <strong>Overview:</strong> This implementation plan outlines the migration from a text-based planning system to a dynamic, database-driven application with role-based access control, project-documentation linking, and comprehensive audit trails.
-        </p>
-
-        <div style="display: flex; gap: 15px; margin: 20px 0;">
-            <button onclick="createProject()" style="padding: 10px 20px; background: var(--primary-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                ➕ Create Project in DB
-            </button>
-            <button onclick="window.open('/todo/addtodo', '_blank')" style="padding: 10px 20px; background: var(--success-color); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
-                ➕ Create Todo in DB
-            </button>
-        </div>
-
-        <details open style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 1: Database Schema & Models
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Create new database schema and DBIC Result classes for role-based access control and audit trail.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create <code>SiteRole.pm</code> Result class</li>
-                    <li>Create <code>UserSiteRole.pm</code> Result class</li>
-                    <li>Create <code>PlanAudit.pm</code> Result class</li>
-                    <li>Update <code>DailyPlan.pm</code>: Add <code>allowed_roles</code> column and JSON helper methods</li>
-                    <li>Update <code>Todo.pm</code>: Add <code>allowed_roles</code> column and JSON helper methods</li>
-                    <li>Access <a href="/admin/schema-comparison" target="_blank">/admin/schema-comparison</a> to sync Result classes to database tables</li>
-                    <li>Verify schema changes in database</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 2.2, 2.3, 9.4</p>
-                <p><strong>Verification:</strong> Run schema-comparison tool, verify tables created, test JSON methods</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 2: Data Seeding
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Seed initial role data for existing sites (CSC, Bmaster) and assign roles to existing users.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create <code>scripts/seed_site_roles.pl</code> script with default roles (admin, developer, user, custom per site)</li>
-                    <li>Test seeding script on development database</li>
-                    <li>Verify role data in <code>site_roles</code> and <code>user_site_roles</code> tables</li>
-                    <li>Document seeding process for future sites</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md section 6.3</p>
-                <p><strong>Verification:</strong> Query database to confirm roles exist for CSC and Bmaster sites</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 3: Access Control Utilities
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Create utility modules for checking user permissions and site access.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create <code>lib/Comserv/Util/PlanAccess.pm</code> with permission checking methods</li>
-                    <li>Add unit tests for PlanAccess utility</li>
-                    <li>Create <code>lib/Comserv/Util/PlanAudit.pm</code> with audit logging methods</li>
-                    <li>Add unit tests for PlanAudit utility</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 3.1, 3.2</p>
-                <p><strong>Verification:</strong> Run unit tests, manually test permission checks</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 4: Plan Controller
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Create new Plan controller to replace Documentation controller for planning routes.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create <code>lib/Comserv/Controller/Plan.pm</code> with base actions</li>
-                    <li>Implement <code>daily</code> action with date/sitename parameters</li>
-                    <li>Implement <code>weekly</code> action with week_start parameter</li>
-                    <li>Implement <code>monthly</code> action with month parameter</li>
-                    <li>Add error handling and logging to all actions</li>
-                    <li>Test controller actions with different user roles</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 4.1, 4.2</p>
-                <p><strong>Verification:</strong> Access <a href="/admin/plan/daily" target="_blank">/admin/plan/daily</a>, verify filtering, check logs</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 5-6: Templates (Daily, Weekly, Monthly Views)
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Create template files for daily, weekly, and monthly plan views that dynamically render from database.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create <code>root/admin/plan/daily.tt</code> template</li>
-                    <li>Create <code>root/admin/plan/weekly.tt</code> template</li>
-                    <li>Create <code>root/admin/plan/monthly.tt</code> template</li>
-                    <li>Create <code>root/admin/plan/master.tt</code> template</li>
-                    <li>Add checkbox functionality for marking todos complete (AJAX)</li>
-                    <li>Test templates with various data sets</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 5.1-5.4; requirements.md FR-1, FR-7</p>
-                <p><strong>Verification:</strong> Visual inspection, test with different dates/sites/roles</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 7: Project-Documentation Integration
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Implement project linking and documentation mapping features.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Extend Plan controller with project actions</li>
-                    <li>Create <code>root/admin/plan/projects.tt</code> template</li>
-                    <li>Implement auto-match algorithm for project-documentation linking</li>
-                    <li>Create <code>root/admin/plan/project_detail.tt</code> template</li>
-                    <li>Test project-documentation linking workflow</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 4.5, 5.5; requirements.md FR-3</p>
-                <p><strong>Verification:</strong> Link projects to docs, verify display on detail page</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 8: Audit Trail Viewer
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Implement audit trail viewing and filtering.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Add audit logging hooks to Plan controller</li>
-                    <li>Create <code>root/admin/plan/audit.tt</code> template</li>
-                    <li>Implement <code>audit</code> action with filters</li>
-                    <li>Test audit logging with various operations</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 4.6, 5.6; requirements.md FR-6</p>
-                <p><strong>Verification:</strong> Perform actions, verify audit log entries, test filters</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 9-10: URL Migration & Todo Controller Integration
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Update existing routes and integrate with Todo controller.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Add redirect in Documentation controller</li>
-                    <li>Update navigation links in templates</li>
-                    <li>Search codebase for hardcoded DailyPlan URLs and update</li>
-                    <li>Update Todo controller methods for audit logging</li>
-                    <li>Update todo templates with role filtering</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 7, 8.1</p>
-                <p><strong>Verification:</strong> Navigation works, todos log audit events</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 11: Testing & Verification
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Comprehensive testing across all implemented features.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Permission Testing (user roles)</li>
-                    <li>Functionality Testing (navigation, filtering, completion)</li>
-                    <li>Performance Testing (page load &lt; 2s, queries &lt; 10)</li>
-                    <li>Browser Testing (Chrome, Firefox, Safari)</li>
-                    <li>Data Migration (text-based plans to database)</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md section 9; requirements.md success metrics</p>
-                <p><strong>Verification:</strong> All tests pass, performance targets met, migration complete</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 12: Documentation & Cleanup
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Document the new system and clean up obsolete files.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Create user documentation</li>
-                    <li>Create admin documentation</li>
-                    <li>Update developer documentation</li>
-                    <li>Archive obsolete files</li>
-                    <li>Update project README</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md section 12; requirements.md problem statement</p>
-                <p><strong>Verification:</strong> Documentation reviewed and accessible</p>
-            </div>
-        </details>
-
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
-                📊 Phase 13: Production Deployment
-            </summary>
-            <div style="padding: 15px;">
-                <p><strong>Status:</strong> <span style="background: #ffc107; color: #000; padding: 3px 8px; border-radius: 3px;">Pending</span></p>
-                <p><strong>Description:</strong> Deploy to production with database migration and monitoring.</p>
-                <h4>Tasks:</h4>
-                <ul>
-                    <li>Pre-deployment: Backup database, review checklist, notify users</li>
-                    <li>Deployment: Deploy code, run schema sync, seed roles</li>
-                    <li>Post-deployment: Verify routes, test accounts, monitor logs</li>
-                    <li>Rollback Plan: Document procedure, keep backup for 7 days</li>
-                </ul>
-                <p><strong>Reference:</strong> spec.md sections 9.3, Appendix A.3</p>
-                <p><strong>Verification:</strong> Production system functional, no errors, positive feedback</p>
-            </div>
-        </details>
-
-        <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; border-radius: 4px; margin: 20px 0;">
-            <h4 style="margin-top: 0;">Success Criteria:</h4>
-            <ul>
-                <li>✅ All database schema changes applied via schema-comparison tool</li>
-                <li>✅ Role-based access control working for all user types</li>
-                <li>✅ Dynamic daily plan view rendering from database</li>
-                <li>✅ Project-documentation linking functional</li>
-                <li>✅ Audit trail capturing all planning changes</li>
-                <li>✅ Page load time &lt; 2 seconds</li>
-                <li>✅ Zero critical errors in production</li>
-                <li>✅ User documentation complete and accessible</li>
-                <li>✅ Migration from text-based plans to database complete</li>
-            </ul>
-        </div>
-    </div>
-
-    [% END %]<!-- end is_csc CSC-only tabs -->
 </div>
 
 <script>

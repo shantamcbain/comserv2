@@ -47,7 +47,7 @@
 
 <style>
     .changelog-meta {
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.9em;
         margin-bottom: 20px;
         border-bottom: 1px solid #eee;
@@ -78,7 +78,7 @@
     }
     
     .changelog-content pre {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         overflow-x: auto;
@@ -93,8 +93,8 @@
     .back-link a {
         display: inline-block;
         padding: 8px 15px;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background-color: var(--bg-secondary, #f8f9fa);
+        border: 1px solid var(--border-color, #dee2e6);
         border-radius: 4px;
         color: #495057;
         text-decoration: none;

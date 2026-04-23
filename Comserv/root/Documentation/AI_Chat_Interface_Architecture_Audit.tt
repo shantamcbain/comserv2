@@ -44,7 +44,7 @@
         <div class="col-100">
             <h2 id="the-answer" style="color: var(--text-color); font-family: var(--header-font);">✅ Direct Answer to Your Question</h2>
             
-            <div style="background-color: #d4edda; padding: var(--spacing-large); border: 2px solid #28a745; border-left: 4px solid var(--success-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: #d4edda; padding: var(--spacing-large); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h3 style="color: #155724; margin-top: 0;">Which chat form should I use for testing?</h3>
                 <p style="color: #155724; font-family: var(--body-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium);"><strong>ANSWER: Both interfaces work. Both persist to identical database. Use whichever is more convenient.</strong></p>
                 
@@ -386,7 +386,7 @@ New response appears in table</pre>
             <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 3: Immediate Database Verification (Within 5 seconds)</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>In MySQL terminal (Window A):</strong></p>
-                <pre style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); border-radius: 3px; overflow-x: auto;">SELECT id, username, message, timestamp, is_system_message, domain, site_name 
+                <pre style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); border-radius: 3px; overflow-x: auto;">SELECT id, username, message, timestamp, is_system_message, domain, site_name 
 FROM ChatMessage 
 ORDER BY id DESC 
 LIMIT 3;</pre>
@@ -425,7 +425,7 @@ LIMIT 3;</pre>
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Success Criteria</h3>
-            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; border-left: 4px solid var(--success-color); border-radius: 4px;">
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color); border-radius: 4px;">
                 <h4 style="color: #155724; margin-top: 0;">✅ Phase 3 PASS Conditions</h4>
                 <ul style="color: #155724; font-family: var(--body-font);">
                     <li>Message appears in database within 2 seconds of sending</li>
@@ -481,7 +481,7 @@ LIMIT 3;</pre>
             </table>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">✅ Findings Summary (CORRECTED)</h3>
-            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; border-left: 4px solid #28a745; border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color, #28a745); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: #155724; margin-top: 0;">✅ Unified Architecture Verified</h4>
                 <p style="color: #155724; font-family: var(--body-font); margin: 0;"><strong>CORRECTION from v0.01:</strong> Widget messages ARE saved. Widget uses /ai/generate endpoint (AI.pm controller) which creates AiConversation and saves messages to AiMessage table. This is identical schema to admin interface.</p>
                 <p style="color: #155724; font-family: var(--body-font);"><strong>Architecture:</strong> Both widget and admin interfaces persist to same unified database backend (AiMessage + AiConversation).</p>

@@ -1049,7 +1049,7 @@
     
     .kb-description {
         font-size: 1.1em;
-        color: #555;
+        color: var(--text-muted-color, #555);
         margin-bottom: 15px;
     }
     
@@ -1063,7 +1063,7 @@
     }
     
     .kb-navigation {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 5px;
         margin-bottom: 30px;
@@ -1083,7 +1083,7 @@
     }
     
     .nav-links a {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         text-decoration: none;
         padding: 5px 10px;
         border-radius: 3px;
@@ -1101,13 +1101,13 @@
     
     .command-section h2 {
         color: #343a40;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
         padding-bottom: 10px;
         margin-bottom: 20px;
     }
     
     .command-card {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
         padding: 20px;
         margin-bottom: 20px;
@@ -1115,7 +1115,7 @@
     }
     
     .command-card h3 {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         margin-top: 0;
         margin-bottom: 10px;
         font-family: monospace;
@@ -1123,12 +1123,12 @@
     }
     
     .command-description {
-        color: #555;
+        color: var(--text-muted-color, #555);
         margin-bottom: 15px;
     }
     
     .command-examples {
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
         border-radius: 3px;
         padding: 10px;
     }
@@ -1152,17 +1152,17 @@
         border-radius: 3px;
         font-family: monospace;
         margin-bottom: 5px;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .example p {
         margin: 5px 0 0 0;
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.95em;
     }
     
     .command-warning {
-        background-color: #fff3cd;
+        background-color: var(--caution-bg, #fff3cd);
         color: #856404;
         padding: 10px;
         border-radius: 3px;
@@ -1181,7 +1181,7 @@
         margin-top: 40px;
         padding-top: 20px;
         border-top: 2px solid #eee;
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         font-size: 0.9em;
     }
     

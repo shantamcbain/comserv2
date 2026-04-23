@@ -10,17 +10,17 @@
 }
 
 .env-badge-production {
-    background-color: #dc3545;
+    background-color: var(--danger-color, #dc3545);
     color: white;
 }
 
 .env-badge-staging {
     background-color: #ffc107;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .env-badge-dev {
-    background-color: #28a745;
+    background-color: var(--success-color, #28a745);
     color: white;
 }
 
@@ -61,7 +61,7 @@
     </header>
     
     <!-- Database Environment Selector -->
-    <div class="db-env-selector" style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
+    <div class="db-env-selector" style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px; padding: 15px; margin: 15px 0;">
         <!-- Full Dev Mode Checkbox -->
         <div style="margin-bottom: 10px; padding: 8px; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px;">
             <label style="cursor: pointer; font-weight: bold;">
@@ -94,13 +94,13 @@
                 <i class="fas fa-exclamation-triangle"></i> Caution: Production Database
             </span>
             [% END %]
-            <button type="button" onclick="toggleAddForm()" style="padding: 8px 12px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
+            <button type="button" onclick="toggleAddForm()" style="padding: 8px 12px; background: var(--primary-color, #007bff); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                 <i class="fas fa-plus"></i> Add New Environment
             </button>
         </div>
         
         <!-- Add New Environment Form (hidden by default) -->
-        <div id="addEnvForm" style="display: none; margin-top: 15px; padding: 15px; background: white; border: 1px solid #dee2e6; border-radius: 4px;">
+        <div id="addEnvForm" style="display: none; margin-top: 15px; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid #dee2e6; border-radius: 4px;">
             <h4 style="margin-top: 0;">Add New Database Environment</h4>
             <form id="newEnvForm" onsubmit="submitNewEnvironment(event)">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
@@ -139,10 +139,10 @@
                     </div>
                 </div>
                 <div style="display: flex; gap: 10px;">
-                    <button type="submit" style="padding: 8px 16px; background: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button type="submit" style="padding: 8px 16px; background: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         <i class="fas fa-save"></i> Save Environment
                     </button>
-                    <button type="button" onclick="toggleAddForm()" style="padding: 8px 16px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button type="button" onclick="toggleAddForm()" style="padding: 8px 16px; background: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         <i class="fas fa-times"></i> Cancel
                     </button>
                 </div>
@@ -247,7 +247,7 @@
                     [% IF database_comparison.ency.connection_status == 'connected' %]
                     <span class="status-badge connected">Connected</span>
                     [% ELSE %]
-                    <span class="status-badge" style="background-color: #dc3545;">Not Connected</span>
+                    <span class="status-badge" style="background-color: var(--danger-color, #dc3545);">Not Connected</span>
                     [% END %]
                     <span class="table-count">[% database_comparison.ency.table_count %] tables</span>
                 </span>
@@ -399,7 +399,7 @@
                     [% IF database_comparison.forager.connection_status == 'connected' %]
                     <span class="status-badge connected">Connected</span>
                     [% ELSE %]
-                    <span class="status-badge" style="background-color: #dc3545;">Not Connected</span>
+                    <span class="status-badge" style="background-color: var(--danger-color, #dc3545);">Not Connected</span>
                     [% END %]
                     <span class="table-count">[% database_comparison.forager.table_count %] tables</span>
                 </span>
@@ -866,14 +866,14 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         html += '<div class="schema-differences-summary" style="margin-bottom: 20px; border: 1px solid #ffcccc; border-radius: 8px; overflow: hidden;">';
         html += '<div style="background: #fff0f0; padding: 10px; border-bottom: 1px solid #ffcccc; font-weight: bold; color: #d32f2f;">';
         html += '<i class="fas fa-exclamation-circle"></i> Schema-level Differences</div>';
-        html += '<table style="width: 100%; border-collapse: collapse; background: white; font-size: 13px;">';
-        html += '<thead style="background: #fdfdfd; text-align: left;"><tr><th style="padding: 8px;">Attribute</th><th style="padding: 8px;">Table Value</th><th style="padding: 8px;">Result Value</th><th style="padding: 8px;">Actions</th></tr></thead>';
+        html += '<table style="width: 100%; border-collapse: collapse; background: var(--card-bg, rgba(255,255,255,0.88)); font-size: 13px;">';
+        html += '<thead style="background: var(--card-bg, rgba(255,255,255,0.88)); text-align: left;"><tr><th style="padding: 8px;">Attribute</th><th style="padding: 8px;">Table Value</th><th style="padding: 8px;">Result Value</th><th style="padding: 8px;">Actions</th></tr></thead>';
         html += '<tbody>';
         
         comparison.differences.forEach(diff => {
             html += '<tr style="border-top: 1px solid #eee;">';
             html += '<td style="padding: 8px;"><strong>' + diff.attribute + '</strong></td>';
-            html += '<td style="padding: 8px;"><code style="background: #f5f5f5; padding: 2px 4px;">' + (diff.table_value || 'None') + '</code></td>';
+            html += '<td style="padding: 8px;"><code style="background: var(--bg-secondary, #f5f5f5); padding: 2px 4px;">' + (diff.table_value || 'None') + '</code></td>';
             html += '<td style="padding: 8px;"><code style="background: #fff8e1; padding: 2px 4px;">' + (diff.result_value || 'None') + '</code></td>';
             html += '<td style="padding: 8px;">';
             
@@ -1107,14 +1107,14 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
         // Add primary key and relationship summaries like in fallback view
         if (comparison && (comparison.primary_keys || comparison.unique_constraints || comparison.relationships || comparison.raw_package_calls)) {
             html += '<div class="schema-metadata-summary" style="margin-top: 15px; padding: 15px; background: var(--secondary-color, #f9f9f9); border-radius: 6px; border-left: 4px solid var(--primary-color, #ccffff);">';
-            html += '<h6 style="margin-top: 0; color: #000000;"><i class="fas fa-info-circle"></i> Schema Metadata (__PACKAGE__)</h6>';
+            html += '<h6 style="margin-top: 0; color: var(--text-color, #000);"><i class="fas fa-info-circle"></i> Schema Metadata (__PACKAGE__)</h6>';
             
             // Primary Keys
             if (comparison.primary_keys) {
                 const tablePKs = comparison.primary_keys.table || [];
                 const resultPKs = comparison.primary_keys.result || [];
                 
-                html += '<div style="margin-bottom: 8px; color: #000000;"><strong>Primary Keys:</strong><br>';
+                html += '<div style="margin-bottom: 8px; color: var(--text-color, #000);"><strong>Primary Keys:</strong><br>';
                 html += '<span style="display: inline-block; width: 60px;">Table:</span> ';
                 html += tablePKs.length > 0 ? '<span class="prop primary">' + tablePKs.join('</span>, <span class="prop primary">') + '</span>' : '<em>None</em>';
                 html += '<br><span style="display: inline-block; width: 60px;">Result:</span> ';
@@ -1124,7 +1124,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             
             // Unique Constraints
             if (comparison.unique_constraints && (comparison.unique_constraints.table.length > 0 || comparison.unique_constraints.result.length > 0)) {
-                html += '<div style="margin-top: 10px; color: #000000;"><strong>Unique Constraints:</strong><br>';
+                html += '<div style="margin-top: 10px; color: var(--text-color, #000);"><strong>Unique Constraints:</strong><br>';
                 
                 const showUniques = (uniques, label) => {
                     html += '<span style="display: inline-block; width: 60px;">' + label + ':</span> ';
@@ -1144,11 +1144,11 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             }
             
             if (comparison.relationships && Object.keys(comparison.relationships).length > 0) {
-                html += '<div style="margin-top: 10px; color: #000000;"><strong>Relationships:</strong><ul style="margin: 5px 0 0 20px; padding: 0;">';
+                html += '<div style="margin-top: 10px; color: var(--text-color, #000);"><strong>Relationships:</strong><ul style="margin: 5px 0 0 20px; padding: 0;">';
                 for (var rel_name in comparison.relationships) {
                     var rel = comparison.relationships[rel_name];
                     var shortClass = (rel.class || 'N/A').split('::').pop();
-                    html += '<li style="margin-bottom: 5px; color: #000000;">';
+                    html += '<li style="margin-bottom: 5px; color: var(--text-color, #000);">';
                     html += '<span class="relationship-tag" title="' + rel.type + ': ' + rel.class + '">';
                     html += '<i class="fas fa-link"></i> <strong>' + rel_name + '</strong> (' + rel.type + ') → ' + shortClass;
                     if (rel.column) {
@@ -1160,7 +1160,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
             }
 
             if (comparison.raw_package_calls && comparison.raw_package_calls.length > 0) {
-                html += '<div style="margin-top: 10px; color: #000000;"><strong>Raw __PACKAGE__ Calls:</strong><pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: #333;">';
+                html += '<div style="margin-top: 10px; color: #000000;"><strong>Raw __PACKAGE__ Calls:</strong><pre style="margin: 5px 0 0 0; padding: 8px; background: #eee; border-radius: 4px; font-size: 11px; overflow-x: auto; color: var(--text-color, #333);">';
                 comparison.raw_package_calls.forEach(function(call) {
                     if (call.method !== 'add_columns' && call.method !== 'table') { // Skip very verbose ones already shown
                         html += call.full + '\n';
@@ -1184,14 +1184,14 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
     }
     
     // Add Detailed Metadata Comparison
-    html += '<div class="metadata-comparison" style="margin-top: 30px; border: 1px solid #ddd; border-radius: 8px; overflow: hidden;">';
-    html += '<div style="background: #f8f9fa; padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">';
+    html += '<div class="metadata-comparison" style="margin-top: 30px; border: 1px solid var(--border-color, #ddd); border-radius: 8px; overflow: hidden;">';
+    html += '<div style="background: var(--bg-secondary, #f8f9fa); padding: 10px; border-bottom: 1px solid #ddd; font-weight: bold;">';
     html += '<i class="fas fa-file-code"></i> Result File Package Metadata Comparison</div>';
     html += '<div style="padding: 15px;">';
-    html += '<p style="font-size: 13px; color: #666; margin-bottom: 15px;">Comparison of <code>__PACKAGE__</code> calls in the Result file vs database schema.</p>';
+    html += '<p style="font-size: 13px; color: var(--text-muted-color, #666); margin-bottom: 15px;">Comparison of <code>__PACKAGE__</code> calls in the Result file vs database schema.</p>';
     
     html += '<table style="width: 100%; border-collapse: collapse; font-size: 13px;">';
-    html += '<thead style="background: #fdfdfd; text-align: left;"><tr><th style="padding: 8px; border-bottom: 2px solid #eee;">Method</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Database State</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Result File Content</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Status</th></tr></thead>';
+    html += '<thead style="background: var(--card-bg, rgba(255,255,255,0.88)); text-align: left;"><tr><th style="padding: 8px; border-bottom: 2px solid #eee;">Method</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Database State</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Result File Content</th><th style="padding: 8px; border-bottom: 2px solid #eee;">Status</th></tr></thead>';
     html += '<tbody>';
     
     // Table name comparison
@@ -1273,7 +1273,7 @@ function buildFieldComparisonHTML(comparison, tableName, database, debugMode) {
     if (allUniqueNames.size === 0 || Array.from(allUniqueNames).every(name => dbUniquesMap[name] === resultUniquesMap[name])) {
         html += '<tr style="border-bottom: 1px solid #eee;">';
         html += '<td style="padding: 8px;"><code>add_unique_constraint</code></td>';
-        html += '<td colspan="2" style="padding: 8px; text-align: center; color: #666;">All unique constraints match</td>';
+        html += '<td colspan="2" style="padding: 8px; text-align: center; color: var(--text-muted-color, #666);">All unique constraints match</td>';
         html += '<td style="padding: 8px;"><span style="color:green"><i class="fas fa-check"></i> Match</span></td>';
         html += '<td style="padding: 8px;"></td>';
         html += '</tr>';

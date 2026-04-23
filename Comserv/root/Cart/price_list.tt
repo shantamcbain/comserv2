@@ -39,7 +39,7 @@
 
 <div class="print-header" style="display:none">
   <h1 style="font-family:var(--header-font)">[% sitename %] — Price List</h1>
-  <p style="color:#666;font-size:0.85em">Prices in CAD. Subject to change without notice.</p>
+  <p style="color: var(--text-muted-color, #666);font-size:0.85em">Prices in CAD. Subject to change without notice.</p>
 </div>
 <style>@media print { .print-header { display: block !important; } }</style>
 

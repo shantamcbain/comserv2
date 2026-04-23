@@ -1,7 +1,7 @@
 [%# Edit Roles Template for Documentation %]
 [% META title = 'Edit Documentation Roles' %]
 [% META description = 'Edit roles for a documentation page' %]
-[% PageVersion = 'admin/documentation/edit_roles.tt,v 1.02 2026/03/24 compact layout' %]
+[% PageVersion = 'admin/documentation/edit_roles.tt,v 1.03 2026/04/22 theme-audit-P4' %]
 
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
@@ -24,9 +24,9 @@
             flex-wrap: wrap;
         }
 
-        .er-title-block h2 { margin: 0 0 2px; font-size: 1.2em; color: #333; }
-        .er-title-block h3 { margin: 0 0 2px; font-size: 1em; color: #444; }
-        .er-title-block .er-path { font-size: 12px; color: #666; }
+        .er-title-block h2 { margin: 0 0 2px; font-size: 1.2em; color: var(--text-color, #333); }
+        .er-title-block h3 { margin: 0 0 2px; font-size: 1em; color: var(--text-color, #444); }
+        .er-title-block .er-path { font-size: 12px; color: var(--text-muted-color, #666); }
 
         .er-topbar-actions { display: flex; gap: 8px; flex-shrink: 0; }
 
@@ -38,8 +38,8 @@
         }
 
         .er-card {
-            background: #fff;
-            border: 1px solid #dee2e6;
+            background: var(--card-bg, rgba(255,255,255,0.88));
+            border: 1px solid var(--border-color, #dee2e6);
             border-radius: 6px;
             padding: 14px 16px;
         }
@@ -49,8 +49,8 @@
             font-size: 0.9em;
             text-transform: uppercase;
             letter-spacing: 0.05em;
-            color: #495057;
-            border-bottom: 1px solid #dee2e6;
+            color: var(--text-color, #495057);
+            border-bottom: 1px solid var(--border-color, #dee2e6);
             padding-bottom: 6px;
         }
 
@@ -71,14 +71,14 @@
 
         .er-help-list {
             font-size: 12px;
-            color: #555;
+            color: var(--text-color, #555);
             line-height: 1.7;
             margin: 0;
             padding: 0;
             list-style: none;
         }
 
-        .er-help-list li strong { color: #333; }
+        .er-help-list li strong { color: var(--text-color, #333); }
 
         /* Role checkboxes grid */
         .er-roles-grid {
@@ -93,9 +93,9 @@
             align-items: center;
             gap: 8px;
             padding: 8px 10px;
-            border: 2px solid #dee2e6;
+            border: 2px solid var(--border-color, #dee2e6);
             border-radius: 5px;
-            background: #f8f9fa;
+            background: var(--bg-secondary, #f8f9fa);
             cursor: pointer;
             transition: all 0.15s ease;
         }
@@ -105,8 +105,8 @@
 
         .er-role-option input[type="checkbox"] { margin: 0; cursor: pointer; }
 
-        .er-role-label { font-size: 13px; font-weight: 500; color: #333; text-transform: capitalize; cursor: pointer; line-height: 1.2; }
-        .er-role-desc  { font-size: 11px; color: #888; }
+        .er-role-label { font-size: 13px; font-weight: 500; color: var(--text-color, #333); text-transform: capitalize; cursor: pointer; line-height: 1.2; }
+        .er-role-desc  { font-size: 11px; color: var(--text-muted-color, #888); }
 
         .er-actions {
             display: flex;
@@ -128,7 +128,7 @@
         }
         .btn-primary  { background: #2c7be5; color: #fff; }
         .btn-primary:hover { background: #1a68c7; color: #fff; }
-        .btn-success  { background: #28a745; color: #fff; }
+        .btn-success  { background: var(--success-color, #28a745); color: #fff; }
         .btn-success:hover { background: #1e7e34; color: #fff; }
         .btn-secondary { background: #e2e8f0; color: #4a5568; }
         .btn-secondary:hover { background: #cbd5e0; }
@@ -180,7 +180,7 @@
                         <span class="er-badge">[% role | ucfirst %]</span>
                     [% END %]
                 [% ELSE %]
-                    <span class="er-badge" style="background:#6c757d;">No Roles Set</span>
+                    <span class="er-badge" style="background: var(--secondary-color, #6c757d);">No Roles Set</span>
                 [% END %]
             </div>
             <h4>Role Reference</h4>

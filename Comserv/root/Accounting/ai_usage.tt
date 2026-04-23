@@ -44,7 +44,7 @@
 </form>
 
 <h2>Period: [% period_from %] → [% period_to %]
-  <small style="font-size:0.7em;color:#555;">
+  <small style="font-size:0.7em;color: var(--text-muted-color, #555);">
     ([% provider == 'grok' ? 'Grok/xAI only' : provider %]
     [% IF agent_filter != 'all' %] · agent: [% agent_filter | html %][% END %])
   </small>
@@ -52,7 +52,7 @@
 
 [% IF agents.size %]
 <h3>Usage by Agent / System</h3>
-<p style="font-size:0.85em;color:#555;">Use this to see how much of the cost was driven by each part of the system (e.g. Inventory accounting AI vs general chat).</p>
+<p style="font-size:0.85em;color: var(--text-muted-color, #555);">Use this to see how much of the cost was driven by each part of the system (e.g. Inventory accounting AI vs general chat).</p>
 <table border="1" cellpadding="4" style="border-collapse:collapse;margin-bottom:1.2em;font-size:0.9em;">
   <tr style="background:#dde;">
     <th>Agent</th>
@@ -148,7 +148,7 @@
 </table>
 
 [% IF invoice_amt > 0 %]
-<div style="margin-top:1.2em;padding:0.8em;background:#fff3cd;border:1px solid #ffc107;border-radius:5px;">
+<div style="margin-top:1.2em;padding:0.8em;background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);border-radius:5px;">
   <strong>Workflow — How to Record This:</strong>
   <ol style="margin:0.5em 0 0 1.2em;">
     <li>Enter the xAI invoice at <a href="/Inventory/invoice/new">/Inventory/invoice/new</a>
