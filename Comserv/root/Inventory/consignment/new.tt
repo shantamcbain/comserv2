@@ -73,7 +73,7 @@
 
   <h2 style="font-family:var(--header-font);color:var(--text-color);margin-bottom:0.5em">Items to Consign</h2>
   <div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffe082;border-radius:4px;padding:8px 14px;margin-bottom:0.8em;font-size:0.85em;color:#5d4037">
-    All active items from <strong>[% source_sitename | html %]</strong> inventory are listed. Set the retail price (what the partner charges customers).
+    Items visible in the shop for <strong>[% source_sitename | html %]</strong> are listed. Set the retail price (what the partner charges customers).
   </div>
 
   <div id="consign-lines">
@@ -205,21 +205,49 @@ var lineCount = 1;
 function addLine() {
   var idx = lineCount++;
   var container = document.getElementById('consign-lines');
-  var firstSel = document.querySelector('#consign-lines .consign-line select');
-  var itemOptionsHTML = firstSel ? firstSel.innerHTML : '<option value="">— select item —</option>';
-  var div = document.createElement('div');
-  div.className = 'consign-line';
-  div.style.cssText = 'display:grid;gap:0.5em;margin-bottom:0.7em;background:var(--secondary-color);padding:10px 12px;border-radius:4px;border:1px solid var(--border-color)';
-  div.innerHTML =
-    '<div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap">'
-    + '<select name="item_id_' + idx + '" onchange="onItemChange(this,' + idx + ')" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
-    + '<label style="font-size:0.85rem">Qty: <input type="number" name="quantity_' + idx + '" min="1" step="1" value="1" style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
-    + '<label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price_' + idx + '" min="0" step="0.01" placeholder="0.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
-    + '<input type="text" name="line_notes_' + idx + '" placeholder="Notes (optional)" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">'
-    + '<button type="button" onclick="this.closest(\'.consign-line\').remove()" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>'
-    + '</div>'
-    + '<div class="item-options-row" id="opts-' + idx + '" style="display:none;gap:0.6em;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border-color);margin-top:4px"></div>'
-    + '<input type="hidden" name="options_selected_' + idx + '" id="options-val-' + idx + '">';
-  container.appendChild(div);
+  if (!container) return;
+
+  var source = container.querySelector('.consign-line');
+  if (!source) return;
+
+  var clone = source.cloneNode(true);
+
+  clone.querySelectorAll('[name]').forEach(function(el) {
+    el.name = el.name.replace(/_\d+$/, '_' + idx);
+    if (el.type !== 'number') el.value = '';
+    else if (el.name.indexOf('quantity') !== -1) el.value = '1';
+    else el.value = '';
+  });
+
+  clone.querySelectorAll('[id]').forEach(function(el) {
+    el.id = el.id.replace(/[-_]\d+$/, function(m) { return m[0] + idx; });
+  });
+
+  var itemSel = clone.querySelector('select[name^="item_id"]');
+  if (itemSel) {
+    itemSel.selectedIndex = 0;
+    itemSel.setAttribute('onchange', 'onItemChange(this,' + idx + ')');
+  }
+
+  clone.querySelectorAll('select:not([name^="item_id"])').forEach(function(s) {
+    s.selectedIndex = 0;
+  });
+
+  var optsRow = clone.querySelector('.item-options-row');
+  if (optsRow) { optsRow.style.display = 'none'; optsRow.innerHTML = ''; }
+
+  var removeBtn = clone.querySelector('.remove-line-btn');
+  if (!removeBtn) {
+    removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'remove-line-btn';
+    removeBtn.style.cssText = 'background:none;border:none;color:#c62828;cursor:pointer;font-size:1.2rem;padding:0 4px;line-height:1';
+    removeBtn.textContent = '\u00d7';
+    var flexRow = clone.querySelector('div');
+    if (flexRow) flexRow.appendChild(removeBtn);
+  }
+  removeBtn.onclick = function() { this.closest('.consign-line').remove(); };
+
+  container.appendChild(clone);
 }
 </script>
