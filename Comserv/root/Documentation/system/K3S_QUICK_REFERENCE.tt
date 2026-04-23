@@ -25,18 +25,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#decision-matrix" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Decisions</a>
-                <a href="#roadmap" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">6-Phase Roadmap</a>
-                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Architecture</a>
-                <a href="#checkpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Critical Checkpoints</a>
-                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Enhancements</a>
-                <a href="#risks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Risks & Mitigation</a>
-                <a href="#next-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Next Steps</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#decision-matrix" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Decisions</a>
+                <a href="#roadmap" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">6-Phase Roadmap</a>
+                <a href="#architecture" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Architecture</a>
+                <a href="#checkpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Critical Checkpoints</a>
+                <a href="#enhancements" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Enhancements</a>
+                <a href="#risks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Risks & Mitigation</a>
+                <a href="#next-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Next Steps</a>
             </div>
         </div>
     </div>
@@ -60,8 +60,8 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Quick Links to Implementation Guides</h3>
             <div style="display: flex; gap: var(--spacing-medium); flex-wrap: wrap;">
                 <a href="/Documentation/K3S_PRODUCTION_MIGRATION_GUIDE" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--primary-color); color: white; border-radius: 4px; text-decoration: none; font-weight: bold;">⭐ START HERE: Implementation Guide</a>
-                <a href="/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--secondary-color); color: white; border-radius: 4px; text-decoration: none;">Main Migration Strategy</a>
-                <a href="/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" style="padding: var(--spacing-small) var(--spacing-medium); background-color: var(--secondary-color); color: white; border-radius: 4px; text-decoration: none;">Grok's Original Plan</a>
+                <a href="/Documentation/DOCKER_KUBERNETES_MIGRATION_STRATEGY" style="padding: var(--spacing-small) var(--spacing-medium); background-color: rgba(255,255,255,0.12); color: white; border-radius: 4px; text-decoration: none;">Main Migration Strategy</a>
+                <a href="/Documentation/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN" style="padding: var(--spacing-small) var(--spacing-medium); background-color: rgba(255,255,255,0.12); color: white; border-radius: 4px; text-decoration: none;">Grok's Original Plan</a>
             </div>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
         </div>
@@ -249,32 +249,32 @@
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">7. Key Risks &amp; Mitigation</h2>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: K3s Cluster Instability</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Master on stable proxmox720; Prometheus monitoring from day 1</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Data Loss During Migration</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Galera replication + 3-day bare-metal retention</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Application Can't Connect to K3s DB</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Test in staging first; rollback procedure ready</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Network Issues Between Hosts</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> All on same LAN (192.168.1.0/24); no complex routing</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Replication Lag During Cutover</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> Monitor Seconds_Behind_Master; wait until 0 before cutover</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font); margin-top: 0;">Risk: Missed Rollback Window</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Mitigation:</strong> 3-day minimum retention; 72-hour decision window</p>
             </div>
@@ -318,7 +318,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">9. See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/system/K3S_PRODUCTION_MIGRATION_GUIDE" style="color: var(--link-color);"><strong>K3S_PRODUCTION_MIGRATION_GUIDE.tt</strong></a> - Detailed step-by-step implementation with copy/paste commands</li>

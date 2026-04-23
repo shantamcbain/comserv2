@@ -49,7 +49,7 @@
 
       <div class="content-section">
         <h2>Add / Update Pricing</h2>
-        <p style="font-size:0.9em;color:#555;">
+        <p style="font-size:0.9em;color: var(--text-muted-color, #555);">
           Use ISO 3166-1 alpha-2 country codes (e.g. <code>CA</code>, <code>IN</code>, <code>BR</code>).
           Use <code>DEFAULT</code> to set the fallback price for regions not listed.
           Prices override the base plan price for users in that region.
@@ -156,7 +156,7 @@
           <li><strong>GB (UK):</strong> ~90–105% of USD price</li>
           <li><strong>EU (Europe):</strong> ~85–110% of USD price</li>
         </ul>
-        <p style="font-size:0.85em;color:#666;">
+        <p style="font-size:0.85em;color: var(--text-muted-color, #666);">
           Source: World Bank PPP data. Adjust based on your actual user demographics.
         </p>
       </div>

@@ -178,12 +178,26 @@ sub details :Path('/admin/plan') :Args(1) {
             $c->stash->{json} = { success => 1, plan => \%plan_data };
             $c->forward('View::JSON');
         } else {
+            my @available_projects;
+            if ($c->stash->{is_admin}) {
+                my $site = $plan->sitename || $c->stash->{plan_sitename} || 'CSC';
+                my %linked_ids = map { $_->{id} => 1 } @projects;
+                eval {
+                    my @all_proj = $schema->resultset('Project')->search(
+                        { sitename => $site, -or => [ status => undef, status => { '!=' => 'archived' } ] },
+                        { order_by => { -asc => 'name' } }
+                    )->all;
+                    @available_projects = map { { id => $_->id, name => $_->name, project_code => $_->project_code } }
+                                         grep { !$linked_ids{$_->id} } @all_proj;
+                };
+            }
             $c->stash(
-                plan         => \%plan_data,
-                is_admin     => $c->stash->{is_admin},
-                is_csc_admin => $c->stash->{is_csc_admin},
-                plan_sitename => $c->stash->{plan_sitename},
-                template     => 'admin/plan/view.tt',
+                plan               => \%plan_data,
+                is_admin           => $c->stash->{is_admin},
+                is_csc_admin       => $c->stash->{is_csc_admin},
+                plan_sitename      => $c->stash->{plan_sitename},
+                available_projects => \@available_projects,
+                template           => 'admin/plan/view.tt',
             );
             $c->forward($c->view('TT'));
         }
@@ -315,7 +329,10 @@ sub update :Path('/admin/plan') :Args(1) {
 sub delete :Path('/admin/plan') :Args(1) {
     my ($self, $c, $plan_id) = @_;
     
-    return unless $c->req->method eq 'DELETE';
+    unless ($c->req->method eq 'DELETE') {
+        $c->response->redirect($c->uri_for('/admin/plan/list'));
+        $c->detach;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete', 
         "Deleting plan: $plan_id");
@@ -351,7 +368,10 @@ sub delete :Path('/admin/plan') :Args(1) {
 sub add_project :Path('/admin/plan') :Args(2) {
     my ($self, $c, $plan_id, $action) = @_;
     
-    return unless $action eq 'project' && $c->req->method eq 'POST';
+    unless ($action eq 'project' && $c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/plan/list'));
+        $c->detach;
+    }
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_project', 
         "Adding project to plan: $plan_id");

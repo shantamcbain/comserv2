@@ -24,17 +24,17 @@
     </div>
 
     <!-- EXECUTIVE SUMMARY -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-color); font-family: var(--body-font); font-size: var(--font-size-small);"><strong>🔧 CORRECTION (v0.02):</strong> Both chat interfaces use the SAME unified database backend (AiMessage + AiConversation schema). Widget uses /ai/generate endpoint (AI.pm), admin interface uses /chat/send_message endpoint (Chat.pm). Both persist to identical database records. Use EITHER interface for testing.</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#the-answer" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">🎯 Direct Answer</a>
-                <a href="#interface-1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Interface #1: Widget</a>
-                <a href="#interface-2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Interface #2: Admin</a>
-                <a href="#backend" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Backend Architecture</a>
-                <a href="#testing" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Testing Strategy</a>
-                <a href="#findings" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Findings</a>
+                <a href="#the-answer" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">🎯 Direct Answer</a>
+                <a href="#interface-1" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Interface #1: Widget</a>
+                <a href="#interface-2" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Interface #2: Admin</a>
+                <a href="#backend" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Backend Architecture</a>
+                <a href="#testing" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Testing Strategy</a>
+                <a href="#findings" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Findings</a>
             </div>
         </div>
     </div>
@@ -44,7 +44,7 @@
         <div class="col-100">
             <h2 id="the-answer" style="color: var(--text-color); font-family: var(--header-font);">✅ Direct Answer to Your Question</h2>
             
-            <div style="background-color: #d4edda; padding: var(--spacing-large); border: 2px solid #28a745; border-left: 4px solid var(--success-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: #d4edda; padding: var(--spacing-large); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h3 style="color: #155724; margin-top: 0;">Which chat form should I use for testing?</h3>
                 <p style="color: #155724; font-family: var(--body-font); font-size: var(--font-size-large); margin-bottom: var(--spacing-medium);"><strong>ANSWER: Both interfaces work. Both persist to identical database. Use whichever is more convenient.</strong></p>
                 
@@ -90,7 +90,7 @@
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>File Location</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>root/static/js/local-chat.js</code></td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Display Mode</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Floating widget (fixed position: bottom 20px, right 20px)</td>
                 </tr>
@@ -98,7 +98,7 @@
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Dimensions</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">300px wide × 400px tall</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Backend API Endpoint</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/ai/generate</code> (POST - sends prompt to AI)</td>
                 </tr>
@@ -106,7 +106,7 @@
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Technology Stack</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Vanilla JavaScript (no jQuery), CSS Grid, fetch() API</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>User Interaction</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Click robot emoji button → chat panel opens → type message → press Enter or click Send</td>
                 </tr>
@@ -114,14 +114,14 @@
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Status Indicator</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">"AI Ready", "AI is thinking...", "AI Error" (shown at bottom of widget)</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Database Persistence</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>✅ FULLY WORKING</strong> - Saves to AiMessage via AI.pm controller (verified source code)</td>
                 </tr>
             </table>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Code Flow (CORRECTED)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">User types message in widget chat panel
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">User types message in widget chat panel
     ↓
 sendMessage() function executes (local-chat.js)
     ↓
@@ -161,7 +161,7 @@ Status updates to "AI Ready"
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Template Files</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>root/chat/admin.tt</code> + <code>root/chat/index.tt</code></td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Routes</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>GET /chat</code> (index) → <code>GET /chat/admin</code> (admin panel, admin only)</td>
                 </tr>
@@ -169,7 +169,7 @@ Status updates to "AI Ready"
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Display Mode</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Full-page (two-column layout: message list + response form)</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Left Column</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Table of all chat messages (ID, User, Domain, Site, Message, Time, Status, Action buttons)</td>
                 </tr>
@@ -177,7 +177,7 @@ Status updates to "AI Ready"
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Right Column</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Response form + Quick response buttons for common replies</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Backend API Endpoints</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>/chat/send_message</code> (POST) + <code>/chat/get_messages</code> (GET) - Both endpoints use Chat.pm and save to AiMessage table</td>
                 </tr>
@@ -185,7 +185,7 @@ Status updates to "AI Ready"
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Database Schema</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>AiMessage</code> + <code>AiConversation</code> (same as widget - unified schema)</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Auto-Refresh</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Page reloads every 30 seconds to show new messages</td>
                 </tr>
@@ -193,14 +193,14 @@ Status updates to "AI Ready"
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Access Control</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin role required (check_user_roles('admin'))</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Database Persistence</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>✅ FULLY WORKING</strong> - All messages and responses saved to ChatMessage table</td>
                 </tr>
             </table>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Code Flow (Admin Interface)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">GET /chat/admin
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">GET /chat/admin
     ↓
 Chat.pm admin() action loads ChatMessage table
     ↓
@@ -295,7 +295,7 @@ New response appears in table</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">INT PRIMARY KEY</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unique message identifier</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>username</code></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Who sent message (user, 'Admin', 'Guest')</td>
@@ -305,7 +305,7 @@ New response appears in table</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">LONGTEXT</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Message content</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>timestamp</code></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR (ISO8601)</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">When message was created</td>
@@ -315,7 +315,7 @@ New response appears in table</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">TINYINT (boolean)</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin marked as read?</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>is_system_message</code></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">TINYINT (boolean)</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Is this an admin response?</td>
@@ -325,7 +325,7 @@ New response appears in table</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Request domain (multi-site support)</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>site_name</code></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Site context (from session)</td>
@@ -356,7 +356,7 @@ New response appears in table</pre>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Test Procedure (Step-by-Step)</h3>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 1: Prepare Test Environment</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Open two terminal windows:
@@ -370,7 +370,7 @@ New response appears in table</pre>
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 2: Create Test Message</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>In admin interface, look at the "Chat Messages" table</li>
@@ -383,10 +383,10 @@ New response appears in table</pre>
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 3: Immediate Database Verification (Within 5 seconds)</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>In MySQL terminal (Window A):</strong></p>
-                <pre style="background-color: white; padding: var(--spacing-small); border: 1px solid var(--border-color); border-radius: 3px; overflow-x: auto;">SELECT id, username, message, timestamp, is_system_message, domain, site_name 
+                <pre style="background-color: rgba(255,255,255,0.88); padding: var(--spacing-small); border: 1px solid var(--border-color); border-radius: 3px; overflow-x: auto;">SELECT id, username, message, timestamp, is_system_message, domain, site_name 
 FROM ChatMessage 
 ORDER BY id DESC 
 LIMIT 3;</pre>
@@ -402,7 +402,7 @@ LIMIT 3;</pre>
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 4: Page Reload Verification (Persistence Test)</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>In admin interface, manually refresh page (F5 or Cmd+R)</li>
@@ -413,7 +413,7 @@ LIMIT 3;</pre>
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: var(--text-color);">Step 5: Advanced Verification (Multiple Messages)</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Send 3-5 more test messages, each with unique content</li>
@@ -425,7 +425,7 @@ LIMIT 3;</pre>
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Success Criteria</h3>
-            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; border-left: 4px solid var(--success-color); border-radius: 4px;">
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color); border-radius: 4px;">
                 <h4 style="color: #155724; margin-top: 0;">✅ Phase 3 PASS Conditions</h4>
                 <ul style="color: #155724; font-family: var(--body-font);">
                     <li>Message appears in database within 2 seconds of sending</li>
@@ -458,7 +458,7 @@ LIMIT 3;</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">User-facing quick chat</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Support staff management</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Backend Used</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">AI.pm /ai/generate endpoint</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">Chat.pm /chat/send_message endpoint</td>
@@ -468,7 +468,7 @@ LIMIT 3;</pre>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ FULLY WORKING (AiMessage + AiConversation)</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ FULLY WORKING (AiMessage + AiConversation)</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);"><strong>Database Schema (UNIFIED)</strong></td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">AiMessage + AiConversation (Ency/Result)</td>
                     <td style="color: var(--text-color); padding: var(--spacing-small); border: 1px solid var(--border-color);">AiMessage + AiConversation (Ency/Result)</td>
@@ -481,7 +481,7 @@ LIMIT 3;</pre>
             </table>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">✅ Findings Summary (CORRECTED)</h3>
-            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid #28a745; border-left: 4px solid #28a745; border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: #d4edda; padding: var(--spacing-medium); border: 2px solid var(--success-color, #28a745); border-left: 4px solid var(--success-color, #28a745); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h4 style="color: #155724; margin-top: 0;">✅ Unified Architecture Verified</h4>
                 <p style="color: #155724; font-family: var(--body-font); margin: 0;"><strong>CORRECTION from v0.01:</strong> Widget messages ARE saved. Widget uses /ai/generate endpoint (AI.pm controller) which creates AiConversation and saves messages to AiMessage table. This is identical schema to admin interface.</p>
                 <p style="color: #155724; font-family: var(--body-font);"><strong>Architecture:</strong> Both widget and admin interfaces persist to same unified database backend (AiMessage + AiConversation).</p>
@@ -489,7 +489,7 @@ LIMIT 3;</pre>
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Test Data for Phase 3 (CORRECTED Schema)</h3>
-            <pre style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">-- Phase 3 Test SQL Query (Corrected for AiMessage)
+            <pre style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; overflow-x: auto;">-- Phase 3 Test SQL Query (Corrected for AiMessage)
 SELECT 
     m.id, 
     m.conversation_id,

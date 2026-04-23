@@ -1,13 +1,12 @@
 <head>
-    [% PageVersion = 'Header.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
-    <meta charset="utf-8">
+    [% PageVersion = 'Header.tt,v 0.02 2026/04/22 shanta Exp shanta ' %]
     [% IF c.session.debug_mode == 1 %]
         [% PageVersion %]
     [% END %]
+    <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
-    <meta charset="utf-8">
     [% # Make sure HostName is defined, use a default if not %]
     [% UNLESS HostName %]
         [% HostName = "http://" _ c.req.uri.host %]
@@ -16,9 +15,6 @@
         [% END %]
     [% END %]
     <title>[% HostName _ ': ' _ ScriptDisplayName _ ': ' _ page_title %]</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="REVISIT-AFTER" content="7 days">
-    <meta name="ROBOTS" content="index all, follow all">
     [% IF keywords %]
         <meta name="keywords" content="[% keywords %]">
     [% ELSE %]
@@ -50,7 +46,8 @@
     [% END %]
 
     <!-- Base CSS with variables -->
-    <link rel="stylesheet" type="text/css" href="/static/css/base.css">
+    [% cv = c.stash.css_v || '20260412' %]
+    <link rel="stylesheet" type="text/css" href="/static/css/base.css?v=[% cv %]">
 
     <!-- Theme CSS - using JSON-based theme system -->
     [%
@@ -81,10 +78,10 @@
         END;
     %]
     <!-- Theme CSS: [% theme_name %] -->
-    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css">
+    <link rel="stylesheet" type="text/css" href="/static/css/themes/[% theme_name %].css?v=[% cv %]">
 
     <!-- Theme overrides to ensure proper application -->
-    <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/theme-overrides.css?v=[% cv %]">
 
     <!-- Add theme class to body -->
     <script>
@@ -98,11 +95,11 @@
     [% END %]
 
     <!-- Menu CSS (part of theme system) -->
-    <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css">
+    <link rel="stylesheet" type="text/css" href="/static/css/menu-theme.css?v=[% cv %]">
 
     <!-- Site-specific CSS (background images, site branding) -->
     [% IF css_view_name %]
-    <link rel="stylesheet" type="text/css" href="[% css_view_name %]">
+    <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
     [% END %]
 
     <!-- Local SVG icon solution (no external dependencies) -->
@@ -130,7 +127,7 @@
     [% END %]
 
     <!-- Back to Top Button CSS -->
-    <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% USE date; date.format(date.now, '%s') %]">
+    <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% cv %]">
 
     [% IF is_admin %]
     <!-- Admin-only Health Monitoring -->
@@ -141,7 +138,7 @@
     <!-- JavaScript dependencies (no jQuery - using vanilla JavaScript) -->
     <script src="/static/js/sub-menu.js"></script>
     <script src="/static/js/menu.js"></script>
-    <script src="/static/js/back-to-top.js?v=[% USE date; date.format(date.now, '%s') %]"></script>
+    <script src="/static/js/back-to-top.js?v=[% cv %]"></script>
     <script language="javascript" type="text/javascript">
         function switchpage(select) {
             var index;
@@ -156,5 +153,5 @@
         }
     </script>
     <!-- AI utilities - loaded globally so the chat widget works on all pages -->
-    <script src="/static/js/ai-common.js"></script>
+    <script src="/static/js/ai-common.js?v=[% cv %]"></script>
 </head>

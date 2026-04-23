@@ -6,59 +6,176 @@ body[class*="theme-"] {
   background-image: var(--background-image) !important;
   background-repeat: var(--background-repeat, repeat) !important;
   background-position: var(--background-position, top left) !important;
-  background-attachment: var(--background-attachment, fixed) !important;
+  background-attachment: var(--background-attachment, scroll) !important;
   background-size: var(--background-size, auto) !important;
   color: var(--text-color) !important;
 }
 
-/* Transparent page container */
-body[class*="theme-"] .app-container,
-body[class*="theme-"] .content-container,
-body[class*="theme-"] .content-sections {
+/* =============================================================================
+   BACKGROUND-IMAGE TRANSPARENCY
+   When the theme has a background image, body gets the class 'has-bg-image'.
+   ALL structural containers must be transparent (or semi-transparent) so the
+   image shows through on every page.  We use !important to override both
+   CSS class rules AND inline style="background-color:..." attributes.
+   ============================================================================= */
+
+/* --- Fully transparent wrappers (no visual background needed) --- */
+/* NOTE: body itself is NOT in this list — it carries the background image */
+body.has-bg-image main,
+body.has-bg-image article,
+body.has-bg-image section,
+body.has-bg-image aside,
+/* layout containers */
+body.has-bg-image .container,
+body.has-bg-image .container-fluid,
+body.has-bg-image .app-container,
+body.has-bg-image .content-container,
+body.has-bg-image .content-sections,
+body.has-bg-image .content-wrapper,
+body.has-bg-image .page-wrapper,
+body.has-bg-image .page-content,
+body.has-bg-image .inner-content,
+body.has-bg-image .main-content,
+body.has-bg-image .site-content,
+body.has-bg-image .layout-content,
+/* common div wrappers from old-style templates */
+body.has-bg-image .row,
+body.has-bg-image .col,
+body.has-bg-image .col-25,
+body.has-bg-image .col-33,
+body.has-bg-image .col-50,
+body.has-bg-image .col-66,
+body.has-bg-image .col-75,
+body.has-bg-image .col-100,
+/* app-section / app-card used in newer templates */
+body.has-bg-image .app-section,
+body.has-bg-image .app-page,
+body.has-bg-image .app-body,
+/* admin dashboard wrappers */
+body.has-bg-image .admin-dashboard,
+body.has-bg-image .admin-sections,
+body.has-bg-image .dashboard-header,
+body.has-bg-image .admin-links,
+body.has-bg-image .stats-grid,
+body.has-bg-image .action-buttons,
+body.has-bg-image .admin-container,
+body.has-bg-image .admin-section,
+/* base-containers.css structural wrappers */
+body.has-bg-image .apiary-container,
+body.has-bg-image .dashboard-stats,
+body.has-bg-image .quick-actions,
+body.has-bg-image .actions-grid,
+body.has-bg-image .inspection-list,
+body.has-bg-image .hive-grid,
+body.has-bg-image .data-section,
+body.has-bg-image .documentation-page,
+body.has-bg-image .documentation-container,
+body.has-bg-image .documentation-content,
+body.has-bg-image .doc-page,
+body.has-bg-image .doc-section,
+body.has-bg-image .doc-subsection,
+body.has-bg-image .markdown-content,
+body.has-bg-image .container-content,
+/* workshop / content wrappers */
+body.has-bg-image .workshop-container,
+body.has-bg-image .workshops-container,
+body.has-bg-image .page-container,
+body.has-bg-image .section-wrapper,
+/* user / todo page wrappers */
+body.has-bg-image .user-container,
+body.has-bg-image .todo-container,
+body.has-bg-image .todo-wrapper,
+body.has-bg-image .plan-container {
   background-color: transparent !important;
-  border-radius: 8px;
-  padding: 20px;
-  margin-top: 0px;
+  background-image: none !important;
+}
+
+/* --- Structural elements that use var(--background-color) should be transparent when bg-image active --- */
+body.has-bg-image .apiary-header,
+body.has-bg-image .stat-card,
+body.has-bg-image .plan-card,
+body.has-bg-image .command-card,
+body.has-bg-image .info-card,
+body.has-bg-image .feature-card,
+body.has-bg-image .theme-container,
+body.has-bg-image .section-content,
+/* documentation-specific */
+body.has-bg-image .documentation-section,
+body.has-bg-image .recent-updates-section,
+body.has-bg-image .all-docs-section,
+body.has-bg-image .theme-section,
+/* status cards on admin */
+body.has-bg-image .status-card,
+body.has-bg-image .status-cards {
+  background-color: rgba(255,255,255,0.12) !important;
+  backdrop-filter: blur(2px);
+}
+
+/* --- Semi-transparent content cards (readable but lets bg show through) --- */
+body.has-bg-image .app-card,
+body.has-bg-image .content-primary,
+body.has-bg-image .content-section,
+body.has-bg-image .content-block,
+body.has-bg-image .data-container,
+body.has-bg-image .form-section,
+body.has-bg-image .table-container,
+body.has-bg-image .data-table-wrapper,
+body.has-bg-image .documentation-card,
+body.has-bg-image .documentation-list li,
+body.has-bg-image .file-card,
+/* Bootstrap-style cards */
+body.has-bg-image .card,
+body.has-bg-image .card-body,
+/* common old-style table layouts */
+body.has-bg-image table.LeftNavTableStyle,
+body.has-bg-image .LeftNavTableStyle,
+/* sidebar */
+body.has-bg-image .sidebar,
+/* workshop pages */
+body.has-bg-image .workshop-details,
+body.has-bg-image .workshop-list-container,
+body.has-bg-image .workshop-card {
+  background-color: rgba(255, 255, 255, 0.15) !important;
+  backdrop-filter: blur(3px);
   box-shadow: none !important;
 }
 
-/* Ensure data containers within are readable if needed, or keep them transparent too */
-body[class*="theme-"] .data-container,
-body[class*="theme-"] .content-primary,
-body[class*="theme-"] .content-section,
-body[class*="theme-"] .form-section,
-body[class*="theme-"] .table-container {
+/* --- Collapsible summaries --- */
+body.has-bg-image .priority-summary {
+    cursor: pointer;
+    font-weight: bold;
+    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    border-radius: 4px;
+    margin-bottom: 10px;
+}
+body.has-bg-image .priority-summary:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* --- Transparent page container (non-bg-image themes — keep legacy behaviour) --- */
+body[class*="theme-"]:not(.has-bg-image) .app-container,
+body[class*="theme-"]:not(.has-bg-image) .content-container,
+body[class*="theme-"]:not(.has-bg-image) .content-sections {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+body[class*="theme-"]:not(.has-bg-image) .data-container,
+body[class*="theme-"]:not(.has-bg-image) .content-primary,
+body[class*="theme-"]:not(.has-bg-image) .content-section,
+body[class*="theme-"]:not(.has-bg-image) .form-section,
+body[class*="theme-"]:not(.has-bg-image) .table-container {
   background-color: rgba(255, 255, 255, 0.1) !important;
-  backdrop-filter: blur(2px);
   padding: 20px;
   border-radius: 8px;
   margin-bottom: 20px;
   border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.priority-summary {
-    cursor: pointer;
-    font-weight: bold;
-    padding: 10px;
-    background-color: rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    margin-bottom: 10px;
-}
-
-.priority-summary:hover {
-    background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* Specific transparency for workshop pages to show background image */
-body[class*="theme-"] .workshop-details,
-body[class*="theme-"] .workshop-list-container {
-    background-color: rgba(255, 255, 255, 0.3) !important;
-}
-
 /* Ensure background image covers the whole page and is visible */
 html, body {
   min-height: 100%;
-  background-attachment: fixed !important;
 }
 
 /* Link styles (excluding menu links) */
@@ -97,7 +214,7 @@ body[class*="theme-"] .dropbtn {
 }
 
 body[class*="theme-"] .dropdown-content {
-  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
@@ -110,11 +227,11 @@ body[class*="theme-"] .horizontal-dropdown:hover .dropdown-content {
 }
 
 body[class*="theme-"] .dropdown-content a {
-  color: var(--nav-link-color) !important;
+  color: var(--nav-link-color, var(--text-color, #000000)) !important;
 }
 
 body[class*="theme-"] .submenu {
-  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
@@ -127,5 +244,5 @@ body[class*="theme-"] .submenu-item:hover .submenu {
 }
 
 body[class*="theme-"] .submenu a {
-  color: var(--nav-link-color) !important;
+  color: var(--nav-link-color, var(--text-color, #000000)) !important;
 }

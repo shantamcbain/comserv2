@@ -39,6 +39,7 @@ services:
     build:
       context: ./Comserv
       dockerfile: Dockerfile
+      network: host
     container_name: comserv-web-dev
     restart: unless-stopped
     labels:
@@ -105,6 +106,7 @@ services:
     build:
       context: ./Comserv
       dockerfile: Dockerfile
+      network: host
     container_name: comserv-web-prod
     restart: unless-stopped
     labels:
@@ -112,6 +114,7 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
+      COMSERV_LOG_MIN_LEVEL: WARN
       CATALYST_HOME: /opt/comserv
       WEB_PORT: 5000
       SYSTEM_IDENTIFIER: "${SYSTEM_IDENTIFIER:-production-prod}"

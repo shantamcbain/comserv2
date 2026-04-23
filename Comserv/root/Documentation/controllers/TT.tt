@@ -15,7 +15,7 @@
         <div class="col-100">
             <h1 style="color: var(--primary-color); font-family: var(--header-font);">Template Toolkit (TT) View Configuration</h1>
             
-            <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+            <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
                 <ul style="list-style-position: inside; color: var(--text-color);">
                     <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">Overview</a></li>
@@ -31,7 +31,7 @@
             <div id="overview" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Overview</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
-                    The <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">TT</code> view (Comserv/lib/Comserv/View/TT.pm) configures Template Toolkit (TT2) for the Comserv application. It handles:
+                    The <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">TT</code> view (Comserv/lib/Comserv/View/TT.pm) configures Template Toolkit (TT2) for the Comserv application. It handles:
                 </p>
                 <ul style="color: var(--text-color); margin: 10px 0 0 20px; line-height: 1.8;">
                     <li>Template file rendering and compilation</li>
@@ -46,7 +46,7 @@
 
             <div id="file-location" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">File Location</h2>
-                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">Comserv/lib/Comserv/View/TT.pm</pre>
+                <pre style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">Comserv/lib/Comserv/View/TT.pm</pre>
                 <p style="color: var(--text-color); font-family: var(--body-font); margin: 10px 0 0 0;">This is a Catalyst View module that extends Catalyst::View::TT2 and applies Comserv-specific configuration.</p>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
@@ -56,9 +56,9 @@
                 <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
                     As of January 12, 2026, TT.pm has been enhanced to properly support UTF-8 character encoding:
                 </p>
-                <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+                <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                     <p style="margin-top: 0; color: var(--text-color);"><strong>UTF-8 Configuration:</strong></p>
-                    <pre style="background-color: white; border: 1px solid var(--border-color); border-radius: 3px; padding: var(--spacing-small); overflow-x: auto; font-size: 0.85em;">ENCODING => 'UTF-8'</pre>
+                    <pre style="background-color: rgba(255,255,255,0.88); border: 1px solid var(--border-color); border-radius: 3px; padding: var(--spacing-small); overflow-x: auto; font-size: 0.85em;">ENCODING => 'UTF-8'</pre>
                     <p style="margin: 10px 0 0 0; color: var(--text-color); font-size: 0.95em;">This configuration tells Template Toolkit to read template files as UTF-8, process content with UTF-8 encoding, and output UTF-8 encoded content. Combined with HTTP Content-Type charset headers (configured in Documentation controller), this ensures proper rendering of international characters, currency symbols, arrows (← →), and other special Unicode characters.</p>
                 </div>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -69,7 +69,7 @@
                 <p style="color: var(--text-color); font-family: var(--body-font);">The TT view is configured as a Catalyst View with the following approach:</p>
                 <ul style="color: var(--text-color); margin: 10px 0 0 20px; line-height: 1.8;">
                     <li><strong>Inherits from:</strong> Catalyst::View::TT2 (Catalyst's Template Toolkit integration)</li>
-                    <li><strong>Configuration method:</strong> Hash-based config passed to parent class in <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 2px;">COMPONENT</code> method</li>
+                    <li><strong>Configuration method:</strong> Hash-based config passed to parent class in <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 2px;">COMPONENT</code> method</li>
                     <li><strong>Template location:</strong> root/templates/ (or configurable via TT's INCLUDE_PATH)</li>
                     <li><strong>Caching:</strong> Enabled by default for performance</li>
                     <li><strong>Character encoding:</strong> UTF-8 (as of Jan 12, 2026)</li>
@@ -80,7 +80,7 @@
             <div id="key-settings" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Key Configuration Settings</h2>
                 <table style="width: 100%; color: var(--text-color); border-collapse: collapse; margin: 10px 0;">
-                    <tr style="background-color: var(--light-color);">
+                    <tr style="background-color: rgba(255,255,255,0.15);">
                         <th style="border: 1px solid var(--border-color); padding: 10px; text-align: left; font-weight: bold;">Setting</th>
                         <th style="border: 1px solid var(--border-color); padding: 10px; text-align: left; font-weight: bold;">Value</th>
                         <th style="border: 1px solid var(--border-color); padding: 10px; text-align: left; font-weight: bold;">Purpose</th>
@@ -109,7 +109,7 @@
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
 
-            <div id="recent-changes" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
+            <div id="recent-changes" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">📝 Recent Changes (v0.01 - Jan 12, 2026)</h3>
                 <ul style="color: var(--text-color); margin: 10px 0 0 20px;">
                     <li><strong>NEW FILE CREATED:</strong> TT.tt documentation created to track View/TT.pm configuration and enhancements</li>

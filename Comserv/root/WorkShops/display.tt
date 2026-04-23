@@ -161,7 +161,7 @@
         display: flex;
         flex-wrap: wrap;
         gap: 20px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 4px;
         margin-bottom: 20px;
@@ -175,7 +175,7 @@
     
     .info-label {
         font-weight: bold;
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
     }
     
     .info-value {
@@ -200,9 +200,9 @@
         padding-bottom: 56.25%; /* 16:9 aspect ratio */
         height: 0;
         overflow: hidden;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
-        background-color: #fff;
+        background-color: rgba(255,255,255,0.88);
         box-shadow: 0 2px 5px rgba(0,0,0,0.1);
     }
     
@@ -241,7 +241,7 @@
     .presentation-description {
         margin-top: 30px;
         padding: 20px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 4px;
         border-left: 4px solid #3498db;
     }

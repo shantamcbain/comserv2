@@ -18,15 +18,12 @@
   --nav-bg: #009933;
   --nav-hover-bg: rgba(0, 0, 0, 0.1);
   --nav-text: #ffffff;
+  --nav-link-color: #ffffff;
+  --dropdown-bg: #e6f5eb;
   --primary-color: #009933;
   --secondary-color: #f0f0f0;
   --success-color: #339933;
   --table-header-bg: #e6e6e6;
   --text-color: black;
   --warning-color: red;
-  --doc-header-bg: #006622;
-  --doc-header-color: #ffffff;
-  --doc-header-hover-bg: #004d19;
-  --doc-content-bg: #f0f0f0;
-  --doc-content-color: #111111;
 }

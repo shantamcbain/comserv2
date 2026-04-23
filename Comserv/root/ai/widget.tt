@@ -18,18 +18,50 @@
             color: var(--text-color, #000);
             font-family: inherit;
         }
-        /* Widget container fills entire popup window */
+        /* Tab bar across the top */
+        #widget-tab-bar {
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            height: 38px;
+            z-index: 200;
+            background: var(--header-bg, #1e3a5f);
+            display: flex;
+            align-items: stretch;
+            border-bottom: 2px solid var(--primary-color, #0077cc);
+        }
+        .widget-tab-btn {
+            flex: 1;
+            border: none;
+            border-right: 1px solid rgba(255,255,255,0.15);
+            background: transparent;
+            color: rgba(255,255,255,0.75);
+            font-size: 0.85em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.15s, color 0.15s;
+            padding: 0 6px;
+            letter-spacing: 0.02em;
+        }
+        .widget-tab-btn:last-child { border-right: none; }
+        .widget-tab-btn:hover { background: rgba(255,255,255,0.12); color: #fff; }
+        .widget-tab-btn.active {
+            background: var(--primary-color, #0077cc);
+            color: #fff;
+        }
+        .widget-tab-btn:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+        }
+        /* Widget chat container fills below tab bar */
         .local-chat-widget {
             position: fixed !important;
-            top: 0 !important; left: 0 !important;
-            right: 0 !important; bottom: 0 !important;
+            top: 38px !important;
+            left: 0 !important; right: 0 !important; bottom: 0 !important;
             width: 100% !important;
-            height: 100% !important;
+            height: calc(100% - 38px) !important;
             z-index: 1 !important;
         }
-        /* Chat toggle button is not needed — panel is always open */
         .chat-button { display: none !important; }
-        /* Panel fills the container absolutely so mouse events work correctly */
         .chat-panel {
             position: absolute !important;
             top: 0 !important; left: 0 !important;
@@ -44,14 +76,143 @@
             box-shadow: none !important;
             border: none !important;
         }
-        /* No expand button — already a separate window */
         #detach-chat { display: none !important; }
-        /* Drag and resize not applicable in popup */
         .chat-header-drag { cursor: default !important; opacity: 0.2 !important; pointer-events: none !important; }
         .chat-resize-handle { display: none !important; }
+
+        /* Form fill panel */
+        #form-fill-panel {
+            display: none;
+            position: fixed;
+            top: 38px; left: 0; right: 0; bottom: 0;
+            overflow-y: auto;
+            background: var(--background-color, #fff);
+            color: var(--text-color, #000);
+            padding: 0.8em 1em 1.2em;
+            z-index: 5;
+            font-family: inherit;
+        }
+        #form-fill-panel h3 {
+            margin: 0 0 0.6em;
+            font-size: 1em;
+            color: var(--primary-color, #0077cc);
+        }
+        #form-fill-panel label { font-size: 0.88em; display: block; margin-bottom: 0.15em; font-weight: bold; }
+        #form-fill-panel input[type=text],
+        #form-fill-panel select {
+            width: 100%; box-sizing: border-box;
+            padding: 4px 7px; border: 1px solid #ccc; border-radius: 4px;
+            font-size: 0.9em; margin-bottom: 0.5em;
+        }
+        #ff-btn-row { display: flex; gap: 0.5em; flex-wrap: wrap; align-items: center; margin-bottom: 0.5em; }
+        #ff-btn-row button {
+            padding: 5px 13px; border-radius: 4px; cursor: pointer;
+            font-size: 0.88em; border: 1px solid transparent;
+        }
+        #ff-ask-btn    { background: #0077cc; color: #fff; border-color: #005fa3; }
+        #ff-review-btn { background: var(--caution-bg, #fff3cd); color: #856404; border-color: var(--caution-color, #ffc107); }
+        #ff-status { color: var(--text-muted-color, #555); font-style: italic; font-size: 0.85em; }
+        #ff-no-form-warning {
+            background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107); border-radius:4px;
+            padding: 0.6em 0.8em; font-size: 0.85em; color: #856404; margin-bottom: 0.6em;
+            display: none;
+        }
+        #ff-raw { display:none; margin-top:0.7em; }
+        #ff-raw pre {
+            background:#eee; padding:0.5em; max-height:140px; overflow:auto;
+            font-size:0.82em; white-space:pre-wrap; border-radius:3px;
+        }
+        #ff-staged-panel {
+            display: none; margin-top: 0.7em;
+            border-top: 2px solid #4a90d9; padding-top: 0.5em;
+        }
+        .ff-staged-item {
+            margin: 0.4em 0; padding: 0.5em;
+            background: #f0f7ff; border: 1px solid #4a90d9; border-radius:4px;
+            font-size: 0.85em;
+        }
+        .ff-staged-item .ff-field-name { font-weight: bold; margin-bottom: 0.25em; }
+        .ff-staged-boxes { display:flex; gap:0.4em; margin-bottom:0.3em; flex-wrap:wrap; }
+        .ff-val-box {
+            flex:1; min-width:120px; padding:0.3em 0.5em;
+            border-radius:3px; font-size:0.82em; white-space:pre-wrap;
+            max-height:80px; overflow:auto;
+        }
+        .ff-val-existing { background:#fff8f8; border:1px solid #f5c6cb; }
+        .ff-val-ai       { background:#f0fff4; border:1px solid #a3d9a5; }
+        .ff-val-box em   { display:block; font-size:0.85em; color: var(--text-muted-color, #666); margin-bottom:0.15em; }
+        #ff-review-panel {
+            display:none; margin-top:0.7em;
+            border-top:2px solid var(--caution-color, #ffc107); padding-top:0.5em;
+        }
+        .ff-correction-item {
+            margin:0.4em 0; padding:0.5em;
+            background: var(--caution-bg, #fffbe6); border:1px solid var(--caution-color, #ffc107); border-radius:4px; font-size:0.85em;
+        }
+        #ff-override-row { font-size:0.82em; color: var(--text-muted-color, #555); margin-bottom:0.4em; display:flex; flex-wrap:wrap; gap:0.8em; }
+        #ff-override-row label { font-weight: normal; display:flex; align-items:center; gap:0.3em; cursor:pointer; }
+        #ff-fields-info { font-size:0.8em; color:#888; margin-bottom:0.4em; }
     </style>
 </head>
 <body class="theme-[% theme_name || 'default' %]">
+
+    <!-- Tab bar -->
+    <div id="widget-tab-bar">
+        <button class="widget-tab-btn active" id="tab-btn-chat"    onclick="widgetShowTab('chat')">💬 Chat</button>
+        <button class="widget-tab-btn"        id="tab-btn-formfill" onclick="widgetShowTab('formfill')">📝 Fill Form</button>
+    </div>
+
+    <!-- Form Fill Panel -->
+    <div id="form-fill-panel">
+        <h3>📝 AI Form Fill — Parent Page</h3>
+
+        <div id="ff-no-form-warning">
+            No form fields detected on the current page. Navigate to a form page first, then switch to this tab.
+        </div>
+
+        <label>Describe what to fill in (name / topic / context):</label>
+        <input type="text" id="ff-entity-name" placeholder="e.g. Freedom Mobile phone bill, or supplier name…" />
+
+        <label>Model:</label>
+        <select id="ff-model-sel"><option value="">Loading models…</option></select>
+
+        <div id="ff-btn-row">
+            <button id="ff-ask-btn"    type="button">Ask AI</button>
+            <button id="ff-review-btn" type="button" title="Review current field values for errors">Review &amp; Correct</button>
+            <span id="ff-status"></span>
+        </div>
+
+        <label>Limit to specific fields (blank = all):</label>
+        <input type="text" id="ff-target-fields" placeholder="e.g. name, email, notes" />
+
+        <div id="ff-override-row">
+            <label><input type="checkbox" id="ff-override"> Override existing values</label>
+            <label><input type="checkbox" id="ff-web-search"> Live web search (Grok or Ollama w/ API key)</label>
+        </div>
+
+        <div id="ff-fields-info"></div>
+
+        <div id="ff-raw">
+            <strong style="font-size:0.85em;">AI Raw Response:</strong>
+            <pre id="ff-raw-text"></pre>
+        </div>
+
+        <div id="ff-staged-panel">
+            <div style="display:flex;align-items:center;gap:0.7em;margin-bottom:0.4em;flex-wrap:wrap;">
+                <strong style="color:#1a4a7a;font-size:0.9em;">Fields With Existing Content — Choose Action:</strong>
+                <button type="button" id="ff-stage-all-btn" style="padding:3px 9px;cursor:pointer;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:3px;font-size:0.82em;">Append All</button>
+                <button type="button" id="ff-skip-all-btn"  style="padding:3px 9px;cursor:pointer;background: var(--bg-secondary, #f8f9fa);border:1px solid #aaa;border-radius:3px;font-size:0.82em;">Skip All</button>
+            </div>
+            <div id="ff-staged-items"></div>
+        </div>
+
+        <div id="ff-review-panel">
+            <strong style="color:#856404;font-size:0.9em;">AI Review Suggestions:</strong>
+            <div id="ff-review-results" style="margin-top:0.4em;"></div>
+        </div>
+    </div>
+
+    <!-- Chat Widget (created by local-chat.js) -->
     <script id="ai-widget-config" type="application/json">[% widget_config %]</script>
     <script>
         (function() {
@@ -63,30 +224,491 @@
                 window.AI_DETACHED_FROM_TITLE = cfg.from_title || '';
                 if (cfg.resume_conv) window.AI_RESUME_CONVERSATION = parseInt(cfg.resume_conv, 10);
             } catch(e) {
-                window.AI_CHAT_PAGE_MODE  = false;
-                window.AI_WIDGET_POPUP    = true;
+                window.AI_CHAT_PAGE_MODE = false;
+                window.AI_WIDGET_POPUP   = true;
             }
         })();
     </script>
     <script src="/static/js/local-chat.js"></script>
     <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            /* Auto-open the chat panel */
-            var btn = document.getElementById('chat-button');
-            if (btn) { btn.click(); }
+    document.addEventListener('DOMContentLoaded', function() {
+        var btn = document.getElementById('chat-button');
+        if (btn) btn.click();
 
-            /* Intercept link clicks: navigate the opener instead of this popup */
-            document.addEventListener('click', function(e) {
-                var anchor = e.target.closest('a[href]');
-                if (!anchor) return;
-                var href = anchor.getAttribute('href');
-                if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
-                if (window.opener && !window.opener.closed) {
-                    e.preventDefault();
-                    window.opener.location.href = href;
+        document.addEventListener('click', function(e) {
+            var anchor = e.target.closest('a[href]');
+            if (!anchor) return;
+            var href = anchor.getAttribute('href');
+            if (!href || href.startsWith('#') || href.startsWith('javascript:')) return;
+            if (window.opener && !window.opener.closed) {
+                e.preventDefault();
+                window.opener.location.href = href;
+            }
+        }, true);
+    });
+
+    // ── Tab switcher ──────────────────────────────────────────────────────────
+    function widgetShowTab(name) {
+        var chatWidget = document.querySelector('.local-chat-widget');
+        var ffPanel    = document.getElementById('form-fill-panel');
+        var btnChat    = document.getElementById('tab-btn-chat');
+        var btnFF      = document.getElementById('tab-btn-formfill');
+        if (name === 'chat') {
+            if (chatWidget) chatWidget.style.display = '';
+            if (ffPanel)    ffPanel.style.display    = 'none';
+            btnChat.classList.add('active');
+            btnFF.classList.remove('active');
+        } else {
+            if (chatWidget) chatWidget.style.display = 'none';
+            if (ffPanel)    ffPanel.style.display    = '';
+            btnChat.classList.remove('active');
+            btnFF.classList.add('active');
+            ffInit();
+        }
+    }
+
+    // ── Form Fill Panel ───────────────────────────────────────────────────────
+    var FF_PAGE_FIELDS  = [];
+    var FF_PAGE_TITLE   = '';
+    var FF_PAGE_PATH    = '';
+    var FF_PENDING_FILL = null;
+
+    function ffHasOpener() {
+        return window.opener && !window.opener.closed;
+    }
+
+    function ffRequestFields() {
+        if (!ffHasOpener()) return;
+        window.opener.postMessage({ type: 'ai_widget_fields_request' }, '*');
+    }
+
+    window.addEventListener('message', function(e) {
+        if (!e.data || !e.data.type) return;
+
+        if (e.data.type === 'ai_widget_fields_response') {
+            FF_PAGE_FIELDS = e.data.fields || [];
+            FF_PAGE_TITLE  = e.data.pageTitle || '';
+            FF_PAGE_PATH   = e.data.pagePath  || '';
+            var info = document.getElementById('ff-fields-info');
+            var warn = document.getElementById('ff-no-form-warning');
+            if (FF_PAGE_FIELDS.length) {
+                var names = FF_PAGE_FIELDS.map(function(f){ return f.name; });
+                info.textContent = FF_PAGE_FIELDS.length + ' field(s) on page: ' + names.slice(0,12).join(', ')
+                    + (names.length > 12 ? '…' : '');
+                warn.style.display = 'none';
+            } else {
+                info.textContent = '';
+                warn.style.display = '';
+            }
+        }
+
+        if (e.data.type === 'ai_widget_fill_ack') {
+            if (FF_PENDING_FILL && FF_PENDING_FILL[e.data.field]) {
+                var cb = FF_PENDING_FILL[e.data.field];
+                cb(e.data.ok);
+                delete FF_PENDING_FILL[e.data.field];
+            }
+        }
+    });
+
+    function ffFillOneInOpener(fieldName, value, callback) {
+        if (!ffHasOpener()) { if (callback) callback(false); return; }
+        if (!FF_PENDING_FILL) FF_PENDING_FILL = {};
+        if (callback) FF_PENDING_FILL[fieldName] = callback;
+        window.opener.postMessage({ type: 'ai_widget_fill_one', field: fieldName, value: value }, '*');
+    }
+
+    function ffInit() {
+        ffLoadModels();
+        ffRequestFields();
+        var entityIn = document.getElementById('ff-entity-name');
+        if (entityIn && !entityIn.value.trim() && FF_PAGE_TITLE) {
+            entityIn.placeholder = 'e.g. ' + FF_PAGE_TITLE;
+        }
+    }
+
+    var FF_ALL_MODELS = { grok: [], ollama: [] };
+
+    // Model size score — lower = smaller/faster
+    function ffModelScore(id) {
+        var s = id.toLowerCase();
+        if (s.match(/0\.5b|1b|1\.5b|tiny|nano/))  return 1;
+        if (s.match(/3b|4b|mini/))                 return 2;
+        if (s.match(/7b|8b/))                      return 3;
+        if (s.match(/13b|14b|20b/))                return 4;
+        if (s.match(/30b|34b|70b|large/))          return 5;
+        if (s.match(/grok-4.*fast/))               return 6;
+        if (s.match(/grok-3-mini|grok-3-fast/))    return 6;
+        if (s.match(/grok-4|grok-3/))              return 7;
+        return 3; // unknown → treat as medium
+    }
+
+    // Pick the smallest Ollama model that can reliably return JSON (~3b+)
+    function ffAutoModel(fieldCount, useSearch) {
+        if (useSearch && !FF_ALL_MODELS.ollama.length) {
+            // No local Ollama models — fall back to Grok for search
+            var grokModel = FF_ALL_MODELS.grok[0];
+            return grokModel ? { model: grokModel, provider: 'grok' }
+                             : { model: 'gemma3:4b', provider: 'ollama' };
+        }
+        if (!FF_ALL_MODELS.ollama.length) {
+            var grokModel = FF_ALL_MODELS.grok[0];
+            return grokModel ? { model: grokModel, provider: 'grok' }
+                             : { model: 'gemma3:4b', provider: 'ollama' };
+        }
+        // Sort ollama models by size score
+        var ranked = FF_ALL_MODELS.ollama.slice().sort(function(a,b){ return ffModelScore(a)-ffModelScore(b); });
+        // Simple fill (few fields): use smallest model that scores ≥ 2 (3b+)
+        // More fields or complex form: use first model that scores ≥ 3 (7b+)
+        var minScore = fieldCount <= 6 ? 2 : 3;
+        var chosen = ranked.find(function(m){ return ffModelScore(m) >= minScore; });
+        if (!chosen) chosen = ranked[ranked.length - 1]; // fallback to largest available
+        return { model: chosen, provider: 'ollama' };
+    }
+
+    function ffLoadModels() {
+        var sel = document.getElementById('ff-model-sel');
+        if (!sel || sel.dataset.loaded) return;
+        fetch('/ai/get_user_providers', { method:'GET', credentials:'include' })
+            .then(function(r){ return r.json(); })
+            .then(function(data) {
+                if (!data.success || !data.providers) return;
+                var opts = [{ val: 'auto|auto', label: '⚡ Auto (recommended)' }];
+                data.providers.forEach(function(p) {
+                    if (p.service === 'grok' && p.models) {
+                        p.models.filter(function(m){ return m.id && !m.id.match(/imagine|video/i); })
+                            .forEach(function(m) {
+                                FF_ALL_MODELS.grok.push(m.id);
+                                var lbl = m.id.replace(/-/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});
+                                opts.push({ val: m.id+'|grok', label: lbl+' (Grok)' });
+                            });
+                    }
+                    if (p.service === 'ollama' && p.models) {
+                        p.models.filter(function(m){ return m.id && !m.id.match(/embed|rerank|tinyllama|phi:2|llava|whisper|tts/i); })
+                            .forEach(function(m) {
+                                FF_ALL_MODELS.ollama.push(m.id);
+                                opts.push({ val: m.id+'|ollama', label: m.id+' (Ollama)' });
+                            });
+                    }
+                });
+                if (opts.length <= 1) opts.push({ val:'mistral:latest|ollama', label:'mistral:latest (Ollama)' });
+                sel.innerHTML = '';
+                // Restore previously saved model selection
+                var saved = localStorage.getItem('ai_widget_ff_model');
+                var defaultIdx = 0;
+                if (saved) {
+                    for (var i = 0; i < opts.length; i++) {
+                        if (opts[i].val === saved) { defaultIdx = i; break; }
+                    }
                 }
-            }, true);
+                opts.forEach(function(o, i) {
+                    var opt = document.createElement('option');
+                    opt.value = o.val; opt.textContent = o.label;
+                    if (i === defaultIdx) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+                sel.dataset.loaded = '1';
+                // Save on change
+                sel.addEventListener('change', function() {
+                    localStorage.setItem('ai_widget_ff_model', sel.value);
+                });
+            })
+            .catch(function() {
+                sel.innerHTML = '<option value="auto|auto">⚡ Auto (recommended)</option>'
+                              + '<option value="gemma3:4b|ollama">gemma3:4b (Ollama)</option>'
+                              + '<option value="qwen2.5:7b|ollama">qwen2.5:7b (Ollama)</option>';
+            });
+    }
+
+    function ffGetMP(fieldCount, useSearch) {
+        var sel = document.getElementById('ff-model-sel');
+        if (sel && sel.value && sel.value !== 'auto|auto') {
+            var p = sel.value.split('|');
+            return { model: p[0], provider: p[1] || 'ollama' };
+        }
+        // Auto mode — pick minimum capable model
+        return ffAutoModel(fieldCount || FF_PAGE_FIELDS.length || 5, useSearch || false);
+    }
+
+    function ffNormalise(v) {
+        if (v === null || v === undefined) return '';
+        if (Array.isArray(v)) return v.join('\n');
+        if (typeof v === 'object') return Object.entries(v).map(function(e){return e[0]+': '+e[1];}).join('\n');
+        return String(v);
+    }
+
+    document.getElementById('ff-ask-btn').addEventListener('click', function() {
+        var name = (document.getElementById('ff-entity-name').value || '').trim();
+        if (!name) { alert('Please describe what to fill in.'); return; }
+        if (!ffHasOpener()) { alert('No parent window found.'); return; }
+        ffRequestFields();
+
+        var statusEl    = document.getElementById('ff-status');
+        var btn         = document.getElementById('ff-ask-btn');
+        var overrideAll = document.getElementById('ff-override').checked;
+        var useSearch   = document.getElementById('ff-web-search').checked;
+        var targetRaw   = (document.getElementById('ff-target-fields').value || '').trim();
+        var targetFields = targetRaw
+            ? targetRaw.split(/[\s,;]+/).map(function(f){ return f.trim().toLowerCase(); }).filter(Boolean)
+            : [];
+        var mp = ffGetMP(FF_PAGE_FIELDS.length, useSearch);
+
+        var allNames = FF_PAGE_FIELDS.map(function(f){ return f.name; });
+        var fieldList = targetFields.length ? targetFields.join(', ') : allNames.join(', ');
+        if (!fieldList) fieldList = 'all fields';
+
+        var fieldInstr = targetFields.length
+            ? 'Return ONLY a raw JSON object with ONLY these fields: ' + fieldList + '.'
+            : 'Return ONLY a raw JSON object. Available fields: ' + fieldList + '. Fill fields you are confident about.';
+
+        var SYSTEM = [
+            'You are an AI assistant helping to fill in a web application form.',
+            'The page is: ' + (FF_PAGE_TITLE || FF_PAGE_PATH || 'a form page') + '.',
+            'Return ONLY a raw JSON object. Keys must exactly match the HTML form field name attributes.',
+            'Values must be plain strings or numbers. No nested objects, arrays, markdown, or code fences.',
+            'Only include fields you are confident about — omit uncertain fields entirely.',
+        ].join(' ');
+
+        btn.disabled = true;
+        statusEl.textContent = 'Asking ' + mp.model + '…';
+        document.getElementById('ff-raw').style.display = 'none';
+        document.getElementById('ff-staged-panel').style.display = 'none';
+        document.getElementById('ff-staged-items').innerHTML = '';
+
+        var timeoutMs = mp.provider === 'grok' ? 45000 : 120000;
+        var ctrl = new AbortController();
+        var tid  = setTimeout(function(){ ctrl.abort(); }, timeoutMs);
+
+        fetch('/ai/generate', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            signal: ctrl.signal,
+            body: JSON.stringify({
+                prompt:     fieldInstr + ' The subject is: ' + name,
+                system:     SYSTEM,
+                provider:   mp.provider,
+                model:      mp.model,
+                page_path:  FF_PAGE_PATH || window.location.pathname,
+                page_title: FF_PAGE_TITLE || document.title,
+                use_search: (mp.provider === 'grok') && useSearch
+            })
+        })
+        .then(function(r){ return r.text().then(function(t){ try{return JSON.parse(t);}catch(e){throw new Error('Non-JSON ('+r.status+')');} }); })
+        .then(function(data) {
+            clearTimeout(tid);
+            btn.disabled = false;
+            var modelUsed = data.model || mp.model;
+            var raw = (data.response || '').trim();
+            document.getElementById('ff-raw-text').textContent = raw || JSON.stringify(data);
+            document.getElementById('ff-raw').style.display = '';
+
+            if (!data.success) {
+                statusEl.textContent = '[' + modelUsed + '] Error: ' + (data.error || 'unknown');
+                return;
+            }
+
+            var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+            if (js === -1) { statusEl.textContent = 'AI returned no JSON. See raw response.'; return; }
+
+            var fields;
+            try { fields = JSON.parse(raw.substring(js, je+1)); } catch(e) { statusEl.textContent = 'JSON parse error: '+e.message; return; }
+
+            var filled = 0, staged = [], skipped = [];
+
+            // Map of page field name → current value
+            var pageFieldMap = {};
+            FF_PAGE_FIELDS.forEach(function(f){ pageFieldMap[f.name.toLowerCase()] = f; });
+
+            Object.keys(fields).forEach(function(key) {
+                if (targetFields.length && targetFields.indexOf(key.toLowerCase()) === -1) return;
+                var pf = pageFieldMap[key.toLowerCase()];
+                if (!pf) { skipped.push(key + '(not on page)'); return; }
+                var val = ffNormalise(fields[key]);
+                if (!val) return;
+
+                var curVal = (pf.value || '').trim();
+                if (!curVal || overrideAll) {
+                    ffFillOneInOpener(pf.name, val);
+                    pf.value = val;
+                    filled++;
+                } else if (curVal.indexOf(val) === -1) {
+                    staged.push({ name: pf.name, curVal: curVal, aiVal: val });
+                } else {
+                    skipped.push(key + '(identical)');
+                }
+            });
+
+            var msg = '[' + modelUsed + '] Filled ' + filled + ' field(s).';
+            if (staged.length)  msg += ' ' + staged.length + ' staged for review.';
+            if (skipped.length) msg += ' Skipped: ' + skipped.slice(0,5).join(', ') + '.';
+            statusEl.textContent = msg;
+
+            ffRenderStaged(staged);
+        })
+        .catch(function(err) {
+            clearTimeout(tid);
+            btn.disabled = false;
+            statusEl.textContent = err.name === 'AbortError' ? 'Timed out — try a faster model.' : 'Request failed: ' + err.message;
         });
+    });
+
+    function ffRenderStaged(staged) {
+        var panel     = document.getElementById('ff-staged-panel');
+        var container = document.getElementById('ff-staged-items');
+        container.innerHTML = '';
+        panel.style.display = staged.length ? '' : 'none';
+        if (!staged.length) return;
+
+        staged.forEach(function(item) {
+            var div = document.createElement('div');
+            div.className = 'ff-staged-item';
+            div.setAttribute('data-name', item.name);
+
+            var nameEl = document.createElement('div');
+            nameEl.className = 'ff-field-name';
+            nameEl.textContent = item.name;
+            div.appendChild(nameEl);
+
+            var boxes = document.createElement('div');
+            boxes.className = 'ff-staged-boxes';
+            function mkBox(label, val, cls) {
+                var b = document.createElement('div');
+                b.className = 'ff-val-box ' + cls;
+                b.innerHTML = '<em>' + label + '</em>' + val.substring(0,300).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                return b;
+            }
+            boxes.appendChild(mkBox('Existing', item.curVal, 'ff-val-existing'));
+            boxes.appendChild(mkBox('AI suggestion', item.aiVal, 'ff-val-ai'));
+            div.appendChild(boxes);
+
+            var btns = document.createElement('div');
+            btns.style.cssText = 'display:flex;gap:0.4em;';
+            function mkBtn(lbl, bg, bc, handler) {
+                var b = document.createElement('button');
+                b.type='button'; b.textContent=lbl;
+                b.style.cssText='padding:2px 9px;cursor:pointer;font-size:0.82em;background:'+bg+';border:1px solid '+bc+';border-radius:3px;';
+                b.onclick=function(){ handler(b); };
+                return b;
+            }
+            btns.appendChild(mkBtn('Append', '#d4edda', '#28a745', function(b) {
+                var newVal = item.curVal + '\n' + item.aiVal;
+                ffFillOneInOpener(item.name, newVal);
+                // Update local cache
+                var pf = FF_PAGE_FIELDS.find(function(f){ return f.name===item.name; });
+                if (pf) pf.value = newVal;
+                div.style.borderColor='#4caf50'; div.style.background='#e8f5e9';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled=false; b.textContent='✓ Appended';
+            }));
+            btns.appendChild(mkBtn('Replace', '#fff3cd', '#ffc107', function(b) {
+                ffFillOneInOpener(item.name, item.aiVal);
+                var pf = FF_PAGE_FIELDS.find(function(f){ return f.name===item.name; });
+                if (pf) pf.value = item.aiVal;
+                div.style.borderColor='#ffc107'; div.style.background='#fff3cd';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled=false; b.textContent='✓ Replaced';
+            }));
+            btns.appendChild(mkBtn('Skip', '#f8f9fa', '#aaa', function(b) {
+                div.style.borderColor='#ccc'; div.style.background='#f8f9fa'; div.style.opacity='0.6';
+                btns.querySelectorAll('button').forEach(function(x){x.disabled=true;});
+                b.disabled=false; b.textContent='✓ Skipped';
+            }));
+            div.appendChild(btns);
+            container.appendChild(div);
+        });
+
+        document.getElementById('ff-stage-all-btn').onclick = function() {
+            container.querySelectorAll('[data-name]').forEach(function(d){
+                var b = d.querySelectorAll('button')[0];
+                if (b && !b.disabled) b.click();
+            });
+        };
+        document.getElementById('ff-skip-all-btn').onclick = function() {
+            container.querySelectorAll('[data-name]').forEach(function(d){
+                var b = d.querySelectorAll('button')[2];
+                if (b && !b.disabled) b.click();
+            });
+        };
+    }
+
+    // ── Review & Correct ──────────────────────────────────────────────────────
+    document.getElementById('ff-review-btn').addEventListener('click', function() {
+        var name = (document.getElementById('ff-entity-name').value || '').trim();
+        if (!name) { alert('Enter the entity name first.'); return; }
+        if (!ffHasOpener()) { alert('No parent window.'); return; }
+        ffRequestFields();
+
+        var statusEl = document.getElementById('ff-status');
+        var btn      = document.getElementById('ff-review-btn');
+        var panel    = document.getElementById('ff-review-panel');
+        var results  = document.getElementById('ff-review-results');
+        btn.disabled = true;
+        panel.style.display = 'none';
+        results.innerHTML = '';
+        statusEl.textContent = 'Reviewing…';
+
+        var mp  = ffGetMP(FF_PAGE_FIELDS.length, false);
+        var currentValues = {};
+        FF_PAGE_FIELDS.forEach(function(f){ if (f.value && f.value.trim()) currentValues[f.name] = f.value.trim(); });
+
+        var ctrl = new AbortController();
+        setTimeout(function(){ ctrl.abort(); }, 60000);
+
+        fetch('/ai/generate', {
+            method:'POST', headers:{'Content-Type':'application/json'}, credentials:'include', signal:ctrl.signal,
+            body: JSON.stringify({
+                prompt: 'You are reviewing a form record named "' + name + '". '
+                    + 'Current values: ' + JSON.stringify(currentValues) + '. '
+                    + 'Identify fields that are obviously wrong or inconsistent. '
+                    + 'Return ONLY raw JSON: {"corrections":[{"field":"name","current":"val","suggested":"val","reason":"why"}]}. '
+                    + 'If nothing is wrong return {"corrections":[]}.',
+                provider:   mp.provider, model: mp.model,
+                page_path:  FF_PAGE_PATH, page_title: FF_PAGE_TITLE
+            })
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            if (!data.success) { statusEl.textContent = 'Review failed: ' + (data.error || ''); return; }
+            var raw = (data.response || '').trim();
+            var js  = raw.indexOf('{'), je = raw.lastIndexOf('}');
+            if (js === -1) { statusEl.textContent = 'AI returned no JSON.'; return; }
+            var parsed      = JSON.parse(raw.substring(js, je+1));
+            var corrections = parsed.corrections || [];
+            if (!corrections.length) { statusEl.textContent = 'Review complete — no obvious errors found.'; return; }
+            statusEl.textContent = 'Found ' + corrections.length + ' potential issue(s):';
+            panel.style.display = '';
+            corrections.forEach(function(c) {
+                var div = document.createElement('div');
+                div.className = 'ff-correction-item';
+                div.innerHTML = '<strong>' + c.field + '</strong>: '
+                    + '<span style="color:#c00;text-decoration:line-through;">' + (c.current||'').substring(0,100).replace(/</g,'&lt;') + '</span>'
+                    + ' → <span style="color:#155724;">' + (c.suggested||'').substring(0,200).replace(/</g,'&lt;') + '</span>'
+                    + '<br><em style="color: var(--text-muted-color, #666);">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
+                var pf = FF_PAGE_FIELDS.find(function(f){ return f.name === c.field; });
+                if (pf) {
+                    var ab = document.createElement('button');
+                    ab.type='button'; ab.textContent='Apply';
+                    ab.style.cssText='margin-left:0.7em;font-size:0.82em;padding:2px 8px;cursor:pointer;';
+                    ab.onclick = (function(field, suggested, btn) {
+                        return function() {
+                            ffFillOneInOpener(field, suggested);
+                            var pf2 = FF_PAGE_FIELDS.find(function(f){ return f.name===field; });
+                            if (pf2) pf2.value = suggested;
+                            btn.textContent='✓ Applied'; btn.disabled=true;
+                        };
+                    })(c.field, c.suggested, ab);
+                    div.appendChild(ab);
+                }
+                results.appendChild(div);
+            });
+        })
+        .catch(function(err) {
+            document.getElementById('ff-review-btn').disabled = false;
+            document.getElementById('ff-status').textContent = err.name==='AbortError' ? 'Review timed out.' : 'Review failed: '+err.message;
+        });
+    });
     </script>
 </body>
 </html>

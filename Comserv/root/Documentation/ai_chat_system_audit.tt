@@ -24,7 +24,7 @@
     </div>
 
     <!-- RECENT CHANGES -->
-    <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 15px 0;">
+    <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 15px; margin: 15px 0;">
         <h3 style="margin-top: 0; color: #856404;">Recent Changes (Jan 2, 2026)</h3>
         <ul style="margin: 10px 0; color: #856404;">
             <li><strong>Schema Fix Applied</strong>: Missing metadata column added to ai_conversations table. Production database at 192.168.1.198:3306 updated with: ALTER TABLE ai_conversations ADD COLUMN metadata longtext NULL AFTER status;</li>
@@ -48,7 +48,7 @@
 
     <div class="row">
         <div class="col-50">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--success-color); font-family: var(--header-font);">System 1: AI Chat (Modern)</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Tables</strong>: ai_conversations, ai_messages</li>
@@ -60,7 +60,7 @@
             </div>
         </div>
         <div class="col-50">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">System 2: Basic Chat (Legacy)</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Table</strong>: chat_messages</li>
@@ -94,7 +94,7 @@
                 <strong>Status</strong>: ✅ Properly modeled with DBIx::Class
             </p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: 0.85em;"><code>CREATE TABLE IF NOT EXISTS ai_conversations (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -119,7 +119,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Primary key, auto-increment</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>user_id</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INT</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
@@ -131,7 +131,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Yes</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation title</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>created_at</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">TIMESTAMP</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
@@ -143,7 +143,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Last message time</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>status</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ENUM</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">No</td>
@@ -163,7 +163,7 @@
                 <strong>Status</strong>: ✅ Properly modeled with DBIx::Class and relationships
             </p>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: 0.8em;"><code>CREATE TABLE IF NOT EXISTS ai_messages (
     id INT AUTO_INCREMENT PRIMARY KEY,
     conversation_id INT NOT NULL,
@@ -195,7 +195,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INT</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Message ID, primary key</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>conversation_id</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INT</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">FK to ai_conversations</td>
@@ -205,7 +205,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ENUM</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">'user' or 'assistant'</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>content</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">LONGTEXT</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Message text</td>
@@ -215,7 +215,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR(100)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Name of model that generated response</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>sources_cited</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">JSON</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ Never populated - citation tracking not implemented</td>
@@ -225,7 +225,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">JSON</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ Always NULL - documentation search not integrated</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>ip_address</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR(45)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">User IP for audit trail</td>
@@ -246,7 +246,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 1: User Initiates Chat</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Route</strong>: POST /ai/chat<br/>
@@ -255,7 +255,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 2: Create or Fetch Conversation</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Code</strong>: AI.pm Lines 670-688<br/>
@@ -264,7 +264,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 3: Save User Message</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Code</strong>: AI.pm Lines 694-704<br/>
@@ -273,7 +273,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 4: Query Ollama LLM</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Service</strong>: External Ollama server (localhost or network)<br/>
@@ -282,7 +282,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 5: Save AI Response</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Code</strong>: AI.pm Lines 713-726<br/>
@@ -291,7 +291,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Step 6: Return to User</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Format</strong>: JSON response<br/>
@@ -313,7 +313,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Issue 1: web_search_results Table Completely Unused</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Severity</strong>: HIGH<br/>
@@ -325,7 +325,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Issue 2: sources_cited Column Always NULL</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Severity</strong>: HIGH<br/>
@@ -337,7 +337,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Issue 3: search_context Always NULL</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Severity</strong>: MEDIUM<br/>
@@ -349,7 +349,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Issue 4: Documentation Metadata Index Not Populated</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Severity</strong>: HIGH<br/>
@@ -361,7 +361,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Issue 5: Code Search Index Not Used</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Severity</strong>: MEDIUM<br/>
@@ -395,7 +395,7 @@
                 <strong>Controller</strong>: Comserv::Controller::Chat
             </p>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: 0.85em;"><code>CREATE TABLE IF NOT EXISTS chat_messages (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username VARCHAR(255) NOT NULL,
@@ -420,7 +420,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INTEGER</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Primary key</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>username</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR(255)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Sender username (or 'Guest')</td>
@@ -430,7 +430,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VARCHAR(255)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ Stored as string, not TIMESTAMP type</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>is_system_message</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">BOOLEAN</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">System vs user message flag</td>
@@ -446,7 +446,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Critical Issue: Missing ChatMessage ORM Model</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Problem</strong>: Controller uses raw database access instead of proper DBIx::Class model<br/>
@@ -468,7 +468,7 @@
 
     <div class="row">
         <div class="col-50">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--success-color); font-family: var(--header-font);">What IS Persisting ✅</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>ai_conversations</strong>: User/conversation relationships ✓</li>
@@ -482,7 +482,7 @@
             </div>
         </div>
         <div class="col-50">
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">What is NOT Persisting ❌</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>web_search_results</strong>: Never created ❌</li>
@@ -515,7 +515,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">1. Create ChatMessage DBIx::Class Model</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>File</strong>: lib/Comserv/Model/Schema/Ency/Result/ChatMessage.pm<br/>
@@ -526,7 +526,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">2. Implement Web Search Results Persistence</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Feature</strong>: Web search integration with AI responses<br/>
@@ -537,7 +537,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">3. Implement Source Citation Tracking</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Feature</strong>: Track and display which sources AI cited<br/>
@@ -558,7 +558,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">4. Add Documentation Search Integration</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Feature</strong>: Full-text search of documentation for AI context<br/>
@@ -569,7 +569,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">5. Auto-generate Conversation Titles</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Feature</strong>: Auto-generated titles for conversations<br/>
@@ -580,7 +580,7 @@
                 </p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">6. Implement AI Model Configuration</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);">
                     <strong>Feature</strong>: Dynamic model configuration per user role<br/>
@@ -612,7 +612,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Working</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation history and messages persisting correctly</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Basic chat system operational</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">✅ Working</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">User-to-admin messaging functional but lacks ORM model</td>
@@ -622,7 +622,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">⚠️ Partial</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">AI Chat complete; Basic Chat missing ChatMessage.pm</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Citation tracking</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Not implemented</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">sources_cited column always NULL</td>
@@ -632,7 +632,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Not implemented</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">web_search_results table empty, never used</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Documentation search</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">❌ Not implemented</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Index table defined but never populated or queried</td>
@@ -648,7 +648,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font);">Next Steps</h2>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Create ChatMessage DBIx::Class model for legacy system</li>
@@ -684,7 +684,7 @@ THEME COMPLIANCE NOTES:
 
 This document uses Comserv theme system CSS variables for full compatibility:
 - Text colors: var(--text-color), var(--text-muted-color)
-- Backgrounds: var(--light-color), var(--secondary-color)
+- Backgrounds: rgba(255,255,255,0.15), var(--secondary-color)
 - Semantic colors: var(--success-color), var(--warning-color), var(--info-color)
 - Typography: var(--header-font), var(--body-font), var(--font-size-*) variables
 - Spacing: var(--spacing-small), var(--spacing-medium), var(--spacing-large)

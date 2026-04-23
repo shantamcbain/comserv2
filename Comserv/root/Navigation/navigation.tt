@@ -1,5 +1,5 @@
 [% META title = 'Main Navigation Menu' %]
-[% PageVersion = 'Navigation/navigation.tt,v 1.1 2025/01/28 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/navigation.tt,v 1.2 2026/04/22 P3.2 theme-audit: no hardcoded colours; all CSS-var compliant' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
     <!-- Using cached navigation system for improved performance -->
@@ -20,8 +20,10 @@
         [%# Global Menu discontinued — Mail/Jobs/Join moved to Main %]
         [% IF 0 %][% INCLUDE 'Navigation/TopDropListGlobal.tt' %][% END %]
         
-        <!-- Hosted Menu -->
+        <!-- Hosted Menu (CSC only — hosting is managed by CSC) -->
+        [% IF c.session.SiteName == 'CSC' %]
         [% INCLUDE 'Navigation/TopDropListHosted.tt' %]
+        [% END %]
         
         <!-- Member Menu -->
         [% INCLUDE 'Navigation/TopDropListMember.tt' %]

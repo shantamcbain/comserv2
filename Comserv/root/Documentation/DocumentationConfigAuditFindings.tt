@@ -26,18 +26,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#executive-summary" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Executive Summary</a>
-                <a href="#findings" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Findings</a>
-                <a href="#removed-entries" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Removed Entries</a>
-                <a href="#unindexed-files" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Unindexed Files</a>
-                <a href="#recommendations" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Recommendations</a>
-                <a href="#next-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Next Steps</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#executive-summary" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Executive Summary</a>
+                <a href="#findings" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Findings</a>
+                <a href="#removed-entries" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Removed Entries</a>
+                <a href="#unindexed-files" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Unindexed Files</a>
+                <a href="#recommendations" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Recommendations</a>
+                <a href="#next-steps" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Next Steps</a>
             </div>
         </div>
     </div>
@@ -59,13 +59,13 @@ This audit examined the Documentation configuration system, specifically the rel
             <h2 id="executive-summary" style="color: var(--text-color); font-family: var(--header-font);">2. Executive Summary</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Critical Finding</h3>
-            <p style="color: var(--text-color); font-family: var(--body-font); background-color: #fff3cd; padding: 12px; border-left: 4px solid #ffc107; margin: 12px 0;">
+            <p style="color: var(--text-color); font-family: var(--body-font); background-color: var(--caution-bg, #fff3cd); padding: 12px; border-left: 4px solid var(--caution-color, #ffc107); margin: 12px 0;">
 The Documentation configuration system contained <strong>63 total discrepancies</strong> between configuration entries and actual files on disk. Cleanup operations have been partially completed to remove non-existent file references, but 31+ files on disk remain unindexed in the configuration.
             </p>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Key Statistics</h3>
             <table style="width: 100%; border-collapse: collapse; margin: 12px 0;">
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color); font-weight: bold;">Metric</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color); font-weight: bold;">Count</td>
                 </tr>
@@ -73,7 +73,7 @@ The Documentation configuration system contained <strong>63 total discrepancies<
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Total Files on Disk</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">472+</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Config Entries (Current)</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">440</td>
                 </tr>
@@ -81,7 +81,7 @@ The Documentation configuration system contained <strong>63 total discrepancies<
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Config Entries (Before Cleanup)</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">472</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Entries Removed (Missing Files)</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">32</td>
                 </tr>
@@ -89,7 +89,7 @@ The Documentation configuration system contained <strong>63 total discrepancies<
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Unindexed Files on Disk</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">31+</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: 8px; border: 1px solid var(--border-color);">Discrepancy Total</td>
                     <td style="padding: 8px; border: 1px solid var(--border-color);">63</td>
                 </tr>
@@ -155,7 +155,7 @@ All 32 missing file entries have been removed from the active configuration.
 The following 32 entries were removed from the active configuration because they referenced files that no longer exist on disk. These were primarily temporary resource tracking files and archived session data:
             </p>
             
-            <div style="background-color: var(--light-color); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: 0.9em;">
 2025-11-03_19-25-20 (Session archive)
 2025-11-03_19-25-35 (Session archive)
@@ -376,7 +376,7 @@ Configuration management and infrastructure documentation:
             <p style="color: var(--text-color); font-family: var(--body-font);">
 The application's Documentation system includes a built-in "Rescan" button in the Administration section that automatically discovers and indexes all valid documentation files. This is the recommended method to add the 31 unindexed files to the configuration.
             </p>
-            <div style="background-color: var(--light-color); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
                 <strong>Steps:</strong>
                 <ol style="margin: 8px 0;">
                     <li>Log in as Administrator</li>
@@ -448,7 +448,7 @@ After completing the rescan and verification steps, the audit will be considered
             <p style="color: var(--text-color); font-family: var(--body-font);">
 The documentation configuration uses JSON format with the following structure for each entry:
             </p>
-            <div style="background-color: var(--light-color); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: 12px; border: 1px solid var(--border-color); margin: 12px 0; border-radius: 4px;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; font-size: 0.85em;">
 {
   "page_id": {
@@ -495,11 +495,11 @@ Once the rescan is completed and verified, the Documentation system will be in a
 </div>
 
 <style>
-    .content-section { margin: 30px 0; padding: 20px; border-left: 4px solid #ddd; }
+    .content-section { margin: 30px 0; padding: 20px; border-left: 4px solid var(--border-color, #ddd); }
     .status-badge { padding: 4px 12px; border-radius: 3px; font-weight: bold; font-size: 0.9em; }
     .status-badge.complete { background: #d4edda; color: #155724; }
-    .status-badge.pending { background: #fff3cd; color: #856404; }
+    .status-badge.pending { background: var(--caution-bg, #fff3cd); color: #856404; }
     .status-badge.cleanup { background: #cce5ff; color: #004085; }
     table { border-collapse: collapse; }
-    table tr:hover { background-color: #f5f5f5; }
+    table tr:hover { background-color: var(--bg-secondary, #f5f5f5); }
 </style>

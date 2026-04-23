@@ -43,7 +43,7 @@
 .schema-table td { padding: 5px 10px; border-bottom: 1px solid var(--border-color, #dee2e6); }
 .badge-auto   { background: #d4edda; color: #155724; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
 .badge-form   { background: #cce5ff; color: #004085; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
-.badge-upload { background: #fff3cd; color: #856404; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
+.badge-upload { background: var(--caution-bg, #fff3cd); color: #856404; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
 .badge-na     { background: #f8d7da; color: #721c24; font-size: 0.75em; padding: 2px 6px; border-radius: 10px; white-space: nowrap; }
 </style>
 

@@ -100,7 +100,7 @@
     <div style="margin: 30px 0;">
         <h3>Phase 1C Sub-Tasks (Tactical Implementation)</h3>
         
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.1: Dedicated CLI Token Setup Endpoint</h4>
             <p><strong>What To Build</strong>: New REST endpoint <code>POST /api/token/cli-setup</code> optimized for command-line use</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -125,11 +125,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: Phase 1B complete (ApiToken schema, ApiTokenValidator)</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: Phase 1B complete (ApiToken schema, ApiTokenValidator)</p>
             <p><strong>Effort Estimate</strong>: 2-3 hours (endpoint implementation + validation logic)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.2: Token Scope & Permission System</h4>
             <p><strong>What To Build</strong>: Fine-grained permission model for API tokens (which projects/endpoints they can access)</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -154,11 +154,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 complete</p>
             <p><strong>Effort Estimate</strong>: 3-4 hours (schema design, validator logic, API endpoints for scope management)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.3: CLI Wrapper Script (`comserv-cli` Command)</h4>
             <p><strong>What To Build</strong>: User-friendly command-line tool for key generation, management, and API testing</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -195,11 +195,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 and #1C.2 complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1 and #1C.2 complete</p>
             <p><strong>Effort Estimate</strong>: 4-5 hours (script implementation, sub-command structure, config file handling, error handling)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.4: Documentation: API Token Reference Guide</h4>
             <p><strong>What To Create</strong>: User and developer documentation for API token system (both UI and CLI)</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -232,11 +232,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: All prior sub-tasks documented and code-complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: All prior sub-tasks documented and code-complete</p>
             <p><strong>Effort Estimate</strong>: 2-3 hours (writing, examples, testing doc accuracy)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.5: End-to-End Testing: Token Generation → CLI Use → API Call</h4>
             <p><strong>What To Test</strong>: Complete workflow from key generation to successful API call via command line</p>
             <p><strong>Test Scenarios</strong>:</p>
@@ -280,11 +280,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.4 all complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.4 all complete</p>
             <p><strong>Effort Estimate</strong>: 2-3 hours (test script development, execution, bug fixes)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.6: Grok Integration: Pass API Tokens to External Tools</h4>
             <p><strong>What To Build</strong>: Configuration and examples for using Comserv API tokens with Grok and other external systems</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -307,11 +307,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.5 complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.5 complete</p>
             <p><strong>Effort Estimate</strong>: 2-3 hours (integration testing, config examples, verification)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.7: Monitoring & Audit: Token Usage Logging</h4>
             <p><strong>What To Build</strong>: Audit trail for token creation, use, and revocation</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -334,11 +334,11 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.6 complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.6 complete</p>
             <p><strong>Effort Estimate</strong>: 2-3 hours (logging infrastructure, dashboard UI, log analysis utilities)</p>
         </div>
 
-        <div style="margin: 20px 0; padding: 15px; background: #fff; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin: 20px 0; padding: 15px; background: rgba(255,255,255,0.88); border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
             <h4>#1C.8: Security Hardening & Best Practices</h4>
             <p><strong>What To Implement</strong>: Security controls and best practices for token management</p>
             <p><strong>Implementation Details</strong>:</p>
@@ -379,7 +379,7 @@
                     </ul>
                 </li>
             </ul>
-            <p><strong>Status</strong>: <span style="background: #fff3cd; padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.7 complete</p>
+            <p><strong>Status</strong>: <span style="background: var(--caution-bg, #fff3cd); padding: 2px 6px; border-radius: 3px;">PENDING</span> | <strong>Dependency</strong>: #1C.1-#1C.7 complete</p>
             <p><strong>Effort Estimate</strong>: 3-4 hours (security review, rate limiting middleware, validation testing)</p>
         </div>
     </div>
@@ -389,68 +389,68 @@
     <h2>📈 Timeline & Resource Allocation</h2>
 
     <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-        <thead style="background: #f5f5f5;">
+        <thead style="background: var(--bg-secondary, #f5f5f5);">
             <tr>
-                <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">Sub-Task</th>
-                <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Effort (hours)</th>
-                <th style="padding: 12px; border: 1px solid #ddd; text-align: center;">Dependency</th>
-                <th style="padding: 12px; border: 1px solid #ddd; text-align: left;">Timeline (Estimated)</th>
+                <th style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: left;">Sub-Task</th>
+                <th style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">Effort (hours)</th>
+                <th style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">Dependency</th>
+                <th style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: left;">Timeline (Estimated)</th>
             </tr>
         </thead>
         <tbody>
-            <tr style="background: #fafafa;">
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.1: CLI Token Setup Endpoint</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">Phase 1B</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 1 (Jan 19-25)</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.1: CLI Token Setup Endpoint</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">Phase 1B</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 1 (Jan 19-25)</td>
             </tr>
             <tr>
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.2: Token Scope System</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">3-4</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">#1C.1</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 1 (Jan 23-29, parallel with #1C.1)</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.2: Token Scope System</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">3-4</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">#1C.1</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 1 (Jan 23-29, parallel with #1C.1)</td>
             </tr>
-            <tr style="background: #fafafa;">
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.3: CLI Wrapper Script</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">4-5</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">#1C.1 + #1C.2</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
-            </tr>
-            <tr>
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.4: Documentation</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
-            </tr>
-            <tr style="background: #fafafa;">
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.5: E2E Testing</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 2 (Jan 26-Feb 1)</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.3: CLI Wrapper Script</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">4-5</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">#1C.1 + #1C.2</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 2 (Jan 26-Feb 1)</td>
             </tr>
             <tr>
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.6: Grok Integration</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.4: Documentation</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 2 (Jan 26-Feb 1)</td>
             </tr>
-            <tr style="background: #fafafa;">
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.7: Audit Logging</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">2-3</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.5: E2E Testing</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 2 (Jan 26-Feb 1)</td>
             </tr>
             <tr>
-                <td style="padding: 12px; border: 1px solid #ddd;">#1C.8: Security Hardening</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">3-4</td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;">All prior</td>
-                <td style="padding: 12px; border: 1px solid #ddd;">Week 3 (Feb 2-8)</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.6: Grok Integration</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 3 (Feb 2-8)</td>
             </tr>
-            <tr style="background: #fff3cd; font-weight: bold;">
-                <td style="padding: 12px; border: 1px solid #ddd;"><strong>TOTAL PHASE 1C</strong></td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;"><strong>21-28 hours</strong></td>
-                <td style="padding: 12px; border: 1px solid #ddd; text-align: center;"><strong>Phase 1B→1C</strong></td>
-                <td style="padding: 12px; border: 1px solid #ddd;"><strong>3 weeks (Jan 19-Feb 8)</strong></td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.7: Audit Logging</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">2-3</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 3 (Feb 2-8)</td>
+            </tr>
+            <tr>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">#1C.8: Security Hardening</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">3-4</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;">All prior</td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);">Week 3 (Feb 2-8)</td>
+            </tr>
+            <tr style="background: var(--caution-bg, #fff3cd); font-weight: bold;">
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);"><strong>TOTAL PHASE 1C</strong></td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;"><strong>21-28 hours</strong></td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd); text-align: center;"><strong>Phase 1B→1C</strong></td>
+                <td style="padding: 12px; border: 1px solid var(--border-color, #ddd);"><strong>3 weeks (Jan 19-Feb 8)</strong></td>
             </tr>
         </tbody>
     </table>
@@ -488,7 +488,7 @@
 
     <h2>🔗 Related Documentation & Resources</h2>
 
-    <div style="background: #f5f5f5; border-left: 4px solid #999; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--bg-secondary, #f5f5f5); border-left: 4px solid #999; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <ul style="line-height: 1.8;">
             <li><a href="/Documentation/TodoAPIAndMasterPlanSync" target="_blank">📄 Implementation Plan: Todo API & Master Plan DB Sync</a> (Phase 1B foundation: Token schema, endpoints)</li>
             <li><a href="/Documentation/ApiTokenReferenceGuide" target="_blank">📘 API Token Reference Guide</a> (Documentation for users, detailed token usage)</li>
@@ -504,7 +504,7 @@
 
     <h2>📌 Key Decisions & Rationale</h2>
 
-    <div style="background: #fff3cd; border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
+    <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid #ff9800; padding: 15px; margin: 20px 0; border-radius: 4px;">
         <ul style="line-height: 1.8;">
             <li><strong>Why Phase 1C (not Phase 2)?</strong> CLI key management is a natural extension of Phase 1B token system - same authentication layer, adds user-facing workflow. Logically grouped as Phase 1C to keep token work together.</li>
             <li><strong>Why Dedicated CLI Tool?</strong> External tools (Grok, scripts, monitoring) need simple, non-browser token management. CLI wrapper reduces friction vs. forcing UI interaction.</li>
@@ -517,7 +517,7 @@
 </div>
 
 <style>
-    .status-pending { background: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
+    .status-pending { background: var(--caution-bg, #fff3cd); color: #856404; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
     .status-in-progress { background: #cfe2ff; color: #084298; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
     .status-blocked { background: #f8d7da; color: #842029; padding: 2px 6px; border-radius: 3px; font-weight: bold; }
 </style>

@@ -200,6 +200,9 @@ sub auto :Private {
         # Set up theme using canonical ThemeConfig model with timeout protection
         my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
+        # CSS cache-busting version (Unix timestamp, changes every request forcing fresh CSS)
+        $c->stash->{css_v} = time();
+
         # Determine request domain (host without port) and non-standard port
         my $req_host = $c->req->uri->host;   # strips port already
         my $req_port = $c->req->uri->port;
@@ -220,6 +223,11 @@ sub auto :Private {
             my $bg_raw      = $theme_vars->{'primary-color'} || $theme_vars->{'background-color'} || '#ccffff';
             (my $bg_hex = $bg_raw) =~ s/^#//;
             $c->stash->{favicon_bg_color} = $bg_hex;
+            # Flag whether this theme has a background image so templates can
+            # add the 'has-bg-image' body class, which theme-overrides.css uses
+            # to make all structural containers transparent.
+            my $bg_img = $theme_vars->{'background-image'} || '';
+            $c->stash->{has_bg_image} = ($bg_img && $bg_img ne 'none') ? 1 : 0;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -298,7 +306,7 @@ sub auto :Private {
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
-        
+
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
         $c->stash->{member_pages} = [];
@@ -454,6 +462,20 @@ sub auto :Private {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
                 "enabled_modules load failed (table may not exist yet): $@");
             $c->stash->{enabled_modules} = {};
+        }
+
+        # Check if current site has active priced inventory items (for Shop nav visibility)
+        eval {
+            my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
+            my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
+                sitename     => $shop_site,
+                status       => 'active',
+                show_in_shop => 1,
+            }, { rows => 1 })->count;
+            $c->stash->{site_has_shop} = $shop_count ? 1 : 0;
+        };
+        if ($@) {
+            $c->stash->{site_has_shop} = 0;
         }
 
         # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
@@ -977,56 +999,52 @@ sub fetch_and_set {
     }
 
     if (!defined $c->stash->{SiteName}) {
-        if (defined $c->session->{SiteName}) {
-            $c->stash->{SiteName} = $c->session->{SiteName};
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
-        } else {
-            my $domain = $c->req->uri->host;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
+        my $domain = $c->req->uri->host;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
-            my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
 
-            if ($site_domain) {
-                my $site_id = $site_domain->site_id;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
+        if ($site_domain) {
+            my $site_id = $site_domain->site_id;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
-                my $site = $c->model('Site')->get_site_details($c, $site_id);
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            my $site = $c->model('Site')->get_site_details($c, $site_id);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
 
-                if ($site) {
-                    $value = $site->name;
-                    $c->stash->{SiteName} = $value;
-                    $c->session->{SiteName} = $value;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
+            if ($site) {
+                $value = $site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
 
-                    # Set ControllerName based on the site's home_view
-                    my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
+                my $home_view = $site->home_view || 'Root';
+                my $controller_exists = 0;
+                eval {
+                    my $ctrl = $c->controller($home_view);
+                    $controller_exists = 1 if $ctrl;
+                };
 
-                    # Verify the controller exists before setting it
-                    my $controller_exists = 0;
-                    eval {
-                        my $controller = $c->controller($home_view);
-                        $controller_exists = 1 if $controller;
-                    };
-
-                    if ($controller_exists) {
-                        $c->stash->{ControllerName} = $home_view;
-                        $c->session->{ControllerName} = $home_view;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
-                    } else {
-                        # If controller doesn't exist, fall back to Root
-                        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
-                            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
-                        $c->stash->{ControllerName} = 'Root';
-                        $c->session->{ControllerName} = 'Root';
-                    }
+                if ($controller_exists) {
+                    $c->stash->{ControllerName} = $home_view;
+                    $c->session->{ControllerName} = $home_view;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
+                } else {
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
+                        "Controller '$home_view' not found. Falling back to 'Root'.");
+                    $c->stash->{ControllerName} = 'Root';
+                    $c->session->{ControllerName} = 'Root';
                 }
+            }
+        } else {
+            if (defined $c->session->{SiteName}) {
+                $c->stash->{SiteName} = $c->session->{SiteName};
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
             } else {
                 $c->session->{SiteName} = 'none';
                 $c->stash->{SiteName} = 'none';
                 $c->session->{ControllerName} = 'Root';
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
             }
         }
     }
@@ -1852,6 +1870,12 @@ sub reset_session :Global {
 sub begin :Private {
     my ($self, $c) = @_;
     
+    # Skip all site/session setup for health check endpoints.
+    # Health checks run every 30s from Docker — no DB, no session, no logging needed.
+    if ($c->req->path =~ m{^/health(?:/|$)}) {
+        return;
+    }
+
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();
     $c->stash->{_request_start_hires} = [gettimeofday()];
@@ -1885,6 +1909,33 @@ sub begin :Private {
 
 sub _port_label {
     my ($port) = @_;
+    my %named = (
+        3000 => 'PC',   # ProjectConfig
+        4001 => 'Pl',   # PlanningSystem
+        4002 => 'SM',   # SchemaManagement
+        4003 => 'HA',   # InfrastructureHA
+        4004 => 'WS',   # WorkShops
+        4005 => 'Us',   # Users
+        4006 => 'FM',   # FileManagement
+        4007 => 'Ma',   # UnifiedMail
+        4008 => 'Mb',   # Membership
+        4009 => 'Pt',   # PointSystem
+        4010 => 'AI',   # AIChatSystem
+        4011 => 'Cs',   # CssThemes
+        4012 => 'En',   # ENCY
+        4013 => 'HD',   # HelpDesk
+        4014 => 'Hp',   # HealthPlanning
+        4015 => 'SH',   # ProdServerHealth
+        4016 => 'Sc',   # Security
+        4017 => 'Dc',   # Documentation
+        4018 => 'AP',   # APISystem
+        4019 => 'BM',   # BMaster
+        4020 => 'Ch',   # AIChatPlanInt
+        4021 => 'In',   # InventorySystem
+        4022 => 'DL',   # DevTimeLogging
+        4030 => '3D',   # 3DPrinting
+    );
+    return $named{$port} if exists $named{$port};
     my $s = "$port";
     $s =~ s/0+$// if $s =~ /0+$/;
     if (length($s) > 2) { $s = substr($s, -2) }

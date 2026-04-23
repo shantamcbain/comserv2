@@ -1,0 +1,193 @@
+[% META
+    title = "Stock Level Management"
+    description = "Admin guide to managing stock levels and inventory transactions"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/stock.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Stock Level Management</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#locations"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Locations</a>
+                <a href="#tx-types"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Transaction Types</a>
+                <a href="#viewing"        style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing Stock</a>
+                <a href="#receiving"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Receiving Stock</a>
+                <a href="#alerts"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Low-Stock Alerts</a>
+                <a href="#print"          style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Print Report</a>
+                <a href="#troubleshoot"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Stock levels are tracked <em>per item per location</em>. Every stock change (receive, use, adjust, transfer)
+                creates an <strong>InventoryTransaction</strong> record — a permanent audit trail of what happened, when, and who did it.
+                The <strong>InventoryStockLevel</strong> table holds the current running balance.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="locations" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Storage Locations</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Create locations at <a href="/Inventory/locations" style="color:var(--link-color)">/Inventory/locations</a>.
+                Examples: <em>3D Lab Shelf A</em>, <em>Freezer</em>, <em>Main Office Supplies</em>, <em>Consignment — Monashee Coop</em>.
+                At least one location is required before you can record stock. The first location created becomes the default
+                (used automatically by supplier invoices).
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="tx-types" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Transaction Types</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Effect</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Triggered By</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">receive</td><td style="border:1px solid var(--border-color);padding:6px 10px">+qty (stock in from supplier)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Supplier invoice saved; manual adjust</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">use</td><td style="border:1px solid var(--border-color);padding:6px 10px">−qty (consumed internally)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Manual adjust</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">transfer</td><td style="border:1px solid var(--border-color);padding:6px 10px">−qty at source, +qty at destination</td><td style="border:1px solid var(--border-color);padding:6px 10px">Manual transfer between locations</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">adjust</td><td style="border:1px solid var(--border-color);padding:6px 10px">±qty (error correction)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Manual adjust (requires reason)</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">return</td><td style="border:1px solid var(--border-color);padding:6px 10px">+qty (customer return back to stock)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Customer order return</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">consignment_out</td><td style="border:1px solid var(--border-color);padding:6px 10px">−qty (sent to consignment partner)</td><td style="border:1px solid var(--border-color);padding:6px 10px">New consignment created</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">consignment_sold</td><td style="border:1px solid var(--border-color);padding:6px 10px">Recorded (already out of stock)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Consignment settlement</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">consignment_return</td><td style="border:1px solid var(--border-color);padding:6px 10px">+qty (unsold items returned)</td><td style="border:1px solid var(--border-color);padding:6px 10px">Consignment settlement</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="viewing" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Viewing Stock</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/Inventory/stock" style="color:var(--link-color)">/Inventory/stock</a> to see all items
+                with their current quantity per location. Items below their <em>reorder_point</em> are highlighted in orange.
+                Click any item row to see its full transaction history.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="receiving" class="row">
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Receiving Stock</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)"><strong>Via supplier invoice (recommended):</strong></p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Create a supplier invoice at <a href="/Inventory/invoice/new" style="color:var(--link-color)">/Inventory/invoice/new</a></li>
+                <li>Add line items with quantities received</li>
+                <li>Save — stock is automatically updated and a <em>receive</em> transaction is logged</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)"><strong>Manual adjustment:</strong></p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/stock" style="color:var(--link-color)">/Inventory/stock</a></li>
+                <li>Click <strong>Adjust</strong> next to the item</li>
+                <li>Choose transaction type, quantity, location, and add a reason note</li>
+                <li>Save</li>
+            </ol>
+        </div>
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Adjustments</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Use <em>adjust</em> type to correct errors — for example, if a physical count differs from the system count.
+                Always enter a clear reason note: <em>"Physical count 2026-04-17 — found 3 extra spools"</em>.
+                Adjustments are logged permanently and cannot be deleted.
+            </p>
+        </div>
+    </div>
+
+    <div id="alerts" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Low-Stock Alerts</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The inventory dashboard (<a href="/Inventory" style="color:var(--link-color)">/Inventory</a>) shows a
+                <strong>Low Stock</strong> section listing all items where current stock &lt; <em>reorder_point</em>.
+                Set reorder_point and reorder_quantity on each item so the system can alert you at the right time.
+                The reorder_quantity field suggests how much to order (e.g. 1 spool = 1000g).
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="print" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Print Stock Report</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/Inventory/print/stock" style="color:var(--link-color)">/Inventory/print/stock</a>
+                for a printable stock report. Filter options:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>low_only=1</strong> — show only items at or below reorder point (clipboard reorder list)</li>
+                <li><strong>category=Filament</strong> — show only one category</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Use your browser's Print function (Ctrl+P). The report is formatted for A4/Letter with print-optimised CSS.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">9. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Negative stock shown</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Items were sold/used before stock was entered. Create a positive <em>adjust</em> transaction with note "Opening balance correction".</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Stock not updated after invoice</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Check invoice status is <em>received</em> (not <em>draft</em>). At least one location must exist.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Print-on-demand items need no stock</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Enable <em>hide_stock_count</em> on the item. No stock entry is required. The system shows "Available to order" to customers.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/items" style="color:var(--link-color)">Managing Inventory Items</a></li>
+            <li><a href="/Documentation/Inventory/suppliers" style="color:var(--link-color)">Supplier Management &amp; Invoices</a></li>
+            <li><a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices (Accounting)</a></li>
+        </ul>
+    </div>
+</div>

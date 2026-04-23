@@ -1,0 +1,51 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>&#x23F0; Auto-Pay — Confirm Posted Charges</h1>
+<p>
+  <a href="/Inventory/invoice">← All Invoices</a>
+</p>
+
+[% IF flash.success_msg %]<p style="color:green;font-weight:bold">[% flash.success_msg %]</p>[% END %]
+[% IF flash.error_msg %]<p style="color:red">[% flash.error_msg %]</p>[% END %]
+
+<p>
+  These invoices are marked <strong>Auto-Pay</strong> and their due date has passed.
+  Once you have confirmed the charge has posted to your bank/card, click <strong>Confirm Paid</strong>.
+</p>
+
+[% IF auto_pay_invoices.size %]
+<table border="1" cellpadding="6" style="width:100%;border-collapse:collapse;">
+  <thead>
+    <tr>
+      <th>Invoice #</th>
+      <th>Supplier</th>
+      <th>Due Date</th>
+      <th>Total</th>
+      <th>Auto-Pay Method</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH inv IN auto_pay_invoices %]
+  <tr style="background: var(--caution-bg, #fff3cd);">
+    <td><a href="/Inventory/invoice/view/[% inv.id %]">[% inv.invoice_number || inv.id %]</a></td>
+    <td>[% inv.supplier.name | html %]</td>
+    <td>[% inv.due_date %]</td>
+    <td style="text-align:right">$[% inv.total_amount %]</td>
+    <td>[% inv.auto_pay_method || '—' | html %]</td>
+    <td>
+      <form method="post" action="/Inventory/invoice/process_auto_pay" style="display:inline;">
+        <input type="hidden" name="invoice_id" value="[% inv.id %]">
+        <button type="submit" style="background: var(--success-color, #28a745);color:white;border:none;padding:4px 12px;border-radius:3px;cursor:pointer;"
+                onclick="return confirm('Confirm the auto-pay charge for [% inv.invoice_number | html %] has posted?')">
+          ✓ Confirm Paid
+        </button>
+      </form>
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p style="color:green;font-weight:bold">&#x2714; No auto-pay invoices are currently overdue. All caught up!</p>
+[% END %]

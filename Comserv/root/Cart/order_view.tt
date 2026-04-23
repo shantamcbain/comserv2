@@ -1,0 +1,106 @@
+[% PageVersion = 'Cart/order_view.tt v0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Order: [% invoice.invoice_number %]</h1>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div style="display:flex;gap:2em;flex-wrap:wrap">
+
+<div style="flex:1;min-width:260px">
+<h2>Customer Info</h2>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Invoice #</th><td>[% invoice.invoice_number %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Customer</th><td>[% invoice.customer_name || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Email</th><td>[% invoice.customer_email || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Phone</th><td>[% invoice.customer_phone || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Address</th><td>[% invoice.customer_address || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Ordered By</th><td>[% invoice.ordered_by || 'guest' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Date</th><td>[% invoice.created_at %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Notes</th><td>[% invoice.notes || '—' %]</td></tr>
+</table>
+</div>
+
+<div style="flex:1;min-width:260px">
+<h2>Payment &amp; Status</h2>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Payment Method</th><td>[% invoice.payment_method %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Payment Status</th><td>[% invoice.payment_status %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Amount Paid</th><td>$[% invoice.amount_paid | format('%.2f') %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Points Redeemed</th><td>[% invoice.points_redeemed || 0 %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Order Status</th><td>[% invoice.status %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Subtotal</th><td>$[% invoice.subtotal | format('%.2f') %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Tax</th><td>$[% invoice.tax_amount | format('%.2f') %]</td></tr>
+  <tr style="font-weight:bold"><th style="background: var(--bg-secondary, #f5f5f5)">Total</th><td>$[% invoice.total_amount | format('%.2f') %]</td></tr>
+</table>
+</div>
+</div>
+
+<h2 style="margin-top:1.5em">Line Items</h2>
+<table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
+  <thead style="background: var(--bg-secondary, #f5f5f5)">
+    <tr>
+      <th>#</th>
+      <th>SKU</th>
+      <th>Item</th>
+      <th>Options</th>
+      <th>Qty</th>
+      <th>Unit Price</th>
+      <th>Total</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH line IN invoice.lines %]
+    <tr>
+      <td>[% loop.count %]</td>
+      <td><small>[% line.sku %]</small></td>
+      <td>[% line.item_name %]</td>
+      <td><small>[% line.options || '—' %]</small></td>
+      <td>[% line.quantity %]</td>
+      <td>$[% line.unit_price | format('%.2f') %]</td>
+      <td>$[% line.line_total | format('%.2f') %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+
+<h2 style="margin-top:1.5em">Update Order</h2>
+<form method="POST" action="/Cart/order_status/[% invoice.id %]">
+  <table>
+    <tr>
+      <td><label>Order Status:</label></td>
+      <td>
+        <select name="status">
+          <option value="new"        [% IF invoice.status == 'new'        %]selected[% END %]>New</option>
+          <option value="processing" [% IF invoice.status == 'processing' %]selected[% END %]>Processing</option>
+          <option value="fulfilled"  [% IF invoice.status == 'fulfilled'  %]selected[% END %]>Fulfilled</option>
+          <option value="cancelled"  [% IF invoice.status == 'cancelled'  %]selected[% END %]>Cancelled</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <td><label>Payment Status:</label></td>
+      <td>
+        <select name="payment_status">
+          <option value="pending"  [% IF invoice.payment_status == 'pending'  %]selected[% END %]>Pending</option>
+          <option value="paid"     [% IF invoice.payment_status == 'paid'     %]selected[% END %]>Paid</option>
+          <option value="partial"  [% IF invoice.payment_status == 'partial'  %]selected[% END %]>Partial</option>
+          <option value="refunded" [% IF invoice.payment_status == 'refunded' %]selected[% END %]>Refunded</option>
+          <option value="cancelled"[% IF invoice.payment_status == 'cancelled'%]selected[% END %]>Cancelled</option>
+        </select>
+      </td>
+    </tr>
+    <tr>
+      <td><label>Amount Paid ($):</label></td>
+      <td><input type="text" name="amount_paid" value="[% invoice.amount_paid | format('%.2f') %]" style="width:80px"></td>
+    </tr>
+    <tr>
+      <td><label>Internal Notes:</label></td>
+      <td><textarea name="notes" rows="2" style="width:300px">[% invoice.notes %]</textarea></td>
+    </tr>
+  </table>
+  <input type="submit" value="Update Order" style="margin-top:0.5em">
+</form>
+
+<p style="margin-top:1.5em"><a href="/Cart/orders">← Back to Orders</a></p>

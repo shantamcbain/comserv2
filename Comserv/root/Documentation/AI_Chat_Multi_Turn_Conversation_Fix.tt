@@ -62,7 +62,7 @@
         </ul>
 
         <p><strong>Example of Old View:</strong></p>
-        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 10px; border-radius: 4px;">
 Conversation #1234
 Status: active
 Messages: 2
@@ -71,7 +71,7 @@ Created: 2025-12-27 01:15
         </pre>
 
         <p><strong>Example of New View:</strong></p>
-        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 10px; border-radius: 4px;">
 What is machine learning?
 Status: active
 Messages: 4
@@ -175,7 +175,7 @@ $preview .= " | A: " . substr($ai_msg, 0, 40) . "...";
         </div>
 
         <p><strong>Result Format:</strong></p>
-        <pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 10px; border-radius: 4px;">
 Q: What is the difference between AI and machine learning? | A: AI is the broader field, while machine learning is...
         </pre>
     </div>
@@ -222,21 +222,21 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
 
         <h3>Files Modified</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-            <tr style="background-color: #f5f5f5;">
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">File</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Changes</th>
+            <tr style="background-color: var(--bg-secondary, #f5f5f5);">
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd); text-align: left;">File</th>
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd); text-align: left;">Changes</th>
             </tr>
             <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><code>Controller/AI.pm</code></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><code>Controller/AI.pm</code></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">
                     - Added conversation_id parameter parsing<br>
                     - Modified conversation saving logic to support reuse<br>
                     - Updated conversations action preview generation
                 </td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd;"><code>root/ai/index.tt</code></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><code>root/ai/index.tt</code></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">
                     - Added currentConversationId state variable<br>
                     - Updated fetch request to include conversation_id<br>
                     - Added conversation ID display in header<br>
@@ -320,30 +320,30 @@ Q: What is the difference between AI and machine learning? | A: AI is the broade
 
         <h3>Expected Results</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-            <tr style="background-color: #f5f5f5;">
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Test</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Expected Behavior</th>
-                <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Result</th>
+            <tr style="background-color: var(--bg-secondary, #f5f5f5);">
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd); text-align: left;">Test</th>
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd); text-align: left;">Expected Behavior</th>
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd); text-align: left;">Result</th>
             </tr>
             <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">First message saved</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Notification shows conversation ID</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">First message saved</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Notification shows conversation ID</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd;">Follow-up in same conversation</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Same conversation ID, no new notification</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Follow-up in same conversation</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Same conversation ID, no new notification</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
             <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;">Conversation list preview</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Shows Q &amp; A format, not just numbers</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Conversation list preview</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Shows Q &amp; A format, not just numbers</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd;">View full conversation</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Shows all message pairs in order</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">✅</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">View full conversation</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Shows all message pairs in order</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">✅</td>
             </tr>
         </table>
     </div>

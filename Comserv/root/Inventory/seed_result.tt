@@ -1,0 +1,30 @@
+<h1>&#127807; Inventory Seed Result</h1>
+<p><a href="/Inventory/items">← View Items</a></p>
+
+<p style="font-weight:bold;color:[% created > 0 ? 'green' : '#666' %]">[% summary | html %]</p>
+
+[% IF seed_log.size %]
+<table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;max-width:700px;">
+  <thead>
+    <tr style="background:#f0f0f0;">
+      <th>SKU</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH entry IN seed_log %]
+    [% SET is_error = entry.match('ERROR') %]
+    [% SET is_skip  = entry.match('skipped') %]
+    <tr style="background:[% is_error ? '#fff0f0' : is_skip ? '#fffbe6' : '#f0fff0' %]">
+      <td style="font-family:monospace;">[% entry.split(':').0 | html %]</td>
+      <td>[% entry | html %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]
+
+<p style="margin-top:16px;">
+  <a href="/Inventory/items?sitename=[% sitename | uri %]" style="background: var(--primary-color, #007bff);color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">View [% sitename | html %] Inventory</a>
+  <a href="/Inventory/seed_filaments?sitename=[% sitename | uri %]" style="margin-left:1em;background:#6c757d;color:white;padding:6px 14px;border-radius:4px;text-decoration:none;">Run Again</a>
+</p>

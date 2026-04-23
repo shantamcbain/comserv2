@@ -43,7 +43,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .btn-danger {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
 }
 
@@ -90,7 +90,7 @@
 }
 
 .api-key-card {
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
@@ -120,7 +120,7 @@
 }
 
 .status-active {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
@@ -147,7 +147,7 @@
     text-align: center;
     padding: 40px;
     color: var(--text-color);
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 2px dashed var(--border-color);
     border-radius: 8px;
 }
