@@ -3,18 +3,38 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em">
   <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">New Consignment</h1>
-  <a href="/Inventory/consignment" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; Back</a>
+  <a href="/Inventory/consignment[% IF source_sitename && source_sitename != sitename %]?source_sitename=[% source_sitename | uri %][% END %]"
+     style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font)">&larr; Back</a>
 </div>
+
+[% IF all_sitenames && all_sitenames.size > 1 %]
+<form method="GET" action="/Inventory/consignment/new" style="margin-bottom:1em;display:flex;align-items:center;gap:0.7em;flex-wrap:wrap;background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:8px 14px">
+  <span style="font-family:var(--body-font);font-size:0.9rem;color:var(--text-color);font-weight:600">Inventory owner (source site):</span>
+  <select name="source_sitename" onchange="this.form.submit()"
+          style="padding:4px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+    [% FOREACH sn IN all_sitenames %]
+    <option value="[% sn | html %]"[% IF sn == source_sitename %] selected[% END %]>[% sn | html %]</option>
+    [% END %]
+  </select>
+  [% IF source_sitename && source_sitename != sitename %]
+  <span style="background:#fff3e0;border:1px solid #ffe082;border-radius:4px;padding:3px 10px;font-size:0.85rem;color:#5d4037;font-family:var(--body-font)">
+    Consignment will be recorded under <strong>[% source_sitename | html %]</strong> inventory
+  </span>
+  [% END %]
+</form>
+[% END %]
 
 [% IF error_msg %]<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% error_msg | html %]</div>[% END %]
 
 [% IF partners.size == 0 %]
 <div style="background: var(--caution-bg, #fff3e0);border:1px solid #ffe082;border-radius:4px;padding:1em;margin-bottom:1em">
-  No consignment partners set up yet. <a href="/Inventory/consignment/partners?edit=new">Add a partner first</a>.
+  No consignment partners set up yet for <strong>[% source_sitename | html %]</strong>.
+  <a href="/Inventory/consignment/partners?edit=new">Add a partner first</a>.
 </div>
 [% ELSE %]
 
 <form method="POST" action="/Inventory/consignment/new">
+<input type="hidden" name="source_sitename" value="[% source_sitename | html %]">
   <table cellpadding="5" style="border-collapse:collapse;width:100%;max-width:700px;margin-bottom:1.5em">
     <tr>
       <th style="text-align:left;width:180px;padding:6px 8px;background:var(--secondary-color)"><label>Partner *</label></th>
