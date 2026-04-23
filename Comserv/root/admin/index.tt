@@ -267,6 +267,12 @@
                         <i class="fas fa-handshake"></i>
                         <span>Consignment</span>
                     </a>
+                    [% IF sitename != '3d' %]
+                    <a href="[% c.uri_for('/Inventory/consignment/new', { source_sitename => '3d' }) %]" class="admin-link">
+                        <i class="fas fa-cube"></i>
+                        <span>Consign from 3D</span>
+                    </a>
+                    [% END %]
                 </div>
             </div>
         </div>
