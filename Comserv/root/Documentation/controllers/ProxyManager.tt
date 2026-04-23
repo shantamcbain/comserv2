@@ -254,22 +254,22 @@
         <div class="col-100">
             <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
             
-            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+            <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 12px; margin: 12px 0; border-radius: 4px;">
                 <h4 style="margin-top: 0; color: #856404;">API Key Not Configured</h4>
                 <p style="color: var(--text-color);">Set environment variable NPM_API_KEY or configure in npm-{environment}.conf</p>
             </div>
 
-            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+            <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 12px; margin: 12px 0; border-radius: 4px;">
                 <h4 style="margin-top: 0; color: #856404;">Docker Not Found</h4>
                 <p style="color: var(--text-color);">Follow OS-specific installation instructions provided in installation_docker view</p>
             </div>
 
-            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+            <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 12px; margin: 12px 0; border-radius: 4px;">
                 <h4 style="margin-top: 0; color: #856404;">Permission Denied on Proxy Operations</h4>
                 <p style="color: var(--text-color);">Verify user role is in proxy_management_roles or request/grant access through access control methods</p>
             </div>
 
-            <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 12px; margin: 12px 0; border-radius: 4px;">
+            <div style="background: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: 12px; margin: 12px 0; border-radius: 4px;">
                 <h4 style="margin-top: 0; color: #856404;">YAML Module Errors</h4>
                 <p style="color: var(--text-color);">Install at least one YAML module: <code>cpanm YAML::XS</code> or similar</p>
             </div>
@@ -309,7 +309,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin: 15px 0; border-radius: 4px;">
+            <div class="success" style="background: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 12px; margin: 15px 0; border-radius: 4px;">
                 <h3 id="see-also" style="margin-top: 0; color: var(--text-color);">See Also</h3>
                 <ul style="color: var(--text-color);">
                     <li><a href="/Documentation/AdminGit" style="color: var(--link-color);">Admin Git Controller</a></li>

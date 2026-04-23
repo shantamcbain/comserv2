@@ -363,7 +363,7 @@ $c->stash->{
             <ul>
                 <li><strong>Never use <code>overflow: hidden</code></strong> on full-page section containers — it clips the background image display</li>
                 <li><strong>Never use <code>backdrop-filter</code></strong> on main structural wrappers — creates stacking context issues</li>
-                <li><strong>Never hardcode <code>background-color: white</code></strong> — use <code>rgba(255,255,255,0.88)</code> instead</li>
+                <li><strong>Never hardcode <code>background-color: rgba(255,255,255,0.88)</code></strong> — use <code>rgba(255,255,255,0.88)</code> instead</li>
                 <li><strong>Never use <code>background-attachment: fixed</code></strong> — breaks on mobile browsers and any ancestor with overflow/transform</li>
                 <li><strong>Never use <code>var(--secondary-color)</code> for large area backgrounds</strong> — the secondary colour varies per theme and may be very dark (e.g. <code>#4A4A4A</code> for the apis/BMaster theme)</li>
             </ul>
@@ -396,7 +396,7 @@ $c->stash->{
 
 /* WRONG — blocks background image */
 .bad-wrapper {
-    background-color: white;           /* use rgba(255,255,255,0.88) instead */
+    background-color: rgba(255,255,255,0.88);           /* use rgba(255,255,255,0.88) instead */
     background-attachment: fixed;      /* use scroll instead */
     overflow: hidden;                  /* remove from page-level containers */
     backdrop-filter: blur(4px);        /* remove from structural wrappers */

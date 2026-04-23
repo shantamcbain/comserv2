@@ -31,17 +31,17 @@
 
 .db-env-production {
     background-color: var(--warning-color, #dc3545);
-    color: #fff;
+    color: var(--button-text, #fff);
 }
 
 .db-env-staging {
-    background-color: #ffc107;
-    color: #333;
+    background-color: var(--caution-color, #ffc107);
+    color: var(--text-color, #333);
 }
 
 .db-env-dev {
     background-color: var(--success-color, #28a745);
-    color: #fff;
+    color: var(--button-text, #fff);
 }
 
 .k8s-migration-banner {

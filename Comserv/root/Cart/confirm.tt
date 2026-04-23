@@ -11,19 +11,19 @@
   <h2>Order Details</h2>
   <table style="width:100%;border-collapse:collapse" border="1" cellpadding="5">
     <tr>
-      <th style="background:#f5f5f5;text-align:left">Invoice #</th>
+      <th style="background: var(--bg-secondary, #f5f5f5);text-align:left">Invoice #</th>
       <td>[% invoice.invoice_number %]</td>
     </tr>
     <tr>
-      <th style="background:#f5f5f5;text-align:left">Customer</th>
+      <th style="background: var(--bg-secondary, #f5f5f5);text-align:left">Customer</th>
       <td>[% invoice.customer_name || '—' %]</td>
     </tr>
     <tr>
-      <th style="background:#f5f5f5;text-align:left">Email</th>
+      <th style="background: var(--bg-secondary, #f5f5f5);text-align:left">Email</th>
       <td>[% invoice.customer_email || '—' %]</td>
     </tr>
     <tr>
-      <th style="background:#f5f5f5;text-align:left">Payment Method</th>
+      <th style="background: var(--bg-secondary, #f5f5f5);text-align:left">Payment Method</th>
       <td>
         [% SWITCH invoice.payment_method %]
           [% CASE 'cash' %]Cash / E-transfer
@@ -34,14 +34,14 @@
       </td>
     </tr>
     <tr>
-      <th style="background:#f5f5f5;text-align:left">Payment Status</th>
+      <th style="background: var(--bg-secondary, #f5f5f5);text-align:left">Payment Status</th>
       <td>[% invoice.payment_status %]</td>
     </tr>
   </table>
 
   <h3 style="margin-top:1.5em">Items Ordered</h3>
   <table style="width:100%;border-collapse:collapse" border="1" cellpadding="5">
-    <thead style="background:#f5f5f5">
+    <thead style="background: var(--bg-secondary, #f5f5f5)">
       <tr>
         <th>Item</th>
         <th>Options</th>
@@ -84,7 +84,7 @@
   </table>
 
   [% IF invoice.payment_method == 'cash' %]
-  <div style="margin-top:1.5em;padding:1em;background:#fff8dc;border:1px solid #e0c000">
+  <div style="margin-top:1.5em;padding:1em;background: var(--caution-bg, #fff8dc);border:1px solid #e0c000">
     <strong>Payment Instructions:</strong><br>
     Please send e-transfer to <strong>billing@[% sitename %].ca</strong> with reference <strong>[% invoice.invoice_number %]</strong>.
     Your order will be processed once payment is received.

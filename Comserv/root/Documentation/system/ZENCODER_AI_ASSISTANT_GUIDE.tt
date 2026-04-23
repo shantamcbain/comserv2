@@ -42,7 +42,7 @@
     <a href="#" style="color: var(--text-muted-color);">Report Issue</a> | <a href="#" style="color: var(--text-muted-color);">Edit This Page</a>
 </div>
 
-<div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+<div style="background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
     <h3 style="margin-top: 0; color: #155724;">✅ Jan 23, 2026 - Configuration Cleanup & Consolidation</h3>
     <p style="margin: 5px 0; color: #155724;"><strong>11-Agent Consolidation:</strong> All 11 agents are now fully consolidated into <code>coding-standards.yaml</code> (v1.3-STABLE). Individual .md files are archived.</p>
     <p style="margin: 5px 0; color: #155724;"><strong>Rule 6 Tool Boundaries:</strong> Strict enforcement of tool boundaries. Zencoder agents MUST NOT read or modify <code>.continue/</code> or <code>.cursor/</code> configurations.</p>

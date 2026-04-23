@@ -60,7 +60,7 @@
 }
 .forager-card p {
     font-size: 0.95rem;
-    color: #555;
+    color: var(--text-muted-color, #555);
     margin: 0.4rem 0 1rem;
 }
 .forager-card a {
@@ -75,7 +75,7 @@
 .forager-card a:hover { background: #2d5a27; }
 
 .forager-about {
-    background: #fff;
+    background: rgba(255,255,255,0.88);
     border-left: 4px solid #7ab648;
     padding: 1.2rem 1.5rem;
     margin-bottom: 2rem;
@@ -83,7 +83,7 @@
 }
 .forager-about h2 { color: #2d5a27; margin-top: 0; }
 .forager-season {
-    background: #fffde7;
+    background: var(--caution-bg, #fffde7);
     border: 1px solid #f9a825;
     border-radius: 8px;
     padding: 1rem 1.4rem;

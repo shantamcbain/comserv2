@@ -14,13 +14,13 @@
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
             title="Send current field values to AI and ask it to identify errors or inconsistencies"
-            style="background:#fff3cd;border:1px solid #ffc107;padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
+            style="background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);padding:0.3em 0.7em;cursor:pointer;">Review &amp; Correct</button>
     [% IF is_admin %]
     <button type="button" id="ency-ai-sync-btn" onclick="encyAiSyncModels()"
             title="Sync available xAI model list from the API — run this if AI returns 410/deprecated errors"
             style="background:#e8f4e8;border:1px solid #5a9;padding:0.3em 0.7em;cursor:pointer;font-size:0.85em;">&#8635; Sync Models</button>
     [% END %]
-    <span id="ency-ai-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+    <span id="ency-ai-status" style="color: var(--text-muted-color, #555);font-style:italic;font-size:0.9em;"></span>
   </div>
   <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
     <label style="font-weight:bold;" title="Leave blank to ask AI about all fields. Enter field names to ONLY update those fields and leave everything else untouched.">
@@ -32,7 +32,7 @@
            title="Only these fields will be filled by AI. All other fields are untouched regardless of what AI returns." />
     <span style="color:#888;margin-left:0.4em;">⚠ Always fill specific fields when correcting a single field.</span>
   </div>
-  <div style="margin-top:0.4em;font-size:0.82em;color:#666;">
+  <div style="margin-top:0.4em;font-size:0.82em;color: var(--text-muted-color, #666);">
     <label style="cursor:pointer;">
       <input type="checkbox" id="ency-ai-override" style="vertical-align:middle;">
       Override existing values (default: only fills empty fields)
@@ -57,13 +57,13 @@
     <strong>ENCY Links Found:</strong>
     <div id="ency-resolve-results" style="margin-top:0.4em;"></div>
   </div>
-  <div id="ency-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid #ffc107;padding-top:0.6em;">
+  <div id="ency-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid var(--caution-color, #ffc107);padding-top:0.6em;">
     <strong style="color:#856404;">AI Review Suggestions:</strong>
     <div id="ency-review-results" style="margin-top:0.4em;"></div>
   </div>
   <div id="ency-ref-picker-panel" style="margin-top:0.8em;border-top:1px solid #acd;padding-top:0.6em;">
     <strong>Reference Picker</strong>
-    <span style="font-size:0.85em;color:#666;margin-left:0.5em;">Search the reference library and formally link a citation to this record.</span>
+    <span style="font-size:0.85em;color: var(--text-muted-color, #666);margin-left:0.5em;">Search the reference library and formally link a citation to this record.</span>
     <div style="margin-top:0.5em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center;">
       <input type="text" id="ency-ref-search-input" placeholder="Search by title, author, or ISBN…" size="38"
              oninput="encyRefSearch(this.value)" style="font-size:0.95em;" />
@@ -75,9 +75,9 @@
   <div id="ency-ai-staged-panel" style="display:none;margin-top:0.8em;border-top:2px solid #4a90d9;padding-top:0.6em;">
     <div style="display:flex;align-items:center;gap:0.8em;margin-bottom:0.6em;flex-wrap:wrap;">
       <strong style="color:#1a4a7a;">AI Suggestions — Fields With Existing Content:</strong>
-      <button type="button" id="ency-ai-stage-all-btn" onclick="encyStageAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;">Append All</button>
-      <button type="button" id="ency-ai-skip-all-btn" onclick="encySkipAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;">Skip All</button>
-      <span style="font-size:0.82em;color:#666;">Choose action per field, or use buttons above for bulk action.</span>
+      <button type="button" id="ency-ai-stage-all-btn" onclick="encyStageAll()" style="padding:0.25em 0.7em;cursor:pointer;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:3px;">Append All</button>
+      <button type="button" id="ency-ai-skip-all-btn" onclick="encySkipAll()" style="padding:0.25em 0.7em;cursor:pointer;background: var(--bg-secondary, #f8f9fa);border:1px solid #aaa;border-radius:3px;">Skip All</button>
+      <span style="font-size:0.82em;color: var(--text-muted-color, #666);">Choose action per field, or use buttons above for bulk action.</span>
     </div>
     <div id="ency-ai-staged-items"></div>
   </div>
@@ -432,7 +432,7 @@
             }
 
             var appendBtn = makeActionBtn('Append',
-                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#d4edda;border:1px solid #28a745;border-radius:3px;',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:3px;',
                 function(btn) {
                     item.el.value = item.currentVal + '\n' + item.aiVal;
                     div.style.background = '#e8f5e9';
@@ -443,7 +443,7 @@
                 });
 
             var replaceBtn = makeActionBtn('Replace',
-                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);border-radius:3px;',
                 function(btn) {
                     item.el.value = item.aiVal;
                     div.style.background = '#fff3cd';
@@ -454,7 +454,7 @@
                 });
 
             var skipBtn = makeActionBtn('Skip',
-                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;',
+                'padding:0.25em 0.7em;cursor:pointer;font-size:0.9em;background: var(--bg-secondary, #f8f9fa);border:1px solid #aaa;border-radius:3px;',
                 function(btn) {
                     div.style.background = '#f8f9fa';
                     div.style.borderColor = '#aaa';
@@ -575,11 +575,11 @@
             corrections.forEach(function(c) {
                 var el = document.querySelector('[name="' + c.field + '"]');
                 var div = document.createElement('div');
-                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background:#fffbe6;border:1px solid #ffc107;border-radius:4px;';
+                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background: var(--caution-bg, #fffbe6);border:1px solid var(--caution-color, #ffc107);border-radius:4px;';
                 div.innerHTML = '<strong>' + c.field + '</strong>: '
                     + '<span style="color:#c00;text-decoration:line-through;">' + (c.current || '').substring(0,120).replace(/</g,'&lt;') + '</span> '
                     + '&rarr; <span style="color:#155724;">' + (c.suggested || '').substring(0,200).replace(/</g,'&lt;') + '</span>'
-                    + '<br><em style="font-size:0.85em;color:#666;">' + (c.reason || '').replace(/</g,'&lt;') + '</em>';
+                    + '<br><em style="font-size:0.85em;color: var(--text-muted-color, #666);">' + (c.reason || '').replace(/</g,'&lt;') + '</em>';
                 if (el) {
                     var applyBtn = document.createElement('button');
                     applyBtn.type = 'button';
@@ -786,7 +786,7 @@
         // Render chip in linked area
         var linked = document.getElementById('ency-ref-linked-chips');
         var chip = document.createElement('span');
-        chip.style.cssText = 'display:inline-block;margin:0.2em 0.3em;padding:0.25em 0.7em;background:#d4edda;border:1px solid #28a745;border-radius:12px;font-size:0.85em;';
+        chip.style.cssText = 'display:inline-block;margin:0.2em 0.3em;padding:0.25em 0.7em;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:12px;font-size:0.85em;';
         chip.innerHTML = '\u2713 [' + ref.reference_id + '] ' + esc(ref.title) +
             (ref.author ? ' — ' + esc(ref.author) : '') + ' ';
         var viewLink = document.createElement('a');

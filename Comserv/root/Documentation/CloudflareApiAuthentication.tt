@@ -135,7 +135,7 @@ perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain
     }
     
     .toc {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 5px;
         margin-bottom: 30px;
@@ -151,7 +151,7 @@ perl /home/shanta/PycharmProjects/comserv2/Comserv/script/test_cloudflare_domain
     }
     
     pre {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         overflow-x: auto;

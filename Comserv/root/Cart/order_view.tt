@@ -11,35 +11,35 @@
 <div style="flex:1;min-width:260px">
 <h2>Customer Info</h2>
 <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <tr><th style="background:#f5f5f5">Invoice #</th><td>[% invoice.invoice_number %]</td></tr>
-  <tr><th style="background:#f5f5f5">Customer</th><td>[% invoice.customer_name || '—' %]</td></tr>
-  <tr><th style="background:#f5f5f5">Email</th><td>[% invoice.customer_email || '—' %]</td></tr>
-  <tr><th style="background:#f5f5f5">Phone</th><td>[% invoice.customer_phone || '—' %]</td></tr>
-  <tr><th style="background:#f5f5f5">Address</th><td>[% invoice.customer_address || '—' %]</td></tr>
-  <tr><th style="background:#f5f5f5">Ordered By</th><td>[% invoice.ordered_by || 'guest' %]</td></tr>
-  <tr><th style="background:#f5f5f5">Date</th><td>[% invoice.created_at %]</td></tr>
-  <tr><th style="background:#f5f5f5">Notes</th><td>[% invoice.notes || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Invoice #</th><td>[% invoice.invoice_number %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Customer</th><td>[% invoice.customer_name || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Email</th><td>[% invoice.customer_email || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Phone</th><td>[% invoice.customer_phone || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Address</th><td>[% invoice.customer_address || '—' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Ordered By</th><td>[% invoice.ordered_by || 'guest' %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Date</th><td>[% invoice.created_at %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Notes</th><td>[% invoice.notes || '—' %]</td></tr>
 </table>
 </div>
 
 <div style="flex:1;min-width:260px">
 <h2>Payment &amp; Status</h2>
 <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <tr><th style="background:#f5f5f5">Payment Method</th><td>[% invoice.payment_method %]</td></tr>
-  <tr><th style="background:#f5f5f5">Payment Status</th><td>[% invoice.payment_status %]</td></tr>
-  <tr><th style="background:#f5f5f5">Amount Paid</th><td>$[% invoice.amount_paid | format('%.2f') %]</td></tr>
-  <tr><th style="background:#f5f5f5">Points Redeemed</th><td>[% invoice.points_redeemed || 0 %]</td></tr>
-  <tr><th style="background:#f5f5f5">Order Status</th><td>[% invoice.status %]</td></tr>
-  <tr><th style="background:#f5f5f5">Subtotal</th><td>$[% invoice.subtotal | format('%.2f') %]</td></tr>
-  <tr><th style="background:#f5f5f5">Tax</th><td>$[% invoice.tax_amount | format('%.2f') %]</td></tr>
-  <tr style="font-weight:bold"><th style="background:#f5f5f5">Total</th><td>$[% invoice.total_amount | format('%.2f') %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Payment Method</th><td>[% invoice.payment_method %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Payment Status</th><td>[% invoice.payment_status %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Amount Paid</th><td>$[% invoice.amount_paid | format('%.2f') %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Points Redeemed</th><td>[% invoice.points_redeemed || 0 %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Order Status</th><td>[% invoice.status %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Subtotal</th><td>$[% invoice.subtotal | format('%.2f') %]</td></tr>
+  <tr><th style="background: var(--bg-secondary, #f5f5f5)">Tax</th><td>$[% invoice.tax_amount | format('%.2f') %]</td></tr>
+  <tr style="font-weight:bold"><th style="background: var(--bg-secondary, #f5f5f5)">Total</th><td>$[% invoice.total_amount | format('%.2f') %]</td></tr>
 </table>
 </div>
 </div>
 
 <h2 style="margin-top:1.5em">Line Items</h2>
 <table border="1" cellpadding="5" cellspacing="0" style="border-collapse:collapse;width:100%">
-  <thead style="background:#f5f5f5">
+  <thead style="background: var(--bg-secondary, #f5f5f5)">
     <tr>
       <th>#</th>
       <th>SKU</th>

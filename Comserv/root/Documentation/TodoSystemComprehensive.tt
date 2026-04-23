@@ -391,7 +391,7 @@
     
     .doc-section h2 {
         color: #2196F3;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
         padding-bottom: 10px;
         margin-bottom: 20px;
     }
@@ -409,7 +409,7 @@
     }
     
     .changelog-links {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 20px;
         border-radius: 5px;
         margin: 20px 0;
@@ -439,7 +439,7 @@
     }
     
     .changelog-links em {
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.9em;
     }
     

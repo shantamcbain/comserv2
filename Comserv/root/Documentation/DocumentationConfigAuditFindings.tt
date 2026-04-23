@@ -59,7 +59,7 @@ This audit examined the Documentation configuration system, specifically the rel
             <h2 id="executive-summary" style="color: var(--text-color); font-family: var(--header-font);">2. Executive Summary</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Critical Finding</h3>
-            <p style="color: var(--text-color); font-family: var(--body-font); background-color: #fff3cd; padding: 12px; border-left: 4px solid #ffc107; margin: 12px 0;">
+            <p style="color: var(--text-color); font-family: var(--body-font); background-color: var(--caution-bg, #fff3cd); padding: 12px; border-left: 4px solid var(--caution-color, #ffc107); margin: 12px 0;">
 The Documentation configuration system contained <strong>63 total discrepancies</strong> between configuration entries and actual files on disk. Cleanup operations have been partially completed to remove non-existent file references, but 31+ files on disk remain unindexed in the configuration.
             </p>
 
@@ -495,11 +495,11 @@ Once the rescan is completed and verified, the Documentation system will be in a
 </div>
 
 <style>
-    .content-section { margin: 30px 0; padding: 20px; border-left: 4px solid #ddd; }
+    .content-section { margin: 30px 0; padding: 20px; border-left: 4px solid var(--border-color, #ddd); }
     .status-badge { padding: 4px 12px; border-radius: 3px; font-weight: bold; font-size: 0.9em; }
     .status-badge.complete { background: #d4edda; color: #155724; }
-    .status-badge.pending { background: #fff3cd; color: #856404; }
+    .status-badge.pending { background: var(--caution-bg, #fff3cd); color: #856404; }
     .status-badge.cleanup { background: #cce5ff; color: #004085; }
     table { border-collapse: collapse; }
-    table tr:hover { background-color: #f5f5f5; }
+    table tr:hover { background-color: var(--bg-secondary, #f5f5f5); }
 </style>
