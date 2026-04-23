@@ -77,26 +77,34 @@
   </div>
 
   <div id="consign-lines">
-    <div class="consign-line" style="display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)">
-      <select name="item_id_0" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-        <option value="">— select item —</option>
-        [% FOREACH item IN items %]
-        <option value="[% item.id %]" data-price="[% item.unit_price || item.unit_cost || '' %]" data-unit="[% item.unit_of_measure | html %]">
-          [% item.name | html %][% IF item.sku %] ([% item.sku | html %])[% END %]
-          [% IF item.unit_price %] — $[% item.unit_price %][% END %]
-        </option>
-        [% END %]
-      </select>
-      <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Qty:
-        <input type="number" name="quantity_0" min="1" step="1" value="1"
-               style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-      </label>
-      <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Retail $:
-        <input type="number" name="retail_price_0" min="0" step="0.01" placeholder="0.00"
-               style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-      </label>
-      <input type="text" name="line_notes_0" placeholder="Notes" maxlength="255"
-             style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+    <div class="consign-line" style="display:grid;gap:0.5em;margin-bottom:0.7em;background:var(--secondary-color);padding:10px 12px;border-radius:4px;border:1px solid var(--border-color)">
+      <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap">
+        <select name="item_id_0" onchange="onItemChange(this,0)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          <option value="">— select item —</option>
+          [% FOREACH item IN items %]
+          [% SET opts_json = item.shop_options ? item.shop_options : '' %]
+          <option value="[% item.id %]"
+                  data-price="[% item.unit_price || item.unit_cost || '' %]"
+                  data-unit="[% item.unit_of_measure | html %]"
+                  data-options="[% opts_json | html %]">
+            [% item.name | html %][% IF item.sku %] ([% item.sku | html %])[% END %]
+            [% IF item.unit_price %] — $[% item.unit_price %][% END %]
+          </option>
+          [% END %]
+        </select>
+        <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Qty:
+          <input type="number" name="quantity_0" min="1" step="1" value="1"
+                 style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+        </label>
+        <label style="font-family:var(--body-font);font-size:0.85rem;color:var(--text-color)">Retail $:
+          <input type="number" name="retail_price_0" min="0" step="0.01" placeholder="0.00"
+                 style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+        </label>
+        <input type="text" name="line_notes_0" placeholder="Notes (optional)" maxlength="255"
+               style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </div>
+      <div class="item-options-row" id="opts-0" style="display:none;gap:0.6em;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border-color);margin-top:4px"></div>
+      <input type="hidden" name="options_selected_0" id="options-val-0">
     </div>
   </div>
 
@@ -135,16 +143,61 @@ function unitStep(unit) {
   return { step: '1', min: '1' };
 }
 
-function fillPrice(sel) {
+function buildOptionsSelectors(optsRow, optsValInput, optionsJson, idx) {
+  optsRow.innerHTML = '';
+  optsRow.style.display = 'none';
+  if (optsValInput) optsValInput.value = '';
+  if (!optionsJson) return;
+  var opts;
+  try { opts = JSON.parse(optionsJson); } catch(e) { return; }
+  if (!Array.isArray(opts) || !opts.length) return;
+  optsRow.style.display = 'flex';
+  opts.forEach(function(opt, oi) {
+    var label = document.createElement('label');
+    label.style.cssText = 'font-size:0.85rem;font-family:var(--body-font);color:var(--text-color);display:flex;align-items:center;gap:4px';
+    label.textContent = (opt.label || opt.type || 'Option') + ': ';
+    var sel = document.createElement('select');
+    sel.style.cssText = 'padding:4px 7px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)';
+    sel.setAttribute('data-opt-label', opt.label || opt.type || 'Option');
+    var emptyOpt = document.createElement('option');
+    emptyOpt.value = '';
+    emptyOpt.textContent = '— select —';
+    sel.appendChild(emptyOpt);
+    (opt.values || opt.choices || []).forEach(function(v) {
+      var o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    });
+    sel.addEventListener('change', function() { updateOptionsVal(optsRow, optsValInput); });
+    label.appendChild(sel);
+    optsRow.appendChild(label);
+  });
+}
+
+function updateOptionsVal(optsRow, optsValInput) {
+  if (!optsValInput) return;
+  var parts = [];
+  optsRow.querySelectorAll('select').forEach(function(s) {
+    if (s.value) parts.push(s.getAttribute('data-opt-label') + ': ' + s.value);
+  });
+  optsValInput.value = parts.join(' | ');
+}
+
+function onItemChange(sel, idx) {
   var opt = sel.options[sel.selectedIndex];
   var line = sel.closest('.consign-line');
   var price = opt.getAttribute('data-price');
   var unit  = opt.getAttribute('data-unit') || '';
+  var optsJson = opt.getAttribute('data-options') || '';
   var s = unitStep(unit);
   var qtyInput   = line && line.querySelector('input[name^="quantity"]');
   var priceInput = line && line.querySelector('input[name^="retail_price"]');
-  if (qtyInput) { qtyInput.step = s.step; qtyInput.min = s.min; if (!qtyInput.value || qtyInput.value == '0') qtyInput.value = s.min; }
+  if (qtyInput) { qtyInput.step = s.step; qtyInput.min = s.min; if (!qtyInput.value || parseFloat(qtyInput.value) <= 0) qtyInput.value = s.min; }
   if (priceInput && price && !priceInput.value) priceInput.value = parseFloat(price).toFixed(2);
+  var optsRow = document.getElementById('opts-' + idx);
+  var optsVal = document.getElementById('options-val-' + idx);
+  if (optsRow) buildOptionsSelectors(optsRow, optsVal, optsJson, idx);
 }
 
 var itemOptionsHTML = document.querySelector('#consign-lines .consign-line select').innerHTML;
@@ -155,12 +208,17 @@ function addLine() {
   var container = document.getElementById('consign-lines');
   var div = document.createElement('div');
   div.className = 'consign-line';
-  div.style.cssText = 'display:flex;gap:0.6em;align-items:center;margin-bottom:0.5em;flex-wrap:wrap;background:var(--secondary-color);padding:8px 10px;border-radius:4px;border:1px solid var(--border-color)';
-  div.innerHTML = '<select name="item_id_' + idx + '" onchange="fillPrice(this)" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
+  div.style.cssText = 'display:grid;gap:0.5em;margin-bottom:0.7em;background:var(--secondary-color);padding:10px 12px;border-radius:4px;border:1px solid var(--border-color)';
+  div.innerHTML =
+    '<div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap">'
+    + '<select name="item_id_' + idx + '" onchange="onItemChange(this,' + idx + ')" style="flex:2;min-width:200px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">' + itemOptionsHTML + '</select>'
     + '<label style="font-size:0.85rem">Qty: <input type="number" name="quantity_' + idx + '" min="1" step="1" value="1" style="width:70px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
     + '<label style="font-size:0.85rem">Retail $: <input type="number" name="retail_price_' + idx + '" min="0" step="0.01" placeholder="0.00" style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)"></label>'
-    + '<input type="text" name="line_notes_' + idx + '" placeholder="Notes" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">'
-    + '<button type="button" onclick="this.closest(\'.consign-line\').remove()" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>';
+    + '<input type="text" name="line_notes_' + idx + '" placeholder="Notes (optional)" maxlength="255" style="flex:1;min-width:100px;padding:5px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">'
+    + '<button type="button" onclick="this.closest(\'.consign-line\').remove()" style="background:none;border:none;color:#c62828;cursor:pointer;font-size:1.1rem;padding:0 4px">&times;</button>'
+    + '</div>'
+    + '<div class="item-options-row" id="opts-' + idx + '" style="display:none;gap:0.6em;flex-wrap:wrap;padding-top:4px;border-top:1px dashed var(--border-color);margin-top:4px"></div>'
+    + '<input type="hidden" name="options_selected_' + idx + '" id="options-val-' + idx + '">';
   container.appendChild(div);
 }
 </script>
