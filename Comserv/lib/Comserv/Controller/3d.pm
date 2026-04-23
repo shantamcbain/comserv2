@@ -929,6 +929,8 @@ sub printers :Path('/3d/printers') :Args(0) {
                 { category => { -like => '%printer%' } },
                 { category => { -like => '%3d_print%' } },
                 { category => '3d_printer' },
+                { category => { -like => '%equipment%' } },
+                { category => { -like => '%3d_equip%' } },
             ],
         );
         $inv_where{id} = { -not_in => [ keys %already_linked ] }
