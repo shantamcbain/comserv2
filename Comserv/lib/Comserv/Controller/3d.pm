@@ -878,20 +878,18 @@ sub printers :Path('/3d/printers') :Args(0) {
                 my $inv_item_id = $c->req->params->{inventory_item_id};
                 my $inv_item    = $schema->resultset('InventoryItem')->find($inv_item_id)
                     if $inv_item_id;
-                if ($inv_item) {
-                    my $eq = eval { $inv_item->equipment };
-                    $schema->resultset('Printing3dPrinter')->create({
-                        sitename          => $sitename,
-                        name              => $c->req->params->{name}            || $inv_item->name,
-                        model             => $c->req->params->{model}           || '',
-                        status            => 'idle',
-                        nozzle_diameter   => $c->req->params->{nozzle_diameter} || '0.40',
-                        bed_size          => $c->req->params->{bed_size}        || '',
-                        notes             => $inv_item->notes                   || '',
-                        inventory_item_id => $inv_item->id,
-                        created_at        => _now(),
-                    });
-                }
+                die "Inventory item not found (id=$inv_item_id)\n" unless $inv_item;
+                $schema->resultset('Printing3dPrinter')->create({
+                    sitename          => $sitename,
+                    name              => $c->req->params->{name}            || $inv_item->name,
+                    model             => $c->req->params->{model}           || '',
+                    status            => 'idle',
+                    nozzle_diameter   => $c->req->params->{nozzle_diameter} || '0.40',
+                    bed_size          => $c->req->params->{bed_size}        || '',
+                    notes             => $inv_item->notes                   || '',
+                    inventory_item_id => $inv_item->id,
+                    created_at        => _now(),
+                });
             } elsif ($action eq 'update_status') {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
@@ -907,6 +905,13 @@ sub printers :Path('/3d/printers') :Args(0) {
                 $printer->delete if $printer && $printer->status eq 'idle';
             }
         };
+        if ($@) {
+            my $err = $@; $err =~ s/\s+$//;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Action '$action' failed: $err");
+            $c->flash->{error_msg} = "Could not complete action '$action': $err";
+        } else {
+            $c->flash->{success_msg} = 'Done.' if $action =~ /^(import_from_inventory|add)$/;
+        }
         $c->res->redirect($c->uri_for('/3d/printers'));
         $c->detach;
     }
