@@ -98,8 +98,8 @@
     [% FOR item IN items %]
     <div class="store-card">
         <h3>[% item.name | html %]</h3>
-        [% IF item.selling_price %]
-        <div class="price">$[% item.selling_price | format('%.2f') %]</div>
+        [% IF item.unit_price %]
+        <div class="price">$[% item.unit_price | format('%.2f') %]</div>
         [% ELSIF item.unit_cost %]
         <div class="price">$[% item.unit_cost | format('%.2f') %]</div>
         [% ELSE %]
