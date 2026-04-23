@@ -115,6 +115,10 @@ sub add :Path('/admin/site_modules/add') :Args(0) {
         my $enabled     = $c->req->param('enabled')  ? 1 : 0;
         my $min_role    = $c->req->param('min_role')    || 'member';
 
+        if ($module_name eq '_custom_') {
+            $module_name = $c->req->param('module_name_custom') || '';
+        }
+
         if ($sitename && $module_name) {
             try {
                 $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
