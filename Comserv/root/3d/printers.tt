@@ -88,18 +88,30 @@
     <thead>
         <tr>
             <th>Name</th><th>Model</th><th>Status</th>
-            <th>Nozzle</th><th>Bed Size</th><th>Notes</th><th>Actions</th>
+            <th>Nozzle</th><th>Bed Size</th>
+            <th>Depr/hr</th><th>Watts</th>
+            <th>Notes</th><th>Actions</th>
         </tr>
     </thead>
     <tbody>
         [% FOREACH p IN printers %]
+        [% SET eq = p.inventory_item.equipment IF p.inventory_item %]
         <tr>
-            <td>[% p.name | html %]</td>
+            <td>
+                [% p.name | html %]
+                [% IF p.inventory_item %]
+                <br><small style="color:var(--text-muted-color);">
+                    <a href="/Inventory/items/view/[% p.inventory_item.id %]" title="View inventory asset">asset #[% p.inventory_item.id %]</a>
+                </small>
+                [% END %]
+            </td>
             <td>[% p.model | html %]</td>
             <td><span class="status-badge status-[% p.status %]">[% p.status %]</span></td>
             <td>[% p.nozzle_diameter %] mm</td>
             <td>[% p.bed_size | html %]</td>
-            <td>[% p.notes | truncate(60) | html %]</td>
+            <td>[% IF eq && eq.depreciation_per_hour %]$[% eq.depreciation_per_hour %][% ELSE %]—[% END %]</td>
+            <td>[% IF eq && eq.wattage %][% eq.wattage %]W[% ELSE %]—[% END %]</td>
+            <td>[% p.notes | truncate(40) | html %]</td>
             <td>
                 [% IF p.status != 'idle' %]
                 <form method="post" action="/3d/printers" style="display:inline;">
@@ -164,6 +176,29 @@
                 <input type="text" name="notes" placeholder="Any notes about this printer">
             </div>
         </div>
+
+        <hr style="border-color:var(--border-color);margin:1em 0;">
+        <p style="font-size:0.9em;color:var(--text-muted-color);margin:0 0 0.8em 0;">
+            <strong>Inventory / Costing</strong> — fill in to auto-create an inventory asset record and enable job cost tracking.
+            Leave blank if you'll link manually later.
+        </p>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Purchase Price ($)</label>
+                <input type="number" name="purchase_price" step="0.01" min="0" placeholder="e.g. 799.00">
+            </div>
+            <div class="form-group">
+                <label>Depreciation / hr ($)</label>
+                <input type="number" name="depreciation_per_hour" step="0.000001" min="0" placeholder="e.g. 0.05">
+                <small style="color:var(--text-muted-color);">Cost charged per print-hour</small>
+            </div>
+            <div class="form-group">
+                <label>Wattage (W)</label>
+                <input type="number" name="wattage" step="1" min="0" placeholder="e.g. 200">
+                <small style="color:var(--text-muted-color);">Used to calculate electricity cost</small>
+            </div>
+        </div>
+
         <button type="submit" class="btn-add">Add Printer</button>
     </form>
 </div>
