@@ -183,6 +183,73 @@ sub add :Path('/marketplace/add') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Edit listing — /marketplace/edit/:id  (owner or admin)
+# -------------------------------------------------------------------------
+sub edit :Path('/marketplace/edit') :Args(1) {
+    my ($self, $c, $id) = @_;
+
+    unless ($c->session->{username}) {
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
+        $c->detach;
+    }
+
+    my $schema  = $self->_schema($c);
+    my $listing = $schema->resultset('MarketplaceListing')->find($id);
+
+    unless ($listing && ($listing->seller_username eq ($c->session->{username}//'') || $self->_is_admin($c))) {
+        $c->flash->{error_msg} = 'Listing not found or permission denied.';
+        $c->res->redirect($c->uri_for('/marketplace'));
+        $c->detach;
+    }
+
+    my @categories = $self->_categories($c, slug => { '!=' => 'all' });
+
+    if ($c->req->method eq 'POST') {
+        my $p     = $c->req->body_parameters;
+        my $title = $p->{title} // '';
+        my $desc  = $p->{description} // '';
+
+        unless ($title && $desc) {
+            $c->stash(
+                error_msg  => 'Title and description are required.',
+                listing    => $listing,
+                categories => \@categories,
+                form       => $p,
+                template   => 'marketplace/edit.tt',
+            );
+            return;
+        }
+
+        my $ltype = $p->{listing_type} || 'sale';
+        $ltype = 'sale' unless $ltype =~ /^(sale|wanted|job)$/;
+
+        eval {
+            $listing->update({
+                listing_type   => $ltype,
+                title          => $title,
+                description    => $desc,
+                price          => $p->{price}   || 0,
+                currency       => $p->{currency} || 'CAD',
+                accepts_points => ($p->{accepts_points} ? 1 : 0),
+                order_url      => $p->{order_url} || undef,
+                category_id    => ($p->{category_id} || undef),
+                expires_at     => ($p->{expires_at} || undef),
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit', "Update listing error: $@");
+            $c->stash(error_msg => 'Error saving changes. Please try again.', listing => $listing, categories => \@categories, form => $p, template => 'marketplace/edit.tt');
+            return;
+        }
+
+        $c->res->redirect($c->uri_for('/marketplace/view', $id, { updated => 1 }));
+        $c->detach;
+    }
+
+    $c->stash(listing => $listing, categories => \@categories, template => 'marketplace/edit.tt');
+}
+
+# -------------------------------------------------------------------------
 # Delete listing — /marketplace/delete/:id  (owner or admin)
 # -------------------------------------------------------------------------
 sub delete :Path('/marketplace/delete') :Args(1) {

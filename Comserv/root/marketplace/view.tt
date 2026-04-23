@@ -11,6 +11,11 @@
       Your listing has been posted successfully!
     </div>
   [% END %]
+  [% IF c.req.query_parameters.updated %]
+    <div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">
+      Listing updated successfully.
+    </div>
+  [% END %]
 
   <div style="border:1px solid var(--border-color, #ddd);border-radius:8px;background:var(--bg-color,#fff);overflow:hidden;">
 
@@ -66,6 +71,10 @@
         [% END %]
 
         [% IF c.session.username == listing.seller_username || c.stash.is_admin %]
+          <a href="/marketplace/edit/[% listing.id %]"
+             style="padding:10px 20px;background:#fd7e14;color:#fff;border-radius:5px;text-decoration:none;">
+            <i class="fas fa-edit"></i> Edit
+          </a>
           [% IF listing.status == 'active' %]
           <form method="POST" action="/marketplace/sold/[% listing.id %]" style="display:inline;">
             <button type="submit" style="padding:10px 20px;background: var(--success-color, #28a745);color:#fff;border:none;border-radius:5px;cursor:pointer;">

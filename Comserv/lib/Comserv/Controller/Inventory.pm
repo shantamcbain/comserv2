@@ -2681,76 +2681,6 @@ sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
 }
 
 # =========================================================================
-# Mark Paid by Shanta — admin marks a supplier invoice as paid by Shanta
-# personally (debit card, cash, etc.) and credits Shanta's point account
-# as compensation.  For pre-point-system invoices: mark paid only.
-# =========================================================================
-
-sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
-    my ($self, $c, $id) = @_;
-
-    unless ($c->session->{is_admin}) {
-        $c->flash->{error_msg} = 'Admin access required';
-        return $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
-    }
-
-    my $schema   = $self->_schema($c);
-    my $sitename = $self->_sitename($c);
-    my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
-    unless ($invoice) {
-        $c->flash->{error_msg} = 'Invoice not found';
-        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
-    }
-
-    my $params         = $c->req->body_parameters;
-    my $payment_note   = $params->{payment_note}   || '';
-    my $pre_point      = $params->{pre_point_system} ? 1 : 0;
-    my $amount         = $invoice->total_amount + 0;
-    my $SHANTA_USER_ID = 178;
-
-    my $notes_suffix = ' — Paid by Shanta';
-    $notes_suffix   .= " ($payment_note)" if $payment_note;
-    $notes_suffix   .= ' [pre-point-system: no point credit]' if $pre_point;
-    my $existing_notes = $invoice->notes || '';
-
-    eval {
-        $schema->txn_do(sub {
-            $invoice->update({
-                status => 'paid',
-                notes  => $existing_notes
-                        ? "$existing_notes\n$notes_suffix"
-                        : $notes_suffix,
-            });
-
-            unless ($pre_point) {
-                require Comserv::Util::PointSystem;
-                my $ps = Comserv::Util::PointSystem->new(c => $c);
-                $ps->credit(
-                    user_id          => $SHANTA_USER_ID,
-                    amount           => $amount,
-                    transaction_type => 'infrastructure_reimbursement',
-                    description      => 'Reimbursement: invoice ' . ($invoice->invoice_number || $id)
-                                      . ' paid by Shanta'
-                                      . ($payment_note ? " ($payment_note)" : ''),
-                    reference_type   => 'supplier_invoice',
-                    reference_id     => $id,
-                );
-            }
-        });
-    };
-    if ($@) {
-        $c->flash->{error_msg} = "Error marking paid: $@";
-    } else {
-        $c->flash->{success_msg} = $pre_point
-            ? "Invoice marked paid (pre-point-system — no point credit)."
-            : sprintf("Invoice marked paid. Shanta credited %.2f pts.", $amount);
-    }
-
-    $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
-}
-
-# =========================================================================
 # CUSTOMER INVOICES (AR / Sales)
 # =========================================================================
 
@@ -2964,26 +2894,69 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 }
 
                 if ($line->item_id) {
-                    my $sl = $schema->resultset('InventoryStockLevel')->find(
-                        { item_id => $line->item_id },
-                        { key => 'primary' }
-                    );
-                    if ($sl) {
-                        my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
-                        $sl->update({ quantity_on_hand => $new_qty });
+                    my $sold_item = eval { $schema->resultset('InventoryItem')->find($line->item_id) };
+
+                    if ($sold_item && $sold_item->is_assemblable) {
+                        # For assemblable (3D-printed / assembled) items: deduct BOM components
+                        # instead of the finished item (printed-on-demand — no finished stock).
+                        my $qty_multiplier = $line->quantity || 1;
+                        my @bom = eval {
+                            $schema->resultset('InventoryItemBOM')->search(
+                                { parent_item_id => $line->item_id },
+                                { prefetch => 'component_item' }
+                            )->all;
+                        };
+                        for my $bom_line (@bom) {
+                            next unless $bom_line->component_item_id;
+                            my $comp_qty = ($bom_line->quantity || 0)
+                                         * $qty_multiplier
+                                         * (1 + ($bom_line->scrap_factor || 0));
+
+                            my $comp_sl = $schema->resultset('InventoryStockLevel')->find(
+                                { item_id => $bom_line->component_item_id }
+                            );
+                            if ($comp_sl) {
+                                my $new_qty = ($comp_sl->quantity_on_hand || 0) - $comp_qty;
+                                $comp_sl->update({ quantity_on_hand => $new_qty });
+                            }
+                            my $comp_name = eval { $bom_line->component_item->name } || 'component';
+                            $schema->resultset('InventoryTransaction')->create({
+                                item_id          => $bom_line->component_item_id,
+                                sitename         => $sitename,
+                                transaction_type => 'use',
+                                quantity         => $comp_qty,
+                                unit_cost        => eval { $bom_line->component_item->unit_cost } || undef,
+                                reference_number => $invoice->invoice_number,
+                                notes            => 'Used in ' . ($sold_item->name || 'item')
+                                                  . ' x' . $qty_multiplier
+                                                  . ' — invoice #' . $invoice->invoice_number,
+                                performed_by     => $c->session->{username} || 'system',
+                                transaction_date => $now,
+                                created_at       => $now,
+                            });
+                        }
+                    } else {
+                        # Non-assemblable items: deduct finished stock directly
+                        my $sl = $schema->resultset('InventoryStockLevel')->find(
+                            { item_id => $line->item_id }
+                        );
+                        if ($sl) {
+                            my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
+                            $sl->update({ quantity_on_hand => $new_qty });
+                        }
+                        $schema->resultset('InventoryTransaction')->create({
+                            item_id          => $line->item_id,
+                            sitename         => $sitename,
+                            transaction_type => 'sell',
+                            quantity         => $line->quantity || 0,
+                            unit_cost        => $line->unit_cost || undef,
+                            reference_number => $invoice->invoice_number,
+                            notes            => 'Customer invoice #' . $invoice->invoice_number,
+                            performed_by     => $c->session->{username} || 'system',
+                            transaction_date => $now,
+                            created_at       => $now,
+                        });
                     }
-                    $schema->resultset('InventoryTransaction')->create({
-                        item_id          => $line->item_id,
-                        sitename         => $sitename,
-                        transaction_type => 'sell',
-                        quantity         => $line->quantity || 0,
-                        unit_cost        => $line->unit_cost || undef,
-                        reference_number => $invoice->invoice_number,
-                        notes            => 'Customer invoice #' . $invoice->invoice_number,
-                        performed_by     => $c->session->{username} || 'system',
-                        transaction_date => $now,
-                        created_at       => $now,
-                    });
                 }
             }
 
