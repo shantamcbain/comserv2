@@ -102,6 +102,41 @@
 .fb-rename-row td { padding:4px 10px; }
 .fb-rename-form { display:flex; gap:6px; align-items:center; }
 .fb-rename-form input { flex:1; font-size:0.85rem; }
+
+/* ── Gallery / Grid View ───────────────────────────────────────── */
+.fb-view-toggle { display:flex; gap:4px; margin-left:auto; }
+.fb-view-btn    { padding:3px 9px; border:1px solid #ccc; border-radius:3px; cursor:pointer;
+                  background:#fff; font-size:.82rem; color:#444; }
+.fb-view-btn.active { background:#1565c0; color:#fff; border-color:#1565c0; }
+.fb-gallery     { display:none; padding:10px; }
+.fb-gallery.active { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:10px; }
+.fb-gcard       { border:1px solid #ddd; border-radius:5px; overflow:hidden; background:#fff;
+                  cursor:pointer; transition:box-shadow .15s; display:flex; flex-direction:column; }
+.fb-gcard:hover { box-shadow:0 2px 10px rgba(0,0,0,.18); border-color:#1565c0; }
+.fb-gcard-thumb { width:100%; height:120px; object-fit:contain; background:#f5f5f5; display:block; }
+.fb-gcard-stl   { width:100%; height:120px; background:#1e1e2e; display:flex; align-items:center;
+                  justify-content:center; font-size:.7rem; color:#90caf9; text-align:center;
+                  padding:4px; box-sizing:border-box; }
+.fb-gcard-icon  { width:100%; height:120px; display:flex; align-items:center; justify-content:center;
+                  font-size:3rem; background:#f5f5f5; }
+.fb-gcard-label { padding:5px 6px; font-size:.72rem; color:#333; white-space:nowrap;
+                  overflow:hidden; text-overflow:ellipsis; border-top:1px solid #eee; }
+.fb-gcard-actions { display:flex; gap:3px; padding:4px 5px; flex-wrap:wrap; border-top:1px solid #f0f0f0; }
+.fb-gcard-actions .btn { padding:1px 5px !important; font-size:.68rem !important; }
+
+/* ── STL Modal viewer ──────────────────────────────────────────── */
+#stl-modal-overlay { display:none; position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:2000;
+                     align-items:center; justify-content:center; }
+#stl-modal-overlay.open { display:flex; }
+#stl-modal { background:#1e1e2e; border-radius:6px; width:min(700px,92vw); height:min(500px,80vh);
+             display:flex; flex-direction:column; overflow:hidden;
+             box-shadow:0 8px 40px rgba(0,0,0,.6); }
+#stl-modal-header { display:flex; align-items:center; justify-content:space-between;
+                    padding:10px 16px; background:#2a2a3e; color:#fff; font-size:.9rem; }
+#stl-canvas-wrap  { flex:1; position:relative; }
+#stl-canvas       { width:100%; height:100%; display:block; }
+#stl-hint         { position:absolute; bottom:8px; left:0; right:0; text-align:center;
+                    color:#7986cb; font-size:.72rem; pointer-events:none; }
 </style>
 
 <div class="app-container">
@@ -244,6 +279,14 @@
               <i class="fas fa-folder-plus"></i> Create
             </button>
           </form>
+
+          [%# View toggle: list / gallery %]
+          <div class="fb-view-toggle">
+            <button class="fb-view-btn active" id="btn-list-view" onclick="fbSetView('list')"
+                    title="List view">&#9776; List</button>
+            <button class="fb-view-btn" id="btn-gallery-view" onclick="fbSetView('gallery')"
+                    title="Gallery / thumbnail grid">&#9641; Gallery</button>
+          </div>
         </div>
 
         [%# Breadcrumb — CSC admin sees full path; others only see below nav_root %]
@@ -438,6 +481,80 @@
 
             </tbody>
           </table>
+
+          [%# ── Gallery grid (hidden by default, shown when gallery view active) %]
+          <div class="fb-gallery" id="fb-gallery">
+            [% FOREACH dir IN directories %]
+            [% SET dir_full = current_directory _ '/' _ dir.name %]
+            [% SET dir_esc  = dir.name | html %]
+            [% SET rid = 'gd' _ loop.count %]
+            <div class="fb-gcard">
+              <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
+                 style="text-decoration:none">
+                <div class="fb-gcard-icon">&#128193;</div>
+              </a>
+              <div class="fb-gcard-label" title="[% dir_esc %]">&#128193; [% dir.name | html %]</div>
+              <div class="fb-gcard-actions">
+                <a href="[% c.uri_for('/file/admin_browser', { dir_path => dir_full }) %]"
+                   class="btn btn-sm btn-primary">Open</a>
+                <a href="[% c.uri_for('/file/dir_sync', { dir_path => dir_full }) %]"
+                   class="btn btn-sm btn-secondary">+DB</a>
+              </div>
+            </div>
+            [% END %]
+
+            [% FOREACH f IN files %]
+            [% SET full_path = current_directory _ '/' _ f.name %]
+            [% SET fname_esc = f.name | html %]
+            [% SET fid = 'gf' _ loop.count %]
+            [% SET is_img = (f.ext == 'jpg' || f.ext == 'jpeg' || f.ext == 'png' || f.ext == 'gif' || f.ext == 'webp' || f.ext == 'bmp') %]
+            [% SET is_stl = (f.ext == 'stl' || f.ext == 'obj' || f.ext == '3mf') %]
+            [% SET is_vid = (f.ext == 'mp4' || f.ext == 'webm' || f.ext == 'mov') %]
+            [% SET gicon  = is_vid ? '&#127909;'
+                          : (f.ext == 'pdf') ? '&#128196;'
+                          : (f.ext == 'zip' || f.ext == 'tar' || f.ext == 'gz') ? '&#128230;'
+                          : (f.ext == 'mp3' || f.ext == 'ogg' || f.ext == 'wav') ? '&#127925;'
+                          : '&#128196;' %]
+            <div class="fb-gcard">
+              [% IF is_img %]
+              <a href="#" onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]');return false">
+                <img class="fb-gcard-thumb"
+                     src="[% c.uri_for('/file/fs_preview', { path => full_path }) %]"
+                     alt="[% fname_esc %]"
+                     loading="lazy"
+                     onerror="this.parentNode.innerHTML='<div class=\'fb-gcard-icon\'>&#128247;</div>'">
+              </a>
+              [% ELSIF is_stl %]
+              <div class="fb-gcard-stl" onclick="fbOpenStl('[% full_path | html %]','[% fname_esc %]')"
+                   title="Click to view 3D model">
+                &#9711; [% fname_esc %]<br>
+                <span style="font-size:.65rem;color:#b0bec5">Click to view 3D</span>
+              </div>
+              [% ELSIF is_vid %]
+              <div class="fb-gcard-icon"
+                   onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]')">[% gicon %]</div>
+              [% ELSE %]
+              <div class="fb-gcard-icon">[% gicon %]</div>
+              [% END %]
+              <div class="fb-gcard-label" title="[% fname_esc %]">[% f.name | html %]</div>
+              <div class="fb-gcard-actions">
+                [% IF is_img || is_vid || f.ext == 'pdf' %]
+                <button class="btn btn-sm btn-primary"
+                        onclick="fbPreview('[% full_path | url %]','[% fname_esc %]','[% f.ext %]')">View</button>
+                [% ELSIF is_stl %]
+                <button class="btn btn-sm btn-primary"
+                        onclick="fbOpenStl('[% full_path | html %]','[% fname_esc %]')">3D View</button>
+                [% END %]
+                <a href="[% c.uri_for('/file/fs_download', { path => full_path }) %]"
+                   class="btn btn-sm btn-secondary">DL</a>
+                <button class="btn btn-sm btn-secondary"
+                        onclick="fbOpenDbImport('[% full_path | html %]','[% fname_esc %]','[% current_directory | html %]')"
+                        title="Add to database">+DB</button>
+              </div>
+            </div>
+            [% END %]
+          </div>
+
           [% ELSE %]
           <p class="empty-state" style="padding:20px">Directory is empty or inaccessible.</p>
           [% END %]
@@ -1119,4 +1236,123 @@ function fbCancelArchive() {
     document.getElementById('fb-arc-overlay').style.display = 'none';
     document.getElementById('fb-arc-modal').classList.remove('open');
 }
+
+/* ── Gallery / List view toggle ─────────────────────────────── */
+function fbSetView(mode) {
+    var tbl     = document.getElementById('fb-tbody');
+    var gallery = document.getElementById('fb-gallery');
+    var thead   = tbl ? tbl.closest('table') : null;
+    var btnList = document.getElementById('btn-list-view');
+    var btnGal  = document.getElementById('btn-gallery-view');
+    if (mode === 'gallery') {
+        if (thead)   thead.style.display = 'none';
+        if (gallery) { gallery.style.display = ''; gallery.classList.add('active'); }
+        if (btnList) btnList.classList.remove('active');
+        if (btnGal)  btnGal.classList.add('active');
+        try { localStorage.setItem('fb_view','gallery'); } catch(e){}
+    } else {
+        if (thead)   thead.style.display = '';
+        if (gallery) { gallery.style.display = 'none'; gallery.classList.remove('active'); }
+        if (btnList) btnList.classList.add('active');
+        if (btnGal)  btnGal.classList.remove('active');
+        try { localStorage.setItem('fb_view','list'); } catch(e){}
+    }
+}
+(function(){ try { if(localStorage.getItem('fb_view')==='gallery') fbSetView('gallery'); } catch(e){} })();
+
+/* ── STL / 3D model viewer ───────────────────────────────────── */
+var _stlRenderer, _stlAnimId;
+function fbOpenStl(path, name) {
+    var overlay = document.getElementById('stl-modal-overlay');
+    if (!overlay) return;
+    document.getElementById('stl-modal-name').textContent = name;
+    overlay.classList.add('open');
+    _fbLoadThreeStl(path);
+}
+function fbCloseStl() {
+    var overlay = document.getElementById('stl-modal-overlay');
+    if (overlay) overlay.classList.remove('open');
+    if (_stlAnimId) { cancelAnimationFrame(_stlAnimId); _stlAnimId = null; }
+    if (_stlRenderer) { _stlRenderer.dispose(); _stlRenderer = null; }
+    var wrap = document.getElementById('stl-canvas-wrap');
+    if (wrap) wrap.innerHTML = '<canvas id="stl-canvas"></canvas><div id="stl-hint">Drag to rotate &bull; Scroll to zoom</div>';
+}
+function _fbLoadThreeStl(path) {
+    var wrap = document.getElementById('stl-canvas-wrap');
+    if (!wrap) return;
+    if (typeof THREE === 'undefined') {
+        var s1 = document.createElement('script');
+        s1.src = 'https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.min.js';
+        s1.onload = function() {
+            var s2 = document.createElement('script');
+            s2.src = 'https://cdn.jsdelivr.net/npm/three@0.165.0/examples/js/loaders/STLLoader.js';
+            s2.onload = function() { _fbRenderStl(path, wrap); };
+            document.head.appendChild(s2);
+        };
+        document.head.appendChild(s1);
+    } else {
+        _fbRenderStl(path, wrap);
+    }
+}
+function _fbRenderStl(path, wrap) {
+    var W = wrap.clientWidth || 680, H = wrap.clientHeight || 420;
+    var scene    = new THREE.Scene();
+    scene.background = new THREE.Color(0x1e1e2e);
+    var camera   = new THREE.PerspectiveCamera(45, W/H, 0.1, 10000);
+    var canvas   = document.getElementById('stl-canvas');
+    _stlRenderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    _stlRenderer.setSize(W, H);
+
+    var ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    var dirLight = new THREE.DirectionalLight(0xffffff, 1);
+    dirLight.position.set(1, 2, 3);
+    scene.add(ambient, dirLight);
+
+    var url = '/file/fs_download?path=' + encodeURIComponent(path);
+    var loader = new THREE.STLLoader();
+    loader.load(url, function(geom) {
+        geom.computeBoundingBox();
+        var box = geom.boundingBox;
+        var center = new THREE.Vector3();
+        box.getCenter(center);
+        geom.translate(-center.x, -center.y, -center.z);
+        var size = new THREE.Vector3();
+        box.getSize(size);
+        var maxDim = Math.max(size.x, size.y, size.z);
+        camera.position.set(0, 0, maxDim * 2);
+        var mat  = new THREE.MeshPhongMaterial({ color:0x90caf9, specular:0x333333, shininess:80 });
+        var mesh = new THREE.Mesh(geom, mat);
+        scene.add(mesh);
+        var isDrag=false, lastX=0, lastY=0;
+        canvas.addEventListener('mousedown', function(e){ isDrag=true; lastX=e.clientX; lastY=e.clientY; });
+        canvas.addEventListener('mouseup',   function(){ isDrag=false; });
+        canvas.addEventListener('mousemove', function(e){
+            if (!isDrag) return;
+            mesh.rotation.y += (e.clientX - lastX) * 0.01;
+            mesh.rotation.x += (e.clientY - lastY) * 0.01;
+            lastX=e.clientX; lastY=e.clientY;
+        });
+        canvas.addEventListener('wheel', function(e){
+            camera.position.z = Math.max(1, camera.position.z + e.deltaY * 0.05);
+        });
+        (function animate(){ _stlAnimId = requestAnimationFrame(animate); _stlRenderer.render(scene,camera); })();
+    }, undefined, function(err){
+        wrap.innerHTML = '<div style="color:#ef9a9a;padding:20px;text-align:center">Could not load model.<br><small>' + path + '</small></div>';
+    });
+}
 </script>
+
+[%# ── STL viewer modal (outside main layout) ────────────────── %]
+<div id="stl-modal-overlay">
+  <div id="stl-modal">
+    <div id="stl-modal-header">
+      <span id="stl-modal-name" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:80%"></span>
+      <button onclick="fbCloseStl()"
+              style="background:none;border:none;color:#fff;font-size:1.4rem;cursor:pointer;line-height:1">&times;</button>
+    </div>
+    <div id="stl-canvas-wrap" style="flex:1;position:relative">
+      <canvas id="stl-canvas"></canvas>
+      <div id="stl-hint">Drag to rotate &bull; Scroll to zoom</div>
+    </div>
+  </div>
+</div>

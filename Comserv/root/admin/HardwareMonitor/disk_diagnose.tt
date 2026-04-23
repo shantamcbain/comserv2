@@ -122,8 +122,26 @@
 <p style="color: var(--text-muted-color, #888);">Directory is empty or not accessible.</p>
 [% ELSE %]
 
-[%# Compute max bytes for relative bars %]
-[% max_bytes = entries.0.bytes || 1 %]
+[%# ── Calculate sizes toggle ── %]
+<div style="margin-bottom:10px;display:flex;align-items:center;gap:12px;">
+  [% IF calc_sizes %]
+  <span style="font-size:.85em;color:#2e7d32;">&#10003; Directory sizes calculated</span>
+  <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% path | uri %]"
+     class="btn btn-sm btn-secondary">&#8635; Refresh without sizes</a>
+  [% ELSE %]
+  <span style="font-size:.85em;color:#888;">Directory sizes show <strong>?</strong> for speed.
+    Sizes for files are instant.</span>
+  <a href="/admin/hardware_monitor/disk_diagnose?hostname=[% hostname | uri %]&amp;path=[% path | uri %]&amp;calc_sizes=1"
+     class="btn btn-sm btn-secondary"
+     title="Run du on each sub-directory — may be slow for large trees">
+    &#128200; Calculate Directory Sizes
+  </a>
+  [% END %]
+</div>
+
+[%# Compute max bytes for relative bars (files only when sizes not calculated) %]
+[% max_bytes = 1 %]
+[% FOREACH e IN entries %][% IF e.bytes > max_bytes %][% max_bytes = e.bytes %][% END %][% END %]
 
 [%# ── Bulk-delete form (hidden; JS populates and submits) ── %]
 <form id="dd-bulk-form" method="post" action="/admin/hardware_monitor/disk_diagnose" style="display:none">
@@ -161,7 +179,7 @@
 </thead>
 <tbody>
 [% FOR e IN entries %]
-[%  pct = max_bytes > 0 ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
+[%  pct = (e.bytes > 0 && max_bytes > 0) ? e.bytes / max_bytes * 100 : 0; pct = pct.int %]
 <tr id="row-[% loop.index %]" data-bytes="[% e.bytes %]" [% IF e.is_net %]style="background:#f0f4ff;opacity:.85;"[% END %]>
   <td class="dd-cb-col">
     [% UNLESS e.is_net %]
@@ -190,6 +208,8 @@
   <td>
     [% IF e.is_net %]
     <div class="dd-bar-wrap"><div class="dd-bar" style="width:0%;background:#90caf9;"></div><span class="dd-bar-lbl" style="color:#1976d2;">network</span></div>
+    [% ELSIF e.size == '?' %]
+    <div style="font-size:.8em;color:#aaa;font-style:italic;">unknown — click Calculate</div>
     [% ELSE %]
     <div class="dd-bar-wrap">
       <div class="dd-bar" style="width:[% pct %]%; background:[% pct >= 80 ? '#e53935' : pct >= 50 ? '#fb8c00' : '#2196f3' %];"></div>
