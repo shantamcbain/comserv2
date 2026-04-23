@@ -874,6 +874,24 @@ sub printers :Path('/3d/printers') :Args(0) {
                         created_at        => _now(),
                     });
                 });
+            } elsif ($action eq 'import_from_inventory') {
+                my $inv_item_id = $c->req->params->{inventory_item_id};
+                my $inv_item    = $schema->resultset('InventoryItem')->find($inv_item_id)
+                    if $inv_item_id;
+                if ($inv_item) {
+                    my $eq = eval { $inv_item->equipment };
+                    $schema->resultset('Printing3dPrinter')->create({
+                        sitename          => $sitename,
+                        name              => $c->req->params->{name}            || $inv_item->name,
+                        model             => $c->req->params->{model}           || '',
+                        status            => 'idle',
+                        nozzle_diameter   => $c->req->params->{nozzle_diameter} || '0.40',
+                        bed_size          => $c->req->params->{bed_size}        || '',
+                        notes             => $inv_item->notes                   || '',
+                        inventory_item_id => $inv_item->id,
+                        created_at        => _now(),
+                    });
+                }
             } elsif ($action eq 'update_status') {
                 my $printer = $schema->resultset('Printing3dPrinter')->find(
                     $c->req->params->{printer_id}
@@ -893,18 +911,35 @@ sub printers :Path('/3d/printers') :Args(0) {
         $c->detach;
     }
 
-    my @printers;
+    my (@printers, @unregistered_inv_printers);
     eval {
         @printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename },
-            { order_by => { -asc => 'name' } }
+            { prefetch => { inventory_item => 'equipment' }, order_by => { -asc => 'name' } }
+        )->all;
+
+        # Inventory items with category '3d_printer' not yet in the farm
+        my %already_linked = map { $_->inventory_item_id => 1 }
+                             grep { $_->inventory_item_id } @printers;
+
+        @unregistered_inv_printers = $schema->resultset('InventoryItem')->search(
+            {
+                sitename => $sitename,
+                category => '3d_printer',
+                status   => 'active',
+                ( %already_linked
+                    ? ( id => { -not_in => [ keys %already_linked ] } )
+                    : () ),
+            },
+            { prefetch => 'equipment', order_by => 'name' }
         )->all;
     };
 
     $c->stash(
-        sitename => $sitename,
-        printers => \@printers,
-        template => '3d/printers.tt',
+        sitename                   => $sitename,
+        printers                   => \@printers,
+        unregistered_inv_printers  => \@unregistered_inv_printers,
+        template                   => '3d/printers.tt',
     );
 }
 
