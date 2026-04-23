@@ -1,0 +1,114 @@
+[% META
+   title = "Customer Detail"
+   description = "Customer order and invoice history"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "CustomerOrder"
+   page_version = "0.02"
+   last_updated = "2026-04-22"
+%]
+[% PageVersion = 'CustomerOrder/customer.tt,v 0.02 2026/04/22 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1><i class="fas fa-user"></i> [% cust_name | html %]</h1>
+    [% IF cust_email %]
+    <p class="page-subtitle"><i class="fas fa-envelope"></i> <a href="mailto:[% cust_email | html %]">[% cust_email | html %]</a></p>
+    [% END %]
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="form-actions">
+        <a href="/CustomerOrder/customers" class="btn btn-secondary">&larr; All Customers</a>
+        <a href="/CustomerOrder/new" class="btn btn-primary"><i class="fas fa-plus"></i> New Order</a>
+      </div>
+
+      <!-- ── Orders ──────────────────────────────── -->
+      <div class="content-section">
+        <h2>Orders ([% orders.size %])</h2>
+        [% IF orders.size %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Date</th>
+                <th>Total</th>
+                <th>Status</th>
+                <th>Notes</th>
+                <th class="action-cell"></th>
+              </tr>
+            </thead>
+            <tbody>
+            [% FOREACH o IN orders %]
+            <tr>
+              <td class="text-muted">[% o.id %]</td>
+              <td>[% o.created_at %]</td>
+              <td>[% o.total_amount ? ('$' _ o.total_amount | format('%.2f')) : '&mdash;' %]</td>
+              <td><span class="status-[% o.status | html %]">[% o.status | html %]</span></td>
+              <td class="text-muted">[% o.notes | html %]</td>
+              <td class="action-cell">
+                <a href="/CustomerOrder/view/[% o.id %]" class="btn btn-sm btn-primary">View</a>
+              </td>
+            </tr>
+            [% END %]
+            </tbody>
+          </table>
+        </div>
+        [% ELSE %]
+        <div class="empty-state"><p>No orders found.</p></div>
+        [% END %]
+      </div>
+
+      <!-- ── Invoices ─────────────────────────────── -->
+      <div class="content-section">
+        <h2>Invoices ([% invoices.size %])</h2>
+        [% IF invoices.size %]
+        [% SET grand_total = 0 %]
+        <div class="table-container">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Invoice #</th>
+                <th>Date</th>
+                <th>Due</th>
+                <th>Total</th>
+                <th>Payment</th>
+                <th class="action-cell"></th>
+              </tr>
+            </thead>
+            <tbody>
+            [% FOREACH inv IN invoices %]
+            [% grand_total = grand_total + (inv.total_amount || 0) %]
+            <tr>
+              <td><code>[% inv.invoice_number || ('INV-' _ inv.id) | html %]</code></td>
+              <td>[% inv.invoice_date %]</td>
+              <td class="text-muted">[% inv.due_date || '&mdash;' %]</td>
+              <td>$[% inv.total_amount | format('%.2f') %]</td>
+              <td><span class="status-[% inv.payment_status | html %]">[% inv.payment_status | ucfirst | html %]</span></td>
+              <td class="action-cell">
+                <a href="/Cart/order/[% inv.id %]" class="btn btn-sm btn-primary">View</a>
+              </td>
+            </tr>
+            [% END %]
+            </tbody>
+            <tfoot>
+              <tr>
+                <th colspan="3">Total</th>
+                <th>$[% grand_total | format('%.2f') %]</th>
+                <th colspan="2"></th>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        [% ELSE %]
+        <div class="empty-state"><p>No invoices found.</p></div>
+        [% END %]
+      </div>
+
+    </div>
+  </div>
+</div>
