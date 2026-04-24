@@ -29,12 +29,25 @@
     Select the jobs to create and click <strong>Add Selected to Queue</strong>.
 </p>
 
+[% IF cons_error %]
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#856404;">
+    <strong>DB Error fetching consignment lines:</strong> [% cons_error | html %]
+</div>
+[% END %]
+
 [% SET total = (restock_needed ? restock_needed.size : 0) + (consignment_needed ? consignment_needed.size : 0) %]
 
 [% IF total == 0 %]
 <div style="text-align:center;padding:2.5em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
     <strong>Everything is up to date.</strong><br>
     No printed items are below reorder point and no open consignment lines need printing.
+    <br><br>
+    <small>
+        Items qualify if their <code>item_origin</code> contains <code>3d_print</code>,
+        their <code>category</code> contains <code>3d_print</code> or <code>filament</code>,
+        or the <code>requires_printing</code> flag is set.<br>
+        Check that the consignment items in Inventory were saved with one of these.
+    </small>
 </div>
 [% ELSE %]
 

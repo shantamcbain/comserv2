@@ -1087,8 +1087,13 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
 
     # 2. Consignment: open lines where item is 3d_printed and qty outstanding > 0
     my @consignment_needed;
+    my $cons_error;
+
+    # Fetch ALL open consignment lines for this site — filter in Perl so a missing
+    # DB column (requires_printing not yet migrated) never silently kills the block
+    my @cons_lines;
     eval {
-        my @lines = $schema->resultset('InventoryConsignmentLine')->search(
+        @cons_lines = $schema->resultset('InventoryConsignmentLine')->search(
             {
                 'consignment.sitename' => $sitename,
                 'consignment.status'   => { -in => [qw(open partially_settled)] },
@@ -1098,26 +1103,50 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 prefetch => ['consignment', 'item'],
             }
         )->all;
-        for my $line (@lines) {
-            next if $active_cons_lines{ $line->id };
-            my $item = eval { $line->item };
-            next unless $item;
-            next unless ($item->item_origin eq '3d_printed' || $item->requires_printing);
-            my $outstanding = $line->quantity_outstanding;
-            next unless $outstanding > 0;
-            push @consignment_needed, {
-                line        => $line,
-                item        => $item,
-                outstanding => $outstanding,
-                filament    => scalar $_find_filament->($item->filament_color, $item->filament_type),
-            };
-        }
     };
+    $cons_error = $@ if $@;
+
+    for my $line (@cons_lines) {
+        next if $active_cons_lines{ $line->id };
+
+        my $item = eval { $line->item };
+        next unless $item;
+
+        # Include if ANY of these is true:
+        #   a) item_origin contains '3d_printed'
+        #   b) category is a 3D type
+        #   c) requires_printing column exists and is truthy
+        my $origin   = lc($item->item_origin || '');
+        my $category = lc($item->category    || '');
+        my $req_print = eval { $item->requires_printing } || 0;
+
+        my $is_3d_item =
+               index($origin,   '3d_print') >= 0
+            || index($category, '3d_print') >= 0
+            || index($category, 'filament')  >= 0
+            || $req_print;
+
+        next unless $is_3d_item;
+
+        my $outstanding = $line->quantity_outstanding;
+        next unless $outstanding > 0;
+
+        push @consignment_needed, {
+            line        => $line,
+            item        => $item,
+            outstanding => $outstanding,
+            filament    => scalar $_find_filament->(
+                eval { $item->filament_color },
+                eval { $item->filament_type },
+            ),
+        };
+    }
 
     $c->stash(
         sitename           => $sitename,
         restock_needed     => \@restock_needed,
         consignment_needed => \@consignment_needed,
+        cons_error         => $cons_error,
         template           => '3d/queue_sync.tt',
     );
 }
