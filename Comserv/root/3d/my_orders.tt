@@ -1,0 +1,97 @@
+[% PageVersion = '3d/my_orders.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.status-badge {
+    display: inline-block;
+    padding: 0.2em 0.7em;
+    border-radius: 12px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: capitalize;
+}
+.status-queued    { background: #ffc107; color: #333; }
+.status-assigned  { background: #17a2b8; color: white; }
+.status-printing  { background: #007bff; color: white; }
+.status-completed { background: #28a745; color: white; }
+.status-cancelled { background: #6c757d; color: white; }
+.status-failed    { background: #dc3545; color: white; }
+.orders-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    overflow: hidden;
+}
+.orders-table th, .orders-table td {
+    padding: 0.7em 0.9em;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-color);
+}
+.orders-table th {
+    background: var(--table-header-bg, var(--secondary-color));
+    font-weight: bold;
+}
+.orders-table tr:last-child td { border-bottom: none; }
+.orders-table tr:hover td { background: var(--table-hover-bg, rgba(0,0,0,0.03)); }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>My Print Orders</h1>
+    <a href="/3d/browse" style="font-size:0.9em;">+ Browse &amp; Order</a>
+</div>
+
+[% IF c.flash.success_msg %]
+<div style="background:var(--success-color,#d4edda);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% c.flash.success_msg %]
+</div>
+[% END %]
+
+[% IF jobs && jobs.size %]
+<table class="orders-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Model</th>
+            <th>Filament</th>
+            <th>Qty</th>
+            <th>Status</th>
+            <th>Printer</th>
+            <th>Ordered</th>
+        </tr>
+    </thead>
+    <tbody>
+        [% FOREACH job IN jobs %]
+        <tr>
+            <td>[% job.id %]</td>
+            <td>
+                [% IF job.model %]
+                <a href="/3d/model/[% job.model_id %]">[% job.model.name | html %]</a>
+                [% ELSE %]
+                <em>Model #[% job.model_id %]</em>
+                [% END %]
+            </td>
+            <td>
+                [% IF job.filament_type %][% job.filament_type | html %][% END %]
+                [% IF job.filament_color %] &bull; [% job.filament_color | html %][% END %]
+            </td>
+            <td>[% job.quantity %]</td>
+            <td>
+                <span class="status-badge status-[% job.status %]">[% job.status %]</span>
+            </td>
+            <td>
+                [% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]
+            </td>
+            <td>[% job.created_at %]</td>
+        </tr>
+        [% END %]
+    </tbody>
+</table>
+[% ELSE %]
+<div style="text-align:center;padding:3em 1em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--muted-color, var(--text-color));">
+    You have no print orders yet.
+    <br><a href="/3d/browse">Browse models to place your first order.</a>
+</div>
+[% END %]

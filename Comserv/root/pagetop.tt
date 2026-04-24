@@ -363,6 +363,9 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+        [% IF c.stash.enabled_modules.item('printing_3d') %]
+            [% INCLUDE 'Navigation/TopDropList3d.tt' %]
+        [% END %]
         </ul>
     </nav>
 
