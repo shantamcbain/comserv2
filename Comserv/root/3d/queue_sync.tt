@@ -1,6 +1,5 @@
 [% PageVersion = '3d/queue_sync.tt,v 1.01 2026/04/24 Shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
-[% USE JSON %]
 
 <style>
 .sync-section { margin-bottom: 2em; }
@@ -243,11 +242,7 @@
 </div>
 
 <script>
-var ALL_FILAMENTS = [
-[% FOREACH f IN all_filaments %]
-  { id:[% f.id %], name:[% f.name | json %], type:[% f.filament_type | json %], color:[% f.filament_color | json %], avail:[% f.avail %] }[% UNLESS loop.last %],[% END %]
-[% END %]
-];
+var ALL_FILAMENTS = [% all_filaments_json %];
 
 var _pickerSrcType, _pickerSrcId;
 
