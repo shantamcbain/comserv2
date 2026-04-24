@@ -92,6 +92,9 @@
                     [% IF job.model_name %][% job.model_name | html %]
                     [% ELSIF job.item_name %][% job.item_name | html %]
                     [% ELSE %]Job #[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]
+                    <span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>
+                    [% END %]
                     [% IF job.source_type && job.source_type != 'manual' %]
                     <br><small style="background:#17a2b8;color:white;padding:0.1em 0.4em;border-radius:8px;font-size:0.75em;">[% job.source_type | html %]</small>
                     [% END %]
@@ -149,7 +152,10 @@
             [% FOREACH job IN active_jobs %]
             <tr>
                 <td>[% job.id %]</td>
-                <td>[% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]</td>
+                <td>
+                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                </td>
                 <td>[% job.username | html %]</td>
                 <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
                 <td>
@@ -165,6 +171,7 @@
                           data-started-at="[% job.started_at || job.created_at %]"
                           data-bom-hours="[% job.bom_print_hours | html %]"
                           data-bom-grams="[% job.bom_filament_grams | html %]"
+                          data-quantity="[% job.quantity | html %]"
                           style="display:inline-flex;gap:0.35em;align-items:center;flex-wrap:wrap;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="complete">
@@ -263,8 +270,9 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
         }
     }
 
+    var qty = parseInt(form.dataset.quantity) || 1;
     if (bomGrams && gInput && !gInput.value) {
-        gInput.value = bomGrams;
+        gInput.value = Math.round(bomGrams * qty * 100) / 100;
     }
 });
 </script>

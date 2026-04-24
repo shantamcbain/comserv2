@@ -1203,7 +1203,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                     filament_item_id    => $filament_id,
                     filament_color      => $fil_color,
                     filament_type       => $fil_type,
-                    filament_quantity   => $qty || 1,
+                    filament_quantity   => undef,
                     quantity            => $qty || 1,
                     inventory_reserved  => 0,
                     created_at          => _now(),
