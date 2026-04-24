@@ -161,21 +161,28 @@
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
                 <td>[% job.started_at || job.created_at %]</td>
                 <td>
-                    <form method="post" action="/3d/queue" style="display:inline-flex;gap:0.4em;align-items:center;flex-wrap:wrap;">
+                    <form method="post" action="/3d/queue" class="complete-form"
+                          data-started-at="[% job.started_at || job.created_at %]"
+                          data-bom-hours="[% job.bom_print_hours | html %]"
+                          data-bom-grams="[% job.bom_filament_grams | html %]"
+                          style="display:inline-flex;gap:0.35em;align-items:center;flex-wrap:wrap;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="complete">
-                        <label style="font-size:0.82em;color:var(--text-color);">Hours:</label>
-                        <input type="number" name="print_hours" step="0.05" min="0.05" max="999"
+                        <label style="font-size:0.82em;color:var(--text-color);">Time:</label>
+                        <input type="number" name="print_hours_h" min="0" max="999"
+                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
+                               placeholder="h" title="Hours">
+                        <span style="font-size:0.85em;color:var(--text-color);">h</span>
+                        <input type="number" name="print_hours_m" min="0" max="59"
+                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
+                               placeholder="m" title="Minutes">
+                        <span style="font-size:0.85em;color:var(--text-color);">m</span>
+                        <label style="font-size:0.82em;color:var(--text-color);margin-left:0.3em;">Filament&nbsp;(g):</label>
+                        <input type="number" name="filament_grams" step="0.01" min="0" max="9999"
                                style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               value="[% job.bom_print_hours | html %]"
-                               placeholder="hrs" title="Print time in hours[% IF job.bom_print_hours %] — BOM default: [% job.bom_print_hours %]h[% END %]">
-                        <label style="font-size:0.82em;color:var(--text-color);">Filament&nbsp;(g):</label>
-                        <input type="number" name="filament_grams" step="0.1" min="0.1" max="9999"
-                               style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               value="[% job.bom_filament_grams | html %]"
-                               placeholder="g" title="Grams of filament used[% IF job.bom_filament_grams %] — BOM default: [% job.bom_filament_grams %]g[% END %]">
+                               placeholder="g" title="Grams of filament used[% IF job.bom_filament_grams %] — BOM: [% job.bom_filament_grams %]g[% END %]">
                         [% IF job.bom_print_hours || job.bom_filament_grams %]
-                        <small style="color:var(--text-muted-color);font-size:0.78em;" title="Pre-filled from BOM">BOM</small>
+                        <small style="color:var(--text-muted-color);font-size:0.78em;" title="BOM estimate available">BOM</small>
                         [% END %]
                         <button type="submit" class="btn-action btn-complete">Complete</button>
                     </form>
@@ -232,3 +239,32 @@
     </table>
 </div>
 [% END %]
+
+<script>
+document.querySelectorAll('.complete-form').forEach(function(form) {
+    var startedAt = form.dataset.startedAt;
+    var bomHours  = parseFloat(form.dataset.bomHours) || 0;
+    var bomGrams  = parseFloat(form.dataset.bomGrams)  || 0;
+
+    var hInput = form.querySelector('[name="print_hours_h"]');
+    var mInput = form.querySelector('[name="print_hours_m"]');
+    var gInput = form.querySelector('[name="filament_grams"]');
+
+    if (startedAt && hInput && mInput) {
+        var started = new Date(startedAt.replace(' ', 'T'));
+        if (started && !isNaN(started.getTime())) {
+            var elapsedMin = Math.floor((Date.now() - started.getTime()) / 60000);
+            if (elapsedMin > 0) {
+                hInput.value = Math.floor(elapsedMin / 60);
+                mInput.value = elapsedMin % 60;
+                hInput.title = 'Auto-calculated from start time' + (bomHours ? ' — BOM estimate: ' + bomHours + 'h' : '');
+                mInput.title = hInput.title;
+            }
+        }
+    }
+
+    if (bomGrams && gInput && !gInput.value) {
+        gInput.value = bomGrams;
+    }
+});
+</script>
