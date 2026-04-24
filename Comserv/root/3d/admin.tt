@@ -90,6 +90,10 @@
         <h3><i class="icon-list"></i> Print Queue</h3>
         <p>View and manage queued and active print jobs. Assign printers to waiting jobs.</p>
     </a>
+    <a href="/3d/queue_sync" class="admin-link-card">
+        <h3><i class="icon-refresh"></i> Sync Print Queue</h3>
+        <p>Scan open consignments and low-stock items to create print jobs automatically.</p>
+    </a>
     <a href="/3d/printers" class="admin-link-card">
         <h3><i class="icon-server"></i> Printer Farm</h3>
         <p>Add, remove, and update the status of printers in your farm.</p>
