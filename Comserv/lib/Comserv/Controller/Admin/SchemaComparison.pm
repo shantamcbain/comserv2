@@ -899,11 +899,13 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 }
 
                 my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
+                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
 
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
+                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
+                        next unless $statement;
                         my $safe_statement = _strip_fk_constraints($statement);
                         $dbh->do($safe_statement);
                     }
@@ -2368,7 +2370,7 @@ sub generate_result_file_content {
     
     # Convert table name to class name
     my $class_name = join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
-    my $namespace = $database eq 'Ency' ? 'Comserv::Model::DBEncy::Result' : 'Comserv::Model::DBForager::Result';
+    my $namespace = $database eq 'Ency' ? 'Comserv::Model::Schema::Ency::Result' : 'Comserv::Model::Schema::Forager::Result';
     
     my $content = qq{package ${namespace}::${class_name};
 
@@ -2467,16 +2469,24 @@ sub clean_scalar_refs {
     return $data;
 }
 
+sub _table_to_class_name {
+    my ($table_name) = @_;
+    return join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
+}
+
 sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
-    
-    my $class_name = ucfirst($table_name);
-    my $namespace = $database eq 'ency' ? 'Ency' : 'Forager';
-    
-    my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $namespace, 'Result');
-    my $result_file_path = File::Spec->catfile($base_path, "$class_name.pm");
-    
-    return $result_file_path;
+
+    my $class_name = _table_to_class_name($table_name);
+    my $ns = ($database && lc($database) eq 'forager') ? 'Forager' : 'Ency';
+
+    my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $ns, 'Result');
+    return File::Spec->catfile($base_path, "$class_name.pm");
+}
+
+sub determine_result_file_path {
+    my ($self, $c, $table_name, $database) = @_;
+    return $self->get_result_file_path($c, $table_name, $database);
 }
 
 =head1 AUTHOR

@@ -1,0 +1,159 @@
+[% PageVersion = '3d/model_detail.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.model-detail-header {
+    display: flex;
+    gap: 1.5em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.model-detail-thumb {
+    flex: 0 0 220px;
+}
+.model-detail-thumb img {
+    width: 100%;
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+}
+.model-detail-thumb .no-thumb {
+    width: 100%;
+    height: 160px;
+    background: var(--secondary-color);
+    border: 1px dashed var(--border-color);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--muted-color, var(--text-color));
+    font-size: 0.9em;
+}
+.model-detail-info {
+    flex: 1;
+}
+.model-detail-info h1 {
+    margin: 0 0 0.3em 0;
+    color: var(--heading-color, var(--text-color));
+}
+.model-meta {
+    font-size: 0.9em;
+    color: var(--muted-color, var(--text-color));
+    margin-bottom: 1em;
+}
+.model-meta span { margin-right: 1em; }
+.order-form {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.2em;
+    margin-top: 1.2em;
+}
+.order-form h2 {
+    margin: 0 0 0.8em 0;
+    font-size: 1.1em;
+    color: var(--heading-color, var(--text-color));
+}
+.form-row {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 0.8em;
+}
+.form-group {
+    flex: 1;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3em;
+}
+.form-group label {
+    font-size: 0.9em;
+    color: var(--text-color);
+    font-weight: bold;
+}
+.form-group input, .form-group select, .form-group textarea {
+    padding: 0.5em 0.7em;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: var(--input-bg, white);
+    color: var(--text-color);
+}
+.btn-order {
+    padding: 0.7em 1.5em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border: none;
+    border-radius: 4px;
+    font-size: 1em;
+    font-weight: bold;
+    cursor: pointer;
+}
+.btn-order:hover { opacity: 0.85; }
+</style>
+
+<p><a href="/3d/browse">&larr; Back to Browse</a></p>
+
+<div class="model-detail-header">
+    <div class="model-detail-thumb">
+        [% IF model.thumbnail_url %]
+        <img src="[% model.thumbnail_url | html %]" alt="[% model.name | html %]">
+        [% ELSE %]
+        <div class="no-thumb">No preview available</div>
+        [% END %]
+    </div>
+    <div class="model-detail-info">
+        <h1>[% model.name | html %]</h1>
+        <div class="model-meta">
+            [% IF model.file_type %]<span><strong>Format:</strong> [% model.file_type | upper %]</span>[% END %]
+            [% IF model.source %]<span><strong>Source:</strong> [% model.source | html %]</span>[% END %]
+            [% IF model.tags %]<span><strong>Tags:</strong> [% model.tags | html %]</span>[% END %]
+        </div>
+        [% IF model.description %]
+        <p>[% model.description | html %]</p>
+        [% END %]
+        [% IF model.source_url %]
+        <p><a href="[% model.source_url | html %]" target="_blank" rel="noopener">Original source &rarr;</a></p>
+        [% END %]
+    </div>
+</div>
+
+[% IF c.session.user_id %]
+<div class="order-form">
+    <h2>Order a Print</h2>
+    <form method="post" action="/3d/order">
+        <input type="hidden" name="model_id" value="[% model.id %]">
+        <div class="form-row">
+            [% IF filaments && filaments.size %]
+            <div class="form-group">
+                <label>Filament Type</label>
+                <select name="filament_type">
+                    <option value="">-- Any available --</option>
+                    [% FOREACH f IN filaments %]
+                    <option value="[% f.name | html %]">[% f.name | html %]</option>
+                    [% END %]
+                </select>
+            </div>
+            [% END %]
+            <div class="form-group">
+                <label>Filament Color</label>
+                <input type="text" name="filament_color" placeholder="e.g. Black, White, Red">
+            </div>
+            <div class="form-group">
+                <label>Quantity</label>
+                <input type="number" name="quantity" value="1" min="1" max="50">
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group" style="flex:2;">
+                <label>Notes (optional)</label>
+                <textarea name="notes" rows="2" placeholder="Any special requirements…"></textarea>
+            </div>
+        </div>
+        <button type="submit" class="btn-order"><i class="icon-print"></i> Place Order</button>
+    </form>
+</div>
+[% ELSE %]
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-top:1em;">
+    <a href="/user/login?destination=/3d/model/[% model.id %]">Log in</a> to order a print of this model.
+</div>
+[% END %]
