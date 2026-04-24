@@ -683,23 +683,66 @@ sub queue :Path('/3d/queue') :Args(0) {
         $c->detach;
     }
 
+    my $dbh = $schema->storage->dbh;
+
     my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
+    my $queue_error;
+
     eval {
-        @queued_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => 'queued' },
-            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
-        )->all;
-        @active_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => { -in => ['assigned','printing'] } },
-            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
-        )->all;
+        my $sql = q{
+            SELECT j.id, j.sitename, j.status, j.item_name, j.username, j.user_id,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.filament_item_id, j.printer_id, j.model_id,
+                   j.source_type, j.consignment_id, j.consignment_line_id,
+                   j.notes, j.admin_notes,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.total_cost,
+                   j.inventory_reserved, j.created_at, j.started_at, j.completed_at,
+                   fi.name  AS filament_name,
+                   fi.sku   AS filament_sku,
+                   pr.name  AS printer_name,
+                   pr.model AS printer_model,
+                   mo.name  AS model_name,
+                   mo.file_path AS model_file
+            FROM printing_3d_jobs j
+            LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            WHERE j.sitename = ?
+              AND j.status = ?
+            ORDER BY j.created_at ASC
+        };
+        my $q_rows = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q_rows // [] };
+
+        my $a_rows = $dbh->selectall_arrayref($sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a_rows // [] };
+    };
+    $queue_error = $@ if $@;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+        "Queue fetch error: $queue_error") if $queue_error;
+
+    eval {
         @idle_printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename, status => 'idle' }
         )->all;
-        @recent_completed = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => 'completed' },
-            { prefetch => ['model', 'printer'], order_by => { -desc => 'completed_at' }, rows => 10 }
-        )->all;
+    };
+
+    eval {
+        my $r_sql = q{
+            SELECT j.id, j.item_name, j.username, j.filament_color, j.filament_type,
+                   j.quantity, j.completed_at, j.total_cost,
+                   pr.name AS printer_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            WHERE j.sitename = ? AND j.status = 'completed'
+            ORDER BY j.completed_at DESC
+            LIMIT 10
+        };
+        my $rc_rows = $dbh->selectall_arrayref($r_sql, { Slice => {} }, $sitename);
+        @recent_completed = @{ $rc_rows // [] };
     };
 
     $c->stash(
@@ -708,6 +751,7 @@ sub queue :Path('/3d/queue') :Args(0) {
         active_jobs       => \@active_jobs,
         idle_printers     => \@idle_printers,
         recent_completed  => \@recent_completed,
+        queue_error       => $queue_error,
         template          => '3d/queue.tt',
     );
 }
@@ -1230,26 +1274,26 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
             next if $avail_stock > 0;
         }
 
-        # Parse line notes for structured filament info: [FIL:type,color] user text
-        # then fall back to keyword scanning
+        # Parse consignment line notes FIRST — consignment-specific choice takes priority
+        # over item-level defaults. Format: [FIL:type,color] followed by optional user notes
         my $line_notes = $line->notes || '';
-        if (!$fil_color && !$fil_type && $line_notes) {
+        my ($notes_type, $notes_color);
+        if ($line_notes) {
             if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
-                $fil_type  = $1 || undef;
-                $fil_color = $2 || undef;
+                $notes_type  = $1 || undef;
+                $notes_color = $2 || undef;
             } else {
                 my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
                 my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple Grey Gray
                                       Silver Gold Clear Natural Transparent Pink Brown Copper Bronze);
                 my $uc = uc($line_notes);
-                for my $t (@known_types) {
-                    if (index($uc, uc($t)) >= 0) { $fil_type = $t; last; }
-                }
-                for my $co (@known_colors) {
-                    if (index(lc($line_notes), lc($co)) >= 0) { $fil_color = $co; last; }
-                }
+                for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $notes_type  = $t; last; } }
+                for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $notes_color = $co; last; } }
             }
         }
+        # Consignment note wins; fall back to item-level filament defaults
+        $fil_color = $notes_color || $fil_color;
+        $fil_type  = $notes_type  || $fil_type;
 
         push @consignment_needed, {
             line          => $line,
