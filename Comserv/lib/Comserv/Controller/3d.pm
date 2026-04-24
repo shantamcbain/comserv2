@@ -547,11 +547,22 @@ sub queue :Path('/3d/queue') :Args(0) {
                 }
 
             } elsif ($action eq 'complete') {
-                my $printer     = $job->printer;
-                my $print_hours    = $c->req->params->{print_hours}     || undef;
-                my $grams_used     = $c->req->params->{filament_grams}  || undef;
-                $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
-                $grams_used  = undef if defined $grams_used  && $grams_used  !~ /^\d+\.?\d*$/;
+                my $printer    = $job->printer;
+                my $grams_used = $c->req->params->{filament_grams} || undef;
+                $grams_used = undef if defined $grams_used && $grams_used !~ /^\d+\.?\d*$/;
+
+                my $print_hours;
+                my $ph_h = $c->req->params->{print_hours_h};
+                my $ph_m = $c->req->params->{print_hours_m};
+                if (defined $ph_h || defined $ph_m) {
+                    $ph_h = 0 + ($ph_h || 0);
+                    $ph_m = 0 + ($ph_m || 0);
+                    my $total = $ph_h + $ph_m / 60;
+                    $print_hours = $total > 0 ? $total : undef;
+                } else {
+                    $print_hours = $c->req->params->{print_hours} || undef;
+                    $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                }
 
                 # ---- Cost calculation ----
                 my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
