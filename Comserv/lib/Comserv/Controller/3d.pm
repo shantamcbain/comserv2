@@ -702,7 +702,7 @@ sub queue :Path('/3d/queue') :Args(0) {
                    pr.name  AS printer_name,
                    pr.model AS printer_model,
                    mo.name  AS model_name,
-                   mo.file_path AS model_file
+                   mo.nfs_path AS model_file
             FROM printing_3d_jobs j
             LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
