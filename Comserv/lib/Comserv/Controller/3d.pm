@@ -707,11 +707,19 @@ sub queue :Path('/3d/queue') :Args(0) {
                    pr.name  AS printer_name,
                    pr.model AS printer_model,
                    mo.name  AS model_name,
-                   mo.nfs_path AS model_file
+                   mo.nfs_path AS model_file,
+                   parent.print_time_hours AS bom_print_hours,
+                   fil_bom.quantity        AS bom_filament_grams,
+                   fil_bom_item.name       AS bom_filament_name
             FROM printing_3d_jobs j
             LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_consignment_lines cl ON cl.id = j.consignment_line_id
+            LEFT JOIN inventory_items parent ON parent.id = COALESCE(j.source_item_id, cl.item_id)
+            LEFT JOIN inventory_item_bom fil_bom
+                   ON fil_bom.parent_item_id = parent.id AND fil_bom.unit = 'g'
+            LEFT JOIN inventory_items fil_bom_item ON fil_bom_item.id = fil_bom.component_item_id
             WHERE j.sitename = ?
               AND j.status = ?
             ORDER BY j.created_at ASC
