@@ -567,11 +567,14 @@ sub queue :Path('/3d/queue') :Args(0) {
                 # ---- Cost calculation ----
                 my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
 
-                # Filament cost: grams_used / 1000 * spool_unit_cost (spool = 1kg sold as 'each')
+                # Filament cost: grams_used * unit_cost/g  (or /1000 if still tracked per spool)
                 if ($job->filament_item_id && $grams_used) {
                     my $fil = eval { $job->filament_item };
                     if ($fil && $fil->unit_cost) {
-                        $filament_cost = ($grams_used / 1000) * $fil->unit_cost;
+                        my $uom = lc($fil->unit_of_measure || 'g');
+                        $filament_cost = ($uom eq 'g')
+                            ? $grams_used * $fil->unit_cost
+                            : ($grams_used / 1000) * $fil->unit_cost;
                     }
                 }
 
@@ -620,8 +623,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                 if ($job->filament_item_id && $grams_used) {
                     my $fil  = eval { $job->filament_item };
                     my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
-                    my $fil_uom   = $fil ? ($fil->unit_of_measure || 'each') : 'each';
-                    my $issue_qty = (lc($fil_uom) eq 'g') ? $grams_used : $grams_used / 1000;
+                    my $fil_uom   = $fil ? lc($fil->unit_of_measure || 'g') : 'g';
+                    my $issue_qty = ($fil_uom eq 'g') ? $grams_used : $grams_used / 1000;
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
