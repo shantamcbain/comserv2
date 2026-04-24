@@ -1091,16 +1091,23 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
 
     # Fetch ALL open consignment lines for this site — filter in Perl so a missing
     # DB column (requires_printing not yet migrated) never silently kills the block
+    # Safe columns — only what we know exists in all DB versions
+    my @safe_item_cols = qw(id sitename sku name description category
+                            item_origin unit_cost unit_price status notes
+                            reorder_point reorder_quantity);
+
     my @cons_lines;
     eval {
+        # Do NOT prefetch 'item' — it SELECTs all result-class columns including
+        # new ones (filament_color etc.) that may not be in the DB yet
         @cons_lines = $schema->resultset('InventoryConsignmentLine')->search(
             {
                 'consignment.sitename' => $sitename,
                 'consignment.status'   => { -in => [qw(open partially_settled)] },
             },
             {
-                join     => ['consignment', 'item'],
-                prefetch => ['consignment', 'item'],
+                join     => 'consignment',
+                prefetch => 'consignment',
             }
         )->all;
     };
@@ -1109,16 +1116,38 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     for my $line (@cons_lines) {
         next if $active_cons_lines{ $line->id };
 
-        my $item = eval { $line->item };
+        # Fetch item with only safe columns so missing DB columns never error
+        my $item_id = $line->item_id;
+        my $item = eval {
+            $schema->resultset('InventoryItem')->find(
+                $item_id,
+                { columns => \@safe_item_cols }
+            );
+        };
         next unless $item;
 
-        # Include if ANY of these is true:
-        #   a) item_origin contains '3d_printed'
-        #   b) category is a 3D type
-        #   c) requires_printing column exists and is truthy
-        my $origin   = lc($item->item_origin || '');
-        my $category = lc($item->category    || '');
-        my $req_print = eval { $item->requires_printing } || 0;
+        my $origin    = lc($item->get_column('item_origin') || '');
+        my $category  = lc($item->get_column('category')    || '');
+
+        # Also try the new columns — they may or may not exist
+        my $req_print = eval {
+            $schema->storage->dbh->selectrow_array(
+                'SELECT requires_printing FROM inventory_items WHERE id = ?',
+                undef, $item_id
+            );
+        } // 0;
+        my $fil_color = eval {
+            $schema->storage->dbh->selectrow_array(
+                'SELECT filament_color FROM inventory_items WHERE id = ?',
+                undef, $item_id
+            );
+        };
+        my $fil_type = eval {
+            $schema->storage->dbh->selectrow_array(
+                'SELECT filament_type FROM inventory_items WHERE id = ?',
+                undef, $item_id
+            );
+        };
 
         my $is_3d_item =
                index($origin,   '3d_print') >= 0
@@ -1132,13 +1161,15 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         next unless $outstanding > 0;
 
         push @consignment_needed, {
-            line        => $line,
-            item        => $item,
-            outstanding => $outstanding,
-            filament    => scalar $_find_filament->(
-                eval { $item->filament_color },
-                eval { $item->filament_type },
-            ),
+            line          => $line,
+            item          => $item,
+            outstanding   => $outstanding,
+            item_name     => $item->get_column('name'),
+            item_category => $category,
+            item_origin   => $origin,
+            fil_color     => $fil_color,
+            fil_type      => $fil_type,
+            filament      => scalar $_find_filament->($fil_color, $fil_type),
         };
     }
 
