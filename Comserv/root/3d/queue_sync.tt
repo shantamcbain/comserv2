@@ -1,0 +1,159 @@
+[% PageVersion = '3d/queue_sync.tt,v 1.00 2026/04/24 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sync-section { margin-bottom: 2em; }
+.sync-section h2 { color: var(--heading-color, var(--text-color)); border-bottom: 2px solid var(--border-color); padding-bottom: 0.3em; margin-bottom: 0.8em; }
+.sync-table { width: 100%; border-collapse: collapse; background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; margin-bottom: 1em; }
+.sync-table th, .sync-table td { padding: 0.6em 0.9em; border-bottom: 1px solid var(--border-color); color: var(--text-color); vertical-align: middle; }
+.sync-table th { background: var(--table-header-bg, var(--secondary-color)); font-weight: bold; text-align: left; }
+.sync-table tr:last-child td { border-bottom: none; }
+.filament-match { font-size: 0.82em; color: var(--text-muted-color); }
+.filament-none  { font-size: 0.82em; color: var(--schema-alert-danger-color, #c0392b); }
+.badge-restock  { background: #ffc107; color: #333; padding: 0.15em 0.5em; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+.badge-consign  { background: #17a2b8; color: white; padding: 0.15em 0.5em; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>Sync Print Queue from Orders &amp; Inventory</h1>
+    <div>
+        <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a> |
+        <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
+    </div>
+</div>
+
+<p style="color:var(--text-muted-color);font-size:0.95em;">
+    This page shows printed items that need to be queued for printing — either because
+    stock has fallen to or below the reorder point, or because an open consignment
+    contains items marked as <em>print on demand</em> or <em>3D printed origin</em>.
+    Select the jobs to create and click <strong>Add Selected to Queue</strong>.
+</p>
+
+[% SET total = (restock_needed ? restock_needed.size : 0) + (consignment_needed ? consignment_needed.size : 0) %]
+
+[% IF total == 0 %]
+<div style="text-align:center;padding:2.5em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
+    <strong>Everything is up to date.</strong><br>
+    No printed items are below reorder point and no open consignment lines need printing.
+</div>
+[% ELSE %]
+
+<form method="post" action="/3d/queue_sync">
+
+[% IF restock_needed && restock_needed.size %]
+<div class="sync-section">
+    <h2>Restock Needed — Stock at or Below Reorder Point ([% restock_needed.size %])</h2>
+    <table class="sync-table">
+        <thead>
+            <tr>
+                <th style="width:2em;"><input type="checkbox" id="chk-all-restock" title="Select all"></th>
+                <th>Item</th><th>Category</th><th>In Stock</th><th>Reorder Pt</th>
+                <th>Qty to Print</th><th>Filament Match</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH r IN restock_needed %]
+        <tr>
+            <td>
+                <input type="checkbox" name="create_job_restock_[% r.item.id %]"
+                       value="restock:[% r.item.id %]" class="chk-restock" checked>
+            </td>
+            <td>
+                [% r.item.name | html %]
+                [% IF r.item.filament_color || r.item.filament_type %]
+                <br><small class="filament-match">
+                    Requires: [% r.item.filament_type | html %] [% r.item.filament_color | html %]
+                </small>
+                [% END %]
+            </td>
+            <td><span class="badge-restock">[% r.item.category | html %]</span></td>
+            <td>[% r.avail %]</td>
+            <td>[% r.item.reorder_point %]</td>
+            <td>[% r.needed %]</td>
+            <td>
+                [% IF r.filament %]
+                <span class="filament-match">
+                    ✓ [% r.filament.name | html %]
+                    [% IF r.filament.filament_type %]([% r.filament.filament_type | html %][% IF r.filament.filament_color %], [% r.filament.filament_color | html %][% END %])[% END %]
+                </span>
+                [% ELSE %]
+                <span class="filament-none">⚠ No matching filament in stock</span>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+[% IF consignment_needed && consignment_needed.size %]
+<div class="sync-section">
+    <h2>Consignment Orders Awaiting Printing ([% consignment_needed.size %])</h2>
+    <table class="sync-table">
+        <thead>
+            <tr>
+                <th style="width:2em;"><input type="checkbox" id="chk-all-consign" title="Select all"></th>
+                <th>Item</th><th>Consignment</th><th>Outstanding Qty</th>
+                <th>Origin</th><th>Filament Match</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH r IN consignment_needed %]
+        <tr>
+            <td>
+                <input type="checkbox" name="create_job_consign_[% r.line.id %]"
+                       value="consignment:[% r.line.id %]" class="chk-consign" checked>
+            </td>
+            <td>
+                [% r.item.name | html %]
+                [% IF r.item.filament_color || r.item.filament_type %]
+                <br><small class="filament-match">
+                    Requires: [% r.item.filament_type | html %] [% r.item.filament_color | html %]
+                </small>
+                [% END %]
+            </td>
+            <td>
+                <span class="badge-consign">#[% r.line.consignment_id %]</span>
+                [% IF r.line.consignment && r.line.consignment.reference_number %]
+                — [% r.line.consignment.reference_number | html %]
+                [% END %]
+            </td>
+            <td>[% r.outstanding %]</td>
+            <td>[% r.item.item_origin | html %]</td>
+            <td>
+                [% IF r.filament %]
+                <span class="filament-match">
+                    ✓ [% r.filament.name | html %]
+                    [% IF r.filament.filament_type %]([% r.filament.filament_type | html %][% IF r.filament.filament_color %], [% r.filament.filament_color | html %][% END %])[% END %]
+                </span>
+                [% ELSE %]
+                <span class="filament-none">⚠ No matching filament in stock</span>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+<div style="display:flex;gap:1em;align-items:center;">
+    <button type="submit" style="padding:0.6em 1.6em;background:var(--button-bg,var(--accent-color));color:var(--button-text,white);border:none;border-radius:4px;font-size:1em;font-weight:bold;cursor:pointer;">
+        Add Selected to Queue
+    </button>
+    <a href="/3d/queue" style="font-size:0.9em;">Cancel</a>
+</div>
+
+</form>
+
+<script>
+document.getElementById('chk-all-restock') && document.getElementById('chk-all-restock').addEventListener('change', function() {
+    document.querySelectorAll('.chk-restock').forEach(function(c) { c.checked = this.checked; }, this);
+});
+document.getElementById('chk-all-consign') && document.getElementById('chk-all-consign').addEventListener('change', function() {
+    document.querySelectorAll('.chk-consign').forEach(function(c) { c.checked = this.checked; }, this);
+});
+</script>
+
+[% END %]
