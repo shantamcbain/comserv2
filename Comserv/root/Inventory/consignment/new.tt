@@ -107,18 +107,38 @@
                  style="width:80px;padding:5px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
         </label>
       </div>
-      <div class="line-3d-fields" style="display:none;gap:0.5em;align-items:center;flex-wrap:wrap;background:var(--bg-color,#fff);border:1px dashed var(--border-color);border-radius:4px;padding:7px 10px">
-        <span style="font-size:0.8rem;font-weight:bold;color:var(--text-muted-color);white-space:nowrap">🖨 Filament:</span>
-        <label style="font-size:0.85rem">Type:
-          <input type="text" name="fil_type_0" list="fil-type-list" placeholder="PLA, PETG…" maxlength="50"
-                 style="width:90px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-        </label>
-        <label style="font-size:0.85rem">Colour:
-          <input type="text" name="fil_color_0" list="fil-color-list" placeholder="Red, Blue…" maxlength="50"
-                 style="width:110px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
-        </label>
-        <label style="font-size:0.85rem;flex:1">Special request / notes:
-          <input type="text" name="line_notes_0" placeholder="e.g. matte finish, min order 5…" maxlength="255"
+      <div class="line-3d-fields" style="display:none;gap:0.5em;align-items:flex-start;flex-direction:column;background:var(--bg-color,#fff);border:1px dashed var(--border-color);border-radius:4px;padding:8px 12px">
+        <div style="display:flex;gap:0.6em;align-items:center;flex-wrap:wrap;width:100%">
+          <span style="font-size:0.8rem;font-weight:bold;color:var(--text-muted-color);white-space:nowrap">🖨 Filament:</span>
+          <select name="fil_spool_0" class="fil-spool-sel" onchange="onSpoolChange(this,0)"
+                  style="flex:2;min-width:200px;padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+            <option value="">— no filament preference —</option>
+            [% FOREACH f IN avail_filaments %]
+            <option value="[% f.id %]"
+                    data-type="[% f.type | html %]"
+                    data-color="[% f.color | html %]"
+                    [% IF f.avail <= 0 %]style="color:#c0392b"[% END %]>
+              [% f.type | html %][% IF f.color %] — [% f.color | html %][% END %] · [% f.name | html %]
+              [% IF f.avail > 0 %]([% f.avail %]g)[% ELSE %](out of stock)[% END %]
+            </option>
+            [% END %]
+            <option value="_other_">Other / Special request (specify below)</option>
+          </select>
+          <input type="hidden" name="fil_type_0"  class="fil-type-hidden"  value="">
+          <input type="hidden" name="fil_color_0" class="fil-color-hidden" value="">
+        </div>
+        <div class="fil-custom-row" style="display:none;gap:0.5em;align-items:center;flex-wrap:wrap;width:100%">
+          <label style="font-size:0.85rem">Type:
+            <input type="text" name="fil_type_custom_0" list="fil-type-list" placeholder="PLA, PETG…" maxlength="50"
+                   style="width:90px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          </label>
+          <label style="font-size:0.85rem">Colour:
+            <input type="text" name="fil_color_custom_0" list="fil-color-list" placeholder="Red, Blue…" maxlength="50"
+                   style="width:110px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+          </label>
+        </div>
+        <label style="font-size:0.85rem;width:100%">Special request / notes:
+          <input type="text" name="line_notes_0" placeholder="e.g. matte finish, minimum order 5, specific brand…" maxlength="255"
                  style="width:100%;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
         </label>
       </div>
@@ -182,6 +202,34 @@ function toggle3dFields(line, show) {
   if (plain) { plain.style.display = show ? 'none' : 'flex'; }
 }
 
+function onSpoolChange(sel, idx) {
+  var opt      = sel.options[sel.selectedIndex];
+  var val      = sel.value;
+  var line     = sel.closest ? sel.closest('.line-3d-fields') : (function(){ var el = sel; while(el && !el.classList.contains('line-3d-fields')) el = el.parentNode; return el; })();
+  if (!line) return;
+  var typeHid  = line.querySelector('.fil-type-hidden');
+  var colorHid = line.querySelector('.fil-color-hidden');
+  var customRow = line.querySelector('.fil-custom-row');
+  var typeCustom  = customRow && customRow.querySelector('input[name^="fil_type_custom"]');
+  var colorCustom = customRow && customRow.querySelector('input[name^="fil_color_custom"]');
+
+  if (val === '_other_') {
+    if (customRow) customRow.style.display = 'flex';
+    if (typeHid)  typeHid.value  = '';
+    if (colorHid) colorHid.value = '';
+  } else if (val) {
+    if (customRow) customRow.style.display = 'none';
+    if (typeHid)  typeHid.value  = opt ? (opt.getAttribute('data-type')  || '') : '';
+    if (colorHid) colorHid.value = opt ? (opt.getAttribute('data-color') || '') : '';
+    if (typeCustom)  typeCustom.value  = '';
+    if (colorCustom) colorCustom.value = '';
+  } else {
+    if (customRow) customRow.style.display = 'none';
+    if (typeHid)  typeHid.value  = '';
+    if (colorHid) colorHid.value = '';
+  }
+}
+
 function onItemChange(sel, idx) {
   var opt   = sel.options[sel.selectedIndex];
   var price = opt ? opt.getAttribute('data-price') : '';
@@ -214,11 +262,18 @@ function addLine() {
     el.id = el.id.replace(/\d+$/, n);
   });
 
-  var itemSel = clone.querySelector('select');
-  if (itemSel) {
-    itemSel.selectedIndex = 0;
-    (function(nn) { itemSel.onchange = function() { onItemChange(this, nn); }; })(n);
-  }
+  var selects = clone.querySelectorAll('select');
+  selects.forEach(function(sel) {
+    sel.selectedIndex = 0;
+    if (sel.classList.contains('fil-spool-sel')) {
+      (function(nn) { sel.onchange = function() { onSpoolChange(this, nn); }; })(n);
+    } else {
+      (function(nn) { sel.onchange = function() { onItemChange(this, nn); }; })(n);
+    }
+  });
+
+  var customRow = clone.querySelector('.fil-custom-row');
+  if (customRow) customRow.style.display = 'none';
 
   toggle3dFields(clone, false);
 
