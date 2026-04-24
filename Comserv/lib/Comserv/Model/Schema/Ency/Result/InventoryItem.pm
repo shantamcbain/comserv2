@@ -154,6 +154,11 @@ __PACKAGE__->add_columns(
         size        => 100,
         is_nullable => 1,
     },
+    print_time_hours => {
+        data_type   => 'decimal',
+        size        => [6, 2],
+        is_nullable => 1,
+    },
     requires_printing => {
         data_type     => 'tinyint',
         is_nullable   => 1,
