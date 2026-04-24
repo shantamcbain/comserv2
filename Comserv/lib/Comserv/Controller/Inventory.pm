@@ -3775,7 +3775,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
             my %lines_by_idx;
             for my $key (keys %$p) {
-                if ($key =~ /^(item_id|quantity|retail_price|line_notes|line_notes_plain|fil_type|fil_color|fil_spool|fil_type_custom|fil_color_custom|options_selected)_(\d+)$/) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes|line_notes_plain|fil_type|fil_color|options_selected)_(\d+)$/) {
                     $lines_by_idx{$2}{$1} = $p->{$key};
                 }
             }
@@ -3786,13 +3786,8 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $item_id      = $l->{item_id};
                 my $qty          = $l->{quantity};
                 my $retail_price = $l->{retail_price};
-                # If spool was "_other_", use the custom text fields; otherwise use JS-set hidden fields
-                my $fil_type  = (($l->{fil_spool} || '') eq '_other_')
-                    ? ($l->{fil_type_custom}  || '')
-                    : ($l->{fil_type}         || '');
-                my $fil_color = (($l->{fil_spool} || '') eq '_other_')
-                    ? ($l->{fil_color_custom} || '')
-                    : ($l->{fil_color}        || '');
+                my $fil_type  = $l->{fil_type}  || '';
+                my $fil_color = $l->{fil_color} || '';
                 my $opts_str     = '';
                 if ($fil_type || $fil_color) {
                     $opts_str = '[FIL:' . $fil_type . ',' . $fil_color . ']';
