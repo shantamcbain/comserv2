@@ -945,34 +945,66 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     my $username = $c->session->{username} || 'system';
+    my $dbh      = $schema->storage->dbh;
 
     # ----------------------------------------------------------
-    # Helper: find best matching filament for a required colour/type
+    # Load all filament spools via raw SQL — safe regardless of
+    # whether the filament_color/type migration has been applied
+    # ----------------------------------------------------------
+    my @all_filaments;
+    eval {
+        my $rows = $dbh->selectall_arrayref(
+            'SELECT i.id, i.name, i.sku,
+                    COALESCE(sl.quantity_on_hand, 0) AS qty_on_hand,
+                    COALESCE(sl.quantity_reserved, 0) AS qty_reserved
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.sitename = ? AND (i.category LIKE ? OR i.category LIKE ?)
+               AND i.status = ?
+             ORDER BY i.name',
+            { Slice => {} },
+            $sitename, '%filament%', '%3d_fil%', 'active'
+        );
+        my %fil_details;
+        eval {
+            my $drows = $dbh->selectall_arrayref(
+                'SELECT id, filament_color, filament_type FROM inventory_items WHERE sitename = ?',
+                { Slice => {} }, $sitename
+            );
+            %fil_details = map { $_->{id} => $_ } @$drows;
+        };
+        for my $r (@$rows) {
+            my $d = $fil_details{ $r->{id} } || {};
+            $r->{filament_color} = $d->{filament_color} || '';
+            $r->{filament_type}  = $d->{filament_type}  || '';
+            $r->{avail}          = ($r->{qty_on_hand} || 0) - ($r->{qty_reserved} || 0);
+            push @all_filaments, $r;
+        }
+    };
+
+    # ----------------------------------------------------------
+    # Helper: find best matching filament from @all_filaments
     # ----------------------------------------------------------
     my $_find_filament = sub {
         my ($req_color, $req_type) = @_;
-        my @candidates = eval {
-            $schema->resultset('InventoryItem')->search(
-                { sitename => $sitename, category => '3d_filament', status => 'active' },
-                { prefetch => 'stock_levels' }
-            )->all;
-        };
-        my $best;
-        for my $fil (@candidates) {
-            my $stock = eval { ($fil->stock_levels->all)[0] };
-            next unless $stock && ($stock->quantity_on_hand - $stock->quantity_reserved) > 0;
+        my ($best, $best_score) = (undef, -1);
+        for my $fil (@all_filaments) {
+            next unless ($fil->{avail} || 0) > 0;
             my $score = 0;
-            if ($req_color && $fil->filament_color) {
-                $score += 2 if lc($fil->filament_color) eq lc($req_color);
-                $score += 1 if index(lc($fil->filament_color), lc($req_color)) >= 0;
+            if ($req_color && $fil->{filament_color}) {
+                $score += 2 if lc($fil->{filament_color}) eq lc($req_color);
+                $score += 1 if index(lc($fil->{filament_color}), lc($req_color)) >= 0;
             }
-            if ($req_type && $fil->filament_type) {
-                $score += 2 if lc($fil->filament_type) eq lc($req_type);
-                $score += 1 if index(lc($fil->filament_type), lc($req_type)) >= 0;
+            if ($req_type && $fil->{filament_type}) {
+                $score += 2 if lc($fil->{filament_type}) eq lc($req_type);
+                $score += 1 if index(lc($fil->{filament_type}), lc($req_type)) >= 0;
             }
-            $best = $fil if !$best || $score > 0;
+            if (!$best || $score > $best_score) {
+                $best       = $fil;
+                $best_score = $score;
+            }
         }
-        return $best;
+        return ($best && ($best_score > 0 || (!$req_color && !$req_type))) ? $best : undef;
     };
 
     # ----------------------------------------------------------
@@ -990,45 +1022,76 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
             my ($item_name, $req_color, $req_type, $qty, $cons_id, $cons_line_id);
 
             if ($src_type eq 'restock') {
-                my $item = eval { $schema->resultset('InventoryItem')->find($src_id) };
+                my @safe_cols = qw(id name reorder_quantity);
+                my $item = eval {
+                    $schema->resultset('InventoryItem')->find($src_id, { columns => \@safe_cols })
+                };
                 next unless $item;
-                $item_name    = $item->name;
-                $req_color    = $item->filament_color;
-                $req_type     = $item->filament_type;
-                $qty          = $item->reorder_quantity || 1;
+                $item_name = $item->get_column('name');
+                $req_color = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $src_id) };
+                $req_type  = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $src_id) };
+                $qty = eval { $dbh->selectrow_array(
+                    'SELECT reorder_quantity FROM inventory_items WHERE id = ?', undef, $src_id) } || 1;
 
             } elsif ($src_type eq 'consignment') {
                 my $line = eval { $schema->resultset('InventoryConsignmentLine')->find($src_id) };
                 next unless $line;
-                my $item   = eval { $line->item };
-                $item_name  = $item ? $item->name : "Item #$src_id";
-                $req_color  = $item ? $item->filament_color : undef;
-                $req_type   = $item ? $item->filament_type  : undef;
-                $qty        = $line->quantity_outstanding || 1;
-                $cons_id    = $line->consignment_id;
+                my @safe_cols = qw(id name);
+                my $item = eval {
+                    $schema->resultset('InventoryItem')->find(
+                        $line->item_id, { columns => \@safe_cols })
+                };
+                $item_name    = $item ? $item->get_column('name') : "Item #" . $line->item_id;
+                $req_color    = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $line->item_id) };
+                $req_type     = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $line->item_id) };
+                $qty          = $line->quantity_outstanding || 1;
+                $cons_id      = $line->consignment_id;
                 $cons_line_id = $line->id;
             }
 
-            my $filament = $_find_filament->($req_color, $req_type);
+            # Admin can override filament via the picker modal
+            my $override_fil_id = $c->req->params->{"filament_override_${src_type}_${src_id}"} || '';
+            my ($filament_id, $fil_color, $fil_type);
+            if ($override_fil_id) {
+                my ($f) = grep { $_->{id} == $override_fil_id } @all_filaments;
+                if ($f) {
+                    $filament_id = $f->{id};
+                    $fil_color   = $f->{filament_color} || $req_color;
+                    $fil_type    = $f->{filament_type}  || $req_type;
+                }
+            }
+            unless ($filament_id) {
+                my $filament = $_find_filament->($req_color, $req_type);
+                if ($filament) {
+                    $filament_id = $filament->{id};
+                    $fil_color   = $req_color || $filament->{filament_color};
+                    $fil_type    = $req_type  || $filament->{filament_type};
+                }
+            }
+
             eval {
                 $schema->resultset('Printing3dJob')->create({
-                    sitename          => $sitename,
-                    model_id          => undef,
-                    user_id           => $c->session->{user_id} || 0,
-                    username          => $username,
-                    status            => 'queued',
-                    source_type       => $src_type,
-                    source_item_id    => ($src_type eq 'restock' ? $src_id : undef),
-                    consignment_id    => $cons_id,
+                    sitename            => $sitename,
+                    model_id            => undef,
+                    user_id             => $c->session->{user_id} || 0,
+                    username            => $username,
+                    status              => 'queued',
+                    source_type         => $src_type,
+                    source_item_id      => ($src_type eq 'restock' ? $src_id : undef),
+                    consignment_id      => $cons_id,
                     consignment_line_id => $cons_line_id,
-                    item_name         => $item_name,
-                    filament_item_id  => $filament ? $filament->id : undef,
-                    filament_color    => $req_color || ($filament ? $filament->filament_color : undef),
-                    filament_type     => $req_type  || ($filament ? $filament->filament_type  : undef),
-                    filament_quantity => $qty || 1,
-                    quantity          => $qty || 1,
-                    inventory_reserved => 0,
-                    created_at        => _now(),
+                    item_name           => $item_name,
+                    filament_item_id    => $filament_id,
+                    filament_color      => $fil_color,
+                    filament_type       => $fil_type,
+                    filament_quantity   => $qty || 1,
+                    quantity            => $qty || 1,
+                    inventory_reserved  => 0,
+                    created_at          => _now(),
                 });
                 $created++;
             };
@@ -1130,29 +1193,21 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         my $category  = lc($item->get_column('category')    || '');
 
         # Also try the new columns — they may or may not exist
-        my $req_print = eval {
-            $schema->storage->dbh->selectrow_array(
-                'SELECT requires_printing FROM inventory_items WHERE id = ?',
-                undef, $item_id
-            );
-        } // 0;
-        my $fil_color = eval {
-            $schema->storage->dbh->selectrow_array(
-                'SELECT filament_color FROM inventory_items WHERE id = ?',
-                undef, $item_id
-            );
-        };
-        my $fil_type = eval {
-            $schema->storage->dbh->selectrow_array(
-                'SELECT filament_type FROM inventory_items WHERE id = ?',
-                undef, $item_id
-            );
-        };
+        # Try new 3D columns via raw SQL (safe — silently returns undef if not migrated)
+        my $req_print = eval { $dbh->selectrow_array(
+            'SELECT requires_printing FROM inventory_items WHERE id = ?', undef, $item_id) } // 0;
+        my $fil_color = eval { $dbh->selectrow_array(
+            'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item_id) };
+        my $fil_type  = eval { $dbh->selectrow_array(
+            'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $item_id) };
 
+        # Include if ANY of these match (broad — catch 3d_printed_item, 3d_printed, printed_item, etc.)
         my $is_3d_item =
-               index($origin,   '3d_print') >= 0
-            || index($category, '3d_print') >= 0
-            || index($category, 'filament')  >= 0
+               index($origin,   '3d_print')  >= 0
+            || index($origin,   'printed')    >= 0
+            || index($category, '3d_print')   >= 0
+            || index($category, 'printed')    >= 0
+            || index($category, 'filament')   >= 0
             || $req_print;
 
         next unless $is_3d_item;
@@ -1178,6 +1233,8 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         restock_needed     => \@restock_needed,
         consignment_needed => \@consignment_needed,
         cons_error         => $cons_error,
+        all_filaments      => \@all_filaments,
+        cons_lines_total   => scalar @cons_lines,
         template           => '3d/queue_sync.tt',
     );
 }
