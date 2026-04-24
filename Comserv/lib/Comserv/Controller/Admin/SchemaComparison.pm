@@ -899,7 +899,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 }
 
                 my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`\Q$table_name\E`/i } @statements;
+                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
 
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
