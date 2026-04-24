@@ -119,10 +119,10 @@
                        value="consignment:[% r.line.id %]" class="chk-consign" checked>
             </td>
             <td>
-                [% r.item.name | html %]
-                [% IF r.item.filament_color || r.item.filament_type %]
+                [% r.item_name | html %]
+                [% IF r.fil_color || r.fil_type %]
                 <br><small class="filament-match">
-                    Requires: [% r.item.filament_type | html %] [% r.item.filament_color | html %]
+                    Requires: [% r.fil_type | html %] [% r.fil_color | html %]
                 </small>
                 [% END %]
             </td>
@@ -133,7 +133,7 @@
                 [% END %]
             </td>
             <td>[% r.outstanding %]</td>
-            <td>[% r.item.item_origin | html %]</td>
+            <td>[% r.item_origin | html %]</td>
             <td>
                 [% IF r.filament %]
                 <span class="filament-match">
