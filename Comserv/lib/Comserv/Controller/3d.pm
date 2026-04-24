@@ -548,17 +548,19 @@ sub queue :Path('/3d/queue') :Args(0) {
 
             } elsif ($action eq 'complete') {
                 my $printer     = $job->printer;
-                my $print_hours = $c->req->params->{print_hours} || undef;
-                $print_hours    = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                my $print_hours    = $c->req->params->{print_hours}     || undef;
+                my $grams_used     = $c->req->params->{filament_grams}  || undef;
+                $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                $grams_used  = undef if defined $grams_used  && $grams_used  !~ /^\d+\.?\d*$/;
 
                 # ---- Cost calculation ----
                 my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
 
-                # Filament cost: quantity * unit_cost from inventory
-                if ($job->filament_item_id) {
+                # Filament cost: grams_used / 1000 * spool_unit_cost (spool = 1kg sold as 'each')
+                if ($job->filament_item_id && $grams_used) {
                     my $fil = eval { $job->filament_item };
                     if ($fil && $fil->unit_cost) {
-                        $filament_cost = ($job->filament_quantity || 1) * $fil->unit_cost;
+                        $filament_cost = ($grams_used / 1000) * $fil->unit_cost;
                     }
                 }
 
@@ -583,13 +585,14 @@ sub queue :Path('/3d/queue') :Args(0) {
                 $total_cost = undef unless $total_cost;
 
                 $job->update({
-                    status           => 'completed',
-                    completed_at     => _now(),
-                    print_hours      => $print_hours,
-                    filament_cost    => $filament_cost,
-                    printer_cost     => $printer_cost,
-                    electricity_cost => $elec_cost,
-                    total_cost       => $total_cost,
+                    status            => 'completed',
+                    completed_at      => _now(),
+                    print_hours       => $print_hours,
+                    filament_quantity => $grams_used,
+                    filament_cost     => $filament_cost,
+                    printer_cost      => $printer_cost,
+                    electricity_cost  => $elec_cost,
+                    total_cost        => $total_cost,
                 });
 
                 if ($printer) {
@@ -731,12 +734,16 @@ sub queue :Path('/3d/queue') :Args(0) {
     eval {
         my $r_sql = q{
             SELECT j.id, j.item_name, j.username, j.filament_color, j.filament_type,
-                   j.quantity, j.completed_at, j.total_cost,
+                   j.quantity, j.print_hours, j.filament_quantity,
+                   j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
                    pr.name AS printer_name,
+                   fi.name AS filament_name,
                    mo.name AS model_name
             FROM printing_3d_jobs j
             LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
             LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
             WHERE j.sitename = ? AND j.status = 'completed'
             ORDER BY j.completed_at DESC
             LIMIT 10
