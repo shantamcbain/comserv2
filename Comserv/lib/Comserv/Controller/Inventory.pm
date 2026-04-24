@@ -2122,10 +2122,20 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
 
             # Ensure a default location exists for this site so stock always posts
-            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
-                { sitename => $sitename, name => 'Default' },
-                { key => 'sitename_name' }
-            );
+            my $default_loc;
+            eval {
+                ($default_loc) = $schema->resultset('InventoryLocation')->search(
+                    { sitename => $sitename, name => 'Default' }
+                )->all;
+                unless ($default_loc) {
+                    $default_loc = $schema->resultset('InventoryLocation')->create({
+                        sitename => $sitename,
+                        name     => 'Default',
+                        status   => 'active',
+                    });
+                }
+            };
+            die "Cannot resolve Default location: $@" if $@ || !$default_loc;
 
             my (@stock_log, $stock_updated, $stock_skipped);
             for my $line ($invoice->lines->all) {
@@ -2139,10 +2149,18 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
 
                 my ($sl, $sl_err);
                 eval {
-                    $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
-                        { item_id => $line->item_id, location_id => $loc_id },
-                        { key => 'item_id_location_id' }
-                    );
+                    $sl = $schema->resultset('InventoryStockLevel')->find({
+                        item_id => $line->item_id, location_id => $loc_id
+                    });
+                    unless ($sl) {
+                        $sl = $schema->resultset('InventoryStockLevel')->create({
+                            item_id           => $line->item_id,
+                            location_id       => $loc_id,
+                            quantity_on_hand  => 0,
+                            quantity_reserved => 0,
+                            quantity_on_order => 0,
+                        });
+                    }
                 };
                 $sl_err = $@ if $@;
                 if ($sl) {
