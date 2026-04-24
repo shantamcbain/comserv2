@@ -252,25 +252,41 @@ document.querySelectorAll('.complete-form').forEach(function(form) {
     var startedAt = form.dataset.startedAt;
     var bomHours  = parseFloat(form.dataset.bomHours) || 0;
     var bomGrams  = parseFloat(form.dataset.bomGrams)  || 0;
+    var qty       = parseInt(form.dataset.quantity) || 1;
 
     var hInput = form.querySelector('[name="print_hours_h"]');
     var mInput = form.querySelector('[name="print_hours_m"]');
     var gInput = form.querySelector('[name="filament_grams"]');
 
-    if (startedAt && hInput && mInput) {
-        var started = new Date(startedAt.replace(' ', 'T'));
-        if (started && !isNaN(started.getTime())) {
-            var elapsedMin = Math.floor((Date.now() - started.getTime()) / 60000);
-            if (elapsedMin > 0) {
-                hInput.value = Math.floor(elapsedMin / 60);
-                mInput.value = elapsedMin % 60;
-                hInput.title = 'Auto-calculated from start time' + (bomHours ? ' — BOM estimate: ' + bomHours + 'h' : '');
-                mInput.title = hInput.title;
+    if (hInput && mInput) {
+        if (bomHours) {
+            var totalMin = Math.round(bomHours * qty * 60);
+            hInput.value = Math.floor(totalMin / 60);
+            mInput.value = totalMin % 60;
+            var hint = 'BOM estimate × ' + qty + ' item(s)';
+            if (startedAt) {
+                var started = new Date(startedAt.replace(' ', 'T'));
+                if (!isNaN(started.getTime())) {
+                    var elapsedMin = Math.floor((Date.now() - started.getTime()) / 60000);
+                    hint += ' — elapsed since assigned: ' + Math.floor(elapsedMin/60) + 'h ' + (elapsedMin%60) + 'm';
+                }
+            }
+            hInput.title = hint;
+            mInput.title = hint;
+        } else if (startedAt) {
+            var started2 = new Date(startedAt.replace(' ', 'T'));
+            if (!isNaN(started2.getTime())) {
+                var elapsedMin2 = Math.floor((Date.now() - started2.getTime()) / 60000);
+                if (elapsedMin2 > 0) {
+                    hInput.value = Math.floor(elapsedMin2 / 60);
+                    mInput.value = elapsedMin2 % 60;
+                    hInput.title = 'Elapsed since job assigned (no BOM data)';
+                    mInput.title = hInput.title;
+                }
             }
         }
     }
 
-    var qty = parseInt(form.dataset.quantity) || 1;
     if (bomGrams && gInput && !gInput.value) {
         gInput.value = Math.round(bomGrams * qty * 100) / 100;
     }
