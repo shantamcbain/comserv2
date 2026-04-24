@@ -2,6 +2,7 @@ package Comserv::Controller::3d;
 use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
+use JSON qw(encode_json);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -1229,13 +1230,14 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     }
 
     $c->stash(
-        sitename           => $sitename,
-        restock_needed     => \@restock_needed,
-        consignment_needed => \@consignment_needed,
-        cons_error         => $cons_error,
-        all_filaments      => \@all_filaments,
-        cons_lines_total   => scalar @cons_lines,
-        template           => '3d/queue_sync.tt',
+        sitename              => $sitename,
+        restock_needed        => \@restock_needed,
+        consignment_needed    => \@consignment_needed,
+        cons_error            => $cons_error,
+        all_filaments         => \@all_filaments,
+        all_filaments_json    => encode_json(\@all_filaments),
+        cons_lines_total      => scalar @cons_lines,
+        template              => '3d/queue_sync.tt',
     );
 }
 
