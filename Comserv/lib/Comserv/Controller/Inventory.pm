@@ -3775,7 +3775,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
             my %lines_by_idx;
             for my $key (keys %$p) {
-                if ($key =~ /^(item_id|quantity|retail_price|line_notes|options_selected)_(\d+)$/) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes|line_notes_plain|fil_type|fil_color|options_selected)_(\d+)$/) {
                     $lines_by_idx{$2}{$1} = $p->{$key};
                 }
             }
@@ -3786,10 +3786,16 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $item_id      = $l->{item_id};
                 my $qty          = $l->{quantity};
                 my $retail_price = $l->{retail_price};
-                my $opts_str     = $l->{options_selected} || '';
-                my $user_note    = $l->{line_notes}       || '';
-                my $line_note    = $opts_str
-                    ? ($user_note ? "$opts_str | $user_note" : $opts_str)
+                my $fil_type     = $l->{fil_type}  || '';
+                my $fil_color    = $l->{fil_color}  || '';
+                my $opts_str     = '';
+                if ($fil_type || $fil_color) {
+                    $opts_str = '[FIL:' . $fil_type . ',' . $fil_color . ']';
+                }
+                # line_notes is the 3D special-request field; line_notes_plain is for non-3D items
+                my $user_note = $l->{line_notes} || $l->{line_notes_plain} || '';
+                my $line_note = $opts_str
+                    ? ($user_note ? "$opts_str $user_note" : $opts_str)
                     : $user_note || undef;
                 $schema->resultset('InventoryConsignmentLine')->create({
                     consignment_id    => $consignment->id,
@@ -3828,7 +3834,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     }
 
     my $source_sitename = $c->req->params->{source_sitename} || $sitename;
-    my (@partners, @items, @all_sitenames);
+    my (@partners, @items, @all_sitenames, @avail_filaments);
     eval {
         @partners = $schema->resultset('InventoryConsignmentPartner')->search(
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
@@ -3836,20 +3842,52 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     eval {
         @items = $schema->resultset('InventoryItem')->search(
             { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
-            { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure'], order_by => 'name' })->all;
+            { columns => [qw(id name sku unit_price unit_cost unit_of_measure category item_origin)],
+              order_by => 'name' })->all;
     };
     eval {
         my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
         @all_sitenames = map { $_->name } @sites;
     };
+    eval {
+        my $dbh = $schema->storage->dbh;
+        my $rows = $dbh->selectall_arrayref(
+            'SELECT i.id, i.name, COALESCE(sl.quantity_on_hand,0)-COALESCE(sl.quantity_reserved,0) AS avail
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.sitename = ? AND (i.category LIKE ? OR i.category LIKE ?) AND i.status = ?
+             ORDER BY i.name',
+            { Slice => {} }, $source_sitename, '%filament%', '%3d_fil%', 'active'
+        );
+        my %fil_det;
+        eval {
+            my $dr = $dbh->selectall_arrayref(
+                'SELECT id, filament_color, filament_type FROM inventory_items WHERE sitename = ?',
+                { Slice => {} }, $source_sitename);
+            %fil_det = map { $_->{id} => $_ } @$dr;
+        };
+        for my $r (@$rows) {
+            my $d = $fil_det{$r->{id}} || {};
+            push @avail_filaments, {
+                id    => $r->{id},
+                name  => $r->{name},
+                avail => $r->{avail},
+                type  => $d->{filament_type}  || '',
+                color => $d->{filament_color} || '',
+            };
+        }
+    };
 
+    use JSON qw(encode_json);
     $c->stash(
-        partners        => \@partners,
-        items           => \@items,
-        sitename        => $sitename,
-        source_sitename => $source_sitename,
-        all_sitenames   => \@all_sitenames,
-        template        => 'Inventory/consignment/new.tt',
+        partners           => \@partners,
+        items              => \@items,
+        sitename           => $sitename,
+        source_sitename    => $source_sitename,
+        all_sitenames      => \@all_sitenames,
+        avail_filaments    => \@avail_filaments,
+        avail_filaments_json => encode_json(\@avail_filaments),
+        template           => 'Inventory/consignment/new.tt',
     );
 }
 
