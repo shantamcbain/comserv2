@@ -904,6 +904,8 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
                 if (@table_statements) {
                     $dbh->do('SET FOREIGN_KEY_CHECKS=0');
                     foreach my $statement (@table_statements) {
+                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
+                        next unless $statement;
                         my $safe_statement = _strip_fk_constraints($statement);
                         $dbh->do($safe_statement);
                     }
