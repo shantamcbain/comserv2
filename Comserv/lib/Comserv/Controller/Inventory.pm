@@ -530,8 +530,14 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
 
         if ($filament_g > 0) {
             my $filament_item_id = $params->{filament_item_id};
-            die "Filament grams entered ($filament_g g) but no filament item selected — please choose a filament spool from the dropdown.\n"
-                unless $filament_item_id;
+            unless ($filament_item_id) {
+                my $default_fil = $schema->resultset('InventoryItem')->search({
+                    sitename     => $sitename,
+                    filament_type => { '!=' => undef },
+                    status       => 'active',
+                })->first;
+                $filament_item_id = $default_fil->id if $default_fil;
+            }
             if ($filament_item_id) {
                 my $scrap = ($params->{filament_scrap} || 2) / 100;
                 $schema->resultset('InventoryItemBOM')->update_or_create({
