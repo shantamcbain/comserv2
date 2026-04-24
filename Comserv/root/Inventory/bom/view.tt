@@ -358,7 +358,8 @@
   electricity (based on printer wattage), and printer depreciation as BOM lines automatically.
   Actual colour stock deduction happens when you fulfil the order.
 </div>
-<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form">
+<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form"
+      onsubmit="if(!document.getElementById('pw_hours').value){alert('Please enter a print time.');return false;}">
   <table cellpadding="4" style="border:1px solid #ffe082;background:#fffdf0;padding:8px;width:100%;max-width:680px">
     <tr>
       <th style="text-align:left;width:200px"><label for="pw_printer">Printer *</label></th>
@@ -377,11 +378,13 @@
       </td>
     </tr>
     <tr>
-      <th><label for="pw_hours">Print Time (hours) *</label></th>
+      <th><label>Print Time *</label></th>
       <td>
-        <input type="number" id="pw_hours" name="print_hours" step="0.01" min="0.01" required
-               style="width:90px" placeholder="12.02" oninput="pwCalc()">
-        <small style="color:#777"> e.g. 12h 1m = 12.017</small>
+        <input type="hidden" id="pw_hours" name="print_hours" value="">
+        <input type="number" id="pw_h" min="0" max="999" style="width:3.5em;text-align:center" placeholder="0" oninput="pwTimeSync()"> h
+        <input type="number" id="pw_m" min="0" max="59"  style="width:3.2em;text-align:center" placeholder="0" oninput="pwTimeSync()"> m
+        <input type="number" id="pw_s" min="0" max="59"  style="width:3.2em;text-align:center" placeholder="0" oninput="pwTimeSync()"> s
+        <small style="color:#777;margin-left:0.4em;" id="pw_hours_display"></small>
       </td>
     </tr>
     [% IF filament_items && filament_items.size > 0 %]
@@ -521,8 +524,23 @@ function pwUpdatePrinter(sel) {
   pwCalc();
 }
 
+function pwTimeSync() {
+  var h = parseInt(document.getElementById('pw_h').value) || 0;
+  var m = parseInt(document.getElementById('pw_m').value) || 0;
+  var s = parseInt(document.getElementById('pw_s').value) || 0;
+  var total = h + m / 60 + s / 3600;
+  document.getElementById('pw_hours').value = total > 0 ? total.toFixed(6) : '';
+  var disp = document.getElementById('pw_hours_display');
+  if (total > 0) {
+    disp.textContent = '= ' + total.toFixed(4) + 'h';
+  } else {
+    disp.textContent = '';
+  }
+  pwCalc();
+}
+
 function pwCalc() {
-  var hours      = parseFloat(document.getElementById('pw_hours')       && document.getElementById('pw_hours').value)       || 0;
+  var hours      = parseFloat(document.getElementById('pw_hours').value) || 0;
   var grams      = parseFloat(document.getElementById('pw_filament_g')  && document.getElementById('pw_filament_g').value)  || 0;
   var kwhRate    = parseFloat(document.getElementById('pw_kwh_rate')     && document.getElementById('pw_kwh_rate').value)    || 0.17;
   var wattPct    = parseFloat(document.getElementById('pw_avg_watt_pct') && document.getElementById('pw_avg_watt_pct').value) || 50;
