@@ -141,8 +141,8 @@
     <table class="queue-table">
         <thead>
             <tr>
-                <th>#</th><th>Model</th><th>User</th><th>Printer</th>
-                <th>Status</th><th>Started</th><th>Complete / Cancel</th>
+                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
+                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
             </tr>
         </thead>
         <tbody>
@@ -152,6 +152,12 @@
                 <td>[% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]</td>
                 <td>[% job.username | html %]</td>
                 <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
+                <td>
+                    [% IF job.filament_type || job.filament_color %]
+                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
                 <td>[% job.started_at || job.created_at %]</td>
                 <td>
