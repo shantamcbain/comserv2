@@ -21,10 +21,14 @@
         <input type="text" id="category" name="category" maxlength="100"
                list="category-suggestions" value="[% item.category | html %]">
         <datalist id="category-suggestions">
+          <option value="3d_printer">3D Printer</option>
           <option value="3d_filament">3D Filament</option>
           <option value="3d_supply">3D Supply</option>
           <option value="3d_printed_item">3D Printed Item (for sale)</option>
+          <option value="3dStock">3D Stock</option>
           <option value="Hardware">Hardware</option>
+          <option value="Equipment">Equipment</option>
+          <option value="Supplies">Supplies</option>
           <option value="Apiary">Apiary</option>
           <option value="Garden">Garden</option>
           <option value="Craft">Craft</option>
@@ -32,7 +36,7 @@
           <option value="Office">Office</option>
           <option value="Service">Service</option>
         </datalist>
-        <small>3D types: <code>3d_filament</code>, <code>3d_supply</code>, <code>3d_printed_item</code></small>
+        <small>3D types: <code>3d_filament</code>, <code>3d_supply</code>, <code>3d_printed_item</code>, <code>3d_printer</code></small>
       </td>
     </tr>
     <tr>
