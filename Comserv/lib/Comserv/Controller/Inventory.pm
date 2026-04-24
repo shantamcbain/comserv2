@@ -3832,9 +3832,13 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     eval {
         @partners = $schema->resultset('InventoryConsignmentPartner')->search(
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
+    };
+    eval {
         @items = $schema->resultset('InventoryItem')->search(
             { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
-            { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure','shop_options'], order_by => 'name' })->all;
+            { columns => ['id','name','sku','unit_price','unit_cost','unit_of_measure'], order_by => 'name' })->all;
+    };
+    eval {
         my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
         @all_sitenames = map { $_->name } @sites;
     };
@@ -3884,6 +3888,70 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
         site_info   => \%site_info,
         template    => 'Inventory/consignment/view.tt',
     );
+}
+
+sub consignment_queue :Path('/Inventory/consignment/queue') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $consignment;
+    eval {
+        $consignment = $schema->resultset('InventoryConsignment')->find(
+            { 'me.id' => $id, 'me.sitename' => $sitename },
+            { prefetch => ['partner', { 'lines' => 'item' }] }
+        );
+    };
+    unless ($consignment) {
+        $c->flash->{error_msg} = 'Consignment not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    my $p = $c->req->body_params;
+    my @lines = $consignment->lines->all;
+    my $queued = 0;
+    my @errors;
+
+    for my $line (@lines) {
+        my $line_id  = $line->id;
+        my $qty_key  = "qty_$line_id";
+        my $fil_key  = "filament_$line_id";
+        my $col_key  = "colour_$line_id";
+        my $qty = $p->{$qty_key};
+        next unless defined $qty && $qty =~ /^\d+$/ && $qty > 0;
+
+        my $item = $line->item;
+        eval {
+            $schema->resultset('Printing3dJob')->create({
+                sitename            => $sitename,
+                model_id            => undef,
+                consignment_id      => $id,
+                consignment_line_id => $line_id,
+                item_name           => ($item ? $item->name : 'Unknown'),
+                user_id             => $c->session->{user_id} || 0,
+                username            => $c->session->{username} || 'admin',
+                status              => 'queued',
+                quantity            => $qty,
+                filament_type       => $p->{$fil_key} || undef,
+                filament_color      => $p->{$col_key} || undef,
+                notes               => 'Consignment #' . $id . ' for ' . $consignment->partner->name
+                                       . ($line->notes ? ' — ' . $line->notes : ''),
+                inventory_reserved  => 0,
+                created_at          => _now(),
+            });
+            $queued++;
+        };
+        push @errors, "Line $line_id: $@" if $@;
+    }
+
+    if (@errors) {
+        $c->flash->{error_msg} = 'Some jobs failed: ' . join('; ', @errors);
+    } else {
+        $c->flash->{success_msg} = "$queued print job(s) added to the queue.";
+    }
+    $c->res->redirect($c->uri_for('/Inventory/consignment/view', [$id]));
+    $c->detach;
 }
 
 sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {

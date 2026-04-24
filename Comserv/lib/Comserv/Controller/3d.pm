@@ -826,7 +826,10 @@ sub printers :Path('/3d/printers') :Args(0) {
             { order_by => { -asc => 'name' } }
         )->all;
     };
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Farm query error: $@") if $@;
+    if ($@) {
+        my $lvl = ($@ =~ /doesn't exist/i) ? 'info' : 'error';
+        $self->logging->log_with_details($c, $lvl, __FILE__, __LINE__, 'printers', "Farm query error: $@");
+    }
 
     eval {
         my %already_linked = map { $_->inventory_item_id => 1 }
@@ -851,7 +854,10 @@ sub printers :Path('/3d/printers') :Args(0) {
             { order_by => 'name' }
         )->all;
     };
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'printers', "Unregistered query error: $@") if $@;
+    if ($@) {
+        my $lvl = ($@ =~ /doesn't exist/i) ? 'info' : 'error';
+        $self->logging->log_with_details($c, $lvl, __FILE__, __LINE__, 'printers', "Unregistered query error: $@");
+    }
 
     $c->stash(
         sitename                   => $sitename,
