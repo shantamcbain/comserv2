@@ -159,6 +159,7 @@
                 { key = 'planning',    label = '📋 Planning Tools',          hint = 'Project planning and task management' },
                 { key = 'ai',          label = '🤖 AI Models',               hint = 'Access to AI chat and form-fill tools' },
                 { key = 'workshops',   label = '🎓 Workshop Calendar',       hint = 'Event scheduling and registration' },
+                { key = 'printing_3d', label = '🖨️ 3D Printing',            hint = 'Printer farm, model catalog, print-on-demand orders' },
                 { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system for your members' },
                 { key = 'foraging',    label = '🌿 Foraging',               hint = 'Forager community tools and plant/mushroom database' },
                 { key = 'ency',        label = '📖 ENCY',                    hint = 'Encyclopedia of biological life — herbs, animals, insects' },

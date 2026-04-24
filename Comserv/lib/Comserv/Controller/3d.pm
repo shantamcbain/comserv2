@@ -932,6 +932,196 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
     );
 }
 
+# ============================================================
+# Queue Sync — detect items needing printing from inventory
+# and consignments, then create queued print jobs
+# ============================================================
+
+sub queue_sync :Path('/3d/queue_sync') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $username = $c->session->{username} || 'system';
+
+    # ----------------------------------------------------------
+    # Helper: find best matching filament for a required colour/type
+    # ----------------------------------------------------------
+    my $_find_filament = sub {
+        my ($req_color, $req_type) = @_;
+        my @candidates = eval {
+            $schema->resultset('InventoryItem')->search(
+                { sitename => $sitename, category => '3d_filament', status => 'active' },
+                { prefetch => 'stock_levels' }
+            )->all;
+        };
+        my $best;
+        for my $fil (@candidates) {
+            my $stock = eval { ($fil->stock_levels->all)[0] };
+            next unless $stock && ($stock->quantity_on_hand - $stock->quantity_reserved) > 0;
+            my $score = 0;
+            if ($req_color && $fil->filament_color) {
+                $score += 2 if lc($fil->filament_color) eq lc($req_color);
+                $score += 1 if index(lc($fil->filament_color), lc($req_color)) >= 0;
+            }
+            if ($req_type && $fil->filament_type) {
+                $score += 2 if lc($fil->filament_type) eq lc($req_type);
+                $score += 1 if index(lc($fil->filament_type), lc($req_type)) >= 0;
+            }
+            $best = $fil if !$best || $score > 0;
+        }
+        return $best;
+    };
+
+    # ----------------------------------------------------------
+    # POST — create the selected jobs
+    # ----------------------------------------------------------
+    if ($c->req->method eq 'POST') {
+        my @job_keys = grep { /^create_job_/ } keys %{ $c->req->params };
+        my $created  = 0;
+
+        for my $key (@job_keys) {
+            my $val        = $c->req->params->{$key} || '';
+            my ($src_type, $src_id) = split /:/, $val;
+            next unless $src_type && $src_id;
+
+            my ($item_name, $req_color, $req_type, $qty, $cons_id, $cons_line_id);
+
+            if ($src_type eq 'restock') {
+                my $item = eval { $schema->resultset('InventoryItem')->find($src_id) };
+                next unless $item;
+                $item_name    = $item->name;
+                $req_color    = $item->filament_color;
+                $req_type     = $item->filament_type;
+                $qty          = $item->reorder_quantity || 1;
+
+            } elsif ($src_type eq 'consignment') {
+                my $line = eval { $schema->resultset('InventoryConsignmentLine')->find($src_id) };
+                next unless $line;
+                my $item   = eval { $line->item };
+                $item_name  = $item ? $item->name : "Item #$src_id";
+                $req_color  = $item ? $item->filament_color : undef;
+                $req_type   = $item ? $item->filament_type  : undef;
+                $qty        = $line->quantity_outstanding || 1;
+                $cons_id    = $line->consignment_id;
+                $cons_line_id = $line->id;
+            }
+
+            my $filament = $_find_filament->($req_color, $req_type);
+            eval {
+                $schema->resultset('Printing3dJob')->create({
+                    sitename          => $sitename,
+                    model_id          => undef,
+                    user_id           => $c->session->{user_id} || 0,
+                    username          => $username,
+                    status            => 'queued',
+                    source_type       => $src_type,
+                    source_item_id    => ($src_type eq 'restock' ? $src_id : undef),
+                    consignment_id    => $cons_id,
+                    consignment_line_id => $cons_line_id,
+                    item_name         => $item_name,
+                    filament_item_id  => $filament ? $filament->id : undef,
+                    filament_color    => $req_color || ($filament ? $filament->filament_color : undef),
+                    filament_type     => $req_type  || ($filament ? $filament->filament_type  : undef),
+                    filament_quantity => $qty || 1,
+                    quantity          => $qty || 1,
+                    inventory_reserved => 0,
+                    created_at        => _now(),
+                });
+                $created++;
+            };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
+                "Job create failed: $@") if $@;
+        }
+
+        $c->flash->{success_msg} = "$created print job(s) added to queue.";
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    # ----------------------------------------------------------
+    # GET — scan for items needing printing
+    # ----------------------------------------------------------
+
+    # Active job source ids (to avoid duplicate queuing)
+    my %active_restock_items;
+    my %active_cons_lines;
+    eval {
+        my @active = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => { -in => [qw(queued assigned printing)] } }
+        )->all;
+        for my $j (@active) {
+            $active_restock_items{ $j->source_item_id }    = 1 if $j->source_item_id;
+            $active_cons_lines{ $j->consignment_line_id } = 1 if $j->consignment_line_id;
+        }
+    };
+
+    # 1. Restock: 3d_printed_item stock at or below reorder_point
+    my @restock_needed;
+    eval {
+        my @items = $schema->resultset('InventoryItem')->search(
+            {
+                sitename => $sitename,
+                category => '3d_printed_item',
+                status   => 'active',
+                reorder_point => { '>' => 0 },
+            },
+            { prefetch => 'stock_levels' }
+        )->all;
+        for my $item (@items) {
+            next if $active_restock_items{ $item->id };
+            my $sl  = eval { ($item->stock_levels->all)[0] };
+            my $avail = $sl ? ($sl->quantity_on_hand - $sl->quantity_reserved) : 0;
+            if ($avail <= $item->reorder_point) {
+                push @restock_needed, {
+                    item   => $item,
+                    avail  => $avail,
+                    needed => ($item->reorder_quantity || 1),
+                    filament => scalar $_find_filament->($item->filament_color, $item->filament_type),
+                };
+            }
+        }
+    };
+
+    # 2. Consignment: open lines where item is 3d_printed and qty outstanding > 0
+    my @consignment_needed;
+    eval {
+        my @lines = $schema->resultset('InventoryConsignmentLine')->search(
+            {
+                'consignment.sitename' => $sitename,
+                'consignment.status'   => { -in => [qw(open partially_settled)] },
+            },
+            {
+                join     => ['consignment', 'item'],
+                prefetch => ['consignment', 'item'],
+            }
+        )->all;
+        for my $line (@lines) {
+            next if $active_cons_lines{ $line->id };
+            my $item = eval { $line->item };
+            next unless $item;
+            next unless ($item->item_origin eq '3d_printed' || $item->requires_printing);
+            my $outstanding = $line->quantity_outstanding;
+            next unless $outstanding > 0;
+            push @consignment_needed, {
+                line        => $line,
+                item        => $item,
+                outstanding => $outstanding,
+                filament    => scalar $_find_filament->($item->filament_color, $item->filament_type),
+            };
+        }
+    };
+
+    $c->stash(
+        sitename           => $sitename,
+        restock_needed     => \@restock_needed,
+        consignment_needed => \@consignment_needed,
+        template           => '3d/queue_sync.tt',
+    );
+}
+
 =encoding utf8
 
 =head1 AUTHOR
