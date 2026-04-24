@@ -1216,13 +1216,50 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         my $outstanding = $line->quantity_outstanding;
         next unless $outstanding > 0;
 
+        # Check current available stock (after the consignment_out deduction)
+        # If stock covers outstanding AND item is not print-on-demand, skip — no need to print
+        my $avail_stock = eval { $dbh->selectrow_array(
+            'SELECT COALESCE(sl.quantity_on_hand,0) - COALESCE(sl.quantity_reserved,0)
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.id = ?',
+            undef, $item_id) } // 0;
+
+        unless ($req_print) {
+            next if $avail_stock > 0;
+        }
+
+        # Parse line notes for structured filament info: [FIL:type,color] user text
+        # then fall back to keyword scanning
+        my $line_notes = $line->notes || '';
+        if (!$fil_color && !$fil_type && $line_notes) {
+            if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                $fil_type  = $1 || undef;
+                $fil_color = $2 || undef;
+            } else {
+                my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple Grey Gray
+                                      Silver Gold Clear Natural Transparent Pink Brown Copper Bronze);
+                my $uc = uc($line_notes);
+                for my $t (@known_types) {
+                    if (index($uc, uc($t)) >= 0) { $fil_type = $t; last; }
+                }
+                for my $co (@known_colors) {
+                    if (index(lc($line_notes), lc($co)) >= 0) { $fil_color = $co; last; }
+                }
+            }
+        }
+
         push @consignment_needed, {
             line          => $line,
             item          => $item,
             outstanding   => $outstanding,
+            avail_stock   => $avail_stock,
             item_name     => $item->get_column('name'),
             item_category => $category,
             item_origin   => $origin,
+            line_notes    => $line_notes,
+            req_print     => $req_print,
             fil_color     => $fil_color,
             fil_type      => $fil_type,
             filament      => scalar $_find_filament->($fil_color, $fil_type),
