@@ -609,6 +609,8 @@ sub queue :Path('/3d/queue') :Args(0) {
                 if ($job->filament_item_id && $grams_used) {
                     my $fil  = eval { $job->filament_item };
                     my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
+                    my $fil_uom   = $fil ? ($fil->unit_of_measure || 'each') : 'each';
+                    my $issue_qty = (lc($fil_uom) eq 'g') ? $grams_used : $grams_used / 1000;
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
@@ -616,10 +618,10 @@ sub queue :Path('/3d/queue') :Args(0) {
                             item_id          => $job->filament_item_id,
                             location_id      => $fsl ? $fsl->location_id : undef,
                             transaction_type => 'issue',
-                            quantity         => $grams_used,
-                            unit_cost        => $filament_cost ? ($filament_cost / $grams_used) : undef,
+                            quantity         => $issue_qty,
+                            unit_cost        => $filament_cost ? ($filament_cost / $issue_qty) : undef,
                             reference_number => '3D-JOB-' . $job->id,
-                            notes            => sprintf('Filament used: %sg — print job #%d completed', $grams_used, $job->id),
+                            notes            => sprintf('Filament used: %sg (%.4f %s) — print job #%d completed', $grams_used, $issue_qty, $fil_uom, $job->id),
                             performed_by     => $c->session->{username} || 'system',
                         );
                     };
