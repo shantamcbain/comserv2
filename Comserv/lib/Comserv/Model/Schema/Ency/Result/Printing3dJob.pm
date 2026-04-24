@@ -16,6 +16,16 @@ __PACKAGE__->add_columns(
         data_type   => 'integer',
         is_nullable => 1,
     },
+    source_type => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 1,
+        default_value => 'manual',
+    },
+    source_item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
     consignment_id => {
         data_type   => 'integer',
         is_nullable => 1,
