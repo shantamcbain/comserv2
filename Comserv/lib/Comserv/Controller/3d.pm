@@ -603,10 +603,12 @@ sub queue :Path('/3d/queue') :Args(0) {
                     });
                 }
 
-                # Inventory accounting: issue (consume) the reserved filament
-                if ($job->filament_item_id && $job->inventory_reserved) {
-                    my $fil  = $job->filament_item;
-                    my $fsl  = eval { ($fil->stock_levels->all)[0] };
+                # Inventory accounting: issue (consume) filament used
+                # Always issue on completion using actual grams — inventory_reserved only
+                # matters for advance reservation (not always set for queue-sync jobs).
+                if ($job->filament_item_id && $grams_used) {
+                    my $fil  = eval { $job->filament_item };
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
@@ -614,10 +616,10 @@ sub queue :Path('/3d/queue') :Args(0) {
                             item_id          => $job->filament_item_id,
                             location_id      => $fsl ? $fsl->location_id : undef,
                             transaction_type => 'issue',
-                            quantity         => $job->filament_quantity || 1,
-                            unit_cost        => $filament_cost ? ($filament_cost / ($job->filament_quantity || 1)) : undef,
+                            quantity         => $grams_used,
+                            unit_cost        => $filament_cost ? ($filament_cost / $grams_used) : undef,
                             reference_number => '3D-JOB-' . $job->id,
-                            notes            => 'Filament consumed — print job #' . $job->id . ' completed',
+                            notes            => sprintf('Filament used: %sg — print job #%d completed', $grams_used, $job->id),
                             performed_by     => $c->session->{username} || 'system',
                         );
                     };
