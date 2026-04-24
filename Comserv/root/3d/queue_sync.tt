@@ -128,7 +128,7 @@
                 [% IF r.filament %]
                 <span class="filament-match" id="fil_label_restock_[% r.item.id %]">
                     ✓ [% r.filament.name | html %]
-                    [% IF r.filament.filament_type %]([% r.filament.filament_type | html %][% IF r.filament.filament_color %], [% r.filament.filament_color | html %][% END %])[% END %]
+                    [% IF r.filament.type %]([% r.filament.type | html %][% IF r.filament.color %], [% r.filament.color | html %][% END %])[% END %]
                 </span>
                 <button type="button" class="btn-pick matched"
                         onclick="openPicker('restock','[% r.item.id %]','[% r.item.name | html %]','[% r.item.filament_type | html %]','[% r.item.filament_color | html %]')">Change</button>
@@ -189,7 +189,7 @@
                 [% IF r.filament %]
                 <span class="filament-match" id="fil_label_consignment_[% r.line.id %]">
                     ✓ [% r.filament.name | html %]
-                    [% IF r.filament.filament_type %]([% r.filament.filament_type | html %][% IF r.filament.filament_color %], [% r.filament.filament_color | html %][% END %])[% END %]
+                    [% IF r.filament.type %]([% r.filament.type | html %][% IF r.filament.color %], [% r.filament.color | html %][% END %])[% END %]
                 </span>
                 <button type="button" class="btn-pick matched"
                         onclick="openPicker('consignment','[% r.line.id %]','[% r.item_name | html %]','[% r.fil_type | html %]','[% r.fil_color | html %]')">Change</button>
@@ -253,8 +253,9 @@ function openPicker(srcType, srcId, itemName, reqType, reqColor) {
         'Selecting filament for: ' + itemName +
         (reqType  ? ' | Needs type: '   + reqType  : '') +
         (reqColor ? ' | Needs colour: ' + reqColor : '');
-    document.getElementById('filament-modal-filter').value = '';
-    renderPickerRows('');
+    var initFilter = reqColor || reqType || '';
+    document.getElementById('filament-modal-filter').value = initFilter;
+    renderPickerRows(initFilter);
     document.getElementById('filament-modal-overlay').classList.add('open');
     document.getElementById('filament-modal-filter').focus();
 }
