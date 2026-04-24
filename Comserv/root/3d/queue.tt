@@ -68,6 +68,12 @@
     </div>
 </div>
 
+[% IF queue_error %]
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#856404;">
+    <strong>Queue load error:</strong> [% queue_error | html %]
+</div>
+[% END %]
+
 <div class="queue-section">
     <h2>Queued — Waiting for Printer ([% queued_jobs.size %])</h2>
     [% IF queued_jobs && queued_jobs.size %]
@@ -83,7 +89,7 @@
             <tr>
                 <td>[% job.id %]</td>
                 <td>
-                    [% IF job.model %][% job.model.name | html %]
+                    [% IF job.model_name %][% job.model_name | html %]
                     [% ELSIF job.item_name %][% job.item_name | html %]
                     [% ELSE %]Job #[% job.id %][% END %]
                     [% IF job.source_type && job.source_type != 'manual' %]
@@ -92,7 +98,7 @@
                 </td>
                 <td>[% job.username | html %]</td>
                 <td>[% job.filament_type | html %] [% job.filament_color | html %]
-                    [% IF job.filament_item %]<br><small style="color:var(--text-muted-color);">[% job.filament_item.name | html %]</small>[% END %]
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
                 </td>
                 <td>[% job.quantity %]</td>
                 <td>[% job.created_at %]</td>
@@ -143,9 +149,9 @@
             [% FOREACH job IN active_jobs %]
             <tr>
                 <td>[% job.id %]</td>
-                <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+                <td>[% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]</td>
                 <td>[% job.username | html %]</td>
-                <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+                <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
                 <td>[% job.started_at || job.created_at %]</td>
                 <td>
@@ -189,9 +195,9 @@
         [% FOREACH job IN recent_completed %]
         <tr>
             <td>[% job.id %]</td>
-            <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+            <td>[% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]</td>
             <td>[% job.username | html %]</td>
-            <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.print_hours %][% job.print_hours %]h[% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.filament_cost %]$[% job.filament_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.printer_cost %]$[% job.printer_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
