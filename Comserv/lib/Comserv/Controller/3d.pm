@@ -976,9 +976,9 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         };
         for my $r (@$rows) {
             my $d = $fil_details{ $r->{id} } || {};
-            $r->{filament_color} = $d->{filament_color} || '';
-            $r->{filament_type}  = $d->{filament_type}  || '';
-            $r->{avail}          = ($r->{qty_on_hand} || 0) - ($r->{qty_reserved} || 0);
+            $r->{color}  = $d->{filament_color} || '';
+            $r->{type}   = $d->{filament_type}  || '';
+            $r->{avail}  = ($r->{qty_on_hand} || 0) - ($r->{qty_reserved} || 0);
             push @all_filaments, $r;
         }
     };
@@ -992,13 +992,13 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         for my $fil (@all_filaments) {
             next unless ($fil->{avail} || 0) > 0;
             my $score = 0;
-            if ($req_color && $fil->{filament_color}) {
-                $score += 2 if lc($fil->{filament_color}) eq lc($req_color);
-                $score += 1 if index(lc($fil->{filament_color}), lc($req_color)) >= 0;
+            if ($req_color && $fil->{color}) {
+                $score += 2 if lc($fil->{color}) eq lc($req_color);
+                $score += 1 if index(lc($fil->{color}), lc($req_color)) >= 0;
             }
-            if ($req_type && $fil->{filament_type}) {
-                $score += 2 if lc($fil->{filament_type}) eq lc($req_type);
-                $score += 1 if index(lc($fil->{filament_type}), lc($req_type)) >= 0;
+            if ($req_type && $fil->{type}) {
+                $score += 2 if lc($fil->{type}) eq lc($req_type);
+                $score += 1 if index(lc($fil->{type}), lc($req_type)) >= 0;
             }
             if (!$best || $score > $best_score) {
                 $best       = $fil;
@@ -1061,16 +1061,16 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 my ($f) = grep { $_->{id} == $override_fil_id } @all_filaments;
                 if ($f) {
                     $filament_id = $f->{id};
-                    $fil_color   = $f->{filament_color} || $req_color;
-                    $fil_type    = $f->{filament_type}  || $req_type;
+                    $fil_color   = $f->{color} || $req_color;
+                    $fil_type    = $f->{type}  || $req_type;
                 }
             }
             unless ($filament_id) {
                 my $filament = $_find_filament->($req_color, $req_type);
                 if ($filament) {
                     $filament_id = $filament->{id};
-                    $fil_color   = $req_color || $filament->{filament_color};
-                    $fil_type    = $req_type  || $filament->{filament_type};
+                    $fil_color   = $req_color || $filament->{color};
+                    $fil_type    = $req_type  || $filament->{type};
                 }
             }
 
@@ -1216,15 +1216,14 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         my $outstanding = $line->quantity_outstanding;
         next unless $outstanding > 0;
 
-        # Check current available stock (after the consignment_out deduction)
-        # If stock covers outstanding AND item is not print-on-demand, skip — no need to print
+        # Check current available stock across ALL locations — SUM to aggregate
         my $avail_stock = eval { $dbh->selectrow_array(
-            'SELECT COALESCE(sl.quantity_on_hand,0) - COALESCE(sl.quantity_reserved,0)
-             FROM inventory_items i
-             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
-             WHERE i.id = ?',
+            'SELECT COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0)
+             FROM inventory_stock_levels sl
+             WHERE sl.item_id = ?',
             undef, $item_id) } // 0;
 
+        # Skip non-print-on-demand items that already have stock on hand
         unless ($req_print) {
             next if $avail_stock > 0;
         }
