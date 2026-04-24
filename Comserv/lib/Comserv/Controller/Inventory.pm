@@ -3852,12 +3852,16 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     eval {
         my $dbh = $schema->storage->dbh;
         my $rows = $dbh->selectall_arrayref(
-            'SELECT i.id, i.name, COALESCE(sl.quantity_on_hand,0)-COALESCE(sl.quantity_reserved,0) AS avail
+            'SELECT i.id, i.name,
+                    COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0) AS avail
              FROM inventory_items i
              LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
-             WHERE i.sitename = ? AND (i.category LIKE ? OR i.category LIKE ?) AND i.status = ?
+             WHERE i.sitename = ?
+               AND (i.category LIKE ? OR i.category LIKE ? OR i.name LIKE ?)
+               AND i.status = ?
+             GROUP BY i.id, i.name
              ORDER BY i.name',
-            { Slice => {} }, $source_sitename, '%filament%', '%3d_fil%', 'active'
+            { Slice => {} }, $source_sitename, '%filament%', '%3d_fil%', '%ilament%', 'active'
         );
         my %fil_det;
         eval {

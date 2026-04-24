@@ -956,15 +956,17 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     eval {
         my $rows = $dbh->selectall_arrayref(
             'SELECT i.id, i.name, i.sku,
-                    COALESCE(sl.quantity_on_hand, 0) AS qty_on_hand,
-                    COALESCE(sl.quantity_reserved, 0) AS qty_reserved
+                    COALESCE(SUM(sl.quantity_on_hand), 0) AS qty_on_hand,
+                    COALESCE(SUM(sl.quantity_reserved), 0) AS qty_reserved
              FROM inventory_items i
              LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
-             WHERE i.sitename = ? AND (i.category LIKE ? OR i.category LIKE ?)
+             WHERE i.sitename = ?
+               AND (i.category LIKE ? OR i.category LIKE ? OR i.name LIKE ?)
                AND i.status = ?
+             GROUP BY i.id, i.name, i.sku
              ORDER BY i.name',
             { Slice => {} },
-            $sitename, '%filament%', '%3d_fil%', 'active'
+            $sitename, '%filament%', '%3d_fil%', '%ilament%', 'active'
         );
         my %fil_details;
         eval {
