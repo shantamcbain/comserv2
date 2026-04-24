@@ -615,6 +615,10 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                 notes             => sprintf('%.3fh on %s', $print_hours, $printer->name),
             }, { key => 'unique_parent_component' });
         }
+
+        if ($print_hours > 0) {
+            $parent->update({ print_time_hours => $print_hours, updated_at => $now });
+        }
     };
     if ($@) {
         $c->flash->{error_msg} = "Wizard failed: $@";
