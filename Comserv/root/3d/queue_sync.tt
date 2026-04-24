@@ -153,7 +153,7 @@
             <tr>
                 <th style="width:2em;"><input type="checkbox" id="chk-all-consign" title="Select all"></th>
                 <th>Item</th><th>Consignment</th><th>Qty</th>
-                <th>Origin / Category</th><th>Filament</th>
+                <th>Origin / Category</th><th>Avail Stock</th><th>Filament</th>
             </tr>
         </thead>
         <tbody>
@@ -170,6 +170,7 @@
                     Requires: [% r.fil_type | html %] [% r.fil_color | html %]
                 </small>
                 [% END %]
+
             </td>
             <td>
                 <span class="badge-consign">#[% r.line.consignment_id %]</span>
@@ -182,6 +183,10 @@
                 [% IF r.item_origin %]<small>[% r.item_origin | html %]</small>[% END %]
                 [% IF r.item_origin && r.item_category %] / [% END %]
                 [% IF r.item_category %]<small>[% r.item_category | html %]</small>[% END %]
+                [% IF r.req_print %]<br><small style="color:#17a2b8;">print-on-demand</small>[% END %]
+            </td>
+            <td style="text-align:center;[% IF r.avail_stock > 0 %]color:#e67e22;font-weight:bold[% END %]">
+                [% r.avail_stock %]
             </td>
             <td>
                 <input type="hidden" name="filament_override_consignment_[% r.line.id %]"
