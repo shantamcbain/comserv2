@@ -13,7 +13,21 @@ __PACKAGE__->add_columns(
         size      => 100,
     },
     model_id => {
-        data_type => 'integer',
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    consignment_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    consignment_line_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    item_name => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
     },
     user_id => {
         data_type => 'integer',
@@ -132,6 +146,12 @@ __PACKAGE__->belongs_to(
 __PACKAGE__->belongs_to(
     filament_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
     'filament_item_id',
+    { join_type => 'left' }
+);
+
+__PACKAGE__->belongs_to(
+    consignment => 'Comserv::Model::Schema::Ency::Result::InventoryConsignment',
+    'consignment_id',
     { join_type => 'left' }
 );
 
