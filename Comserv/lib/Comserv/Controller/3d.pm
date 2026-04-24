@@ -646,6 +646,44 @@ sub queue :Path('/3d/queue') :Args(0) {
                         "Depreciation transaction failed for job $job_id: $@") if $@;
                 }
 
+                # Inventory: add finished printed item to stock (receive = goods in)
+                my $printed_item_id;
+                if ($job->source_item_id) {
+                    $printed_item_id = $job->source_item_id;
+                } elsif ($job->consignment_line_id) {
+                    $printed_item_id = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
+                            undef, $job->consignment_line_id)
+                    };
+                }
+                if ($printed_item_id) {
+                    my $default_loc = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT id FROM inventory_locations WHERE sitename = ? ORDER BY id LIMIT 1',
+                            undef, $sitename)
+                    };
+                    if ($default_loc) {
+                        eval {
+                            $self->_inventory_transaction($c,
+                                schema           => $schema,
+                                sitename         => $sitename,
+                                item_id          => $printed_item_id,
+                                location_id      => $default_loc,
+                                transaction_type => 'receive',
+                                quantity         => $job->quantity || 1,
+                                unit_cost        => $total_cost   || undef,
+                                reference_number => '3D-JOB-' . $job->id,
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d',
+                                                        $job->quantity || 1, $job->id),
+                                performed_by     => $c->session->{username} || 'system',
+                            );
+                        };
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt failed for job $job_id: $@") if $@;
+                    }
+                }
+
             } elsif ($action eq 'cancel') {
                 my $printer = $job->printer;
                 $job->update({ status => 'cancelled', completed_at => _now() });
