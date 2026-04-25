@@ -115,6 +115,49 @@
       <th><label for="notes">Notes</label></th>
       <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
     </tr>
+
+    <tbody id="3d-fields" style="display:none;">
+      <tr><td colspan="2"><hr><strong>3D Printing Details</strong>
+          <small style="font-weight:normal;color:#666;"> — shown for filament spools and printed items</small>
+      </td></tr>
+      <tr>
+        <th><label for="filament_color">Filament Colour</label></th>
+        <td>
+          <input type="text" id="filament_color" name="filament_color" maxlength="100"
+                 list="colour-suggestions" placeholder="e.g. Black, Red, Galaxy Blue">
+          <datalist id="colour-suggestions">
+            <option value="Black"><option value="White"><option value="Red">
+            <option value="Blue"><option value="Green"><option value="Yellow">
+            <option value="Orange"><option value="Purple"><option value="Grey">
+            <option value="Silver"><option value="Gold"><option value="Clear">
+            <option value="Natural"><option value="Galaxy Blue"><option value="Galaxy Black">
+          </datalist>
+          <small>For filament spools: colour of this spool. For printed items: required filament colour.</small>
+        </td>
+      </tr>
+      <tr>
+        <th><label for="filament_type">Filament Type</label></th>
+        <td>
+          <input type="text" id="filament_type" name="filament_type" maxlength="100"
+                 list="type-suggestions" placeholder="e.g. PLA, PETG, ABS">
+          <datalist id="type-suggestions">
+            <option value="PLA"><option value="PLA+"><option value="PETG">
+            <option value="ABS"><option value="ASA"><option value="TPU">
+            <option value="Nylon"><option value="PC"><option value="Wood PLA">
+            <option value="Metal PLA"><option value="Silk PLA"><option value="Resin">
+          </datalist>
+          <small>Material type. Used to auto-match filament stock when queueing print jobs.</small>
+        </td>
+      </tr>
+      <tr id="requires-printing-row">
+        <th><label for="requires_printing">Print on Demand?</label></th>
+        <td>
+          <input type="checkbox" id="requires_printing" name="requires_printing" value="1">
+          <small>Tick for items printed only when ordered (no standing stock). These appear in the print queue when an order or consignment is received.</small>
+        </td>
+      </tr>
+    </tbody>
+
     [% IF coa_accounts.size %]
     <tr><td colspan="2"><hr><strong>Accounting (optional)</strong></td></tr>
     <tr>
@@ -178,6 +221,20 @@
     </tr>
   </table>
 </form>
+<script>
+(function() {
+    var cat = document.getElementById('category');
+    var block = document.getElementById('3d-fields');
+    function toggle3d() {
+        var v = cat.value.toLowerCase();
+        var show = v.indexOf('filament') !== -1 || v.indexOf('3d_print') !== -1 || v === '3d_printer';
+        block.style.display = show ? '' : 'none';
+    }
+    cat.addEventListener('input', toggle3d);
+    cat.addEventListener('change', toggle3d);
+    toggle3d();
+})();
+</script>
 
 [% IF is_popup %]
 <script>
