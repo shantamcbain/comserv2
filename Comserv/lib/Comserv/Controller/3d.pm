@@ -1310,28 +1310,41 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         }
     };
 
-    # 1. Restock: 3d_printed_item stock at or below reorder_point
+    # 1. Restock: any 3D-printed item (by item_origin OR category) at or below reorder_point
     my @restock_needed;
     eval {
         my @items = $schema->resultset('InventoryItem')->search(
             {
-                sitename => $sitename,
-                category => '3d_printed_item',
-                status   => 'active',
+                sitename      => $sitename,
+                status        => 'active',
                 reorder_point => { '>' => 0 },
+                -or => [
+                    item_origin => { -like => '%3d_print%' },
+                    item_origin => { -like => '%printed%'  },
+                    category    => { -like => '%3d_print%' },
+                    category    => { -like => '%printed%'  },
+                ],
             },
             { prefetch => 'stock_levels' }
         )->all;
         for my $item (@items) {
             next if $active_restock_items{ $item->id };
-            my $sl  = eval { ($item->stock_levels->all)[0] };
-            my $avail = $sl ? ($sl->quantity_on_hand - $sl->quantity_reserved) : 0;
+            my $fil_color = eval { $dbh->selectrow_array(
+                'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $fil_type  = eval { $dbh->selectrow_array(
+                'SELECT filament_type  FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $avail = 0;
+            eval {
+                ($avail) = $dbh->selectrow_array(
+                    'SELECT COALESCE(SUM(quantity_on_hand),0) - COALESCE(SUM(quantity_reserved),0)
+                     FROM inventory_stock_levels WHERE item_id = ?', undef, $item->id);
+            };
             if ($avail <= $item->reorder_point) {
                 push @restock_needed, {
-                    item   => $item,
-                    avail  => $avail,
-                    needed => ($item->reorder_quantity || 1),
-                    filament => scalar $_find_filament->($item->filament_color, $item->filament_type),
+                    item     => $item,
+                    avail    => $avail,
+                    needed   => ($item->reorder_quantity || 1),
+                    filament => scalar $_find_filament->($fil_color, $fil_type),
                 };
             }
         }
