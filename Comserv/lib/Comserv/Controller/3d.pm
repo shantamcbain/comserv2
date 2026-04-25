@@ -801,7 +801,7 @@ sub queue :Path('/3d/queue') :Args(0) {
     };
 
     eval {
-        my $r_sql = q{
+        my $r_sql = "
             SELECT j.id, j.item_name, j.username, j.filament_color, j.filament_type,
                    j.quantity, j.print_hours, j.filament_quantity,
                    j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
@@ -816,7 +816,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             WHERE j.sitename = ? AND j.status = 'completed'
             ORDER BY j.completed_at DESC
             LIMIT $history_limit
-        };
+        ";
         my $rc_rows = $dbh->selectall_arrayref($r_sql, { Slice => {} }, $sitename);
         @recent_completed = @{ $rc_rows // [] };
     };
@@ -1311,11 +1311,18 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 });
                 $created++;
             };
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
-                "Job create failed: $@") if $@;
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
+                    "Job create failed: $@");
+                $c->flash->{error_msg} = "Error creating job: $@";
+            }
         }
 
-        $c->flash->{success_msg} = "$created print job(s) added to queue.";
+        if ($created) {
+            $c->flash->{success_msg} = "$created print job(s) added to queue.";
+        } else {
+            $c->flash->{error_msg} = ($c->flash->{error_msg} || '') . ' No jobs were selected or created. Check that checkboxes are ticked.';
+        }
         $c->res->redirect($c->uri_for('/3d/queue'));
         $c->detach;
     }
