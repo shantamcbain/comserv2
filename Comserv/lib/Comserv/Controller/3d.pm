@@ -1240,6 +1240,27 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 $qty          = $line->quantity_outstanding || 1;
                 $cons_id      = $line->consignment_id;
                 $cons_line_id = $line->id;
+
+                # Parse filament color/type from consignment line notes — takes priority
+                # over item-level defaults. Supports [FIL:type,color] or plain keywords.
+                my $line_notes = $line->notes || '';
+                if ($line_notes) {
+                    my ($n_type, $n_color);
+                    if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                        $n_type  = $1 || undef;
+                        $n_color = $2 || undef;
+                    } else {
+                        my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                        my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple
+                                              Grey Gray Silver Gold Clear Natural Transparent
+                                              Pink Brown Copper Bronze);
+                        my $uc = uc($line_notes);
+                        for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $n_type  = $t; last; } }
+                        for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $n_color = $co; last; } }
+                    }
+                    $req_color = $n_color if $n_color;
+                    $req_type  = $n_type  if $n_type;
+                }
             }
 
             # Admin can override filament via the picker modal
