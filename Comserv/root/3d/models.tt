@@ -59,8 +59,10 @@
         <input type="hidden" name="action" value="upload">
 
         <div id="stl-drop-zone" onclick="document.getElementById('stl_file').click()">
-            <div>📁 Drop STL file here or <strong>click to browse</strong></div>
-            <input type="file" name="stl_file" id="stl_file" accept=".stl,.STL"
+            <div>📁 Drop model file here or <strong>click to browse</strong><br>
+            <small style="color:var(--text-muted-color)">.stl .3mf .obj .gcode .step — volume auto-calculated for STL only</small></div>
+            <input type="file" name="stl_file" id="stl_file"
+                   accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp"
                    style="display:none" required onchange="previewFile(this)">
             <div id="stl-preview"></div>
         </div>
