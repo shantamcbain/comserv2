@@ -1297,12 +1297,13 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     # GET — scan for items needing printing
     # ----------------------------------------------------------
 
-    # Active job source ids (to avoid duplicate queuing)
+    # Active or completed job source ids (to avoid duplicate queuing)
+    # completed = already printed, no need to re-queue; cancelled = OK to re-queue
     my %active_restock_items;
     my %active_cons_lines;
     eval {
         my @active = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => { -in => [qw(queued assigned printing)] } }
+            { sitename => $sitename, status => { -in => [qw(queued assigned printing completed)] } }
         )->all;
         for my $j (@active) {
             $active_restock_items{ $j->source_item_id }    = 1 if $j->source_item_id;
