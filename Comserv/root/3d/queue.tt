@@ -58,11 +58,35 @@
 
 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
     <h1>Print Queue</h1>
-    <div>
+    <div style="display:flex;gap:0.8em;align-items:center;">
+        <a href="/3d/queue_sync"
+           style="padding:0.4em 1em;background:var(--accent-color,#007bff);color:white;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;">
+            ⟳ Sync from Orders
+        </a>
+        <a href="/3d/queue_print" target="_blank"
+           style="padding:0.4em 1em;background:#6c757d;color:white;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;">
+            🖶 Print
+        </a>
         <a href="/3d/printers" style="font-size:0.9em;">Printer Farm</a> |
         <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
     </div>
 </div>
+
+[% IF c.flash.success_msg %]
+<div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#155724;">
+    [% c.flash.success_msg | html %]
+</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#721c24;">
+    [% c.flash.error_msg | html %]
+</div>
+[% END %]
+[% IF queue_error %]
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#856404;">
+    <strong>Queue load error:</strong> [% queue_error | html %]
+</div>
+[% END %]
 
 <div class="queue-section">
     <h2>Queued — Waiting for Printer ([% queued_jobs.size %])</h2>
@@ -78,9 +102,21 @@
             [% FOREACH job IN queued_jobs %]
             <tr>
                 <td>[% job.id %]</td>
-                <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+                <td>
+                    [% IF job.model_name %][% job.model_name | html %]
+                    [% ELSIF job.item_name %][% job.item_name | html %]
+                    [% ELSE %]Job #[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]
+                    <span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>
+                    [% END %]
+                    [% IF job.source_type && job.source_type != 'manual' %]
+                    <br><small style="background:#17a2b8;color:white;padding:0.1em 0.4em;border-radius:8px;font-size:0.75em;">[% job.source_type | html %]</small>
+                    [% END %]
+                </td>
                 <td>[% job.username | html %]</td>
-                <td>[% job.filament_type | html %] [% job.filament_color | html %]</td>
+                <td>[% job.filament_type | html %] [% job.filament_color | html %]
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+                </td>
                 <td>[% job.quantity %]</td>
                 <td>[% job.created_at %]</td>
                 <td>
@@ -122,27 +158,53 @@
     <table class="queue-table">
         <thead>
             <tr>
-                <th>#</th><th>Model</th><th>User</th><th>Printer</th>
-                <th>Status</th><th>Started</th><th>Complete / Cancel</th>
+                <th>#</th><th>Model / Item</th><th>User</th><th>Printer</th>
+                <th>Filament</th><th>Status</th><th>Started</th><th>Complete / Cancel</th>
             </tr>
         </thead>
         <tbody>
             [% FOREACH job IN active_jobs %]
             <tr>
                 <td>[% job.id %]</td>
-                <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+                <td>
+                    [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
+                    [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                </td>
                 <td>[% job.username | html %]</td>
-                <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+                <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
+                <td>
+                    [% IF job.filament_type || job.filament_color %]
+                    <span style="font-size:0.88em;">[% job.filament_type | html %][% IF job.filament_type && job.filament_color %] [% END %][% job.filament_color | html %]</span>
+                    [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+                    [% ELSE %]&mdash;[% END %]
+                </td>
                 <td><span class="status-badge status-[% job.status %]">[% job.status %]</span></td>
                 <td>[% job.started_at || job.created_at %]</td>
                 <td>
-                    <form method="post" action="/3d/queue" style="display:inline-flex;gap:0.4em;align-items:center;flex-wrap:wrap;">
+                    <form method="post" action="/3d/queue" class="complete-form"
+                          data-started-at="[% job.started_at || job.created_at %]"
+                          data-bom-hours="[% job.bom_print_hours | html %]"
+                          data-bom-grams="[% job.bom_filament_grams | html %]"
+                          data-quantity="[% job.quantity | html %]"
+                          style="display:inline-flex;gap:0.35em;align-items:center;flex-wrap:wrap;">
                         <input type="hidden" name="job_id" value="[% job.id %]">
                         <input type="hidden" name="action" value="complete">
-                        <label style="font-size:0.82em;color:var(--text-color);">Hours:</label>
-                        <input type="number" name="print_hours" step="0.25" min="0.25" max="999"
+                        <label style="font-size:0.82em;color:var(--text-color);">Time:</label>
+                        <input type="number" name="print_hours_h" min="0" max="999"
+                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
+                               placeholder="h" title="Hours">
+                        <span style="font-size:0.85em;color:var(--text-color);">h</span>
+                        <input type="number" name="print_hours_m" min="0" max="59"
+                               style="width:3.2em;padding:0.2em 0.3em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
+                               placeholder="m" title="Minutes">
+                        <span style="font-size:0.85em;color:var(--text-color);">m</span>
+                        <label style="font-size:0.82em;color:var(--text-color);margin-left:0.3em;">Filament&nbsp;(g):</label>
+                        <input type="number" name="filament_grams" step="0.01" min="0" max="9999"
                                style="width:5em;padding:0.2em 0.4em;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;background:var(--input-bg,white);color:var(--text-color);"
-                               placeholder="0.0" title="Print time in hours — used to calculate cost">
+                               placeholder="g" title="Grams of filament used[% IF job.bom_filament_grams %] — BOM: [% job.bom_filament_grams %]g[% END %]">
+                        [% IF job.bom_print_hours || job.bom_filament_grams %]
+                        <small style="color:var(--text-muted-color);font-size:0.78em;" title="BOM estimate available">BOM</small>
+                        [% END %]
                         <button type="submit" class="btn-action btn-complete">Complete</button>
                     </form>
                     <form method="post" action="/3d/queue" style="display:inline;margin-left:0.3em;">
@@ -163,12 +225,24 @@
 
 [% IF recent_completed && recent_completed.size %]
 <div class="queue-section">
-    <h2>Recently Completed — Cost Summary (last 10)</h2>
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Recently Completed — Cost Summary (last [% history_limit %])</span>
+        <span style="font-size:0.75em;font-weight:normal;display:flex;gap:0.5em;align-items:center;">
+            Show:
+            [% FOREACH n IN [10, 25, 50, 100, 200] %]
+            [% IF n == history_limit %]
+            <strong>[% n %]</strong>
+            [% ELSE %]
+            <a href="?history=[% n %]" style="color:var(--accent-color,#007bff);">[% n %]</a>
+            [% END %]
+            [% END %]
+        </span>
+    </h2>
     <table class="queue-table">
         <thead>
             <tr>
-                <th>#</th><th>Model</th><th>User</th><th>Printer</th>
-                <th>Hours</th><th>Filament $</th><th>Printer $</th><th>Electricity $</th><th>Total $</th>
+                <th>#</th><th>Item / Model</th><th>User</th><th>Printer</th>
+                <th>Hours</th><th>Filament</th><th>Filament $</th><th>Printer $</th><th>Electricity $</th><th>Total $</th>
                 <th>Completed</th>
             </tr>
         </thead>
@@ -176,10 +250,15 @@
         [% FOREACH job IN recent_completed %]
         <tr>
             <td>[% job.id %]</td>
-            <td>[% IF job.model %][% job.model.name | html %][% ELSE %]#[% job.model_id %][% END %]</td>
+            <td>[% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]</td>
             <td>[% job.username | html %]</td>
-            <td>[% IF job.printer %][% job.printer.name | html %][% ELSE %]&mdash;[% END %]</td>
+            <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.print_hours %][% job.print_hours %]h[% ELSE %]&mdash;[% END %]</td>
+            <td style="font-size:0.85em;">
+                [% IF job.filament_type || job.filament_color %][% job.filament_type | html %] [% job.filament_color | html %][% END %]
+                [% IF job.filament_quantity %]<br><small>[% job.filament_quantity %]g</small>[% END %]
+                [% IF job.filament_name %]<br><small style="color:var(--text-muted-color);">[% job.filament_name | html %]</small>[% END %]
+            </td>
             <td>[% IF job.filament_cost %]$[% job.filament_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.printer_cost %]$[% job.printer_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
             <td>[% IF job.electricity_cost %]$[% job.electricity_cost | format('%.2f') %][% ELSE %]&mdash;[% END %]</td>
@@ -193,3 +272,49 @@
     </table>
 </div>
 [% END %]
+
+<script>
+document.querySelectorAll('.complete-form').forEach(function(form) {
+    var startedAt = form.dataset.startedAt;
+    var bomHours  = parseFloat(form.dataset.bomHours) || 0;
+    var bomGrams  = parseFloat(form.dataset.bomGrams)  || 0;
+    var qty       = parseInt(form.dataset.quantity) || 1;
+
+    var hInput = form.querySelector('[name="print_hours_h"]');
+    var mInput = form.querySelector('[name="print_hours_m"]');
+    var gInput = form.querySelector('[name="filament_grams"]');
+
+    if (hInput && mInput) {
+        if (bomHours) {
+            var totalMin = Math.round(bomHours * qty * 60);
+            hInput.value = Math.floor(totalMin / 60);
+            mInput.value = totalMin % 60;
+            var hint = 'BOM estimate × ' + qty + ' item(s)';
+            if (startedAt) {
+                var started = new Date(startedAt.replace(' ', 'T'));
+                if (!isNaN(started.getTime())) {
+                    var elapsedMin = Math.floor((Date.now() - started.getTime()) / 60000);
+                    hint += ' — elapsed since assigned: ' + Math.floor(elapsedMin/60) + 'h ' + (elapsedMin%60) + 'm';
+                }
+            }
+            hInput.title = hint;
+            mInput.title = hint;
+        } else if (startedAt) {
+            var started2 = new Date(startedAt.replace(' ', 'T'));
+            if (!isNaN(started2.getTime())) {
+                var elapsedMin2 = Math.floor((Date.now() - started2.getTime()) / 60000);
+                if (elapsedMin2 > 0) {
+                    hInput.value = Math.floor(elapsedMin2 / 60);
+                    mInput.value = elapsedMin2 % 60;
+                    hInput.title = 'Elapsed since job assigned (no BOM data)';
+                    mInput.title = hInput.title;
+                }
+            }
+        }
+    }
+
+    if (bomGrams && gInput && !gInput.value) {
+        gInput.value = Math.round(bomGrams * qty * 100) / 100;
+    }
+});
+</script>

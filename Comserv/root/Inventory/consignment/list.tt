@@ -7,6 +7,9 @@
     <a href="/Inventory/consignment/partners" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
       <i class="fas fa-handshake"></i> Partners
     </a>
+    <a href="/3d/queue_sync" style="padding:6px 14px;border:1px solid var(--border-color);color:var(--text-color);border-radius:4px;text-decoration:none;font-family:var(--body-font);font-size:0.9rem">
+      ⟳ Sync Print Queue
+    </a>
     <a href="/Inventory/consignment/new" style="padding:6px 14px;background:var(--primary-color);color:#fff;border-radius:4px;text-decoration:none;font-family:var(--body-font)">
       + New Consignment
     </a>

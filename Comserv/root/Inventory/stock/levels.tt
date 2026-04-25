@@ -19,6 +19,8 @@
   <a href="/Inventory/items">Items</a>
   &nbsp;|&nbsp;
   <a href="/Inventory">Dashboard</a>
+  &nbsp;|&nbsp;
+  <a href="/3d/queue_sync">⟳ Sync Print Queue</a>
 </div>
 
 <form method="GET" action="/Inventory/stock/levels">

@@ -2,6 +2,7 @@ package Comserv::Controller::3d;
 use Moose;
 use namespace::autoclean;
 use POSIX qw(strftime);
+use JSON qw(encode_json);
 use Comserv::Util::Logging;
 
 has 'logging' => (
@@ -546,18 +547,34 @@ sub queue :Path('/3d/queue') :Args(0) {
                 }
 
             } elsif ($action eq 'complete') {
-                my $printer     = $job->printer;
-                my $print_hours = $c->req->params->{print_hours} || undef;
-                $print_hours    = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                my $printer    = $job->printer;
+                my $grams_used = $c->req->params->{filament_grams} || undef;
+                $grams_used = undef if defined $grams_used && $grams_used !~ /^\d+\.?\d*$/;
+
+                my $print_hours;
+                my $ph_h = $c->req->params->{print_hours_h};
+                my $ph_m = $c->req->params->{print_hours_m};
+                if (defined $ph_h || defined $ph_m) {
+                    $ph_h = 0 + ($ph_h || 0);
+                    $ph_m = 0 + ($ph_m || 0);
+                    my $total = $ph_h + $ph_m / 60;
+                    $print_hours = $total > 0 ? $total : undef;
+                } else {
+                    $print_hours = $c->req->params->{print_hours} || undef;
+                    $print_hours = undef if defined $print_hours && $print_hours !~ /^\d+\.?\d*$/;
+                }
 
                 # ---- Cost calculation ----
                 my ($filament_cost, $printer_cost, $elec_cost, $total_cost);
 
-                # Filament cost: quantity * unit_cost from inventory
-                if ($job->filament_item_id) {
+                # Filament cost: grams_used * unit_cost/g  (or /1000 if still tracked per spool)
+                if ($job->filament_item_id && $grams_used) {
                     my $fil = eval { $job->filament_item };
                     if ($fil && $fil->unit_cost) {
-                        $filament_cost = ($job->filament_quantity || 1) * $fil->unit_cost;
+                        my $uom = lc($fil->unit_of_measure || 'g');
+                        $filament_cost = ($uom eq 'g')
+                            ? $grams_used * $fil->unit_cost
+                            : ($grams_used / 1000) * $fil->unit_cost;
                     }
                 }
 
@@ -582,13 +599,14 @@ sub queue :Path('/3d/queue') :Args(0) {
                 $total_cost = undef unless $total_cost;
 
                 $job->update({
-                    status           => 'completed',
-                    completed_at     => _now(),
-                    print_hours      => $print_hours,
-                    filament_cost    => $filament_cost,
-                    printer_cost     => $printer_cost,
-                    electricity_cost => $elec_cost,
-                    total_cost       => $total_cost,
+                    status            => 'completed',
+                    completed_at      => _now(),
+                    print_hours       => $print_hours,
+                    filament_quantity => $grams_used,
+                    filament_cost     => $filament_cost,
+                    printer_cost      => $printer_cost,
+                    electricity_cost  => $elec_cost,
+                    total_cost        => $total_cost,
                 });
 
                 if ($printer) {
@@ -599,10 +617,14 @@ sub queue :Path('/3d/queue') :Args(0) {
                     });
                 }
 
-                # Inventory accounting: issue (consume) the reserved filament
-                if ($job->filament_item_id && $job->inventory_reserved) {
-                    my $fil  = $job->filament_item;
-                    my $fsl  = eval { ($fil->stock_levels->all)[0] };
+                # Inventory accounting: issue (consume) filament used
+                # Always issue on completion using actual grams — inventory_reserved only
+                # matters for advance reservation (not always set for queue-sync jobs).
+                if ($job->filament_item_id && $grams_used) {
+                    my $fil  = eval { $job->filament_item };
+                    my $fsl  = eval { ($fil->stock_levels->all)[0] } if $fil;
+                    my $fil_uom   = $fil ? lc($fil->unit_of_measure || 'g') : 'g';
+                    my $issue_qty = ($fil_uom eq 'g') ? $grams_used : $grams_used / 1000;
                     eval {
                         $self->_inventory_transaction($c,
                             schema           => $schema,
@@ -610,10 +632,10 @@ sub queue :Path('/3d/queue') :Args(0) {
                             item_id          => $job->filament_item_id,
                             location_id      => $fsl ? $fsl->location_id : undef,
                             transaction_type => 'issue',
-                            quantity         => $job->filament_quantity || 1,
-                            unit_cost        => $filament_cost ? ($filament_cost / ($job->filament_quantity || 1)) : undef,
+                            quantity         => $issue_qty,
+                            unit_cost        => $filament_cost ? ($filament_cost / $issue_qty) : undef,
                             reference_number => '3D-JOB-' . $job->id,
-                            notes            => 'Filament consumed — print job #' . $job->id . ' completed',
+                            notes            => sprintf('Filament used: %sg (%.4f %s) — print job #%d completed', $grams_used, $issue_qty, $fil_uom, $job->id),
                             performed_by     => $c->session->{username} || 'system',
                         );
                     };
@@ -638,6 +660,44 @@ sub queue :Path('/3d/queue') :Args(0) {
                     };
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
                         "Depreciation transaction failed for job $job_id: $@") if $@;
+                }
+
+                # Inventory: add finished printed item to stock (receive = goods in)
+                my $printed_item_id;
+                if ($job->source_item_id) {
+                    $printed_item_id = $job->source_item_id;
+                } elsif ($job->consignment_line_id) {
+                    $printed_item_id = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT item_id FROM inventory_consignment_lines WHERE id = ?',
+                            undef, $job->consignment_line_id)
+                    };
+                }
+                if ($printed_item_id) {
+                    my $default_loc = eval {
+                        $schema->storage->dbh->selectrow_array(
+                            'SELECT id FROM inventory_locations WHERE sitename = ? ORDER BY id LIMIT 1',
+                            undef, $sitename)
+                    };
+                    if ($default_loc) {
+                        eval {
+                            $self->_inventory_transaction($c,
+                                schema           => $schema,
+                                sitename         => $sitename,
+                                item_id          => $printed_item_id,
+                                location_id      => $default_loc,
+                                transaction_type => 'receive',
+                                quantity         => $job->quantity || 1,
+                                unit_cost        => $total_cost   || undef,
+                                reference_number => '3D-JOB-' . $job->id,
+                                notes            => sprintf('Printed: %d unit(s) completed — job #%d',
+                                                        $job->quantity || 1, $job->id),
+                                performed_by     => $c->session->{username} || 'system',
+                            );
+                        };
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+                            "Finished goods receipt failed for job $job_id: $@") if $@;
+                    }
                 }
 
             } elsif ($action eq 'cancel') {
@@ -682,23 +742,83 @@ sub queue :Path('/3d/queue') :Args(0) {
         $c->detach;
     }
 
+    my $dbh = $schema->storage->dbh;
+
+    my $history_limit = $c->req->params->{history} || 10;
+    $history_limit = int($history_limit);
+    $history_limit = 10  if $history_limit < 1;
+    $history_limit = 500 if $history_limit > 500;
+
     my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
+    my $queue_error;
+
     eval {
-        @queued_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => 'queued' },
-            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
-        )->all;
-        @active_jobs = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => { -in => ['assigned','printing'] } },
-            { prefetch => ['model', 'printer', 'filament_item'], order_by => { -asc => 'created_at' } }
-        )->all;
+        my $sql = q{
+            SELECT j.id, j.sitename, j.status, j.item_name, j.username, j.user_id,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.filament_item_id, j.printer_id, j.model_id,
+                   j.source_type, j.consignment_id, j.consignment_line_id,
+                   j.notes, j.admin_notes,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.total_cost,
+                   j.inventory_reserved, j.created_at, j.started_at, j.completed_at,
+                   fi.name  AS filament_name,
+                   fi.sku   AS filament_sku,
+                   pr.name  AS printer_name,
+                   pr.model AS printer_model,
+                   mo.name  AS model_name,
+                   mo.nfs_path AS model_file,
+                   parent.print_time_hours AS bom_print_hours,
+                   fil_bom.quantity        AS bom_filament_grams,
+                   fil_bom_item.name       AS bom_filament_name
+            FROM printing_3d_jobs j
+            LEFT JOIN inventory_items fi ON fi.id = j.filament_item_id
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_consignment_lines cl ON cl.id = j.consignment_line_id
+            LEFT JOIN inventory_items parent ON parent.id = COALESCE(j.source_item_id, cl.item_id)
+            LEFT JOIN inventory_item_bom fil_bom
+                   ON fil_bom.parent_item_id = parent.id AND fil_bom.unit = 'g'
+            LEFT JOIN inventory_items fil_bom_item ON fil_bom_item.id = fil_bom.component_item_id
+            WHERE j.sitename = ?
+              AND j.status = ?
+            ORDER BY j.created_at ASC
+        };
+        my $q_rows = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q_rows // [] };
+
+        my $a_rows = $dbh->selectall_arrayref($sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a_rows // [] };
+    };
+    $queue_error = $@ if $@;
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue',
+        "Queue fetch error: $queue_error") if $queue_error;
+
+    eval {
         @idle_printers = $schema->resultset('Printing3dPrinter')->search(
             { sitename => $sitename, status => 'idle' }
         )->all;
-        @recent_completed = $schema->resultset('Printing3dJob')->search(
-            { sitename => $sitename, status => 'completed' },
-            { prefetch => ['model', 'printer'], order_by => { -desc => 'completed_at' }, rows => 10 }
-        )->all;
+    };
+
+    eval {
+        my $r_sql = "
+            SELECT j.id, j.item_name, j.username, j.filament_color, j.filament_type,
+                   j.quantity, j.print_hours, j.filament_quantity,
+                   j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
+                   pr.name AS printer_name,
+                   fi.name AS filament_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models  mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
+            WHERE j.sitename = ? AND j.status = 'completed'
+            ORDER BY j.completed_at DESC
+            LIMIT $history_limit
+        ";
+        my $rc_rows = $dbh->selectall_arrayref($r_sql, { Slice => {} }, $sitename);
+        @recent_completed = @{ $rc_rows // [] };
     };
 
     $c->stash(
@@ -707,7 +827,80 @@ sub queue :Path('/3d/queue') :Args(0) {
         active_jobs       => \@active_jobs,
         idle_printers     => \@idle_printers,
         recent_completed  => \@recent_completed,
+        queue_error       => $queue_error,
+        history_limit     => $history_limit,
         template          => '3d/queue.tt',
+    );
+}
+
+# ============================================================
+# Admin — Printable Queue View (no nav/header/footer)
+# ============================================================
+
+sub queue_print :Path('/3d/queue_print') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->storage->dbh;
+
+    my (@queued_jobs, @active_jobs, @recent_completed);
+
+    my $sql = q{
+        SELECT j.id, j.sitename, j.status, j.item_name, j.username,
+               j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+               j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+               j.created_at, j.started_at, j.completed_at,
+               fi.name  AS filament_name,
+               pr.name  AS printer_name,
+               mo.name  AS model_name
+        FROM printing_3d_jobs j
+        LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+        LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+        LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+        WHERE j.sitename = ? AND j.status = ?
+        ORDER BY j.created_at ASC
+    };
+
+    eval {
+        my $q = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q // [] };
+        my $a = $dbh->selectall_arrayref(
+            $sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a // [] };
+    };
+
+    eval {
+        my $r = $dbh->selectall_arrayref(q{
+            SELECT j.id, j.item_name, j.username,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
+                   pr.name AS printer_name,
+                   fi.name AS filament_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+            WHERE j.sitename = ? AND j.status = 'completed'
+            ORDER BY j.completed_at DESC
+            LIMIT 30
+        }, { Slice => {} }, $sitename);
+        @recent_completed = @{ $r // [] };
+    };
+
+    $c->stash(
+        sitename         => $sitename,
+        queued_jobs      => \@queued_jobs,
+        active_jobs      => \@active_jobs,
+        recent_completed => \@recent_completed,
+        print_date       => _now(),
+        ai_popup_mode    => 1,
+        template         => '3d/queue_print.tt',
     );
 }
 
@@ -929,6 +1122,388 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
         pending_message => 'AI-powered web search for 3D models is coming soon. '
             . 'This feature is pending the AIChatSystem web-search extension.',
         template => '3d/browse.tt',
+    );
+}
+
+# ============================================================
+# Queue Sync — detect items needing printing from inventory
+# and consignments, then create queued print jobs
+# ============================================================
+
+sub queue_sync :Path('/3d/queue_sync') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $username = $c->session->{username} || 'system';
+    my $dbh      = $schema->storage->dbh;
+
+    # ----------------------------------------------------------
+    # Load all filament spools via raw SQL — safe regardless of
+    # whether the filament_color/type migration has been applied
+    # ----------------------------------------------------------
+    my @all_filaments;
+    eval {
+        my $rows = $dbh->selectall_arrayref(
+            'SELECT i.id, i.name, i.sku,
+                    COALESCE(SUM(sl.quantity_on_hand), 0) AS qty_on_hand,
+                    COALESCE(SUM(sl.quantity_reserved), 0) AS qty_reserved
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.sitename = ?
+               AND (i.category LIKE ? OR i.category LIKE ? OR i.name LIKE ?)
+               AND i.status = ?
+             GROUP BY i.id, i.name, i.sku
+             ORDER BY i.name',
+            { Slice => {} },
+            $sitename, '%filament%', '%3d_fil%', '%ilament%', 'active'
+        );
+        my %fil_details;
+        eval {
+            my $drows = $dbh->selectall_arrayref(
+                'SELECT id, filament_color, filament_type FROM inventory_items WHERE sitename = ?',
+                { Slice => {} }, $sitename
+            );
+            %fil_details = map { $_->{id} => $_ } @$drows;
+        };
+        for my $r (@$rows) {
+            my $d = $fil_details{ $r->{id} } || {};
+            $r->{color}  = $d->{filament_color} || '';
+            $r->{type}   = $d->{filament_type}  || '';
+            $r->{avail}  = ($r->{qty_on_hand} || 0) - ($r->{qty_reserved} || 0);
+            push @all_filaments, $r;
+        }
+    };
+
+    # ----------------------------------------------------------
+    # Helper: find best matching filament from @all_filaments
+    # ----------------------------------------------------------
+    my $_find_filament = sub {
+        my ($req_color, $req_type) = @_;
+        my ($best, $best_score) = (undef, -1);
+        for my $fil (@all_filaments) {
+            next unless ($fil->{avail} || 0) > 0;
+            my $score = 0;
+            if ($req_color && $fil->{color}) {
+                $score += 2 if lc($fil->{color}) eq lc($req_color);
+                $score += 1 if index(lc($fil->{color}), lc($req_color)) >= 0;
+            }
+            if ($req_type && $fil->{type}) {
+                $score += 2 if lc($fil->{type}) eq lc($req_type);
+                $score += 1 if index(lc($fil->{type}), lc($req_type)) >= 0;
+            }
+            if (!$best || $score > $best_score) {
+                $best       = $fil;
+                $best_score = $score;
+            }
+        }
+        return ($best && ($best_score > 0 || (!$req_color && !$req_type))) ? $best : undef;
+    };
+
+    # ----------------------------------------------------------
+    # POST — create the selected jobs
+    # ----------------------------------------------------------
+    if ($c->req->method eq 'POST') {
+        my @job_keys = grep { /^create_job_/ } keys %{ $c->req->params };
+        my $created  = 0;
+
+        for my $key (@job_keys) {
+            my $val        = $c->req->params->{$key} || '';
+            my ($src_type, $src_id) = split /:/, $val;
+            next unless $src_type && $src_id;
+
+            my ($item_name, $req_color, $req_type, $qty, $cons_id, $cons_line_id);
+
+            if ($src_type eq 'restock') {
+                my @safe_cols = qw(id name reorder_quantity);
+                my $item = eval {
+                    $schema->resultset('InventoryItem')->find($src_id, { columns => \@safe_cols })
+                };
+                next unless $item;
+                $item_name = $item->get_column('name');
+                $req_color = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $src_id) };
+                $req_type  = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $src_id) };
+                $qty = eval { $dbh->selectrow_array(
+                    'SELECT reorder_quantity FROM inventory_items WHERE id = ?', undef, $src_id) } || 1;
+
+            } elsif ($src_type eq 'consignment') {
+                my $line = eval { $schema->resultset('InventoryConsignmentLine')->find($src_id) };
+                next unless $line;
+                my @safe_cols = qw(id name);
+                my $item = eval {
+                    $schema->resultset('InventoryItem')->find(
+                        $line->item_id, { columns => \@safe_cols })
+                };
+                $item_name    = $item ? $item->get_column('name') : "Item #" . $line->item_id;
+                $req_color    = eval { $dbh->selectrow_array(
+                    'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $line->item_id) };
+                $req_type     = eval { $dbh->selectrow_array(
+                    'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $line->item_id) };
+                $qty          = $line->quantity_outstanding || 1;
+                $cons_id      = $line->consignment_id;
+                $cons_line_id = $line->id;
+
+                # Parse filament color/type from consignment line notes — takes priority
+                # over item-level defaults. Supports [FIL:type,color] or plain keywords.
+                my $line_notes = $line->notes || '';
+                if ($line_notes) {
+                    my ($n_type, $n_color);
+                    if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                        $n_type  = $1 || undef;
+                        $n_color = $2 || undef;
+                    } else {
+                        my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                        my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple
+                                              Grey Gray Silver Gold Clear Natural Transparent
+                                              Pink Brown Copper Bronze);
+                        my $uc = uc($line_notes);
+                        for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $n_type  = $t; last; } }
+                        for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $n_color = $co; last; } }
+                    }
+                    $req_color = $n_color if $n_color;
+                    $req_type  = $n_type  if $n_type;
+                }
+            }
+
+            # Admin can override filament via the picker modal
+            my $override_fil_id = $c->req->params->{"filament_override_${src_type}_${src_id}"} || '';
+            my ($filament_id, $fil_color, $fil_type);
+            if ($override_fil_id) {
+                my ($f) = grep { $_->{id} == $override_fil_id } @all_filaments;
+                if ($f) {
+                    $filament_id = $f->{id};
+                    $fil_color   = $f->{color} || $req_color;
+                    $fil_type    = $f->{type}  || $req_type;
+                }
+            }
+            unless ($filament_id) {
+                my $filament = $_find_filament->($req_color, $req_type);
+                if ($filament) {
+                    $filament_id = $filament->{id};
+                    $fil_color   = $req_color || $filament->{color};
+                    $fil_type    = $req_type  || $filament->{type};
+                }
+            }
+
+            eval {
+                $schema->resultset('Printing3dJob')->create({
+                    sitename            => $sitename,
+                    model_id            => undef,
+                    user_id             => $c->session->{user_id} || 0,
+                    username            => $username,
+                    status              => 'queued',
+                    source_type         => $src_type,
+                    source_item_id      => ($src_type eq 'restock' ? $src_id : undef),
+                    consignment_id      => $cons_id,
+                    consignment_line_id => $cons_line_id,
+                    item_name           => $item_name,
+                    filament_item_id    => $filament_id,
+                    filament_color      => $fil_color,
+                    filament_type       => $fil_type,
+                    filament_quantity   => undef,
+                    quantity            => $qty || 1,
+                    inventory_reserved  => 0,
+                    created_at          => _now(),
+                });
+                $created++;
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'queue_sync',
+                    "Job create failed: $@");
+                $c->flash->{error_msg} = "Error creating job: $@";
+            }
+        }
+
+        if ($created) {
+            $c->flash->{success_msg} = "$created print job(s) added to queue.";
+        } else {
+            $c->flash->{error_msg} = ($c->flash->{error_msg} || '') . ' No jobs were selected or created. Check that checkboxes are ticked.';
+        }
+        $c->res->redirect($c->uri_for('/3d/queue'));
+        $c->detach;
+    }
+
+    # ----------------------------------------------------------
+    # GET — scan for items needing printing
+    # ----------------------------------------------------------
+
+    # Active or completed job source ids (to avoid duplicate queuing)
+    # completed = already printed, no need to re-queue; cancelled = OK to re-queue
+    my %active_restock_items;
+    my %active_cons_lines;
+    eval {
+        my @active = $schema->resultset('Printing3dJob')->search(
+            { sitename => $sitename, status => { -in => [qw(queued assigned printing completed)] } }
+        )->all;
+        for my $j (@active) {
+            $active_restock_items{ $j->source_item_id }    = 1 if $j->source_item_id;
+            $active_cons_lines{ $j->consignment_line_id } = 1 if $j->consignment_line_id;
+        }
+    };
+
+    # 1. Restock: any 3D-printed item (by item_origin OR category) at or below reorder_point
+    my @restock_needed;
+    eval {
+        my @items = $schema->resultset('InventoryItem')->search(
+            {
+                sitename      => $sitename,
+                status        => 'active',
+                reorder_point => { '>' => 0 },
+                -or => [
+                    item_origin => { -like => '%3d_print%' },
+                    item_origin => { -like => '%printed%'  },
+                    category    => { -like => '%3d_print%' },
+                    category    => { -like => '%printed%'  },
+                ],
+            },
+            { prefetch => 'stock_levels' }
+        )->all;
+        for my $item (@items) {
+            next if $active_restock_items{ $item->id };
+            my $fil_color = eval { $dbh->selectrow_array(
+                'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $fil_type  = eval { $dbh->selectrow_array(
+                'SELECT filament_type  FROM inventory_items WHERE id = ?', undef, $item->id) };
+            my $avail = 0;
+            eval {
+                ($avail) = $dbh->selectrow_array(
+                    'SELECT COALESCE(SUM(quantity_on_hand),0) - COALESCE(SUM(quantity_reserved),0)
+                     FROM inventory_stock_levels WHERE item_id = ?', undef, $item->id);
+            };
+            if ($avail <= $item->reorder_point) {
+                push @restock_needed, {
+                    item     => $item,
+                    avail    => $avail,
+                    needed   => ($item->reorder_quantity || 1),
+                    filament => scalar $_find_filament->($fil_color, $fil_type),
+                };
+            }
+        }
+    };
+
+    # 2. Consignment: open lines where item is 3d_printed and qty outstanding > 0
+    my @consignment_needed;
+    my $cons_error;
+
+    # Fetch ALL open consignment lines for this site — filter in Perl so a missing
+    # DB column (requires_printing not yet migrated) never silently kills the block
+    # Safe columns — only what we know exists in all DB versions
+    my @safe_item_cols = qw(id sitename sku name description category
+                            item_origin unit_cost unit_price status notes
+                            reorder_point reorder_quantity);
+
+    my @cons_lines;
+    eval {
+        # Do NOT prefetch 'item' — it SELECTs all result-class columns including
+        # new ones (filament_color etc.) that may not be in the DB yet
+        @cons_lines = $schema->resultset('InventoryConsignmentLine')->search(
+            {
+                'consignment.sitename' => $sitename,
+                'consignment.status'   => { -in => [qw(open partially_settled)] },
+            },
+            {
+                join     => 'consignment',
+                prefetch => 'consignment',
+            }
+        )->all;
+    };
+    $cons_error = $@ if $@;
+
+    for my $line (@cons_lines) {
+        next if $active_cons_lines{ $line->id };
+
+        # Fetch item with only safe columns so missing DB columns never error
+        my $item_id = $line->item_id;
+        my $item = eval {
+            $schema->resultset('InventoryItem')->find(
+                $item_id,
+                { columns => \@safe_item_cols }
+            );
+        };
+        next unless $item;
+
+        my $origin    = lc($item->get_column('item_origin') || '');
+        my $category  = lc($item->get_column('category')    || '');
+
+        # Also try the new columns — they may or may not exist
+        # Try new 3D columns via raw SQL (safe — silently returns undef if not migrated)
+        my $req_print = eval { $dbh->selectrow_array(
+            'SELECT requires_printing FROM inventory_items WHERE id = ?', undef, $item_id) } // 0;
+        my $fil_color = eval { $dbh->selectrow_array(
+            'SELECT filament_color FROM inventory_items WHERE id = ?', undef, $item_id) };
+        my $fil_type  = eval { $dbh->selectrow_array(
+            'SELECT filament_type FROM inventory_items WHERE id = ?',  undef, $item_id) };
+
+        # Include if ANY of these match (broad — catch 3d_printed_item, 3d_printed, printed_item, etc.)
+        my $is_3d_item =
+               index($origin,   '3d_print')  >= 0
+            || index($origin,   'printed')    >= 0
+            || index($category, '3d_print')   >= 0
+            || index($category, 'printed')    >= 0
+            || index($category, 'filament')   >= 0
+            || $req_print;
+
+        next unless $is_3d_item;
+
+        my $outstanding = $line->quantity_outstanding;
+        next unless $outstanding > 0;
+
+        my $avail_stock = eval { $dbh->selectrow_array(
+            'SELECT COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0)
+             FROM inventory_stock_levels sl
+             WHERE sl.item_id = ?',
+            undef, $item_id) } // 0;
+
+        # Parse consignment line notes FIRST — consignment-specific choice takes priority
+        # over item-level defaults. Format: [FIL:type,color] followed by optional user notes
+        my $line_notes = $line->notes || '';
+        my ($notes_type, $notes_color);
+        if ($line_notes) {
+            if ($line_notes =~ /\[FIL:([^,\]]*),([^\]]*)\]/) {
+                $notes_type  = $1 || undef;
+                $notes_color = $2 || undef;
+            } else {
+                my @known_types  = qw(PLA PLA+ PETG ABS ASA TPU Nylon PC Resin);
+                my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple Grey Gray
+                                      Silver Gold Clear Natural Transparent Pink Brown Copper Bronze);
+                my $uc = uc($line_notes);
+                for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $notes_type  = $t; last; } }
+                for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $notes_color = $co; last; } }
+            }
+        }
+        # Consignment note wins; fall back to item-level filament defaults
+        $fil_color = $notes_color || $fil_color;
+        $fil_type  = $notes_type  || $fil_type;
+
+        push @consignment_needed, {
+            line          => $line,
+            item          => $item,
+            outstanding   => $outstanding,
+            avail_stock   => $avail_stock,
+            item_name     => $item->get_column('name'),
+            item_category => $category,
+            item_origin   => $origin,
+            line_notes    => $line_notes,
+            req_print     => $req_print,
+            fil_color     => $fil_color,
+            fil_type      => $fil_type,
+            filament      => scalar $_find_filament->($fil_color, $fil_type),
+        };
+    }
+
+    $c->stash(
+        sitename              => $sitename,
+        restock_needed        => \@restock_needed,
+        consignment_needed    => \@consignment_needed,
+        cons_error            => $cons_error,
+        all_filaments         => \@all_filaments,
+        all_filaments_json    => encode_json(\@all_filaments),
+        cons_lines_total      => scalar @cons_lines,
+        template              => '3d/queue_sync.tt',
     );
 }
 

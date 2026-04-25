@@ -31,6 +31,7 @@
       <th>Unit Cost</th>
       <th>Components</th>
       <th>Assembled Cost</th>
+      <th>3D Queue</th>
       <th>Actions</th>
     </tr>
   </thead>
@@ -38,14 +39,17 @@
   [% FOREACH ai IN assemblable_items %]
     [% assembled_cost = 0 %]
     [% comp_count = 0 %]
+    [% has_fil_bom = 0 %]
     [% FOREACH comp IN ai.bom_components %]
       [% comp_count = comp_count + 1 %]
+      [% IF comp.unit == 'g' %][% has_fil_bom = 1 %][% END %]
       [% ci = comp.component_item %]
       [% IF ci && ci.unit_cost && !comp.is_optional %]
         [% eff_qty = comp.quantity * (1 + (comp.scrap_factor || 0)) %]
         [% assembled_cost = assembled_cost + (ci.unit_cost * eff_qty) %]
       [% END %]
     [% END %]
+    [% is_3d = (ai.item_origin == '3d_printed' || ai.item_origin == '3d_printer' || ai.requires_printing) %]
     <tr>
       <td>[% ai.sku %]</td>
       <td><a href="/Inventory/bom/[% ai.id %]">[% ai.name | html %]</a></td>
@@ -69,6 +73,21 @@
           [% END %]
         [% ELSE %]
           —
+        [% END %]
+      </td>
+      <td style="text-align:center;font-size:0.85em;">
+        [% IF is_3d %]
+          [% IF has_fil_bom && ai.print_time_hours %]
+            <span style="color:var(--success-color,#28a745);" title="Filament grams and print time configured">&#10003; Ready</span>
+          [% ELSIF has_fil_bom %]
+            <span style="color:#e67e22;" title="Filament grams set but print_time_hours missing">&#9651; No time</span>
+          [% ELSIF ai.print_time_hours %]
+            <span style="color:#e67e22;" title="Print time set but filament BOM (g) missing">&#9651; No grams</span>
+          [% ELSE %]
+            <span style="color:var(--danger-color,#dc3545);" title="No filament BOM or print time — queue will not pre-fill">&#9888; Not set</span>
+          [% END %]
+        [% ELSE %]
+          <span style="color:#aaa;">n/a</span>
         [% END %]
       </td>
       <td>
