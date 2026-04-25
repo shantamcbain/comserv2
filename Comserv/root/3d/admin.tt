@@ -102,6 +102,10 @@
         <h3><i class="icon-list"></i> Model Catalog</h3>
         <p>Browse available 3D model files for printing.</p>
     </a>
+    <a href="/3d/models" class="admin-link-card">
+        <h3>🗂 Model Manager</h3>
+        <p>Upload STL files, auto-calculate grams from geometry, and link models to inventory items.</p>
+    </a>
 </div>
 
 <h2 class="section-header">Inventory (Filaments &amp; Supplies)</h2>
