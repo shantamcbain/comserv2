@@ -72,6 +72,16 @@
     </div>
 </div>
 
+[% IF c.flash.success_msg %]
+<div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#155724;">
+    [% c.flash.success_msg | html %]
+</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#721c24;">
+    [% c.flash.error_msg | html %]
+</div>
+[% END %]
 [% IF queue_error %]
 <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#856404;">
     <strong>Queue load error:</strong> [% queue_error | html %]
