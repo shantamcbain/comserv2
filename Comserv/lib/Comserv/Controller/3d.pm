@@ -334,6 +334,59 @@ sub model_detail :Path('/3d/model') :Args(1) {
 }
 
 # ============================================================
+# Model Download — serve model file to logged-in users
+# ============================================================
+
+sub model_download :Path('/3d/model_download') :Args(1) {
+    my ($self, $c, $id) = @_;
+    $self->_require_module($c);
+    $self->_require_login($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $model = eval { $schema->resultset('Printing3dModel')->find({ id => $id, sitename => $sitename }) };
+    unless ($model && $model->nfs_path) {
+        $c->flash->{error_msg} = 'Model file not found.';
+        $c->res->redirect($c->uri_for('/3d/browse'));
+        $c->detach;
+    }
+
+    my $path = $model->nfs_path;
+    unless (-f $path && -r $path) {
+        $c->flash->{error_msg} = 'File not found on server: ' . $path;
+        $c->res->redirect($c->uri_for('/3d/model', [$id]));
+        $c->detach;
+    }
+
+    require File::Basename;
+    my $filename = File::Basename::basename($path);
+    my ($ext) = ($filename =~ /\.([^.]+)$/);
+    my %mime_map = (
+        stl   => 'application/vnd.ms-pki.stl',
+        '3mf' => 'application/vnd.ms-package.3dmanufacturing-3dmodel+xml',
+        obj   => 'application/x-tgif',
+        gcode => 'text/plain',
+        step  => 'application/step',
+        stp   => 'application/step',
+    );
+    my $mime = $mime_map{lc($ext // '')} || 'application/octet-stream';
+
+    open(my $fh, '<:raw', $path) or do {
+        $c->flash->{error_msg} = "Cannot read file: $!";
+        $c->res->redirect($c->uri_for('/3d/model', [$id]));
+        $c->detach;
+    };
+    $c->response->content_type($mime);
+    $c->response->header('Content-Disposition' => "attachment; filename=\"$filename\"");
+    $c->response->header('Content-Length' => -s $path);
+    local $/ = undef;
+    $c->response->body(<$fh>);
+    close $fh;
+    $c->detach;
+}
+
+# ============================================================
 # Order a Print — reserves filament in inventory
 # ============================================================
 
