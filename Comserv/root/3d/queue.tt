@@ -215,7 +215,19 @@
 
 [% IF recent_completed && recent_completed.size %]
 <div class="queue-section">
-    <h2>Recently Completed — Cost Summary (last 10)</h2>
+    <h2 style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Recently Completed — Cost Summary (last [% history_limit %])</span>
+        <span style="font-size:0.75em;font-weight:normal;display:flex;gap:0.5em;align-items:center;">
+            Show:
+            [% FOREACH n IN [10, 25, 50, 100, 200] %]
+            [% IF n == history_limit %]
+            <strong>[% n %]</strong>
+            [% ELSE %]
+            <a href="?history=[% n %]" style="color:var(--accent-color,#007bff);">[% n %]</a>
+            [% END %]
+            [% END %]
+        </span>
+    </h2>
     <table class="queue-table">
         <thead>
             <tr>

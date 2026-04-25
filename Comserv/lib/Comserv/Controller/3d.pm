@@ -744,6 +744,11 @@ sub queue :Path('/3d/queue') :Args(0) {
 
     my $dbh = $schema->storage->dbh;
 
+    my $history_limit = $c->req->params->{history} || 10;
+    $history_limit = int($history_limit);
+    $history_limit = 10  if $history_limit < 1;
+    $history_limit = 500 if $history_limit > 500;
+
     my (@queued_jobs, @active_jobs, @idle_printers, @recent_completed);
     my $queue_error;
 
@@ -810,7 +815,7 @@ sub queue :Path('/3d/queue') :Args(0) {
             LEFT JOIN inventory_items     fi ON fi.id = j.filament_item_id
             WHERE j.sitename = ? AND j.status = 'completed'
             ORDER BY j.completed_at DESC
-            LIMIT 10
+            LIMIT $history_limit
         };
         my $rc_rows = $dbh->selectall_arrayref($r_sql, { Slice => {} }, $sitename);
         @recent_completed = @{ $rc_rows // [] };
@@ -823,6 +828,7 @@ sub queue :Path('/3d/queue') :Args(0) {
         idle_printers     => \@idle_printers,
         recent_completed  => \@recent_completed,
         queue_error       => $queue_error,
+        history_limit     => $history_limit,
         template          => '3d/queue.tt',
     );
 }
@@ -1439,17 +1445,11 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         my $outstanding = $line->quantity_outstanding;
         next unless $outstanding > 0;
 
-        # Check current available stock across ALL locations — SUM to aggregate
         my $avail_stock = eval { $dbh->selectrow_array(
             'SELECT COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0)
              FROM inventory_stock_levels sl
              WHERE sl.item_id = ?',
             undef, $item_id) } // 0;
-
-        # Skip non-print-on-demand items that already have stock on hand
-        unless ($req_print) {
-            next if $avail_stock > 0;
-        }
 
         # Parse consignment line notes FIRST — consignment-specific choice takes priority
         # over item-level defaults. Format: [FIL:type,color] followed by optional user notes
