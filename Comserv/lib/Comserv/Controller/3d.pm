@@ -957,7 +957,7 @@ sub queue_print :Path('/3d/queue_print') :Args(0) {
         active_jobs      => \@active_jobs,
         recent_completed => \@recent_completed,
         print_date       => _now(),
-        ai_popup_mode    => 1,
+        no_wrapper       => 1,
         template         => '3d/queue_print.tt',
     );
 }
