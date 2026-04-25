@@ -5,12 +5,10 @@
 <title>Consignment Slip — [% consignment.reference_number || ('C-' _ consignment.id) %]</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: rgba(255,255,255,0.88); padding: 12mm; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #f5f5f5; }
 h1 { font-size: 14pt; font-weight: bold; }
 table { border-collapse: collapse; width: 100%; }
 th, td { padding: 5px 8px; text-align: left; vertical-align: top; }
-.border-box { border: 1px solid #888; }
-.border-box td { border: 1px solid #888; }
 tfoot tr td { border-top: 2px solid #333; font-weight: bold; }
 thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
 .section { margin-bottom: 1.2em; }
@@ -21,24 +19,47 @@ thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
 .parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 1.2em; }
 .party { border: 1px solid #999; padding: 6px 10px; }
 .party + .party { border-left: none; }
-.items-table thead th { background: #ececec; font-size: 9pt; }
-.items-table tbody tr:nth-child(even) { background: var(--bg-secondary, #fafafa); }
+.items-table thead th { background: #ececec; font-size: 9pt; border: 1px solid #ccc; }
+.items-table td { border: 1px solid #ddd; }
+.items-table tbody tr:nth-child(even) td { background: #fafafa; }
 .items-table tfoot td { background: #ececec; }
 .text-right { text-align: right !important; }
-.totals { text-align: right; margin-top: 0.5em; font-size: 10pt; }
 .sign-block { margin-top: 2.5em; display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
 .sign-line { border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 9pt; }
-.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: var(--text-muted-color, #555); border-top: 1px solid #ccc; padding-top: 0.5em; }
+.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: #555; border-top: 1px solid #ccc; padding-top: 0.5em; }
+.print-bar {
+  background: #333; color: #fff; padding: 8px 20px;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
+}
+.print-bar a { color: #adf; text-decoration: none; font-size: 0.9em; }
+.print-bar button {
+  background: #28a745; color: #fff; border: none;
+  padding: 6px 14px; border-radius: 4px; cursor: pointer;
+  font-size: 0.95em; font-weight: bold;
+}
+.page {
+  max-width: 240mm; margin: 12px auto; background: #fff;
+  padding: 12mm 14mm; box-shadow: 0 0 8px rgba(0,0,0,0.15);
+}
 @media print {
-  body { padding: 8mm; }
-  .no-print { display: none; }
+  body { background: #fff; }
+  .no-print { display: none !important; }
+  .page { box-shadow: none; margin: 0; padding: 8mm; max-width: 100%; }
 }
 </style>
 </head>
-<body onload="window.print()">
+<body>
 
 [% SET con = consignment %]
 [% SET comm_pct = con.partner.commission_percent || 0 %]
+
+<div class="print-bar no-print">
+  <button onclick="window.print()">🖶 Print</button>
+  <a href="/Inventory/consignment/view/[% con.id %]">← Back to Consignment</a>
+  <a href="/Inventory/consignment">All Consignments</a>
+</div>
+
+<div class="page">
 
 <div class="slip-header">
   <div class="left">
@@ -139,10 +160,8 @@ thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
   </div>
 </div>
 
-<div class="no-print" style="margin-top:2em;text-align:center">
-  <button onclick="window.print()" style="padding:8px 20px;font-size:10pt;cursor:pointer">Print</button>
-  <button onclick="window.close()" style="padding:8px 20px;font-size:10pt;cursor:pointer;margin-left:1em">Close</button>
-</div>
+
+</div><!-- .page -->
 
 </body>
 </html>
