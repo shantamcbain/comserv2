@@ -68,6 +68,25 @@ __PACKAGE__->add_columns(
         default_value => \'CURRENT_TIMESTAMP',
         is_nullable   => 1,
     },
+    item_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    stl_volume_cm3 => {
+        data_type     => 'decimal',
+        size          => [12, 4],
+        is_nullable   => 1,
+    },
+    stl_weight_g => {
+        data_type     => 'decimal',
+        size          => [10, 3],
+        is_nullable   => 1,
+    },
+    print_time_hours => {
+        data_type     => 'decimal',
+        size          => [8, 3],
+        is_nullable   => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -76,6 +95,12 @@ __PACKAGE__->has_many(
     jobs => 'Comserv::Model::Schema::Ency::Result::Printing3dJob',
     'model_id',
     { cascade_delete => 0 }
+);
+
+__PACKAGE__->belongs_to(
+    inventory_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    'item_id',
+    { join_type => 'LEFT', on_delete => 'SET NULL', on_update => 'CASCADE' }
 );
 
 1;
