@@ -4037,22 +4037,13 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         }
     };
 
-    my $vars = {
+    $c->stash(
         consignment => $consignment,
         sitename    => $sitename,
         site_info   => \%site_info,
-        c           => $c,
-        debug_msg   => [],
-        WRAPPER     => '',
-    };
-
-    my $output = '';
-    $c->view('TT')->template->process('Inventory/consignment/print.tt', $vars, \$output)
-        or die $c->view('TT')->template->error;
-
-    $c->response->content_type('text/html; charset=utf-8');
-    $c->response->body($output);
-    $c->detach;
+        no_wrapper  => 1,
+        template    => 'Inventory/consignment/print.tt',
+    );
 }
 
 sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
