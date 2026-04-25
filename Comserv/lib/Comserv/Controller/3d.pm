@@ -1222,34 +1222,45 @@ sub models :Path('/3d/models') :Args(0) {
         my $action = $c->req->params->{action} || '';
 
         if ($action eq 'upload') {
-            my $upload = $c->req->upload('stl_file');
-            my $name   = $c->req->params->{model_name}       || '';
-            my $desc   = $c->req->params->{model_desc}       || '';
-            my $tags   = $c->req->params->{model_tags}       || '';
-            my $item_id = $c->req->params->{item_id} || undef;
-            my $print_h = $c->req->params->{print_hours}     || undef;
+            my $upload  = $c->req->upload('stl_file');
+            my $name    = $c->req->params->{model_name} || '';
+            my $desc    = $c->req->params->{model_desc} || '';
+            my $tags    = $c->req->params->{model_tags} || '';
+            my $item_id = $c->req->params->{item_id}    || undef;
+            my $print_h = $c->req->params->{print_hours} || undef;
 
             unless ($upload && $name) {
-                $c->flash->{error_msg} = 'Model name and STL file are required.';
+                $c->flash->{error_msg} = 'Model name and a file are required.';
                 $c->res->redirect($c->uri_for('/3d/models'));
                 $c->detach;
             }
 
-            my $filename = $upload->filename;
-            $filename =~ s/[^\w.\-]/_/g;
-            my $nfs_local = "/data/nfs/3d/models/$filename";
-            my $nfs_host  = "/home/shanta/comserv-workshop/3d/models/$filename";
+            my ($orig_name) = ($upload->filename =~ /([^\/\\]+)$/);
+            my ($ext) = ($orig_name =~ /\.([^.]+)$/);
+            $ext = lc($ext // '');
 
-            eval { $upload->copy_to($nfs_local) };
-            if ($@) {
-                $c->flash->{error_msg} = "Upload failed: $@";
+            my ($file_row, $upload_err) =
+                $c->model('File')->upload_and_record($c, $upload, 'path:/data/nfs/3d/models');
+            if ($upload_err) {
+                $c->flash->{error_msg} = "Upload failed: $upload_err";
                 $c->res->redirect($c->uri_for('/3d/models'));
                 $c->detach;
             }
 
-            my $stl_info  = $self->_parse_stl($nfs_local);
-            my $vol_cm3   = $stl_info ? $stl_info->{volume_cm3}   : undef;
-            my $weight_g  = $vol_cm3  ? sprintf('%.3f', $vol_cm3 * 1.24) : undef;
+            my $nfs_stored = $file_row->nfs_path || $file_row->file_path || '';
+
+            my ($vol_cm3, $weight_g, $tri_count);
+            if ($ext eq 'stl' && $nfs_stored && -r $nfs_stored) {
+                my $stl_info = $self->_parse_stl($nfs_stored);
+                if ($stl_info) {
+                    my $v = $stl_info->{volume_cm3};
+                    if (defined $v && $v == $v && $v > 0) {
+                        $vol_cm3  = $v;
+                        $weight_g = sprintf('%.3f', $v * 1.24);
+                        $tri_count = $stl_info->{triangles};
+                    }
+                }
+            }
 
             eval {
                 $schema->resultset('Printing3dModel')->create({
@@ -1257,8 +1268,9 @@ sub models :Path('/3d/models') :Args(0) {
                     name             => $name,
                     description      => $desc || undef,
                     tags             => $tags || undef,
-                    nfs_path         => $nfs_local,
-                    file_type        => 'stl',
+                    file_id          => $file_row->id,
+                    nfs_path         => $nfs_stored,
+                    file_type        => $ext || 'unknown',
                     source           => 'upload',
                     added_by         => $c->session->{username} || 'admin',
                     item_id          => $item_id || undef,
@@ -1270,10 +1282,14 @@ sub models :Path('/3d/models') :Args(0) {
                 });
             };
             if ($@) {
-                $c->flash->{error_msg} = "Could not save model: $@";
+                $c->flash->{error_msg} = "Could not save model record: $@";
             } else {
-                my $msg = "Model '$name' uploaded.";
-                $msg .= " STL volume: ${vol_cm3} cm³ → ~${weight_g} g PLA." if $weight_g;
+                my $msg = "Model '$name' uploaded (.$ext, file id " . $file_row->id . ").";
+                if ($vol_cm3) {
+                    $msg .= " STL: ${vol_cm3} cm³ → ~${weight_g} g PLA ($tri_count triangles).";
+                } elsif ($ext ne 'stl') {
+                    $msg .= " Volume calculation is STL-only; set grams manually or via BOM wizard.";
+                }
                 $c->flash->{success_msg} = $msg;
             }
             $c->res->redirect($c->uri_for('/3d/models'));
