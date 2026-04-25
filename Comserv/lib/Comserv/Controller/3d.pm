@@ -354,7 +354,12 @@ sub model_download :Path('/3d/model_download') :Args(1) {
 
     my $path = $model->nfs_path;
     unless (-f $path && -r $path) {
-        $c->flash->{error_msg} = 'File not found on server: ' . $path;
+        my $nfs_root = $ENV{WORKSHOP_RESOURCES_PATH} || '/home/shanta/comserv-workshop';
+        (my $alt = $path) =~ s{^/data/nfs}{$nfs_root};
+        $path = $alt if -f $alt && -r $alt;
+    }
+    unless (-f $path && -r $path) {
+        $c->flash->{error_msg} = 'File not found on server: ' . $model->nfs_path;
         $c->res->redirect($c->uri_for('/3d/model', [$id]));
         $c->detach;
     }
