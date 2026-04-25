@@ -1413,7 +1413,16 @@
             }
             ffBtn.disabled = true; ffBtn.textContent = '⏳';
 
+            // Detect if form has contact/company fields — if so, enable web search
+            // so the AI can look up real-world information (address, phone, email, etc.)
+            var contactFieldRE = /phone|email|address|contact|url|website|city|postal|zip/i;
+            var hasContactFields = fields.some(function(f) {
+                return contactFieldRE.test(f.name) || contactFieldRE.test(f.label || '');
+            });
+            var useSearch = hasContactFields ? 1 : 0;
+
             const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                (useSearch ? 'If web search results are provided above, use them to find accurate real-world information (address, phone, email, etc.) for the entity described. ' : '') +
                 'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
                 'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
 
@@ -1423,7 +1432,7 @@
             fetch('/ai/generate', {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true, use_search: useSearch })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
