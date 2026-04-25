@@ -828,6 +828,77 @@ sub queue :Path('/3d/queue') :Args(0) {
 }
 
 # ============================================================
+# Admin — Printable Queue View (no nav/header/footer)
+# ============================================================
+
+sub queue_print :Path('/3d/queue_print') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->storage->dbh;
+
+    my (@queued_jobs, @active_jobs, @recent_completed);
+
+    my $sql = q{
+        SELECT j.id, j.sitename, j.status, j.item_name, j.username,
+               j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+               j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+               j.created_at, j.started_at, j.completed_at,
+               fi.name  AS filament_name,
+               pr.name  AS printer_name,
+               mo.name  AS model_name
+        FROM printing_3d_jobs j
+        LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+        LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+        LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+        WHERE j.sitename = ? AND j.status = ?
+        ORDER BY j.created_at ASC
+    };
+
+    eval {
+        my $q = $dbh->selectall_arrayref($sql, { Slice => {} }, $sitename, 'queued');
+        @queued_jobs = @{ $q // [] };
+        my $a = $dbh->selectall_arrayref(
+            $sql =~ s/AND j\.status = \?/AND j.status IN ('assigned','printing')/r,
+            { Slice => {} }, $sitename);
+        @active_jobs = @{ $a // [] };
+    };
+
+    eval {
+        my $r = $dbh->selectall_arrayref(q{
+            SELECT j.id, j.item_name, j.username,
+                   j.quantity, j.filament_color, j.filament_type, j.filament_quantity,
+                   j.print_hours, j.filament_cost, j.printer_cost, j.electricity_cost, j.total_cost,
+                   j.completed_at,
+                   pr.name AS printer_name,
+                   fi.name AS filament_name,
+                   mo.name AS model_name
+            FROM printing_3d_jobs j
+            LEFT JOIN printing_3d_printers pr ON pr.id = j.printer_id
+            LEFT JOIN printing_3d_models   mo ON mo.id = j.model_id
+            LEFT JOIN inventory_items      fi ON fi.id = j.filament_item_id
+            WHERE j.sitename = ? AND j.status = 'completed'
+            ORDER BY j.completed_at DESC
+            LIMIT 30
+        }, { Slice => {} }, $sitename);
+        @recent_completed = @{ $r // [] };
+    };
+
+    $c->stash(
+        sitename         => $sitename,
+        queued_jobs      => \@queued_jobs,
+        active_jobs      => \@active_jobs,
+        recent_completed => \@recent_completed,
+        print_date       => _now(),
+        ai_popup_mode    => 1,
+        template         => '3d/queue_print.tt',
+    );
+}
+
+# ============================================================
 # Admin — Printer Farm
 # ============================================================
 

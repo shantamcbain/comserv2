@@ -63,6 +63,10 @@
            style="padding:0.4em 1em;background:var(--accent-color,#007bff);color:white;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;">
             ⟳ Sync from Orders
         </a>
+        <a href="/3d/queue_print" target="_blank"
+           style="padding:0.4em 1em;background:#6c757d;color:white;border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;">
+            🖶 Print
+        </a>
         <a href="/3d/printers" style="font-size:0.9em;">Printer Farm</a> |
         <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
     </div>
