@@ -3055,11 +3055,12 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
     $copies = 50 if $copies > 50;
 
     $c->stash(
-        item      => $item,
-        locations => \@locations,
-        copies    => $copies,
-        sitename  => $sitename,
-        template  => 'Inventory/print/label.tt',
+        item       => $item,
+        locations  => \@locations,
+        copies     => $copies,
+        sitename   => $sitename,
+        no_wrapper => 1,
+        template   => 'Inventory/print/label.tt',
     );
 }
 
@@ -3092,9 +3093,10 @@ sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
     }
 
     $c->stash(
-        items    => \@items,
-        sitename => $sitename,
-        template => 'Inventory/print/labels_multi.tt',
+        items      => \@items,
+        sitename   => $sitename,
+        no_wrapper => 1,
+        template   => 'Inventory/print/labels_multi.tt',
     );
 }
 
@@ -3158,6 +3160,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
         categories  => \@categories,
         sitename    => $sitename,
         print_date  => $self->_now(),
+        no_wrapper  => 1,
         template    => 'Inventory/print/stock_report.tt',
     );
 }
@@ -3199,6 +3202,7 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
         assembled_cost => $assembled_cost,
         print_date     => $self->_now(),
         sitename       => $self->_sitename($c),
+        no_wrapper     => 1,
         template       => 'Inventory/print/bom.tt',
     );
 }

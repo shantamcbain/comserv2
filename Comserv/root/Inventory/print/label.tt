@@ -1,123 +1,53 @@
-[% PageVersion = 'Inventory/print/label.tt,v 0.01 2026/04/14 shanta Exp' %]
-[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Labels — [% item.name | html %]</title>
 <style>
-  .no-print { }
-  @media print {
-    .no-print { display: none !important; }
-    body { margin: 0; padding: 0; }
-  }
-
-  body { font-family: Arial, sans-serif; background: var(--bg-secondary, #f5f5f5); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #f5f5f5; }
 
   .print-controls {
-    background: #333;
-    color: #fff;
-    padding: 12px 20px;
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    flex-wrap: wrap;
+    background: #333; color: #fff; padding: 12px 20px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
   }
   .print-controls a { color: #adf; text-decoration: none; }
   .print-controls button {
-    background: var(--success-color, #28a745);
-    color: #fff;
-    border: none;
-    padding: 8px 18px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
+    background: #28a745; color: #fff; border: none;
+    padding: 8px 18px; border-radius: 4px; cursor: pointer;
+    font-size: 1em; font-weight: bold;
   }
 
   .label-page {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6mm;
-    padding: 10mm;
-    max-width: 210mm;
-    margin: 10px auto;
-    background: rgba(255,255,255,0.88);
+    display: flex; flex-wrap: wrap; gap: 6mm;
+    padding: 10mm; max-width: 210mm;
+    margin: 10px auto; background: #fff;
     box-shadow: 0 0 8px rgba(0,0,0,0.2);
   }
 
   .label {
-    width: 62mm;
-    height: 40mm;
-    border: 1px solid #333;
-    border-radius: 3px;
-    padding: 3mm;
-    box-sizing: border-box;
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-    page-break-inside: avoid;
-    background: rgba(255,255,255,0.88);
-    overflow: hidden;
+    width: 62mm; height: 40mm;
+    border: 1px solid #333; border-radius: 3px; padding: 3mm;
+    display: flex; flex-direction: column; justify-content: space-between;
+    page-break-inside: avoid; background: #fff; overflow: hidden;
   }
 
-  .label-site {
-    font-size: 6pt;
-    color: #888;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-  }
-
-  .label-name {
-    font-size: 10pt;
-    font-weight: bold;
-    line-height: 1.2;
-    max-height: 2.4em;
-    overflow: hidden;
-    flex: 1;
-    margin: 1mm 0;
-  }
-
-  .label-sku {
-    font-family: 'Courier New', monospace;
-    font-size: 9pt;
-    font-weight: bold;
-    letter-spacing: 2px;
-    border-top: 1px solid #ccc;
-    padding-top: 1mm;
-    text-align: center;
-  }
-
-  .label-sku-bars {
-    font-family: 'Courier New', monospace;
-    font-size: 16pt;
-    letter-spacing: -1px;
-    text-align: center;
-    color: #000;
-    line-height: 1;
-    display: block;
-  }
-
-  .label-meta {
-    font-size: 6.5pt;
-    color: var(--text-muted-color, #555);
-    display: flex;
-    justify-content: space-between;
-  }
-
-  .label-location {
-    font-size: 7pt;
-    color: #444;
-    margin-top: 1mm;
-  }
+  .label-site { font-size: 6pt; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+  .label-name { font-size: 10pt; font-weight: bold; line-height: 1.2; max-height: 2.4em; overflow: hidden; flex: 1; margin: 1mm 0; }
+  .label-sku { font-family: 'Courier New', monospace; font-size: 9pt; font-weight: bold; letter-spacing: 2px; border-top: 1px solid #ccc; padding-top: 1mm; text-align: center; }
+  .label-sku-bars { font-family: 'Courier New', monospace; font-size: 16pt; letter-spacing: -1px; text-align: center; color: #000; line-height: 1; display: block; }
+  .label-meta { font-size: 6.5pt; color: #555; display: flex; justify-content: space-between; }
+  .label-location { font-size: 7pt; color: #444; margin-top: 1mm; }
 
   @media print {
-    .label-page {
-      box-shadow: none;
-      margin: 0;
-      padding: 5mm;
-    }
-    .label {
-      border-color: #000;
-    }
+    body { background: #fff; }
+    .no-print { display: none !important; }
+    .label-page { box-shadow: none; margin: 0; padding: 5mm; }
+    .label { border-color: #000; }
   }
 </style>
+</head>
+<body>
 
 <div class="no-print print-controls">
   <a href="/Inventory/item/view/[% item.id %]">&larr; Back to Item</a>
@@ -168,3 +98,5 @@ function updateCopies(n) {
   window.location.href = '/Inventory/print/label/[% item.id %]?copies=' + n;
 }
 </script>
+</body>
+</html>
