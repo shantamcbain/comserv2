@@ -1126,6 +1126,235 @@ sub search_deeper :Path('/3d/search_deeper') :Args(0) {
 }
 
 # ============================================================
+# STL Parser — calculate volume and weight from STL file
+# ============================================================
+
+sub _parse_stl {
+    my ($self, $filepath) = @_;
+    return undef unless $filepath && -r $filepath;
+
+    my ($volume_cm3, $triangle_count) = (0, 0);
+
+    open my $fh, '<:raw', $filepath or return undef;
+    my $header;
+    read($fh, $header, 80) or do { close $fh; return undef; };
+
+    my $is_ascii = ($header =~ /^solid\s/i && $header !~ /\x00/);
+    if (!$is_ascii) {
+        my $buf;
+        read($fh, $buf, 4) or do { close $fh; return undef; };
+        $triangle_count = unpack('V', $buf);
+
+        for my $i (1 .. $triangle_count) {
+            my $tri;
+            read($fh, $tri, 50) or last;
+            my (undef, $x1,$y1,$z1, $x2,$y2,$z2, $x3,$y3,$z3) =
+                unpack('f<3 f<3 f<3 f<3', $tri);
+            $volume_cm3 += ($x1*($y2*$z3 - $y3*$z2)
+                          - $y1*($x2*$z3 - $x3*$z2)
+                          + $z1*($x2*$y3 - $x3*$y2)) / 6.0;
+        }
+    } else {
+        seek $fh, 0, 0;
+        my @vertices;
+        while (my $line = <$fh>) {
+            if ($line =~ /^\s*vertex\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)\s+([\d.eE+\-]+)/i) {
+                push @vertices, [$1+0, $2+0, $3+0];
+                if (@vertices == 3) {
+                    my ($v1,$v2,$v3) = @vertices;
+                    $volume_cm3 += ($v1->[0]*($v2->[1]*$v3->[2] - $v3->[1]*$v2->[2])
+                                  - $v1->[1]*($v2->[0]*$v3->[2] - $v3->[0]*$v2->[2])
+                                  + $v1->[2]*($v2->[0]*$v3->[1] - $v3->[0]*$v2->[1])) / 6.0;
+                    @vertices = ();
+                    $triangle_count++;
+                }
+            }
+        }
+    }
+    close $fh;
+
+    $volume_cm3 = abs($volume_cm3) / 1000.0;
+    return { volume_cm3 => $volume_cm3, triangles => $triangle_count };
+}
+
+# ============================================================
+# Model Manager — upload STL, link to inventory item
+# ============================================================
+
+sub models :Path('/3d/models') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+    my $dbh      = $schema->storage->dbh;
+
+    my @all_items = eval {
+        $schema->resultset('InventoryItem')->search(
+            { sitename => $sitename, status => 'active',
+              -or => [
+                item_origin => { -like => '%3d_print%' },
+                item_origin => { -like => '%printed%'  },
+                category    => { -like => '%3d_print%' },
+                category    => { -like => '%printed%'  },
+              ] },
+            { columns => [qw(id name sku)], order_by => 'name' }
+        )->all;
+    };
+
+    my @models = eval {
+        my $rows = $dbh->selectall_arrayref(
+            q{SELECT m.id, m.name, m.description, m.nfs_path, m.file_type,
+                     m.stl_volume_cm3, m.stl_weight_g, m.print_time_hours,
+                     m.item_id, m.created_at, m.is_active,
+                     i.name AS item_name, i.sku AS item_sku
+              FROM printing_3d_models m
+              LEFT JOIN inventory_items i ON i.id = m.item_id
+              WHERE m.sitename = ?
+              ORDER BY m.name},
+            { Slice => {} }, $sitename
+        );
+        @{ $rows // [] }
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->params->{action} || '';
+
+        if ($action eq 'upload') {
+            my $upload = $c->req->upload('stl_file');
+            my $name   = $c->req->params->{model_name}       || '';
+            my $desc   = $c->req->params->{model_desc}       || '';
+            my $tags   = $c->req->params->{model_tags}       || '';
+            my $item_id = $c->req->params->{item_id} || undef;
+            my $print_h = $c->req->params->{print_hours}     || undef;
+
+            unless ($upload && $name) {
+                $c->flash->{error_msg} = 'Model name and STL file are required.';
+                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->detach;
+            }
+
+            my $filename = $upload->filename;
+            $filename =~ s/[^\w.\-]/_/g;
+            my $nfs_local = "/data/nfs/3d/models/$filename";
+            my $nfs_host  = "/home/shanta/comserv-workshop/3d/models/$filename";
+
+            eval { $upload->copy_to($nfs_local) };
+            if ($@) {
+                $c->flash->{error_msg} = "Upload failed: $@";
+                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->detach;
+            }
+
+            my $stl_info  = $self->_parse_stl($nfs_local);
+            my $vol_cm3   = $stl_info ? $stl_info->{volume_cm3}   : undef;
+            my $weight_g  = $vol_cm3  ? sprintf('%.3f', $vol_cm3 * 1.24) : undef;
+
+            eval {
+                $schema->resultset('Printing3dModel')->create({
+                    sitename         => $sitename,
+                    name             => $name,
+                    description      => $desc || undef,
+                    tags             => $tags || undef,
+                    nfs_path         => $nfs_local,
+                    file_type        => 'stl',
+                    source           => 'upload',
+                    added_by         => $c->session->{username} || 'admin',
+                    item_id          => $item_id || undef,
+                    stl_volume_cm3   => $vol_cm3  // undef,
+                    stl_weight_g     => $weight_g // undef,
+                    print_time_hours => $print_h  || undef,
+                    is_active        => 1,
+                    created_at       => _now(),
+                });
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Could not save model: $@";
+            } else {
+                my $msg = "Model '$name' uploaded.";
+                $msg .= " STL volume: ${vol_cm3} cm³ → ~${weight_g} g PLA." if $weight_g;
+                $c->flash->{success_msg} = $msg;
+            }
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+
+        } elsif ($action eq 'link') {
+            my $model_id = $c->req->params->{model_id} or do {
+                $c->flash->{error_msg} = 'No model specified.';
+                $c->res->redirect($c->uri_for('/3d/models'));
+                $c->detach;
+            };
+            my $item_id      = $c->req->params->{item_id}      || undef;
+            my $print_h      = $c->req->params->{print_hours}  || undef;
+
+            eval {
+                my $m = $schema->resultset('Printing3dModel')->find($model_id);
+                $m->update({
+                    item_id          => $item_id || undef,
+                    print_time_hours => $print_h  || undef,
+                }) if $m;
+            };
+            $c->flash->{$@ ? 'error_msg' : 'success_msg'} =
+                $@ ? "Update failed: $@" : 'Model updated.';
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+
+        } elsif ($action eq 'deactivate') {
+            my $model_id = $c->req->params->{model_id};
+            eval { $schema->resultset('Printing3dModel')->find($model_id)->update({ is_active => 0 }) } if $model_id;
+            $c->flash->{success_msg} = 'Model deactivated.';
+            $c->res->redirect($c->uri_for('/3d/models'));
+            $c->detach;
+        }
+    }
+
+    $c->stash(
+        sitename   => $sitename,
+        models     => \@models,
+        all_items  => \@all_items,
+        template   => '3d/models.tt',
+    );
+}
+
+sub model_stl_info :Path('/3d/model_stl_info') :Args(1) {
+    my ($self, $c, $model_id) = @_;
+    $self->_require_module($c);
+    $self->_require_admin($c);
+
+    my $schema = $self->_schema($c);
+    my $model  = eval { $schema->resultset('Printing3dModel')->find($model_id) };
+    unless ($model && $model->nfs_path) {
+        $c->res->body(encode_json({ error => 'Model not found or no file' }));
+        $c->res->content_type('application/json');
+        $c->detach;
+    }
+
+    my $info = $self->_parse_stl($model->nfs_path) // {};
+    my $vol  = $info->{volume_cm3} // 0;
+    my $w_pla  = $vol * 1.24;
+    my $w_petg = $vol * 1.27;
+    my $w_abs  = $vol * 1.05;
+
+    eval {
+        $model->update({
+            stl_volume_cm3 => $vol || undef,
+            stl_weight_g   => $w_pla ? sprintf('%.3f', $w_pla) : undef,
+        }) if $vol;
+    };
+
+    $c->res->content_type('application/json');
+    $c->res->body(encode_json({
+        volume_cm3    => sprintf('%.4f', $vol),
+        triangles     => $info->{triangles} // 0,
+        weight_pla_g  => sprintf('%.2f', $w_pla),
+        weight_petg_g => sprintf('%.2f', $w_petg),
+        weight_abs_g  => sprintf('%.2f', $w_abs),
+    }));
+    $c->detach;
+}
+
+# ============================================================
 # Queue Sync — detect items needing printing from inventory
 # and consignments, then create queued print jobs
 # ============================================================
