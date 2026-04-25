@@ -5,27 +5,27 @@
 <title>Consignment Slip — [% consignment.reference_number || ('C-' _ consignment.id) %]</title>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
-body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #000; background: #fff; padding: 12mm; }
-h1 { font-size: 14pt; font-weight: bold; }
+body { font-family: Arial, Helvetica, sans-serif; font-size: 9.5pt; color: #000; background: #fff; padding: 10mm; }
+h1 { font-size: 13pt; font-weight: bold; }
 table { border-collapse: collapse; width: 100%; }
-th, td { padding: 5px 8px; text-align: left; vertical-align: top; }
+th, td { padding: 3px 6px; text-align: left; vertical-align: top; }
 tfoot tr td { border-top: 2px solid #333; font-weight: bold; }
 thead tr th { border-bottom: 2px solid #333; background: #f0f0f0; }
-.section { margin-bottom: 1.2em; }
-.slip-header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 0.8em; margin-bottom: 1em; }
-.slip-header .left h1 { font-size: 15pt; }
+.section { margin-bottom: 0.6em; }
+.slip-header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 0.4em; margin-bottom: 0.6em; }
+.slip-header .left h1 { font-size: 13pt; }
 .slip-header .right { text-align: right; }
-.slip-header .right h2 { font-size: 13pt; letter-spacing: 1px; }
-.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 1.2em; }
-.party { border: 1px solid #999; padding: 6px 10px; }
+.slip-header .right h2 { font-size: 12pt; letter-spacing: 1px; }
+.parties { display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin-bottom: 0.6em; }
+.party { border: 1px solid #999; padding: 4px 8px; }
 .party + .party { border-left: none; }
-.items-table thead th { background: #ececec; font-size: 9pt; }
+.items-table thead th { background: #ececec; font-size: 8.5pt; }
 .items-table tbody tr:nth-child(even) { background: #fafafa; }
 .items-table tfoot td { background: #ececec; }
 .text-right { text-align: right !important; }
-.sign-block { margin-top: 2.5em; display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
-.sign-line { border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 9pt; }
-.footer-note { margin-top: 1.2em; font-size: 8.5pt; color: #555; border-top: 1px solid #ccc; padding-top: 0.5em; }
+.sign-block { margin-top: 1.2em; display: grid; grid-template-columns: 1fr 1fr; gap: 2em; }
+.sign-line { border-top: 1px solid #333; padding-top: 4px; text-align: center; font-size: 8.5pt; }
+.footer-note { margin-top: 0.6em; font-size: 8pt; color: #555; border-top: 1px solid #ccc; padding-top: 0.3em; }
 .print-bar {
   position: fixed; top: 0; left: 0; right: 0; z-index: 999;
   background: #333; color: #fff; padding: 8px 20px;
