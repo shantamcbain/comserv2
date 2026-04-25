@@ -4015,10 +4015,10 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->find(
+        $consignment = $schema->resultset('InventoryConsignment')->search(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
-        );
+        )->first;
     };
     unless ($consignment) {
         $c->flash->{error_msg} = 'Consignment not found.';
