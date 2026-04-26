@@ -4,13 +4,9 @@
    roles = "guest,user,admin"
    TemplateType = "Application"
    category = "Membership"
-   page_version = "0.01"
-   last_updated = "2026-03-18"
+   page_version = "0.02"
+   last_updated = "2026-04-26"
 %]
-[% PageVersion = 'membership/Index.tt,v 0.01 2026/03/18 AI Assistant Exp AI Assistant ' %]
-[% IF debug_mode == 1 %]
-  [% PageVersion %]
-[% END %]
 
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
@@ -43,13 +39,7 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>Username</th>
-                <th>Name</th>
-                <th>Plan</th>
-                <th>Status</th>
-                <th>Billing</th>
-                <th>Expires</th>
-                <th>Actions</th>
+                <th>Username</th><th>Name</th><th>Plan</th><th>Status</th><th>Billing</th><th>Expires</th><th>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -81,13 +71,7 @@
         <h2>Your Current Plan</h2>
         <div class="table-container">
           <table class="data-table">
-            <tr>
-              <th>Plan</th>
-              <th>Status</th>
-              <th>Billing</th>
-              <th>Expires</th>
-              <th>Actions</th>
-            </tr>
+            <tr><th>Plan</th><th>Status</th><th>Billing</th><th>Expires</th><th>Actions</th></tr>
             <tr>
               <td>[% user_membership.plan.name | html %]</td>
               <td>[% user_membership.status | html %]</td>
@@ -99,6 +83,59 @@
             </tr>
           </table>
         </div>
+      </div>
+      [% END %]
+
+      [%# ── SiteName Plans ──────────────────────────────────────────────────── %]
+      [% IF plans.size %]
+      <div class="content-section">
+        <h2>[% site_name | html %] Plans</h2>
+        <p class="text-muted">Choose the plan that fits your needs. Click <strong>Learn More</strong> to see full details and sign up.</p>
+        <div class="plan-cards-grid">
+          [% FOREACH plan IN plans %]
+          [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
+          <div class="plan-card[% IF plan.is_featured %] plan-card-featured[% END %]">
+            [% IF plan.is_featured %]
+            <div class="plan-card-badge">&#9733; Most Popular</div>
+            [% END %]
+            <h3 class="plan-card-name">[% plan.name | html %]</h3>
+            <div class="plan-card-price">
+              [% IF display_price == 0 %]Free
+              [% ELSE %][% plan.price_currency | html %]&nbsp;[% display_price %]/mo[% END %]
+            </div>
+            [% IF plan.price_annual > 0 AND display_price > 0 %]
+            <div class="plan-card-annual">or [% plan.price_currency | html %]&nbsp;[% plan.price_annual %]/yr
+              [% SET saving = (display_price * 12) - plan.price_annual %]
+              [% IF saving > 0 %]<span class="badge">Save [% plan.price_currency | html %][% saving | format('%.2f') %]</span>[% END %]
+            </div>
+            [% END %]
+            [% IF plan.description %]<p class="plan-card-desc">[% plan.description | html %]</p>[% END %]
+            <ul class="plan-card-features">
+              [% IF plan.has_subdomain %]<li>&#127760; Subdomain included</li>[% END %]
+              [% IF plan.has_custom_domain %]<li>&#127760; Custom domain support</li>[% END %]
+              [% IF plan.has_email %]<li>&#9993; [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %]</li>[% END %]
+              [% IF plan.has_hosting %]<li>&#128421; Hosting — [% plan.hosting_tier || 'Included' | html %]</li>[% END %]
+              [% IF plan.ai_requests_per_day > 0 %]<li>&#129302; [% plan.ai_requests_per_day %] AI requests/day</li>[% END %]
+              [% IF plan.has_planning %]<li>&#128203; Planning &amp; project tools</li>[% END %]
+              [% IF plan.has_beekeeping %]<li>&#128029; Beekeeping module</li>[% END %]
+              [% IF plan.has_currency %]<li>&#127881; [% plan.currency_bonus > 0 ? plan.currency_bonus _ ' bonus coins' : 'Site coins' %]</li>[% END %]
+              [% IF plan.inventory_item AND plan.inventory_item.is_assemblable %]<li class="text-success"><strong>+ Optional add-ons</strong></li>[% END %]
+            </ul>
+            <div class="plan-card-actions">
+              <a href="[% c.uri_for('/membership/plan_details', [plan.id]) %]" class="btn btn-primary">
+                Learn More &amp; Join &rarr;
+              </a>
+            </div>
+          </div>
+          [% END %]
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No membership plans have been configured for this site yet.</p>
+        [% IF is_admin %]
+        <p><a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Configure Plans</a></p>
+        [% END %]
       </div>
       [% END %]
 
@@ -124,10 +161,9 @@
 
         [% IF csc_not_registered %]
         <div class="alert alert-warning">
-          <strong>&#9888; [% site_name | html %] is not yet registered with CSC</strong>
-          <p>Register to unlock hosting services for your members.
-          CSC handles domain setup, server maintenance, and billing —
-          [% site_name | html %] earns a referral commission on every hosting payment.</p>
+          <strong>&#9888; [% site_name | html %] is not yet registered with CSC for paid hosting</strong>
+          <p>Free and Basic plans let your members self-manage a subdomain without CSC involvement.
+          Register with CSC to unlock managed domain hosting, cPanel accounts, and referral commissions.</p>
           <div class="form-actions">
             <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', ref => 'membership' }) %]"
                class="btn btn-primary">Register [% site_name | html %] with CSC &rarr;</a>
@@ -167,7 +203,7 @@
       <div class="content-section">
         <h2>&#127760; CSC Hosting Plans</h2>
         <p class="text-muted">
-          [% site_name | html %] is a CSC hosting partner. Members can purchase hosting plans directly through CSC.
+          [% site_name | html %] is a CSC hosting partner. Members can add managed cloud hosting with domain support.
         </p>
         <div class="plan-cards-grid">
           [% FOREACH hplan IN csc_hosting_plans %]
@@ -175,105 +211,23 @@
             [% IF hplan.is_featured %]
             <div class="plan-card-badge">&#9733; Most Popular</div>
             [% END %]
-            <strong>[% hplan.name | html %]</strong>
+            <h3 class="plan-card-name">[% hplan.name | html %]</h3>
             <div class="plan-card-price">
               [% IF hplan.price_monthly == 0 %]Free[% ELSE %][% hplan.price_currency | html %]&nbsp;[% hplan.price_monthly %]/mo[% END %]
             </div>
-            [% IF hplan.description %]
-            <p class="text-muted">[% hplan.description | html %]</p>
-            [% END %]
-            <ul>
-              [% IF hplan.has_subdomain %]<li>Subdomain on partner SiteName</li>[% END %]
-              [% IF hplan.has_custom_domain %]<li>Custom domain support</li>[% END %]
-              [% IF hplan.has_planning %]<li>Planning &amp; project tools</li>[% END %]
-              [% IF hplan.ai_requests_per_day > 0 %]<li>[% hplan.ai_requests_per_day %] AI requests/day</li>[% END %]
+            [% IF hplan.description %]<p class="plan-card-desc">[% hplan.description | html %]</p>[% END %]
+            <ul class="plan-card-features">
+              [% IF hplan.has_subdomain %]<li>&#127760; Subdomain on CSC domain</li>[% END %]
+              [% IF hplan.has_custom_domain %]<li>&#127760; Custom domain support</li>[% END %]
+              [% IF hplan.has_planning %]<li>&#128203; Planning &amp; project tools</li>[% END %]
+              [% IF hplan.ai_requests_per_day > 0 %]<li>&#129302; [% hplan.ai_requests_per_day %] AI requests/day</li>[% END %]
             </ul>
-            <a href="[% c.uri_for('/membership/subscribe', { plan_id => hplan.id }) %]" class="btn btn-primary">
-              Get Hosting &rarr;
+            <a href="[% c.uri_for('/membership/plan_details', [hplan.id]) %]" class="btn btn-primary">
+              Learn More &amp; Join &rarr;
             </a>
           </div>
           [% END %]
         </div>
-      </div>
-      [% END %]
-
-      [% IF plans.size %]
-      <div class="content-section">
-        <h2>Available Plans</h2>
-        <div class="table-container">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Plan</th>
-                <th>Monthly</th>
-                <th>Annual</th>
-                <th>AI Models</th>
-                <th>Email</th>
-                <th>Hosting</th>
-                <th>Beekeeping</th>
-                <th>Planning</th>
-                <th>Currency</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              [% FOREACH plan IN plans %]
-              <tr[% IF plan.is_featured %] class="featured-plan"[% END %]>
-                <td>
-                  <strong>[% plan.name | html %]</strong>
-                  [% IF plan.is_featured %]<span class="badge">Popular</span>[% END %]
-                  [% IF plan.inventory_item %]
-                  <br><small class="text-muted">SKU: [% plan.inventory_item.sku | html %]</small>
-                  [% END %]
-                  [% IF plan.description %]<br><small>[% plan.description | html %]</small>[% END %]
-                  [%# BOM optional add-ons %]
-                  [% IF plan.inventory_item AND plan.inventory_item.is_assemblable %]
-                  <br><small class="text-success"><strong>+ Optional add-ons available</strong></small>
-                  [% END %]
-                </td>
-                [%# Price: pull from inventory item unit_price if linked, else plan price %]
-                [% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
-                <td>
-                  [% IF display_price == 0 %]
-                    Free
-                  [% ELSE %]
-                    [% plan.price_currency | html %] [% display_price %]/mo
-                  [% END %]
-                </td>
-                <td>
-                  [% IF plan.price_annual == 0 %]
-                    Free
-                  [% ELSE %]
-                    [% plan.price_currency | html %] [% plan.price_annual %]/yr
-                  [% END %]
-                </td>
-                <td>[% IF plan.ai_requests_per_day > 0 %][% plan.ai_requests_per_day %]/day[% ELSE %]—[% END %]</td>
-                <td>[% IF plan.has_email %][% plan.email_addresses %] addr[% ELSE %]—[% END %]</td>
-                <td>[% IF plan.has_hosting %][% plan.hosting_tier || 'Included' | html %][% ELSE %]—[% END %]</td>
-                <td>[% plan.has_beekeeping ? '✓' : '—' %]</td>
-                <td>[% plan.has_planning ? '✓' : '—' %]</td>
-                <td>[% plan.has_currency ? '✓' : '—' %]</td>
-                <td class="action-cell">
-                  [% IF c.session.username %]
-                    <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
-                       class="btn btn-primary">Join</a>
-                  [% ELSE %]
-                    <a href="[% c.uri_for('/user/login', { return_to => c.uri_for('/membership/subscribe', { plan_id => plan.id }) }) %]"
-                       class="btn btn-primary">Join</a>
-                  [% END %]
-                </td>
-              </tr>
-              [% END %]
-            </tbody>
-          </table>
-        </div>
-      </div>
-      [% ELSE %]
-      <div class="content-section">
-        <p class="empty-state">No membership plans have been configured for this site yet.</p>
-        [% IF is_admin %]
-        <p><a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Configure Plans</a></p>
-        [% END %]
       </div>
       [% END %]
 
@@ -291,8 +245,7 @@
           [% END %]
           <div class="form-field">
             <strong>Site Coins</strong> <em class="text-warning">(Promotional)</em>
-            — Use your internal coin balance to pay for memberships and services offered by participating members.
-            New accounts receive <strong>100 free coins</strong> to get started.
+            — Use your internal coin balance. New accounts receive <strong>100 free coins</strong> to get started.
             <br><a href="[% c.uri_for('/payment/buy/coins') %]">Buy more coins →</a>
           </div>
         </div>
@@ -305,8 +258,6 @@
         </div>
       </div>
       [% END %]
-
-
 
     </div>
   </div>
