@@ -4,123 +4,219 @@
    roles = "guest,user,admin"
    TemplateType = "Application"
    category = "Membership"
-   page_version = "0.01"
-   last_updated = "2026-04-03"
+   page_version = "0.02"
+   last_updated = "2026-04-26"
 %]
+
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+[% SET display_price = plan.inventory_item ? plan.inventory_item.unit_price : plan.price_monthly %]
+[% SET is_free_or_basic = (display_price == 0 OR plan.slug.match('free|basic')) %]
 
 <div class="app-container">
   <div class="page-header">
     <h1>[% plan.name | html %]</h1>
     [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
     <div class="form-actions" style="margin-top:0.5rem">
-      <a href="[% c.uri_for('/membership/plans') %]" class="btn btn-secondary">← Compare All Plans</a>
+      <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← All Plans</a>
     </div>
   </div>
 
   <div class="content-container">
     <div class="content-primary">
 
+      [%# ── Pricing ──────────────────────────────────────────────────────────── %]
       <div class="content-section">
         <h2>Pricing</h2>
         <div class="form-row">
           <div class="form-field">
             <strong>Monthly:</strong>
-            [% IF plan.price_monthly == 0 %]
-              Free
-            [% ELSE %]
-              [% plan.price_currency | html %] [% plan.price_monthly %] / month
-            [% END %]
+            [% IF display_price == 0 %]<span class="text-success"><strong>Free</strong></span>
+            [% ELSE %][% plan.price_currency | html %] [% display_price %] / month[% END %]
           </div>
           [% IF plan.price_annual > 0 %]
           <div class="form-field">
             <strong>Annual:</strong>
             [% plan.price_currency | html %] [% plan.price_annual %] / year
-            [% SET saving = (plan.price_monthly * 12) - plan.price_annual %]
-            [% IF saving > 0 %]
-              <span class="badge">Save [% plan.price_currency | html %][% saving %] per year</span>
-            [% END %]
+            [% SET saving = (display_price * 12) - plan.price_annual %]
+            [% IF saving > 0 %]<span class="badge">Save [% plan.price_currency | html %][% saving | format('%.2f') %] per year</span>[% END %]
           </div>
           [% END %]
         </div>
-        <p style="font-size:0.85em;color:#888">
+        [% IF display_price > 0 %]
+        <p style="font-size:0.85em;color:var(--text-muted-color,#888)">
           Prices shown in [% plan.price_currency | html %]. Geographic pricing may apply based on your location.
         </p>
+        [% END %]
       </div>
 
+      [%# ── Features ─────────────────────────────────────────────────────────── %]
       <div class="content-section">
-        <h2>Features Included</h2>
+        <h2>What's Included</h2>
         <div class="table-container">
           <table class="data-table">
             <tbody>
+
+              [%# Subdomain %]
               <tr>
-                <td><strong>AI Requests per Day</strong></td>
-                <td>[% IF plan.ai_requests_per_day > 0 %][% plan.ai_requests_per_day %] requests/day[% ELSE %]Not included[% END %]</td>
-              </tr>
-              <tr>
-                <td><strong>AI Models Available</strong></td>
-                <td>[% IF plan.max_ai_models > 0 %]Up to [% plan.max_ai_models %] models[% ELSE %]Not included[% END %]</td>
-              </tr>
-              <tr>
-                <td><strong>Email Addresses</strong></td>
+                <td><strong>&#127760; Subdomain</strong></td>
                 <td>
-                  [% IF plan.has_email %]
-                    [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %] @[site_name]
-                  [% ELSE %]
-                    Not included
-                  [% END %]
-                </td>
-              </tr>
-              <tr>
-                <td><strong>Hosting</strong></td>
-                <td>
-                  [% IF plan.has_hosting %]
-                    [% plan.hosting_tier || 'Shared Hosting' | html %] included
-                  [% ELSE %]
-                    Not included
-                  [% END %]
-                </td>
-              </tr>
-              <tr>
-                <td><strong>Subdomain</strong></td>
-                <td>[% plan.has_subdomain ? 'Included' : 'Not included' %]</td>
-              </tr>
-              <tr>
-                <td><strong>Custom Domain</strong></td>
-                <td>[% plan.has_custom_domain ? 'Included' : 'Not included' %]</td>
-              </tr>
-              <tr>
-                <td><strong>Beekeeping Module</strong></td>
-                <td>[% plan.has_beekeeping ? 'Included' : 'Not included' %]</td>
-              </tr>
-              <tr>
-                <td><strong>Planning System</strong></td>
-                <td>[% plan.has_planning ? 'Included' : 'Not included' %]</td>
-              </tr>
-              <tr>
-                <td><strong>Site Currency (Coins)</strong></td>
-                <td>
-                  [% IF plan.has_currency %]
-                    Included
-                    [% IF plan.currency_bonus > 0 %]
-                      — plus <strong>[% plan.currency_bonus %] bonus coins</strong> on activation
+                  [% IF plan.has_subdomain %]
+                    <span class="text-success">&#10003; Included</span>
+                    [% IF is_free_or_basic %]
+                    <br><small class="text-muted">A <em>[% site_name | html %].sitename</em> subdomain — managed by [% site_name | html %] directly. No CSC involvement required.</small>
+                    [% ELSE %]
+                    <br><small class="text-muted">CSC-managed subdomain on a registered domain.</small>
                     [% END %]
                   [% ELSE %]
-                    Not included
+                    <span class="text-muted">Not included</span>
                   [% END %]
                 </td>
               </tr>
+
+              [%# Custom Domain %]
+              <tr>
+                <td><strong>&#127760; Custom Domain</strong></td>
+                <td>
+                  [% IF plan.has_custom_domain %]
+                    <span class="text-success">&#10003; Included</span>
+                    <br><small class="text-muted">Bring your own domain (e.g. yourname.ca). CSC assists with DNS and proxy setup.</small>
+                  [% ELSE %]
+                    <span class="text-muted">Not included — upgrade for custom domain support</span>
+                  [% END %]
+                </td>
+              </tr>
+
+              [%# Email %]
+              <tr>
+                <td><strong>&#9993; Email</strong></td>
+                <td>
+                  [% IF plan.has_email %]
+                    <span class="text-success">&#10003; [% plan.email_addresses %] email address[% IF plan.email_addresses != 1 %]es[% END %]</span>
+                    <br><small class="text-muted">&#64;[% site_name.lower | html %] addresses included with this plan.</small>
+                  [% ELSE %]
+                    <span class="text-muted">Not included — upgrade for &#64;[% site_name.lower | html %] email addresses</span>
+                  [% END %]
+                </td>
+              </tr>
+
+              [%# Hosting %]
+              <tr>
+                <td><strong>&#128421; Managed Hosting</strong></td>
+                <td>
+                  [% IF plan.has_hosting %]
+                    <span class="text-success">&#10003; [% plan.hosting_tier || 'Shared Hosting' | html %]</span>
+                    [% IF is_free_or_basic %]
+                    <br><small class="text-muted">[% site_name | html %] manages hosting on its own infrastructure. No separate CSC account needed.</small>
+                    [% ELSE %]
+                    <br><small class="text-muted">CSC-managed shared hosting via WHC.ca (cPanel, email, databases, file manager).</small>
+                    [% END %]
+                  [% ELSE %]
+                    <span class="text-muted">Not included</span>
+                  [% END %]
+                </td>
+              </tr>
+
+              [%# AI %]
+              <tr>
+                <td><strong>&#129302; AI Assistant</strong></td>
+                <td>
+                  [% IF plan.ai_requests_per_day > 0 %]
+                    <span class="text-success">&#10003; [% plan.ai_requests_per_day %] requests / day</span>
+                    [% IF plan.ai_models_allowed %]
+                    <br><small class="text-muted">Models: [% plan.get_ai_models.join(', ') | html %]</small>
+                    [% END %]
+                  [% ELSE %]
+                    <span class="text-muted">Not included</span>
+                  [% END %]
+                </td>
+              </tr>
+
+              [%# Planning %]
+              <tr>
+                <td><strong>&#128203; Planning System</strong></td>
+                <td>[% plan.has_planning ? '<span class="text-success">&#10003; Included</span>' : '<span class="text-muted">Not included</span>' %]</td>
+              </tr>
+
+              [%# Beekeeping %]
+              [% IF plan.has_beekeeping OR site_name == 'CSC' %]
+              <tr>
+                <td><strong>&#128029; Beekeeping Module</strong></td>
+                <td>[% plan.has_beekeeping ? '<span class="text-success">&#10003; Included</span>' : '<span class="text-muted">Not included</span>' %]</td>
+              </tr>
+              [% END %]
+
+              [%# Currency / Coins %]
+              <tr>
+                <td><strong>&#127881; Site Coins</strong></td>
+                <td>
+                  [% IF plan.has_currency %]
+                    <span class="text-success">&#10003; Included</span>
+                    [% IF plan.currency_bonus > 0 %]
+                    <br><small class="text-muted">+ <strong>[% plan.currency_bonus %] bonus coins</strong> credited on activation</small>
+                    [% END %]
+                  [% ELSE %]
+                    <span class="text-muted">Not included</span>
+                  [% END %]
+                </td>
+              </tr>
+
+              [%# Add-on Services %]
               <tr>
                 <td><strong>Add-on Services</strong></td>
                 <td>Up to [% plan.max_services %] service[% IF plan.max_services != 1 %]s[% END %]</td>
               </tr>
+
             </tbody>
           </table>
         </div>
       </div>
 
+      [%# ── How to Get Started ────────────────────────────────────────────────── %]
+      <div class="content-section">
+        <h2>How to Get Started</h2>
+        <ol style="font-family:var(--body-font);line-height:1.8;padding-left:1.4em">
+          <li>
+            <strong>Create your account</strong> — Takes about 2 minutes.
+            <a href="[% c.uri_for('/user/register', { return_to => c.req.uri }) %]" class="btn btn-sm btn-secondary" style="margin-left:0.5em">Create Account</a>
+            <span style="font-size:0.85em;color:var(--text-muted-color)"> or
+              <a href="[% c.uri_for('/user/login', { return_to => c.req.uri }) %]">log in</a> if you already have one.
+            </span>
+          </li>
+          <li>
+            <strong>Choose your billing cycle</strong> — Monthly or annual (save up to
+            [% IF plan.price_monthly > 0 AND plan.price_annual > 0 %]
+              [% SET saving_pct = ((plan.price_monthly * 12 - plan.price_annual) / (plan.price_monthly * 12) * 100).int %]
+              [% saving_pct %]%
+            [% ELSE %]more[% END %]
+            with annual).
+          </li>
+          [% IF plan.has_subdomain OR plan.has_custom_domain %]
+          <li>
+            <strong>Set up your domain</strong>
+            [% IF is_free_or_basic %]
+            — Pick a subdomain like <em>yourname.[% site_name.lower | html %]</em>. [% site_name | html %] will set this up for you — no extra fees, no CSC account needed.
+            [% ELSE %]
+            — Choose a CSC subdomain or bring your own domain. CSC handles DNS and proxy setup.
+            [% END %]
+          </li>
+          [% END %]
+          [% IF plan.has_email %]
+          <li>
+            <strong>Set up your email</strong> — You'll receive [% plan.email_addresses %] &#64;[% site_name.lower | html %] address[% IF plan.email_addresses != 1 %]es[% END %].
+            Webmail access is provided; you can also configure your own email client (IMAP/SMTP).
+          </li>
+          [% END %]
+          <li>
+            <strong>Pay &amp; activate</strong> — Use PayPal, Site Coins, or your preferred payment method.
+            [% IF display_price == 0 %]This plan is <strong>free</strong> — no payment required.[% END %]
+          </li>
+        </ol>
+      </div>
+
+      [%# ── Payment Options ─────────────────────────────────────────────────── %]
       <div class="content-section">
         <h2>Payment Options</h2>
         <div class="form-row">
@@ -141,16 +237,97 @@
         </div>
       </div>
 
-      <div class="form-actions">
+      [%# ── CTA + Popup trigger ─────────────────────────────────────────────── %]
+      <div class="form-actions" style="margin-top:1.5rem">
         [% IF c.session.username %]
           <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]"
-             class="btn btn-primary">Subscribe to [% plan.name | html %]</a>
+             class="btn btn-primary" style="font-size:1.1rem;padding:0.6em 1.8em">
+            Subscribe to [% plan.name | html %]
+          </a>
         [% ELSE %]
-          <a href="[% c.uri_for('/user/login') %]" class="btn btn-primary">Log In to Subscribe</a>
+          <button type="button" class="btn btn-primary" style="font-size:1.1rem;padding:0.6em 1.8em"
+                  onclick="document.getElementById('signup-modal').style.display='flex'">
+            Join — [% IF display_price == 0 %]Free[% ELSE %][% plan.price_currency | html %] [% display_price %]/mo[% END %]
+          </button>
         [% END %]
-        <a href="[% c.uri_for('/membership/plans') %]" class="btn btn-secondary">Compare All Plans</a>
+        <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">← Compare All Plans</a>
       </div>
 
     </div>
   </div>
 </div>
+
+[%# ── Signup Modal (shown to guests only) ────────────────────────────────── %]
+[% UNLESS c.session.username %]
+<div id="signup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center">
+  <div style="background:var(--background-color,#fff);border-radius:8px;padding:2rem;max-width:480px;width:92%;position:relative;box-shadow:0 8px 32px rgba(0,0,0,0.25)">
+    <button onclick="document.getElementById('signup-modal').style.display='none'"
+            style="position:absolute;top:0.75rem;right:1rem;background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--text-muted-color)"
+            title="Close">&times;</button>
+
+    <h2 style="margin-top:0;font-family:var(--header-font)">Get Started with [% plan.name | html %]</h2>
+    [% IF display_price == 0 %]
+    <p style="color:var(--text-muted-color);font-family:var(--body-font)">This plan is free. Just create an account to activate it.</p>
+    [% ELSE %]
+    <p style="color:var(--text-muted-color);font-family:var(--body-font)">[% plan.price_currency | html %] [% display_price %]/mo — takes just a few minutes to set up.</p>
+    [% END %]
+
+    <div style="display:flex;flex-direction:column;gap:0.75rem;margin:1.5rem 0">
+
+      <div style="display:flex;align-items:flex-start;gap:1rem">
+        <div style="min-width:2rem;height:2rem;border-radius:50%;background:var(--primary-color,#2a6496);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem">1</div>
+        <div style="font-family:var(--body-font)">
+          <strong>Create a free account</strong>
+          <div style="font-size:0.9rem;color:var(--text-muted-color)">Choose a username, enter your email, set a password.</div>
+          <a href="[% c.uri_for('/user/register', { return_to => c.uri_for('/membership/subscribe', { plan_id => plan.id }) }) %]"
+             class="btn btn-primary" style="margin-top:0.4rem;display:inline-block">Create Account</a>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border-color,#ddd);margin:0.25rem 0"></div>
+
+      <div style="display:flex;align-items:flex-start;gap:1rem">
+        <div style="min-width:2rem;height:2rem;border-radius:50%;background:var(--secondary-color,#e8e8e8);color:var(--text-color);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem">2</div>
+        <div style="font-family:var(--body-font)">
+          <strong>Already have an account?</strong>
+          <div style="font-size:0.9rem;color:var(--text-muted-color)">Log in and we'll take you straight to the subscription page.</div>
+          <a href="[% c.uri_for('/user/login', { return_to => c.uri_for('/membership/subscribe', { plan_id => plan.id }) }) %]"
+             class="btn btn-secondary" style="margin-top:0.4rem;display:inline-block">Log In</a>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border-color,#ddd);margin:0.25rem 0"></div>
+
+      <div style="display:flex;align-items:flex-start;gap:1rem">
+        <div style="min-width:2rem;height:2rem;border-radius:50%;background:var(--secondary-color,#e8e8e8);color:var(--text-color);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:0.95rem">3</div>
+        <div style="font-family:var(--body-font)">
+          <strong>Choose your options &amp; pay</strong>
+          [% IF plan.has_subdomain OR plan.has_email %]
+          <div style="font-size:0.9rem;color:var(--text-muted-color)">
+            Pick your
+            [% IF plan.has_subdomain %]subdomain[% END %][% IF plan.has_subdomain AND plan.has_email %] and [% END %][% IF plan.has_email %]email address[% END %]
+            [% IF is_free_or_basic %]— managed entirely by [% site_name | html %], no CSC account needed.[% END %]
+          </div>
+          [% ELSE %]
+          <div style="font-size:0.9rem;color:var(--text-muted-color)">Select billing cycle and complete payment.</div>
+          [% END %]
+        </div>
+      </div>
+
+    </div>
+
+    <p style="font-size:0.8rem;color:var(--text-muted-color);font-family:var(--body-font);margin:0">
+      By signing up you agree to [% site_name | html %]'s terms of service. You can cancel at any time.
+    </p>
+  </div>
+</div>
+
+<script>
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') document.getElementById('signup-modal').style.display = 'none';
+});
+document.getElementById('signup-modal').addEventListener('click', function(e) {
+  if (e.target === this) this.style.display = 'none';
+});
+</script>
+[% END %]

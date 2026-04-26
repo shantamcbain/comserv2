@@ -470,6 +470,7 @@ sub plan_details :Local :Args(1) {
     $c->stash(
         template    => 'membership/PlanDetails.tt',
         plan        => $plan,
+        site_name   => $site_name,
         patreon_cfg => $patreon_cfg,
     );
     $c->forward($c->view('TT'));
