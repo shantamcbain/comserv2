@@ -145,7 +145,7 @@
 
 <style>
     .git-output {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 4px;
         white-space: pre-wrap;

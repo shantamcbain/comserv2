@@ -22,7 +22,7 @@
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <!-- AI Chat System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
                 <h3>AI Chat System</h3>
                 <p>Real-time AI-assisted documentation and code search with multi-model support.</p>
                 <div style="margin-top: 10px;">
@@ -33,7 +33,7 @@
             </div>
 
             <!-- Todo System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
                 <h3>Todo System</h3>
                 <p>Hierarchical task management with project support and time tracking.</p>
                 <div style="margin-top: 10px;">
@@ -44,7 +44,7 @@
             </div>
 
             <!-- Documentation System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
                 <h3>Documentation System</h3>
                 <p>In-application wiki with role-specific and site-specific documentation.</p>
                 <div style="margin-top: 10px;">
@@ -52,20 +52,20 @@
                     <a href="/Documentation/Documentation_Workflow">📋 Workflow</a> | 
                     <a href="/Documentation">🚀 Access System</a>
                 </div>
-                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                <div style="margin-top: 10px; font-size: 0.9em; color: var(--text-muted-color, #666);">
                     <strong>Status:</strong> Active with 314+ documentation files
                 </div>
             </div>
 
             <!-- WorkShop System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #2196f3;">
                 <h3>Workshop System</h3>
                 <p>Training and workshop management across multiple sites.</p>
                 <div style="margin-top: 10px;">
                     <a href="/Documentation/WorkShop">📄 Documentation</a> | 
                     <a href="/workshop">🚀 Access System</a>
                 </div>
-                <div style="margin-top: 10px; font-size: 0.9em; color: #666;">
+                <div style="margin-top: 10px; font-size: 0.9em; color: var(--text-muted-color, #666);">
                     <strong>Status:</strong> Active
                 </div>
             </div>
@@ -73,12 +73,12 @@
     </div>
 
     <!-- DOMAIN-SPECIFIC SYSTEMS -->
-    <div style="background: #fff3e0; padding: 20px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #ff9800;">
+    <div style="background: var(--caution-bg, #fff3e0); padding: 20px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #ff9800;">
         <h2>📚 Domain-Specific Knowledge & Site Systems</h2>
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <!-- ENCY -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>ENCY (Encyclopedia)</h3>
                 <p>Comprehensive biological and ecological database with medicinal plants and organisms.</p>
                 <div style="margin-top: 10px;">
@@ -88,7 +88,7 @@
             </div>
 
             <!-- BMaster -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>BMaster (Bee Apiary)</h3>
                 <p>Specialized bee apiary management and tracking system.</p>
                 <div style="margin-top: 10px;">
@@ -98,7 +98,7 @@
             </div>
 
             <!-- MCoop -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>MCoop (Monashee Coop)</h3>
                 <p>Cooperative management system for shared resources and member coordination.</p>
                 <div style="margin-top: 10px;">
@@ -108,7 +108,7 @@
             </div>
 
             <!-- Ve7tit -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>Ve7tit (Radio Comms)</h3>
                 <p>Amateur radio communications and network management system.</p>
                 <div style="margin-top: 10px;">
@@ -118,7 +118,7 @@
             </div>
 
             <!-- WeaverBeck -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>WeaverBeck (Genealogy)</h3>
                 <p>Family genealogy and heritage documentation system.</p>
                 <div style="margin-top: 10px;">
@@ -128,7 +128,7 @@
             </div>
 
             <!-- Shanta -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>Shanta (Personal)</h3>
                 <p>Personal and household management system.</p>
                 <div style="margin-top: 10px;">
@@ -138,7 +138,7 @@
             </div>
 
             <!-- Forager -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>Forager (Wild Plants)</h3>
                 <p>Foraging resource management and wild plant tracking system.</p>
                 <div style="margin-top: 10px;">
@@ -148,7 +148,7 @@
             </div>
 
             <!-- CSC -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>CSC (Community/Code Space)</h3>
                 <p>Community space and maker-space management system.</p>
                 <div style="margin-top: 10px;">
@@ -158,7 +158,7 @@
             </div>
 
             <!-- USBM -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #ff9800;">
                 <h3>USBM (Bureau/Management)</h3>
                 <p>Organization and bureau management system.</p>
                 <div style="margin-top: 10px;">
@@ -175,7 +175,7 @@
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <!-- Proxmox -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
                 <h3>Proxmox Integration</h3>
                 <p>Virtual machine management via Proxmox VE API integration.</p>
                 <div style="margin-top: 10px;">
@@ -185,7 +185,7 @@
             </div>
 
             <!-- Cloudflare -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
                 <h3>Cloudflare Integration</h3>
                 <p>DNS and domain management via Cloudflare API.</p>
                 <div style="margin-top: 10px;">
@@ -195,7 +195,7 @@
             </div>
 
             <!-- Ollama AI -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
                 <h3>Ollama AI Integration</h3>
                 <p>Local AI model inference without external APIs.</p>
                 <div style="margin-top: 10px;">
@@ -204,7 +204,7 @@
             </div>
 
             <!-- Database Management -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #9c27b0;">
                 <h3>Database Schema Management</h3>
                 <p>Dynamic database schema creation, comparison, and migration.</p>
                 <div style="margin-top: 10px;">
@@ -221,7 +221,7 @@
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <!-- Authentication -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
                 <h3>Authentication System</h3>
                 <p>Multi-layered user authentication and session management.</p>
                 <div style="margin-top: 10px;">
@@ -231,7 +231,7 @@
             </div>
 
             <!-- User Management -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
                 <h3>User Management</h3>
                 <p>User account creation, roles, and permissions control.</p>
                 <div style="margin-top: 10px;">
@@ -241,7 +241,7 @@
             </div>
 
             <!-- Multi-Site Management -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
                 <h3>Multi-Site Management</h3>
                 <p>Support for multiple independent sites with separate databases and themes.</p>
                 <div style="margin-top: 10px;">
@@ -251,7 +251,7 @@
             </div>
 
             <!-- Theme System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
                 <h3>Theme System</h3>
                 <p>Per-site CSS/JS themes and visual customization.</p>
                 <div style="margin-top: 10px;">
@@ -261,7 +261,7 @@
             </div>
 
             <!-- Navigation -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #4caf50;">
                 <h3>Navigation System</h3>
                 <p>Dynamic menu generation and navigation structure management.</p>
                 <div style="margin-top: 10px;">
@@ -277,7 +277,7 @@
         
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
             <!-- Admin Panel -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
                 <h3>Admin Panel</h3>
                 <p>System administration, backup/restore, and diagnostics.</p>
                 <div style="margin-top: 10px;">
@@ -287,7 +287,7 @@
             </div>
 
             <!-- Backup Manager -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
                 <h3>Backup Manager</h3>
                 <p>Database backup creation, scheduling, and restoration.</p>
                 <div style="margin-top: 10px;">
@@ -297,7 +297,7 @@
             </div>
 
             <!-- Logging System -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
                 <h3>Logging System</h3>
                 <p>Centralized logging and application event tracking.</p>
                 <div style="margin-top: 10px;">
@@ -307,7 +307,7 @@
             </div>
 
             <!-- Health Monitoring -->
-            <div style="background: white; padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
+            <div style="background: rgba(255,255,255,0.88); padding: 15px; border-radius: 4px; border: 1px solid #e91e63;">
                 <h3>Health Monitoring</h3>
                 <p>System health checks and diagnostics.</p>
                 <div style="margin-top: 10px;">
@@ -320,5 +320,5 @@
     <!-- ACTIVE PROJECTS LINK -->
     <div style="background: #f0f7ff; padding: 20px; margin: 20px 0; border-radius: 4px; border-left: 4px solid #0288d1;">
         <h2>📁 Active Projects</h2>
-        <p><a href="/project/project" style="color: #007bff; font-weight: bold; text-decoration: none;">→ View All Projects</a></p>
+        <p><a href="/project/project" style="color: var(--link-color, #007bff); font-weight: bold; text-decoration: none;">→ View All Projects</a></p>
     </div>

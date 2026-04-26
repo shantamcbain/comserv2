@@ -100,7 +100,7 @@
     <div>
         <label for="manual_project_id">Manual Project ID:</label>
         <input type="text" id="manual_project_id" name="manual_project_id" value="[% project_id OR '' %]" placeholder="Enter numeric project ID if you know it, otherwise leave blank">
-        <small style="color: #666; font-size: 0.9em; display: block; margin-top: 2px;">
+        <small style="color: var(--text-muted-color, #666); font-size: 0.9em; display: block; margin-top: 2px;">
             Only use this field if you know the exact numeric project ID. Otherwise, use the dropdown above.
         </small>
     </div>

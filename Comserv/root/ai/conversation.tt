@@ -11,7 +11,7 @@
     [% END %]
 
     [% IF conversation %]
-    <div style="margin-bottom:15px; padding:12px; background:#f5f5f5; border-radius:4px; font-size:0.9em; color:#555;">
+    <div style="margin-bottom:15px; padding:12px; background: var(--bg-secondary, #f5f5f5); border-radius:4px; font-size:0.9em; color: var(--text-muted-color, #555);">
         <strong>Model:</strong> [% conversation.model || 'Unknown' %]
         &nbsp;|&nbsp;
         <strong>Status:</strong> [% conversation.status %]

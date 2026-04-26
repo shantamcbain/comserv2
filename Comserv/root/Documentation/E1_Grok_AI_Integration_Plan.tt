@@ -89,28 +89,28 @@
 
         <h3>Test Files Created</h3>
         <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-            <thead style="background: #f5f5f5;">
+            <thead style="background: var(--bg-secondary, #f5f5f5);">
                 <tr>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Test File</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Test Count</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Status</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Test File</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Test Count</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Status</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><code>t/model_Grok.t</code></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">13</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ PASS</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>t/model_Grok.t</code></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">13</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ PASS</td>
                 </tr>
-                <tr style="background: #fafafa;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><code>t/controller_AI_grok_integration.t</code></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">10</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ PASS</td>
+                <tr style="background: var(--bg-secondary, #fafafa);">
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>t/controller_AI_grok_integration.t</code></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">10</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ PASS</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>TOTAL</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>23</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>✅ 100% PASS</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>TOTAL</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>23</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>✅ 100% PASS</strong></td>
                 </tr>
             </tbody>
         </table>
@@ -261,74 +261,74 @@ volumes:
         <h2 id="implementation-checklist">📊 Implementation Checklist</h2>
 
         <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-            <thead style="background: #f5f5f5;">
+            <thead style="background: var(--bg-secondary, #f5f5f5);">
                 <tr>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Task</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Status</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Completed</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">Notes</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Task</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Status</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Completed</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Notes</th>
                 </tr>
             </thead>
             <tbody>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">2.1: Create Grok.pm model</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 02:20</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">532 lines, K8s secrets + env var fallback</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.1: Create Grok.pm model</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 02:20</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">532 lines, K8s secrets + env var fallback</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">2.2: Add controller routing</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 14:05</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">+40 lines, conditional provider routing</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.2: Add controller routing</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">+40 lines, conditional provider routing</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">2.3: Unit tests (model)</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 14:05</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">model_Grok.t: 13/13 pass</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.3: Unit tests (model)</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">model_Grok.t: 13/13 pass</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">2.4: Integration tests</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 14:05</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">controller_AI_grok_integration.t: 10/10 pass</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.4: Integration tests</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">controller_AI_grok_integration.t: 10/10 pass</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">2.5: Documentation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 14:05</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Phase 1-2 complete in this doc</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2.5: Documentation</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 14:05</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Phase 1-2 complete in this doc</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">3.1: Admin configuration controller</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 15:08</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">209 lines, 8 methods, encryption + validation</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.1: Admin configuration controller</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">209 lines, 8 methods, encryption + validation</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">3.2: Configuration form template</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 15:08</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">AiConfiguration.tt: 366 lines, responsive UI</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.2: Configuration form template</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">AiConfiguration.tt: 366 lines, responsive UI</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">3.3: Secure key storage</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 15:08</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">AiModelConfig table with encryption</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.3: Secure key storage</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">AiModelConfig table with encryption</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">3.4: API key validation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 15:08</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">_validate_api_key() with AJAX test button</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.4: API key validation</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">_validate_api_key() with AJAX test button</td>
                 </tr>
                 <tr style="background: #e8f5e9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;">3.5: Phase 3 documentation</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ COMPLETE</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">2026-01-07 15:08</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Updated this .tt file with Phase 3 details</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.5: Phase 3 documentation</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ COMPLETE</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2026-01-07 15:08</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Updated this .tt file with Phase 3 details</td>
                 </tr>
             </tbody>
         </table>
@@ -409,8 +409,8 @@ Content-Type: application/json
 
 <style>
 .alert { padding: 15px; margin: 20px 0; border-left: 4px solid; border-radius: 4px; }
-.alert-warning { background: #fff3cd; border-left-color: #ffc107; }
-.alert-success { background: #d4edda; border-left-color: #28a745; }
-.nav-btn { display: inline-block; padding: 10px 20px; margin: 5px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; }
-.nav-btn-highlight { background: #28a745; font-weight: bold; }
+.alert-warning { background: var(--caution-bg, #fff3cd); border-left-color: #ffc107; }
+.alert-success { background: #d4edda; border-left-color: var(--success-color, #28a745); }
+.nav-btn { display: inline-block; padding: 10px 20px; margin: 5px; background: var(--primary-color, #007bff); color: white; text-decoration: none; border-radius: 4px; }
+.nav-btn-highlight { background: var(--success-color, #28a745); font-weight: bold; }
 </style>

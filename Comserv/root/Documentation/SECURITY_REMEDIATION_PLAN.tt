@@ -53,96 +53,96 @@
     </div>
 
     <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-        <thead style="background: #f5f5f5;">
+        <thead style="background: var(--bg-secondary, #f5f5f5);">
             <tr>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 5%;">Rank</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Initiative</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Category</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 10%;">Severity</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Timeline</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Impact</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 5%;">Rank</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 25%;">Initiative</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 15%;">Category</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 10%;">Severity</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 20%;">Timeline</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 25%;">Impact</th>
             </tr>
         </thead>
         <tbody>
             <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">1</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.1: SQL Injection Fixes</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 9.8)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1 (Jan 6-7)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Database compromise, data theft, system takeover</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">1</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.1: SQL Injection Fixes</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🔴 CRITICAL (CVSS 9.8)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1 (Jan 6-7)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Database compromise, data theft, system takeover</td>
             </tr>
             <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">2</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.2: Command Injection Prevention</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 9.8)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1 (Jan 6-7)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Remote code execution, system compromise</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">2</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.2: Command Injection Prevention</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🔴 CRITICAL (CVSS 9.8)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1 (Jan 6-7)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Remote code execution, system compromise</td>
             </tr>
             <tr style="background: #ffebee; border-bottom: 2px solid #c62828;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">3</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.3: Weak Password Hashing → Argon2</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL (CVSS 8.1)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Credential compromise via brute force/rainbow tables</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">3</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.3: Weak Password Hashing → Argon2</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🔴 CRITICAL (CVSS 8.1)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Credential compromise via brute force/rainbow tables</td>
             </tr>
-            <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">4</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.2: K8s Readiness Phase</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Deployment readiness, system stability</td>
+            <tr style="background: var(--caution-bg, #fff3cd); border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">4</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>A.2: K8s Readiness Phase</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🔴 CRITICAL</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Deployment readiness, system stability</td>
             </tr>
-            <tr style="background: #fff3cd; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">5</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.1: K8s Migration</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🔴 CRITICAL</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-4 (Jan 13-26)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Production environment modernization</td>
+            <tr style="background: var(--caution-bg, #fff3cd); border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">5</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>A.1: K8s Migration</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🔴 CRITICAL</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 2-4 (Jan 13-26)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Production environment modernization</td>
             </tr>
-            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">6</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.4: Session & CSRF Security</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH (CVSS 7.5)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Session hijacking, account takeover, data manipulation</td>
+            <tr style="background: #d4edda; border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">6</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.4: Session & CSRF Security</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🟠 HIGH (CVSS 7.5)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Session hijacking, account takeover, data manipulation</td>
             </tr>
-            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">7</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>E.1: AI Chat System</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Infrastructure</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-4 (Jan 13-26)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Development productivity, documentation access</td>
+            <tr style="background: #d4edda; border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">7</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>E.1: AI Chat System</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Infrastructure</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🟠 HIGH</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 2-4 (Jan 13-26)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Development productivity, documentation access</td>
             </tr>
-            <tr style="background: #d4edda; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">8</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.5: Encryption & Key Management</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH (CVSS 7.5)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-3 (Jan 13-19)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Encrypted credential compromise</td>
+            <tr style="background: #d4edda; border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">8</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.5: Encryption & Key Management</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🟠 HIGH (CVSS 7.5)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 2-3 (Jan 13-19)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Encrypted credential compromise</td>
             </tr>
-            <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">9</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.1/B.2: Bug Fixes (Docker Secrets, Auth)</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Bugs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟠 HIGH</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 1-2 (Jan 6-12)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">System stability, authentication reliability</td>
+            <tr style="background: #e8f4f8; border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">9</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>B.1/B.2: Bug Fixes (Docker Secrets, Auth)</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Bugs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🟠 HIGH</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 1-2 (Jan 6-12)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">System stability, authentication reliability</td>
             </tr>
-            <tr style="background: #e8f4f8; border-bottom: 1px solid #ddd;">
-                <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">10</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>G.6: Input Validation & Security Headers</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">🟡 MEDIUM (CVSS 5.3)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Week 2-3 (Jan 13-19)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Defense-in-depth hardening, OWASP compliance</td>
+            <tr style="background: #e8f4f8; border-bottom: 1px solid var(--border-color, #ddd);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); font-weight: bold;">10</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>G.6: Input Validation & Security Headers</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">🟡 MEDIUM (CVSS 5.3)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Week 2-3 (Jan 13-19)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Defense-in-depth hardening, OWASP compliance</td>
             </tr>
         </tbody>
     </table>
@@ -218,125 +218,125 @@
     <h2 id="vulnerability-matrix">Full Vulnerability Matrix</h2>
 
     <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-        <thead style="background: #f5f5f5;">
+        <thead style="background: var(--bg-secondary, #f5f5f5);">
             <tr>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 8%;">ID</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Vulnerability</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 12%;">Severity</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 12%;">CVSS</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 25%;">Impact</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 23%;">Location</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 8%;">ID</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 20%;">Vulnerability</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 12%;">Severity</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 12%;">CVSS</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 25%;">Impact</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 23%;">Location</th>
             </tr>
         </thead>
         <tbody>
             <!-- CRITICAL VULNERABILITIES -->
             <tr style="background: #ffebee;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>1</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>SQL Injection</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">9.8</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Database compromise, unauthorized data access, data modification, system takeover</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Admin.pm:330</code> (database name), <code>Admin.pm:348</code> (table name)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>1</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>SQL Injection</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">9.8</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Database compromise, unauthorized data access, data modification, system takeover</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Admin.pm:330</code> (database name), <code>Admin.pm:348</code> (table name)</td>
             </tr>
             <tr style="background: #ffebee;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>2</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Command Injection (Shell Execution)</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">9.8</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Remote code execution, system compromise, data theft, privilege escalation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Admin.pm</code> backticks (df, uptime, git commands in get_system_stats)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>2</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Command Injection (Shell Execution)</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">9.8</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Remote code execution, system compromise, data theft, privilege escalation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Admin.pm</code> backticks (df, uptime, git commands in get_system_stats)</td>
             </tr>
             <tr style="background: #ffebee;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>3</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Weak Password Hashing (No Salt)</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">8.1</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Credential compromise via brute force (SHA-256 is fast), rainbow table attacks, account takeover</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm:279</code> hash_password() uses SHA256 unsalted</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>3</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Weak Password Hashing (No Salt)</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #c62828; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">CRITICAL</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">8.1</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Credential compromise via brute force (SHA-256 is fast), rainbow table attacks, account takeover</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Controller/User.pm:279</code> hash_password() uses SHA256 unsalted</td>
             </tr>
 
             <!-- HIGH VULNERABILITIES -->
             <tr style="background: #ffe0b2;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>4</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Session Cookie Insecurity</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Session hijacking via MITM attacks, account takeover, session fixation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Comserv.pm:88-95</code> cookie_secure=0, missing SameSite attribute</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>4</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Session Cookie Insecurity</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">7.5</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Session hijacking via MITM attacks, account takeover, session fixation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Comserv.pm:88-95</code> cookie_secure=0, missing SameSite attribute</td>
             </tr>
             <tr style="background: #ffe0b2;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>5</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>No CSRF Protection</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Unauthorized form submissions, data manipulation, account takeover</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">All controllers - no CSRF token validation in POST/PUT/DELETE handlers</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>5</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>No CSRF Protection</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">7.5</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Unauthorized form submissions, data manipulation, account takeover</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">All controllers - no CSRF token validation in POST/PUT/DELETE handlers</td>
             </tr>
             <tr style="background: #ffe0b2;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>6</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Hardcoded Admin Bypass</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">8.8</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Account compromise = full admin access, privilege escalation, system compromise</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/AdminAuth.pm:45</code> hardcoded 'Shanta' + 'ai_assistant' usernames grant automatic admin</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>6</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Hardcoded Admin Bypass</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">8.8</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Account compromise = full admin access, privilege escalation, system compromise</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Util/AdminAuth.pm:45</code> hardcoded 'Shanta' + 'ai_assistant' usernames grant automatic admin</td>
             </tr>
             <tr style="background: #ffe0b2;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>7</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Weak Encryption (AES-256-CBC, No PBKDF2)</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Encrypted credential compromise, key derivation attacks, brute force</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/Encryption.pm</code> iterations=1 (should be 10k+), plaintext key files</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>7</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Weak Encryption (AES-256-CBC, No PBKDF2)</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">7.5</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Encrypted credential compromise, key derivation attacks, brute force</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Util/Encryption.pm</code> iterations=1 (should be 10k+), plaintext key files</td>
             </tr>
             <tr style="background: #ffe0b2;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>8</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insecure Session State Storage</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">7.5</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Unauthorized session access, privilege escalation, data theft</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Comserv.pm:94</code> dir=/tmp/session_data (world-readable), loose permissions</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>8</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Insecure Session State Storage</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f57c00; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">HIGH</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">7.5</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Unauthorized session access, privilege escalation, data theft</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Comserv.pm:94</code> dir=/tmp/session_data (world-readable), loose permissions</td>
             </tr>
 
             <!-- MEDIUM VULNERABILITIES -->
-            <tr style="background: #fff9c4;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>9</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insufficient Input Validation</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">XSS attacks, injection attacks, data corruption</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm:611</code> register() only checks field existence, not format/length</td>
+            <tr style="background: var(--caution-bg, #fff9c4);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>9</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Insufficient Input Validation</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">5.3</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">XSS attacks, injection attacks, data corruption</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Controller/User.pm:611</code> register() only checks field existence, not format/length</td>
             </tr>
-            <tr style="background: #fff9c4;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>10</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sensitive Data in Logs</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">User enumeration, credential leakage via logs, information disclosure</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm</code> logs username in plaintext during auth attempts</td>
+            <tr style="background: var(--caution-bg, #fff9c4);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>10</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Sensitive Data in Logs</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">5.3</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">User enumeration, credential leakage via logs, information disclosure</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Controller/User.pm</code> logs username in plaintext during auth attempts</td>
             </tr>
-            <tr style="background: #fff9c4;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>11</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Missing Security Headers</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3.7</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Clickjacking attacks, XSS attacks, MIME-type sniffing</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">All controllers - missing X-Frame-Options, X-Content-Type-Options, HSTS</td>
+            <tr style="background: var(--caution-bg, #fff9c4);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>11</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Missing Security Headers</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3.7</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Clickjacking attacks, XSS attacks, MIME-type sniffing</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">All controllers - missing X-Frame-Options, X-Content-Type-Options, HSTS</td>
             </tr>
-            <tr style="background: #fff9c4;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>12</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Insecure Encryption Key Storage</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">5.3</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Encryption key compromise, credential decryption, plaintext credential recovery</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Util/Encryption.pm</code> keys in /config (world-readable if not chmod 600)</td>
+            <tr style="background: var(--caution-bg, #fff9c4);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>12</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Insecure Encryption Key Storage</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">5.3</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Encryption key compromise, credential decryption, plaintext credential recovery</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Util/Encryption.pm</code> keys in /config (world-readable if not chmod 600)</td>
             </tr>
-            <tr style="background: #fff9c4;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>13</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Missing Logging for Auth Events</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">4.2</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Undetected brute force attacks, missing audit trail for security incidents</td>
-                <td style="padding: 10px; border: 1px solid #ddd;"><code>Controller/User.pm</code> logs failures but no rate limiting or alerting</td>
+            <tr style="background: var(--caution-bg, #fff9c4);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>13</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Missing Logging for Auth Events</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><span style="background: #f9a825; color: white; padding: 3px 8px; border-radius: 3px; font-weight: bold;">MEDIUM</span></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">4.2</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Undetected brute force attacks, missing audit trail for security incidents</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>Controller/User.pm</code> logs failures but no rate limiting or alerting</td>
             </tr>
         </tbody>
     </table>
@@ -378,7 +378,7 @@
         <p><strong>Files:</strong> Util/Encryption.pm, key file management</p>
     </div>
 
-    <div class="plan-card" style="background: #fff9c4; border-left: 4px solid #f9a825; margin: 20px 0; padding: 15px;">
+    <div class="plan-card" style="background: var(--caution-bg, #fff9c4); border-left: 4px solid #f9a825; margin: 20px 0; padding: 15px;">
         <h4>G.6: Input Validation & Security Headers</h4>
         <p><strong>Plan:</strong> <a href="/Documentation/Plans/G6_InputValidation_SecurityHeaders" class="doc-link">G.6_InputValidation_SecurityHeaders.tt</a> (To be created)</p>
         <p><strong>Severity:</strong> 🟡 MEDIUM | <strong>Timeline:</strong> Week 2-3 (Jan 13-19) | <strong>Effort:</strong> 4-5 hours</p>
@@ -390,53 +390,53 @@
     <div style="margin: 20px 0;">
         <h3>Week 1 Timeline (Jan 6-12, 2026)</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-            <tr style="background: #f5f5f5;">
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Day</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Task</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Duration</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 35%;">Deliverable</th>
+            <tr style="background: var(--bg-secondary, #f5f5f5);">
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 20%;">Day</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 30%;">Task</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 15%;">Duration</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 35%;">Deliverable</th>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Mon 6th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.1: SQL Injection Analysis & Fixes</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3-4 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Fixed Admin.pm, test suite, PR ready</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Mon 6th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.1: SQL Injection Analysis & Fixes</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3-4 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Fixed Admin.pm, test suite, PR ready</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Tue 7th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.2: Command Injection Prevention</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">4-5 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">IPC::Run implementation, system_stats() updated, tests</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Tue 7th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.2: Command Injection Prevention</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">4-5 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">IPC::Run implementation, system_stats() updated, tests</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Wed 8th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.3a: Password Hashing Analysis & Schema Update</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Schema migration, backward compatibility plan</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Wed 8th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.3a: Password Hashing Analysis & Schema Update</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Schema migration, backward compatibility plan</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Thu 9th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.3b: Argon2 Implementation (parallel: G.5 Encryption Design)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs + 2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">User.pm updated with Argon2, migration script ready</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Thu 9th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.3b: Argon2 Implementation (parallel: G.5 Encryption Design)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs + 2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">User.pm updated with Argon2, migration script ready</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Fri 10th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.4a: Session & CSRF Implementation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Comserv.pm updated, CSRF token generation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Fri 10th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.4a: Session & CSRF Implementation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Comserv.pm updated, CSRF token generation</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sat 11th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.4b: CSRF Token Integration (Forms)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">All forms updated with tokens, controllers validate</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Sat 11th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.4b: CSRF Token Integration (Forms)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">All forms updated with tokens, controllers validate</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sun 12th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.1-G.4 Testing & Validation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Full security test suite, all PRs reviewed</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Sun 12th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.1-G.4 Testing & Validation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Full security test suite, all PRs reviewed</td>
             </tr>
         </table>
     </div>
@@ -444,60 +444,60 @@
     <div style="margin: 20px 0;">
         <h3>Week 2 Timeline (Jan 13-19, 2026)</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
-            <tr style="background: #f5f5f5;">
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 20%;">Day</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 30%;">Task</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 15%;">Duration</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left; width: 35%;">Deliverable</th>
+            <tr style="background: var(--bg-secondary, #f5f5f5);">
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 20%;">Day</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 30%;">Task</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 15%;">Duration</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left; width: 35%;">Deliverable</th>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Mon 13th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.5: Encryption Key Management Hardening</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">PBKDF2 implementation, key file permissions (chmod 600)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Mon 13th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.5: Encryption Key Management Hardening</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">PBKDF2 implementation, key file permissions (chmod 600)</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Tue 14th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.5 Continuation & Documentation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Encryption.pm updated, secure key rotation guide</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Tue 14th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.5 Continuation & Documentation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Encryption.pm updated, secure key rotation guide</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Wed 15th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.6: Input Validation (User Registration)</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Data::Validate integration, regex patterns, tests</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Wed 15th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.6: Input Validation (User Registration)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Data::Validate integration, regex patterns, tests</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Thu 16th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.6: Security Headers Implementation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">X-Frame-Options, X-Content-Type-Options, HSTS added to Root.pm</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Thu 16th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.6: Security Headers Implementation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">X-Frame-Options, X-Content-Type-Options, HSTS added to Root.pm</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Fri 17th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security Audit Logging & Monitoring Setup</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">3 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Hashed username logging, rate limiting config, alerting rules</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Fri 17th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security Audit Logging & Monitoring Setup</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">3 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Hashed username logging, rate limiting config, alerting rules</td>
             </tr>
             <tr style="background: #f9f9f9;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sat 18th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.1-G.6 Comprehensive Testing & Documentation</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">4 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Full security test coverage, OWASP checklist, documentation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Sat 18th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.1-G.6 Comprehensive Testing & Documentation</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">4 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Full security test coverage, OWASP checklist, documentation</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Sun 19th</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Security Plan Validation & Master Plan Integration</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">2 hrs</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">All G.1-G.6 PRs merged, security.md updated, master plan updated</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Sun 19th</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Security Plan Validation & Master Plan Integration</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">2 hrs</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">All G.1-G.6 PRs merged, security.md updated, master plan updated</td>
             </tr>
         </table>
     </div>
 
     <h2 id="dependency-analysis">Dependency Analysis</h2>
 
-    <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3>Execution Dependencies</h3>
         <ul>
             <li><strong>G.1 (SQL Injection) is PREREQUISITE</strong> for testing framework - must fix first</li>

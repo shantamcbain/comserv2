@@ -33,17 +33,17 @@
 }
 
 .env-badge-production {
-    background-color: #dc3545;
+    background-color: var(--danger-color, #dc3545);
     color: white;
 }
 
 .env-badge-staging {
     background-color: #ffc107;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .env-badge-dev {
-    background-color: #28a745;
+    background-color: var(--success-color, #28a745);
     color: white;
 }
 

@@ -158,7 +158,7 @@
         padding: 10px;
         border-radius: 3px;
         text-align: center;
-        color: #333;
+        color: var(--text-color, #333);
         font-size: 12px;
         min-width: 80px;
     }

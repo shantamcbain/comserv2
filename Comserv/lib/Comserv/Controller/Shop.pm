@@ -223,7 +223,7 @@ sub admin :Path('/shop/admin') :Args(0) {
 
     unless ($self->_is_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required.';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
@@ -269,7 +269,7 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
 
     unless ($self->_is_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required.';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
@@ -341,7 +341,7 @@ sub setup :Path('/shop/setup') :Args(0) {
 
     unless ($self->_is_admin($c)) {
         $c->flash->{error_msg} = 'Admin access required.';
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 
@@ -405,7 +405,7 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
     my ($self, $c, $id) = @_;
 
     unless ($self->_is_admin($c)) {
-        $c->res->redirect($c->uri_for('/user/login'));
+        $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
 

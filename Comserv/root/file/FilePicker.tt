@@ -20,25 +20,25 @@
 .fp-toolbar select { padding:5px 8px; border:1px solid #ccc; border-radius:3px; font-size:.88rem; }
 .fp-toolbar button, .fp-toolbar a.btn { padding:5px 12px; font-size:.85rem; }
 .fp-tabs       { display:flex; gap:0; border-bottom:2px solid #1976d2; margin-bottom:10px; }
-.fp-tab        { padding:5px 16px; border:1px solid #ccc; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-size:.85rem; background:#f5f5f5; color:#333; margin-right:3px; }
+.fp-tab        { padding:5px 16px; border:1px solid #ccc; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-size:.85rem; background: var(--bg-secondary, #f5f5f5); color: var(--text-color, #333); margin-right:3px; }
 .fp-tab.active { background:#1976d2; color:#fff; border-color:#1976d2; font-weight:600; }
 .fp-panel      { display:none; flex:1; overflow-y:auto; }
 .fp-panel.active { display:block; }
 .fp-grid       { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; }
-.fp-card       { border:2px solid #e0e0e0; border-radius:4px; overflow:hidden; cursor:pointer; background:#fff; transition:border-color .15s; }
+.fp-card       { border:2px solid #e0e0e0; border-radius:4px; overflow:hidden; cursor:pointer; background: rgba(255,255,255,0.88); transition:border-color .15s; }
 .fp-card:hover { border-color:#1976d2; box-shadow:0 0 0 2px #bbdefb; }
-.fp-card img   { width:100%; height:80px; object-fit:contain; background:#f5f5f5; display:block; }
-.fp-card .fp-icon { width:100%; height:80px; display:flex; align-items:center; justify-content:center; font-size:2.2rem; background:#f5f5f5; }
-.fp-card .fp-name { padding:3px 5px; font-size:.68rem; color:#555; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fp-card img   { width:100%; height:80px; object-fit:contain; background: var(--bg-secondary, #f5f5f5); display:block; }
+.fp-card .fp-icon { width:100%; height:80px; display:flex; align-items:center; justify-content:center; font-size:2.2rem; background: var(--bg-secondary, #f5f5f5); }
+.fp-card .fp-name { padding:3px 5px; font-size:.68rem; color: var(--text-muted-color, #555); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .fp-card .fp-src  { padding:0 5px 3px; font-size:.65rem; color:#888; }
 .fp-card .fp-use  { display:block; width:100%; padding:3px 0; background:#1976d2; color:#fff; border:none; cursor:pointer; font-size:.78rem; text-align:center; }
 .fp-card .fp-use:hover { background:#1565c0; }
-.fp-url-box    { padding:14px; background:#f5f5f5; border:1px solid #ccc; border-radius:4px; }
+.fp-url-box    { padding:14px; background: var(--bg-secondary, #f5f5f5); border:1px solid #ccc; border-radius:4px; }
 .fp-url-box label { display:block; font-size:.85rem; font-weight:600; margin-bottom:6px; }
 .fp-url-box input { width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:.85rem; box-sizing:border-box; }
 .fp-url-box .fp-url-preview { margin-top:8px; text-align:center; min-height:60px; }
 .fp-url-box .fp-url-preview img { max-height:120px; max-width:100%; border-radius:3px; border:1px solid #ccc; }
-.fp-loading    { text-align:center; padding:20px; color:#666; font-style:italic; }
+.fp-loading    { text-align:center; padding:20px; color: var(--text-muted-color, #666); font-style:italic; }
 .fp-empty      { text-align:center; padding:20px; color:#999; }
 .fp-sel-bar    { background:#e3f2fd; border:1px solid #90caf9; border-radius:4px; padding:8px 12px; margin-bottom:10px; display:none; align-items:center; gap:10px; font-size:.88rem; }
 .fp-sel-bar.visible { display:flex; }
@@ -49,11 +49,11 @@
   <div class="fp-header">
     <h2>&#128193; Select File
       [% IF type_filter %]
-      <span style="font-size:.8rem;color:#666;font-weight:normal"> — [% type_filter | html %]</span>
+      <span style="font-size:.8rem;color: var(--text-muted-color, #666);font-weight:normal"> — [% type_filter | html %]</span>
       [% END %]
     </h2>
     <button onclick="window.close()"
-            style="padding:4px 12px;border:1px solid #ccc;background:#f5f5f5;border-radius:3px;cursor:pointer">
+            style="padding:4px 12px;border:1px solid #ccc;background: var(--bg-secondary, #f5f5f5);border-radius:3px;cursor:pointer">
       &times; Close
     </button>
   </div>

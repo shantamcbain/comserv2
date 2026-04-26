@@ -178,12 +178,26 @@ sub details :Path('/admin/plan') :Args(1) {
             $c->stash->{json} = { success => 1, plan => \%plan_data };
             $c->forward('View::JSON');
         } else {
+            my @available_projects;
+            if ($c->stash->{is_admin}) {
+                my $site = $plan->sitename || $c->stash->{plan_sitename} || 'CSC';
+                my %linked_ids = map { $_->{id} => 1 } @projects;
+                eval {
+                    my @all_proj = $schema->resultset('Project')->search(
+                        { sitename => $site, -or => [ status => undef, status => { '!=' => 'archived' } ] },
+                        { order_by => { -asc => 'name' } }
+                    )->all;
+                    @available_projects = map { { id => $_->id, name => $_->name, project_code => $_->project_code } }
+                                         grep { !$linked_ids{$_->id} } @all_proj;
+                };
+            }
             $c->stash(
-                plan         => \%plan_data,
-                is_admin     => $c->stash->{is_admin},
-                is_csc_admin => $c->stash->{is_csc_admin},
-                plan_sitename => $c->stash->{plan_sitename},
-                template     => 'admin/plan/view.tt',
+                plan               => \%plan_data,
+                is_admin           => $c->stash->{is_admin},
+                is_csc_admin       => $c->stash->{is_csc_admin},
+                plan_sitename      => $c->stash->{plan_sitename},
+                available_projects => \@available_projects,
+                template           => 'admin/plan/view.tt',
             );
             $c->forward($c->view('TT'));
         }
@@ -351,9 +365,59 @@ sub delete :Path('/admin/plan') :Args(1) {
     };
 }
 
-sub add_project :Path('/admin/plan') :Args(2) {
+sub edit_form :Path('/admin/plan') :Args(2) {
     my ($self, $c, $plan_id, $action) = @_;
-    
+
+    if ($action eq 'edit') {
+        my $schema = $c->model('DBEncy');
+        my $plan;
+        eval { $plan = $schema->resultset('DailyPlan')->find($plan_id) };
+
+        unless ($plan) {
+            $c->stash(error_msg => "Plan not found.", template => 'admin/plan/view.tt');
+            $c->forward($c->view('TT'));
+            $c->detach;
+        }
+
+        if ($c->req->method eq 'POST') {
+            my $p = $c->req->body_parameters;
+            eval {
+                $plan->update({
+                    plan_name        => $p->{plan_name}        // $plan->plan_name,
+                    plan_description => $p->{plan_description} // $plan->plan_description,
+                    status           => $p->{status}           // $plan->status,
+                    priority         => $p->{priority}         // $plan->priority,
+                    start_date       => $p->{start_date}       || undef,
+                    due_date         => $p->{due_date}         || undef,
+                });
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_form',
+                    "Error saving plan $plan_id: $@");
+                $c->stash(
+                    plan      => { $plan->get_columns },
+                    error_msg => "Save failed: $@",
+                    is_admin  => $c->stash->{is_admin},
+                    template  => 'admin/plan/edit.tt',
+                );
+                $c->forward($c->view('TT'));
+            } else {
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_form',
+                    "Plan $plan_id updated via edit form");
+                $c->response->redirect($c->uri_for("/admin/plan/$plan_id"));
+            }
+            $c->detach;
+        }
+
+        $c->stash(
+            plan     => { $plan->get_columns },
+            is_admin => $c->stash->{is_admin},
+            template => 'admin/plan/edit.tt',
+        );
+        $c->forward($c->view('TT'));
+        $c->detach;
+    }
+
     unless ($action eq 'project' && $c->req->method eq 'POST') {
         $c->response->redirect($c->uri_for('/admin/plan/list'));
         $c->detach;

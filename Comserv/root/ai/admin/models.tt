@@ -271,7 +271,7 @@
 }
 
 .model-status.enabled {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
@@ -341,7 +341,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -359,7 +359,7 @@
 }
 
 .btn-delete {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
     flex: 1;
 }

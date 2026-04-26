@@ -75,10 +75,10 @@
         <td style="padding:4px 0">[% con.reference_number || ('C-' _ con.id) %]</td></tr>
     <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color)">Status</th>
         <td style="padding:4px 0">
-          [% IF con.status == 'open' %]<span style="background:#fff3e0;color:#e65100;border-radius:3px;padding:2px 8px">Open</span>
+          [% IF con.status == 'open' %]<span style="background: var(--caution-bg, #fff3e0);color:#e65100;border-radius:3px;padding:2px 8px">Open</span>
           [% ELSIF con.status == 'partially_settled' %]<span style="background:#e3f2fd;color:#1565c0;border-radius:3px;padding:2px 8px">Partially Settled</span>
           [% ELSIF con.status == 'settled' %]<span style="background:#d4edda;color:#155724;border-radius:3px;padding:2px 8px">Settled</span>
-          [% ELSE %]<span style="background:#f5f5f5;color:#555;border-radius:3px;padding:2px 8px">[% con.status | html %]</span>[% END %]
+          [% ELSE %]<span style="background: var(--bg-secondary, #f5f5f5);color: var(--text-muted-color, #555);border-radius:3px;padding:2px 8px">[% con.status | html %]</span>[% END %]
         </td></tr>
     [% IF con.notes %]
     <tr><th style="text-align:left;padding:4px 10px 4px 0;color:var(--text-muted-color);vertical-align:top">Notes</th>
@@ -147,7 +147,7 @@
 </table>
 
 <div class="print-only" style="margin-top:2em;font-family:Arial,sans-serif;font-size:9pt">
-  <p style="margin:0 0 0.4em;color:#555">Commission rate: [% comm_pct %]% — Items remain property of [% site_info.display_name || sitename | html %] until sold.</p>
+  <p style="margin:0 0 0.4em;color: var(--text-muted-color, #555)">Commission rate: [% comm_pct %]% — Items remain property of [% site_info.display_name || sitename | html %] until sold.</p>
   <table style="width:100%;border-collapse:collapse;margin-top:1.5em">
     <tr>
       <td style="width:48%;padding-top:2em;border-top:1px solid #333;text-align:center">
@@ -160,6 +160,51 @@
     </tr>
   </table>
 </div>
+
+<hr style="border:none;border-top:2px solid var(--border-color);margin:1.5em 0" class="no-print">
+<h2 style="font-family:var(--header-font);color:var(--text-color);margin-bottom:0.4em" class="no-print">Send to Print Queue</h2>
+<div style="background:#e3f2fd;border:1px solid #90caf9;border-radius:4px;padding:8px 14px;margin-bottom:0.8em;font-size:0.85em;color:#0d47a1" class="no-print">
+  For each item that needs to be printed, enter the quantity to queue and optionally the filament type and colour. Leave qty at 0 to skip that line.
+</div>
+<form method="POST" action="/Inventory/consignment/queue/[% con.id %]" class="no-print">
+  <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem;margin-bottom:1em">
+    <thead>
+      <tr style="border-bottom:2px solid var(--border-color);background:var(--secondary-color)">
+        <th style="padding:8px 10px;text-align:left">Item</th>
+        <th style="padding:8px 10px;text-align:right">Consigned Qty</th>
+        <th style="padding:8px 10px;text-align:center">Qty to Queue</th>
+        <th style="padding:8px 10px;text-align:center">Filament Type</th>
+        <th style="padding:8px 10px;text-align:center">Colour</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% FOREACH line IN con.lines %]
+    <tr style="border-bottom:1px solid var(--border-color)">
+      <td style="padding:7px 10px;color:var(--text-color)">
+        <strong>[% line.item.name | html %]</strong>
+        [% IF line.notes %]<br><small style="color:var(--text-muted-color)">[% line.notes | html %]</small>[% END %]
+      </td>
+      <td style="padding:7px 10px;text-align:right">[% line.quantity_sent %]</td>
+      <td style="padding:7px 10px;text-align:center">
+        <input type="number" name="qty_[% line.id %]" min="0" step="1" value="[% line.quantity_sent %]"
+               style="width:70px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);text-align:right">
+      </td>
+      <td style="padding:7px 10px;text-align:center">
+        <input type="text" name="filament_[% line.id %]" placeholder="e.g. PLA" maxlength="100"
+               style="width:90px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </td>
+      <td style="padding:7px 10px;text-align:center">
+        <input type="text" name="colour_[% line.id %]" placeholder="e.g. Blue" maxlength="100"
+               style="width:90px;padding:4px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color)">
+      </td>
+    </tr>
+    [% END %]
+    </tbody>
+  </table>
+  <button type="submit" style="padding:7px 20px;background:#1565c0;color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font)">
+    Add to Print Queue
+  </button>
+</form>
 
 [% IF con.status != 'settled' %]
 <hr style="border:none;border-top:2px solid var(--border-color);margin:1.5em 0" class="no-print">

@@ -132,7 +132,7 @@
     .doc-header {
         margin-bottom: 30px;
         padding-bottom: 20px;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
     }
     
     .doc-header h1 {
@@ -145,7 +145,7 @@
         flex-wrap: wrap;
         gap: 15px;
         font-size: 0.9em;
-        color: #666;
+        color: var(--text-muted-color, #666);
     }
     
     .doc-section {
@@ -166,7 +166,7 @@
     }
     
     .faq-item h3 {
-        color: #333;
+        color: var(--text-color, #333);
         margin: 10px 0;
         font-weight: bold;
         cursor: pointer;

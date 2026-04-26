@@ -86,10 +86,180 @@ sub auto :Private {
     return 1;
 }
 
-sub redirect_hosted        :Path('/hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
-sub redirect_Hosted        :Path('/Hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
-sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting_signup'), 301); $_[1]->detach }
-sub redirect_accounts      :Path('/accounts') :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
+sub redirect_Hosted        :Path('/Hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosted'),  302); $_[1]->detach }
+sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting_signup'), 302); $_[1]->detach }
+
+sub hosted_dashboard :Path('/hosted') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} || 'CSC';
+    my $is_admin = $c->session->{is_admin} || 0;
+
+    my $acct = eval { $schema->resultset('HostingAccount')->find({ sitename => $sitename }) };
+
+    my $cost_cfg = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    my $all_plans = [
+        { slug => 'hosting-app',      name => 'App-only (Proxy)',   sku => 'HOST-APP',    monthly => ($cost_cfg ? $cost_cfg->unit_price : 10.00) },
+        { slug => 'hosting-subdomain', name => 'Subdomain + cPanel', sku => 'HOST-CPANEL', monthly => ($cost_cfg ? sprintf('%.2f', $cost_cfg->unit_price * 1.5) : 15.00) },
+    ];
+
+    $c->stash(
+        template  => 'hosting/hosted_dashboard.tt',
+        acct      => $acct,
+        cost_cfg  => $cost_cfg,
+        all_plans => $all_plans,
+        sitename  => $sitename,
+        is_admin  => $is_admin,
+    );
+}
+
+sub hosting_accounts :Path('/accounts') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->response->redirect($c->uri_for('/hosted'));
+        $c->detach;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $status  = $c->req->param('status') || 'all';
+    my $search  = {};
+    $search->{status} = $status unless $status eq 'all';
+
+    my @accounts = eval { $schema->resultset('HostingAccount')->search(
+        $search, { order_by => 'sitename' }
+    )->all };
+
+    my $cost_cfg = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    my @site_accounts = eval { $schema->resultset('SitePointAccount')->search(
+        {}, { order_by => 'sitename' }
+    )->all };
+
+    my $founder_cfg = eval {
+        $schema->resultset('FounderRoyaltyConfig')->search(
+            { active => 1 }, { rows => 1 }
+        )->first;
+    };
+
+    $c->stash(
+        template      => 'hosting/admin_accounts.tt',
+        accounts      => \@accounts,
+        cost_cfg      => $cost_cfg,
+        site_accounts => \@site_accounts,
+        founder_cfg   => $founder_cfg,
+        status_filter => $status,
+    );
+}
+
+sub activate_hosting :Path('/hosting/activate') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->res->status(403);
+        $c->stash(template => 'error.tt');
+        return;
+    }
+
+    my $schema     = $c->model('DBEncy');
+    my $acct_id    = $c->req->param('account_id') or do {
+        $c->flash->{error_msg} = 'account_id required';
+        $c->response->redirect($c->uri_for('/accounts'));
+        return;
+    };
+    my $payment_amount = $c->req->param('payment_amount') || 0;
+
+    my $acct = $schema->resultset('HostingAccount')->find($acct_id);
+    unless ($acct) {
+        $c->flash->{error_msg} = "Hosting account #$acct_id not found.";
+        $c->response->redirect($c->uri_for('/accounts'));
+        return;
+    }
+
+    eval {
+        my $renewal = DateTime->now->add(months => 1)->strftime('%Y-%m-%d');
+        $acct->update({ status => 'active', next_renewal_date => $renewal });
+
+        if ($payment_amount > 0) {
+            my $ps = Comserv::Util::PointSystem->new(c => $c);
+            $ps->apply_hosting_commission($acct, $payment_amount);
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Activation error: $@";
+    } else {
+        $c->flash->{success_msg} = "Hosting account for " . $acct->sitename . " activated.";
+    }
+
+    $c->response->redirect($c->uri_for('/accounts'));
+}
+
+sub hosting_cost_admin :Path('/hosting/cost') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->response->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $cfg    = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+        eval {
+            if ($cfg) {
+                $cfg->update({
+                    server_cost_monthly     => $p->{server_cost_monthly}     || $cfg->server_cost_monthly,
+                    active_site_count       => $p->{active_site_count}       || $cfg->active_site_count,
+                    overhead_percent        => $p->{overhead_percent}        || $cfg->overhead_percent,
+                    commission_percent      => $p->{commission_percent}      || $cfg->commission_percent,
+                    member_discount_percent => $p->{member_discount_percent} || $cfg->member_discount_percent,
+                    notes                   => $p->{notes},
+                    updated_by              => $c->session->{username},
+                });
+            } else {
+                $cfg = $schema->resultset('HostingCostConfig')->create({
+                    server_cost_monthly     => $p->{server_cost_monthly}     || 0,
+                    active_site_count       => $p->{active_site_count}       || 1,
+                    overhead_percent        => $p->{overhead_percent}        || 20,
+                    commission_percent      => $p->{commission_percent}      || 10,
+                    member_discount_percent => $p->{member_discount_percent} || 10,
+                    notes                   => $p->{notes},
+                    updated_by              => $c->session->{username},
+                });
+            }
+        };
+        if ($@) {
+            $c->flash->{error_msg} = "Save error: $@";
+        } else {
+            $c->flash->{success_msg} = 'Hosting cost config saved.';
+        }
+        $c->response->redirect($c->uri_for('/hosting/cost'));
+        return;
+    }
+
+    $c->stash(
+        template => 'hosting/cost_config.tt',
+        cfg      => $cfg,
+    );
+}
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;

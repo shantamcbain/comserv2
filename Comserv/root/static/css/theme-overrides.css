@@ -214,7 +214,7 @@ body[class*="theme-"] .dropbtn {
 }
 
 body[class*="theme-"] .dropdown-content {
-  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
@@ -227,11 +227,11 @@ body[class*="theme-"] .horizontal-dropdown:hover .dropdown-content {
 }
 
 body[class*="theme-"] .dropdown-content a {
-  color: var(--nav-link-color) !important;
+  color: var(--nav-link-color, var(--text-color, #000000)) !important;
 }
 
 body[class*="theme-"] .submenu {
-  background-color: var(--dropdown-bg, var(--secondary-color)) !important;
+  background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9)) !important;
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;
@@ -244,5 +244,5 @@ body[class*="theme-"] .submenu-item:hover .submenu {
 }
 
 body[class*="theme-"] .submenu a {
-  color: var(--nav-link-color) !important;
+  color: var(--nav-link-color, var(--text-color, #000000)) !important;
 }

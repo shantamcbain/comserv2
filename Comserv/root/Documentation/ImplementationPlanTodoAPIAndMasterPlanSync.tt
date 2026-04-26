@@ -155,7 +155,7 @@
     <p><strong>Dev-Only Enforcement</strong>: Only accessible via comserv_server.pl (development). Blocked in Starman production environment.</p>
     
     <h4>Request Body (JSON)</h4>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
   "subject": "string (required)",
   "description": "string (optional)",
   "project_id": "integer (optional, defaults to project 1)",
@@ -188,7 +188,7 @@
     <h3>1.3 Endpoint: PUT /api/todo/{id}</h3>
     <p><strong>Purpose</strong>: Update todo status/priority from IDE agent</p>
     <p><strong>Request Body</strong> (partial update allowed):</p>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>{
   "status": "integer 1-3",
   "priority": "integer 1-10",
   "description": "string",
@@ -242,7 +242,7 @@
     <h3>2.1 Master Plan Structure (Query-Based)</h3>
     
     <p>Instead of hardcoded task lists, Master Plan will query database:</p>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>[% projects = schema.resultset('Project').search({ status => { '!=' => 3 } } ) %]
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>[% projects = schema.resultset('Project').search({ status => { '!=' => 3 } } ) %]
 [% FOREACH project IN projects %]
    &lt;h3&gt;[% project.name %] ([% project.project_code %])&lt;/h3&gt;
    
@@ -269,7 +269,7 @@
     
     <p><strong>Design Rationale</strong>: Normalized table for flexibility (one project → multiple docs, one doc → multiple projects)</p>
     <p><strong>Table Structure</strong>:</p>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>CREATE TABLE project_documentation_mapping (
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>CREATE TABLE project_documentation_mapping (
     id INT AUTO_INCREMENT PRIMARY KEY,
     project_id INT NOT NULL,
     documentation_path VARCHAR(500) NOT NULL,  -- e.g., /Documentation/ConfigurationInfrastructure.tt#section-id
@@ -280,7 +280,7 @@
 );
 </code></pre>
     <p><strong>Example Data</strong>:</p>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>project_id=5, documentation_path=/Documentation/ConfigurationInfrastructure.tt#section-auth, is_primary=1
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>project_id=5, documentation_path=/Documentation/ConfigurationInfrastructure.tt#section-auth, is_primary=1
 project_id=5, documentation_path=/Documentation/Troubleshooting.tt#section-config, is_primary=0
 project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
 </code></pre>
@@ -293,7 +293,7 @@ project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
     <h3>3.1 Flag Format in DailyPlan.tt</h3>
     
     <p>Add <code>add_to_todo</code> attribute to tasks:</p>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>&lt;div class="task-item" data-task-id="task-001" data-add_to_todo="true"&gt;
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>&lt;div class="task-item" data-task-id="task-001" data-add_to_todo="true"&gt;
   &lt;h4&gt;Fix Todo Display Bug&lt;/h4&gt;
   &lt;p&gt;Critical blocker for Daily Plans UI&lt;/p&gt;
   &lt;button onclick="addTodoFromDailyPlan(this)" class="add-todo-btn"&gt;+ Add to Todo&lt;/button&gt;
@@ -331,7 +331,7 @@ project_id=5, documentation_path=/Documentation/UserGuide.tt, is_primary=0
     <pre>Agent → POST /api/todo/create → Todo auto-added → Master Plan updates automatically</pre>
 
     <h3>4.2 API Call Example (Perl)</h3>
-    <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>use LWP::UserAgent;
+    <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>use LWP::UserAgent;
 use JSON::MaybeXS;
 
 my $ua = LWP::UserAgent->new;

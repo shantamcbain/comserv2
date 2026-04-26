@@ -100,7 +100,7 @@
     [% display_project_details(project, 0) %]
 </div>
 
-<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid var(--border-color, #ddd); border-radius:4px; padding:16px; background: var(--bg-secondary, #fafafa);">
     <h3 style="margin-top:0;">AI Chat Activity</h3>
     <div id="ai-project-conversations" data-project-id="[% project.id %]">
         <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>

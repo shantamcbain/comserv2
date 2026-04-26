@@ -226,7 +226,7 @@ $c->stash(
     </ul>
 
     <h2 id="active-hierarchies">Active Project Hierarchies</h2>
-    <div style="background: #f9f9f9; border: 1px solid #ddd; padding: 15px; border-radius: 4px;">
+    <div style="background: #f9f9f9; border: 1px solid var(--border-color, #ddd); padding: 15px; border-radius: 4px;">
         <h3>1. Planning & Task Management</h3>
         <ul style="list-style: none;">
             <li>📂 <strong>Project Management</strong> (ID: 1)

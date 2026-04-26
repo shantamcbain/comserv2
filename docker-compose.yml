@@ -39,6 +39,7 @@ services:
     build:
       context: ./Comserv
       dockerfile: Dockerfile
+      network: host
     container_name: comserv-web-dev
     restart: unless-stopped
     labels:
@@ -105,6 +106,7 @@ services:
     build:
       context: ./Comserv
       dockerfile: Dockerfile
+      network: host
     container_name: comserv-web-prod
     restart: unless-stopped
     labels:

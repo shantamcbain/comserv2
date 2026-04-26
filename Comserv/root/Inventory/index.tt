@@ -13,21 +13,21 @@
   </div>
 
   <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.5rem;">
-    <a href="/Inventory/items" style="flex:1;min-width:110px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+    <a href="/Inventory/items" style="flex:1;min-width:110px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:#1e40af;">[% item_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">Active Items</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Active Items</div>
     </a>
-    <a href="/Inventory/suppliers" style="flex:1;min-width:110px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+    <a href="/Inventory/suppliers" style="flex:1;min-width:110px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:#7c3aed;">[% supplier_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">Suppliers</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Suppliers</div>
     </a>
-    <a href="/Inventory/locations" style="flex:1;min-width:110px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+    <a href="/Inventory/locations" style="flex:1;min-width:110px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:#047857;">[% location_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">Locations</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Locations</div>
     </a>
     <a href="/Inventory/stock/levels?low_only=1" style="flex:1;min-width:110px;background:[% low_stock > 0 ? '#fef2f2' : '#fff' %];border:1px solid [% low_stock > 0 ? '#ef4444' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:[% low_stock > 0 ? '#b91c1c' : '#059669' %];">[% low_stock %]</div>
-      <div style="font-size:0.8rem;color:#555;">Low Stock</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Low Stock</div>
     </a>
   </div>
 

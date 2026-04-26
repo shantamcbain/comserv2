@@ -96,7 +96,7 @@
     }
     
     .file-info {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 4px;
         margin-bottom: 20px;
@@ -130,14 +130,14 @@
         display: block;
         margin-bottom: 8px;
         font-weight: bold;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .form-group input[type="text"],
     .form-group select {
         width: 100%;
         padding: 10px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
     }
     
@@ -149,7 +149,7 @@
     }
     
     .submit-button {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
         border: none;
         padding: 12px 20px;
@@ -163,7 +163,7 @@
     }
     
     .cancel-link {
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         text-decoration: none;
     }
     
