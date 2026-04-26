@@ -397,6 +397,101 @@ sub record_payment {
 }
 
 # ---------------------------------------------------------------------------
+# credit_site_account(sitename => '3d', amount => N, transaction_type => ..., description => ...)
+# Credits a SiteName's point account (SitePointAccount table).
+# Used for referral commissions paid to the referring SiteName.
+# ---------------------------------------------------------------------------
+sub credit_site_account {
+    my ($self, %args) = @_;
+    my ($sitename, $amount, $type, $desc) =
+        @args{qw(sitename amount transaction_type description)};
+
+    die "credit_site_account: sitename required\n" unless $sitename;
+    die "credit_site_account: amount must be > 0\n"
+        unless looks_like_number($amount) && $amount > 0;
+
+    $self->_schema->txn_do(sub {
+        my $acct = $self->_schema->resultset('SitePointAccount')->find_or_create(
+            { sitename => $sitename },
+            { key => 'sitename' },
+        );
+        $acct->update({
+            balance         => ($acct->balance || 0) + $amount,
+            lifetime_earned => ($acct->lifetime_earned || 0) + $amount,
+        });
+    });
+
+    $self->_log->log_with_details(
+        $self->_c, 'info', __FILE__, __LINE__, 'credit_site_account',
+        "Credited $amount pts to site account '$sitename' (type=$type)"
+    );
+    return 1;
+}
+
+# ---------------------------------------------------------------------------
+# apply_hosting_commission(hosting_account_row, payment_amount)
+# On first hosting payment: credit referring SiteName and founder royalty.
+# Returns hashref { commission => N, royalty => N } or undef if nothing done.
+# ---------------------------------------------------------------------------
+sub apply_hosting_commission {
+    my ($self, $hosting_acct, $payment_amount) = @_;
+    return undef unless $hosting_acct && $payment_amount > 0;
+
+    my $schema = $self->_schema;
+    my $result  = { commission => 0, royalty => 0 };
+
+    my $cost_cfg = $schema->resultset('HostingCostConfig')->search(
+        {}, { order_by => { -desc => 'id' }, rows => 1 }
+    )->first;
+
+    my $commission_pct = ($cost_cfg ? $cost_cfg->commission_percent : 10) / 100;
+    my $referring      = $hosting_acct->referring_sitename;
+
+    if ($referring) {
+        my $commission = sprintf('%.4f', $payment_amount * $commission_pct);
+        eval {
+            $self->credit_site_account(
+                sitename         => $referring,
+                amount           => $commission,
+                transaction_type => 'hosting_commission',
+                description      => sprintf('Hosting commission: %s signed up (%s)',
+                    $hosting_acct->sitename, $hosting_acct->plan_slug // ''),
+            );
+        };
+        $result->{commission} = $commission unless $@;
+    }
+
+    my $founder_cfg = $schema->resultset('FounderRoyaltyConfig')->search(
+        { active => 1 }, { order_by => { -desc => 'id' }, rows => 1 }
+    )->first;
+
+    if ($founder_cfg) {
+        my $royalty_pct     = ($founder_cfg->royalty_percent || 5) / 100;
+        my $royalty_amount  = sprintf('%.4f', $payment_amount * $royalty_pct);
+        my $founder_user    = $schema->resultset('User')
+            ->find({ username => $founder_cfg->founder_username });
+        if ($founder_user && $royalty_amount > 0) {
+            eval {
+                $self->credit(
+                    user_id          => $founder_user->id,
+                    amount           => $royalty_amount,
+                    transaction_type => 'founder_royalty',
+                    description      => sprintf('Founder royalty %s%% on hosting payment: %s (%s)',
+                        $founder_cfg->royalty_percent,
+                        $hosting_acct->sitename,
+                        $hosting_acct->plan_slug // ''),
+                    reference_type   => 'hosting_account',
+                    reference_id     => $hosting_acct->id,
+                );
+            };
+            $result->{royalty} = $royalty_amount unless $@;
+        }
+    }
+
+    return $result;
+}
+
+# ---------------------------------------------------------------------------
 # convert(amount => N, from => 'USD', to => 'CAD') -> DECIMAL
 # Converts an amount between any two currencies using currency_rates.
 # Falls back to 1:1 if either rate is missing.
