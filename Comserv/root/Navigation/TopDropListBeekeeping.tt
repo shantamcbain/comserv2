@@ -6,9 +6,13 @@
       - enabled_modules.apiary      (site-level apiary module enabled)
       - SiteName == 'BMaster'       (always show on BMaster site)
 
+    Link strategy:
+      - Guests (not logged in): info/advertising pages that explain each feature
+      - Members (logged in):    working /Apiary/* management pages
+
     All routes in this file correspond to existing controller actions.
 %]
-[% PageVersion = 'Navigation/TopDropListBeekeeping.tt,v 0.01 2026/04/21 shanta Exp shanta' %]
+[% PageVersion = 'Navigation/TopDropListBeekeeping.tt,v 0.02 2026/04/26 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
 [% END %]
@@ -16,10 +20,15 @@
 [% SET site = c.stash.SiteName || c.session.SiteName || '' %]
 [% SET mods = c.stash.enabled_modules %]
 [% SET can_beekeep = mods.beekeeping || mods.apiary || (site == 'BMaster') || c.stash.is_admin %]
+[% SET logged_in = c.session.username ? 1 : 0 %]
 
 [% IF can_beekeep %]
 <li class="horizontal-dropdown">
+    [% IF logged_in %]
+    <a href="/Apiary" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
+    [% ELSE %]
     <a href="/BMaster" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
+    [% END %]
     <div class="dropdown-content">
 
         <!-- BMaster Home -->
@@ -27,7 +36,7 @@
 
         <div class="dropdown-divider"></div>
 
-        <!-- Bee Pasture & Forage -->
+        <!-- Bee Pasture & Forage — visible to all -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-plant"></i>Bee Pasture &amp; Forage</span>
             <div class="submenu">
@@ -37,42 +46,54 @@
             </div>
         </div>
 
-        <!-- Apiary Management -->
+        <!-- Apiary Management — members get /Apiary/*, guests get info pages -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-apiary"></i>Apiary Management</span>
             <div class="submenu">
-                <a href="/Apiary" class="submenu-link"><i class="icon-home"></i>Apiary Overview</a>
-                <a href="/BMaster/apiary" class="submenu-link"><i class="icon-manage"></i>My Apiary</a>
+                [% IF logged_in %]
+                <a href="/Apiary" class="submenu-link"><i class="icon-home"></i>My Apiary Dashboard</a>
                 <a href="/Apiary/HiveManagement" class="submenu-link"><i class="icon-hive"></i>Hive Management</a>
+                <a href="/Apiary/yards" class="submenu-link"><i class="icon-map"></i>My Yards</a>
                 <a href="/BMaster/beehealth" class="submenu-link"><i class="icon-medical"></i>Bee Health Monitoring</a>
                 <a href="/BMaster/honey" class="submenu-link"><i class="icon-honey"></i>Honey &amp; Harvest</a>
+                [% ELSE %]
+                <a href="/BMaster/apiary" class="submenu-link"><i class="icon-home"></i>About Apiary Management</a>
+                <a href="/BMaster/beehealth" class="submenu-link"><i class="icon-medical"></i>Bee Health Monitoring</a>
+                <a href="/BMaster/honey" class="submenu-link"><i class="icon-honey"></i>Honey &amp; Harvest</a>
+                [% END %]
             </div>
         </div>
 
-        <!-- Inspections -->
+        <!-- Hive Inspections — members get working pages, guests get teaser -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-inspect"></i>Hive Inspections</span>
             <div class="submenu">
+                [% IF logged_in %]
                 <a href="/Apiary/inspections" class="submenu-link"><i class="icon-list"></i>All Inspections</a>
-                [% IF c.session.username %]
                 <a href="/Apiary/inspections/new" class="submenu-link"><i class="icon-add"></i>New Inspection</a>
-                [% END %]
                 <a href="/Apiary/inspections/calendar" class="submenu-link"><i class="icon-calendar"></i>Inspection Calendar</a>
                 <a href="/Apiary/inspections/reports" class="submenu-link"><i class="icon-report"></i>Inspection Reports</a>
+                [% ELSE %]
+                <a href="/BMaster/apiary" class="submenu-link"><i class="icon-inspect"></i>Learn About Hive Inspections</a>
+                [% END %]
             </div>
         </div>
 
-        <!-- Queen Rearing -->
+        <!-- Queen Rearing — members get /Apiary/*, guests get info -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-insect"></i>Queen Rearing</span>
             <div class="submenu">
+                [% IF logged_in %]
                 <a href="/Apiary/QueenRearing" class="submenu-link"><i class="icon-insect"></i>Queen Rearing System</a>
                 <a href="/BMaster/Queens" class="submenu-link"><i class="icon-list"></i>Queen Records</a>
                 <a href="/Apiary/BeeHealth" class="submenu-link"><i class="icon-medical"></i>Colony Health</a>
+                [% ELSE %]
+                <a href="/BMaster/Queens" class="submenu-link"><i class="icon-insect"></i>About Queen Rearing</a>
+                [% END %]
             </div>
         </div>
 
-        <!-- Education -->
+        <!-- Education — visible to all -->
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-workshop"></i>Education &amp; Resources</span>
             <div class="submenu">
@@ -82,12 +103,12 @@
             </div>
         </div>
 
-        [% IF c.session.username %]
+        [% IF logged_in %]
         <div class="dropdown-divider"></div>
         <a href="/navigation/add_link?menu=Beekeeping" class="menu-item"><i class="icon-add"></i>Add Beekeeping Link</a>
         [% END %]
 
-        [% IF c.session.roles && c.session.roles.grep('^admin$').size %]
+        [% IF c.stash.is_admin %]
         <div class="dropdown-divider"></div>
         <a href="/navigation/manage_links?menu=Beekeeping" class="menu-item"><i class="icon-manage"></i>Manage Beekeeping Menu</a>
         [% END %]

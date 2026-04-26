@@ -27,8 +27,7 @@ sub auto :Private {
     my $site_id = $c->session->{SiteID};
 
     unless ($user_id) {
-        $c->flash->{error_msg} = 'Please log in to access the Apiary module.';
-        $c->response->redirect($c->uri_for('/membership/plans'));
+        $c->response->redirect($c->uri_for('/BMaster/apiary'));
         $c->detach;
         return 0;
     }
