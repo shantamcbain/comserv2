@@ -112,6 +112,9 @@
                     [% IF job.source_type && job.source_type != 'manual' %]
                     <br><small style="background:#17a2b8;color:white;padding:0.1em 0.4em;border-radius:8px;font-size:0.75em;">[% job.source_type | html %]</small>
                     [% END %]
+                    [% IF job.model_id && job.model_file %]
+                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download model file for slicer">⬇ Download File</a>
+                    [% END %]
                 </td>
                 <td>[% job.username | html %]</td>
                 <td>[% job.filament_type | html %] [% job.filament_color | html %]
@@ -169,6 +172,9 @@
                 <td>
                     [% IF job.model_name %][% job.model_name | html %][% ELSIF job.item_name %][% job.item_name | html %][% ELSE %]#[% job.id %][% END %]
                     [% IF job.quantity > 1 %]<span style="margin-left:0.4em;background:var(--accent-color,#007bff);color:white;padding:0.1em 0.5em;border-radius:10px;font-size:0.8em;font-weight:bold;" title="Quantity to print">×[% job.quantity %]</span>[% END %]
+                    [% IF job.model_id && job.model_file %]
+                    <br><a href="/3d/model_download/[% job.model_id %]" style="font-size:0.8em;color:var(--accent-color,#007bff);" title="Download model file for slicer">⬇ Download File</a>
+                    [% END %]
                 </td>
                 <td>[% job.username | html %]</td>
                 <td>[% IF job.printer_name %][% job.printer_name | html %][% ELSE %]&mdash;[% END %]</td>

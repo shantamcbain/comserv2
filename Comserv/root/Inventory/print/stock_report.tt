@@ -1,113 +1,54 @@
-[% PageVersion = 'Inventory/print/stock_report.tt,v 0.01 2026/04/14 shanta Exp' %]
-[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Stock Report — [% sitename | html %]</title>
 <style>
-  @media print {
-    .no-print { display: none !important; }
-    body { margin: 10mm; padding: 0; font-size: 9pt; }
-    table { font-size: 8pt; }
-    h1 { font-size: 14pt; margin: 0 0 4mm 0; }
-    h2 { font-size: 11pt; margin: 4mm 0 2mm 0; page-break-after: avoid; }
-    tr { page-break-inside: avoid; }
-    .low-row { background: var(--caution-bg, #fff8dc) !important; }
-  }
-
-  body { font-family: Arial, sans-serif; margin: 0; background: var(--bg-secondary, #f5f5f5); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: Arial, sans-serif; background: #fff; margin: 0; }
 
   .print-controls {
-    background: #333;
-    color: #fff;
-    padding: 10px 20px;
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    flex-wrap: wrap;
+    background: #333; color: #fff; padding: 10px 20px;
+    display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   }
   .print-controls a { color: #adf; text-decoration: none; }
   .print-controls button {
-    background: var(--success-color, #28a745);
-    color: #fff;
-    border: none;
-    padding: 7px 16px;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 1em;
-    font-weight: bold;
+    background: #28a745; color: #fff; border: none;
+    padding: 7px 16px; border-radius: 4px; cursor: pointer;
+    font-size: 1em; font-weight: bold;
   }
   .print-controls form { display: inline-flex; gap: 8px; align-items: center; }
   .print-controls select { padding: 3px 6px; border-radius: 3px; }
 
-  .report-page {
-    max-width: 260mm;
-    margin: 12px auto;
-    background: rgba(255,255,255,0.88);
-    padding: 15mm;
-    box-shadow: 0 0 8px rgba(0,0,0,0.15);
-  }
+  .report-page { max-width: 260mm; margin: 12px auto; padding: 15mm; }
 
-  .report-header {
-    border-bottom: 2px solid #333;
-    padding-bottom: 6px;
-    margin-bottom: 12px;
-  }
+  .report-header { border-bottom: 2px solid #333; padding-bottom: 6px; margin-bottom: 12px; }
+  .report-meta { display: flex; justify-content: space-between; font-size: 0.85em; color: #555; margin-bottom: 8px; }
 
-  .report-meta {
-    display: flex;
-    justify-content: space-between;
-    font-size: 0.85em;
-    color: var(--text-muted-color, #555);
-    margin-bottom: 8px;
-  }
-
-  table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 16px;
-  }
-
-  th {
-    background: #444;
-    color: #fff;
-    padding: 5px 8px;
-    text-align: left;
-    font-size: 0.85em;
-  }
-
-  td {
-    padding: 4px 8px;
-    border-bottom: 1px solid var(--border-color, #ddd);
-    font-size: 0.9em;
-    vertical-align: top;
-  }
-
+  table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+  th { background: #444; color: #fff; padding: 5px 8px; text-align: left; font-size: 0.85em; }
+  td { padding: 4px 8px; border-bottom: 1px solid #ddd; font-size: 0.9em; vertical-align: top; }
   tr:nth-child(even) td { background: #f9f9f9; }
+  .low-row td { background: #fff8dc !important; }
+  .low-badge { color: #c00; font-weight: bold; font-size: 0.8em; }
 
-  .low-row td { background: var(--caution-bg, #fff8dc) !important; }
-  .low-badge {
-    color: #c00;
-    font-weight: bold;
-    font-size: 0.8em;
-  }
-
-  .summary {
-    border: 1px solid #ccc;
-    padding: 8px 12px;
-    border-radius: 4px;
-    font-size: 0.9em;
-    margin-bottom: 12px;
-    background: var(--bg-secondary, #fafafa);
-  }
-
-  h2 {
-    border-bottom: 1px solid #ccc;
-    padding-bottom: 4px;
-    margin-top: 16px;
-  }
+  .summary { border: 1px solid #ccc; padding: 8px 12px; border-radius: 4px; font-size: 0.9em; margin-bottom: 12px; background: #fafafa; }
+  h1 { font-size: 16pt; }
+  h2 { font-size: 12pt; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-top: 16px; margin-bottom: 8px; }
 
   @media print {
-    .report-page { box-shadow: none; padding: 0; max-width: none; }
+    .no-print { display: none !important; }
+    body { font-size: 9pt; }
+    table { font-size: 8pt; }
+    h1 { font-size: 14pt; margin: 0 0 4mm 0; }
+    h2 { font-size: 11pt; margin: 4mm 0 2mm 0; page-break-after: avoid; }
+    tr { page-break-inside: avoid; }
+    .low-row { background: #fff8dc !important; }
+    .report-page { padding: 10mm; }
   }
 </style>
+</head>
+<body>
 
 <div class="no-print print-controls">
   <a href="/Inventory/stock/levels">&larr; Stock Levels</a>
@@ -125,7 +66,7 @@
       <input type="checkbox" name="low_only" value="1"[% IF low_only %] checked[% END %]>
       Low stock only
     </label>
-    <button type="submit" style="background: var(--primary-color, #007bff);">Filter</button>
+    <button type="submit" style="background:#007bff;">Filter</button>
   </form>
   &nbsp;
   <button onclick="window.print()">&#128438; Print Report</button>
@@ -167,42 +108,24 @@
       [% cur_cat = item.category %]
       <h2>[% cur_cat | html %]</h2>
       <table>
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>Item Name</th>
-            <th>Unit</th>
-            <th>On Hand</th>
-            <th>Reserved</th>
-            <th>Available</th>
-            <th>Reorder Point</th>
-            <th>Reorder Qty</th>
-            <th>Unit Cost</th>
-            <th>Stock Value</th>
-            <th>Last Count</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>SKU</th><th>Item Name</th><th>Unit</th>
+          <th>On Hand</th><th>Reserved</th><th>Available</th>
+          <th>Reorder Point</th><th>Reorder Qty</th>
+          <th>Unit Cost</th><th>Stock Value</th><th>Last Count</th>
+        </tr></thead>
         <tbody>
     [% ELSIF !item.category && cur_cat != '__none__' %]
       [% IF cur_cat %]</tbody></table>[% END %]
       [% cur_cat = '__none__' %]
       <h2>Uncategorized</h2>
       <table>
-        <thead>
-          <tr>
-            <th>SKU</th>
-            <th>Item Name</th>
-            <th>Unit</th>
-            <th>On Hand</th>
-            <th>Reserved</th>
-            <th>Available</th>
-            <th>Reorder Point</th>
-            <th>Reorder Qty</th>
-            <th>Unit Cost</th>
-            <th>Stock Value</th>
-            <th>Last Count</th>
-          </tr>
-        </thead>
+        <thead><tr>
+          <th>SKU</th><th>Item Name</th><th>Unit</th>
+          <th>On Hand</th><th>Reserved</th><th>Available</th>
+          <th>Reorder Point</th><th>Reorder Qty</th>
+          <th>Unit Cost</th><th>Stock Value</th><th>Last Count</th>
+        </tr></thead>
         <tbody>
     [% END %]
     [% SET total_reserved = 0 %]
@@ -221,12 +144,7 @@
       <td style="text-align:right;">[% total_reserved %]</td>
       <td style="text-align:right;">[% available %]</td>
       <td style="text-align:right;">
-        [% IF item.reorder_point %]
-          [% item.reorder_point %]
-          [% IF row.is_low %]<span class="low-badge"> &#9888; LOW</span>[% END %]
-        [% ELSE %]
-          -
-        [% END %]
+        [% IF item.reorder_point %][% item.reorder_point %][% IF row.is_low %]<span class="low-badge"> &#9888; LOW</span>[% END %][% ELSE %]-[% END %]
       </td>
       <td style="text-align:right;">[% item.reorder_quantity || '-' %]</td>
       <td style="text-align:right;">[% item.unit_cost ? item.unit_cost : '-' %]</td>
@@ -236,9 +154,11 @@
   [% END %]
   [% IF report_rows.size > 0 %]</tbody></table>[% END %]
 
-  [% END %][%# end IF report_rows.size %]
+  [% END %]
 
   <div style="margin-top:20px;border-top:1px solid #ccc;padding-top:8px;font-size:0.8em;color:#888;text-align:right;">
     Inventory System &mdash; [% sitename %] &mdash; [% print_date %]
   </div>
 </div>
+</body>
+</html>

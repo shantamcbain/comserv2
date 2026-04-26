@@ -167,7 +167,8 @@
             <td>[% m.print_time_hours ? m.print_time_hours _ ' h' : '—' %]</td>
             <td class="stl-info">
                 [% IF m.nfs_path %]
-                <code style="font-size:0.75em;word-break:break-all;">[% m.nfs_path | html %]</code>
+                <code style="font-size:0.75em;word-break:break-all;">[% m.nfs_path | html %]</code><br>
+                <a href="/3d/model_download/[% m.id %]" class="btn-sm btn-primary" style="margin-top:0.3em;display:inline-block;">⬇ Download</a>
                 [% ELSE %]<em>—</em>[% END %]
             </td>
             <td>
