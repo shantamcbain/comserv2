@@ -28,7 +28,7 @@
     [% IF logged_in %]
     <a href="/Apiary" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
     [% ELSE %]
-    <a href="/BMaster" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
+    <a href="/BMaster/apiary" class="dropbtn"><i class="icon-hive"></i>Beekeeping</a>
     [% END %]
     <div class="dropdown-content">
 
