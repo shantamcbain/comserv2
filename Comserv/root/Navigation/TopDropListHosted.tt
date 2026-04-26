@@ -22,18 +22,20 @@
         <!-- Hosted sites from database (SiteDomain table) -->
         [% SET hosted_sites = [] %]
         [% TRY %]
-        [% SET hosted_sites = c.model('DBEncy').resultset('SiteDomain').search({}, { order_by => 'domain', prefetch => 'site' }).all %]
+        [% SET hosted_sites = c.model('DBEncy').resultset('SiteDomain').search({}, { order_by => 'domain' }).all %]
         [% CATCH %][% END %]
         [% IF hosted_sites.size %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-production"></i>Hosted Sites</span>
             <div class="submenu">
+                [% TRY %]
                 [% FOREACH sd IN hosted_sites %]
                 <a href="https://[% sd.domain | html %]" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>[% sd.site.name | html %][% IF sd.domain %] — [% sd.domain | html %][% END %]
+                    <i class="icon-site"></i>[% sd.domain | html %]
                 </a>
                 [% END %]
+                [% CATCH %][% END %]
             </div>
         </div>
         [% END %]
