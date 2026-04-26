@@ -227,21 +227,21 @@ sub add :Local {
 
     unless ($c->session->{username}) {
         $c->response->redirect($c->uri_for('/user/login', { return_to => '/workshop/add' }));
+        $c->detach();
         return;
     }
 
-    # Set the TT template to use
     $c->stash->{template} = 'WorkShops/AddWorkshop.tt';
 }
 sub addworkshop :Local {
     my ( $self, $c ) = @_;
 
     unless ($c->session->{username}) {
-        $c->response->redirect($c->uri_for('/user/login'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/workshop/addworkshop' }));
+        $c->detach();
         return;
     }
 
-    # Retrieve the form data from the request
     my $params = $c->request->parameters;
 
     # Validate the form data

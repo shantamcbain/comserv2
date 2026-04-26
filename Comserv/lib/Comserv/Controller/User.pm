@@ -69,10 +69,22 @@ sub login :Local {
     # NOTE: Only overwrite the session referer when we have an explicit value.
     # This ensures a controller that redirects to /user/login without return_to still
     # returns the user to the right place (the session referer set before the redirect).
-    my $explicit_return = $c->req->param('return_to')
-                       || $c->req->param('destination')
-                       || $c->req->referer
-                       || '';
+    my $is_local_url = sub {
+        my $url = shift || '';
+        return ($url =~ m{^/} && $url !~ m{^//} && $url !~ m{[<>"'\0]}) ? 1 : 0;
+    };
+
+    my $raw_return = $c->req->param('return_to')
+                  || $c->req->param('destination')
+                  || '';
+    my $http_referer = $c->req->referer || '';
+
+    my $explicit_return = '';
+    if ($raw_return && $is_local_url->($raw_return)) {
+        $explicit_return = $raw_return;
+    } elsif ($http_referer && $is_local_url->($http_referer)) {
+        $explicit_return = $http_referer;
+    }
 
     my @login_patterns = (
         qr{/user/login}, qr{/login}, qr{/do_login},
@@ -85,7 +97,6 @@ sub login :Local {
     };
 
     if ($explicit_return && !$is_login_url->($explicit_return)) {
-        # Explicit valid destination — store it
         $c->session->{referer} = $explicit_return;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
             "Stored explicit referer in session: $explicit_return");
@@ -206,11 +217,15 @@ sub do_login :Local {
             "Using return_to parameter for redirect: $redirect_path"
         );
     } else {
-        # Fall back to session referer
-        $redirect_path = $c->session->{referer} || '/';
+        my $sess_ref = $c->session->{referer} || '';
+        if ($sess_ref =~ m{^/} && $sess_ref !~ m{^//} && $sess_ref !~ m{[<>"'\0]}) {
+            $redirect_path = $sess_ref;
+        } else {
+            $redirect_path = '/';
+        }
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+            "Using session referer for redirect: $redirect_path"
         );
     }
 
