@@ -49,7 +49,7 @@
     window.AI_CHAT_USER_CONFIG = {
         username: '[% c.session.username || 'Guest' %]',
         isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
-        isAdmin:  [% (c.check_user_roles('admin') || c.check_user_roles('developer')) ? 'true' : 'false' %],
+        isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
         siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
     };
     </script>

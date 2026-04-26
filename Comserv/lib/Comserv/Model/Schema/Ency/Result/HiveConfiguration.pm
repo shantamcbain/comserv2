@@ -182,6 +182,27 @@ __PACKAGE__->has_many(
     { cascade_delete => 1 }
 );
 
+__PACKAGE__->has_many(
+    'configuration_boxes',
+    'Comserv::Model::Schema::Ency::Result::ConfigurationBox',
+    'configuration_id',
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'configuration_inventory',
+    'Comserv::Model::Schema::Ency::Result::ConfigurationInventory',
+    'configuration_id',
+    { cascade_delete => 1 }
+);
+
+__PACKAGE__->has_many(
+    'hives_using_config',
+    'Comserv::Model::Schema::Ency::Result::Hive',
+    'configuration_id',
+    { cascade_delete => 0 }
+);
+
 # Custom methods
 sub display_name {
     my $self = shift;

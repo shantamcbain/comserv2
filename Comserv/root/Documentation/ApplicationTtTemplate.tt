@@ -536,4 +536,79 @@ $c->stash->{
             <li>Test the page functionality and responsive design</li>
         </ol>
     </div>
+
+    <div class="app-section">
+        <h2>BMaster / Apiary — Queen Data Model Patterns</h2>
+        <p>The following patterns apply to all Apiary templates that work with queens, hive assignments, and inspection records.</p>
+
+        <div class="content-section">
+            <h3>Canonical Queen Tables</h3>
+            <ul>
+                <li><strong><code>queens</code></strong> — canonical queen registry (Result: <code>Queen.pm</code>). One row per queen. Includes genetic lineage, lifecycle status, denormalised location FKs.</li>
+                <li><strong><code>queen_events</code></strong> — lifecycle event journal (Result: <code>QueenEvent.pm</code>). Event types: grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved, marked, clipped, inspected.</li>
+                <li><strong><code>queen_hive_assignments</code></strong> — full hive movement history (Result: <code>QueenHiveAssignment.pm</code>). Current assignment = row where <code>removed_date IS NULL</code>.</li>
+                <li><strong><code>inspections</code></strong> — hive inspection records (Result: <code>Inspection.pm</code>). Has nullable <code>queen_id</code> FK when queen was confirmed present.</li>
+            </ul>
+        </div>
+
+        <div class="content-section">
+            <h3>TT Patterns — Displaying Current Queen</h3>
+            <pre>[%# Get current queen via Hive.current_queen() helper %]
+[% current_queen = hive.current_queen %]
+[% IF current_queen %]
+    &lt;p&gt;Queen: [% current_queen.tag_number | html %]
+       [% IF current_queen.genetic_line %]([% current_queen.genetic_line | html %])[% END %]&lt;/p&gt;
+    &lt;p&gt;Status: [% current_queen.mating_status | html %] / [% current_queen.health_status | html %]&lt;/p&gt;
+[% ELSE %]
+    &lt;p class="text-muted"&gt;No queen recorded for this hive.&lt;/p&gt;
+[% END %]</pre>
+        </div>
+
+        <div class="content-section">
+            <h3>TT Patterns — Queen Event History</h3>
+            <pre>[%# Loop through queen lifecycle events %]
+[% FOREACH event IN queen.queen_events.search({}, { order_by => { -desc => 'event_date' } }) %]
+    &lt;tr&gt;
+        &lt;td&gt;[% event.event_date | html %]&lt;/td&gt;
+        &lt;td&gt;[% event.event_type | html %]&lt;/td&gt;
+        &lt;td&gt;[% event.inspector | html %]&lt;/td&gt;
+        &lt;td&gt;[% event.notes | html %]&lt;/td&gt;
+    &lt;/tr&gt;
+[% END %]</pre>
+        </div>
+
+        <div class="content-section">
+            <h3>TT Patterns — Queen Hive Assignment History</h3>
+            <pre>[%# Show all hives a queen has lived in %]
+[% FOREACH assignment IN queen.queen_hive_assignments.search({}, { order_by => { -desc => 'assigned_date' }, prefetch => 'hive' }) %]
+    &lt;tr&gt;
+        &lt;td&gt;[% assignment.hive.hive_number | html %]&lt;/td&gt;
+        &lt;td&gt;[% assignment.assigned_date | html %]&lt;/td&gt;
+        &lt;td&gt;[% assignment.removed_date || 'Current' | html %]&lt;/td&gt;
+        &lt;td&gt;[% assignment.reason | html %]&lt;/td&gt;
+    &lt;/tr&gt;
+[% END %]</pre>
+        </div>
+
+        <div class="content-section">
+            <h3>Controller Pattern — Get Queens for a Hive</h3>
+            <pre>## CORRECT: use ApiaryModel::get_queens_for_hive($hive_id)
+## This queries via queen_hive_assignments (not directly on queens.hive_id)
+my @queens = $c->model('ApiaryModel')->get_queens_for_hive($hive_id);
+
+## Or via Result class relationship:
+my $hive = $schema->resultset('Hive')->find($hive_id);
+my $current_queen = $hive->current_queen;           # active assignment only
+my $queen_history = $hive->queen_history->all;      # all assignments</pre>
+        </div>
+
+        <div class="content-section">
+            <h3>Migration Notes</h3>
+            <ul>
+                <li><code>queens_enhanced</code> — reference/staging table, retained until Forager migration (todos 797/798) is verified. Do not drop until migration complete.</li>
+                <li>Forager migration scripts: <code>sql/migrations/009_queen_log_schema.sql</code> (schema) and <code>010_queen_log_forager_migration.sql</code> (data).</li>
+                <li>Field mapping: <code>apis_queens_tb.queen_code</code> → <code>queens.tag_number</code>; <code>apis_queen_log_tb</code> rows → <code>inspections</code> rows + <code>queen_events</code> for status changes.</li>
+            </ul>
+        </div>
+    </div>
 </div>
