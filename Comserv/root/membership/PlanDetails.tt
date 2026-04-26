@@ -188,8 +188,8 @@
           <li>
             <strong>Choose your billing cycle</strong> — Monthly or annual (save up to
             [% IF plan.price_monthly > 0 AND plan.price_annual > 0 %]
-              [% SET saving_pct = ((plan.price_monthly * 12 - plan.price_annual) / (plan.price_monthly * 12) * 100).int %]
-              [% saving_pct %]%
+              [% SET saving_pct = (plan.price_monthly * 12 - plan.price_annual) / (plan.price_monthly * 12) * 100 %]
+              [% saving_pct | format('%.0f') %]%
             [% ELSE %]more[% END %]
             with annual).
           </li>
