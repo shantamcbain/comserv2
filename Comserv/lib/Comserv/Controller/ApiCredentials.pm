@@ -59,8 +59,7 @@ sub auto :Private {
         # Store a message for the user
         $c->flash->{error_message} = "You must be an administrator to access API credentials management.";
         
-        # Redirect to the home page
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         $c->detach();
         return 0;
     }

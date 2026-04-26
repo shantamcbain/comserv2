@@ -1,7 +1,7 @@
 [% META
    title = "User Registration Guide"
    description = "Step-by-step guide for creating a new account on this site"
-   roles = ""
+   roles = "guest,normal,editor,admin,developer"
    TemplateType = "Documentation"
    category = "User"
    page_version = "0.01"

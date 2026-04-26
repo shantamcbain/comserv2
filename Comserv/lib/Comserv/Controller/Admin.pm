@@ -2196,7 +2196,9 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     
     my $table_name = $c->req->param('table_name');
     my $database = $c->req->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => { success => 0, error => 'Missing required parameters' });
@@ -2242,7 +2244,9 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     
     my $table_name = $c->request->param('table_name');
     my $database = $c->request->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => {
@@ -4119,7 +4123,8 @@ sub generate_result_file {
     my ($self, $c) = @_;
     
     my $table_name = $c->req->param('table_name');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+
     if (!$table_name) {
         $c->flash->{error_msg} = "No table name specified for Result file generation.";
         return;
