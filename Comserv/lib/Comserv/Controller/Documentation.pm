@@ -677,16 +677,22 @@ sub view :Path('/Documentation') :Args(1) {
             $c->response->status(403);
             $c->stash(
                 error_msg => "Access denied: This documentation is not available for your site.",
+                user_role  => $user_role,
+                site_name  => $site_name,
                 template => 'Documentation/Error.tt'
             );
             return;
         }
 
         # Check role access
-        my $has_role = $is_admin; # Admins can see everything
+        # Empty roles or roles containing 'guest' → publicly accessible (no login required)
+        my $page_roles = $metadata->{roles} // [];
+        my $has_role = $is_admin
+                    || !@$page_roles
+                    || (grep { $_ eq 'guest' } @$page_roles);
         unless ($has_role) {
-            foreach my $role (@{$metadata->{roles}}) {
-                if ($role eq $user_role || 
+            foreach my $role (@$page_roles) {
+                if ($role eq $user_role ||
                     ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $role } @{$c->session->{roles}}) ||
                     ($role eq 'normal' && $is_authenticated)) {
                     $has_role = 1;
@@ -701,6 +707,8 @@ sub view :Path('/Documentation') :Args(1) {
             $c->response->status(403);
             $c->stash(
                 error_msg => "Access denied: You don't have permission to view this documentation.",
+                user_role  => $user_role,
+                site_name  => $site_name,
                 template => 'Documentation/Error.tt'
             );
             return;
@@ -896,13 +904,41 @@ sub view :Path('/Documentation') :Args(1) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
             "Found unregistered .tt file: $tt_path");
 
-        # Check admin access for unregistered files
-        unless ($is_admin) {
+        # Read the file's own META block to determine required roles
+        my @unreg_roles;
+        eval {
+            open my $fh, '<:encoding(UTF-8)', $tt_full_path or die $!;
+            my $content = do { local $/; <$fh> };
+            close $fh;
+            my $meta = Comserv::Controller::Documentation::ScanMethods::_parse_meta_block($content);
+            if ($meta->{roles}) {
+                @unreg_roles = split(/\s*,\s*/, $meta->{roles});
+            }
+        };
+
+        # If no roles in META or 'guest' listed → public; otherwise use the META roles
+        my $unreg_ok = $is_admin
+                    || !@unreg_roles
+                    || (grep { $_ eq 'guest' } @unreg_roles);
+        unless ($unreg_ok) {
+            foreach my $r (@unreg_roles) {
+                if ($r eq $user_role ||
+                    ($c->session->{roles} && ref $c->session->{roles} eq 'ARRAY' && grep { $_ eq $r } @{$c->session->{roles}}) ||
+                    ($r eq 'normal' && $is_authenticated)) {
+                    $unreg_ok = 1;
+                    last;
+                }
+            }
+        }
+
+        unless ($unreg_ok) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
-                "Access denied to unregistered page $page: admin required");
+                "Access denied to unregistered page $page: insufficient role ($user_role)");
             $c->response->status(403);
             $c->stash(
-                error_msg => "Access denied: Unregistered documentation requires admin privileges.",
+                error_msg => "Access denied: You don't have permission to view this documentation.",
+                user_role  => $user_role,
+                site_name  => $site_name,
                 template => 'Documentation/Error.tt'
             );
             return;

@@ -1,7 +1,7 @@
 [% META
     title = "Shop & Marketplace"
     description = "Admin guide to the SiteName shop, marketplace listings, and cart system"
-    roles = "admin"
+    roles = "guest,normal,admin"
     TemplateType = "Documentation"
     category = "Inventory"
     page_version = "1.00"
