@@ -114,6 +114,16 @@
         [% IF model.source_url %]
         <p><a href="[% model.source_url | html %]" target="_blank" rel="noopener">Original source &rarr;</a></p>
         [% END %]
+        [% IF c.session.user_id && model.nfs_path %]
+        <p style="margin-top:0.8em;">
+            <a href="/3d/model_download/[% model.id %]"
+               style="display:inline-block;padding:0.45em 1.1em;background:var(--button-bg,var(--accent-color,#007bff));color:var(--button-text,white);border-radius:4px;font-size:0.9em;font-weight:bold;text-decoration:none;"
+               title="Download [% model.file_type | upper | html %] file to open in your slicer">
+                ⬇ Download [% model.file_type | upper | html %] File
+            </a>
+            <small style="color:var(--muted-color,var(--text-color));margin-left:0.6em;">Open in Bambu Studio, PrusaSlicer, Cura, etc.</small>
+        </p>
+        [% END %]
     </div>
 </div>
 
