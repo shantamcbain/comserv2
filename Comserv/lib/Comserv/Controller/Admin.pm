@@ -4674,53 +4674,48 @@ sub get_result_field_info {
         my $columns_section = $1;
         
         my $field_info = {};
-        
+
+        # Helper: parse attributes from a field definition block.
+        # Handles one level of nested braces (e.g. extra => { list => [...] } for ENUM).
+        my $parse_field_def = sub {
+            my ($field_def) = @_;
+            my %info;
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $info{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $info{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $info{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $info{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $info{default_value} = $1;
+            }
+            # Extract ENUM list from: extra => { list => [qw/val1 val2 .../] }
+            if ($field_def =~ /extra\s*=>\s*\{[^}]*list\s*=>\s*\[qw.([^\]\/!|]+)[\/!|>)]\]/s) {
+                $info{enum_list} = [ split /\s+/, $1 ];
+            }
+            return \%info;
+        };
+
+        # Regex that matches a brace-delimited block allowing one level of nesting.
+        # Handles: extra => { list => [...] }  inside the field definition.
+        my $block_re = qr/\{((?:[^{}]|\{[^{}]*\})*)\}/s;
+
         # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from hash format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>?\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
-        
+
         # Try array format: "field_name", { ... }
-        if ($columns_section =~ /["']$field_name["']\s*,\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from array format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /["']$field_name["']\s*,\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
     }
     
@@ -4934,6 +4929,13 @@ sub update_table_field_from_result {
         $col_def .= 'DATE';
     } elsif ($data_type eq 'BOOLEAN') {
         $col_def .= 'TINYINT(1)';
+    } elsif ($data_type eq 'ENUM') {
+        my $enum_list = $result_field_info->{enum_list};
+        unless ($enum_list && ref($enum_list) eq 'ARRAY' && @$enum_list) {
+            die "ENUM field '$field_name' has no list values in Result class (extra => { list => [...] } missing)";
+        }
+        my $values = join(',', map { "'$_'" } @$enum_list);
+        $col_def .= "ENUM($values)";
     } else {
         $col_def .= $data_type;
         $col_def .= "($size)" if $size;

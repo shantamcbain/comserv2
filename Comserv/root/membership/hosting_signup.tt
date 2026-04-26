@@ -2,16 +2,17 @@
    title = "CSC Hosting Registration"
    TemplateType = "Application"
 %]
-[% SET is_update = hosting_account ? 1 : 0 %]
+[% SET is_edit = hosting_account ? 1 : 0 %]
 
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
   <div class="page-header">
-    [% IF is_update %]
-    <h1>&#127760; Update CSC Hosting &mdash; [% site_name | html %]</h1>
-    <p>Update your hosting settings for <strong>[% site_name | html %]</strong>. Changes will be reviewed by CSC admin.</p>
+    [% IF is_edit %]
+    <h1>&#9998; Edit CSC Hosting Registration — [% site_name | html %]</h1>
+    <p>Update your hosting registration details for <strong>[% site_name | html %]</strong>.
+    Changes to add-ons or plan will be reviewed by CSC before taking effect.</p>
     [% ELSE %]
     <h1>&#127760; Register [% site_name | html %] with CSC Hosting</h1>
     <p>Complete this form to register <strong>[% site_name | html %]</strong> as a CSC hosting partner.
@@ -114,6 +115,7 @@
         <div class="content-section">
           <h2>Domain Setup</h2>
 
+          [% SET saved_domain_type = hosting_account.domain_type || 'subdomain' %]
           <div class="form-row">
             <div class="form-field">
               <label for="domain_type">Domain Type</label>
@@ -126,12 +128,14 @@
             </div>
           </div>
 
+          [% SET saved_parent = hosting_account.parent_domain || '' %]
           <div class="form-row" id="row_parent_domain">
             <div class="form-field">
               <label for="parent_domain">Parent Domain <span style="color:#888;font-size:0.85em;">(the domain your subdomain will live under)</span></label>
               <select name="parent_domain" id="parent_domain">
                 [% FOREACH d IN domains %]
-                <option value="[% d.domain | html %]">[% d.domain | html %]</option>
+                <option value="[% d.domain | html %]"
+                  [% IF saved_parent == d.domain %]selected[% END %]>[% d.domain | html %]</option>
                 [% END %]
                 <option value="">— or type below —</option>
               </select>
@@ -153,6 +157,7 @@
           <h2>Feature Add-ons</h2>
           <p style="color: var(--text-muted-color, #666);font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
           [% SET current_addons = hosting_account.requested_addons || '' %]
+          [% SET saved_addons = current_addons ? current_addons.split(',') : [] %]
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
             [% FOREACH addon IN [
                 { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary',    hint = 'Hive management, inspections, honey tracking' },
@@ -168,7 +173,7 @@
             ] %]
             <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid var(--border-color, #ddd);border-radius:6px;padding:0.75rem;cursor:pointer;background: var(--bg-secondary, #fafafa);">
               <input type="checkbox" name="addon_[% addon.key %]" value="1"
-                [% IF current_addons.search(addon.key) %]checked[% END %]
+                [% IF saved_addons.grep('^' _ addon.key _ '$').size %]checked[% END %]
                 style="margin-top:0.2rem;flex-shrink:0;">
               <div>
                 <strong>[% addon.label %]</strong><br>
@@ -190,9 +195,11 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">
-            [% IF is_update %]Update Settings[% ELSE %]Submit Registration &rarr;[% END %]
-          </button>
+          [% IF is_edit %]
+          <button type="submit" class="btn btn-primary">&#9998; Update Registration</button>
+          [% ELSE %]
+          <button type="submit" class="btn btn-primary">Submit Registration &rarr;</button>
+          [% END %]
           <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
         </div>
 

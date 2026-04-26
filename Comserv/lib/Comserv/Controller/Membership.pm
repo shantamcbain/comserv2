@@ -227,12 +227,16 @@ sub hosting_signup :Local :Args(0) {
             }
         };
         if ($@) {
-            $c->stash->{error_msg} = "Registration failed: $@";
+            $c->stash->{error_msg} = ($hosting_account ? "Update" : "Registration") . " failed: $@";
         } else {
-            $c->flash->{success_msg} = "$site_name has been submitted for CSC hosting registration. Status: pending.";
             my $new_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
                 { sitename => $site_name }, { rows => 1 }
             )->single;
+            if ($hosting_account) {
+                $c->flash->{success_msg} = "Hosting registration for $site_name has been updated. CSC will be notified of any changes.";
+            } else {
+                $c->flash->{success_msg} = "$site_name has been submitted for CSC hosting registration. Status: pending.";
+            }
             eval {
                 my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                 $notifier->send_hosting_signup_notification($c, $new_account);
@@ -252,7 +256,8 @@ sub hosting_signup :Local :Args(0) {
         csc_hosting_plans => $csc_hosting_plans,
         hosting_account   => $hosting_account,
         selected_plan     => $c->req->query_parameters->{plan}
-                              || ($hosting_account ? $hosting_account->plan_slug : ''),
+                            || ($hosting_account ? $hosting_account->plan_slug : '')
+                            || '',
     );
     $c->forward($c->view('TT'));
 }

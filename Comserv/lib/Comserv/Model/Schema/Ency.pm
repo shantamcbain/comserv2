@@ -57,6 +57,22 @@ __PACKAGE__->register_class('InternalCurrencyTransaction', 'Comserv::Model::Sche
 # Register Beekeeping hive component tracking
 __PACKAGE__->register_class('HiveComponent', 'Comserv::Model::Schema::Ency::Result::HiveComponent');
 
+# Register Apiary / Queen lifecycle system classes (DB Project 219 — QueenLogModel)
+__PACKAGE__->register_class('Queen',                'Comserv::Model::Schema::Ency::Result::Queen');
+__PACKAGE__->register_class('QueenEvent',           'Comserv::Model::Schema::Ency::Result::QueenEvent');
+__PACKAGE__->register_class('QueenHiveAssignment',  'Comserv::Model::Schema::Ency::Result::QueenHiveAssignment');
+__PACKAGE__->register_class('QueenEnhanced',        'Comserv::Model::Schema::Ency::Result::QueenEnhanced');
+__PACKAGE__->register_class('Hive',                 'Comserv::Model::Schema::Ency::Result::Hive');
+__PACKAGE__->register_class('Inspection',           'Comserv::Model::Schema::Ency::Result::Inspection');
+__PACKAGE__->register_class('InspectionDetail',     'Comserv::Model::Schema::Ency::Result::InspectionDetail');
+__PACKAGE__->register_class('Box',                  'Comserv::Model::Schema::Ency::Result::Box');
+__PACKAGE__->register_class('Yard',                 'Comserv::Model::Schema::Ency::Result::Yard');
+__PACKAGE__->register_class('Pallet',               'Comserv::Model::Schema::Ency::Result::Pallet');
+__PACKAGE__->register_class('HiveConfiguration',    'Comserv::Model::Schema::Ency::Result::HiveConfiguration');
+__PACKAGE__->register_class('HiveFrame',            'Comserv::Model::Schema::Ency::Result::HiveFrame');
+__PACKAGE__->register_class('HoneyHarvest',         'Comserv::Model::Schema::Ency::Result::HoneyHarvest');
+__PACKAGE__->register_class('Treatment',            'Comserv::Model::Schema::Ency::Result::Treatment');
+
 # Register Chart of Accounts and General Ledger classes
 # (modeled on SQL-Ledger / LedgerSMB account + journal_entry + journal_line)
 __PACKAGE__->register_class('CoaAccountHeading', 'Comserv::Model::Schema::Ency::Result::CoaAccountHeading');
