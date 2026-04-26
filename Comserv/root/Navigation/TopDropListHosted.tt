@@ -29,11 +29,13 @@
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-production"></i>Hosted Sites</span>
             <div class="submenu">
+                [% TRY %]
                 [% FOREACH sd IN hosted_sites %]
                 <a href="https://[% sd.domain | html %]" target="_blank" class="submenu-link">
                     <i class="icon-site"></i>[% sd.domain | html %]
                 </a>
                 [% END %]
+                [% CATCH %][% END %]
             </div>
         </div>
         [% END %]
