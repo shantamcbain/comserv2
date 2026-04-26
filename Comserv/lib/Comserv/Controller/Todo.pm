@@ -5,8 +5,9 @@ use DateTime;
 use DateTime::Format::ISO8601;
 use Data::Dumper;
 use JSON::MaybeXS;
-use Comserv::Util::Logging; # Import the logging utility
+use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
+use Comserv::Util::PointSystem;
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -711,9 +712,10 @@ sub modify :Path('/todo/modify') :Args(1) {
         "Updating todo item with record ID: $record_id."
     );
 
-    # Capture old due_date before update so we can log rescheduling
+    # Capture old values before update
     my $old_due_date   = $todo->due_date   // '';
     my $old_start_date = $todo->start_date // '';
+    my $old_status     = $todo->status     // '';
     my $new_due_date   = $form_data->{due_date} || DateTime->now->add(days => 7)->ymd;
     my $today          = DateTime->now->ymd;
     my $current_user   = $c->session->{username} || 'system';
@@ -794,6 +796,45 @@ sub modify :Path('/todo/modify') :Args(1) {
         if ($@) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.reschedule',
                 "Could not write TodoInterval for todo $record_id: $@");
+        }
+    }
+
+    # --- Award completion points ---
+    my $new_status = $form_data->{status} // '';
+    my $was_done   = ($old_status eq '3' || $old_status eq 'DONE');
+    my $is_done    = ($new_status eq '3' || $new_status eq 'DONE');
+    if ($is_done && !$was_done) {
+        $todo->discard_changes;
+        my $rate    = $todo->point_rate;
+        my $billed  = $todo->billable // 1;
+        if ($rate && $rate > 0 && $billed) {
+            my $minutes = $todo->accumulative_time || ($todo->estimated_man_hours ? $todo->estimated_man_hours * 60 : 0);
+            my $hours   = $minutes / 60;
+            my $points  = sprintf('%.4f', $hours * $rate);
+            if ($points > 0) {
+                my $dev_username = $todo->developer || $current_user;
+                my $dev_user = eval { $schema->resultset('User')->find({ username => $dev_username }) };
+                if ($dev_user) {
+                    eval {
+                        my $ps = Comserv::Util::PointSystem->new(c => $c);
+                        $ps->credit(
+                            user_id          => $dev_user->id,
+                            amount           => $points,
+                            transaction_type => 'todo_completion',
+                            description      => sprintf('Todo #%d completed: %s (%.2f hrs @ %.4f/hr)',
+                                $record_id, ($todo->subject // ''), $hours, $rate),
+                            reference_type   => 'todo',
+                            reference_id     => $record_id,
+                        );
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'modify.points',
+                            "Awarded $points pts to $dev_username for todo #$record_id completion");
+                    };
+                    if ($@) {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'modify.points',
+                            "Failed to award completion points for todo $record_id: $@");
+                    }
+                }
+            }
         }
     }
 
@@ -955,6 +996,8 @@ sub create :Local {
                           : 'user',
         project_id => $selected_project_id,
         date_time_posted => $params->{date_time_posted} || $current_date,
+        billable   => defined($params->{billable})   ? ($params->{billable}   ? 1 : 0) : 1,
+        point_rate => ($params->{point_rate} && $params->{point_rate} =~ /^\d+(\.\d+)?$/) ? $params->{point_rate} : undef,
     };
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
