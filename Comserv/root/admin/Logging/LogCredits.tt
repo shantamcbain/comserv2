@@ -1,0 +1,115 @@
+[% META
+   title = "Log Point Credits"
+   description = "Review and manage point credits for closed log entries"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+%]
+<div class="content-container">
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;flex-wrap:wrap;gap:0.5em">
+  <h1 style="font-family:var(--header-font);color:var(--text-color);margin:0">Log Point Credits</h1>
+  <div style="display:flex;gap:0.5em;flex-wrap:wrap">
+    <a href="/admin/logs" style="padding:6px 14px;border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;font-family:var(--body-font);font-size:0.9rem">← Logs</a>
+    <a href="/admin" style="padding:6px 14px;border:1px solid var(--border-color);border-radius:4px;color:var(--text-color);text-decoration:none;font-family:var(--body-font);font-size:0.9rem">Admin</a>
+  </div>
+</div>
+
+[% IF error_msg %]
+<div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% error_msg | html %]</div>
+[% END %]
+[% IF success_msg %]
+<div style="background:#d4edda;color:#155724;border:1px solid #c3e6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% success_msg | html %]</div>
+[% END %]
+
+<div style="display:flex;gap:0.5em;margin-bottom:1.2em;flex-wrap:wrap;align-items:center">
+  <span style="font-family:var(--body-font);font-size:0.9rem;color:var(--text-muted-color)">Filter:</span>
+  [% FOREACH f IN [['pending','Pending (not credited)'],['credited','Credited'],['all','All closed']] %]
+  <a href="/log/credits?filter=[% f.0 %]"
+     style="padding:5px 14px;border-radius:4px;font-family:var(--body-font);font-size:0.9rem;text-decoration:none;
+            [% IF filter == f.0 %]background:var(--primary-color);color:#fff;border:1px solid var(--primary-color)
+            [% ELSE %]background:var(--secondary-color);color:var(--text-color);border:1px solid var(--border-color)[% END %]">
+    [% f.1 %]
+  </a>
+  [% END %]
+  <span style="margin-left:auto;font-family:var(--body-font);font-size:0.85rem;color:var(--text-muted-color)">[% total %] entries</span>
+</div>
+
+[% IF logs.size == 0 %]
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:1.5em;text-align:center;color:var(--text-muted-color);font-family:var(--body-font)">
+  No log entries found for this filter.
+</div>
+[% ELSE %]
+<div style="overflow-x:auto">
+<table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:0.9rem">
+  <thead>
+    <tr style="background:var(--secondary-color);border-bottom:2px solid var(--border-color)">
+      <th style="padding:8px 10px;text-align:left;white-space:nowrap">#</th>
+      <th style="padding:8px 10px;text-align:left">User</th>
+      <th style="padding:8px 10px;text-align:left">Site</th>
+      <th style="padding:8px 10px;text-align:left">Abstract</th>
+      <th style="padding:8px 10px;text-align:center;white-space:nowrap">Duration</th>
+      <th style="padding:8px 10px;text-align:center;white-space:nowrap">Credited</th>
+      <th style="padding:8px 10px;text-align:center">Action</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH log IN logs %]
+  <tr style="border-bottom:1px solid var(--border-color);[% IF !log.points_processed %]background:#fffde7[% END %]">
+    <td style="padding:7px 10px;white-space:nowrap">
+      <a href="/log/details?record_id=[% log.record_id %]" style="color:var(--link-color)">#[% log.record_id %]</a>
+    </td>
+    <td style="padding:7px 10px">[% log.username | html %]</td>
+    <td style="padding:7px 10px">[% log.sitename | html %]</td>
+    <td style="padding:7px 10px;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"
+        title="[% log.abstract | html %]">[% log.abstract | html %]</td>
+    <td style="padding:7px 10px;text-align:center;white-space:nowrap">[% log.time || '—' %]</td>
+    <td style="padding:7px 10px;text-align:center">
+      [% IF log.points_processed %]
+      <span style="color:#2e7d32;font-weight:600">✓ Yes</span>
+      [% ELSE %]
+      <span style="color:#b71c1c;font-weight:600">✗ No</span>
+      [% END %]
+    </td>
+    <td style="padding:7px 10px;text-align:center">
+      [% IF !log.points_processed %]
+      <form method="POST" action="/log/credits" style="display:inline">
+        <input type="hidden" name="action"   value="credit_one">
+        <input type="hidden" name="log_id"   value="[% log.record_id %]">
+        <input type="hidden" name="filter"   value="[% filter | html %]">
+        <button type="submit"
+                style="padding:3px 12px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-family:var(--body-font);font-size:0.85rem"
+                onclick="return confirm('Credit points for log #[% log.record_id %]?')">
+          Credit
+        </button>
+      </form>
+      [% ELSE %]
+      <span style="color:var(--text-muted-color);font-size:0.85rem">done</span>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+</div>
+
+[% IF pages > 1 %]
+<div style="display:flex;gap:0.4em;margin-top:1em;justify-content:center;flex-wrap:wrap">
+  [% FOREACH p IN [1..pages] %]
+  <a href="/log/credits?filter=[% filter %]&page=[% p %]"
+     style="padding:4px 10px;border:1px solid var(--border-color);border-radius:4px;font-family:var(--body-font);font-size:0.85rem;text-decoration:none;
+            [% IF p == page %]background:var(--primary-color);color:#fff[% ELSE %]color:var(--text-color)[% END %]">
+    [% p %]
+  </a>
+  [% END %]
+</div>
+[% END %]
+[% END %]
+
+<div style="margin-top:1.5em;background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;padding:1em;font-family:var(--body-font);font-size:0.85rem;color:var(--text-muted-color)">
+  <strong>Back-credit historical logs:</strong> Run the batch script from the server:
+  <code style="display:block;margin-top:0.4em;padding:4px 8px;background:var(--background-color);border-radius:3px;font-size:0.85em">perl Comserv/script/back_credit_logs.pl --dry-run</code>
+  Remove <code>--dry-run</code> to actually apply credits. Idempotent — safe to run multiple times.
+</div>
+
+</div>

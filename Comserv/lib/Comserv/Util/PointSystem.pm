@@ -85,9 +85,23 @@ sub new {
     }, $class;
 }
 
+sub new_from_schema {
+    my ($class, %args) = @_;
+    die "new_from_schema requires 'schema'" unless $args{schema};
+    return bless {
+        _c       => undef,
+        _schema  => $args{schema},
+        _logging => Comserv::Util::Logging->instance,
+    }, $class;
+}
+
 sub _c      { $_[0]->{_c} }
 sub _log    { $_[0]->{_logging} }
-sub _schema { $_[0]->_c->model('DBEncy')->schema }
+sub _schema {
+    my $self = shift;
+    return $self->{_schema} if $self->{_schema};
+    return $self->_c->model('DBEncy')->schema;
+}
 
 # ---------------------------------------------------------------------------
 # balance($user_id) -> DECIMAL
@@ -541,14 +555,30 @@ sub bill_time_log {
 
     my $todo = $log_row->todo;
 
-    my $rate = $log_row->point_rate
-            // ($todo ? $todo->point_rate : undef)
-            // DEFAULT_POINT_RATE;
-
-    my $points = sprintf('%.4f', ($minutes / 60) * $rate);
-
     my $dev_user = $schema->resultset('User')
         ->find({ username => $log_row->username });
+
+    my $dev_role;
+    if ($dev_user) {
+        my $site = $schema->resultset('Site')->search({ name => ($log_row->sitename // '') })->first;
+        if ($site) {
+            my $usr = $schema->resultset('UserSiteRole')->search(
+                { user_id => $dev_user->id, site_id => $site->id },
+                { order_by => { -asc => 'role' } }
+            )->first;
+            $dev_role = $usr ? $usr->role : undef;
+        }
+    }
+
+    my $rate = $log_row->point_rate
+            // ($todo ? $todo->point_rate : undef)
+            // $self->resolve_rate(
+                rule_type => 'hourly_rate',
+                sitename  => $log_row->sitename,
+                role      => $dev_role,
+            );
+
+    my $points = sprintf('%.4f', ($minutes / 60) * $rate);
 
     my $customer_user_id = $todo ? $todo->user_id : undef;
     my $billable         = $todo ? ($todo->billable // 1) : 0;
@@ -616,10 +646,12 @@ sub bill_time_log {
         $self->_log->log_with_details(
             $self->_c, 'info', __FILE__, __LINE__, 'bill_time_log',
             sprintf(
-                "Processed log #%d: %.4f pts — dev=%s customer=%s",
+                "Processed log #%d: %.4f pts @ %.2f/hr — dev=%s role=%s customer=%s",
                 $log_row->record_id,
                 $points,
+                $rate,
                 $dev_user ? $dev_user->username : '(unknown)',
+                $dev_role // 'unknown',
                 $customer_user_id // '(none)',
             )
         );
