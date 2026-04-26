@@ -122,7 +122,7 @@
               [% IF plan.inventory_item AND plan.inventory_item.is_assemblable %]<li class="text-success"><strong>+ Optional add-ons</strong></li>[% END %]
             </ul>
             <div class="plan-card-actions">
-              <a href="[% c.uri_for('/membership/plan_details', [plan.id]) %]" class="btn btn-primary">
+              <a href="[% c.uri_for('/membership/plan_details/' _ plan.id) %]" class="btn btn-primary">
                 Learn More &amp; Join &rarr;
               </a>
             </div>
@@ -222,7 +222,7 @@
               [% IF hplan.has_planning %]<li>&#128203; Planning &amp; project tools</li>[% END %]
               [% IF hplan.ai_requests_per_day > 0 %]<li>&#129302; [% hplan.ai_requests_per_day %] AI requests/day</li>[% END %]
             </ul>
-            <a href="[% c.uri_for('/membership/plan_details', [hplan.id]) %]" class="btn btn-primary">
+            <a href="[% c.uri_for('/membership/plan_details/' _ hplan.id) %]" class="btn btn-primary">
               Learn More &amp; Join &rarr;
             </a>
           </div>
