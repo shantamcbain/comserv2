@@ -107,8 +107,11 @@ sub apiary :Path('/BMaster/apiary') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apiary', "BMaster apiary method called");
     push @{$c->stash->{debug_errors}}, "BMaster apiary method called";
 
-    # Redirect to the Apiary controller
-    $c->response->redirect('/Apiary');
+    if ($c->session->{user_id}) {
+        $c->response->redirect($c->uri_for('/Apiary'));
+    } else {
+        $c->stash(template => 'BMaster/apiary.tt');
+    }
 }
 
 # Route for Queen Rearing System

@@ -20,7 +20,8 @@
 [% SET site = c.stash.SiteName || c.session.SiteName || '' %]
 [% SET mods = c.stash.enabled_modules %]
 [% SET can_beekeep = mods.beekeeping || mods.apiary || (site == 'BMaster') || c.stash.is_admin %]
-[% SET logged_in = c.session.username ? 1 : 0 %]
+[% SET logged_in = 0 %]
+[% IF c.session.username %][% SET logged_in = 1 %][% END %]
 
 [% IF can_beekeep %]
 <li class="horizontal-dropdown">
