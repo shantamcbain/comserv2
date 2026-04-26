@@ -1,7 +1,7 @@
 [% META
     title = "Managing Inventory Items"
     description = "Admin guide to creating and managing inventory items"
-    roles = "admin"
+    roles = "guest,normal,admin"
     TemplateType = "Documentation"
     category = "Inventory"
     page_version = "1.00"
