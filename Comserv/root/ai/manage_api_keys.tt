@@ -43,7 +43,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -53,7 +53,7 @@
 }
 
 .btn-danger {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
 }
 
@@ -120,7 +120,7 @@
 }
 
 .status-active {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 

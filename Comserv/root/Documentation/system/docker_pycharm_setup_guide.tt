@@ -837,7 +837,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can I develop on Windows with WSL2?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> Docker Desktop for Windows with WSL2 backend is recommended. It provides native Docker experience with better performance than Hyper-V.</p>
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Setup:</strong> Enable WSL2 in Docker Desktop settings → Resources → WSL Integration</p>
                     </div>
@@ -848,7 +848,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Do I need to install Perl locally?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>No!</strong> Docker container includes everything. Your host machine only needs Docker and PyCharm installed.</p>
                     </div>
                 </div>
@@ -858,7 +858,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">What happens to my code when I stop the container?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Your code is safe!</strong> Since we use volume mounts (<code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">-v "$(pwd):/app"</code>), all code exists on your host machine. Stopping/deleting the container doesn't affect your source files.</p>
                     </div>
                 </div>
@@ -868,7 +868,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can multiple developers share one container image?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> That's the entire point of Phase 5. Once you push the image to Docker Hub or GitHub Container Registry, teammates can pull it and run their own instances. Each developer gets their own container instance but from the same image.</p>
                     </div>
                 </div>
@@ -878,7 +878,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">How do I update the container when dependencies change?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Three approaches:</strong></p>
                         <ol style="color: var(--text-color); font-family: var(--body-font);">
                             <li><strong>Quick update:</strong> Install module inside running container: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">docker exec comserv-dev cpanm New::Module</code></li>
@@ -893,7 +893,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">Can I run database alongside Comserv in containers?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Yes!</strong> Use Docker Compose. The Docker migration strategy (see linked document) includes Phase 2 which containerizes MySQL/PostgreSQL alongside the app. Future documentation will cover docker-compose orchestration.</p>
                     </div>
                 </div>
@@ -903,7 +903,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">What's the difference between container and image?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Image = Blueprint, Container = Running instance</strong></p>
                         <ul style="color: var(--text-color); font-family: var(--body-font);">
                             <li><strong>Image:</strong> Template file (read-only). Like a class definition.</li>
@@ -918,7 +918,7 @@
                     <div style="background-color: var(--table-header-bg); padding: var(--spacing-medium); cursor: pointer;" onclick="this.nextElementSibling.style.display=this.nextElementSibling.style.display==='none'?'block':'none'">
                         <h6 style="font-family: var(--header-font); color: var(--text-color); margin: 0;">How much disk space does a container use?</h6>
                     </div>
-                    <div style="display: none; padding: var(--spacing-medium); background-color: white;">
+                    <div style="display: none; padding: var(--spacing-medium); background-color: rgba(255,255,255,0.88);">
                         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Varies:</strong></p>
                         <ul style="color: var(--text-color); font-family: var(--body-font);">
                             <li>Comserv image: ~2-3 GB</li>

@@ -12,12 +12,12 @@
 .sm-table th { background:var(--bg-secondary); padding:8px 12px; text-align:left; border-bottom:2px solid var(--border-color); }
 .sm-table td { padding:8px 12px; border-bottom:1px solid var(--border-color); vertical-align:middle; }
 .sm-table tr:hover td { background:var(--bg-secondary); }
-.badge-on  { display:inline-block; padding:2px 8px; border-radius:3px; background:#28a745; color:#fff; font-size:0.78em; font-weight:bold; }
-.badge-off { display:inline-block; padding:2px 8px; border-radius:3px; background:#6c757d; color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-on  { display:inline-block; padding:2px 8px; border-radius:3px; background: var(--success-color, #28a745); color:#fff; font-size:0.78em; font-weight:bold; }
+.badge-off { display:inline-block; padding:2px 8px; border-radius:3px; background: var(--secondary-color, #6c757d); color:#fff; font-size:0.78em; font-weight:bold; }
 .btn-sm { padding:3px 10px; font-size:0.82em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; }
 .btn-primary   { background:var(--primary-color); color:#fff; }
 .btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
-.btn-danger    { background:#dc3545; color:#fff; }
+.btn-danger    { background: var(--danger-color, #dc3545); color:#fff; }
 .add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:16px; margin-top:24px; }
 .add-form h2 { margin-top:0; font-size:1.1em; }
 .add-form label { display:inline-block; width:120px; font-size:0.9em; }
@@ -111,8 +111,51 @@
         </p>
         <p>
             <label for="sm-mod">Module:</label>
-            <input id="sm-mod" type="text" name="module_name" placeholder="planning, apiary, filemanager…" style="width:200px;">
+            <select id="sm-mod" name="module_name" style="width:260px;">
+                <optgroup label="3D Printing">
+                    <option value="printing_3d">printing_3d — 3D Printing services &amp; printer farm</option>
+                </optgroup>
+                <optgroup label="Commerce">
+                    <option value="ecommerce">ecommerce — Online shop &amp; cart</option>
+                </optgroup>
+                <optgroup label="Community">
+                    <option value="planning">planning — Planning &amp; project management</option>
+                    <option value="helpdesk">helpdesk — HelpDesk ticket system</option>
+                    <option value="workshop">workshop — Workshop management</option>
+                    <option value="apiary">apiary — Apiary / beekeeping</option>
+                    <option value="filemanager">filemanager — File Manager</option>
+                    <option value="marketplace">marketplace — Marketplace listings</option>
+                </optgroup>
+                <optgroup label="Other (type below)">
+                    <option value="_custom_">— enter custom name below —</option>
+                </optgroup>
+            </select>
+            <input id="sm-mod-custom" type="text" name="module_name_custom"
+                   placeholder="custom module name"
+                   style="width:180px; display:none; margin-top:4px;">
+            <small style="display:block; margin-top:4px; color:var(--text-muted-color);">
+                Select a module from the list, or choose "enter custom name" for unlisted modules.
+            </small>
         </p>
+        <script>
+        document.getElementById('sm-mod').addEventListener('change', function() {
+            var custom = document.getElementById('sm-mod-custom');
+            if (this.value === '_custom_') {
+                custom.style.display = 'inline';
+                custom.required = true;
+            } else {
+                custom.style.display = 'none';
+                custom.required = false;
+            }
+        });
+        document.querySelector('form').addEventListener('submit', function() {
+            var sel = document.getElementById('sm-mod');
+            var custom = document.getElementById('sm-mod-custom');
+            if (sel.value === '_custom_' && custom.value.trim()) {
+                sel.value = custom.value.trim();
+            }
+        });
+        </script>
         <p>
             <label>Enabled:</label>
             <input type="checkbox" name="enabled" value="1" checked>

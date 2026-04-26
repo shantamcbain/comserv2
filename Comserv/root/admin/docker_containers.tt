@@ -20,7 +20,7 @@
     user-select: none;
 }
 .collapsible-header:hover {
-    background-color: #e9ecef !important;
+    background-color: var(--bg-secondary, #e9ecef) !important;
 }
 .collapsible-content {
     display: none;
@@ -49,28 +49,28 @@
         <a href="http://workstation.local:3001/admin/docker-containers" style="font-weight:bold;">
             Open Docker Management on port 3001 →
         </a>
-        <br><small style="color:#666;">You will need to log in separately at port 3001 (sessions are per-port).</small>
+        <br><small style="color: var(--text-muted-color, #666);">You will need to log in separately at port 3001 (sessions are per-port).</small>
     </div>
     [% ELSE %]
     
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('container-status')" 
-                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
                 <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
                     <span>
                         <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 10px; font-size: 0.8em;"></i>
                         <i class="icon-list" style="margin-right: 10px;"></i>
                         Container Status Overview
                     </span>
-                    <button onclick="event.stopPropagation(); refreshContainers();" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button onclick="event.stopPropagation(); refreshContainers();" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         <i class="icon-refresh"></i> Refresh
                     </button>
                 </h3>
             </div>
             <div id="container-status" class="card-body collapsible-content" style="padding: 20px;">
                 <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
-                    <p style="color: #666; text-align: center;">Loading container information...</p>
+                    <p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>
                 </div>
             </div>
         </div>
@@ -79,21 +79,21 @@
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('volumes-status')"
-                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
                 <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
                     <span>
                         <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 10px; font-size: 0.8em;"></i>
                         <i class="icon-storage" style="margin-right: 10px;"></i>
                         Volume Status Overview
                     </span>
-                    <button onclick="event.stopPropagation(); refreshVolumes();" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button onclick="event.stopPropagation(); refreshVolumes();" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         <i class="icon-refresh"></i> Refresh
                     </button>
                 </h3>
             </div>
             <div id="volumes-status" class="card-body collapsible-content" style="padding: 20px;">
                 <div id="volumes-list" style="display: flex; flex-direction: column; gap: 10px;">
-                    <p style="color: #666; text-align: center;">Loading volume information...</p>
+                    <p style="color: var(--text-muted-color, #666); text-align: center;">Loading volume information...</p>
                 </div>
             </div>
         </div>
@@ -102,7 +102,7 @@
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('container-controls')" 
-                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
                 <h3 style="margin: 0; display: flex; align-items: center;">
                     <i class="fas fa-chevron-right chevron-icon" id="chevron-container-controls" style="margin-right: 10px; font-size: 0.8em;"></i>
                     <i class="icon-tools" style="margin-right: 10px;"></i>
@@ -115,7 +115,7 @@
                             <label for="service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
                                 Select Service:
                             </label>
-                            <select id="service-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <select id="service-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                                 <option value="">-- Select a service --</option>
                                 <option value="all">All Services</option>
                             </select>
@@ -131,7 +131,7 @@
                                     <i class="icon-refresh"></i> Restart
                                 </button>
                                 <button id="rebuild-btn" onclick="rebuildContainer()" 
-                                    style="padding: 8px 16px; background-color: #ffc107; color: #333; border: none; border-radius: 4px; cursor: pointer;">
+                                    style="padding: 8px 16px; background-color: #ffc107; color: var(--text-color, #333); border: none; border-radius: 4px; cursor: pointer;">
                                     🔨 Rebuild
                                 </button>
                                 <button id="logs-btn" onclick="viewLogs()" 
@@ -147,11 +147,11 @@
                             </label>
                             <div style="display: flex; gap: 10px; flex-wrap: wrap;">
                                 <button id="prune-btn" onclick="pruneDockerSystem()" 
-                                    style="padding: 8px 16px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    style="padding: 8px 16px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     🗑️ Prune Unused
                                 </button>
                                 <button id="disk-usage-btn" onclick="showDiskUsage()" 
-                                    style="padding: 8px 16px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    style="padding: 8px 16px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
                                     💾 Disk Usage
                                 </button>
                             </div>
@@ -171,12 +171,12 @@
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('production-deployment')" 
-                 style="background-color: #fff3cd; padding: 15px; border: 2px solid #ffc107; border-bottom: 1px solid #ddd;">
+                 style="background-color: #fff3cd; padding: 15px; border: 2px solid #ffc107; border-bottom: 1px solid var(--border-color, #ddd);">
                 <h3 style="margin: 0; display: flex; align-items: center;">
                     <i class="fas fa-chevron-right chevron-icon" id="chevron-production-deployment" style="margin-right: 10px; font-size: 0.8em;"></i>
                     <i class="fas fa-rocket" style="margin-right: 10px; color: #dc3545;"></i>
                     Production Deployment
-                    <span style="margin-left: 10px; background-color: #dc3545; color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em;">CAUTION</span>
+                    <span style="margin-left: 10px; background-color: var(--danger-color, #dc3545); color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em;">CAUTION</span>
                 </h3>
             </div>
             <div id="production-deployment" class="card-body collapsible-content" style="padding: 20px;">
@@ -200,7 +200,7 @@
                         <label for="deploy-service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
                             Service to Deploy:
                         </label>
-                        <select id="deploy-service-select" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="deploy-service-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                             <option value="web-prod">web-prod (Production)</option>
                             <option value="web-dev">web-dev (Development)</option>
                         </select>
@@ -210,7 +210,7 @@
                         <label for="ssh-target-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
                             SSH Target:
                         </label>
-                        <select id="ssh-target-select" onchange="updateSSHTarget()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <select id="ssh-target-select" onchange="updateSSHTarget()" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                             <option value="custom">Custom...</option>
                             <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
                             <option value="shanta@workstation.local">shanta@workstation.local</option>
@@ -222,8 +222,8 @@
                             Production Server:
                         </label>
                         <input type="text" id="production-host" value="ubuntu@192.168.1.126" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <small style="color: #666;">Format: user@hostname or user@IP</small>
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                        <small style="color: var(--text-muted-color, #666);">Format: user@hostname or user@IP</small>
                     </div>
 
                     <div>
@@ -231,7 +231,7 @@
                             SSH Port:
                         </label>
                         <input type="number" id="ssh-port" value="22" min="1" max="65535"
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                     </div>
 
                     <div>
@@ -240,13 +240,13 @@
                         </label>
                         <div style="position: relative;">
                             <input type="password" id="ssh-password" placeholder="Enter SSH password" 
-                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #ddd; border-radius: 4px;">
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                             <button onclick="togglePasswordVisibility()" type="button"
-                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666;">
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted-color, #666);">
                                 <i id="password-eye-icon" class="fas fa-eye"></i>
                             </button>
                         </div>
-                        <small style="color: #666;">Stored securely in ~/.comserv/secrets/ssh_credentials.json</small>
+                        <small style="color: var(--text-muted-color, #666);">Stored securely in ~/.comserv/secrets/ssh_credentials.json</small>
                     </div>
 
                     <div>
@@ -254,8 +254,8 @@
                             Production Directory:
                         </label>
                         <input type="text" id="production-directory" value="/opt/comserv/Comserv" 
-                               style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
-                        <small style="color: #666;">Path where docker-compose.yml is located on production server</small>
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                        <small style="color: var(--text-muted-color, #666);">Path where docker-compose.yml is located on production server</small>
                     </div>
 
                     <div style="display: flex; align-items: center; gap: 10px; grid-column: 1 / -1;">
@@ -274,7 +274,7 @@
 
                     <div style="display: flex; align-items: center; gap: 8px;">
                         <button onclick="testSSHConnection()" 
-                            style="padding: 10px 20px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            style="padding: 10px 20px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                             <i class="fas fa-network-wired"></i> Test Connection
                         </button>
                         <div id="ssh-status-indicator" style="width: 16px; height: 16px; border-radius: 50%; background-color: #ccc; border: 2px solid #999;" 
@@ -288,13 +288,13 @@
                     </button>
                     
                     <button onclick="deployToProduction()" 
-                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
                         title="Build image → Push to Docker Hub → SSH trigger deploy.sh on production server">
                         <i class="fas fa-rocket"></i> Auto Deploy (Hub)
                     </button>
 
                     <button onclick="showDeploymentCommands()" 
-                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        style="padding: 10px 20px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-code"></i> Show Commands
                     </button>
                 </div>
@@ -484,15 +484,15 @@
                 
                 <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
                     <button id="ssh-connect-btn" onclick="connectSSHTerminal()" 
-                        style="padding: 10px 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        style="padding: 10px 20px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-play"></i> Connect
                     </button>
                     <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled
-                        style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
+                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
                         <i class="fas fa-stop"></i> Disconnect
                     </button>
                     <div id="ssh-connection-status" style="margin-left: 10px; color: #ccc; font-size: 14px;">
-                        <i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected
+                        <i class="fas fa-circle" style="color: var(--text-muted-color, #6c757d);"></i> Disconnected
                     </div>
                 </div>
 
@@ -515,7 +515,7 @@
     <div class="content-section" style="margin-bottom: 20px;">
         <div class="card">
             <div class="card-header collapsible-header" onclick="toggleSection('output-console-section')" 
-                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid #ddd;">
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
                 <h3 style="margin: 0; display: flex; align-items: center;">
                     <i class="fas fa-chevron-right chevron-icon" id="chevron-output-console-section" style="margin-right: 10px; font-size: 0.8em;"></i>
                     <i class="icon-log" style="margin-right: 10px;"></i>
@@ -524,15 +524,15 @@
             </div>
             <div id="output-console-section" class="card-body collapsible-content" style="padding: 20px;">
                 <div id="last-deploy-banner" style="display:none; margin-bottom: 10px; padding: 8px 12px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 12px; font-family: monospace;">
-                    <strong>Last deploy log:</strong> <span id="last-deploy-file" style="color:#333;"></span>
+                    <strong>Last deploy log:</strong> <span id="last-deploy-file" style="color: var(--text-color, #333);"></span>
                     <button onclick="loadHistoryIntoOutput()" style="margin-left: 12px; padding: 2px 8px; font-size: 11px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Show in Output</button>
                 </div>
-                <div id="output-box" style="background-color: #f5f5f5; border: 1px solid #ddd; border-radius: 4px; padding: 15px; 
+                <div id="output-box" style="background-color: #f5f5f5; border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 15px; 
                     font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
                     Ready for commands...
                 </div>
                 <div style="margin-top: 10px;">
-                    <button onclick="clearOutput()" style="padding: 6px 12px; background-color: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button onclick="clearOutput()" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         Clear Output
                     </button>
                 </div>
@@ -686,7 +686,7 @@
     }
 
     function refreshContainers() {
-        containersList.innerHTML = '<p style="color: #666; text-align: center;">Loading container information...</p>';
+        containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
 
         fetch('/admin/docker-list', { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
@@ -715,7 +715,7 @@
 
     function refreshVolumes() {
         const volumesList = document.getElementById('volumes-list');
-        volumesList.innerHTML = '<p style="color: #666; text-align: center;">Loading volume information...</p>';
+        volumesList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading volume information...</p>';
 
         fetch('/admin/docker-volumes', { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
@@ -742,7 +742,7 @@
     function displayVolumes(volumes) {
         const volumesList = document.getElementById('volumes-list');
         if (!volumes || volumes.length === 0) {
-            volumesList.innerHTML = '<p style="color: #666; text-align: center;">No volumes found</p>';
+            volumesList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No volumes found</p>';
             return;
         }
 
@@ -754,7 +754,7 @@
             const typeIcon  = isNfs ? '🌐' : '💾';
 
             const mountDisplay = vol.mountpoint
-                ? `<div style="font-size: 12px; color: #666; margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
+                ? `<div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 4px;"><strong>Mountpoint:</strong> <code style="font-size: 11px;">${vol.mountpoint}</code></div>`
                 : '';
 
             const nfsDetail = isNfs
@@ -770,7 +770,7 @@
                 : '';
 
             html += `
-                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 12px; background-color: rgba(255,255,255,0.88);">
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 12px; background-color: rgba(255,255,255,0.88);">
                     <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
                         <strong style="font-size: 14px;">${typeIcon} ${vol.name}</strong>
                         <span style="background-color: ${typeColor}; color: white; padding: 2px 8px; border-radius: 3px; font-size: 11px;">${typeLabel}</span>
@@ -787,11 +787,11 @@
 
     function displayContainers(containers, host) {
         if (!containers || containers.length === 0) {
-            containersList.innerHTML = '<p style="color: #666; text-align: center;">No containers found</p>';
+            containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">No containers found</p>';
             return;
         }
 
-        const hostLabel = host ? `<div style="margin-bottom:10px;padding:6px 10px;background:#e9ecef;border-radius:4px;font-size:13px;"><strong>Server:</strong> ${host}</div>` : '';
+        const hostLabel = host ? `<div style="margin-bottom:10px;padding:6px 10px;background: var(--bg-secondary, #e9ecef);border-radius:4px;font-size:13px;"><strong>Server:</strong> ${host}</div>` : '';
         let html = hostLabel;
         containers.forEach(container => {
             const stateColor = getStateColor(container.state);
@@ -799,27 +799,27 @@
             const isRunning = ['running', 'up'].includes((container.state||'').toLowerCase());
             const displayName = container.name || container.id || '(unnamed)';
             const healthBadge = container.status && container.status.includes('healthy') && !container.status.includes('unhealthy')
-                ? '<span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">healthy</span>'
+                ? '<span style="background: var(--success-color, #28a745);color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">healthy</span>'
                 : container.status && container.status.includes('unhealthy')
-                ? '<span style="background:#dc3545;color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">unhealthy</span>'
+                ? '<span style="background: var(--danger-color, #dc3545);color:#fff;padding:1px 6px;border-radius:3px;font-size:11px;margin-left:6px;">unhealthy</span>'
                 : '';
 
             html += `
-                <div style="border: 1px solid #ddd; border-radius: 4px; padding: 15px; background-color: rgba(255,255,255,0.88);">
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 15px; background-color: rgba(255,255,255,0.88);">
                     <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
                         <div style="flex: 1;">
-                            <h4 style="margin: 0 0 5px 0; color: #333;">
+                            <h4 style="margin: 0 0 5px 0; color: var(--text-color, #333);">
                                 <span style="color: ${stateColor}; margin-right: 8px;">${stateIcon}</span>
                                 ${displayName}${healthBadge}
                             </h4>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                            <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
                                 <strong>Image:</strong> ${container.image || ''}
                             </div>
-                            <div style="font-size: 12px; color: #666; margin-bottom: 3px;">
+                            <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
                                 <strong>ID:</strong> <code>${container.id || ''}</code>
                                 &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
                             </div>
-                            ${container.ports ? `<div style="font-size:12px;color:#666;margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
+                            ${container.ports ? `<div style="font-size:12px;color: var(--text-muted-color, #666);margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
                             <div style="font-size: 12px;">
                                 <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
                                     ${(container.state||'unknown').toUpperCase()}
@@ -829,12 +829,12 @@
                         <div style="display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end;">
                             ${container.state === 'not_created' ? `
                                 <button onclick="createContainerDirect('${container.name}')"
-                                    style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    style="padding: 6px 12px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     🚀 Create & Start
                                 </button>
                             ` : isRunning ? `
                                 <button onclick="stopContainerDirect('${container.name}')"
-                                    style="padding: 6px 12px; background-color: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    style="padding: 6px 12px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ■ Stop
                                 </button>
                                 <button onclick="restartContainerDirect('${container.name}')"
@@ -847,7 +847,7 @@
                                 </button>
                             ` : `
                                 <button onclick="startContainerDirect('${container.name}')"
-                                    style="padding: 6px 12px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
+                                    style="padding: 6px 12px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 12px;">
                                     ▶ Start
                                 </button>
                                 <button onclick="viewLogsDirect('${container.name}')"
@@ -1364,7 +1364,7 @@
             // Show temporary success message
             const msg = document.createElement('div');
             msg.textContent = '✓ Copied to clipboard!';
-            msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: #28a745; color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; font-weight: bold;';
+            msg.style.cssText = 'position: fixed; top: 20px; right: 20px; background: var(--success-color, #28a745); color: white; padding: 12px 24px; border-radius: 4px; z-index: 10000; font-weight: bold;';
             document.body.appendChild(msg);
             setTimeout(() => msg.remove(), 2000);
         }).catch(err => {
@@ -1404,7 +1404,7 @@
             disconnectBtn.style.opacity = '0.5';
             disconnectBtn.style.cursor = 'not-allowed';
         } else {
-            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: #6c757d;"></i> Disconnected';
+            statusDiv.innerHTML = '<i class="fas fa-circle" style="color: var(--text-muted-color, #6c757d);"></i> Disconnected';
             connectBtn.disabled = false;
             connectBtn.style.opacity = '1';
             connectBtn.style.cursor = 'pointer';
@@ -1797,7 +1797,7 @@
 
 <style>
     .card {
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
     }
@@ -1833,11 +1833,11 @@
     }
 
     h1 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-bottom: 20px;
     }
 
     h3 {
-        color: #333;
+        color: var(--text-color, #333);
     }
 </style>

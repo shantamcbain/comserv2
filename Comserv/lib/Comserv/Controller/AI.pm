@@ -3846,7 +3846,7 @@ sub _get_module_data {
 
     # --- Todo / Task data ---
     # Triggers on todo keywords OR when asking about project state/status/progress
-    my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog/i)
+    my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
     if ($want_todos) {
@@ -3894,10 +3894,11 @@ sub _get_module_data {
                                        : $stat == 2 ? 'IN PROGRESS'
                                        : $stat == 3 ? 'DONE'
                                        : "status=$stat";
+                        my $blocking_flag = ($stat == 2) ? " [IN PROGRESS - potential blocker]" : "";
                         my $line = "  [#$id] P$pri | $subj"
                             . ($due        ? " | Due: $due" : " | No due date")
                             . ($proj_label ? " | Project: $proj_label" : '')
-                            . " | $stat_label";
+                            . " | $stat_label$blocking_flag";
 
                         if ($due && $due lt $today) {
                             push @overdue,  "OVERDUE $line";
@@ -4385,13 +4386,12 @@ sub _do_web_search {
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to local chat-capable models only.
-    # Exclude: embedding/reranker models, code-only models, and :cloud models
-    # (cloud-routed Ollama models need external API keys and will timeout).
+    # Filter to chat-capable models only.
+    # Exclude: embedding/reranker models, code-only models.
+    # :cloud models (Ollama-routed cloud) are allowed — they work through the same endpoint.
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /:cloud$/i
            && $n !~ /starcoder|coder|codellama/i;
     } @$installed_models;
 
@@ -4409,6 +4409,7 @@ sub _pick_ollama_tier {
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
         'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
         'deepseek'   => 7, 'command'  => 7,
+        'kimi-k2'    => 232, 'kimi'   => 72,
     );
     for my $n (@names) {
         my $score;
@@ -6111,8 +6112,7 @@ sub get_user_providers :Local :Args(0) {
             my $installed = $ollama->list_models() || [];
             my @chat_models = grep {
                 my $n = $_->{name} || '';
-                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-                   && $n !~ /:cloud$/i;
+                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
             } @$installed;
 
             # Build servers list for admins (used by widget server-switcher)

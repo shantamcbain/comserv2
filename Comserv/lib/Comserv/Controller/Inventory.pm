@@ -530,6 +530,14 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
 
         if ($filament_g > 0) {
             my $filament_item_id = $params->{filament_item_id};
+            unless ($filament_item_id) {
+                my $default_fil = $schema->resultset('InventoryItem')->search({
+                    sitename     => $sitename,
+                    filament_type => { '!=' => undef },
+                    status       => 'active',
+                })->first;
+                $filament_item_id = $default_fil->id if $default_fil;
+            }
             if ($filament_item_id) {
                 my $scrap = ($params->{filament_scrap} || 2) / 100;
                 $schema->resultset('InventoryItemBOM')->update_or_create({
@@ -614,6 +622,10 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                 sort_order        => 11,
                 notes             => sprintf('%.3fh on %s', $print_hours, $printer->name),
             }, { key => 'unique_parent_component' });
+        }
+
+        if ($print_hours > 0) {
+            $parent->update({ print_time_hours => $print_hours, updated_at => $now });
         }
     };
     if ($@) {
@@ -2122,10 +2134,20 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             my $ref = 'INV-' . ($invoice->invoice_number || $invoice->id);
 
             # Ensure a default location exists for this site so stock always posts
-            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
-                { sitename => $sitename, name => 'Default' },
-                { key => 'sitename_name' }
-            );
+            my $default_loc;
+            eval {
+                ($default_loc) = $schema->resultset('InventoryLocation')->search(
+                    { sitename => $sitename, name => 'Default' }
+                )->all;
+                unless ($default_loc) {
+                    $default_loc = $schema->resultset('InventoryLocation')->create({
+                        sitename => $sitename,
+                        name     => 'Default',
+                        status   => 'active',
+                    });
+                }
+            };
+            die "Cannot resolve Default location: $@" if $@ || !$default_loc;
 
             my (@stock_log, $stock_updated, $stock_skipped);
             for my $line ($invoice->lines->all) {
@@ -2139,10 +2161,18 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
 
                 my ($sl, $sl_err);
                 eval {
-                    $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
-                        { item_id => $line->item_id, location_id => $loc_id },
-                        { key => 'item_id_location_id' }
-                    );
+                    $sl = $schema->resultset('InventoryStockLevel')->find({
+                        item_id => $line->item_id, location_id => $loc_id
+                    });
+                    unless ($sl) {
+                        $sl = $schema->resultset('InventoryStockLevel')->create({
+                            item_id           => $line->item_id,
+                            location_id       => $loc_id,
+                            quantity_on_hand  => 0,
+                            quantity_reserved => 0,
+                            quantity_on_order => 0,
+                        });
+                    }
                 };
                 $sl_err = $@ if $@;
                 if ($sl) {
@@ -2681,76 +2711,6 @@ sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
 }
 
 # =========================================================================
-# Mark Paid by Shanta — admin marks a supplier invoice as paid by Shanta
-# personally (debit card, cash, etc.) and credits Shanta's point account
-# as compensation.  For pre-point-system invoices: mark paid only.
-# =========================================================================
-
-sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
-    my ($self, $c, $id) = @_;
-
-    unless ($c->session->{is_admin}) {
-        $c->flash->{error_msg} = 'Admin access required';
-        return $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
-    }
-
-    my $schema   = $self->_schema($c);
-    my $sitename = $self->_sitename($c);
-    my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
-    unless ($invoice) {
-        $c->flash->{error_msg} = 'Invoice not found';
-        return $c->res->redirect($c->uri_for('/Inventory/invoice'));
-    }
-
-    my $params         = $c->req->body_parameters;
-    my $payment_note   = $params->{payment_note}   || '';
-    my $pre_point      = $params->{pre_point_system} ? 1 : 0;
-    my $amount         = $invoice->total_amount + 0;
-    my $SHANTA_USER_ID = 178;
-
-    my $notes_suffix = ' — Paid by Shanta';
-    $notes_suffix   .= " ($payment_note)" if $payment_note;
-    $notes_suffix   .= ' [pre-point-system: no point credit]' if $pre_point;
-    my $existing_notes = $invoice->notes || '';
-
-    eval {
-        $schema->txn_do(sub {
-            $invoice->update({
-                status => 'paid',
-                notes  => $existing_notes
-                        ? "$existing_notes\n$notes_suffix"
-                        : $notes_suffix,
-            });
-
-            unless ($pre_point) {
-                require Comserv::Util::PointSystem;
-                my $ps = Comserv::Util::PointSystem->new(c => $c);
-                $ps->credit(
-                    user_id          => $SHANTA_USER_ID,
-                    amount           => $amount,
-                    transaction_type => 'infrastructure_reimbursement',
-                    description      => 'Reimbursement: invoice ' . ($invoice->invoice_number || $id)
-                                      . ' paid by Shanta'
-                                      . ($payment_note ? " ($payment_note)" : ''),
-                    reference_type   => 'supplier_invoice',
-                    reference_id     => $id,
-                );
-            }
-        });
-    };
-    if ($@) {
-        $c->flash->{error_msg} = "Error marking paid: $@";
-    } else {
-        $c->flash->{success_msg} = $pre_point
-            ? "Invoice marked paid (pre-point-system — no point credit)."
-            : sprintf("Invoice marked paid. Shanta credited %.2f pts.", $amount);
-    }
-
-    $c->res->redirect($c->uri_for('/Inventory/invoice/view/' . $id));
-}
-
-# =========================================================================
 # CUSTOMER INVOICES (AR / Sales)
 # =========================================================================
 
@@ -2964,26 +2924,69 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 }
 
                 if ($line->item_id) {
-                    my $sl = $schema->resultset('InventoryStockLevel')->find(
-                        { item_id => $line->item_id },
-                        { key => 'primary' }
-                    );
-                    if ($sl) {
-                        my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
-                        $sl->update({ quantity_on_hand => $new_qty });
+                    my $sold_item = eval { $schema->resultset('InventoryItem')->find($line->item_id) };
+
+                    if ($sold_item && $sold_item->is_assemblable) {
+                        # For assemblable (3D-printed / assembled) items: deduct BOM components
+                        # instead of the finished item (printed-on-demand — no finished stock).
+                        my $qty_multiplier = $line->quantity || 1;
+                        my @bom = eval {
+                            $schema->resultset('InventoryItemBOM')->search(
+                                { parent_item_id => $line->item_id },
+                                { prefetch => 'component_item' }
+                            )->all;
+                        };
+                        for my $bom_line (@bom) {
+                            next unless $bom_line->component_item_id;
+                            my $comp_qty = ($bom_line->quantity || 0)
+                                         * $qty_multiplier
+                                         * (1 + ($bom_line->scrap_factor || 0));
+
+                            my $comp_sl = $schema->resultset('InventoryStockLevel')->find(
+                                { item_id => $bom_line->component_item_id }
+                            );
+                            if ($comp_sl) {
+                                my $new_qty = ($comp_sl->quantity_on_hand || 0) - $comp_qty;
+                                $comp_sl->update({ quantity_on_hand => $new_qty });
+                            }
+                            my $comp_name = eval { $bom_line->component_item->name } || 'component';
+                            $schema->resultset('InventoryTransaction')->create({
+                                item_id          => $bom_line->component_item_id,
+                                sitename         => $sitename,
+                                transaction_type => 'use',
+                                quantity         => $comp_qty,
+                                unit_cost        => eval { $bom_line->component_item->unit_cost } || undef,
+                                reference_number => $invoice->invoice_number,
+                                notes            => 'Used in ' . ($sold_item->name || 'item')
+                                                  . ' x' . $qty_multiplier
+                                                  . ' — invoice #' . $invoice->invoice_number,
+                                performed_by     => $c->session->{username} || 'system',
+                                transaction_date => $now,
+                                created_at       => $now,
+                            });
+                        }
+                    } else {
+                        # Non-assemblable items: deduct finished stock directly
+                        my $sl = $schema->resultset('InventoryStockLevel')->find(
+                            { item_id => $line->item_id }
+                        );
+                        if ($sl) {
+                            my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
+                            $sl->update({ quantity_on_hand => $new_qty });
+                        }
+                        $schema->resultset('InventoryTransaction')->create({
+                            item_id          => $line->item_id,
+                            sitename         => $sitename,
+                            transaction_type => 'sell',
+                            quantity         => $line->quantity || 0,
+                            unit_cost        => $line->unit_cost || undef,
+                            reference_number => $invoice->invoice_number,
+                            notes            => 'Customer invoice #' . $invoice->invoice_number,
+                            performed_by     => $c->session->{username} || 'system',
+                            transaction_date => $now,
+                            created_at       => $now,
+                        });
                     }
-                    $schema->resultset('InventoryTransaction')->create({
-                        item_id          => $line->item_id,
-                        sitename         => $sitename,
-                        transaction_type => 'sell',
-                        quantity         => $line->quantity || 0,
-                        unit_cost        => $line->unit_cost || undef,
-                        reference_number => $invoice->invoice_number,
-                        notes            => 'Customer invoice #' . $invoice->invoice_number,
-                        performed_by     => $c->session->{username} || 'system',
-                        transaction_date => $now,
-                        created_at       => $now,
-                    });
                 }
             }
 
@@ -3070,11 +3073,12 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
     $copies = 50 if $copies > 50;
 
     $c->stash(
-        item      => $item,
-        locations => \@locations,
-        copies    => $copies,
-        sitename  => $sitename,
-        template  => 'Inventory/print/label.tt',
+        item       => $item,
+        locations  => \@locations,
+        copies     => $copies,
+        sitename   => $sitename,
+        no_wrapper => 1,
+        template   => 'Inventory/print/label.tt',
     );
 }
 
@@ -3107,9 +3111,10 @@ sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
     }
 
     $c->stash(
-        items    => \@items,
-        sitename => $sitename,
-        template => 'Inventory/print/labels_multi.tt',
+        items      => \@items,
+        sitename   => $sitename,
+        no_wrapper => 1,
+        template   => 'Inventory/print/labels_multi.tt',
     );
 }
 
@@ -3173,6 +3178,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
         categories  => \@categories,
         sitename    => $sitename,
         print_date  => $self->_now(),
+        no_wrapper  => 1,
         template    => 'Inventory/print/stock_report.tt',
     );
 }
@@ -3214,6 +3220,7 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
         assembled_cost => $assembled_cost,
         print_date     => $self->_now(),
         sitename       => $self->_sitename($c),
+        no_wrapper     => 1,
         template       => 'Inventory/print/bom.tt',
     );
 }
@@ -3751,11 +3758,12 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
 
 sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     my ($self, $c) = @_;
-    my $sitename = $self->_sitename($c);
-    my $schema   = $self->_schema($c);
-    my $status   = $c->req->params->{status} || 'all';
+    my $sitename        = $self->_sitename($c);
+    my $schema          = $self->_schema($c);
+    my $status          = $c->req->params->{status} || 'all';
+    my $source_sitename = $c->req->params->{source_sitename} || $sitename;
 
-    my %where = ('me.sitename' => $sitename);
+    my %where = ('me.sitename' => $source_sitename);
     $where{'me.status'} = $status if $status ne 'all';
 
     my @consignments;
@@ -3768,10 +3776,11 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
     push @{$c->stash->{debug_errors}}, "Consignment list error: $@" if $@;
 
     $c->stash(
-        consignments  => \@consignments,
-        filter_status => $status,
-        sitename      => $sitename,
-        template      => 'Inventory/consignment/list.tt',
+        consignments    => \@consignments,
+        filter_status   => $status,
+        sitename        => $sitename,
+        source_sitename => $source_sitename,
+        template        => 'Inventory/consignment/list.tt',
     );
 }
 
@@ -3783,12 +3792,13 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
+        my $inv_sitename = $p->{source_sitename} || $sitename;
         eval {
             die "Partner required\n" unless $p->{partner_id};
             die "Date sent required\n" unless $p->{date_sent};
 
             my $consignment = $schema->resultset('InventoryConsignment')->create({
-                sitename         => $sitename,
+                sitename         => $inv_sitename,
                 partner_id       => $p->{partner_id},
                 reference_number => $p->{reference_number} || undef,
                 date_sent        => $p->{date_sent},
@@ -3799,7 +3809,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
 
             my %lines_by_idx;
             for my $key (keys %$p) {
-                if ($key =~ /^(item_id|quantity|retail_price|line_notes)_(\d+)$/) {
+                if ($key =~ /^(item_id|quantity|retail_price|line_notes|line_notes_plain|fil_type|fil_color|options_selected)_(\d+)$/) {
                     $lines_by_idx{$2}{$1} = $p->{$key};
                 }
             }
@@ -3810,7 +3820,17 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $item_id      = $l->{item_id};
                 my $qty          = $l->{quantity};
                 my $retail_price = $l->{retail_price};
-                my $line_note    = $l->{line_notes};
+                my $fil_type  = $l->{fil_type}  || '';
+                my $fil_color = $l->{fil_color} || '';
+                my $opts_str     = '';
+                if ($fil_type || $fil_color) {
+                    $opts_str = '[FIL:' . $fil_type . ',' . $fil_color . ']';
+                }
+                # line_notes is the 3D special-request field; line_notes_plain is for non-3D items
+                my $user_note = $l->{line_notes} || $l->{line_notes_plain} || '';
+                my $line_note = $opts_str
+                    ? ($user_note ? "$opts_str $user_note" : $opts_str)
+                    : $user_note || undef;
                 $schema->resultset('InventoryConsignmentLine')->create({
                     consignment_id    => $consignment->id,
                     item_id           => $item_id,
@@ -3821,7 +3841,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                     notes             => $line_note    || undef,
                 });
                 $schema->resultset('InventoryTransaction')->create({
-                    sitename         => $sitename,
+                    sitename         => $inv_sitename,
                     item_id          => $item_id,
                     transaction_type => 'consignment_out',
                     quantity         => -($qty),
@@ -3833,28 +3853,79 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
             }
         };
         if ($@) {
-            $c->stash(error_msg => "Failed: $@");
+            $c->stash(
+                error_msg       => "Failed: $@",
+                source_sitename => $p->{source_sitename} || '',
+            );
         } else {
             $c->flash->{success_msg} = 'Consignment created.';
-            $c->res->redirect($c->uri_for('/Inventory/consignment'));
+            $c->res->redirect($c->uri_for('/Inventory/consignment',
+                ($p->{source_sitename} && $p->{source_sitename} ne $sitename)
+                    ? { source_sitename => $p->{source_sitename} } : ()
+            ));
             $c->detach;
         }
     }
 
-    my (@partners, @items);
+    my $source_sitename = $c->req->params->{source_sitename} || $sitename;
+    my (@partners, @items, @all_sitenames, @avail_filaments);
     eval {
         @partners = $schema->resultset('InventoryConsignmentPartner')->search(
-            { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+            { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
+    };
+    eval {
         @items = $schema->resultset('InventoryItem')->search(
-            { sitename => $sitename, status => 'active', show_in_shop => 1 },
-            { columns => ['id','name','sku','unit_price','unit_cost'], order_by => 'name' })->all;
+            { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
+            { columns => [qw(id name sku unit_price unit_cost unit_of_measure category item_origin)],
+              order_by => 'name' })->all;
+    };
+    eval {
+        my @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all;
+        @all_sitenames = map { $_->name } @sites;
+    };
+    eval {
+        my $dbh = $schema->storage->dbh;
+        my $rows = $dbh->selectall_arrayref(
+            'SELECT i.id, i.name,
+                    COALESCE(SUM(sl.quantity_on_hand),0) - COALESCE(SUM(sl.quantity_reserved),0) AS avail
+             FROM inventory_items i
+             LEFT JOIN inventory_stock_levels sl ON sl.item_id = i.id
+             WHERE i.sitename = ?
+               AND (i.category LIKE ? OR i.category LIKE ? OR i.name LIKE ?)
+               AND i.status = ?
+             GROUP BY i.id, i.name
+             ORDER BY i.name',
+            { Slice => {} }, $source_sitename, '%filament%', '%3d_fil%', '%ilament%', 'active'
+        );
+        my %fil_det;
+        eval {
+            my $dr = $dbh->selectall_arrayref(
+                'SELECT id, filament_color, filament_type FROM inventory_items WHERE sitename = ?',
+                { Slice => {} }, $source_sitename);
+            %fil_det = map { $_->{id} => $_ } @$dr;
+        };
+        for my $r (@$rows) {
+            my $d = $fil_det{$r->{id}} || {};
+            push @avail_filaments, {
+                id    => $r->{id},
+                name  => $r->{name},
+                avail => $r->{avail},
+                type  => $d->{filament_type}  || '',
+                color => $d->{filament_color} || '',
+            };
+        }
     };
 
+    use JSON qw(encode_json);
     $c->stash(
-        partners => \@partners,
-        items    => \@items,
-        sitename => $sitename,
-        template => 'Inventory/consignment/new.tt',
+        partners           => \@partners,
+        items              => \@items,
+        sitename           => $sitename,
+        source_sitename    => $source_sitename,
+        all_sitenames      => \@all_sitenames,
+        avail_filaments    => \@avail_filaments,
+        avail_filaments_json => encode_json(\@avail_filaments),
+        template           => 'Inventory/consignment/new.tt',
     );
 }
 
@@ -3895,7 +3966,7 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
     );
 }
 
-sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
+sub consignment_queue :Path('/Inventory/consignment/queue') :Args(1) {
     my ($self, $c, $id) = @_;
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
@@ -3906,6 +3977,70 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
+    };
+    unless ($consignment) {
+        $c->flash->{error_msg} = 'Consignment not found.';
+        $c->res->redirect($c->uri_for('/Inventory/consignment'));
+        $c->detach;
+    }
+
+    my $p = $c->req->body_params;
+    my @lines = $consignment->lines->all;
+    my $queued = 0;
+    my @errors;
+
+    for my $line (@lines) {
+        my $line_id  = $line->id;
+        my $qty_key  = "qty_$line_id";
+        my $fil_key  = "filament_$line_id";
+        my $col_key  = "colour_$line_id";
+        my $qty = $p->{$qty_key};
+        next unless defined $qty && $qty =~ /^\d+$/ && $qty > 0;
+
+        my $item = $line->item;
+        eval {
+            $schema->resultset('Printing3dJob')->create({
+                sitename            => $sitename,
+                model_id            => undef,
+                consignment_id      => $id,
+                consignment_line_id => $line_id,
+                item_name           => ($item ? $item->name : 'Unknown'),
+                user_id             => $c->session->{user_id} || 0,
+                username            => $c->session->{username} || 'admin',
+                status              => 'queued',
+                quantity            => $qty,
+                filament_type       => $p->{$fil_key} || undef,
+                filament_color      => $p->{$col_key} || undef,
+                notes               => 'Consignment #' . $id . ' for ' . $consignment->partner->name
+                                       . ($line->notes ? ' — ' . $line->notes : ''),
+                inventory_reserved  => 0,
+                created_at          => _now(),
+            });
+            $queued++;
+        };
+        push @errors, "Line $line_id: $@" if $@;
+    }
+
+    if (@errors) {
+        $c->flash->{error_msg} = 'Some jobs failed: ' . join('; ', @errors);
+    } else {
+        $c->flash->{success_msg} = "$queued print job(s) added to the queue.";
+    }
+    $c->res->redirect($c->uri_for('/Inventory/consignment/view', [$id]));
+    $c->detach;
+}
+
+sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $sitename = $self->_sitename($c);
+    my $schema   = $self->_schema($c);
+
+    my $consignment;
+    eval {
+        $consignment = $schema->resultset('InventoryConsignment')->search(
+            { 'me.id' => $id, 'me.sitename' => $sitename },
+            { prefetch => ['partner', { 'lines' => 'item' }] }
+        )->first;
     };
     unless ($consignment) {
         $c->flash->{error_msg} = 'Consignment not found.';
@@ -3924,22 +4059,13 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
         }
     };
 
-    my $vars = {
-        %{ $c->stash },
+    $c->stash(
         consignment => $consignment,
         sitename    => $sitename,
         site_info   => \%site_info,
-        c           => $c,
-    };
-
-    my $view   = $c->view('TT');
-    my $output = '';
-    $view->template->process('Inventory/consignment/print.tt', $vars, \$output)
-        or die $view->template->error;
-
-    $c->response->content_type('text/html; charset=utf-8');
-    $c->response->body($output);
-    $c->detach;
+        no_wrapper  => 1,
+        template    => 'Inventory/consignment/print.tt',
+    );
 }
 
 sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {

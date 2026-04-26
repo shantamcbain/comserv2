@@ -1569,8 +1569,8 @@ sub download :Local :Args(1) {
         : $c->uri_for($self->action_for('index'));
 
     # Access: admin, file owner, workshop leader, or registered attendee
-    my $admin_auth = Comserv::Util::AdminAuth->new();
-    my $is_admin   = ($admin_auth->get_admin_type($c) // 'none') ne 'none';
+    my $admin_auth_dl = Comserv::Util::AdminAuth->new();
+    my $is_admin   = $admin_auth_dl->get_admin_type($c) ne 'none';
     my $is_owner   = ($file->user_id && $file->user_id == $user_id);
 
     my ($is_leader, $is_registered) = (0, 0);
@@ -1792,7 +1792,7 @@ sub resources :Path('/workshop/resources') :Args(0) {
     my $admin_auth = Comserv::Util::AdminAuth->new();
     my $admin_type = $admin_auth->get_admin_type($c);
     my $is_csc     = ($admin_type eq 'csc' || $admin_type eq 'special');
-    my $is_admin   = $admin_type && $admin_type ne 'none';
+    my $is_admin   = $admin_type ne 'none';
     my $nfs_root   = $self->_nfs_root();
     my $nfs_available = -d $nfs_root;
 

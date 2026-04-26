@@ -64,10 +64,10 @@
     </button>
     <button type="button" id="ai-form-review-btn"
             title="Send current field values to AI and identify errors or inconsistencies"
-            style="padding:4px 10px;background:#fff3cd;border:1px solid #ffc107;border-radius:4px;cursor:pointer;">
+            style="padding:4px 10px;background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);border-radius:4px;cursor:pointer;">
       Review &amp; Correct
     </button>
-    <span id="ai-form-status" style="color:#555;font-style:italic;font-size:0.9em;"></span>
+    <span id="ai-form-status" style="color: var(--text-muted-color, #555);font-style:italic;font-size:0.9em;"></span>
   </div>
 
   <div style="margin-top:0.5em;font-size:0.85em;color:#444;">
@@ -81,7 +81,7 @@
            title="Only these fields will be filled by AI. All others are untouched." />
   </div>
 
-  <div style="margin-top:0.4em;font-size:0.82em;color:#666;display:flex;flex-wrap:wrap;gap:0.8em;align-items:center;">
+  <div style="margin-top:0.4em;font-size:0.82em;color: var(--text-muted-color, #666);display:flex;flex-wrap:wrap;gap:0.8em;align-items:center;">
     <label style="cursor:pointer;">
       <input type="checkbox" id="ai-form-override" style="vertical-align:middle;">
       Override existing values (default: only fills empty fields)
@@ -102,18 +102,18 @@
     <div style="display:flex;align-items:center;gap:0.8em;margin-bottom:0.6em;flex-wrap:wrap;">
       <strong style="color:#1a4a7a;">AI Suggestions — Fields With Existing Content:</strong>
       <button type="button" id="ai-form-stage-all-btn"
-              style="padding:3px 10px;cursor:pointer;background:#d4edda;border:1px solid #28a745;border-radius:3px;font-size:0.85em;">
+              style="padding:3px 10px;cursor:pointer;background:#d4edda;border:1px solid var(--success-color, #28a745);border-radius:3px;font-size:0.85em;">
         Append All
       </button>
       <button type="button" id="ai-form-skip-all-btn"
-              style="padding:3px 10px;cursor:pointer;background:#f8f9fa;border:1px solid #aaa;border-radius:3px;font-size:0.85em;">
+              style="padding:3px 10px;cursor:pointer;background: var(--bg-secondary, #f8f9fa);border:1px solid #aaa;border-radius:3px;font-size:0.85em;">
         Skip All
       </button>
     </div>
     <div id="ai-form-staged-items"></div>
   </div>
 
-  <div id="ai-form-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid #ffc107;padding-top:0.6em;">
+  <div id="ai-form-review-panel" style="display:none;margin-top:0.8em;border-top:2px solid var(--caution-color, #ffc107);padding-top:0.6em;">
     <strong style="color:#856404;">AI Review Suggestions:</strong>
     <div id="ai-form-review-results" style="margin-top:0.4em;"></div>
   </div>
@@ -409,11 +409,11 @@
             corrections.forEach(function(c) {
                 var el  = document.querySelector('[name="' + c.field + '"]');
                 var div = document.createElement('div');
-                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background:#fffbe6;border:1px solid #ffc107;border-radius:4px;font-size:0.9em;';
+                div.style.cssText = 'margin:0.5em 0;padding:0.5em;background: var(--caution-bg, #fffbe6);border:1px solid var(--caution-color, #ffc107);border-radius:4px;font-size:0.9em;';
                 div.innerHTML = '<strong>' + c.field + '</strong>: '
                     + '<span style="color:#c00;text-decoration:line-through;">' + (c.current||'').substring(0,120).replace(/</g,'&lt;') + '</span> '
                     + '&rarr; <span style="color:#155724;">' + (c.suggested||'').substring(0,200).replace(/</g,'&lt;') + '</span>'
-                    + '<br><em style="color:#666;">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
+                    + '<br><em style="color: var(--text-muted-color, #666);">' + (c.reason||'').replace(/</g,'&lt;') + '</em>';
                 if (el) {
                     var applyBtn = document.createElement('button');
                     applyBtn.type = 'button';
@@ -457,7 +457,7 @@
             function box(title, val, bg, border) {
                 var b = document.createElement('div');
                 b.style.cssText = 'flex:1;min-width:180px;padding:0.4em;background:' + bg + ';border:1px solid ' + border + ';border-radius:3px;font-size:0.85em;white-space:pre-wrap;max-height:100px;overflow:auto;';
-                b.innerHTML = '<em style="display:block;margin-bottom:0.2em;color:#666;">' + title + '</em>' + val.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+                b.innerHTML = '<em style="display:block;margin-bottom:0.2em;color: var(--text-muted-color, #666);">' + title + '</em>' + val.replace(/&/g,'&amp;').replace(/</g,'&lt;');
                 return b;
             }
             row.appendChild(box('Existing', item.currentVal, '#fff8f8', '#f5c6cb'));

@@ -266,7 +266,7 @@ CREATE TABLE presentation_slide (
     }
     
     .toc {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         margin-bottom: 30px;
@@ -294,7 +294,7 @@ CREATE TABLE presentation_slide (
     
     h2 {
         color: #2c3e50;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
         padding-bottom: 5px;
     }
     
@@ -304,7 +304,7 @@ CREATE TABLE presentation_slide (
     
     pre {
         background-color: #f8f8f8;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 3px;
         padding: 10px;
         overflow-x: auto;

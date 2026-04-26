@@ -58,7 +58,7 @@
                 </p>
                 <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                     <p style="margin-top: 0; color: var(--text-color);"><strong>UTF-8 Configuration:</strong></p>
-                    <pre style="background-color: white; border: 1px solid var(--border-color); border-radius: 3px; padding: var(--spacing-small); overflow-x: auto; font-size: 0.85em;">ENCODING => 'UTF-8'</pre>
+                    <pre style="background-color: rgba(255,255,255,0.88); border: 1px solid var(--border-color); border-radius: 3px; padding: var(--spacing-small); overflow-x: auto; font-size: 0.85em;">ENCODING => 'UTF-8'</pre>
                     <p style="margin: 10px 0 0 0; color: var(--text-color); font-size: 0.95em;">This configuration tells Template Toolkit to read template files as UTF-8, process content with UTF-8 encoding, and output UTF-8 encoded content. Combined with HTTP Content-Type charset headers (configured in Documentation controller), this ensures proper rendering of international characters, currency symbols, arrows (← →), and other special Unicode characters.</p>
                 </div>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>

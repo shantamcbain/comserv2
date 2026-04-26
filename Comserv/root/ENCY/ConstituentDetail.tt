@@ -106,7 +106,7 @@
         <td>
             [% IF edit_mode %]
             <input type="text" name="molecular_weight" value="[% constituent.molecular_weight | html %]" size="15" />
-            <span style="font-size:0.85em;color:#666;"> g/mol (numbers only — units stripped automatically)</span>
+            <span style="font-size:0.85em;color: var(--text-muted-color, #666);"> g/mol (numbers only — units stripped automatically)</span>
             [% ELSE %]
             [% IF constituent.molecular_weight %][% constituent.molecular_weight | html %] g/mol[% END %]
             [% END %]
@@ -273,7 +273,7 @@
         <td>
             [% IF edit_mode %]
             <input type="text" name="image" value="[% constituent.image | html %]" size="60" />
-            <span style="font-size:0.85em;color:#666;"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
+            <span style="font-size:0.85em;color: var(--text-muted-color, #666);"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
             [% ELSE %]
             [% IF constituent.image %]
             [% ency_img_tag(constituent.image, 300, 300) %]

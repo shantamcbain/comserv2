@@ -17,15 +17,15 @@
 .fl-wrap      { overflow-x:auto; -webkit-overflow-scrolling:touch; width:100%; }
 .fl-table     { width:100%; border-collapse:collapse; font-size:.875rem; min-width:480px; }
 .fl-table thead th { background:#f0f0f0; padding:7px 10px; text-align:left;
-                     font-weight:600; border-bottom:2px solid #ddd; white-space:nowrap; }
-.fl-table tbody tr:nth-child(even) { background:#fafafa; }
+                     font-weight:600; border-bottom:2px solid var(--border-color, #ddd); white-space:nowrap; }
+.fl-table tbody tr:nth-child(even) { background: var(--bg-secondary, #fafafa); }
 .fl-table tbody tr:hover { background:#f0f5ff; }
 .fl-table td  { padding:5px 10px; vertical-align:middle; border-bottom:1px solid #f0f0f0; }
 .fl-name      { max-width:220px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .fl-name a    { color:#1565c0; text-decoration:none; }
 .fl-name a:hover { text-decoration:underline; }
-.fl-num       { text-align:right; white-space:nowrap; color:#555; font-size:.8rem; }
-.fl-date      { white-space:nowrap; color:#666; font-size:.8rem; }
+.fl-num       { text-align:right; white-space:nowrap; color: var(--text-muted-color, #555); font-size:.8rem; }
+.fl-date      { white-space:nowrap; color: var(--text-muted-color, #666); font-size:.8rem; }
 .fl-badge     { display:inline-block; padding:1px 6px; border-radius:3px;
                 font-size:.7rem; font-weight:bold; color:#fff; }
 .fl-badge-dup { background:#c0720a; }
@@ -35,10 +35,10 @@
        vertical-align:middle; font-weight:500; }
 .btn:hover { opacity:.88; text-decoration:none; }
 .btn-sm        { padding:2px 8px; font-size:.75rem; }
-.btn-primary   { background:#007bff; color:#fff !important; }
+.btn-primary   { background: var(--primary-color, #007bff); color:#fff !important; }
 .btn-secondary { background:#6c757d; color:#fff !important; }
 .btn-edit      { background:#fd7e14; color:#fff !important; }
-.btn-delete    { background:#dc3545; color:#fff !important; }
+.btn-delete    { background: var(--danger-color, #dc3545); color:#fff !important; }
 </style>
 
 [% MACRO fmt_size(b) BLOCK %]
@@ -185,12 +185,12 @@
                           title="Move this file to a different directory on disk and update the database">
                     &#8594; Move
                   </button>
-                  <div id="fl-move-[% loop.index %]" style="display:none;margin-top:6px;background:#f8f8f8;border:1px solid #ddd;border-radius:4px;padding:8px 10px;min-width:320px;">
+                  <div id="fl-move-[% loop.index %]" style="display:none;margin-top:6px;background:#f8f8f8;border:1px solid var(--border-color, #ddd);border-radius:4px;padding:8px 10px;min-width:320px;">
                     <form method="post" action="[% c.uri_for('/file/fs_move') %]">
                       <input type="hidden" name="old_path" value="[% fp | html %]">
                       <input type="hidden" name="dir"      value="">
                       <input type="hidden" name="back_url" value="[% c.uri_for('/file/list', { sitename => filter_params.sitename, file_status => filter_params.file_status, file_type => filter_params.file_type, is_duplicate => filter_params.is_duplicate }) %]">
-                      <div style="font-size:.8rem;color:#555;margin-bottom:5px;">
+                      <div style="font-size:.8rem;color: var(--text-muted-color, #555);margin-bottom:5px;">
                         Moving: <code style="font-size:.78rem">[% fp | html %]</code>
                       </div>
                       <label style="font-size:.82rem;font-weight:600">Destination directory:</label>

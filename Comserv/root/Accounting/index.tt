@@ -12,34 +12,34 @@
   [%# ── Summary stat bar ──────────────────────────────────────────── %]
   <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.5rem;">
 
-    <div style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;">
+    <div style="flex:1;min-width:120px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;">
       <div style="font-size:1.8rem;font-weight:bold;color:#2563eb;">[% acct_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">COA Accounts</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">COA Accounts</div>
     </div>
 
-    <div style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;">
+    <div style="flex:1;min-width:120px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;">
       <div style="font-size:1.8rem;font-weight:bold;color:#6d28d9;">[% entry_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">GL Entries</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">GL Entries</div>
     </div>
 
     <a href="/Inventory/invoice?status=outstanding" style="flex:1;min-width:120px;background:[% ap_outstanding > 0 ? '#fff7ed' : '#fff' %];border:1px solid [% ap_outstanding > 0 ? '#f97316' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:[% ap_outstanding > 0 ? '#c2410c' : '#059669' %];">[% ap_outstanding %]</div>
-      <div style="font-size:0.8rem;color:#555;">AP Outstanding</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">AP Outstanding</div>
     </a>
 
     <a href="/Inventory/sales" style="flex:1;min-width:120px;background:[% ar_outstanding > 0 ? '#fefce8' : '#fff' %];border:1px solid [% ar_outstanding > 0 ? '#ca8a04' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:[% ar_outstanding > 0 ? '#92400e' : '#059669' %];">[% ar_outstanding %]</div>
-      <div style="font-size:0.8rem;color:#555;">AR Outstanding</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">AR Outstanding</div>
     </a>
 
-    <a href="/Inventory/items" style="flex:1;min-width:120px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
+    <a href="/Inventory/items" style="flex:1;min-width:120px;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:#1e40af;">[% item_count %]</div>
-      <div style="font-size:0.8rem;color:#555;">Active Items</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Active Items</div>
     </a>
 
     <a href="/Inventory/stock/levels?low_only=1" style="flex:1;min-width:120px;background:[% low_stock > 0 ? '#fef2f2' : '#fff' %];border:1px solid [% low_stock > 0 ? '#ef4444' : '#ddd' %];border-radius:8px;padding:0.9rem 1rem;text-align:center;text-decoration:none;">
       <div style="font-size:1.8rem;font-weight:bold;color:[% low_stock > 0 ? '#b91c1c' : '#059669' %];">[% low_stock %]</div>
-      <div style="font-size:0.8rem;color:#555;">Low Stock</div>
+      <div style="font-size:0.8rem;color: var(--text-muted-color, #555);">Low Stock</div>
     </a>
 
   </div>

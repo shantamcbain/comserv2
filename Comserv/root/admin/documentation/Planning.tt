@@ -1,9 +1,9 @@
 [%# Define all version, date, and path variables in one place here %]
-[% version = '0.75' %]
-[% date_iso = '2026/03/20' %]
-[% formatted_date = 'March 20, 2026' %]
+[% version = '0.74' %]
+[% date_iso = '2026/02/21' %]
+[% formatted_date = 'February 21, 2026' %]
 [% time = '16:30:00' %]
-[% change_log = 'Planning System Migration: DB-driven model now live for all sites via DailyPlan.tt. Non-CSC sites see DB plans only. CSC sees DB plans + this legacy text section. SiteName-based access controls implemented. Plan creation form live at /admin/plan/create. Normal/user/editor roles now have planning access. NEXT: migrate remaining text groups below into DB records, then remove text section entirely.' %]
+[% change_log = 'Users: 3-Step Self-Registration COMPLETE - Refactored existing register.tt and do_create_account, created VerifyEmail.tt and CompleteProfile.tt (PascalCase). Clean URLs (/register, /verify_email, /complete_profile). Reused existing code, deleted duplicates. Phase 2 in progress. Next: Enhanced login (email/username support).' %]
 [%# Determine file path for metadata %]
 [% file_path = 'admin/documentation/Planning.tt' %]
 
@@ -89,7 +89,7 @@ last_updated = '2026/02/08'
     }
     .jump-link:hover {
         text-decoration: underline;
-        background: #e9ecef;
+        background: var(--bg-secondary, #e9ecef);
     }
 
     /* Navigation Anchors - strictly for positioning jump targets */
@@ -109,9 +109,9 @@ last_updated = '2026/02/08'
     /* Group container styling */
     .priority-group-container {
         margin-bottom: 20px;
-        border: 2px solid #dee2e6;
+        border: 2px solid var(--border-color, #dee2e6);
         border-radius: 6px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
     }
 
     .group-header {
@@ -119,9 +119,9 @@ last_updated = '2026/02/08'
         font-weight: bold;
         padding: 12px 15px;
         cursor: pointer;
-        background-color: #e9ecef;
+        background-color: var(--bg-secondary, #e9ecef);
         border-radius: 4px 4px 0 0;
-        color: #495057;
+        color: var(--text-color, #495057);
     }
 
     .group-header:hover {
@@ -135,92 +135,12 @@ last_updated = '2026/02/08'
     /* Sub-container styling - nested priority containers */
     .priority-group-container .priority-container {
         margin-bottom: 10px;
-        border: 1px solid #dee2e6;
+        border: 1px solid var(--border-color, #dee2e6);
     }
 </style>
 
 <div class="container">
-    <h1>Planning (CSC — Legacy Text View)</h1>
-
-    <!-- YOU ARE HERE banner -->
-    <div style="background:#cce5ff;border:1px solid #004085;border-radius:6px;padding:10px 16px;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;">
-        <span style="font-size:0.9em;">
-            <strong>📍 YOU ARE HERE:</strong>
-            Step 3 of 7 — <em>Refactor MasterPlanCoordination to coordinator-only role</em> &nbsp;·&nbsp;
-            <a href="#anchor-planning-system-project" style="color:#004085;font-weight:bold;">View full plan status ↓</a>
-        </span>
-        <span style="font-size:0.82em;color:#004085;">
-            Branch: <code>planningsystem-59ae</code> &nbsp;·&nbsp;
-            <a href="/Documentation/DailyPlan#planning" style="color:#004085;">Back to DB view</a>
-        </span>
-    </div>
-
-    <!-- ═══════════════════════════════════════════════════════════════
-         MIGRATION STATUS — March 2026
-         This section is ONLY visible to CSC users. All other sites now
-         see the DB-driven plan list at the top of the PLANNING tab.
-         Goal: migrate all groups below into DB records, then delete this file.
-    ═══════════════════════════════════════════════════════════════ -->
-    <div style="background:#fff3cd;border:2px solid #ffc107;border-radius:6px;padding:14px 18px;margin-bottom:18px;">
-        <strong>⚠️ LEGACY TEXT PLANNING — BEING MIGRATED</strong>
-        <p style="margin:6px 0 0;">This text-based planning view is <strong>CSC-admin-only</strong> and is being replaced by the DB-driven plan list above.
-        Non-CSC sites (BMaster, Shanta, etc.) no longer see this section — they use the database model only.
-        The goal is to enter each project/plan below into the database, then remove this entire section.</p>
-        <p style="margin:6px 0 0;">
-            <strong>Current migration progress:</strong>
-            <span style="background:#28a745;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">DB Model LIVE ✓</span>
-            <span style="background:#ffc107;color:#333;padding:1px 7px;border-radius:3px;font-size:0.85em;">Migrating projects ⏳</span>
-            <span style="background:#6c757d;color:#fff;padding:1px 7px;border-radius:3px;font-size:0.85em;">Remove text view 🔜</span>
-        </p>
-        <p style="margin:8px 0 0;font-size:0.9em;">
-            <strong>What "Start Next Step" means:</strong>
-            The Zenflow task listed for each group has phases. "Start Next Step" = the next unchecked phase box in that group's task plan.
-            Before starting, verify: (1) all previous phase boxes are ✅, (2) no blocking dependencies are open,
-            (3) the feature branch for that task is active (check port assignments in Active Zenflow Workflows below).
-        </p>
-    </div>
-
-    <!-- HOW TO ADD A PLAN (Plan vs Project) -->
-    <details style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0;margin-bottom:18px;">
-        <summary style="padding:12px 16px;cursor:pointer;font-weight:bold;">📖 How to Add a Plan — Plan vs Project (click to expand)</summary>
-        <div style="padding:14px 16px;font-size:0.93em;line-height:1.6;">
-            <h4 style="margin-top:0;">Plan vs Project — what's the difference?</h4>
-            <table style="border-collapse:collapse;width:100%;font-size:0.92em;">
-                <thead>
-                    <tr style="background:var(--primary-color);color:#fff;">
-                        <th style="padding:8px 12px;text-align:left;">Concept</th>
-                        <th style="padding:8px 12px;text-align:left;">Plan</th>
-                        <th style="padding:8px 12px;text-align:left;">Project</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">What it is</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A time-boxed focus sprint or theme (e.g. "Q2 Hive Expansion")</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">A deliverable system or feature (e.g. "Planning System", "AI Chat")</td></tr>
-                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Answers</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we focusing on right now?"</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">"What are we building?"</td></tr>
-                    <tr><td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Scoped to</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">SiteName, has priority + status + dates</td>
-                        <td style="padding:6px 12px;border-bottom:1px solid var(--border-color);">Has project code, developer, todos</td></tr>
-                    <tr><td style="padding:6px 12px;">Linked via</td>
-                        <td style="padding:6px 12px;" colspan="2">Many-to-many <code>daily_plan_projects</code> join table — one plan can span multiple projects</td></tr>
-                </tbody>
-            </table>
-            <h4 style="margin-top:14px;">Steps to add a Plan (DB-driven):</h4>
-            <ol style="margin:0;padding-left:20px;">
-                <li>Click <strong>+ New Plan</strong> at the top of the PLANNING tab (or go to <a href="/admin/plan/create">/admin/plan/create</a>).</li>
-                <li>Fill in: <strong>Plan Name</strong> (required), Description, Status (active/paused/completed), Priority (1=highest), Start Date, Due Date.</li>
-                <li>The plan is automatically scoped to your <strong>SiteName</strong> — CSC admins can see all sites; other admins see only their own.</li>
-                <li>After saving, add <strong>Todos</strong> to the plan via the Todo System (<a href="/todo/addtodo">/todo/addtodo</a>) — link the todo to the plan.</li>
-                <li>To add a <strong>Project</strong> to the plan, use the project DB (<a href="/project">/project</a>) and associate via <code>daily_plan_projects</code>.</li>
-            </ol>
-            <p style="margin:10px 0 0;font-size:0.88em;color:var(--text-muted-color);">
-                <strong>Routes:</strong> Admin access via <code>/admin</code> | User profile &amp; role info at <code>/user/profile</code> |
-                Roles with planning access: admin, developer, devops, editor, user, normal (all above member).
-            </p>
-        </div>
-    </details>
+    <h1>Planning </h1>
 
     <div class="row">
         <div class="col-12">
@@ -228,13 +148,6 @@ last_updated = '2026/02/08'
             <details class="nav-jump" open>
                 <summary>🎯 Quick Jump to Priority (Click to Toggle)</summary>
                 <div class="jump-links-container">
-                    <div class="jump-line" style="background:#d4edda;padding:4px 8px;border-radius:3px;margin-bottom:6px;">
-                        <strong>📅 <a href="/Documentation/DailyPlan#planning" class="jump-link">DB-Driven Plans (live)</a></strong>:
-                        <a href="/admin/plan/create" class="jump-link">+ New Plan</a> |
-                        <a href="/Documentation/DailyPlan#planning" class="jump-link">View All Plans</a> |
-                        <a href="/todo" class="jump-link">Todo System</a> |
-                        <a href="/todo/addtodo" class="jump-link">+ Add Todo</a>
-                    </div>
                     <div class="jump-line">
                         <strong><a href="#group-docker-k8s" class="jump-link">🐳 Docker and K8s Management</a></strong>:
                         <a href="#anchor-project-config-test" class="jump-link">ProjectConfig</a>
@@ -255,16 +168,17 @@ last_updated = '2026/02/08'
                         <a href="#anchor-priority-3" class="jump-link">UpdateFormat</a>
                     </div>
                     <div class="jump-line">
-                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>
-                        <span style="background:#28a745;color:#fff;padding:0 5px;border-radius:3px;font-size:0.8em;">DB LIVE</span>:
-                        <a href="#anchor-planning-system-project" class="jump-link">ProjectDetails</a> |
-                        <a href="#anchor-all-projects-list" class="jump-link">AllProjects</a> |
-                        <a href="#anchor-phase1" class="jump-link">DBEnvMgmt⏳</a> |
-                        <a href="#anchor-phase2" class="jump-link">SchemaModels🔜</a> |
-                        <a href="#anchor-priority-5" class="jump-link">PlanController🔜</a> |
-                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI🔜</a> |
-                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo🔜</a> |
-                        <a href="/Documentation/DailyPlan" class="jump-link">DynamicView↗</a>
+                        <strong><a href="#group-planning" class="jump-link">📅 Planning System</a></strong>:
+                        <a href="#planning-system-project" class="jump-link">ProjectDetails</a> |
+                        <a href="#all-projects-list" class="jump-link">AllProjects</a> |
+                        <a href="#anchor-phase0-complete" class="jump-link">Phase0</a> |
+                        <a href="#anchor-phase1" class="jump-link">Phase1</a> |
+                        <a href="#anchor-phase2" class="jump-link">Phase2</a> |
+                        <a href="#anchor-dailyplan-improvements" class="jump-link">DailyPlanUI</a> |
+                        <a href="#anchor-dynamic-daily" class="jump-link">DynamicDailyView</a> |
+                        <a href="#anchor-priority-12" class="jump-link">ThemeSync</a> |
+                        <a href="#anchor-priority-5" class="jump-link">CriticalFlagging</a> |
+                        <a href="#anchor-priority-6" class="jump-link">IntegrateTodo</a>
                     </div>
                     <div class="jump-line">
                         <strong><a href="#group-sync" class="jump-link">🔄 Synchronization & Standards</a></strong>:
@@ -365,6 +279,14 @@ last_updated = '2026/02/08'
         </div>
     </details>
 
+    <div id="anchor-dynamic-daily" class="nav-anchor"></div>
+    <div id="dynamic-daily" class="doc-section">
+        <h2>Dynamic Daily Tasks</h2>
+        <div class="dynamic-container">
+            [% INCLUDE 'todo/day.tt' %]
+        </div>
+    </div>
+
     <div id="planning" class="doc-section">
         <h2>Planning lists</h2>
 
@@ -379,7 +301,7 @@ last_updated = '2026/02/08'
                 [% IF all_db_projects.size > 0 %]
                     [% FOREACH proj IN all_db_projects %]
                         [% UNLESS proj.parent_id %]
-                        <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                        <details style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                             <summary style="cursor: pointer; font-weight: bold;">
                                 📁 [% proj.name %] (ID: [% proj.id %])
                             </summary>
@@ -396,12 +318,12 @@ last_updated = '2026/02/08'
 
                                 [% IF proj_subs.size > 0 %]
                                     <details style="margin-top: 8px;">
-                                        <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                        <summary style="cursor: pointer; font-weight: bold; color: var(--text-color, #555);">
                                             📂 Sub-projects ([% proj_subs.size %])
                                         </summary>
                                         <div style="margin-left: 15px; font-size: 0.95em;">
                                             [% FOREACH sub IN proj_subs %]
-                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: #f9f9f9;">
+                                                <div style="margin: 5px 0; padding: 5px; border-left: 2px solid #4CAF50; background: var(--bg-secondary, #f8f9fa);">
                                                     📄 [% sub.name %] (ID: [% sub.id %]) - [% sub.status || 'Unknown' %]
                                                 </div>
                                             [% END %]
@@ -434,7 +356,7 @@ last_updated = '2026/02/08'
                     [% SET k8s_project = schema.resultset('Project').find(137) %]
                     
                     [% IF k8s_project %]
-                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                        <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                                 <h3>[% k8s_project.name %] (Project ID: 137)</h3>
                                 <ul>
                                     <li><strong>Description:</strong> [% k8s_project.description || 'Our Kurbuntes setup' %]</li>
@@ -454,10 +376,10 @@ last_updated = '2026/02/08'
                                     <h4>📋 Todos for [% k8s_project.name %] ([% k8s_todos.count %])</h4>
                                     <ul style="list-style-type: none; padding-left: 0;">
                                         [% FOREACH todo IN k8s_todos.all %]
-                                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                            <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: var(--bg-secondary, #f9f9f9);">
                                                 [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                                 [% todo.subject %]
-                                                <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                                <br><small style="color: var(--text-muted-color, #666);">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
                                             </li>
                                         [% END %]
                                     </ul>
@@ -664,103 +586,10 @@ last_updated = '2026/02/08'
             </details>
 
             <div id="anchor-priority-schema" class="nav-anchor"></div>
-            <details id="priority-schema-system" class="priority-container" open>
-                <summary class="priority-summary">📊 Schema Management System Enhancement</summary>
+            <details id="priority-schema-system" class="priority-container">
+                <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Current Step:</strong> Requirements ✅ Complete</p>
-                    <p><strong>Overall Progress:</strong> 25% (1 of 4 workflow steps complete)</p>
-                    
-                    <h4>🎯 Project Overview</h4>
-                    <p>Enhance the existing database schema management system to provide comprehensive tools for managing all databases used by the Comserv application. Fix critical bugs, add missing features (API, CLI, table renaming, multi-site support, Result file editor), and improve navigation and documentation.</p>
-                    
-                    <h4>📋 Workflow Steps</h4>
-                    <ul>
-                        <li>✅ <strong>Step 1: Requirements</strong> - COMPLETED (2026-02-05)
-                            <ul>
-                                <li>Created comprehensive PRD at <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
-                                <li>Analyzed existing codebase (SchemaComparison.pm, RemoteDB.pm, schema_compare.tt)</li>
-                                <li>Documented 5 critical bugs to fix and 6 major features to add</li>
-                                <li>Added workflow tracking requirements (Section 3.6)</li>
-                            </ul>
-                        </li>
-                        <li>🔄 <strong>Step 2: Technical Specification</strong> - PENDING
-                            <ul>
-                                <li>Define implementation approach</li>
-                                <li>Design API endpoints and CLI tool architecture</li>
-                                <li>Plan database schema changes if needed</li>
-                                <li>Deliverable: <code>spec.md</code></li>
-                            </ul>
-                        </li>
-                        <li>⏭️ <strong>Step 3: Planning</strong> - NOT STARTED
-                            <ul>
-                                <li>Break down work into concrete implementation tasks</li>
-                                <li>Estimate time and dependencies</li>
-                                <li>Create detailed task list</li>
-                            </ul>
-                        </li>
-                        <li>⏭️ <strong>Step 4: Implementation</strong> - NOT STARTED
-                            <ul>
-                                <li>Execute planned tasks</li>
-                                <li>Run tests and validation</li>
-                                <li>Update documentation</li>
-                            </ul>
-                        </li>
-                    </ul>
-                    
-                    <h4>🔧 Problems to Fix (Critical Bugs)</h4>
-                    <ul>
-                        <li><strong>P1:</strong> Creating field in Result file shows "no result file" until manual refresh (DBIx::Class schema reload issue)</li>
-                        <li><strong>P2:</strong> System shows "Total Databases: 2" but only displays one (192.168.1.198) - missing configured servers</li>
-                        <li><strong>P3:</strong> Missing pages (Result editor, table manager, API explorer, CLI interface)</li>
-                        <li><strong>P4:</strong> Poor navigation in admin interface</li>
-                        <li><strong>P5:</strong> Insufficient documentation in /Documentation/ system</li>
-                    </ul>
-                    
-                    <h4>✨ Features to Add</h4>
-                    <ul>
-                        <li><strong>F1:</strong> REST API and CLI tool for AI/automation</li>
-                        <li><strong>F2:</strong> Table renaming with automatic relationship updates</li>
-                        <li><strong>F3:</strong> Create database tables from Result files</li>
-                        <li><strong>F4:</strong> Multi-site database isolation (private copies per site)</li>
-                        <li><strong>F5:</strong> Browser-based Result file editor with syntax highlighting</li>
-                        <li><strong>F6:</strong> Workflow tracking in DailyPlan.tt and Planning.tt (this document)</li>
-                    </ul>
-                    
-                    <h4>📁 Artifacts & Links</h4>
-                    <ul>
-                        <li><a href="/Documentation/AI_ASSISTANTS_IDE_INTEGRATION_AUDIT.md">Requirements Document (PRD)</a> - <code>.zenflow/tasks/schema-managment-system-7eb3/requirements.md</code></li>
-                        <li><a href="/admin/schema_compare">Current Schema Compare Interface</a> - Working baseline</li>
-                        <li>Source: <code>Comserv/lib/Comserv/Controller/Admin/SchemaComparison.pm</code> (1816 lines, extensive sync logic)</li>
-                        <li>Template: <code>Comserv/root/admin/schema_compare.tt</code> (1716 lines, field comparison UI)</li>
-                        <li>DB Config: <code>Comserv/db_config.template.json</code> (multi-server support)</li>
-                    </ul>
-                    
-                    <h4>🔗 Code Reuse Strategy</h4>
-                    <p>Maximum leverage of existing code from SchemaComparison.pm:</p>
-                    <ul>
-                        <li><code>sync_table_to_result</code>, <code>sync_result_to_table</code> - Bidirectional sync</li>
-                        <li><code>create_result_from_table</code>, <code>create_table_from_result</code> - Creation operations</li>
-                        <li><code>get_all_result_files</code> - Result file scanning</li>
-                        <li>RemoteDB.pm - Multi-server connection management</li>
-                    </ul>
-                    
-                    <h4>⏱️ Timeline Estimate</h4>
-                    <ul>
-                        <li>Requirements: ✅ Complete (2 hours actual)</li>
-                        <li>Technical Spec: 3-4 hours (estimated)</li>
-                        <li>Planning: 2-3 hours (estimated)</li>
-                        <li>Implementation: 20-30 hours (estimated, depends on feature prioritization)</li>
-                    </ul>
-                    
-                    <h4>🎯 Success Criteria</h4>
-                    <ul>
-                        <li>All 5 critical bugs fixed and validated</li>
-                        <li>API endpoints functional and documented (OpenAPI/Swagger)</li>
-                        <li>CLI tool working with basic commands</li>
-                        <li>Multi-site support tested with 2+ sites</li>
-                        <li>Result file editor saves without errors</li>
-                        <li>Documentation complete in /Documentation/ system</li>
-                    </ul>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
                 </div>
             </details>
 
@@ -782,12 +611,12 @@ last_updated = '2026/02/08'
                         [% SET api_project = schema.resultset('Project').find(157) %]
                         
                         [% IF api_project %]
-                            <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: #f9f9f9;">
+                            <details class="sub-container" style="margin: 15px 0; border: 1px solid #ddd; padding: 10px; background: var(--bg-secondary, #f8f9fa);">
                                 <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em; margin-bottom: 10px;">
                                     📦 API System Project (ID 157) - [% api_project.sub_projects.count %] Sub-projects
                                 </summary>
                                 <div style="margin-top: 10px;">
-                                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                                         <p><strong>Name:</strong> [% api_project.name %]</p>
                                         <p><strong>Status:</strong> [% api_project.status || 'Unknown' %]</p>
                                         <p><strong>Developer:</strong> [% api_project.developer_name || 'Not assigned' %]</p>
@@ -801,15 +630,15 @@ last_updated = '2026/02/08'
                                         [% SET sub_projects = api_project.sub_projects.search({}, { order_by => 'id' }) %]
                                         [% IF sub_projects.count > 0 %]
                                             <details style="margin-top: 10px;" open>
-                                                <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                                <summary style="cursor: pointer; font-weight: bold; color: var(--text-color, #555);">
                                                     📂 Implementation Phases ([% sub_projects.count %] sub-projects)
                                                 </summary>
                                                 <div style="margin-left: 20px;">
                                                     [% FOREACH phase IN sub_projects.all %]
-                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                                        <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: var(--bg-secondary, #f5f5f5);">
                                                             <summary style="cursor: pointer;">
                                                                 [% IF phase.status == 'In-Process' %]⏳[% ELSIF phase.status == 'Completed' %]✅[% ELSE %]📄[% END %]
-                                                                [% phase.name %] (ID: [% phase.id %]) - <span style="color: #666;">[% phase.status %]</span>
+                                                                [% phase.name %] (ID: [% phase.id %]) - <span style="color: var(--text-muted-color, #666);">[% phase.status %]</span>
                                                             </summary>
                                                             <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
                                                                 <p><strong>Description:</strong> [% phase.description || 'No description' %]</p>
@@ -829,10 +658,10 @@ last_updated = '2026/02/08'
                                                                         <div style="margin-left: 15px; font-size: 0.85em;">
                                                                             <ul style="list-style-type: none; padding-left: 0;">
                                                                                 [% FOREACH task IN todos.all %]
-                                                                                    <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                                    <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: var(--bg-secondary, #f9f9f9);">
                                                                                         [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                                                                         [% task.subject %]
-                                                                                        <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                                        <br><small style="color: var(--text-muted-color, #666);">Status: [% task.status %] | Due: [% task.due_date %]</small>
                                                                                         <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
                                                                                         <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
                                                                                     </li>
@@ -880,12 +709,12 @@ last_updated = '2026/02/08'
                                 <li>⏳ Verify database entries and Planning.tt rendering</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-completed">COMPLETED</span>
+                        <li><strong>Phase 1: Domain Detection Middleware</strong> (ID 159) - <span class="status-pending">PENDING</span>
                             <ul>
-                                <li>✅ Create domain configuration file (<code>Comserv/config/api_domains.json</code>)</li>
-                                <li>✅ Implement <code>ApiDomainDetector</code> utility (<code>Comserv/Util/ApiDomainDetector.pm</code>)</li>
-                                <li>✅ No Catalyst registration needed — utility pattern (like ApiTokenValidator)</li>
-                                <li>✅ Write unit tests (<code>t/util/api_domain_detector.t</code>)</li>
+                                <li>Create domain configuration file</li>
+                                <li>Implement ApiDomainDetector middleware</li>
+                                <li>Register middleware in Catalyst</li>
+                                <li>Write unit tests</li>
                             </ul>
                         </li>
                         <li><strong>Phase 2: Controller Refactoring</strong> (ID 160) - <span class="status-pending">PENDING</span>
@@ -903,13 +732,11 @@ last_updated = '2026/02/08'
                                 <li>Test external access</li>
                             </ul>
                         </li>
-                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-inprogress">IN PROGRESS</span>
+                        <li><strong>Phase 4: CLI Tool Development</strong> (ID 162) - <span class="status-pending">PENDING</span>
                             <ul>
-                                <li>✅ Create <code>~/.comserv/credentials</code> (chmod 600) with API token + api_url</li>
-                                <li>✅ Create <code>Comserv::Util::ApiCredentials</code> — reads credentials file with env var overrides</li>
-                                <li>✅ Generate CLI Development Token (DB id=1, expires 2027-03-24)</li>
-                                <li>Create CLI script (<code>Comserv/script/comserv-api-cli</code>)</li>
-                                <li>Implement CLI commands (todos list, todo create/get/update, project get)</li>
+                                <li>Create CLI script structure</li>
+                                <li>Implement CLI commands</li>
+                                <li>Add authentication support</li>
                                 <li>Implement output formatting and error handling</li>
                                 <li>Test all CLI commands</li>
                             </ul>
@@ -988,108 +815,9 @@ last_updated = '2026/02/08'
             <summary class="group-header">📅 Planning System</summary>
             <div class="priority-content">
 
-            <!-- ═══════════════════════════════════════
-                 PROJECT DETAILS & CURRENT PLAN STATUS
-                 Mirrors plan.md (planningsystem-59ae)
-            ═══════════════════════════════════════ -->
-            <div id="anchor-planning-system-project" class="nav-anchor"></div>
-            <div style="background:var(--bg-secondary);border:1px solid var(--primary-color);border-radius:6px;padding:16px;margin-bottom:18px;">
-                <h3 style="margin:0 0 8px;font-size:1.1em;">📋 Planning System — Project Summary</h3>
-                <p style="margin:0 0 10px;font-size:0.92em;">
-                    <strong>Goal:</strong> Migrate all planning from text-based .tt files to a fully DB-driven system with SiteName-based access controls,
-                    role-based visibility, developer time logging, and a points-based payment system. Each SiteName gets its own plan view.
-                    CSC retains access to this legacy text section during migration; all other sites see DB plans only.
-                </p>
-                <p style="margin:0 0 6px;font-size:0.88em;">
-                    <strong>Zenflow task:</strong> <code>planningsystem-59ae</code> |
-                    <strong>Branch:</strong> <code>planningsystem-59ae</code> (port 4001) |
-                    <strong>Priority:</strong> HIGH |
-                    <a href="/Documentation" style="color:var(--primary-color);">All Docs</a> |
-                    <a href="/Documentation/MasterPlanCoordination" style="color:var(--primary-color);">Master Plan</a>
-                </p>
-
-                <!-- BRANCHES TO CONSOLIDATE -->
-                <details style="margin:10px 0 0;">
-                    <summary style="cursor:pointer;font-size:0.88em;font-weight:bold;color:var(--text-muted-color);">🔀 Branch Consolidation Status</summary>
-                    <div style="font-size:0.85em;padding:8px 0 0;line-height:2;">
-                        <span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">merged</span> <code>cssthemes-9195</code> — CSS themes<br>
-                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>membership-1304</code> — roles/membership (needed for role-based access docs step)<br>
-                        <span style="background:#ffc107;color:#333;padding:1px 6px;border-radius:3px;">coordinate</span> <code>aichatsystem-ef4e</code> — AI chat (port 4001 originally)<br>
-                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> pointsystem (new branch) — Developer points &amp; payments step<br>
-                        <span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">handoff</span> <code>api-bc05</code> — API work (independent)<br>
-                    </div>
-                </details>
-
-                <!-- CURRENT PLAN STEPS (mirrors plan.md planningsystem-59ae) -->
-                <h4 style="margin:16px 0 8px;font-size:0.95em;">📌 Plan Steps — Current State</h4>
-                <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
-                    <thead>
-                        <tr style="background:var(--primary-color);color:#fff;">
-                            <th style="padding:6px 10px;text-align:left;width:30%;">Step</th>
-                            <th style="padding:6px 10px;text-align:left;width:15%;">Status</th>
-                            <th style="padding:6px 10px;text-align:left;">Notes</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="border-bottom:1px solid var(--border-color);">
-                            <td style="padding:6px 10px;font-weight:bold;">1. Implementation</td>
-                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
-                            <td style="padding:6px 10px;">SiteName access gates, DB plan list in DailyPlan.tt, 'normal' role, plan create form, UserSiteRole login merge</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
-                            <td style="padding:6px 10px;font-weight:bold;">2. Migrate DailyPlan.tt to DB coordinator</td>
-                            <td style="padding:6px 10px;"><span style="background:#28a745;color:#fff;padding:1px 6px;border-radius:3px;">✅ DONE</span></td>
-                            <td style="padding:6px 10px;">
-                                ✅ SiteName routing, CSC-only tabs wrapped<br>
-                                ✅ DB active_priorities live (replaces hardcoded lists)<br>
-                                ✅ Gantt tab added (all sites); | json filter fixed<br>
-                                ✅ Stale text tabs removed; Phase 0 collapsed with DB migration note<br>
-                                ✅ Hash→tab JS: quick links now auto-switch to correct tab<br>
-                                ✅ Sub-project accordion in Planning tab (todo 510)<br>
-                                ✅ Plan-project link form + /admin/plan/link_project route (todo 511)
-                            </td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);">
-                            <td style="padding:6px 10px;">3. Refactor MasterPlanCoordination</td>
-                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
-                            <td style="padding:6px 10px;">Coordinator-only role; link to DB records. Blocked by: step 2 complete.</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
-                            <td style="padding:6px 10px;">4. Role-Based Access Documentation</td>
-                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
-                            <td style="padding:6px 10px;">Role matrix: CSC admin → all, SiteName admin → own site. Coordinate with <code>membership-1304</code>.</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);">
-                            <td style="padding:6px 10px;">5. DB Schema verification</td>
-                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
-                            <td style="padding:6px 10px;">Verify <code>dailyplan</code>, <code>dailyplan_entry</code> tables in production. Update DocumentationConfig.json.</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);background:var(--bg-secondary);">
-                            <td style="padding:6px 10px;">6. Developer Points &amp; Payments</td>
-                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
-                            <td style="padding:6px 10px;">4 new DB tables, PointsLedger utility, hooks into Todo/Plan create. Handoff to <code>pointsystem-XXXX</code> branch.</td>
-                        </tr>
-                        <tr style="border-bottom:1px solid var(--border-color);">
-                            <td style="padding:6px 10px;">7. Test &amp; Verify</td>
-                            <td style="padding:6px 10px;"><span style="background:#6c757d;color:#fff;padding:1px 6px;border-radius:3px;">🔜 PENDING</span></td>
-                            <td style="padding:6px 10px;">Manual tests: CSC text+DB, non-CSC DB-only, plan creation, role access, points system.</td>
-                        </tr>
-                    </tbody>
-                </table>
-
-                <div style="margin-top:12px;padding:10px 14px;background:#d4edda;border:1px solid #28a745;border-radius:4px;font-size:0.9em;">
-                    <strong>▶ Next: Step 3 — Refactor MasterPlanCoordination</strong>
-                    <ul style="margin:6px 0 0;padding-left:18px;line-height:1.8;">
-                        <li>Remove inline task detail from <code>MasterPlanCoordination.tt</code></li>
-                        <li>Replace with links to individual plan files / DB records</li>
-                        <li>Add dependency list (#11 Architecture Phase 2 as blocker)</li>
-                        <li>Coordinate with <code>membership-1304</code> branch for role definitions</li>
-                    </ul>
-                </div>
-            </div>
-
-            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS — Step 3 of 7 (Step 2 DONE)</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
-            <p><strong>Zenflow Task:</strong> <code>planningsystem-59ae</code> (port 4001) | <strong>Branch:</strong> <code>planningsystem-59ae</code></p>
+            <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS - Phase 0 COMPLETE</span> | <strong>Priority:</strong> <span class="status-pending">CRITICAL</span></p>
+            <p><strong>Zenflow Task:</strong> <code>new-task-3cda</code> (port 4000) | <strong>Branch:</strong> <code>new-task-3cda</code></p>
+            <p><em>Note: Planning System project not yet created in database. Create project record and update this section with project ID.</em></p>
 
             <p><strong>Objective:</strong> Migrate planning system from text-based files to database-driven dynamic system with role-based access control, audit trails, and integration with project management.</p>
 
@@ -1111,7 +839,7 @@ last_updated = '2026/02/08'
                 [% SET planning_project = schema.resultset('Project').find(planning_project_search.id) IF planning_project_search %]
 
                 [% IF planning_project %]
-                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                             <h3>[% planning_project.name %]</h3>
                             <ul>
                                 <li><strong>Description:</strong> [% planning_project.description || 'No description' %]</li>
@@ -1136,10 +864,10 @@ last_updated = '2026/02/08'
                                 <h4>📋 Todos for [% planning_project.name %] ([% planning_todos.count %])</h4>
                                 <ul style="list-style-type: none; padding-left: 0;">
                                     [% FOREACH todo IN planning_todos.all %]
-                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: var(--bg-secondary, #f9f9f9);">
                                             [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                             [% todo.subject %]
-                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><small style="color: var(--text-muted-color, #666);">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
                                             <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
                                             <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
                                         </li>
@@ -1159,15 +887,15 @@ last_updated = '2026/02/08'
 
                             [% IF planning_subs.size > 0 %]
                                 <details style="margin-top: 10px;" open>
-                                    <summary style="cursor: pointer; font-weight: bold; color: #555;">
+                                    <summary style="cursor: pointer; font-weight: bold; color: var(--text-color, #555);">
                                         📂 Sub-Projects ([% planning_subs.size %])
                                     </summary>
                                     <div style="margin-left: 20px;">
                                         [% FOREACH subproject IN planning_subs %]
-                                            <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: #f5f5f5;">
+                                            <details class="subproject-item" style="margin: 8px 0; padding: 8px; border-left: 3px solid #4CAF50; background: var(--bg-secondary, #f5f5f5);">
                                                 <summary style="cursor: pointer;">
                                                     [% IF subproject.status == 'In-Process' %]⏳[% ELSIF subproject.status == 'Completed' %]✅[% ELSE %]📄[% END %]
-                                                    Sub-Project: [% subproject.name %] (ID: [% subproject.id %]) - <span style="color: #666;">[% subproject.status %]</span>
+                                                    Sub-Project: [% subproject.name %] (ID: [% subproject.id %]) - <span style="color: var(--text-muted-color, #666);">[% subproject.status %]</span>
                                                 </summary>
                                                 <div style="margin: 8px 0 0 15px; font-size: 0.9em;">
                                                     <ul>
@@ -1193,10 +921,10 @@ last_updated = '2026/02/08'
                                                             <div style="margin-left: 15px; font-size: 0.85em;">
                                                                 <ul style="list-style-type: none; padding-left: 0;">
                                                                     [% FOREACH task IN sub_todos.all %]
-                                                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: var(--bg-secondary, #f9f9f9);">
                                                                             [% IF task.status == 'In-Process' %]⏳[% ELSIF task.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                                                             [% task.subject %]
-                                                                            <br><small style="color: #666;">Status: [% task.status %] | Due: [% task.due_date %]</small>
+                                                                            <br><small style="color: var(--text-muted-color, #666);">Status: [% task.status %] | Due: [% task.due_date %]</small>
                                                                             <br><a href="/todo/showtodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
                                                                             <a href="/todo/edittodo?record_id=[% task.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
                                                                         </li>
@@ -1233,17 +961,12 @@ last_updated = '2026/02/08'
                 <p style="color: #d9534f;"><strong>Error:</strong> Unable to fetch Planning System project from database. [% error.info %]</p>
             [% END %]
 
-            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text Reference — being migrated to DB)</h4>
-            <p style="background:#d4edda;border:1px solid #28a745;border-radius:4px;padding:8px 12px;font-size:0.9em;">
-                <strong>📊 DB-tracked:</strong> These phases are now tracked as DB todos 502–516 under
-                <a href="/project/details?project_id=138" style="color:#155724;">Planning System project (id=138)</a> →
-                sub-projects 186–190. View them via the <a href="/Documentation/DailyPlan#planning" style="color:#155724;">PLANNING tab</a>.
-                As each phase is completed and verified in DB, its text section below will be removed.
-            </p>
+            <h4>🚀 Implementation Workflow: Phases P0-P14 (Text-Based Detail View)</h4>
+            <p><em>Note: These text-based phase details are maintained for reference. Once Planning System project is created in database, the container above will show the database-driven version alongside these details.</em></p>
 
             <div id="anchor-phase0-complete" class="nav-anchor"></div>
             <!-- Phase 0: Planning System Analysis & Integration Mapping -->
-            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;">
+            <details class="phase-container" style="margin: 15px 0; border: 2px solid #4CAF50; padding: 10px; background: #e8f5e9;" open>
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ✅ Phase 0: Planning System Analysis & Integration Mapping (COMPLETE)
                         </summary>
@@ -1372,7 +1095,6 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 5: Plan Controller -->
-                    <div id="anchor-priority-5" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 5: Plan Controller (PENDING)
@@ -1397,7 +1119,6 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 6: Daily Plan Template -->
-                    <div id="anchor-dailyplan-improvements" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 6: Daily Plan Template (PENDING)
@@ -1510,7 +1231,6 @@ last_updated = '2026/02/08'
                     </details>
 
                     <!-- Phase 11: Todo Controller Integration -->
-                    <div id="anchor-priority-6" class="nav-anchor"></div>
                     <details class="phase-container" style="margin: 15px 0; border: 2px solid #FF9800; padding: 10px; background: #fff3e0;">
                         <summary style="cursor: pointer; font-weight: bold; font-size: 1.1em;">
                             ⏳ Phase 11: Todo Controller Integration (PENDING)
@@ -1766,7 +1486,7 @@ last_updated = '2026/02/08'
                 [% SET workshop_project = schema.resultset('Project').find(73) %]
                 
                 [% IF workshop_project %]
-                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                    <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                             <h3>[% workshop_project.name %] (Project ID: 73)</h3>
                             <ul>
                                 <li><strong>Description:</strong> [% workshop_project.description || 'Workshop module for managing and advertising educational workshops across multiple sites' %]</li>
@@ -1791,10 +1511,10 @@ last_updated = '2026/02/08'
                                 <h4>📋 Todos for [% workshop_project.name %] ([% workshop_todos.count %])</h4>
                                 <ul style="list-style-type: none; padding-left: 0;">
                                     [% FOREACH todo IN workshop_todos.all %]
-                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: #fafafa;">
+                                        <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #FF9800; background: var(--bg-secondary, #f9f9f9);">
                                             [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                             [% todo.subject %]
-                                            <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                            <br><small style="color: var(--text-muted-color, #666);">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
                                             <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
                                             <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
                                         </li>
@@ -1829,168 +1549,168 @@ last_updated = '2026/02/08'
 
             <h4>🔌 API Endpoints</h4>
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Workshop Management Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Workshop Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop</strong> - List all workshops with filtering
-                            <br><small style="color: #666;">Query params: site_filter (all|public|mysite), status_filter (all|draft|published|registration_closed|in_progress|completed|cancelled), date_from, date_to</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Query params: site_filter (all|public|mysite), status_filter (all|draft|published|registration_closed|in_progress|completed|cancelled), date_from, date_to</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/add</strong> - Display workshop creation form
-                            <br><small style="color: #666;">Auth: Authenticated users only</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Authenticated users only</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/addworkshop</strong> - Create new workshop
-                            <br><small style="color: #666;">Auth: Authenticated users | Fields: title, description, start_date, max_participants, status, share (public/private), registration_deadline</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Authenticated users | Fields: title, description, start_date, max_participants, status, share (public/private), registration_deadline</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/details</strong> - View workshop details
-                            <br><small style="color: #666;">Query params: workshop_id | Auth: Public for published workshops, registered participants for materials</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Query params: workshop_id | Auth: Public for published workshops, registered participants for materials</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/edit</strong> - Display workshop edit form
-                            <br><small style="color: #666;">Query params: workshop_id | Auth: Workshop leader or admin</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Query params: workshop_id | Auth: Workshop leader or admin</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/edit</strong> - Update workshop
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Updates all workshop fields including status and share settings</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Updates all workshop fields including status and share settings</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/dashboard</strong> - Workshop leader dashboard
-                            <br><small style="color: #666;">Auth: Authenticated users | Shows workshops created by user with stats</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Authenticated users | Shows workshops created by user with stats</small>
                         </li>
                     </ul>
                 </div>
             </details>
 
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Lifecycle Management Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Lifecycle Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/publish</strong> - Publish workshop (draft → published)
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/close_registration</strong> - Close registration (published → registration_closed)
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/start</strong> - Start workshop (any → in_progress)
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/complete</strong> - Complete workshop (any → completed)
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/cancel</strong> - Cancel workshop (any → cancelled)
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                     </ul>
                 </div>
             </details>
 
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Registration & Participant Management Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Registration & Participant Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/register</strong> - Register for workshop
-                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id | Auto-handles capacity limits and waitlist</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Authenticated users | Params: workshop_id | Auto-handles capacity limits and waitlist</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/unregister</strong> - Cancel registration
-                            <br><small style="color: #666;">Auth: Authenticated users | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Authenticated users | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/participants</strong> - View participant list
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows registered and waitlist separately</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id | Shows registered and waitlist separately</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/add_participant</strong> - Manually add participant
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, email, name, site_affiliation</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id, email, name, site_affiliation</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/remove_participant</strong> - Remove participant
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, participant_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id, participant_id</small>
                         </li>
                     </ul>
                 </div>
             </details>
 
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>File Management Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>File Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/files</strong> - List workshop files
-                            <br><small style="color: #666;">Auth: View access (registered participants, leader, admin) | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: View access (registered participants, leader, admin) | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/upload</strong> - Upload workshop file
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, file | Max size: 50MB | Allowed types: ppt, pptx, pdf, doc, docx, txt</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id, file | Max size: 50MB | Allowed types: ppt, pptx, pdf, doc, docx, txt</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/download</strong> - Download workshop file
-                            <br><small style="color: #666;">Auth: Registered participants, leader, or admin | Params: file_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Registered participants, leader, or admin | Params: file_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/delete_file</strong> - Delete workshop file
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: file_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: file_id</small>
                         </li>
                     </ul>
                 </div>
             </details>
 
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Content Management Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Content Management Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/content</strong> - List content sections
-                            <br><small style="color: #666;">Auth: View access | Params: workshop_id | Ordered by sort_order</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: View access | Params: workshop_id | Ordered by sort_order</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/add_content</strong> - Display content creation form
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/add_content</strong> - Create content section
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, title, content, content_type, sort_order</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id, title, content, content_type, sort_order</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/edit_content</strong> - Display content edit form
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: content_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/edit_content</strong> - Update content section
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id, title, content, content_type, sort_order</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: content_id, title, content, content_type, sort_order</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/delete_content</strong> - Delete content section
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: content_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: content_id</small>
                         </li>
                     </ul>
                 </div>
             </details>
 
             <details open>
-                <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Email Communication Endpoints</strong></summary>
-                <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Email Communication Endpoints</strong></summary>
+                <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                     <ul style="list-style: none; padding-left: 0;">
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/compose_email</strong> - Display email composition form
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>POST /workshop/send_email</strong> - Send email to participants
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id, subject, body | Sends to all registered participants</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id, subject, body | Sends to all registered participants</small>
                         </li>
                         <li style="margin-bottom: 8px;">
                             <strong>GET /workshop/email_history</strong> - View email history
-                            <br><small style="color: #666;">Auth: Workshop leader or admin | Params: workshop_id | Shows all sent emails with status</small>
+                            <br><small style="color: var(--text-muted-color, #666);">Auth: Workshop leader or admin | Params: workshop_id | Shows all sent emails with status</small>
                         </li>
                     </ul>
                 </div>
@@ -2045,7 +1765,7 @@ last_updated = '2026/02/08'
                 [% SET schema = c.model('DBEncy').schema %]
                 [% SET bmaster_project = schema.resultset('Project').search({ project_code => 'BMASTER' }, { rows => 1 }).first %]
                 [% IF bmaster_project %]
-                    <div style="margin:10px 0;padding:10px;border:1px solid #ccc;background:white;">
+                    <div style="margin:10px 0;padding:10px;border:1px solid #ccc;background: var(--card-bg, rgba(255,255,255,0.88));">
                         <h3>[% bmaster_project.name %] (Project ID: [% bmaster_project.id %])</h3>
                         <ul>
                             <li><strong>Status:</strong> [% bmaster_project.status %]</li>
@@ -2057,10 +1777,10 @@ last_updated = '2026/02/08'
                             <h4>📋 Todos ([% bmaster_todos.count %])</h4>
                             <ul style="list-style-type:none;padding-left:0;">
                                 [% FOREACH todo IN bmaster_todos.all %]
-                                    <li style="margin:5px 0;padding:5px;border-left:2px solid #FF9800;background:#fafafa;">
+                                    <li style="margin:5px 0;padding:5px;border-left:2px solid #FF9800;background: var(--bg-secondary, #f9f9f9);">
                                         [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                         [% todo.subject %]
-                                        <br><small style="color:#666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                        <br><small style="color: var(--text-muted-color, #666);">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
                                     </li>
                                 [% END %]
                             </ul>
@@ -2326,7 +2046,7 @@ last_updated = '2026/02/08'
                         [% SET users_project = schema.resultset('Project').find(184) %]
 
                         [% IF users_project %]
-                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: white;">
+                            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ccc; background: var(--card-bg, rgba(255,255,255,0.88));">
                                     <h3>[% users_project.name %] (Project ID: [% users_project.id %])</h3>
                                     <ul>
                                         <li><strong>Description:</strong> [% users_project.description || 'User and Admin Management System with email verification and role management' %]</li>
@@ -2351,10 +2071,10 @@ last_updated = '2026/02/08'
                                         <h4>📋 Todos for [% users_project.name %] ([% users_todos.count %])</h4>
                                         <ul style="list-style-type: none; padding-left: 0;">
                                             [% FOREACH todo IN users_todos.all %]
-                                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #007bff; background: #fafafa;">
+                                                <li style="margin: 5px 0; padding: 5px; border-left: 2px solid #007bff; background: var(--bg-secondary, #f9f9f9);">
                                                     [% IF todo.status == 'In-Process' %]⏳[% ELSIF todo.status == 'Completed' %]✅[% ELSE %]📌[% END %]
                                                     [% todo.subject %]
-                                                    <br><small style="color: #666;">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
+                                                    <br><small style="color: var(--text-muted-color, #666);">Status: [% todo.status %] | Due: [% todo.due_date %]</small>
                                                     <br><a href="/todo/showtodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">View</a> |
                                                     <a href="/todo/edittodo?record_id=[% todo.record_id %]" target="_blank" style="font-size: 0.9em;">Edit</a>
                                                 </li>
@@ -2498,7 +2218,7 @@ last_updated = '2026/02/08'
                     <p><strong>Phase 2: User Self-Service (Week 2-3) - ⏳ IN PROGRESS</strong></p>
                     <ul>
                         <li>✅ UserVerification utility (code/token generation and validation)
-                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            <ul style="font-size: 0.9em; color: var(--text-muted-color, #666); margin-top: 5px;">
                                 <li>Moose-based utility class with SHA256 hashing</li>
                                 <li>6-digit verification codes & 32-char hex reset tokens</li>
                                 <li>24-hour expiry for all codes/tokens</li>
@@ -2507,7 +2227,7 @@ last_updated = '2026/02/08'
                             </ul>
                         </li>
                         <li>✅ 3-step registration (email → verify code → complete profile)
-                            <ul style="font-size: 0.9em; color: #666; margin-top: 5px;">
+                            <ul style="font-size: 0.9em; color: var(--text-muted-color, #666); margin-top: 5px;">
                                 <li>Refactored existing register.tt and do_create_account (reuse over new)</li>
                                 <li>Created VerifyEmail.tt and CompleteProfile.tt (PascalCase naming)</li>
                                 <li>Clean URLs: /user/register, /user/verify_email, /user/complete_profile</li>
@@ -2550,8 +2270,8 @@ last_updated = '2026/02/08'
 
                     <h4>🗄️ Database Schema Changes</h4>
                     <details open>
-                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>New Tables & Modifications</strong></summary>
-                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>New Tables & Modifications</strong></summary>
+                        <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                             <p><strong>User Table Modifications:</strong></p>
                             <ul>
                                 <li><code>username</code> - Change to nullable (admin-created accounts)</li>
@@ -2575,48 +2295,48 @@ last_updated = '2026/02/08'
 
                     <h4>🔌 Key Features</h4>
                     <details open>
-                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>User Self-Service</strong></summary>
-                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>User Self-Service</strong></summary>
+                        <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                             <ul style="list-style: none; padding-left: 0;">
                                 <li style="margin-bottom: 8px;">
                                     <strong>Self-Registration</strong>
-                                    <br><small style="color: #666;">3-step process: Enter username+email → Verify 6-digit code → Complete profile with password</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">3-step process: Enter username+email → Verify 6-digit code → Complete profile with password</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>Enhanced Login</strong>
-                                    <br><small style="color: #666;">Accepts email OR username, password OR verification code (for admin-created accounts)</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">Accepts email OR username, password OR verification code (for admin-created accounts)</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>Password Management</strong>
-                                    <br><small style="color: #666;">Change password (while logged in) | Reset via email link with 24-hour token</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">Change password (while logged in) | Reset via email link with 24-hour token</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>Profile Management</strong>
-                                    <br><small style="color: #666;">View profile with site roles | Edit name and email | Username read-only</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">View profile with site roles | Edit name and email | Username read-only</small>
                                 </li>
                             </ul>
                         </div>
                     </details>
 
                     <details open>
-                        <summary style="cursor: pointer; padding: 10px; background: #e9ecef; border-radius: 4px; margin-bottom: 10px;"><strong>Admin Features</strong></summary>
-                        <div style="padding: 10px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px;">
+                        <summary style="cursor: pointer; padding: 10px; background: var(--bg-secondary, #e9ecef); border-radius: 4px; margin-bottom: 10px;"><strong>Admin Features</strong></summary>
+                        <div style="padding: 10px; background: var(--bg-secondary, #f8f9fa); border: 1px solid #dee2e6; border-radius: 4px;">
                             <ul style="list-style: none; padding-left: 0;">
                                 <li style="margin-bottom: 8px;">
                                     <strong>User Dashboard</strong>
-                                    <br><small style="color: #666;">List all users | Filter by site, role, status | Search by username, email | CSC admins see all, site admins see their site only</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">List all users | Filter by site, role, status | Search by username, email | CSC admins see all, site admins see their site only</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>User Creation</strong>
-                                    <br><small style="color: #666;">Admin creates account with email only | Sends invitation email with verification code | User sets own username and password</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">Admin creates account with email only | Sends invitation email with verification code | User sets own username and password</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>User Management</strong>
-                                    <br><small style="color: #666;">Edit user details | Suspend/activate accounts | View audit logs</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">Edit user details | Suspend/activate accounts | View audit logs</small>
                                 </li>
                                 <li style="margin-bottom: 8px;">
                                     <strong>Role Management</strong>
-                                    <br><small style="color: #666;">Assign/remove roles per site | Manage site-specific role list | Standard roles: normal, editor, developer, WorkshopLeader, admin</small>
+                                    <br><small style="color: var(--text-muted-color, #666);">Assign/remove roles per site | Manage site-specific role list | Standard roles: normal, editor, developer, WorkshopLeader, admin</small>
                                 </li>
                             </ul>
                         </div>
@@ -2823,7 +2543,7 @@ last_updated = '2026/02/08'
                         [% SET project = schema.resultset('Project').find(114) %]
                         
                         [% IF project %]
-                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: #f8f9fa; border-radius: 5px;">
+                            <div class="project-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; padding: 10px; background: var(--bg-secondary, #f8f9fa); border-radius: 5px;">
                                 <div>
                                     <p style="margin: 0;">
                                         <strong>Status:</strong> 
@@ -2833,7 +2553,7 @@ last_updated = '2026/02/08'
                                         | <strong>Project Code:</strong> <code>[% project.project_code %]</code>
                                         | <strong>Hours:</strong> [% project.estimated_man_hours %]
                                     </p>
-                                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: #666;">
+                                    <p style="margin: 5px 0 0 0; font-size: 0.9em; color: var(--text-muted-color, #666);">
                                         <strong>Timeline:</strong> [% project.start_date %] → [% project.end_date %]
                                         | <strong>Developer:</strong> [% project.developer_name %]
                                     </p>
@@ -2842,27 +2562,27 @@ last_updated = '2026/02/08'
                                     <a href="http://workstation.local:4001/project/details?project_id=114" 
                                        target="_blank" 
                                        class="btn-secondary" 
-                                       style="padding: 6px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                       style="padding: 6px 12px; background: var(--primary-color, #007bff); color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
                                         📊 View Details
                                     </a>
                                     <a href="http://workstation.local:4001/project/editproject?project_id=114" 
                                        target="_blank" 
                                        class="btn-primary" 
-                                       style="padding: 6px 12px; background: #28a745; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
+                                       style="padding: 6px 12px; background: var(--success-color, #28a745); color: white; text-decoration: none; border-radius: 4px; font-size: 0.9em;">
                                         ✏️ Edit Project
                                     </a>
                                 </div>
                             </div>
                             
-                            <div class="project-description content-section">
-                                <h4>Project Description</h4>
-                                <div class="code-block" style="white-space: pre-wrap; line-height: 1.6;">
+                            <div class="project-description" style="background: var(--card-bg, rgba(255,255,255,0.88)); padding: 15px; border-left: 4px solid #007bff; margin-bottom: 15px;">
+                                <h4 style="margin-top: 0;">Project Description</h4>
+                                <div style="white-space: pre-wrap; font-family: monospace; font-size: 0.9em; line-height: 1.6;">
 [% project.description %]
                                 </div>
                             </div>
                             
                             [% IF project.comments %]
-                            <div class="project-comments alert alert-warning" style="font-size: 0.9em;">
+                            <div class="project-comments" style="background: #fffbea; padding: 10px; border-left: 4px solid #ffc107; margin-bottom: 15px; font-size: 0.9em;">
                                 <strong>📝 Notes:</strong> [% project.comments %]
                             </div>
                             [% END %]
@@ -2992,9 +2712,9 @@ last_updated = '2026/02/08'
                     <h4>🔧 Action Required</h4>
                     <div style="background: #fff3cd; border-left: 4px solid #ffc107; padding: 10px; margin: 10px 0;">
                         <strong>Database Migration Needed:</strong>
-                        <pre style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 3px;">mysql -h 192.168.1.129 -u root -p comserv &lt; Comserv/db/migrations/create_user_api_keys_table.sql</pre>
+                        <pre style="background: var(--bg-secondary, #f8f9fa); padding: 10px; margin: 5px 0; border-radius: 3px;">mysql -h 192.168.1.129 -u root -p comserv &lt; Comserv/db/migrations/create_user_api_keys_table.sql</pre>
                         <strong>Environment Variable:</strong>
-                        <pre style="background: #f8f9fa; padding: 10px; margin: 5px 0; border-radius: 3px;">export API_KEY_ENCRYPTION_KEY="your-32-character-key"</pre>
+                        <pre style="background: var(--bg-secondary, #f8f9fa); padding: 10px; margin: 5px 0; border-radius: 3px;">export API_KEY_ENCRYPTION_KEY="your-32-character-key"</pre>
                     </div>
 
                     <h4>🔗 Related Systems</h4>

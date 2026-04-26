@@ -44,7 +44,8 @@
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
-        supportPollTimer: null      // setInterval handle for support chat polling
+        supportPollTimer: null,     // setInterval handle for support chat polling
+        siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
@@ -208,11 +209,25 @@
             opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
             sel.appendChild(opt);
         });
-        // Restore previously saved agent selection
+        // Site-name → default agent map (when no saved preference)
+        var siteAgentMap = {
+            'BMaster':    'bmaster',
+            'ENCY':       'ency',
+            'CSC':        'csc',
+            'HelpDesk':   'helpdesk',
+        };
+
+        // Restore previously saved agent selection, or auto-select by site
         var saved = localStorage.getItem('ai_widget_agent');
         if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
+        } else if (state.siteName && siteAgentMap[state.siteName]) {
+            var siteAgent = siteAgentMap[state.siteName];
+            if (sel.querySelector('option[value="' + siteAgent + '"]')) {
+                sel.value = siteAgent;
+                _applyAgentOverride(siteAgent);
+            }
         }
         sel.addEventListener('change', function() {
             var chosen = sel.value;
@@ -1398,7 +1413,16 @@
             }
             ffBtn.disabled = true; ffBtn.textContent = '⏳';
 
+            // Detect if form has contact/company fields — if so, enable web search
+            // so the AI can look up real-world information (address, phone, email, etc.)
+            var contactFieldRE = /phone|email|address|contact|url|website|city|postal|zip/i;
+            var hasContactFields = fields.some(function(f) {
+                return contactFieldRE.test(f.name) || contactFieldRE.test(f.label || '');
+            });
+            var useSearch = hasContactFields ? 1 : 0;
+
             const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                (useSearch ? 'If web search results are provided above, use them to find accurate real-world information (address, phone, email, etc.) for the entity described. ' : '') +
                 'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
                 'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
 
@@ -1408,7 +1432,7 @@
             fetch('/ai/generate', {
                 method: 'POST', credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true, use_search: useSearch })
             })
             .then(function(r) { return r.json(); })
             .then(function(data) {
@@ -2218,9 +2242,9 @@
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
         const s = id.toLowerCase();
-        // Exclude embedding/reranker/vision-only/cloud-routed models
+        // Exclude embedding/reranker/vision-only models
         if (/embed|rerank|bge|nomic|clip|whisper|tts|vision(?!.*instruct)/.test(s)) return false;
-        if (/:cloud$/.test(s)) return false;  // Ollama cloud-routed models need external API keys
+        // :cloud models (Ollama-routed cloud) are chat-capable — include them
         return true;
     }
 
@@ -2232,6 +2256,7 @@
         if (/7b|8b|mistral(?!.*\d{2})/.test(s))               return 3;
         if (/13b|14b|llama3\.1(?!.*\d{2})/.test(s))           return 4;
         if (/30b|34b|70b|405b|mixtral/.test(s))               return 5;
+        if (/kimi-k2|kimi/.test(s))                            return 6;
         return 3;
     }
 
@@ -3026,6 +3051,7 @@
             if (cfg.username) state.username = cfg.username;
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
+            if (cfg.siteName) state.siteName = cfg.siteName;
         }
 
         // If this /ai page was opened by detaching the widget, honour the original

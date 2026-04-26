@@ -21,14 +21,14 @@
     <strong>Audit Date:</strong> 2025-12-18 | <strong>Updated:</strong> 2026-01-02 | <strong>Scope:</strong> Ollama + xAI/DeepSeek integrations | <strong>Status:</strong> Phase 1 Analysis Complete + Schema Regression Fixed
 </div>
 
-<div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+<div style="background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
     <h3 style="margin-top: 0; color: #155724;">✅ Jan 2, 2026 - Schema Regression Fix Applied</h3>
     <p style="margin: 5px 0; color: #155724;"><strong>AI Chat Database Schema:</strong> Missing metadata column in ai_conversations table fixed. This resolves message creation failures documented in Phase 1 analysis.</p>
     <p style="margin: 5px 0; color: #155724;"><strong>Impact on Integration:</strong> AI Chat message persistence now operational. Conversations created post-Jan 2 will properly save metadata.</p>
     <p style="margin: 5px 0; color: #155724;"><strong>Related Work:</strong> See DAILY_AUDIT_2026-01-02.md Chat 1 for complete fix details and impact assessment.</p>
 </div>
 
-<nav id="toc" style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--header-color, #007bff);">
+<nav id="toc" style="background-color: var(--bg-secondary, #f8f9fa); padding: 15px; margin-bottom: 20px; border-left: 4px solid var(--header-color, #007bff);">
     <h3 style="margin-top: 0;">Table of Contents</h3>
     <ul>
         <li><a href="#executive_summary">Executive Summary</a></li>
@@ -100,50 +100,50 @@
 <h3>Documentation Files (Primary: .tt Format)</h3>
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-    <thead style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+    <thead style="background-color: var(--bg-secondary, #f8f9fa); border-bottom: 2px solid var(--border-color, #dee2e6);">
         <tr>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">File</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Status</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Version</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Coverage</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Issues</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">File</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Status</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Version</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Coverage</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Issues</th>
         </tr>
     </thead>
     <tbody>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">AI.tt</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">0.02</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Ollama basic endpoints</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Missing xAI/DeepSeek</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">AI.tt</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">0.02</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Ollama basic endpoints</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Missing xAI/DeepSeek</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">AIAssistants.tt</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">⚠️ Deprecated</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1.2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">General AI guidelines</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Marked for archival 2025-12-20</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">AIAssistants.tt</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">⚠️ Deprecated</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1.2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">General AI guidelines</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Marked for archival 2025-12-20</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">AI_Guidelines.tt</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">?</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">AI guidelines</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Potential duplicate of AIAssistants.tt</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">AI_Guidelines.tt</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">?</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">AI guidelines</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Potential duplicate of AIAssistants.tt</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1.0</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Feature-specific</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Needs completeness review</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1.0</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Feature-specific</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Needs completeness review</td>
         </tr>
         <tr>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">system/ZENCODER_AI_ASSISTANT_GUIDE.tt</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1.0</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Zencoder-specific</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Agent-focused, not integration</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">system/ZENCODER_AI_ASSISTANT_GUIDE.tt</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1.0</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Zencoder-specific</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Agent-focused, not integration</td>
         </tr>
     </tbody>
 </table>
@@ -163,44 +163,44 @@
 <h3>Code Files (Implementation)</h3>
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-    <thead style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+    <thead style="background-color: var(--bg-secondary, #f8f9fa); border-bottom: 2px solid var(--border-color, #dee2e6);">
         <tr>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">File</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Type</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Key Functionality</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Status</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">File</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Type</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Key Functionality</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Status</th>
         </tr>
     </thead>
     <tbody>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">lib/Comserv/Controller/AI.pm</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Controller</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">index, generate, query_form, result, start_server</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active (Last: 2025-01-28)</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">lib/Comserv/Controller/AI.pm</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Controller</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">index, generate, query_form, result, start_server</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active (Last: 2025-01-28)</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">lib/Comserv/Model/Ollama.pm</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Model</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">query, chat, parse_todos, check_connection, start_server, list_available_models, pull_model</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active (Last: 2025-10-06)</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">lib/Comserv/Model/Ollama.pm</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Model</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">query, chat, parse_todos, check_connection, start_server, list_available_models, pull_model</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active (Last: 2025-10-06)</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Schema</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">is_enabled, get_decrypted_api_key, set_encrypted_api_key, get_capabilities, can_role_use</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">lib/Comserv/Model/Schema/Ency/Result/AiModelConfig.pm</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Schema</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">is_enabled, get_decrypted_api_key, set_encrypted_api_key, get_capabilities, can_role_use</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">config/ai_assistants.json</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Config</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">customCommands (CleanupAgent), models (Grok/xai)</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">⚠️ Minimal</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">config/ai_assistants.json</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Config</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">customCommands (CleanupAgent), models (Grok/xai)</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">⚠️ Minimal</td>
         </tr>
         <tr>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">root/comserv-ai-guidelines-consolidated.yaml</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Config</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Master reference, agent configs, standards</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">✅ Active & Authoritative</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">root/comserv-ai-guidelines-consolidated.yaml</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Config</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Master reference, agent configs, standards</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">✅ Active & Authoritative</td>
         </tr>
     </tbody>
 </table>
@@ -491,78 +491,78 @@
 <h2 id="section_7">Part 7: Implementation Priority & Timeline</h2>
 
 <table style="width: 100%; border-collapse: collapse; margin: 20px 0;">
-    <thead style="background-color: #f8f9fa; border-bottom: 2px solid #dee2e6;">
+    <thead style="background-color: var(--bg-secondary, #f8f9fa); border-bottom: 2px solid var(--border-color, #dee2e6);">
         <tr>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Task</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Phase</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Priority</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Effort</th>
-            <th style="padding: 12px; text-align: left; border: 1px solid #dee2e6;">Timeline</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Task</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Phase</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Priority</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Effort</th>
+            <th style="padding: 12px; text-align: left; border: 1px solid var(--border-color, #dee2e6);">Timeline</th>
         </tr>
     </thead>
     <tbody>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R1.1: Eliminate .md files</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">HIGH</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2-3h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 1</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R1.1: Eliminate .md files</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">HIGH</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2-3h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 1</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R1.2: Consolidate AI docs</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">HIGH</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">4-5h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 1-2</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R1.2: Consolidate AI docs</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">HIGH</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">4-5h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 1-2</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R1.3: Template compliance</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">MEDIUM</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">3-4h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 2</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R1.3: Template compliance</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">MEDIUM</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">3-4h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 2</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R1.4: Documentation sync</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">MEDIUM</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">5-6h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 2-3</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R1.4: Documentation sync</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">MEDIUM</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">5-6h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 2-3</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R2.1: xAI documentation</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">HIGH</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">3-4h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 3</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R2.1: xAI documentation</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">HIGH</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">3-4h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 3</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R2.2: DeepSeek documentation</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">HIGH</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">3-4h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 3-4</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R2.2: DeepSeek documentation</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">HIGH</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">3-4h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 3-4</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R2.3: Enhanced Ollama docs</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">MEDIUM</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2-3h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 4</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R2.3: Enhanced Ollama docs</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">MEDIUM</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2-3h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 4</td>
         </tr>
-        <tr style="border-bottom: 1px solid #dee2e6;">
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R2.4: Security documentation</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">HIGH</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2-3h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 4-5</td>
+        <tr style="border-bottom: 1px solid var(--border-color, #dee2e6);">
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R2.4: Security documentation</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">HIGH</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2-3h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 4-5</td>
         </tr>
         <tr>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">R2.5: Role-based config</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">2</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">MEDIUM</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">1-2h</td>
-            <td style="padding: 12px; border: 1px solid #dee2e6;">Week 5</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">R2.5: Role-based config</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">2</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">MEDIUM</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">1-2h</td>
+            <td style="padding: 12px; border: 1px solid var(--border-color, #dee2e6);">Week 5</td>
         </tr>
     </tbody>
 </table>
@@ -589,7 +589,7 @@
 
 <hr />
 
-<div style="background-color: #f8f9fa; padding: 20px; margin-top: 30px; border-top: 2px solid #dee2e6;">
+<div style="background-color: var(--bg-secondary, #f8f9fa); padding: 20px; margin-top: 30px; border-top: 2px solid var(--border-color, #dee2e6);">
     <h3>Related Documentation</h3>
     <ul>
         <li><strong>Implementation Plan:</strong> See documentation_system_plan.md for detailed step-by-step instructions</li>
@@ -599,7 +599,7 @@
     </ul>
 </div>
 
-<div style="background-color: #f8f9fa; padding: 20px; margin-top: 20px; text-align: center; border-top: 1px solid #dee2e6;">
+<div style="background-color: var(--bg-secondary, #f8f9fa); padding: 20px; margin-top: 20px; text-align: center; border-top: 1px solid var(--border-color, #dee2e6);">
     <p><strong>Document Version:</strong> 1.0 | <strong>Last Updated:</strong> 2025-12-18 | <strong>Status:</strong> Complete - Ready for Phase 1 Implementation</p>
 </div>
 

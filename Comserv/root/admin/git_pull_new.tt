@@ -160,7 +160,7 @@
 
 <style>
     .git-output {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-radius: 4px;
         white-space: pre-wrap;
@@ -198,11 +198,11 @@
     }
     .badge-primary {
         color: #fff;
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
     }
     .badge-secondary {
         color: #fff;
-        background-color: #6c757d;
+        background-color: var(--secondary-color, #6c757d);
     }
     .mr-1 {
         margin-right: 0.25rem;
