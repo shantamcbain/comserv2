@@ -647,8 +647,8 @@ sub _daily_log_action {
                     level   => uc($e->level),
                     ts      => $e->timestamp,
                     message => substr($e->message || '', 0, 500),
-                    file    => $e->filename || '',
-                    line    => $e->line_number || '',
+                    file    => $e->file || '',
+                    line    => $e->line || '',
                 };
             }
         };
