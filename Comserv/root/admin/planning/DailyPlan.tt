@@ -144,13 +144,12 @@
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
                 [% IF open_log_entry %]
-                <button class="dl-btn dl-btn-start" id="dl-start-btn"
-                        style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;"
-                        onclick="toggleLogPanel()"
-                        oncontextmenu="event.preventDefault();dailyLogAction('end')"
-                        title="Day log active — click to view, right-click to close">
-                  🌅 Start Day
-                </button>
+                <a class="dl-btn dl-btn-start" id="dl-start-btn"
+                   href="/log/[% open_log_entry.record_id %]"
+                   style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;text-decoration:none;display:inline-block;"
+                   title="View today's daily log">
+                  🌅 Today's Log
+                </a>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
                 [% ELSE %]
                 <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
