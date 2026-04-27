@@ -50,6 +50,18 @@ sub convert_status_to_string {
     return $status_map{$status_code} // $status_code;
 }
 
+sub normalize_status {
+    my ($self, $val) = @_;
+    return 1 unless defined $val;
+    my %str_to_num = (
+        '1' => 1, 'NEW' => 1, 'New' => 1,
+        '2' => 2, 'IN PROGRESS' => 2, 'InProgress' => 2, 'In Progress' => 2,
+        '3' => 3, 'DONE' => 3, 'Done' => 3, 'Completed' => 3,
+        '4' => 4, 'Cancelled' => 4, 'CANCELLED' => 4,
+    );
+    return $str_to_num{$val} // ($val =~ /^\d+$/ ? $val + 0 : 1);
+}
+
 # Helper method to filter todos by date range
 sub filter_todos_by_date_range {
     my ($self, $c, $todos, $start_date, $end_date, $include_overdue) = @_;
@@ -384,9 +396,12 @@ sub details :Path('/todo/details') :Args {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
             "AI conv fetch error: $@") if $@;
 
+        my $current_status = $self->normalize_status($todo->get_column('status'));
+
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
+            current_status    => $current_status,
             accumulative_time => $accumulative_time,
             projects          => $projects,
             todo_intervals    => \@intervals,
@@ -596,14 +611,17 @@ sub edit :Path('/todo/edit') :Args(1) {
     );
 
     # Add the todo, projects, and users to the stash
+    my $current_status = $self->normalize_status($todo->get_column('status'));
+
     $c->stash(
         record           => $todo,
+        current_status   => $current_status,
         projects         => $projects,
         users            => \@users,
         accumulative_time => $accumulative_time,
-        build_priority   => \%priority_options, # Priority options for dropdown
-        build_status     => \%status_options,   # Status options for dropdown
-        return_to        => $return_to,         # URL to return to after action
+        build_priority   => \%priority_options,
+        build_status     => \%status_options,
+        return_to        => $return_to,
         template         => 'todo/edit.tt'
     );
 
@@ -737,7 +755,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             owner                => $form_data->{owner},
             developer            => $form_data->{developer},
             username_of_poster   => $c->session->{username},
-            status               => $form_data->{status},
+            status               => $self->normalize_status($form_data->{status}),
             priority             => $form_data->{priority},
             time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
             share                => $form_data->{share} || 0,
