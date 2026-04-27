@@ -259,6 +259,49 @@
             </details>
             [% END %]
 
+            [%# ── GOOD MORNING LOG SUMMARY (shown when today's log is open) ── %]
+            [% IF open_log_entry %]
+            [% SET log_details = open_log_entry.details || '' %]
+            <div id="morning-summary" style="margin-bottom:16px;padding:12px 16px;border-left:4px solid #2a7a2a;background:color-mix(in srgb,#2a7a2a 8%,var(--bg-color));border-radius:0 6px 6px 0;">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
+                    <div style="flex:1;min-width:200px;">
+                        <strong style="color:#1a5a1a;">🌅 [% open_log_entry.abstract | html %]</strong>
+                        <span style="font-size:0.8em;color:var(--text-muted-color);margin-left:8px;">started [% open_log_entry.start_time %]
+                            · <a href="/log/[% open_log_entry.record_id %]" style="color:#1a5a1a;">view full log →</a></span>
+                    </div>
+                    <div style="display:flex;gap:6px;">
+                        <button onclick="toggleLogPanel()" style="padding:3px 10px;font-size:0.8em;border:1px solid #2a7a2a;border-radius:4px;background:transparent;color:#2a7a2a;cursor:pointer;">✏ Edit Notes</button>
+                        <button onclick="dailyLogAction('end')" style="padding:3px 10px;font-size:0.8em;border:1px solid #888;border-radius:4px;background:transparent;color:var(--text-muted-color);cursor:pointer;">🌙 End Day</button>
+                    </div>
+                </div>
+                [%# Show key sections extracted from details %]
+                [% SET has_audit   = log_details.search('AUDIT ISSUES') %]
+                [% SET has_stale   = log_details.search('STALE OPEN LOGS') %]
+                [% SET has_top5    = log_details.search('TOP PRIORITIES') %]
+                [% SET notes_start = log_details.search('Notes:\n') %]
+                [% IF has_stale >= 0 || has_audit >= 0 %]
+                <div style="margin-top:8px;font-size:0.82em;display:flex;flex-wrap:wrap;gap:12px;">
+                    [% IF has_stale >= 0 %]
+                    <span style="color:#9b0000;">⚠️ Unclosed logs from previous days — see log panel for details</span>
+                    [% END %]
+                    [% IF has_audit >= 0 %]
+                    <span style="color:#c45d00;">🚨 System errors/warnings detected — audit todo map created in <a href="/todo" style="color:#c45d00;">Todo</a></span>
+                    [% END %]
+                </div>
+                [% END %]
+                <div style="margin-top:8px;">
+                    <label style="font-size:0.82em;font-weight:bold;color:var(--text-muted-color);">Notes for today:</label>
+                    <textarea id="morning-notes-inline"
+                        style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;resize:vertical;background:var(--bg-color);color:var(--text-color);"
+                        rows="2"
+                        onblur="saveLogEntry([% open_log_entry.record_id %])"
+                        oninput="document.getElementById('log-desc-edit') && (document.getElementById('log-desc-edit').value = this.value)"
+                    >[% log_details | html %]</textarea>
+                    <span id="morning-notes-status" style="font-size:0.75em;color:var(--text-muted-color);"></span>
+                </div>
+            </div>
+            [% END %]
+
             [%# ── CURRENT ACTIVE PRIORITIES (DB-driven, role/site/user scoped) ── %]
             <div style="margin-bottom:24px;">
                 <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
@@ -1357,9 +1400,12 @@ if (window.location.hash === '#log-panel-open') {
 
 function saveLogEntry(entryId) {
     var title = (document.getElementById('log-title-edit') || {}).value || '';
-    var desc  = (document.getElementById('log-desc-edit')  || {}).value || '';
-    var statusEl = document.getElementById('log-save-status');
-    if (statusEl) statusEl.textContent = 'Saving…';
+    var desc  = (document.getElementById('log-desc-edit')  || {}).value
+             || (document.getElementById('morning-notes-inline') || {}).value || '';
+    var statusEl  = document.getElementById('log-save-status');
+    var statusEl2 = document.getElementById('morning-notes-status');
+    if (statusEl)  statusEl.textContent  = 'Saving…';
+    if (statusEl2) statusEl2.textContent = 'Saving…';
 
     fetch('/planning/update_log_entry', {
         method: 'POST',
@@ -1371,13 +1417,14 @@ function saveLogEntry(entryId) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        if (statusEl) {
-            statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
-            statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000';
-        }
+        var msg = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
+        var col = d.success ? '#2a7a2a' : '#9b0000';
+        if (statusEl)  { statusEl.textContent  = msg; statusEl.style.color  = col; }
+        if (statusEl2) { statusEl2.textContent = msg; statusEl2.style.color = col; }
     })
     .catch(function(e) {
-        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
+        if (statusEl)  { statusEl.textContent  = '❌ Request failed'; statusEl.style.color  = '#9b0000'; }
+        if (statusEl2) { statusEl2.textContent = '❌ Request failed'; statusEl2.style.color = '#9b0000'; }
     });
 }
 </script>
