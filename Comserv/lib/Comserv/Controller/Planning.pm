@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::Ollama;
 use JSON;
 use Time::Piece;
 use DateTime;
@@ -600,13 +601,13 @@ sub _daily_log_action {
             return {
                 success  => JSON::true,
                 action   => 'start',
-                entry_id => $existing->id + 0,
-                response => "\x{1F305} Good morning, $username! You already have an open daily log for today (entry #" . $existing->id . "). Check <a href='/log'>your logs</a>.",
+                entry_id => $existing->record_id + 0,
+                response => "\x{1F305} Good morning, $username! You already have an open daily log for today (entry #" . $existing->record_id . "). Check <a href='/log'>/log</a>.",
                 message  => "Daily log already open.",
             };
         }
 
-        # Stale open logs from previous days
+        # ── Stale open logs from previous days ──
         my @stale_logs;
         eval {
             @stale_logs = $schema->resultset('Log')->search(
@@ -615,7 +616,7 @@ sub _daily_log_action {
             )->all;
         };
 
-        # Top priorities for the day
+        # ── Top priorities for today ──
         my @top_todos;
         eval {
             @top_todos = $schema->resultset('Todo')->search(
@@ -625,9 +626,9 @@ sub _daily_log_action {
             )->all;
         };
 
-        # ── Audit: SystemLog DB (log_with_details) for unreported errors ──
-        my ($error_count, $todo_created) = (0, 0);
-        my %groups;  # subroutine => [ {level, timestamp, message}, ... ]
+        # ── Audit: SystemLog (log_with_details) for errors/warnings in last 24h ──
+        my ($error_count, $todo_created, $helpdesk_count) = (0, 0, 0);
+        my %groups;
 
         eval {
             my $since = do {
@@ -635,25 +636,34 @@ sub _daily_log_action {
                 sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
             };
             my @errs = $schema->resultset('SystemLog')->search(
-                { level     => { -in => ['error','critical','warn','ERROR','CRITICAL','WARN'] },
+                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
                   timestamp => { '>=' => $since } },
                 { order_by => { -desc => 'timestamp' }, rows => 200 }
             )->all;
             for my $e (@errs) {
                 my $sub = $e->subroutine || 'unknown';
-                $sub =~ s/^Comserv::Controller:://;
+                $sub =~ s/^Comserv:://;
                 push @{ $groups{$sub} }, {
                     level   => uc($e->level),
                     ts      => $e->timestamp,
-                    message => substr($e->message || '', 0, 300),
+                    message => substr($e->message || '', 0, 500),
+                    file    => $e->filename || '',
+                    line    => $e->line_number || '',
                 };
             }
         };
-
         $error_count = scalar keys %groups;
 
+        # ── Check for open HelpDesk support tickets ──
+        eval {
+            $helpdesk_count = $schema->resultset('SupportTicket')->count(
+                { status => 'open' }
+            ) || 0;
+        };
+
+        # ── Create AI-assisted Todos for each error group ──
+        my @audit_todo_subjects;
         if ($error_count) {
-            # Check if an audit root todo already exists for today to avoid duplicates
             my $existing_audit;
             eval {
                 $existing_audit = $schema->resultset('Todo')->search(
@@ -665,13 +675,14 @@ sub _daily_log_action {
             };
 
             unless ($existing_audit) {
-                my $group_summary = join(', ', map { "$_ (" . scalar(@{$groups{$_}}) . ")" } sort keys %groups);
-                my $root_desc = "=== Morning Audit - $today ===\n\n"
-                    . "Found errors/warnings in " . $error_count . " area(s): $group_summary\n\n"
-                    . "Sub-todos have been created for each area. Resolve each one to clear the audit.\n"
-                    . "This todo is blocking — it will remain open until all sub-issues are addressed.";
+                my $ollama;
+                eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
 
                 my $root_todo;
+                my $root_desc = "=== Morning Audit - $today ===\n\n"
+                    . "Found errors in " . $error_count . " area(s).\n"
+                    . "Each sub-todo below was created with AI assistance from the system error log.\n"
+                    . "Resolve each sub-todo to clear this audit.";
                 eval {
                     $root_todo = $schema->resultset('Todo')->create({
                         subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count area(s) need review ($today)",
@@ -701,26 +712,51 @@ sub _daily_log_action {
                     $todo_created = 1;
                     my $root_id = $root_todo->record_id;
 
-                    # Create one child todo per controller/subroutine group
                     for my $sub (sort keys %groups) {
                         my @entries = @{ $groups{$sub} };
                         my $count   = scalar @entries;
-                        my $levels  = join(', ', do { my %u; grep { !$u{$_}++ } map { $_->{level} } @entries });
-                        my $detail  = "Area: $sub\nLevel(s): $levels\nOccurrences: $count\n\n";
-                        my $shown   = $count > 5 ? 5 : $count;
-                        for my $i (0 .. $shown - 1) {
-                            $detail .= "[$entries[$i]{level}] $entries[$i]{ts}\n  $entries[$i]{message}\n\n";
-                        }
-                        $detail .= "(+" . ($count - $shown) . " more in system_log)" if $count > $shown;
+                        my $shown   = $count > 3 ? 3 : $count;
+                        my $raw_err = join("\n", map {
+                            "[$_->{level}] $_->{ts} $_->{file}:$_->{line}\n  $_->{message}"
+                        } @entries[0..$shown-1]);
 
-                        my $priority = ($levels =~ /CRITICAL|ERROR/) ? 1 : 2;
+                        my ($ai_subject, $ai_desc, $ai_priority) = ($sub . " — $count error(s) ($today)", $raw_err, 1);
+
+                        if ($ollama) {
+                            eval {
+                                my $prompt = "You are a software triage assistant. Given this system error from a Catalyst Perl web app, "
+                                    . "create a concise bug todo.\n\n"
+                                    . "Error area: $sub\n"
+                                    . "Occurrences: $count\n"
+                                    . "Sample errors:\n$raw_err\n\n"
+                                    . "Respond with ONLY a JSON object (no markdown, no explanation):\n"
+                                    . '{"subject":"one-line bug title (max 100 chars)","description":"2-3 sentence summary of the issue and suggested fix","priority":1}' . "\n"
+                                    . "Use priority 1 for crashes/data loss, 2 for functional failures, 3 for warnings.";
+
+                                my $resp = $ollama->chat(
+                                    messages => [{ role => 'user', content => $prompt }]
+                                );
+                                if ($resp && $resp =~ /\{.*\}/s) {
+                                    my ($json_str) = ($resp =~ /(\{.*?\})/s);
+                                    my $parsed = eval { decode_json($json_str) };
+                                    if ($parsed && !$@) {
+                                        $ai_subject  = substr($parsed->{subject}     || $ai_subject, 0, 200);
+                                        $ai_desc     = $parsed->{description} || $ai_desc;
+                                        $ai_priority = $parsed->{priority}    || $ai_priority;
+                                        $ai_priority = 1 if $ai_priority < 1;
+                                        $ai_priority = 3 if $ai_priority > 3;
+                                        $ai_desc .= "\n\n--- Raw errors ($count occurrence(s)) ---\n$raw_err";
+                                    }
+                                }
+                            };
+                        }
 
                         eval {
                             $schema->resultset('Todo')->create({
-                                subject             => "[$levels] $sub — $count issue(s) ($today)",
-                                description         => $detail,
+                                subject             => $ai_subject,
+                                description         => $ai_desc,
                                 status              => 1,
-                                priority            => $priority,
+                                priority            => $ai_priority,
                                 is_blocking         => 0,
                                 blocked_by_todo_id  => $root_id,
                                 parent_id           => $root_id,
@@ -741,21 +777,25 @@ sub _daily_log_action {
                                 share               => 0,
                             });
                         };
+                        push @audit_todo_subjects, $ai_subject;
                     }
                 }
             } else {
-                $todo_created = 1;  # already existed, signal that audit ran
+                $todo_created = 1;
             }
         }
 
-        # Build log details
+        # ── Build daily log details ──
         my $details = "=== Daily Log - $today ===\n\n";
         if (@stale_logs) {
             $details .= "\x{26A0}\x{FE0F} STALE OPEN LOGS (" . scalar(@stale_logs) . " unclosed from previous days):\n";
             for my $sl (@stale_logs) {
-                $details .= "  \x{2022} Log #" . $sl->id . " from " . ($sl->start_date || '?') . ": " . substr($sl->abstract || '', 0, 80) . "\n";
+                $details .= "  \x{2022} Log #" . $sl->record_id . " from " . ($sl->start_date || '?') . ": " . substr($sl->abstract || '', 0, 80) . "\n";
             }
             $details .= "\n";
+        }
+        if ($helpdesk_count) {
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -767,13 +807,11 @@ sub _daily_log_action {
             $details .= "\n";
         }
         if ($error_count) {
-            $details .= "\x{1F6A8} AUDIT ISSUES ($error_count area(s) in last 24h):\n";
-            for my $sub (sort keys %groups) {
-                my $count  = scalar @{ $groups{$sub} };
-                my @lvls   = do { my %u; grep { !$u{$_}++ } map { $_->{level} } @{ $groups{$sub} } };
-                $details .= "  \x{2022} [${\join(',',@lvls)}] $sub — $count occurrence(s)\n";
+            $details .= "\x{1F6A8} SYSTEM ERRORS AUDITED ($error_count area(s) in last 24h) — Todos created:\n";
+            for my $s (@audit_todo_subjects) {
+                $details .= "  \x{2022} $s\n";
             }
-            $details .= "  Sub-todos created and linked as blocking map.\n\n";
+            $details .= "\n";
         }
         $details .= "Notes:\n";
 
@@ -810,18 +848,19 @@ sub _daily_log_action {
         return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$log_entry;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "Start-of-day Log #" . $log_entry->id . " created by $username");
+            "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
-        my $stale_msg    = @stale_logs  ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
-        my $error_msg    = $error_count ? " \x{26A0}\x{FE0F} $error_count area(s) with errors/warnings in the last 24h." . ($todo_created ? " A blocking audit todo map was created — see <a href='/todo'>/todo</a>." : " (Audit todo already exists for today.)") : '';
-        my $priority_msg = @top_todos   ? " Your top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
+        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
+        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
+        my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
 
         return {
             success  => JSON::true,
             action   => 'start',
-            entry_id => $log_entry->id + 0,
-            response => "\x{1F305} Good morning, $username! Your daily log has been started (Log #" . $log_entry->id . "). View it at <a href='/log'>/log</a>.$stale_msg$error_msg$priority_msg Have a productive day!",
-            message  => "Daily log started. Check /log.",
+            entry_id => $log_entry->record_id + 0,
+            response => "\x{1F305} Good morning, $username! Daily log started (Log #" . $log_entry->record_id . ").$stale_msg$helpdesk_msg$error_msg$priority_msg <a href='/log'>View log</a>.",
+            message  => "Daily log started.",
         };
     }
 
@@ -832,7 +871,7 @@ sub _daily_log_action {
                 { username => $username, sitename => $sitename,
                   abstract => { -like => "%Good Morning - Daily Log - $today%" },
                   status   => 2 },
-                { order_by => { -desc => 'id' }, rows => 1 }
+                { order_by => { -desc => 'record_id' }, rows => 1 }
             )->first;
         };
         unless ($open_entry) {
@@ -847,13 +886,13 @@ sub _daily_log_action {
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "End-of-day Log #" . $open_entry->id . " closed by $username");
+            "End-of-day Log #" . $open_entry->record_id . " closed by $username");
 
         return {
             success  => JSON::true,
             action   => 'end',
-            entry_id => $open_entry->id + 0,
-            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->id . "). View it at <a href='/log'>/log</a>.",
+            entry_id => $open_entry->record_id + 0,
+            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->record_id . "). View it at <a href='/log'>/log</a>.",
             message  => "Daily log closed.",
         };
     }
