@@ -521,7 +521,7 @@ sub daily :Path('/planning/daily') :Args {
                     { username => $_log_user,
                       abstract => { -like => "%Good Morning - Daily Log - $current_date_str%" },
                       status   => 2 },
-                    { order_by => { -desc => 'id' }, rows => 1 }
+                    { order_by => { -desc => 'record_id' }, rows => 1 }
                 )->first;
                 $open = { $row->get_columns } if $row;
             };
