@@ -541,11 +541,15 @@ sub daily :Path('/planning/daily') :Args {
         audit_todos => do {
             my @at;
             eval {
-                my %audit_cond = (
-                    subject => { -like => '%Morning Audit%' },
+                my $audit_cond = {
+                    -or => [
+                        { subject => { -like => '%Morning Audit%' } },
+                        { subject => { -like => '[Error]%' } },
+                    ],
                     status  => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
-                );
-                $audit_cond{sitename} = $sitename unless $is_csc;
+                };
+                $audit_cond->{sitename} = $sitename unless $is_csc;
+                my %audit_cond = %$audit_cond;
                 my @roots = $c->model('DBEncy')->resultset('Todo')->search(
                     \%audit_cond,
                     { order_by => { -desc => 'start_date' }, rows => 10 }
