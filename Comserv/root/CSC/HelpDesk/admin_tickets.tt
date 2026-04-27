@@ -1,4 +1,4 @@
-[% PageVersion = 'CSC/HelpDesk/admin_tickets.tt,v 0.02 2026/04/27 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/HelpDesk/admin_tickets.tt,v 0.03 2026/04/27 shanta Exp shanta ' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
@@ -36,6 +36,7 @@
                 <th>Status</th>
                 <th>Submitted by</th>
                 <th>Created</th>
+                <th>Last Activity</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -47,20 +48,32 @@
                 <td>[% t.subject %]</td>
                 <td>[% t.category || 'other' %]</td>
                 <td>
-                    <span class="priority-[% t.priority || 'medium' %]">
+                    <span class="ticket-priority priority-[% t.priority || 'medium' %]">
                         [% t.priority || 'medium' %]
                     </span>
                 </td>
                 <td>
-                    <span class="status-[% t.status %]">
-                        [% t.status %]
+                    <span class="ticket-status status-[% t.status %]">
+                        [% t.status | replace('_', ' ') %]
                     </span>
                 </td>
                 <td>[% t.username || t.email || 'guest' %]</td>
                 <td>[% t.created_at %]</td>
-                <td>
+                <td>[% t.updated_at || t.created_at %]</td>
+                <td class="ticket-row-actions">
                     <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
                        class="btn btn-sm btn-primary">View</a>
+                    [% IF t.status != 'closed' %]
+                    <form method="post"
+                          action="[% c.uri_for('/HelpDesk/ticket/update_status/' _ t.ticket_number) %]"
+                          style="display:inline;">
+                        <button type="submit" name="new_status" value="closed"
+                                class="btn btn-sm btn-danger"
+                                onclick="return confirm('Close ticket [% t.ticket_number %]?')">
+                            Close
+                        </button>
+                    </form>
+                    [% END %]
                 </td>
             </tr>
         [% END %]

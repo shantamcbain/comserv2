@@ -88,6 +88,28 @@
 .tickets-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #cccccc); }
 .tickets-table tr:hover td { background: rgba(0,0,0,.025); }
 .no-tickets { padding: 20px; text-align: center; color: var(--text-muted-color, #6c757d); }
+.ticket-row-actions { white-space: nowrap; display: flex; gap: 4px; align-items: center; }
+
+/* Status panel (staff only) */
+.ticket-status-panel {
+    background-color: rgba(255,255,255,0.88);
+    border-radius: 6px; padding: 14px 18px; margin-bottom: 20px;
+    border: 1px solid var(--border-color, #cccccc);
+}
+.ticket-status-actions {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; align-items: center;
+}
+.ticket-resolution-note {
+    margin-top: 12px; font-size: 0.9em; color: var(--text-muted-color, #6c757d);
+    border-top: 1px solid var(--border-color, #cccccc); padding-top: 8px;
+}
+.message-system {
+    border-left: 4px solid var(--text-muted-color, #6c757d);
+    background-color: rgba(0,0,0,0.03);
+    font-style: italic;
+    color: var(--text-muted-color, #6c757d);
+}
+.status-awaiting_response { background: var(--caution-color, #ffc107); color: #000; }
 
 /* Alerts — use standard success/error semantic colours */
 .hd-alert-error   {
@@ -99,4 +121,9 @@
     background: rgba(0,153,0,0.1); color: var(--success-color, #009900);
     padding: 10px 14px; border-radius: 4px; margin-bottom: 16px;
     border: 1px solid var(--success-color, #009900);
+}
+.hd-alert-info {
+    background: rgba(23,162,184,0.1); color: var(--info-color, #17a2b8);
+    padding: 10px 14px; border-radius: 4px; margin-bottom: 16px;
+    border: 1px solid var(--info-color, #17a2b8);
 }
