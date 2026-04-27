@@ -53,13 +53,14 @@ sub convert_status_to_string {
 sub normalize_status {
     my ($self, $val) = @_;
     return 1 unless defined $val;
-    my %str_to_num = (
-        '1' => 1, 'NEW' => 1, 'New' => 1,
-        '2' => 2, 'IN PROGRESS' => 2, 'InProgress' => 2, 'In Progress' => 2,
-        '3' => 3, 'DONE' => 3, 'Done' => 3, 'Completed' => 3,
-        '4' => 4, 'Cancelled' => 4, 'CANCELLED' => 4,
-    );
-    return $str_to_num{$val} // ($val =~ /^\d+$/ ? $val + 0 : 1);
+    return $val + 0 if $val =~ /^\d+$/;
+    my $lc = lc($val);
+    $lc =~ s/[-_ ]+//g;
+    return 1 if $lc eq 'new';
+    return 2 if $lc =~ /^in?progress$|^inprog$|^inprocess$/;
+    return 3 if $lc =~ /^done$|^completed$|^complete$/;
+    return 4 if $lc =~ /^cancel/;
+    return 1;
 }
 
 # Helper method to filter todos by date range
