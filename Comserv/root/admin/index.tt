@@ -450,6 +450,69 @@
         </div>
 
         <div class="admin-section theme-section">
+            <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
+                <h3><i class="fas fa-life-ring"></i> HelpDesk</h3>
+                [% IF helpdesk_open_count > 0 %]
+                <span style="background:#c0392b;color:#fff;border-radius:12px;padding:2px 12px;font-size:0.9em;font-weight:bold;">
+                    [% helpdesk_open_count %] open
+                </span>
+                [% END %]
+            </div>
+            <div class="section-content">
+                [% IF helpdesk_open_tickets.size %]
+                <table style="width:100%;border-collapse:collapse;font-size:0.88em;margin-bottom:10px;">
+                    <thead>
+                        <tr style="background:#f1f3f5;text-align:left;">
+                            <th style="padding:5px 8px;">Ticket</th>
+                            <th style="padding:5px 8px;">Subject</th>
+                            <th style="padding:5px 8px;">Site</th>
+                            <th style="padding:5px 8px;">Priority</th>
+                            <th style="padding:5px 8px;">Created</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    [% FOREACH t IN helpdesk_open_tickets %]
+                        <tr style="border-bottom:1px solid #e9ecef;">
+                            <td style="padding:5px 8px;">
+                                <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]" style="font-family:monospace;">[% t.ticket_number %]</a>
+                            </td>
+                            <td style="padding:5px 8px;">[% t.subject | truncate(50) %]</td>
+                            <td style="padding:5px 8px;">[% t.site_name %]</td>
+                            <td style="padding:5px 8px;">
+                                <span style="color:[% t.priority == 'critical' ? '#c0392b' : t.priority == 'high' ? '#e67e22' : '#555' %];font-weight:bold;">
+                                    [% t.priority || 'medium' %]
+                                </span>
+                            </td>
+                            <td style="padding:5px 8px;color:#888;">[% t.created_at %]</td>
+                        </tr>
+                    [% END %]
+                    </tbody>
+                </table>
+                [% ELSE %]
+                <p style="color:#27ae60;margin:6px 0;">&#10003; No open tickets.</p>
+                [% END %]
+                <div class="admin-links" style="margin-top:8px;">
+                    <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="admin-link">
+                        <i class="fas fa-inbox"></i>
+                        <span>Open Tickets [% IF helpdesk_open_count > 0 %]([% helpdesk_open_count %])[% END %]</span>
+                    </a>
+                    <a href="[% c.uri_for('/HelpDesk/admin/tickets/all') %]" class="admin-link">
+                        <i class="fas fa-list-alt"></i>
+                        <span>All Tickets</span>
+                    </a>
+                    <a href="[% c.uri_for('/HelpDesk/admin') %]" class="admin-link">
+                        <i class="fas fa-cog"></i>
+                        <span>HelpDesk Admin</span>
+                    </a>
+                    <a href="[% c.uri_for('/HelpDesk/kb') %]" class="admin-link">
+                        <i class="fas fa-book"></i>
+                        <span>Knowledge Base</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-folder-open"></i> File Management</h3>
             </div>
