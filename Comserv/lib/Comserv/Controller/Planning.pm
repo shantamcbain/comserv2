@@ -624,97 +624,127 @@ sub _daily_log_action {
             )->all;
         };
 
-        # ── Audit: DB SystemLog + application.log for unreported errors ──
+        # ── Audit: SystemLog DB (log_with_details) for unreported errors ──
         my ($error_count, $todo_created) = (0, 0);
-        my @audit_lines;
+        my %groups;  # subroutine => [ {level, timestamp, message}, ... ]
 
-        # 1. DB SystemLog errors in last 24h
         eval {
             my $since = do {
                 my @t = localtime(time - 86400);
                 sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
             };
             my @errs = $schema->resultset('SystemLog')->search(
-                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
+                { level     => { -in => ['error','critical','warn','ERROR','CRITICAL','WARN'] },
                   timestamp => { '>=' => $since } },
-                { order_by => { -desc => 'timestamp' }, rows => 20 }
+                { order_by => { -desc => 'timestamp' }, rows => 200 }
             )->all;
             for my $e (@errs) {
-                push @audit_lines, "[DB/" . uc($e->level) . "] " . $e->timestamp . " — " . substr($e->message || '', 0, 200);
+                my $sub = $e->subroutine || 'unknown';
+                $sub =~ s/^Comserv::Controller:://;
+                push @{ $groups{$sub} }, {
+                    level   => uc($e->level),
+                    ts      => $e->timestamp,
+                    message => substr($e->message || '', 0, 300),
+                };
             }
         };
 
-        # 2. application.log file — scan last 24h for error:/critical: lines
-        eval {
-            my $log_path = $c->path_to('logs', 'application.log')->stringify;
-            if (-f $log_path) {
-                my $cutoff = time - 86400;
-                open(my $fh, '<', $log_path) or die "Cannot open $log_path: $!";
-
-                # Read last 8000 bytes to avoid scanning huge file
-                my $size = -s $log_path;
-                if ($size > 8000) {
-                    seek($fh, -8000, 2);
-                    <$fh>; # discard partial first line
-                }
-
-                my %seen_patterns;
-                while (my $line = <$fh>) {
-                    chomp $line;
-                    next unless $line =~ /^(?:error|critical):\s*\[(\d{4}-\d{2}-\d{2}[T ][\d:]+)\]/i;
-                    my $ts_str = $1;
-                    # Parse timestamp
-                    my $ts_epoch = 0;
-                    eval {
-                        (my $ts_clean = $ts_str) =~ s/T/ /;
-                        my ($y,$mo,$d,$h,$mi,$s) = $ts_clean =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
-                        require Time::Local;
-                        $ts_epoch = Time::Local::timelocal($s,$mi,$h,$d,$mo-1,$y-1900) if $y;
-                    };
-                    next if $ts_epoch && $ts_epoch < $cutoff;
-
-                    # Deduplicate by condensed pattern (strip timestamp/pid noise)
-                    (my $pattern = $line) =~ s/\[\d{4}-\d{2}-\d{2}[^\]]+\]//g;
-                    $pattern =~ s/\[\d+\]//g;
-                    $pattern = substr($pattern, 0, 120);
-                    next if $seen_patterns{$pattern}++;
-
-                    push @audit_lines, "[FILE/" . uc(($line =~ /^(\w+):/)[0] || 'ERROR') . "] $ts_str — " . substr($line, 0, 200);
-                }
-                close($fh);
-            }
-        };
-
-        $error_count = scalar @audit_lines;
+        $error_count = scalar keys %groups;
 
         if ($error_count) {
-            my $max_show  = $error_count > 10 ? 10 : $error_count;
-            my $todo_desc = "Errors found during Start Day audit ($today):\n\n"
-                . join("\n", @audit_lines[0..$max_show-1])
-                . ($error_count > $max_show ? "\n\n(+" . ($error_count - $max_show) . " more — check /log and application.log)" : '');
+            # Check if an audit root todo already exists for today to avoid duplicates
+            my $existing_audit;
             eval {
-                $schema->resultset('Todo')->create({
-                    subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count error(s) need review ($today)",
-                    description         => $todo_desc,
-                    status              => 2,
-                    priority            => 1,
-                    sitename            => $sitename,
-                    developer           => $username,
-                    username_of_poster  => $username,
-                    last_mod_by         => $username,
-                    last_mod_date       => $today,
-                    date_time_posted    => $today . ' 00:00:00',
-                    start_date          => $today,
-                    due_date            => $today,
-                    parent_todo         => '',
-                    estimated_man_hours => 0,
-                    accumulative_time   => '00:00:00',
-                    group_of_poster     => 'admin',
-                    project_code        => 'system',
-                    share               => 0,
-                });
-                $todo_created = 1;
+                $existing_audit = $schema->resultset('Todo')->search(
+                    { sitename   => $sitename,
+                      subject    => { -like => "%Morning Audit%$today%" },
+                      start_date => $today },
+                    { rows => 1 }
+                )->first;
             };
+
+            unless ($existing_audit) {
+                my $group_summary = join(', ', map { "$_ (" . scalar(@{$groups{$_}}) . ")" } sort keys %groups);
+                my $root_desc = "=== Morning Audit - $today ===\n\n"
+                    . "Found errors/warnings in " . $error_count . " area(s): $group_summary\n\n"
+                    . "Sub-todos have been created for each area. Resolve each one to clear the audit.\n"
+                    . "This todo is blocking — it will remain open until all sub-issues are addressed.";
+
+                my $root_todo;
+                eval {
+                    $root_todo = $schema->resultset('Todo')->create({
+                        subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count area(s) need review ($today)",
+                        description         => $root_desc,
+                        status              => 1,
+                        priority            => 1,
+                        is_blocking         => 1,
+                        sitename            => $sitename,
+                        developer           => $username,
+                        username_of_poster  => $username,
+                        user_id             => $user_id || 0,
+                        last_mod_by         => $username,
+                        last_mod_date       => $today,
+                        date_time_posted    => $today . ' 00:00:00',
+                        start_date          => $today,
+                        due_date            => $today,
+                        parent_todo         => '',
+                        estimated_man_hours => 0,
+                        accumulative_time   => '00:00:00',
+                        group_of_poster     => 'admin',
+                        project_code        => 'system',
+                        share               => 0,
+                    });
+                };
+
+                if ($root_todo && !$@) {
+                    $todo_created = 1;
+                    my $root_id = $root_todo->record_id;
+
+                    # Create one child todo per controller/subroutine group
+                    for my $sub (sort keys %groups) {
+                        my @entries = @{ $groups{$sub} };
+                        my $count   = scalar @entries;
+                        my $levels  = join(', ', do { my %u; grep { !$u{$_}++ } map { $_->{level} } @entries });
+                        my $detail  = "Area: $sub\nLevel(s): $levels\nOccurrences: $count\n\n";
+                        my $shown   = $count > 5 ? 5 : $count;
+                        for my $i (0 .. $shown - 1) {
+                            $detail .= "[$entries[$i]{level}] $entries[$i]{ts}\n  $entries[$i]{message}\n\n";
+                        }
+                        $detail .= "(+" . ($count - $shown) . " more in system_log)" if $count > $shown;
+
+                        my $priority = ($levels =~ /CRITICAL|ERROR/) ? 1 : 2;
+
+                        eval {
+                            $schema->resultset('Todo')->create({
+                                subject             => "[$levels] $sub — $count issue(s) ($today)",
+                                description         => $detail,
+                                status              => 1,
+                                priority            => $priority,
+                                is_blocking         => 0,
+                                blocked_by_todo_id  => $root_id,
+                                parent_id           => $root_id,
+                                sitename            => $sitename,
+                                developer           => $username,
+                                username_of_poster  => $username,
+                                user_id             => $user_id || 0,
+                                last_mod_by         => $username,
+                                last_mod_date       => $today,
+                                date_time_posted    => $today . ' 00:00:00',
+                                start_date          => $today,
+                                due_date            => $today,
+                                parent_todo         => '',
+                                estimated_man_hours => 0,
+                                accumulative_time   => '00:00:00',
+                                group_of_poster     => 'admin',
+                                project_code        => 'system',
+                                share               => 0,
+                            });
+                        };
+                    }
+                }
+            } else {
+                $todo_created = 1;  # already existed, signal that audit ran
+            }
         }
 
         # Build log details
@@ -734,6 +764,15 @@ sub _daily_log_action {
                 $n++;
             }
             $details .= "\n";
+        }
+        if ($error_count) {
+            $details .= "\x{1F6A8} AUDIT ISSUES ($error_count area(s) in last 24h):\n";
+            for my $sub (sort keys %groups) {
+                my $count  = scalar @{ $groups{$sub} };
+                my @lvls   = do { my %u; grep { !$u{$_}++ } map { $_->{level} } @{ $groups{$sub} } };
+                $details .= "  \x{2022} [${\join(',',@lvls)}] $sub — $count occurrence(s)\n";
+            }
+            $details .= "  Sub-todos created and linked as blocking map.\n\n";
         }
         $details .= "Notes:\n";
 
@@ -773,7 +812,7 @@ sub _daily_log_action {
             "Start-of-day Log #" . $log_entry->id . " created by $username");
 
         my $stale_msg    = @stale_logs  ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
-        my $error_msg    = $error_count ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h." . ($todo_created ? " A review todo was created." : '') : '';
+        my $error_msg    = $error_count ? " \x{26A0}\x{FE0F} $error_count area(s) with errors/warnings in the last 24h." . ($todo_created ? " A blocking audit todo map was created — see <a href='/todo'>/todo</a>." : " (Audit todo already exists for today.)") : '';
         my $priority_msg = @top_todos   ? " Your top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
 
         return {
