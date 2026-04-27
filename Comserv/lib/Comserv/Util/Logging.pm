@@ -68,6 +68,7 @@ my @BOT_PATTERNS = (
 # Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
 my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
 my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
+my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
@@ -439,6 +440,60 @@ sub log_with_details {
             }
         };
         # Don't log the error of sending the error notification to avoid infinite loop
+    }
+
+    # Auto-create a Todo in the audit panel for every EMAIL-threshold+ error.
+    # This ensures errors show up immediately without waiting for Start Day.
+    if ($current_prio >= $notify_prio
+        && $c && blessed($c) && $c->can('model')
+        && !$_in_todo_create) {
+        $_in_todo_create = 1;
+        eval {
+            my $now_date = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $sub_name = $subroutine // 'unknown';
+            $sub_name =~ s/^Comserv:://;
+            my $sub_short    = substr($sub_name, 0, 80);
+            my $todo_subject = "[Error] $sub_short ($now_date)";
+            my $sitename     = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $username     = ($c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
+            my $uid          = ($c->can('session') && $c->session) ? ($c->session->{user_id}  || undef)    : undef;
+            my $top_level    = uc($level);
+            my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
+
+            my $existing = $c->model('DBEncy')->resultset('Todo')->search(
+                { subject    => { -like => "[Error] $sub_short%" },
+                  start_date => $now_date,
+                  status     => { -not_in => [3, 'done', 'Done', 'DONE', 'completed', 'Completed'] } },
+                { rows => 1 }
+            )->first;
+
+            unless ($existing) {
+                my %create_args = (
+                    subject             => $todo_subject,
+                    description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
+                    status              => 1,
+                    priority            => $todo_priority,
+                    is_blocking         => 0,
+                    sitename            => $sitename,
+                    developer           => $username,
+                    username_of_poster  => $username,
+                    last_mod_by         => $username,
+                    last_mod_date       => $now_date,
+                    date_time_posted    => $now_date . ' 00:00:00',
+                    start_date          => $now_date,
+                    due_date            => $now_date,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => 'system',
+                    share               => 0,
+                );
+                $create_args{user_id} = $uid if defined $uid;
+                $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
+            }
+        };
+        $_in_todo_create = 0;
     }
 
     return $log_message;
