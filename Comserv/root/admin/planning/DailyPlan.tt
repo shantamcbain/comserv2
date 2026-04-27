@@ -225,10 +225,25 @@
     <div id="today-work" class="tab-content active">
         <div id="today-work-content">
 
+            [%# ── Action bar (below tabs) ── %]
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-color);">
+                <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
+                <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
+                <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
+                [% IF is_admin %]
+                [% IF open_log_entry %]
+                <a href="#log-panel" onclick="toggleLogPanel();return false;" style="padding:4px 12px;border:1px solid #2a7a2a;border-radius:4px;text-decoration:none;font-size:0.82em;color:#2a7a2a;" title="View today's open log entry">🌅 Today's Log</a>
+                [% ELSE %]
+                <button onclick="dailyLogAction('start')" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;background:transparent;font-size:0.82em;color:#20c997;cursor:pointer;" title="Start your day — audits application errors, checks HelpDesk, creates daily log">🌅 Start Day</button>
+                [% END %]
+                <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                [% END %]
+            </div>
+
             [%# ── Cross-project dependency summary (compact, collapsible) ── %]
-            [%# project_id = BLOCKED project; depends_on_id = BLOCKER (must come first) %]
             [% IF active_blockers && active_blockers.size %]
-            <details style="margin-bottom:12px;font-size:0.83em;">
+            <details style="margin-bottom:8px;font-size:0.83em;">
                 <summary style="cursor:pointer;color:var(--text-muted-color);padding:5px 0;list-style:none;display:flex;align-items:center;gap:6px;">
                     <span style="padding:1px 6px;border-radius:3px;background:#6f42c1;color:#fff;font-size:0.85em;">🔗 [% active_blockers.size %]</span>
                     <span>cross-project dependencies — priority order affected (<span style="color:#6f42c1;">purple badges ↓</span>)[% IF dep_auto_resolved %] — <span style="color:#28a745;">✓ [% dep_auto_resolved %] auto-resolved this load</span>[% END %][% IF dep_auto_detected %] — <span style="color:#17a2b8;">+ [% dep_auto_detected %] new auto-detected</span>[% END %]</span>
@@ -249,66 +264,58 @@
             </details>
             [% END %]
 
-            [%# ── GOOD MORNING LOG SUMMARY (shown when today's log is open) ── %]
-            [% IF open_log_entry %]
-            [% SET log_details = open_log_entry.details || '' %]
-            <div id="morning-summary" style="margin-bottom:16px;padding:12px 16px;border-left:4px solid #2a7a2a;background:color-mix(in srgb,#2a7a2a 8%,var(--bg-color));border-radius:0 6px 6px 0;">
-                <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;">
-                    <div style="flex:1;min-width:200px;">
-                        <strong style="color:#1a5a1a;">🌅 [% open_log_entry.abstract | html %]</strong>
-                        <span style="font-size:0.8em;color:var(--text-muted-color);margin-left:8px;">started [% open_log_entry.start_time %]
-                            · <a href="/log/[% open_log_entry.record_id %]" style="color:#1a5a1a;">view full log →</a></span>
+            [%# ── Audit Todos (from today's application error audit) ── %]
+            [% IF audit_todos && audit_todos.size %]
+            <details style="margin-bottom:8px;">
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#c45d00 10%,var(--bg-color));border:1px solid #c45d00;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#c45d00;">🚨 Application Error Audit</span>
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] todo(s) from today's system log scan — click to review</span>
+                </summary>
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
+                    [% FOREACH at IN audit_todos %]
+                    <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;">
+                        [% IF at.is_root %]
+                        <span style="font-weight:bold;color:#c45d00;min-width:16px;">⚠</span>
+                        [% ELSE %]
+                        <span style="color:var(--text-muted-color);min-width:16px;padding-left:12px;">↳</span>
+                        [% END %]
+                        <span style="background:var(--primary-color);color:#fff;border-radius:3px;padding:1px 5px;font-size:0.78em;flex-shrink:0;">P[% at.priority %]</span>
+                        <a href="/todo/details?record_id=[% at.record_id %]" style="color:var(--text-color);text-decoration:none;flex:1;">[% at.subject | html %]</a>
+                        <a href="/log/log_form?todo_record_id=[% at.record_id %]" style="font-size:0.8em;color:var(--text-muted-color);flex-shrink:0;">📋 Log</a>
                     </div>
-                    <div style="display:flex;gap:6px;">
-                        <button onclick="toggleLogPanel()" style="padding:3px 10px;font-size:0.8em;border:1px solid #2a7a2a;border-radius:4px;background:transparent;color:#2a7a2a;cursor:pointer;">✏ Edit Notes</button>
-                        <button onclick="dailyLogAction('end')" style="padding:3px 10px;font-size:0.8em;border:1px solid #888;border-radius:4px;background:transparent;color:var(--text-muted-color);cursor:pointer;">🌙 End Day</button>
-                    </div>
-                </div>
-                [%# Show key sections extracted from details %]
-                [% SET has_audit   = log_details.search('AUDIT ISSUES') %]
-                [% SET has_stale   = log_details.search('STALE OPEN LOGS') %]
-                [% SET has_top5    = log_details.search('TOP PRIORITIES') %]
-                [% SET notes_start = log_details.search('Notes:\n') %]
-                [% IF has_stale >= 0 || has_audit >= 0 %]
-                <div style="margin-top:8px;font-size:0.82em;display:flex;flex-wrap:wrap;gap:12px;">
-                    [% IF has_stale >= 0 %]
-                    <span style="color:#9b0000;">⚠️ Unclosed logs from previous days — see log panel for details</span>
-                    [% END %]
-                    [% IF has_audit >= 0 %]
-                    <span style="color:#c45d00;">🚨 System errors/warnings detected — audit todo map created in <a href="/todo" style="color:#c45d00;">Todo</a></span>
                     [% END %]
                 </div>
-                [% END %]
-                <div style="margin-top:8px;">
-                    <label style="font-size:0.82em;font-weight:bold;color:var(--text-muted-color);">Notes for today:</label>
-                    <textarea id="morning-notes-inline"
-                        style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;resize:vertical;background:var(--bg-color);color:var(--text-color);"
-                        rows="3"
-                        onblur="saveLogNotes([% open_log_entry.record_id %])"
-                    >[% open_log_entry.notes_only | html %]</textarea>
-                    <span id="morning-notes-status" style="font-size:0.75em;color:var(--text-muted-color);"></span>
-                </div>
-            </div>
+            </details>
             [% END %]
 
-            [%# ── CURRENT ACTIVE PRIORITIES (DB-driven, role/site/user scoped) ── %]
-            <div style="margin-bottom:24px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
-                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
-                        <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
-                        <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
-                        [% IF is_admin %]
-                        [% IF open_log_entry %]
-                        <a href="#log-panel" onclick="toggleLogPanel();return false;" style="padding:4px 12px;border:1px solid #2a7a2a;border-radius:4px;text-decoration:none;font-size:0.82em;color:#2a7a2a;" title="View today's open log entry">🌅 Today's Log</a>
-                        [% ELSE %]
-                        <button onclick="dailyLogAction('start')" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;background:transparent;font-size:0.82em;color:#20c997;cursor:pointer;" title="Start your day — creates daily log and audits system errors">🌅 Start Day</button>
-                        [% END %]
-                        <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
-                        <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
-                        [% END %]
+            [%# ── Open HelpDesk Tickets ── %]
+            [% IF helpdesk_tickets && helpdesk_tickets.size %]
+            <details style="margin-bottom:8px;">
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#9b0000 10%,var(--bg-color));border:1px solid #9b0000;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#9b0000;">🎫 Open HelpDesk Tickets</span>
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% helpdesk_tickets.size %] open — click to review</span>
+                </summary>
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #9b0000;border-top:none;border-radius:0 0 4px 4px;">
+                    [% FOREACH ht IN helpdesk_tickets %]
+                    <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-family:monospace;color:var(--text-muted-color);flex-shrink:0;">[% ht.ticket_number %]</span>
+                        <span style="background:#9b0000;color:#fff;border-radius:3px;padding:1px 5px;font-size:0.78em;flex-shrink:0;">[% ht.priority | upper %]</span>
+                        <span style="flex:1;">[% ht.subject | html %]</span>
+                        <span style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">[% ht.username %] · [% ht.created_at %]</span>
+                        <a href="/HelpDesk/ticket/[% ht.ticket_number %]" style="font-size:0.82em;color:#9b0000;flex-shrink:0;">View →</a>
                     </div>
+                    [% END %]
+                    <div style="margin-top:6px;text-align:right;">
+                        <a href="/HelpDesk" style="font-size:0.82em;color:#9b0000;">View all tickets →</a>
+                    </div>
+                </div>
+            </details>
+            [% END %]
+
+            [%# ── CURRENT ACTIVE PRIORITIES ── %]
+            <div style="margin-bottom:24px;">
+                <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);">
+                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
                 </div>
 
                 [% IF active_priorities && active_priorities.size %]
