@@ -37,7 +37,39 @@
         <tr><td><label>Due Date:</label></td>
             <td><input type="date" name="due_date" value="[% record.get_column('due_date') %]"></td></tr>
         <tr><td><label>Time of Day:</label></td>
-            <td><input type="time" name="time_of_day" value="[% record.get_column('time_of_day') %]"></td></tr>
+            <td>
+                <select name="time_of_day">
+                    <option value="">-- Select Time --</option>
+                    [%
+                        USE date;
+                        SET current_time = record.get_column('time_of_day');
+                        IF current_time;
+                            SET current_time_short = current_time.substr(0, 5);
+                        ELSE;
+                            SET current_time_short = '';
+                        END;
+                        FOREACH hour IN [0..23];
+                            SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                            IF hour == 0;
+                                SET hour_12 = 12; SET period = 'AM';
+                            ELSIF hour < 12;
+                                SET hour_12 = hour; SET period = 'AM';
+                            ELSIF hour == 12;
+                                SET hour_12 = 12; SET period = 'PM';
+                            ELSE;
+                                SET hour_12 = hour - 12; SET period = 'PM';
+                            END;
+                            FOREACH minute IN ['00', '30'];
+                                SET time_value_24 = hour_24 _ ':' _ minute;
+                                SET time_display  = hour_12 _ ':' _ minute _ ' ' _ period;
+                    %]
+                    <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                    [%
+                            END;
+                        END;
+                    %]
+                </select>
+            </td></tr>
         <tr><td><label>Status:</label></td>
             <td>
                 <select name="status">
@@ -48,7 +80,11 @@
                 </select>
             </td></tr>
         <tr><td><label>Priority:</label></td>
-            <td><input type="number" name="priority" value="[% record.get_column('priority') %]" size="4"></td></tr>
+            <td>
+                <select name="priority">
+                    [% INCLUDE "todo/priority_select.tt" %]
+                </select>
+            </td></tr>
         <tr><td><label>Est. Hours:</label></td>
             <td><input type="number" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" size="6"></td></tr>
         <tr><td><label>Accumulated Time:</label></td>
