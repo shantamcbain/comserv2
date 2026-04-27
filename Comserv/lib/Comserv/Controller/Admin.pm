@@ -244,6 +244,8 @@ sub index :Path :Args(0) {
             "HelpDesk ticket query error: $@");
     }
 
+    my $software_status = $self->_get_software_status($c);
+
     $c->stash(
         template              => 'admin/index.tt',
         stats                 => $stats,
@@ -254,10 +256,58 @@ sub index :Path :Args(0) {
         outstanding_invoices   => $outstanding_invoices,
         helpdesk_open_tickets  => $helpdesk_open_tickets,
         helpdesk_open_count    => $helpdesk_open_count,
+        software_status        => $software_status,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Completed Admin index action");
+}
+
+sub _get_software_status {
+    my ($self, $c) = @_;
+
+    my $repo_dir = $c->path_to('..')->stringify;
+
+    my $current_branch  = '';
+    my $last_commit     = '';
+    my $commits_behind  = 0;
+    my $has_uncommitted = 0;
+    my $has_untracked   = 0;
+    my @recommendations;
+
+    eval {
+        chomp($current_branch = `git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null`);
+        chomp($last_commit    = `git -C "$repo_dir" log -1 --format="%h %s" 2>/dev/null`);
+
+        my $fetch_out = `git -C "$repo_dir" fetch origin 2>&1`;
+        chomp(my $behind_raw = `git -C "$repo_dir" rev-list --count HEAD..origin/main 2>/dev/null`);
+        $commits_behind = ($behind_raw =~ /^\d+$/) ? $behind_raw + 0 : 0;
+
+        my $status_out = `git -C "$repo_dir" status --porcelain 2>/dev/null`;
+        $has_uncommitted = ($status_out =~ /^[MADRCU]/m) ? 1 : 0;
+        $has_untracked   = ($status_out =~ /^\?\?/m)     ? 1 : 0;
+
+        if ($commits_behind > 0) {
+            push @recommendations, {
+                type    => 'warning',
+                icon    => 'fas fa-exclamation-triangle',
+                message => "Your branch is $commits_behind commit(s) behind origin/main.",
+                action  => 'Run Git Pull to update.',
+                link    => '/admin/git_pull',
+            };
+        }
+    };
+
+    return {
+        git_status => {
+            current_branch          => $current_branch  || 'Unknown',
+            last_commit             => $last_commit      || 'No commits',
+            commits_behind          => $commits_behind,
+            has_uncommitted_changes => $has_uncommitted,
+            has_untracked_files     => $has_untracked,
+        },
+        recommendations => \@recommendations,
+    };
 }
 
 # Get system statistics for the admin dashboard
@@ -5444,20 +5494,6 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-
-    # Port restriction: only accessible from port 3001 (host dev server)
-    my $port = $c->req->uri->port || 0;
-    if ($port == 5000) {
-        $c->response->body('');
-        $c->response->status(403);
-        return;
-    }
-    if ($port && $port != 3001) {
-        my $redirect_uri = $c->req->uri->clone;
-        $redirect_uri->port(3001);
-        $c->response->redirect($redirect_uri);
-        return;
-    }
 
     # CSC admin only - use AdminAuth (same pattern as all other admin actions)
     my $admin_auth = Comserv::Util::AdminAuth->new();
