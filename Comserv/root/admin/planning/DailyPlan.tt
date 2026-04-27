@@ -241,14 +241,18 @@
                 [% END %]
             </div>
 
-            [%# ── Cross-project dependency summary (compact, collapsible) ── %]
-            [% IF active_blockers && active_blockers.size %]
-            <details style="margin-bottom:8px;font-size:0.83em;">
-                <summary style="cursor:pointer;color:var(--text-muted-color);padding:5px 0;list-style:none;display:flex;align-items:center;gap:6px;">
-                    <span style="padding:1px 6px;border-radius:3px;background:#6f42c1;color:#fff;font-size:0.85em;">🔗 [% active_blockers.size %]</span>
-                    <span>cross-project dependencies — priority order affected (<span style="color:#6f42c1;">purple badges ↓</span>)[% IF dep_auto_resolved %] — <span style="color:#28a745;">✓ [% dep_auto_resolved %] auto-resolved this load</span>[% END %][% IF dep_auto_detected %] — <span style="color:#17a2b8;">+ [% dep_auto_detected %] new auto-detected</span>[% END %]</span>
+            [%# ── Cross-project dependency summary (always visible, collapsible) ── %]
+            <details style="margin-bottom:8px;">
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#6f42c1 10%,var(--bg-color));border:1px solid #6f42c1;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#6f42c1;">🔗 Cross-Project Dependencies</span>
+                    [% IF active_blockers && active_blockers.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% active_blockers.size %] active — priority order affected[% IF dep_auto_resolved %] · ✓ [% dep_auto_resolved %] auto-resolved[% END %]</span>
+                    [% ELSE %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">none active</span>
+                    [% END %]
                 </summary>
-                <div style="margin-top:6px;padding:8px 10px;background:var(--bg-secondary);border-radius:4px;border-left:3px solid #6f42c1;">
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #6f42c1;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF active_blockers && active_blockers.size %]
                     [% FOREACH ab IN active_blockers %]
                     <div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.9em;border-bottom:1px solid var(--border-color);">
                         <a href="/project/details?project_id=[% ab.depends_on_id %]" style="color:#6f42c1;font-weight:bold;text-decoration:none;">[% ab.depends_on_name %]</a>
@@ -257,21 +261,27 @@
                         <span style="color:var(--text-muted-color);font-size:0.8em;">can proceed</span>
                     </div>
                     [% END %]
-                    <div style="margin-top:5px;text-align:right;">
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No active cross-project dependencies.</p>
+                    [% END %]
+                    <div style="margin-top:6px;text-align:right;">
                         <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">+ Manage Dependencies</a>
                     </div>
                 </div>
             </details>
-            [% END %]
 
-            [%# ── Audit Todos (from today's application error audit) ── %]
-            [% IF audit_todos && audit_todos.size %]
+            [%# ── Audit Todos (always visible, collapsible) ── %]
             <details style="margin-bottom:8px;">
                 <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#c45d00 10%,var(--bg-color));border:1px solid #c45d00;list-style:none;display:flex;align-items:center;gap:8px;">
                     <span style="font-weight:bold;color:#c45d00;">🚨 Application Error Audit</span>
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] todo(s) from today's system log scan — click to review</span>
+                    [% IF audit_todos && audit_todos.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] todo(s) from today's system log scan</span>
+                    [% ELSE %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">no errors found — click Start Day to run audit</span>
+                    [% END %]
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF audit_todos && audit_todos.size %]
                     [% FOREACH at IN audit_todos %]
                     <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;">
                         [% IF at.is_root %]
@@ -284,18 +294,24 @@
                         <a href="/log/log_form?todo_record_id=[% at.record_id %]" style="font-size:0.8em;color:var(--text-muted-color);flex-shrink:0;">📋 Log</a>
                     </div>
                     [% END %]
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos for today. Click <strong>🌅 Start Day</strong> to scan the application error log and create todos for any issues found.</p>
+                    [% END %]
                 </div>
             </details>
-            [% END %]
 
-            [%# ── Open HelpDesk Tickets ── %]
-            [% IF helpdesk_tickets && helpdesk_tickets.size %]
-            <details style="margin-bottom:8px;">
+            [%# ── Open HelpDesk Tickets (always visible, collapsible) ── %]
+            <details style="margin-bottom:12px;">
                 <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#9b0000 10%,var(--bg-color));border:1px solid #9b0000;list-style:none;display:flex;align-items:center;gap:8px;">
                     <span style="font-weight:bold;color:#9b0000;">🎫 Open HelpDesk Tickets</span>
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% helpdesk_tickets.size %] open — click to review</span>
+                    [% IF helpdesk_tickets && helpdesk_tickets.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% helpdesk_tickets.size %] open</span>
+                    [% ELSE %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">none open</span>
+                    [% END %]
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #9b0000;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF helpdesk_tickets && helpdesk_tickets.size %]
                     [% FOREACH ht IN helpdesk_tickets %]
                     <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                         <span style="font-family:monospace;color:var(--text-muted-color);flex-shrink:0;">[% ht.ticket_number %]</span>
@@ -308,9 +324,11 @@
                     <div style="margin-top:6px;text-align:right;">
                         <a href="/HelpDesk" style="font-size:0.82em;color:#9b0000;">View all tickets →</a>
                     </div>
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No open support tickets.</p>
+                    [% END %]
                 </div>
             </details>
-            [% END %]
 
             [%# ── CURRENT ACTIVE PRIORITIES ── %]
             <div style="margin-bottom:24px;">
