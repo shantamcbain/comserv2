@@ -8,6 +8,7 @@ use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::PointSystem;
+use Comserv::Util::Priority qw(priority_options);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -31,7 +32,7 @@ sub begin :Private {
 
 sub BUILD {
     my $self = shift;
-    $self->priority({ map {$_ => $_} (1 .. 10) });
+    $self->priority(priority_options());
     $self->status({
         1 => 'NEW',
         2 => 'IN PROGRESS',
