@@ -733,7 +733,7 @@ sub modify :Path('/todo/modify') :Args(1) {
             share                => $form_data->{share} // $todo->get_column('share') // 0,
             last_mod_by          => $current_user,
             last_mod_date        => $today,
-            user_id              => ($form_data->{user_id} && $form_data->{user_id} =~ /^\d+$/) ? $form_data->{user_id} : $todo->get_column('user_id'),
+            user_id              => $todo->get_column('user_id'),
             project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
             date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
         });
