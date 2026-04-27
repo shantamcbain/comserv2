@@ -538,6 +538,40 @@ sub daily :Path('/planning/daily') :Args {
             $open;
         },
 
+        audit_todos => do {
+            my @at;
+            eval {
+                my $root = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename   => $sitename,
+                      subject    => { -like => '%Morning Audit%' },
+                      start_date => $current_date_str },
+                    { rows => 1 }
+                )->first;
+                if ($root) {
+                    my @children = $c->model('DBEncy')->resultset('Todo')->search(
+                        { parent_id => $root->record_id },
+                        { order_by => { -asc => 'priority' } }
+                    )->all;
+                    push @at, { $root->get_columns, is_root => 1 };
+                    push @at, map { { $_->get_columns, is_root => 0 } } @children;
+                }
+            };
+            \@at;
+        },
+
+        helpdesk_tickets => do {
+            my @ht;
+            eval {
+                @ht = map { { $_->get_columns } }
+                    $c->model('DBEncy')->resultset('SupportTicket')->search(
+                        { status    => 'open',
+                          site_name => $sitename },
+                        { order_by => { -desc => 'created_at' }, rows => 50 }
+                    )->all;
+            };
+            \@ht;
+        },
+
         template => 'admin/planning/DailyPlan.tt',
     );
 }
