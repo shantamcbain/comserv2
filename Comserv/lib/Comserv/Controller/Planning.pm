@@ -541,18 +541,19 @@ sub daily :Path('/planning/daily') :Args {
         audit_todos => do {
             my @at;
             eval {
-                my $root = $c->model('DBEncy')->resultset('Todo')->search(
-                    { sitename   => $sitename,
-                      subject    => { -like => '%Morning Audit%' },
-                      start_date => $current_date_str },
-                    { rows => 1 }
-                )->first;
-                if ($root) {
+                my @roots = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename => $sitename,
+                      subject  => { -like => '%Morning Audit%' },
+                      status   => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                    { order_by => { -desc => 'start_date' }, rows => 5 }
+                )->all;
+                for my $root (@roots) {
+                    push @at, { $root->get_columns, is_root => 1 };
                     my @children = $c->model('DBEncy')->resultset('Todo')->search(
-                        { parent_id => $root->record_id },
+                        { parent_id => $root->record_id,
+                          status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
                         { order_by => { -asc => 'priority' } }
                     )->all;
-                    push @at, { $root->get_columns, is_root => 1 };
                     push @at, map { { $_->get_columns, is_root => 0 } } @children;
                 }
             };
@@ -564,8 +565,7 @@ sub daily :Path('/planning/daily') :Args {
             eval {
                 @ht = map { { $_->get_columns } }
                     $c->model('DBEncy')->resultset('SupportTicket')->search(
-                        { status    => 'open',
-                          site_name => $sitename },
+                        { status => 'open' },
                         { order_by => { -desc => 'created_at' }, rows => 50 }
                     )->all;
             };
