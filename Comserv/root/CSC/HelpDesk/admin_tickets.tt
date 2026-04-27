@@ -1,0 +1,74 @@
+[% PageVersion = 'CSC/HelpDesk/admin_tickets.tt,v 0.02 2026/04/27 shanta Exp shanta ' %]
+
+[% IF c.session.debug_mode == 1 %]
+ <br>[% PageVersion %]</br>
+[% END %]
+
+<div class="helpdesk-container">
+    <h1>[% title || 'Ticket Management' %]</h1>
+
+    [% IF error_msg %]
+    <div class="hd-alert-error">[% error_msg %]</div>
+    [% END %]
+
+    <div class="admin-ticket-nav">
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]"
+           class="btn [% status_filter == 'open' ? 'btn-primary' : 'btn-secondary' %]">Open</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets') %]"
+           class="btn [% status_filter == 'all' ? 'btn-primary' : 'btn-secondary' %]">All</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/resolved') %]"
+           class="btn [% status_filter == 'resolved' ? 'btn-primary' : 'btn-secondary' %]">Resolved</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/closed') %]"
+           class="btn [% status_filter == 'closed' ? 'btn-primary' : 'btn-secondary' %]">Closed</a>
+        <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
+    </div>
+
+    [% IF tickets && tickets.size %]
+    <p>[% tickets.size %] ticket(s)</p>
+    <table class="tickets-table">
+        <thead>
+            <tr>
+                <th>Ticket #</th>
+                <th>Site</th>
+                <th>Subject</th>
+                <th>Category</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Submitted by</th>
+                <th>Created</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH t IN tickets %]
+            <tr>
+                <td><code>[% t.ticket_number %]</code></td>
+                <td>[% t.site_name %]</td>
+                <td>[% t.subject %]</td>
+                <td>[% t.category || 'other' %]</td>
+                <td>
+                    <span class="priority-[% t.priority || 'medium' %]">
+                        [% t.priority || 'medium' %]
+                    </span>
+                </td>
+                <td>
+                    <span class="status-[% t.status %]">
+                        [% t.status %]
+                    </span>
+                </td>
+                <td>[% t.username || t.email || 'guest' %]</td>
+                <td>[% t.created_at %]</td>
+                <td>
+                    <a href="[% c.uri_for('/HelpDesk/ticket/view/' _ t.ticket_number) %]"
+                       class="btn btn-sm btn-primary">View</a>
+                </td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="no-tickets">
+        <p>No tickets found.</p>
+    </div>
+    [% END %]
+</div>

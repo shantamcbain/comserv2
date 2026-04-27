@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use POSIX qw(strftime);
 use Try::Tiny;
+use JSON ();
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -59,8 +60,11 @@ sub base :Chained('/') :PathPart('HelpDesk') :CaptureArgs(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
         "Starting HelpDesk base action");
     
-    # Common setup for all HelpDesk pages
-    $c->stash(section => 'helpdesk');
+    $c->stash(
+        section       => 'helpdesk',
+        site_favicon  => '/favicon/helpdesk',
+        css_view_name => '/static/css/helpdesk.css',
+    );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
         "Completed HelpDesk base action");
@@ -255,46 +259,111 @@ Admin page for HelpDesk management
 
 =cut
 
-sub admin :Chained('base') :PathPart('admin') :Args(0) {
+sub _is_staff {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
-        "Starting admin action");
-    
-    # Check if user has admin role
-    my $has_admin_role = 0;
-    if ($c->session->{roles}) {
-        my $roles = $c->session->{roles};
-        if (ref($roles) eq 'ARRAY') {
-            $has_admin_role = grep { $_ eq 'admin' } @$roles;
-        } elsif (!ref($roles)) {
-            $has_admin_role = $roles =~ /\badmin\b/i;
-        }
-    }
-    
-    unless ($has_admin_role) {
-        my $root_controller = $c->controller('Root');
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'admin', 
-            "Unauthorized access attempt to HelpDesk admin by user: " . ($root_controller->user_exists($c) ? ($c->session->{username} || 'Guest') : 'Guest'));
-        
-        # Redirect to main HelpDesk page with error message
+    my $roles = $c->session->{roles};
+    return 0 unless $roles;
+    return ref($roles) eq 'ARRAY'
+        ? (grep { $_ eq 'admin' || $_ eq 'helpdesk' } @$roles) ? 1 : 0
+        : ($roles =~ /\b(?:admin|helpdesk)\b/i ? 1 : 0);
+}
+
+sub _require_admin {
+    my ($self, $c) = @_;
+    my $is_staff = $self->_is_staff($c);
+    unless ($is_staff) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_require_admin',
+            "Unauthorized HelpDesk admin access by: " . ($c->session->{username} || 'Guest'));
         $c->stash->{error_msg} = "You don't have permission to access the HelpDesk admin area.";
         $c->detach('index');
-        return;
     }
-    
+    return $is_staff;
+}
+
+sub admin :Chained('base') :PathPart('admin') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Starting admin action");
+    $self->_require_admin($c);
     $c->stash(
         template => 'CSC/HelpDesk/admin.tt',
-        title => 'HelpDesk Administration'
+        title    => 'HelpDesk Administration',
     );
-    
-    # Push debug message to stash
     push @{$c->stash->{debug_msg}}, "HelpDesk admin page loaded";
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', 
-        "Completed admin action");
-    
-    # Explicitly forward to the TT view
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin', "Completed admin action");
+    $c->forward($c->view('TT'));
+}
+
+sub admin_tickets :Chained('base') :PathPart('admin/tickets') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, undef, 'All Tickets');
+}
+
+sub admin_tickets_open :Chained('base') :PathPart('admin/tickets/open') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'open', 'Open Tickets');
+}
+
+sub admin_tickets_closed :Chained('base') :PathPart('admin/tickets/closed') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'closed', 'Closed Tickets');
+}
+
+sub admin_tickets_resolved :Chained('base') :PathPart('admin/tickets/resolved') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+    $self->_load_admin_tickets($c, 'resolved', 'Resolved Tickets');
+}
+
+sub _load_admin_tickets {
+    my ($self, $c, $status_filter, $title) = @_;
+
+    my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $roles      = $c->session->{roles} || [];
+    my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles;
+    my $is_csc     = (lc($site_name) eq 'csc')
+                  || (grep { lc($_) eq 'admin' } @roles_list
+                      && lc($c->session->{SiteName} || '') eq 'csc');
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_load_admin_tickets',
+        "Loading admin tickets: filter=" . ($status_filter || 'all')
+        . " site=$site_name is_csc=" . ($is_csc ? 'yes' : 'no'));
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my %search;
+        $search{site_name} = $site_name unless $is_csc;
+        if ($status_filter && $status_filter eq 'open') {
+            $search{status} = [qw(open in_progress)];
+        } elsif ($status_filter) {
+            $search{status} = $status_filter;
+        }
+
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 100 }
+        )->all;
+
+        $c->stash(
+            template      => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets       => \@tickets,
+            title         => $title,
+            is_admin_view => 1,
+            status_filter => $status_filter || 'all',
+        );
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_admin_tickets',
+            "Error loading admin tickets: $_");
+        $c->stash(
+            template  => 'CSC/HelpDesk/admin_tickets.tt',
+            tickets   => [],
+            title     => $title,
+            error_msg => 'Error loading tickets.',
+        );
+    };
+
     $c->forward($c->view('TT'));
 }
 
@@ -351,6 +420,20 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
 
+        $self->_notify_site_admins($c,
+            ticket  => $ticket,
+            subject => "[HelpDesk] New ticket " . $ticket->ticket_number . ": " . $ticket->subject,
+            body    => "A new support ticket has been submitted on $site_name.\n\n"
+                     . "Ticket:   " . $ticket->ticket_number . "\n"
+                     . "Subject:  " . $ticket->subject . "\n"
+                     . "Category: " . ($ticket->category || 'other') . "\n"
+                     . "Priority: " . ($ticket->priority || 'medium') . "\n"
+                     . "From:     " . ($ticket->username || $ticket->email || 'Guest') . "\n\n"
+                     . "Description:\n" . $ticket->description . "\n\n"
+                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+            event   => 'submit_ticket',
+        );
+
         $c->stash(
             template      => 'CSC/HelpDesk/ticket_submitted.tt',
             ticket        => $ticket,
@@ -397,12 +480,7 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
         }
 
         my $user_id  = $c->session->{user_id} || 0;
-        my $is_admin = 0;
-        if ($c->session->{roles}) {
-            my $roles = $c->session->{roles};
-            $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
-                                                 : ($roles =~ /\badmin\b/i ? 1 : 0);
-        }
+        my $is_admin = $self->_is_staff($c);
 
         unless ($is_admin || ($ticket->user_id && $ticket->user_id == $user_id)) {
             $c->stash(
@@ -414,11 +492,24 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
             return;
         }
 
+        my @messages;
+        eval { @messages = $ticket->messages->all };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
+                "Could not load ticket messages: $@");
+        }
+
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view_ticket',
+            "Loaded " . scalar(@messages) . " messages for ticket $ticket_number");
+
         $c->stash(
-            template => 'CSC/HelpDesk/ticket_status.tt',
-            ticket   => $ticket,
-            tickets  => [$ticket],
-            title    => 'Ticket: ' . $ticket_number,
+            template     => 'CSC/HelpDesk/ticket_view.tt',
+            ticket       => $ticket,
+            messages     => \@messages,
+            is_staff     => $is_admin,
+            title        => 'Ticket: ' . $ticket_number,
+            success_msg  => $c->flash->{success_msg} || '',
+            error_msg    => $c->flash->{error_msg}   || '',
         );
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view_ticket',
@@ -431,6 +522,148 @@ sub view_ticket :Chained('ticket_base') :PathPart('view') :Args(1) {
     };
 
     $c->forward($c->view('TT'));
+}
+
+=head2 ticket_reply
+
+Add a reply message to a ticket and email the other party
+
+=cut
+
+sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+        "ticket_reply called: method=" . $c->req->method . " ticket=$ticket_number");
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $body_text = $c->req->params->{reply_body} || '';
+    unless ($body_text) {
+        $c->flash->{error_msg} = 'Reply body cannot be empty.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $is_staff     = $self->_is_staff($c);
+    my $sender_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $sender_name     = $c->session->{username} || 'Anonymous' unless $sender_name =~ /\S/;
+    my $sender_email = $c->session->{email} || '';
+    my $sender_type  = $is_staff ? 'staff' : 'user';
+    my $site_name    = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->stash(error_msg => "Ticket not found.", template => 'CSC/HelpDesk/ticket_status.tt', tickets => []);
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        my $user_id = $c->session->{user_id} || 0;
+        unless ($is_staff || ($ticket->user_id && $ticket->user_id == $user_id)) {
+            $c->stash(error_msg => 'Permission denied.', template => 'CSC/HelpDesk/ticket_status.tt', tickets => []);
+            $c->forward($c->view('TT'));
+            return;
+        }
+
+        my $msg = $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => $sender_type,
+            sender_name  => $sender_name,
+            sender_email => $sender_email,
+            body         => $body_text,
+            created_at   => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+            "Message inserted OK: id=" . $msg->id . " ticket_id=" . $ticket->id);
+
+        my $public_ticket_url = do {
+            my $public_domain = '';
+            eval {
+                my $site_rec = $schema->resultset('Site')->search(
+                    { name => $ticket->site_name },
+                    { rows => 1 }
+                )->first;
+                if ($site_rec) {
+                    my $domain_rec = $schema->resultset('SiteDomain')->search(
+                        { site_id => $site_rec->id },
+                        { rows => 1 }
+                    )->first;
+                    $public_domain = $domain_rec->domain if $domain_rec;
+                }
+            };
+            $public_domain
+                ? 'https://' . $public_domain . '/HelpDesk/ticket/view/' . $ticket_number
+                : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
+        };
+
+        if ($sender_type eq 'staff') {
+            my $to_email = $ticket->email || '';
+            if ($to_email) {
+                my $subject = "Re: [Ticket " . $ticket->ticket_number . "] " . $ticket->subject;
+                my $body    = "Hello,\n\n"
+                    . "A staff member has replied to your support ticket.\n\n"
+                    . "--- Reply from $sender_name ---\n$body_text\n\n"
+                    . "View your ticket: $public_ticket_url\n\n"
+                    . "Regards,\n$site_name Support Team";
+                eval { $c->model('Mail')->send_email($c, $to_email, $subject, $body) };
+                $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
+                    $@ ? "Email to submitter failed: $@" : "Reply email sent to $to_email");
+            } else {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
+                    "No email address on ticket " . $ticket->ticket_number . " — skipping notification email");
+            }
+        } elsif ($sender_type eq 'user') {
+            my $site_id   = $c->session->{site_id} || undef;
+            my $from_email = '';
+            eval {
+                if ($c->model('Mail')->can('get_smtp_config')) {
+                    my $smtp_cfg = $c->model('Mail')->get_smtp_config($c, $site_id);
+                    $from_email  = $smtp_cfg->{from} || $smtp_cfg->{username} || '';
+                }
+            };
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_reply',
+                "Customer reply on ticket " . $ticket->ticket_number . "; staff notify email: " . ($from_email || 'none'));
+            if ($from_email) {
+                my $staff_subject = "[HelpDesk] Customer reply on Ticket " . $ticket->ticket_number;
+                my $staff_body    = "A customer has replied to ticket " . $ticket->ticket_number . ".\n\n"
+                    . "Subject: " . $ticket->subject . "\n"
+                    . "From: $sender_name ($sender_email)\n\n"
+                    . "--- Reply ---\n$body_text\n\n"
+                    . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open') . "\n\n"
+                    . "Regards,\n$site_name HelpDesk";
+                eval { $c->model('Mail')->send_email($c, $from_email, $staff_subject, $staff_body) };
+                $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_reply',
+                    $@ ? "Staff notify email failed: $@" : "Staff notify email sent to $from_email");
+            }
+        }
+
+        $self->_notify_site_admins($c,
+            ticket  => $ticket,
+            subject => "[HelpDesk] Reply on ticket " . $ticket->ticket_number . ": " . $ticket->subject,
+            body    => "A " . ($sender_type eq 'staff' ? 'staff' : 'customer') . " reply has been posted on ticket "
+                     . $ticket->ticket_number . " (" . $site_name . ").\n\n"
+                     . "From: $sender_name" . ($sender_email ? " <$sender_email>" : '') . "\n\n"
+                     . "--- Reply ---\n$body_text\n\n"
+                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+            event   => 'ticket_reply',
+        );
+
+        $c->flash->{success_msg} = 'Your reply has been posted.';
+
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_reply',
+            "Error posting reply: $_");
+        $c->flash->{error_msg} = 'Error posting reply: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
 }
 
 =head2 ticket_list
@@ -447,12 +680,7 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
 
     my $user_id   = $c->session->{user_id} || 0;
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-    my $is_admin  = 0;
-    if ($c->session->{roles}) {
-        my $roles = $c->session->{roles};
-        $is_admin = ref($roles) eq 'ARRAY' ? grep { $_ eq 'admin' } @$roles
-                                             : ($roles =~ /\badmin\b/i ? 1 : 0);
-    }
+    my $is_admin  = $self->_is_staff($c);
 
     try {
         my $schema = $c->model('DBEncy')->schema;
@@ -488,6 +716,150 @@ sub ticket_list :Chained('ticket_base') :PathPart('list') :Args(0) {
 Fallback for HelpDesk URLs that don't match any actions
 
 =cut
+
+sub api_search_tickets :Chained('base') :PathPart('api/search_tickets') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+    $c->response->headers->header('Cache-Control' => 'no-store');
+
+    my $q         = $c->req->param('q') || '';
+    my $limit     = int($c->req->param('limit') || 20);
+    $limit        = 50 if $limit > 50;
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_csc    = (lc($site_name) eq 'csc');
+    my $is_staff  = $self->_is_staff($c);
+
+    unless ($q) {
+        $c->response->body(JSON::encode_json({ error => 'q parameter required', tickets => [] }));
+        return;
+    }
+
+    my @results;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $like   = { -like => '%' . $q . '%' };
+        my %where  = (
+            -or => [
+                subject     => $like,
+                description => $like,
+                category    => $like,
+                ticket_number => $like,
+            ]
+        );
+        $where{site_name} = $site_name unless $is_csc || $is_staff;
+
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%where,
+            { order_by => { -desc => 'created_at' }, rows => $limit }
+        )->all;
+
+        for my $t (@tickets) {
+            push @results, {
+                ticket_number => $t->ticket_number,
+                site_name     => $t->site_name,
+                subject       => $t->subject,
+                category      => $t->category || 'other',
+                priority      => $t->priority  || 'medium',
+                status        => $t->status,
+                created_at    => $t->created_at . '',
+                summary       => do {
+                    my $d = $t->description || '';
+                    length($d) > 200 ? substr($d, 0, 200) . '…' : $d;
+                },
+            };
+        }
+    };
+
+    $c->response->body(JSON::encode_json({
+        query   => $q,
+        count   => scalar(@results),
+        tickets => \@results,
+    }));
+}
+
+sub tickets_alert :Chained('base') :PathPart('admin/tickets_alert') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($self->_is_staff($c)) {
+        $c->response->body('{"open_count":0}');
+        return;
+    }
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $is_csc    = (lc($site_name) eq 'csc');
+    my $count = 0;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my %search = (status => 'open');
+        $search{site_name} = $site_name unless $is_csc;
+        $count = $schema->resultset('SupportTicket')->search(\%search)->count;
+    };
+    $c->response->headers->header('Cache-Control' => 'no-store');
+    $c->response->body('{"open_count":' . ($count + 0) . '}');
+}
+
+=head2 _notify_site_admins
+
+Send an email + application alert to all active admin/helpdesk users for the
+ticket's site whenever a new ticket is submitted or a reply is posted.
+
+=cut
+
+sub _notify_site_admins {
+    my ($self, $c, %args) = @_;
+    my $ticket    = $args{ticket}    or return;
+    my $subject   = $args{subject}   or return;
+    my $body      = $args{body}      or return;
+    my $event     = $args{event}     || 'ticket_event';
+
+    my $schema    = $c->model('DBEncy')->schema;
+    my $site_name = $ticket->site_name || '';
+
+    my @admin_emails;
+    eval {
+        my $site_rec = $schema->resultset('Site')->search(
+            { name => $site_name }, { rows => 1 })->first;
+
+        if ($site_rec) {
+            my @usr_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id   => $site_rec->id,
+                    role      => [qw(admin helpdesk)],
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+
+            for my $ur (@usr_roles) {
+                my $email = eval { $ur->user->email } || '';
+                push @admin_emails, $email if $email && $email =~ /\@/;
+            }
+        }
+
+        if (!@admin_emails) {
+            my @global_admins = $schema->resultset('User')->search(
+                { roles => { -like => '%admin%' } },
+                { columns => ['email'] }
+            )->all;
+            @admin_emails = map { $_->email || () } @global_admins;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_notify_site_admins',
+            "Error finding admin emails: $@");
+    }
+
+    @admin_emails = do { my %seen; grep { $_ && !$seen{$_}++ } @admin_emails };
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+        "HelpDesk alert [$site_name]: $subject (notifying " . scalar(@admin_emails) . " admin(s))");
+
+    for my $to (@admin_emails) {
+        eval { $c->model('Mail')->send_email($c, $to, $subject, $body) };
+        $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, $event,
+            $@ ? "Admin notify email to $to failed: $@" : "Admin notify email sent to $to");
+    }
+}
 
 sub default :Chained('base') :PathPart('') :Args {
     my ($self, $c) = @_;

@@ -7894,6 +7894,36 @@ sub _build_helpdesk_system_prompt {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
     my $username  = $c->session->{username} || 'the user';
 
+    my $recent_tickets_section = '';
+    eval {
+        my $schema    = $c->model('DBEncy')->schema;
+        my $is_csc    = (lc($site_name) eq 'csc');
+        my %search    = (status => [qw(open in_progress)]);
+        $search{site_name} = $site_name unless $is_csc;
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 30 }
+        )->all;
+
+        if (@tickets) {
+            $recent_tickets_section = "\nRECENT OPEN TICKETS (use these to identify patterns and avoid duplicate advice):\n";
+            for my $t (@tickets) {
+                my $desc = $t->description || '';
+                $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+                $desc =~ s/\n/ /g;
+                $recent_tickets_section .= sprintf(
+                    "- [%s] %s | cat:%s pri:%s | %s\n",
+                    $t->ticket_number, $t->subject,
+                    $t->category || 'other', $t->priority || 'medium',
+                    $desc
+                );
+            }
+        }
+    };
+
+    my $base_url = $c->req->base || "http://workstation.local:3001";
+    $base_url =~ s{/$}{};
+
     return <<END_PROMPT;
 You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
 
@@ -7907,18 +7937,26 @@ CAPABILITIES:
    - Troubleshooting (loading issues, database errors, log analysis)
    - System Administration (Linux commands, server maintenance, backup and recovery)
 
-2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
-   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
-   /HelpDesk/ticket/new
+2. TICKET SEARCH: You can search existing tickets to find similar issues and their resolutions.
+   Call: GET $base_url/HelpDesk/api/search_tickets?q=KEYWORDS&limit=10
+   The response is JSON: { tickets: [{ ticket_number, subject, category, status, summary }] }
+   Use this to:
+   - Check if a reported issue has already been solved (reference the ticket number)
+   - Identify recurring problem patterns
+   - Find resolutions from previously closed tickets
+
+3. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket at: /HelpDesk/ticket/new
    Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
    and a description of the issue.
 
-3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+4. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
    frustration, suggest connecting with a live agent through the chat system or by visiting
    /HelpDesk/contact
-
+$recent_tickets_section
 GUIDELINES:
 - Be concise, friendly, and professional
+- Before answering, search tickets for similar issues — if found, mention the ticket number(s)
 - If you don't know the answer, say so clearly and suggest the ticket or live agent option
 - Always confirm you understood the user's issue before suggesting solutions
 - For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
