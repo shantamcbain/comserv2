@@ -210,7 +210,7 @@ sub hosting_cost_admin :Path('/hosting/cost') :Args(0) {
 
     unless ($c->session->{is_admin}) {
         $c->flash->{error_msg} = 'Admin access required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         $c->detach;
     }
 
@@ -266,7 +266,7 @@ sub setup_hosting :Path('/hosting/setup') :Args(0) {
 
     unless ($c->session->{is_admin}) {
         $c->flash->{error_msg} = 'Admin access required.';
-        $c->response->redirect($c->uri_for('/'));
+        $c->response->redirect($c->uri_for('/user/login'));
         $c->detach;
     }
 
