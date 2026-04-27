@@ -1317,11 +1317,11 @@ function dailyLogAction(action) {
     .then(function(r) { return r.json(); })
     .then(function(d) {
         if (d.success) {
-            feedback.textContent = d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
+            feedback.innerHTML = d.response || d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
             feedback.style.color = '#2a7a2a';
-            setTimeout(function() { window.location.reload(); }, 800);
+            setTimeout(function() { window.location.reload(); }, 2000);
         } else {
-            feedback.textContent = d.error || 'Error';
+            feedback.innerHTML = d.response || d.error || 'Error';
             feedback.style.color = '#9b0000';
             if (startBtn) startBtn.disabled = false;
             if (endBtn)   endBtn.disabled   = false;
