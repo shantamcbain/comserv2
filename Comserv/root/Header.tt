@@ -106,7 +106,10 @@
     <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
     [% END %]
 
-    <!-- Local SVG icon solution (no external dependencies) -->
+    <!-- FontAwesome for icons not covered by the SVG mask set -->
+    <link rel="stylesheet" type="text/css" href="/static/css/fontawesome/all.min.css">
+
+    <!-- Local SVG icon solution (overrides selected FA icons with themed SVGs) -->
     <link rel="stylesheet" type="text/css" href="/static/css/svg-icons.css">
 
     <!-- Fix for icons to respect theme colors -->

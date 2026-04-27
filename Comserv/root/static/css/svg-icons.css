@@ -3,41 +3,74 @@
  * Uses locally hosted SVG files for icons
  */
 
-/* Remove all emoji fallback content from icon elements */
-[class*="icon-"]::before,
-[class*="fas"]::before {
+/* Remove emoji/text fallback content from custom .icon-* elements only.
+   FontAwesome .fas::before glyphs are allowed through for icons without SVG overrides. */
+[class*="icon-"]::before {
   content: none !important;
 }
 
-/* Base icon class */
-.icon {
-  display: inline-block;
-  width: 1em;
-  height: 1em;
-  margin-right: 0.5em;
-  vertical-align: -0.125em;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
+/* Suppress FA glyph pseudo-elements for .fas classes that have SVG mask overrides below,
+   so only the SVG mask shape is visible (not both). */
+.fas.fa-3d::before, .fas.fa-accounts::before, .fas.fa-admin-links::before,
+.fas.fa-apply::before, .fas.fa-arrow-circle-left::before, .fas.fa-arrow-up::before,
+.fas.fa-book::before, .fas.fa-briefcase::before, .fas.fa-bug::before,
+.fas.fa-calendar::before, .fas.fa-calendar-alt::before, .fas.fa-calendar-week::before,
+.fas.fa-chalkboard-teacher::before, .fas.fa-chart-bar::before, .fas.fa-chart-line::before,
+.fas.fa-cloud::before, .fas.fa-code::before, .fas.fa-cog::before, .fas.fa-cogs::before,
+.fas.fa-concierge-bell::before, .fas.fa-contact::before, .fas.fa-credit-card::before,
+.fas.fa-css3::before, .fas.fa-database::before, .fas.fa-development::before,
+.fas.fa-docs::before, .fas.fa-download::before, .fas.fa-drive::before,
+.fas.fa-edit::before, .fas.fa-envelope::before, .fas.fa-envelope-open::before,
+.fas.fa-eye::before, .fas.fa-faq::before, .fas.fa-file::before, .fas.fa-file-alt::before,
+.fas.fa-file-archive::before, .fas.fa-file-audio::before, .fas.fa-file-code::before,
+.fas.fa-file-excel::before, .fas.fa-file-pdf::before, .fas.fa-file-powerpoint::before,
+.fas.fa-file-video::before, .fas.fa-file-word::before, .fas.fa-folder::before,
+.fas.fa-git::before, .fas.fa-globe::before, .fas.fa-globe-americas::before,
+.fas.fa-graduation-cap::before, .fas.fa-herb::before, .fas.fa-history::before,
+.fas.fa-home::before, .fas.fa-id-card::before, .fas.fa-image::before,
+.fas.fa-info::before, .fas.fa-it::before, .fas.fa-kb::before, .fas.fa-key::before,
+.fas.fa-link::before, .fas.fa-list::before, .fas.fa-list-ul::before,
+.fas.fa-network-wired::before, .fas.fa-palette::before, .fas.fa-plus::before,
+.fas.fa-production::before, .fas.fa-question-circle::before, .fas.fa-redo::before,
+.fas.fa-resources::before, .fas.fa-rocket::before, .fas.fa-search::before,
+.fas.fa-security::before, .fas.fa-server::before, .fas.fa-sign-in::before,
+.fas.fa-sign-in-alt::before, .fas.fa-sign-out::before, .fas.fa-sign-out-alt::before,
+.fas.fa-site::before, .fas.fa-sliders-h::before, .fas.fa-special::before,
+.fas.fa-status::before, .fas.fa-store::before, .fas.fa-sun::before,
+.fas.fa-support::before, .fas.fa-sync::before, .fas.fa-table::before,
+.fas.fa-tachometer::before, .fas.fa-tachometer-alt::before, .fas.fa-tasks::before,
+.fas.fa-terminal::before, .fas.fa-ticket::before, .fas.fa-toggle-off::before,
+.fas.fa-toggle-on::before, .fas.fa-tool::before, .fas.fa-tools::before,
+.fas.fa-trash::before, .fas.fa-trash-alt::before, .fas.fa-unlock::before,
+.fas.fa-upload::before, .fas.fa-user::before, .fas.fa-user-cog::before,
+.fas.fa-user-plus::before, .fas.fa-user-shield::before, .fas.fa-users::before,
+.fas.fa-wrench::before {
+  content: none !important;
 }
 
-/* Common styling for all icons */
-.icon, .fas {
+/* Base sizing/layout for custom .icon-* classes and any .fas with an SVG mask override.
+   .fas gets mask display properties so the specific .fas.fa-* overrides render correctly.
+   background-color is NOT set here globally — only the specific override rules set it. */
+.icon,
+.fas {
   display: inline-block;
   width: 1em;
   height: 1em;
   margin-right: 0.5em;
   vertical-align: -0.125em;
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: contain;
-  /* Use currentColor to inherit the text color */
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
   mask-position: center;
   -webkit-mask-size: contain;
   mask-size: contain;
+}
+
+/* .icon-* additionally uses background for the SVG mask colour */
+.icon {
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
   background-color: currentColor;
 }
 
