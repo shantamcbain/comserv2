@@ -468,6 +468,35 @@ sub log_with_details {
             )->first;
 
             unless ($existing) {
+                # Try to match the error's file/subroutine to a project.
+                # The file path (e.g. "Comserv/Controller/Todo.pm") and
+                # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")
+                # both carry the controller/module name which we can match
+                # against project_name or project_code in the Project table.
+                my $matched_project_id   = undef;
+                my $matched_project_code = 'system';
+                eval {
+                    my $search_term;
+                    if ($sub_name =~ /Controller::(\w+)/) {
+                        $search_term = $1;
+                    } elsif ($file && $file =~ m{/(\w+)\.pm$}i) {
+                        $search_term = $1;
+                    }
+                    if ($search_term && $search_term ne 'unknown') {
+                        my $proj = $c->model('DBEncy')->resultset('Project')->search(
+                            { -or => [
+                                { name         => { -like => "%$search_term%" } },
+                                { project_code => { -like => "%$search_term%" } },
+                            ]},
+                            { rows => 1 }
+                        )->first;
+                        if ($proj) {
+                            $matched_project_id   = $proj->id;
+                            $matched_project_code = $proj->project_code || 'system';
+                        }
+                    }
+                };
+
                 my %create_args = (
                     subject             => $todo_subject,
                     description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
@@ -486,10 +515,11 @@ sub log_with_details {
                     estimated_man_hours => 0,
                     accumulative_time   => '00:00:00',
                     group_of_poster     => 'admin',
-                    project_code        => 'system',
+                    project_code        => $matched_project_code,
                     share               => 0,
                 );
-                $create_args{user_id} = $uid if defined $uid;
+                $create_args{user_id}    = $uid                  if defined $uid;
+                $create_args{project_id} = $matched_project_id   if defined $matched_project_id;
                 $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
             }
         };
