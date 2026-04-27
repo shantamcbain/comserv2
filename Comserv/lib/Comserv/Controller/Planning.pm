@@ -515,9 +515,10 @@ sub daily :Path('/planning/daily') :Args {
         },
         open_log_entry => do {
             my $open;
+            my $_log_user = $c->session->{username} || '';
             eval {
                 my $row = $c->model('DBEncy')->resultset('Log')->search(
-                    { sitename => $sitename,
+                    { username => $_log_user,
                       abstract => { -like => "%Good Morning - Daily Log - $current_date_str%" },
                       status   => 2 },
                     { order_by => { -desc => 'id' }, rows => 1 }
