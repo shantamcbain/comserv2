@@ -1661,6 +1661,10 @@ sub site_setup {
     # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
 
+    # Test the configuration by generating a sample URL
+    my $test_url = $c->uri_for('/test');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
     # Primary attempt: lookup by SiteName (as provided)
