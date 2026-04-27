@@ -830,16 +830,14 @@ sub modify :Path('/todo/modify') :Args(1) {
 
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
-    
+
     if ($form_data->{return_to}) {
         $c->response->redirect($form_data->{return_to});
         $c->detach();
     }
-    
-    $c->stash(
-        record      => $todo,             # Provide updated data
-        template    => 'todo/details.tt',  # Redirect back to the form for review
-    );
+
+    $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+    $c->detach();
 }
 
 sub create :Local {
