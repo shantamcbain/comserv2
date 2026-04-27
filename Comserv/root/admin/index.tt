@@ -9,6 +9,23 @@
         [% END %]
     </div>
 
+    <nav class="admin-quick-nav">
+        <a href="#section-software"><i class="fas fa-cogs"></i> Software</a>
+        <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
+        <a href="#section-inventory"><i class="fas fa-boxes"></i> Inventory</a>
+        <a href="#section-customers"><i class="fas fa-users"></i> Customers</a>
+        <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
+        <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
+        <a href="#section-marketplace"><i class="fas fa-store"></i> Marketplace</a>
+        <a href="#section-database"><i class="fas fa-database"></i> Database</a>
+        <a href="#section-ai"><i class="fas fa-robot"></i> AI</a>
+        <a href="#section-environment"><i class="fas fa-cog"></i> Config</a>
+        <a href="#section-system"><i class="fas fa-tools"></i> System</a>
+        <a href="#section-infrastructure"><i class="fas fa-cloud"></i> Infrastructure</a>
+        <a href="#section-ency"><i class="fas fa-book"></i> ENCY</a>
+        <a href="#section-files"><i class="fas fa-folder-open"></i> Files</a>
+    </nav>
+
     [%# ── Persistent action-required banners ──────────────────────── %]
     [% IF pending_hosting > 0 %]
     <div style="background:#fff3cd;border:2px solid #e67e22;border-radius:8px;padding:1rem 1.4rem;margin-bottom:1.2rem;display:flex;justify-content:space-between;align-items:center;">
@@ -53,7 +70,7 @@
     [% END %]
 
     <!-- Software Management Status - Prominent Section -->
-    <div class="software-management-section theme-section">
+    <div id="section-software" class="software-management-section theme-section">
         <div class="section-header">
             <h2><i class="fas fa-cogs"></i> Software Management</h2>
             <div class="section-subtitle">Deploy, update, and manage your application</div>
@@ -77,41 +94,14 @@
                     </div>
                     [% IF software_status.git_status.commits_behind > 0 %]
                     <div class="status-item warning">
-                        <label>Behind Origin:</label>
+                        <label>Behind origin/main:</label>
                         <span class="value">[% software_status.git_status.commits_behind %] commit(s)</span>
                     </div>
                     [% END %]
                     [% IF software_status.git_status.has_uncommitted_changes %]
                     <div class="status-item warning">
                         <label>Uncommitted Changes:</label>
-                        <span class="value">Changes need to be committed</span>
-                    </div>
-                    [% END %]
-                    [% IF software_status.git_status.has_untracked_files %]
-                    <div class="status-item info">
-                        <label>Untracked Files:</label>
-                        <span class="value">[% software_status.git_status.untracked_files.size %] file(s) not in Git</span>
-                    </div>
-                    [% END %]
-                </div>
-            </div>
-
-            <div class="status-card service-status">
-                <div class="card-header">
-                    <i class="fas fa-server"></i>
-                    <h3>Starman Service</h3>
-                </div>
-                <div class="card-content">
-                    <div class="status-item">
-                        <label>Service Status:</label>
-                        <span class="value service-indicator [% software_status.starman_status.status_class %]">
-                            [% software_status.starman_status.is_active || 'Unknown' %]
-                        </span>
-                    </div>
-                    [% IF software_status.starman_status.uptime_info %]
-                    <div class="status-item">
-                        <label>Running Since:</label>
-                        <span class="value">[% software_status.starman_status.uptime_info %]</span>
+                        <span class="value">Yes</span>
                     </div>
                     [% END %]
                 </div>
@@ -120,35 +110,19 @@
 
         <!-- Action Buttons -->
         <div class="action-buttons">
-            <a href="[% c.uri_for('/admin/production_deploy') %]" class="btn btn-primary btn-large">
-                <i class="fas fa-rocket"></i>
+            <a href="[% c.uri_for('/admin/docker-containers') %]" class="btn btn-primary btn-large">
+                <i class="fas fa-docker"></i>
                 <div class="btn-content">
-                    <div class="btn-title">Production Deploy</div>
-                    <div class="btn-subtitle">Full deployment with backup & restart</div>
+                    <div class="btn-title">Docker Containers</div>
+                    <div class="btn-subtitle">Deploy &amp; manage containers</div>
                 </div>
             </a>
-            
+
             <a href="[% c.uri_for('/admin/git_pull') %]" class="btn btn-secondary">
                 <i class="fas fa-download"></i>
                 <div class="btn-content">
                     <div class="btn-title">Git Pull</div>
-                    <div class="btn-subtitle">Update code only</div>
-                </div>
-            </a>
-            
-            <a href="[% c.uri_for('/admin/restart_starman') %]" class="btn btn-warning">
-                <i class="fas fa-redo"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Restart Service</div>
-                    <div class="btn-subtitle">Restart Starman only</div>
-                </div>
-            </a>
-
-            <a href="[% c.uri_for('/admin/docker-containers') %]" class="btn btn-info">
-                <i class="fas fa-docker"></i>
-                <div class="btn-content">
-                    <div class="btn-title">Docker Containers</div>
-                    <div class="btn-subtitle">Manage Docker containers</div>
+                    <div class="btn-subtitle">Pull from origin/main</div>
                 </div>
             </a>
         </div>
@@ -179,7 +153,7 @@
 
     <!-- Traditional Admin Sections -->
     <div class="admin-sections">
-        <div class="admin-section theme-section">
+        <div id="section-inventory" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
             </div>
@@ -241,7 +215,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-customers" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-users"></i> Customers</h3>
             </div>
@@ -277,7 +251,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-membership" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-id-card"></i> Membership</h3>
             </div>
@@ -318,7 +292,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-shop" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-shopping-bag"></i> Shop &amp; eCommerce</h3>
             </div>
@@ -348,7 +322,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-marketplace" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-store"></i> Marketplace</h3>
             </div>
@@ -374,7 +348,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-database" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-database"></i> Database Management</h3>
             </div>
@@ -400,7 +374,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-ai" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-robot"></i> AI Configuration</h3>
             </div>
@@ -414,7 +388,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-environment" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-cog"></i> Environment Configuration</h3>
             </div>
@@ -436,7 +410,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-system" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-tools"></i> System Management</h3>
             </div>
@@ -478,7 +452,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-infrastructure" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-cloud"></i> Infrastructure</h3>
             </div>
@@ -504,7 +478,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-ency" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-book"></i> Encyclopedia (ENCY)</h3>
             </div>
@@ -530,7 +504,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-helpdesk" class="admin-section theme-section">
             <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
                 <h3><i class="fas fa-life-ring"></i> HelpDesk</h3>
                 [% IF helpdesk_open_count > 0 %]
@@ -593,7 +567,7 @@
             </div>
         </div>
 
-        <div class="admin-section theme-section">
+        <div id="section-files" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-folder-open"></i> File Management</h3>
             </div>
@@ -721,8 +695,33 @@
 }
 
 .dashboard-header {
-    margin-bottom: 30px;
+    margin-bottom: 10px;
     text-align: center;
+}
+
+.admin-quick-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 10px 0 18px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border-color, #ccc);
+}
+.admin-quick-nav a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 14px;
+    background: var(--nav-bg, rgba(0,0,0,0.1));
+    color: var(--nav-text, var(--text-color, #333));
+    text-decoration: none;
+    font-size: 0.82em;
+    border: 1px solid var(--border-color, #ccc);
+    white-space: nowrap;
+}
+.admin-quick-nav a:hover {
+    background: var(--button-hover-bg, #e0e0e0);
 }
 
 .dashboard-header h1 {
