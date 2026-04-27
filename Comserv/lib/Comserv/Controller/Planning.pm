@@ -524,7 +524,16 @@ sub daily :Path('/planning/daily') :Args {
                       status   => 2 },
                     { order_by => { -desc => 'record_id' }, rows => 1 }
                 )->first;
-                $open = { $row->get_columns } if $row;
+                if ($row) {
+                    my %cols = $row->get_columns;
+                    my $det = $cols{details} || '';
+                    if ($det =~ /Notes:\n(.*)$/s) {
+                        $cols{notes_only} = $1;
+                    } else {
+                        $cols{notes_only} = '';
+                    }
+                    $open = \%cols;
+                }
             };
             $open;
         },
@@ -922,6 +931,7 @@ sub update_log_entry :Path('/planning/update_log_entry') :Args(0) {
     my $entry_id    = $c->req->param('entry_id')    || 0;
     my $title       = $c->req->param('title')       // '';
     my $description = $c->req->param('description') // '';
+    my $notes_only  = $c->req->param('notes_only')  || 0;
 
     unless ($entry_id) {
         $c->response->status(400);
@@ -945,7 +955,21 @@ sub update_log_entry :Path('/planning/update_log_entry') :Args(0) {
         return;
     }
 
-    eval { $entry->update({ abstract => $title, details => $description }) };
+    my %update = ();
+    $update{abstract} = $title if length($title);
+
+    if ($notes_only) {
+        my $existing = $entry->details || '';
+        if ($existing =~ s/Notes:\n.*$/Notes:\n$description/s) {
+            $update{details} = $existing;
+        } else {
+            $update{details} = $existing . "\nNotes:\n$description";
+        }
+    } else {
+        $update{details} = $description;
+    }
+
+    eval { $entry->update(\%update) };
     if ($@) {
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Update failed: $@" }));
