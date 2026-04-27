@@ -65,35 +65,53 @@ sub login :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 'Accessing login page');
 
     # Determine the page to return to after login.
-    # Priority: return_to param > destination param (used by Admin.pm) > HTTP Referer
-    my $return_to = $c->req->param('return_to')
-                 || $c->req->param('destination')
-                 || $c->req->referer
-                 || $c->uri_for('/');
-    my $referer = $return_to;
+    # Priority: explicit return_to param > destination param > HTTP Referer > existing session referer > /
+    # NOTE: Only overwrite the session referer when we have an explicit value.
+    # This ensures a controller that redirects to /user/login without return_to still
+    # returns the user to the right place (the session referer set before the redirect).
+    my $is_local_url = sub {
+        my $url = shift || '';
+        return ($url =~ m{^/} && $url !~ m{^//} && $url !~ m{[<>"'\0]}) ? 1 : 0;
+    };
 
-    # Don't store the login or registration pages as the referer
-    if ($referer !~ m{/user/login} && $referer !~ m{/login} && $referer !~ m{/do_login} &&
-        $referer !~ m{/user/register} && $referer !~ m{/user/do_create_account} &&
-        $referer !~ m{/user/verify_email} && $referer !~ m{/user/complete_profile}) {
-        $c->session->{referer} = $referer;
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Stored referer in session: $referer");
-    } else {
-        # Clear session referer if it's a login/registration page, and default to home page
-        if (!$c->session->{referer} || 
-            $c->session->{referer} =~ m{/user/login} || 
-            $c->session->{referer} =~ m{/user/register} ||
-            $c->session->{referer} =~ m{/user/do_create_account} ||
-            $c->session->{referer} =~ m{/user/verify_email} ||
-            $c->session->{referer} =~ m{/user/complete_profile}) {
-            $c->session->{referer} = $c->uri_for('/');
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
-                "Cleared registration/login referer, using home page");
-        } else {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', 
-                "Using existing valid session referer: " . $c->session->{referer});
-        }
+    my $raw_return = $c->req->param('return_to')
+                  || $c->req->param('destination')
+                  || '';
+    my $http_referer = $c->req->referer || '';
+
+    my $explicit_return = '';
+    if ($raw_return && $is_local_url->($raw_return)) {
+        $explicit_return = $raw_return;
+    } elsif ($http_referer && $is_local_url->($http_referer)) {
+        $explicit_return = $http_referer;
     }
+
+    my @login_patterns = (
+        qr{/user/login}, qr{/login}, qr{/do_login},
+        qr{/user/register}, qr{/user/do_create_account},
+        qr{/user/verify_email}, qr{/user/complete_profile},
+    );
+    my $is_login_url = sub {
+        my $url = shift || '';
+        return grep { $url =~ $_ } @login_patterns;
+    };
+
+    if ($explicit_return && !$is_login_url->($explicit_return)) {
+        $c->session->{referer} = $explicit_return;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
+            "Stored explicit referer in session: $explicit_return");
+    } elsif ($c->session->{referer} && !$is_login_url->($c->session->{referer})) {
+        # Keep existing valid session referer (e.g. set by a controller that redirected to login)
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
+            "Keeping existing session referer: " . $c->session->{referer});
+    } else {
+        # No usable referer anywhere — fall back to home page
+        $c->session->{referer} = $c->uri_for('/');
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login',
+            "No valid referer found, using home page");
+    }
+
+    my $referer = $explicit_return || '';
 
     # Clear any error messages
     $c->stash->{error_msg} = undef;
@@ -111,7 +129,8 @@ sub login :Local {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'login', "Session referer: " . ($c->session->{referer} || 'undefined'));
 
     # Store the referer in the stash for the template
-    $c->stash->{return_to} = $c->session->{referer};
+    my $return_to = $c->session->{referer} // '';
+    $c->stash->{return_to} = $return_to;
     
     # Check if admin access is required (from URL parameter)
     my $admin_required = $c->req->param('admin_required');
@@ -198,11 +217,15 @@ sub do_login :Local {
             "Using return_to parameter for redirect: $redirect_path"
         );
     } else {
-        # Fall back to session referer
-        $redirect_path = $c->session->{referer} || '/';
+        my $sess_ref = $c->session->{referer} || '';
+        if ($sess_ref =~ m{^/} && $sess_ref !~ m{^//} && $sess_ref !~ m{[<>"'\0]}) {
+            $redirect_path = $sess_ref;
+        } else {
+            $redirect_path = '/';
+        }
         $self->logging->log_with_details(
             $c, 'info', __FILE__, __LINE__, 'do_login',
-            "Using session referer for redirect: " . ($c->session->{referer} || 'undefined')
+            "Using session referer for redirect: $redirect_path"
         );
     }
 
@@ -349,6 +372,12 @@ sub do_login :Local {
                     "Could not auto-activate account: $@");
             }
         }
+
+        # Rotate the session ID on successful login to discard any stale/corrupted
+        # pre-login session data and prevent session fixation attacks.
+        eval { $c->change_session_id() };
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_login',
+            "Session rotated for user '$username'" . ($@ ? " (change_session_id not available: $@)" : ''));
 
         # Store additional session data for backward compatibility
         $c->session->{username} = $user->username;

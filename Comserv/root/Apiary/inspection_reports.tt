@@ -1,0 +1,215 @@
+[% META title = "Inspection Reports" %]
+[% PageVersion = 'Apiary/inspection_reports.tt,v 0.01 2026/04/21 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1><i class="fas fa-chart-bar"></i> Inspection Reports</h1>
+        <p class="page-subtitle">Seasonal summary for [% report_year %]</p>
+    </div>
+
+    <div class="feature-actions">
+        <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">
+            <i class="fas fa-arrow-left"></i> Back to Inspections
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/new') %]" class="btn btn-primary">
+            <i class="fas fa-plus"></i> New Inspection
+        </a>
+        <a href="[% c.uri_for('/Apiary/inspections/calendar') %]" class="btn btn-info">
+            <i class="fas fa-calendar"></i> Calendar View
+        </a>
+        <form method="GET" action="[% c.uri_for('/Apiary/inspections/reports') %]" class="inline-form">
+            <select name="year" class="form-input" onchange="this.form.submit()">
+                [% USE date %]
+                [% current_year = date.format(date.now, '%Y') %]
+                [% FOREACH y IN [current_year - 2 .. current_year] %]
+                    <option value="[% y %]" [% IF y == report_year %]selected[% END %]>[% y %]</option>
+                [% END %]
+            </select>
+        </form>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <!-- Inspections by Month -->
+            <div class="app-section">
+                <h2><i class="fas fa-calendar-alt"></i> Inspections by Month</h2>
+                <div class="content-section">
+                    [% months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %]
+                    [% IF by_month && by_month.keys.size %]
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        [% FOREACH mon IN months %]
+                                            <th>[% mon %]</th>
+                                        [% END %]
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr>
+                                        [% FOREACH i IN [1..12] %]
+                                            [% mon_key = i < 10 ? "0$i" : "$i" %]
+                                            [% count = by_month.$mon_key || 0 %]
+                                            <td class="[% count > 0 ? 'cell-active' : 'cell-empty' %]">
+                                                [% count %]
+                                            </td>
+                                        [% END %]
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        [% max_count = 1 %]
+                        [% FOREACH k IN by_month.keys %]
+                            [% v = by_month.$k %]
+                            [% IF v > max_count %][% max_count = v %][% END %]
+                        [% END %]
+                        <div class="chart-bar-group">
+                            [% FOREACH i IN [1..12] %]
+                                [% mon_key = i < 10 ? "0$i" : "$i" %]
+                                [% count = by_month.$mon_key || 0 %]
+                                [% pct = max_count > 0 ? (count / max_count * 100) : 0 %]
+                                [% idx = i - 1 %]
+                                <div class="chart-bar-col">
+                                    <div class="chart-bar-fill" style="height: [% pct %]%;"
+                                         title="[% months.$idx %]: [% count %] inspection(s)"></div>
+                                    <div class="chart-bar-label">[% months.$idx %]</div>
+                                </div>
+                            [% END %]
+                        </div>
+                    [% ELSE %]
+                        <div class="empty-state">
+                            <p>No inspection data for [% report_year %].</p>
+                        </div>
+                    [% END %]
+                </div>
+            </div>
+
+            <div class="feature-grid">
+
+                <!-- Inspections by Type -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-tag feature-icon"></i> By Inspection Type</h3>
+                    </div>
+                    <div class="feature-content">
+                        [% IF by_type && by_type.keys.size %]
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH type IN by_type.keys.sort %]
+                                            <tr>
+                                                <td>[% type.replace('_', ' ') | ucfirst %]</td>
+                                                <td>[% by_type.$type %]</td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        [% ELSE %]
+                            <p class="info-text">No data available.</p>
+                        [% END %]
+                    </div>
+                </div>
+
+                <!-- Inspections by Status -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-heartbeat feature-icon"></i> By Overall Status</h3>
+                    </div>
+                    <div class="feature-content">
+                        [% IF by_status && by_status.keys.size %]
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Status</th>
+                                            <th>Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH status IN by_status.keys.sort %]
+                                            <tr>
+                                                <td>
+                                                    <span class="status-badge status-[% status %]">
+                                                        [% status | ucfirst %]
+                                                    </span>
+                                                </td>
+                                                <td>[% by_status.$status %]</td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        [% ELSE %]
+                            <p class="info-text">No data available.</p>
+                        [% END %]
+                    </div>
+                </div>
+
+                <!-- Action Items -->
+                <div class="feature-card">
+                    <div class="feature-header">
+                        <h3><i class="fas fa-exclamation-triangle feature-icon"></i> Inspections with Action Required</h3>
+                    </div>
+                    <div class="feature-content">
+                        [% IF action_items && action_items.size %]
+                            <div class="table-container">
+                                <table class="data-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Status</th>
+                                            <th>Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        [% FOREACH item IN action_items %]
+                                            <tr>
+                                                <td>
+                                                    <a href="[% c.uri_for('/Apiary/inspections/view', [item.id]) %]">
+                                                        [% item.inspection_date %]
+                                                    </a>
+                                                </td>
+                                                <td>
+                                                    <span class="status-badge status-[% item.overall_status %]">
+                                                        [% item.overall_status | ucfirst %]
+                                                    </span>
+                                                </td>
+                                                <td>[% item.action_required | html | truncate(60) %]</td>
+                                            </tr>
+                                        [% END %]
+                                    </tbody>
+                                </table>
+                            </div>
+                        [% ELSE %]
+                            <p class="info-text">No outstanding action items for [% report_year %].</p>
+                        [% END %]
+                    </div>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% c.uri_for('/Apiary/inspections') %]" class="btn btn-secondary">Back to Inspections</a>
+            <a href="[% c.uri_for('/Apiary') %]" class="btn btn-secondary">Apiary Home</a>
+        </div>
+    </div>
+
+</div>
+

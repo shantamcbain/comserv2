@@ -125,7 +125,7 @@
     }
     
     .back-link {
-        background-color: #6c757d;
+        background-color: var(--text-muted-color, #6c757d);
         color: white;
     }
     
@@ -146,7 +146,7 @@
     }
     
     .upload-instructions {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 15px;
         border-left: 4px solid #17a2b8;
         margin-bottom: 20px;
@@ -164,28 +164,28 @@
         display: block;
         margin-bottom: 8px;
         font-weight: bold;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .form-group input[type="file"] {
         width: 100%;
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
     }
     
     .form-group input[type="text"],
     .form-group textarea {
         width: 100%;
         padding: 10px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
     }
     
     .help-text {
         font-size: 0.85em;
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         margin-top: 4px;
     }
     
@@ -197,7 +197,7 @@
     }
     
     .submit-button {
-        background-color: #28a745;
+        background-color: var(--success-color, #28a745);
         color: white;
         border: none;
         padding: 12px 20px;
@@ -211,7 +211,7 @@
     }
     
     .cancel-link {
-        color: #6c757d;
+        color: var(--text-muted-color, #6c757d);
         text-decoration: none;
     }
     

@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "templates"
-   page_version = "0.06"
-   last_updated = "Mon Apr 13 2026"
+   page_version = "0.07"
+   last_updated = "Tue Apr 22 2026"
    site_specific = "false"
 %]
 # all links must be Documentation/DocumentationTemplate format
@@ -205,7 +205,64 @@ THEME COMPLIANCE NOTES FOR DEVELOPERS:
 
 This template is fully theme-compliant using the actual Comserv theme system:
 
-1. **CSS Variables Used**: All styling uses CSS custom properties from base.css:
+1. **Canonical CSS Variables** (defined in static/css/base.css — use ONLY these names):
+
+   COLOURS:
+   --primary-color        Brand primary; nav bars, headings           default: #ccffff
+   --secondary-color      Muted secondary surfaces                    default: #f9f9f9
+   --accent-color         Highlight / call-to-action                  default: #FF9900
+   --text-color           Body text and headings                      default: #000000
+   --background-color     Page background solid colour                default: #ffffff
+   --link-color           Hyperlink colour                            default: #0000FF
+   --link-hover-color     Hyperlink hover colour                      default: #000099
+   --border-color         Borders and dividers                        default: #cccccc
+   --table-header-bg      Table <th> and card header background       default: #f2f2f2
+   --success-color        Success / positive state                    default: #009900
+   --warning-color        Warning / danger / error state              default: #ff0000
+   --info-color           Informational highlights                    default: #17a2b8
+   --caution-color        Caution / staging-environment (amber)       default: #ffc107
+   --light-color          Very light neutral surface                  default: #f8f9fa
+   --text-muted-color     De-emphasised / secondary text (canonical)  default: #6c757d
+   --text-muted           Alias → --text-muted-color (compat only)
+
+   BACKGROUND / ALIASES:
+   --background-image     Optional background-image URL               default: none
+   --bg-color             Alias → --background-color
+   --bg-secondary         Alias → --secondary-color
+   --card-bg              Alias → --table-header-bg
+
+   NAVIGATION:
+   --nav-bg               Nav bar background   → --primary-color
+   --nav-text             Nav bar text colour  → --text-color
+   --nav-hover-bg         Nav item hover bg    default: rgba(0,0,0,0.1)
+
+   TYPOGRAPHY:
+   --header-font          Heading font stack   default: Verdana, Helvetica, sans-serif
+   --body-font            Body font stack      default: Verdana, Helvetica, sans-serif
+   --font-size-base       Base font size       default: 16px
+   --font-size-small      Small text           default: 14px
+   --font-size-large      Large sub-heading    default: 20px
+   --font-size-xlarge     Extra-large / hero   default: 24px
+
+   SPACING & LAYOUT:
+   --spacing-small        Compact pad/gap      default: 0.5rem
+   --spacing-medium       Standard pad/gap     default: 1rem
+   --spacing-large        Section pad/gap      default: 2rem
+   --container-width      Max page width       default: 1200px
+
+   BUTTONS:
+   --button-bg            Button background    default: #f2f2f2
+   --button-text          Button text colour   default: #000000
+   --button-border        Button border        default: #cccccc
+   --button-hover-bg      Button hover bg      default: #e0e0e0
+
+   NAMING RULES:
+   - Use canonical names in all new CSS. --text-muted alias is backward-compat only.
+   - Never hardcode colours in .tt inline styles; always use var(--name, fallback).
+   - Site-specific vars (--bee-yellow etc.) belong in the site's theme file only.
+   - Admin-component vars belong in admin.css, delegating to canonical vars.
+
+   CSS Variables Used in this template:
    - --text-color, --background-color, --primary-color, --secondary-color
    - --header-font, --body-font, --font-size-* variables
    - --spacing-small, --spacing-medium, --spacing-large for consistent spacing

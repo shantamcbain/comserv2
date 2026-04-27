@@ -61,37 +61,37 @@
         <h3>Comparison</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             <thead>
-                <tr style="background-color: #f5f5f5;">
-                    <th style="padding: 10px; border: 1px solid #ddd;">Feature</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/result (Form)</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/chat (New) - BEFORE</th>
-                    <th style="padding: 10px; border: 1px solid #ddd;">/ai/chat (New) - AFTER</th>
+                <tr style="background-color: var(--bg-secondary, #f5f5f5);">
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Feature</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">/ai/result (Form)</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">/ai/chat (New) - BEFORE</th>
+                    <th style="padding: 10px; border: 1px solid var(--border-color, #ddd);">/ai/chat (New) - AFTER</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves Conversation</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Saves Conversation</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves User Message</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Saves User Message</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Saves AI Response</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">❌ No</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Saves AI Response</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ No</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ Yes</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>Returns conversation_id</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ In stash</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">❌ Not available</td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">✅ In JSON</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Returns conversation_id</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ In stash</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">❌ Not available</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">✅ In JSON</td>
                 </tr>
             </tbody>
         </table>
@@ -166,25 +166,25 @@ try {
 
         <h3>AiConversation Record</h3>
         <table style="width: 100%; border-collapse: collapse; margin: 10px 0;">
-            <tr style="background-color: #f5f5f5;">
-                <th style="padding: 8px; border: 1px solid #ddd;">Field</th>
-                <th style="padding: 8px; border: 1px solid #ddd;">Value</th>
+            <tr style="background-color: var(--bg-secondary, #f5f5f5);">
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Field</th>
+                <th style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Value</th>
             </tr>
             <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>user_id</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">Current user's ID from session</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>user_id</strong></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">Current user's ID from session</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>title</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">First 80 chars of user prompt</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>title</strong></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">First 80 chars of user prompt</td>
             </tr>
             <tr>
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>status</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">'active'</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>status</strong></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">'active'</td>
             </tr>
             <tr style="background-color: #f9f9f9;">
-                <td style="padding: 8px; border: 1px solid #ddd;"><strong>created_at</strong></td>
-                <td style="padding: 8px; border: 1px solid #ddd;">CURRENT_TIMESTAMP (automatic)</td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);"><strong>created_at</strong></td>
+                <td style="padding: 8px; border: 1px solid var(--border-color, #ddd);">CURRENT_TIMESTAMP (automatic)</td>
             </tr>
         </table>
 

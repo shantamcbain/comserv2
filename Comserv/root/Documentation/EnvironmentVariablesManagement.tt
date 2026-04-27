@@ -58,7 +58,7 @@ needing SSH or direct file system access.</p>
     <li>Port and network configuration</li>
 </ul>
 
-<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Important:</strong> Changes to <code>.env</code> take effect only after a server or container
     restart. The page displays a reminder when you save a variable.
 </div>
@@ -145,12 +145,12 @@ needing SSH or direct file system access.</p>
     <li>Click <strong>"Save"</strong></li>
 </ol>
 
-<div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: #d4edda; border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>✅ Naming convention:</strong> Use ALL_CAPS_WITH_UNDERSCORES for environment variable keys.
     This is the standard Unix convention and ensures compatibility.
 </div>
 
-<div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Restart required:</strong> The new variable will not be active until the
     server or Docker container is restarted.
 </div>
@@ -193,7 +193,7 @@ blank, it will save as blank. The system does not retain and re-use the previous
     <li>The variable is immediately removed from the <code>.env</code> file</li>
 </ol>
 
-<div style="background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: #f8d7da; border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Warning:</strong> Deletion is immediate and not reversible through the UI.
     If you need to recover a deleted variable, use the exported backup <code>.env</code> file
     (see <a href="#exporting">Exporting</a> below) or check the server's backup directory.
@@ -276,7 +276,7 @@ Domain: workstation.local | Client IP: 127.0.0.1 | Server: workshops-7d21 (192.1
     <li><strong>Running directly (not in Docker):</strong> Not needed — auto-detection works correctly</li>
 </ul>
 
-<div style="background: #d4edda; border: 1px solid #28a745; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: #d4edda; border: 1px solid var(--success-color, #28a745); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>✅ Tip:</strong> Both <code>docker-compose.dev.yml</code> and <code>docker-compose.prod.yml</code>
     are configured to pass <code>CATALYST_SERVER_IP</code> from the host's <code>.env</code> file into
     the container automatically. You only need to set it once in the <code>.env</code> file on each host.
@@ -337,7 +337,7 @@ container at startup.</p>
     </tbody>
 </table>
 
-<div style="background: #cce5ff; border: 1px solid #007bff; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: #cce5ff; border: 1px solid var(--primary-color, #007bff); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>ℹ️ Note:</strong> Container names differ between servers. On the workstation the running
     container may be named <code>comserv2-web-1</code>, while on production it is
     <code>comserv2-web-prod</code>. Container names are set in the docker-compose file and do not
@@ -428,7 +428,7 @@ supervisorctl restart comserv-server
         application log at INFO level with the acting administrator's identity.</li>
 </ul>
 
-<div style="background: #f8d7da; border: 1px solid #dc3545; border-radius: 4px; padding: 10px; margin-top: 10px;">
+<div style="background: #f8d7da; border: 1px solid var(--danger-color, #dc3545); border-radius: 4px; padding: 10px; margin-top: 10px;">
     <strong>⚠️ Production warning:</strong> Editing environment variables on a live production server
     requires a container or service restart, which causes a brief outage. Plan changes during
     maintenance windows when possible.

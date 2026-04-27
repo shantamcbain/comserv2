@@ -7,50 +7,58 @@
 
 <!-- Hosted menu -->
 <li class="horizontal-dropdown">
-    <a href="/CSC/hosting" class="dropbtn"><i class="icon-hosted"></i>Hosted</a>
+    <a href="/hosted" class="dropbtn"><i class="icon-hosted"></i>Hosted</a>
     <div class="dropdown-content">
         <!-- Core Hosted Services -->
-        <a href="/CSC/hosting" class="menu-item"><i class="icon-home"></i>Hosted Services</a>
-        <a href="/hosting_signup" class="menu-item"><i class="icon-apply"></i>Apply for Hosted Account</a>
-        <a href="/CSC/hosting" class="menu-item"><i class="icon-accounts"></i>Hosted Accounts</a>
+        <a href="/hosted" class="menu-item"><i class="icon-home"></i>My Hosting</a>
+        <a href="/hosting_signup" class="menu-item"><i class="icon-apply"></i>Apply for Hosting</a>
         <a href="/marketplace?type=job&q=hosting" class="menu-item"><i class="icon-marketplace"></i>Hosting on Marketplace</a>
-        
+
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
         <a href="/navigation/add_link?menu=Hosted" class="menu-item"><i class="icon-add"></i>Add Hosted Link</a>
         [% END %]
-        
-        <!-- Production Hosted Sites -->
+
+        <!-- Hosted sites from database (SiteDomain table) -->
+        [% SET hosted_sites = [] %]
+        [% TRY %]
+        [% SET hosted_sites = c.model('DBEncy').resultset('SiteDomain').search({}, { order_by => 'domain' }).all %]
+        [% CATCH %][% END %]
+        [% IF hosted_sites.size %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-production"></i>Production Sites</span>
+            <span class="submenu-header"><i class="icon-production"></i>Hosted Sites</span>
             <div class="submenu">
-                <a href="https://shamanbotanicals.ca" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>shamanbotanicals.ca
+                [% TRY %]
+                [% FOREACH sd IN hosted_sites %]
+                <a href="https://[% sd.domain | html %]" target="_blank" class="submenu-link">
+                    <i class="icon-site"></i>[% sd.domain | html %]
                 </a>
-                <a href="https://3d.usbm.ca" target="_blank" class="submenu-link">
-                    <i class="icon-3d"></i>3D Printing (USBM)
-                </a>
-                <a href="https://ve7tit.com" target="_blank" class="submenu-link">
-                    <i class="icon-site"></i>ve7tit.com
-                </a>
-                <a href="https://altpowerstore.com" target="_blank" class="submenu-link">
-                    <i class="icon-store"></i>altpowerstore.com
-                </a>
+                [% END %]
+                [% CATCH %][% END %]
             </div>
         </div>
-        
-        <!-- Development/Local Sites -->
+        [% END %]
+
+        <!-- Active HostingAccounts from DB -->
+        [% SET ha_list = [] %]
+        [% TRY %]
+        [% SET ha_list = c.model('DBEncy').resultset('HostingAccount').search({ status => 'active' }, { order_by => 'sitename' }).all %]
+        [% CATCH %][% END %]
+        [% IF ha_list.size %]
+        <div class="dropdown-divider"></div>
         <div class="submenu-item">
-            <span class="submenu-header"><i class="icon-development"></i>Development Sites</span>
+            <span class="submenu-header"><i class="icon-accounts"></i>Active Hosted Accounts</span>
             <div class="submenu">
-                <a href="https://3d.local:3000" target="_blank" class="submenu-link">
-                    <i class="icon-3d"></i>3D Printing (Local)
+                [% FOREACH ha IN ha_list %]
+                <a href="[% IF ha.domain %]http://[% ha.domain | html %][% ELSE %]#[% END %]" target="_blank" class="submenu-link">
+                    <i class="icon-site"></i>[% ha.sitename | html %][% IF ha.domain %] — [% ha.domain | html %][% END %]
                 </a>
-                <!-- Add more development sites here -->
+                [% END %]
             </div>
         </div>
-        
+        [% END %]
+
         <!-- Public Hosted Links from database -->
         [% SET hosted_db_links = c.stash.dbi.query("SELECT * FROM internal_links_tb WHERE category = 'Hosted_links' AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
         [% IF hosted_db_links.size %]
@@ -139,6 +147,8 @@
         
         [% IF c.stash.is_admin || c.session.roles.grep('admin').size %]
         <div class="dropdown-divider"></div>
+        <a href="/accounts" class="menu-item"><i class="icon-accounts"></i>All Hosting Accounts</a>
+        <a href="/hosting/cost" class="menu-item"><i class="icon-settings"></i>Hosting Cost Config</a>
         <a href="/hosting" class="menu-item"><i class="icon-server"></i>NPM Proxy Manager</a>
         <a href="/admin/marketplace" class="menu-item"><i class="icon-admin"></i>Manage Marketplace</a>
         <a href="/navigation/manage_links?menu=Hosted" class="menu-item"><i class="icon-manage"></i>Manage Hosted Menu</a>

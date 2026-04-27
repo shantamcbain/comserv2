@@ -452,7 +452,7 @@ spec:
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Security Best Practices</h3>
-            <div style="background-color: #fff3cd; color: #856404; padding: var(--spacing-medium); border: 1px solid #ffeeba; border-radius: 4px; margin: var(--spacing-medium) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); color: #856404; padding: var(--spacing-medium); border: 1px solid #ffeeba; border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <p style="margin: 0; font-family: var(--body-font);"><strong>✓ Do's:</strong></p>
                 <ul style="margin: 5px 0; padding-left: 20px;">
                     <li>Store credentials in environment variables</li>

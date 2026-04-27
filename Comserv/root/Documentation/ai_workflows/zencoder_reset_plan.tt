@@ -25,7 +25,7 @@
     <div style="background-color: var(--warning-color); padding: 10px; margin: 15px 0; border-left: 4px solid var(--danger-color);">
         <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong style="color: var(--danger-color);">📌 IMPORTANT:</strong> This document describes a reset/consolidation plan. <strong>The plan was substantially completed on Dec 31, 2025.</strong> Current Zencoder configuration is now consolidated in /.zencoder/coding-standards.yaml (v1.0-STABLE). Read that file and repo.md for current state.</p>
     </div>
-    <div style="background-color: #d4edda; border-left: 4px solid #28a745; padding: 15px; margin: 15px 0;">
+    <div style="background-color: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 15px; margin: 15px 0;">
         <h3 style="margin-top: 0; color: #155724;">✅ Jan 2, 2026 - Compliance Improvements Applied</h3>
         <p style="margin: 5px 0; color: #155724;"><strong>Multi-File Safety Protocol:</strong> Added explicit /updateprompt checkpoints before each file edit in multi-file operations. Prevents token exhaustion during infrastructure updates.</p>
         <p style="margin: 5px 0; color: #155724;"><strong>Main Agent Workflow Improvements:</strong> Updated Main Agent spec to enforce /updateprompt as FIRST action, implement PATH A/B/C pattern, and mark compliance as MANDATORY (not advisory).</p>

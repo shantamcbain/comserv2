@@ -102,6 +102,11 @@ __PACKAGE__->add_columns(
         size => 100,
         is_nullable => 1,
     },
+    treatment_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → treatments — structured treatment record applied during this inspection',
+    },
     notes => {
         data_type => 'text',
         is_nullable => 1,
@@ -133,6 +138,13 @@ __PACKAGE__->belongs_to(
     'frame',
     'Comserv::Model::Schema::Ency::Result::HiveFrame',
     'frame_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
+);
+
+__PACKAGE__->belongs_to(
+    'treatment',
+    'Comserv::Model::Schema::Ency::Result::Treatment',
+    'treatment_id',
     { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 

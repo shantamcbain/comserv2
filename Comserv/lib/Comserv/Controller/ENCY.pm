@@ -706,7 +706,11 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
         if ($ok) {
-            $c->flash->{success_msg} = 'Herb added successfully';
+            my $new_id = $result->record_id;
+            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
+            my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
+            my $todo_msg = $unresolved   ? " $unresolved term(s) logged as todos." : '';
+            $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
             $c->res->redirect($c->uri_for($self->action_for('index')));
         } else {
             $c->stash(

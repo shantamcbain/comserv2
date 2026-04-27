@@ -83,14 +83,14 @@
     
     .option-card {
         flex: 1 1 250px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .option-card h3 {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         margin-top: 0;
     }
     
@@ -103,17 +103,17 @@
     }
     
     .btn-primary {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
     }
     
     .btn-success {
-        background-color: #28a745;
+        background-color: var(--success-color, #28a745);
         color: white;
     }
     
     .option-card-ai {
-        border-left: 4px solid #28a745;
+        border-left: 4px solid var(--success-color, #28a745);
     }
 
     .option-card-admin {

@@ -26,7 +26,7 @@
     .form-group textarea {
         width: 100%;
         padding: 8px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
     }
 
@@ -207,9 +207,9 @@
         <div class="form-group">
             <label for="status">Status:</label>
             <select id="status" name="status" required>
-                <option value="1" [% IF record.get_column('status') == 1 %]selected[% END %]>NEW</option>
-                <option value="2" [% IF record.get_column('status') == 2 %]selected[% END %]>IN PROGRESS</option>
-                <option value="3" [% IF record.get_column('status') == 3 %]selected[% END %]>DONE</option>
+                <option value="1" [% IF current_status == 1 %]selected[% END %]>NEW</option>
+                <option value="2" [% IF current_status == 2 %]selected[% END %]>IN PROGRESS</option>
+                <option value="3" [% IF current_status == 3 %]selected[% END %]>DONE</option>
             </select>
         </div>
         

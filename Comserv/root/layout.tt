@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+[% IF no_wrapper %][% content %][% RETURN %][% END %]<!DOCTYPE html>
 <!-- File: /home/shanta/PycharmProjects/comserv/Comserv/root/layout.tt -->
 <html data-debug-mode="[% c.session.debug_mode || 0 %]">[% PageVersion = 'layout.tt,v 0.01 2023/08/30 shanta Exp shanta ' %]
 [%# DBI is now provided by the application context, no need to include DefaultDBI.tt %]
@@ -22,8 +22,9 @@
 [% IF c.stash.ai_popup_mode %]
     [%# Popup / detached-widget mode: render bare — no nav, no footer, no back-to-top %]
     [% content %]
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
+    [%- SET _cv = c.stash.css_v || '1' -%]
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% _cv %]">
+    <script src="/static/js/local-chat.js?v=[% _cv %]"></script>
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
@@ -42,8 +43,17 @@
     [% END %]
 
     <!-- Chat widget CSS and JS — outside footer TRY/CATCH so it appears on every page -->
-    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% USE date; date.format(date.now, '%s') || '1' %]">
-    <script src="/static/js/local-chat.js?v=[% date.format(date.now, '%s') || '1' %]"></script>
+    [%- SET _cv = c.stash.css_v || '1' -%]
+    <link rel="stylesheet" href="/static/css/ai-chat.css?v=[% _cv %]">
+    <script>
+    window.AI_CHAT_USER_CONFIG = {
+        username: '[% c.session.username || 'Guest' %]',
+        isGuest:  [% (c.session.username && !c.session.username.match('^Guest-')) ? 'false' : 'true' %],
+        isAdmin:  [% (c.stash.is_admin || c.session.is_admin) ? 'true' : 'false' %],
+        siteName: '[% c.stash.SiteName || c.session.SiteName || '' %]'
+    };
+    </script>
+    <script src="/static/js/local-chat.js?v=[% _cv %]"></script>
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
     <script>

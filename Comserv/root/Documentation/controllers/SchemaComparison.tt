@@ -132,52 +132,52 @@
             <h2 id="helper-methods" style="color: var(--text-color); font-family: var(--header-font);">Helper Methods (Internal)</h2>
             
             <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-                <thead style="background: #f5f5f5;">
+                <thead style="background: var(--bg-secondary, #f5f5f5);">
                     <tr>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Method</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Purpose</th>
+                        <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Method</th>
+                        <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Purpose</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_table_field_info()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Query database for field metadata (type, size, constraints)</td>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>get_table_field_info()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Query database for field metadata (type, size, constraints)</td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_result_field_info()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Parse Result file for field declarations and attributes</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>get_result_field_info()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Parse Result file for field declarations and attributes</td>
                     </tr>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>update_result_field_from_table()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Modify Result file content based on table schema changes</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>update_table_field_from_result()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Log intent to update database table from Result file</td>
-                    </tr>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>generate_result_file()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Create Result file structure on filesystem</td>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>update_result_field_from_table()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Modify Result file content based on table schema changes</td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>generate_result_file_content()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Generate Perl code for Result file based on table schema</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>update_table_field_from_result()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Log intent to update database table from Result file</td>
                     </tr>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>build_result_table_mapping()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Build mapping of database tables to Result file locations</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_ency_table_schema()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Query ENCY database schema metadata</td>
-                    </tr>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_forager_table_schema()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Query Forager database schema metadata</td>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>generate_result_file()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Create Result file structure on filesystem</td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>get_result_file_path()</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Calculate filesystem path for Result file</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>generate_result_file_content()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Generate Perl code for Result file based on table schema</td>
+                    </tr>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>build_result_table_mapping()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Build mapping of database tables to Result file locations</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>get_ency_table_schema()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Query ENCY database schema metadata</td>
+                    </tr>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>get_forager_table_schema()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Query Forager database schema metadata</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>get_result_file_path()</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Calculate filesystem path for Result file</td>
                     </tr>
                 </tbody>
             </table>
@@ -191,28 +191,28 @@
             <h2 id="api-endpoints" style="color: var(--text-color); font-family: var(--header-font);">API Endpoints</h2>
             
             <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-                <thead style="background: #f5f5f5;">
+                <thead style="background: var(--bg-secondary, #f5f5f5);">
                     <tr>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Endpoint</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Method</th>
-                        <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Description</th>
+                        <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Endpoint</th>
+                        <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Method</th>
+                        <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Description</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/sync_table_to_result</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Sync database table field to Result file</td>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>/schema-comparison/sync_table_to_result</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">POST</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Sync database table field to Result file</td>
                     </tr>
                     <tr>
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/sync_result_to_table</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Sync Result file field to database table</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>/schema-comparison/sync_result_to_table</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">POST</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Sync Result file field to database table</td>
                     </tr>
-                    <tr style="background: #fafafa;">
-                        <td style="padding: 10px; border: 1px solid #ddd;"><code>/schema-comparison/create_result_from_table</code></td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">POST</td>
-                        <td style="padding: 10px; border: 1px solid #ddd;">Generate Result file from database table</td>
+                    <tr style="background: var(--bg-secondary, #fafafa);">
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><code>/schema-comparison/create_result_from_table</code></td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">POST</td>
+                        <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Generate Result file from database table</td>
                     </tr>
                 </tbody>
             </table>

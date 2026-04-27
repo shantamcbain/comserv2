@@ -1,43 +1,155 @@
-[% PageVersion = '3D Feature Landing Page, v0.2 2026/04/13 Shanta Exp shanta' %]
+[% PageVersion = '3d/index.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h1 id="top" style="color:var(--text-color);font-family:var(--header-font)">Join us in our 3D Community!</h1>
-<nav style="margin-bottom:var(--spacing-medium);font-family:var(--body-font)">
-    <a id="3dtop"></a>
-    <a href="#overview" style="color:var(--primary-color)">Overview</a> |
-    <a href="#shop" style="color:var(--primary-color)">Shop</a> |
-    <a href="#explore" style="color:var(--primary-color)">Explore</a> |
-    <a href="#contact" style="color:var(--primary-color)">Contact</a>
-</nav>
+<style>
+.printing-3d-hero {
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 2em;
+    margin-bottom: 1.5em;
+    text-align: center;
+}
+.printing-3d-hero h1 {
+    color: var(--heading-color, var(--text-color));
+    font-size: 2em;
+    margin: 0 0 0.3em 0;
+}
+.printing-3d-hero p {
+    color: var(--text-color);
+    font-size: 1.1em;
+    margin: 0;
+}
+.printing-3d-stats {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.stat-card {
+    flex: 1;
+    min-width: 150px;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.2em 1em;
+    text-align: center;
+}
+.stat-card .stat-number {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--accent-color, var(--link-color));
+}
+.stat-card .stat-label {
+    color: var(--text-color);
+    font-size: 0.9em;
+    margin-top: 0.3em;
+}
+.printing-3d-actions {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.action-btn {
+    display: inline-block;
+    padding: 0.8em 1.5em;
+    background: var(--button-bg, var(--accent-color));
+    color: var(--button-text, white);
+    border-radius: 5px;
+    text-decoration: none;
+    font-weight: bold;
+    border: 1px solid var(--button-border, var(--accent-color));
+    transition: opacity 0.2s;
+}
+.action-btn:hover {
+    opacity: 0.85;
+    text-decoration: none;
+}
+.action-btn.secondary {
+    background: var(--secondary-color);
+    color: var(--link-color);
+    border-color: var(--border-color);
+}
+.printing-3d-notice {
+    background: var(--schema-alert-warning-bg, #fff3cd);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1em 1.2em;
+    color: var(--text-color);
+}
+</style>
 
-<a id="overview"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
-<h2 style="color:var(--text-color);font-family:var(--header-font)">Overview</h2>
-<p style="color:var(--text-color);font-family:var(--body-font)">Welcome to the 3D printing community. Browse our available print services and products below, add items to your cart, and check out online.</p>
+[% IF error_msg %]
+<div class="printing-3d-notice">
+    <strong>Notice:</strong> [% error_msg %]
+</div>
+[% END %]
 
-<!-- ===== SHOP LINK ===== -->
-<a id="shop"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
-<h2 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-store"></i> Shop</h2>
-<p style="color:var(--text-color);font-family:var(--body-font)">
-  Browse our 3D print services, filament, and products.
-  [% IF c.session.cart %]
-    [% _cc = 0 %][% FOREACH _k IN c.session.cart.keys %][% _cc = _cc + c.session.cart.$_k.quantity %][% END %]
-    [% IF _cc > 0 %]
-      You have <a href="/Cart" style="color:var(--primary-color);font-weight:bold">[% _cc %] item[% IF _cc != 1 %]s[% END %] in your cart</a>.
+[% IF c.flash.success_msg %]
+<div style="background:var(--success-color,#d4edda);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;margin-bottom:1em;color:var(--text-color);">
+    [% c.flash.success_msg %]
+</div>
+[% END %]
+
+<div class="printing-3d-hero">
+    <h1><i class="icon-3d"></i> 3D Printing</h1>
+    <p>An add-on service for <strong>[% sitename || SiteName %]</strong> — browse models, order prints, and manage your printer farm.</p>
+</div>
+
+[% IF module_enabled %]
+
+<div class="printing-3d-stats">
+    <div class="stat-card">
+        <div class="stat-number">[% model_count || 0 %]</div>
+        <div class="stat-label">Models Available</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-number">[% printer_count || 0 %]</div>
+        <div class="stat-label">Printers Ready</div>
+    </div>
+    [% IF c.session.user_id %]
+    <div class="stat-card">
+        <div class="stat-number">[% my_open_jobs || 0 %]</div>
+        <div class="stat-label">My Open Jobs</div>
+    </div>
     [% END %]
-  [% END %]
-</p>
-<p style="font-family:var(--body-font)">
-  <a href="/shop" class="menu-item" style="color:var(--primary-color);font-weight:bold"><i class="fas fa-store"></i> Browse Products &amp; Services →</a>
-</p>
+    <div class="stat-card">
+        <div class="stat-number">[% store_item_count || 0 %]</div>
+        <div class="stat-label">Items in Store</div>
+    </div>
+</div>
 
-<!-- ===== EXPLORE ===== -->
-<a id="explore"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
-<h2 style="color:var(--text-color);font-family:var(--header-font)">Explore</h2>
-<p style="color:var(--text-color);font-family:var(--body-font)">Explore the various 3D models and interactive content we have to offer.</p>
+<div class="printing-3d-actions">
+    <a href="/3d/browse" class="action-btn"><i class="icon-list"></i> Browse Models</a>
+    <a href="/shop" class="action-btn"><i class="icon-shop"></i> Shop Printed Items</a>
+    [% IF c.session.user_id %]
+    <a href="/3d/my_orders" class="action-btn secondary"><i class="icon-briefcase"></i> My Orders</a>
+    [% END %]
+    [% IF c.session.roles.grep('admin').size %]
+    <a href="/3d/admin" class="action-btn secondary"><i class="icon-admin"></i> Admin Dashboard</a>
+    <a href="/3d/queue" class="action-btn secondary"><i class="icon-list"></i> Print Queue</a>
+    <a href="/3d/printers" class="action-btn secondary"><i class="icon-server"></i> Printer Farm</a>
+    [% END %]
+</div>
 
-<!-- ===== CONTACT ===== -->
-<a id="contact"></a><a href="#3dtop" style="color:var(--text-muted-color);font-size:var(--font-size-small)">↑ top</a>
-<h2 style="color:var(--text-color);font-family:var(--header-font)">Contact</h2>
-<p style="color:var(--text-color);font-family:var(--body-font)">
-  Questions or custom print requests? Contact us at <a href="mailto:3d@cscoop.ca" style="color:var(--primary-color)">3d@cscoop.ca</a>
-</p>
+<h2>How It Works</h2>
+<ol>
+    <li><strong>Browse</strong> our catalog of 3D model files.</li>
+    <li><strong>Select</strong> a model and choose your filament preferences.</li>
+    <li><strong>Order</strong> — the system assigns your job to an available printer automatically, or queues it for the next available slot.</li>
+    <li><strong>Track</strong> your order status under <em>My Orders</em>.</li>
+</ol>
+
+[% ELSE %]
+
+<div class="printing-3d-notice">
+    <strong>3D Printing</strong> is not yet enabled for <strong>[% sitename || SiteName %]</strong>.
+    [% IF c.session.roles.grep('admin').size %]
+    <br>As a site admin, you can enable it under <a href="/admin">Admin</a> &rsaquo; Site Modules.
+    [% ELSE %]
+    <br>Please contact your site administrator to enable this feature.
+    [% END %]
+</div>
+
+[% END %]

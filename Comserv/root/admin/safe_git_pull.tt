@@ -118,27 +118,27 @@
 }
 
 .admin-header {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--primary-color, #007bff);
 }
 
 .admin-header h1 {
     margin: 0 0 10px 0;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .admin-description {
     margin: 0;
-    color: #666;
+    color: var(--text-muted-color, #666);
     font-size: 14px;
 }
 
 .admin-section {
-    background: white;
-    border: 1px solid #dee2e6;
+    background: var(--card-bg, rgba(255,255,255,0.88));
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -146,7 +146,7 @@
 
 .admin-section h2 {
     margin: 0 0 15px 0;
-    color: #333;
+    color: var(--text-color, #333);
     font-size: 18px;
 }
 
@@ -161,7 +161,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     border-radius: 4px;
 }
 
@@ -171,7 +171,7 @@
 
 .protected-file-item {
     padding: 12px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     border-radius: 4px;
     border-left: 3px solid #28a745;
     margin-bottom: 10px;
@@ -183,7 +183,7 @@
 }
 
 .file-path code {
-    background: #e9ecef;
+    background: var(--bg-secondary, #e9ecef);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 13px;
@@ -191,7 +191,7 @@
 
 .file-description {
     font-size: 13px;
-    color: #666;
+    color: var(--text-muted-color, #666);
 }
 
 .git-pull-form {
@@ -236,7 +236,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -245,31 +245,31 @@
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--secondary-color, #6c757d);
     color: white;
 }
 
 .btn-outline-primary {
     border: 1px solid #007bff;
     color: #007bff;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .btn-outline-info {
     border: 1px solid #17a2b8;
     color: #17a2b8;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .btn-outline-success {
     border: 1px solid #28a745;
     color: #28a745;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .output-container {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
     padding: 15px;
 }
@@ -324,7 +324,7 @@
 }
 
 .badge-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 

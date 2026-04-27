@@ -260,61 +260,71 @@ sub index :Path :Args(0) {
         "Completed Admin index action");
 }
 
-sub docker_containers :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->res->redirect($c->uri_for('/admin/infrastructure'));
-}
-
 # Get system statistics for the admin dashboard
 sub get_system_stats {
     my ($self, $c) = @_;
     
     my $stats = {
-        user_count => 0,
-        content_count => 0,
-        comment_count => 0,
-        disk_usage => '0 MB',
-        db_size => '0 MB',
-        uptime => '0 days',
+        user_count        => 0,
+        active_user_count => 0,
+        file_count        => 0,
+        disk_usage        => 'Unknown',
+        disk_pct          => 0,
+        disk_used         => '',
+        disk_total        => '',
+        disk_level        => 'ok',
+        nfs_pct           => 0,
+        nfs_used          => '',
+        nfs_total         => '',
+        nfs_level         => 'ok',
+        uptime            => 'Unknown',
     };
-    
-    # Try to get user count
+
     eval {
-        $stats->{user_count} = $c->model('DBEncy::User')->count();
+        my $schema = $c->model('DBEncy');
+        $stats->{user_count}        = $schema->resultset('User')->count;
+        $stats->{active_user_count} = $schema->resultset('User')->search({ status => 'active' })->count;
     };
-    
-    # Try to get content count (pages, posts, etc.)
+
     eval {
-        $stats->{content_count} = $c->model('DBEncy::Content')->count();
+        $stats->{file_count} = $c->model('DBEncy')->resultset('File')->search({ file_status => 'active' })->count;
     };
-    
-    # Try to get comment count
+
     eval {
-        $stats->{comment_count} = $c->model('DBEncy::Comment')->count();
-    };
-    
-    # Get disk usage (this is a simplified example)
-    eval {
-        my $df_output = `df -h . | tail -1`;
-        if ($df_output =~ /(\d+)%/) {
-            $stats->{disk_usage} = "$1%";
+        my $df = `df -P -BM . 2>/dev/null | tail -1`;
+        if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+            my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+            $stats->{disk_pct}   = $pct;
+            $stats->{disk_used}  = $used >= 1024 ? sprintf('%.1f GB', $used/1024) : "${used} MB";
+            $stats->{disk_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+            $stats->{disk_usage} = "$pct%";
+            $stats->{disk_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
         }
     };
-    
-    # Get database size (this would need to be customized for your DB)
+
     eval {
-        # This is just a placeholder - you'd need to implement actual DB size checking
-        $stats->{db_size} = "Unknown";
+        my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
+        if (-d $nfs_root) {
+            my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
+            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+                my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+                $stats->{nfs_pct}   = $pct;
+                $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
+                $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+                $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            }
+        }
     };
-    
-    # Get system uptime
+
     eval {
-        my $uptime_output = `uptime`;
-        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+users/) {
+        my $uptime_output = `uptime 2>/dev/null`;
+        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+user/) {
             $stats->{uptime} = $1;
+        } elsif ($uptime_output =~ /up\s+(.+)/) {
+            ($stats->{uptime} = $1) =~ s/,\s*\d+\s*user.*//;
         }
     };
-    
+
     return $stats;
 }
 
@@ -2209,7 +2219,9 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     
     my $table_name = $c->req->param('table_name');
     my $database = $c->req->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => { success => 0, error => 'Missing required parameters' });
@@ -2255,7 +2267,9 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     
     my $table_name = $c->request->param('table_name');
     my $database = $c->request->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => {
@@ -4132,7 +4146,8 @@ sub generate_result_file {
     my ($self, $c) = @_;
     
     my $table_name = $c->req->param('table_name');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+
     if (!$table_name) {
         $c->flash->{error_msg} = "No table name specified for Result file generation.";
         return;
@@ -4140,7 +4155,7 @@ sub generate_result_file {
     
     try {
         my $db_schema = $self->get_database_table_schema($c, $table_name);
-        my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
+        my $result_file_content = $self->_generate_result_file_content_basic($table_name, $db_schema);
         
         # Save the Result file
         my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
@@ -4155,8 +4170,8 @@ sub generate_result_file {
     };
 }
 
-# Generate Result file content from database schema
-sub generate_result_file_content {
+# Generate Result file content from database schema (basic/legacy version)
+sub _generate_result_file_content_basic {
     my ($self, $table_name, $db_schema) = @_;
     
     my $class_name = ucfirst($table_name);
@@ -4682,53 +4697,48 @@ sub get_result_field_info {
         my $columns_section = $1;
         
         my $field_info = {};
-        
+
+        # Helper: parse attributes from a field definition block.
+        # Handles one level of nested braces (e.g. extra => { list => [...] } for ENUM).
+        my $parse_field_def = sub {
+            my ($field_def) = @_;
+            my %info;
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $info{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $info{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $info{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $info{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $info{default_value} = $1;
+            }
+            # Extract ENUM list from: extra => { list => [qw/val1 val2 .../] }
+            if ($field_def =~ /extra\s*=>\s*\{[^}]*list\s*=>\s*\[qw.([^\]\/!|]+)[\/!|>)]\]/s) {
+                $info{enum_list} = [ split /\s+/, $1 ];
+            }
+            return \%info;
+        };
+
+        # Regex that matches a brace-delimited block allowing one level of nesting.
+        # Handles: extra => { list => [...] }  inside the field definition.
+        my $block_re = qr/\{((?:[^{}]|\{[^{}]*\})*)\}/s;
+
         # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from hash format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>?\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
-        
+
         # Try array format: "field_name", { ... }
-        if ($columns_section =~ /["']$field_name["']\s*,\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from array format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /["']$field_name["']\s*,\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
     }
     
@@ -4942,6 +4952,13 @@ sub update_table_field_from_result {
         $col_def .= 'DATE';
     } elsif ($data_type eq 'BOOLEAN') {
         $col_def .= 'TINYINT(1)';
+    } elsif ($data_type eq 'ENUM') {
+        my $enum_list = $result_field_info->{enum_list};
+        unless ($enum_list && ref($enum_list) eq 'ARRAY' && @$enum_list) {
+            die "ENUM field '$field_name' has no list values in Result class (extra => { list => [...] } missing)";
+        }
+        my $values = join(',', map { "'$_'" } @$enum_list);
+        $col_def .= "ENUM($values)";
     } else {
         $col_def .= $data_type;
         $col_def .= "($size)" if $size;
@@ -5403,6 +5420,25 @@ sub generate_result_file_content {
 
 =cut
 
+sub _docker_env {
+    my $home = $ENV{HOME} || '/home/shanta';
+    my @candidates = (
+        '/var/run/docker.sock',
+        "$home/.docker/desktop/docker.sock",
+        '/run/user/1000/docker.sock',
+    );
+    for my $sock (@candidates) {
+        return "DOCKER_HOST=unix://$sock" if -S $sock;
+    }
+    return '';
+}
+
+sub _docker_bin {
+    return '/usr/local/bin/docker' if -x '/usr/local/bin/docker';
+    return '/usr/bin/docker'       if -x '/usr/bin/docker';
+    return 'docker';
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
@@ -5467,29 +5503,44 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    # Run docker compose ps to get container status
-    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $denv  = _docker_env();
+    my $docker = _docker_bin();
+
+    my $output = `$denv $docker ps --all --format json 2>&1`;
     my $exit_code = $? >> 8;
     
     if ($exit_code != 0) {
-        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
         $c->response->content_type('application/json');
         return;
     }
     
-    # Parse JSON output (one JSON object per line)
+    # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
         next unless $line =~ /^\{/;
         eval {
             my $container = decode_json($line);
+            my $name = $container->{Names} || $container->{Name} || '';
+            $name =~ s{^/}{};
+            # Extract service name from compose label if present
+            my $service = '';
+            if (my $labels = $container->{Labels}) {
+                ($service) = $labels =~ /com\.docker\.compose\.service=([^,]+)/;
+            }
+            $service ||= $name;
+            # Parse ports string "0.0.0.0:3000->3000/tcp, ..." into array
+            my @ports;
+            if (my $ports_str = $container->{Ports}) {
+                @ports = grep { /\d+:\d+/ } split(/,\s*/, $ports_str);
+            }
             push @containers, {
-                name => $container->{Name} || '',
-                service => $container->{Service} || '',
-                state => $container->{State} || 'unknown',
-                status => $container->{Status} || '',
-                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
-                image => $container->{Image} || ''
+                name    => $name,
+                service => $service,
+                state   => $container->{State} || 'unknown',
+                status  => $container->{Status} || '',
+                ports   => \@ports,
+                image   => $container->{Image} || ''
             };
         };
     }
@@ -5518,7 +5569,10 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $names_out = `docker volume ls -q 2>&1`;
+    my $denv_v  = _docker_env();
+    my $docker_v = _docker_bin();
+
+    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
     my $names_exit = $? >> 8;
 
     if ($names_exit != 0) {
@@ -5536,7 +5590,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
     my $inspect_exit = $? >> 8;
 
     my @volumes;
@@ -5590,24 +5644,24 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
 
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
+    my $denv_r   = _docker_env();
+    my $docker_r = _docker_bin();
+    my $home_r   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
 
     my ($output, $exit_code);
     if ($service eq 'all') {
-        my $home = $ENV{HOME} || '/home/shanta';
-        my $compose_dir = "$home/PycharmProjects/comserv2";
-        $output = `cd '$compose_dir' && $docker compose restart 2>&1`;
+        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
         $exit_code = $? >> 8;
     } else {
-        $output = `$docker restart '$service' 2>&1`;
+        $output = `$denv_r $docker_r restart '$service' 2>&1`;
         $exit_code = $? >> 8;
         if ($exit_code != 0) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
                 "docker restart $service failed (exit $exit_code): $output");
         }
     }
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5639,16 +5693,16 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_s   = _docker_env();
+    my $docker_s = _docker_bin();
+    my $home_s   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && $docker compose start 2>&1"
-        : "$docker start '$service' 2>&1";
+        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
+        : "$denv_s $docker_s start '$service' 2>&1";
 
     my $output    = `$cmd`;
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -5681,16 +5735,16 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $docker = '/usr/local/bin/docker';
-    $docker = 'docker' unless -x $docker;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_st   = _docker_env();
+    my $docker_st = _docker_bin();
+    my $home_st   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && $docker compose stop 2>&1"
-        : "$docker stop '$service' 2>&1";
+        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
+        : "$denv_st $docker_st stop '$service' 2>&1";
 
     my $output    = `$cmd`;
-    $output //= "(no output captured — docker may not be in PATH)";
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -6595,6 +6649,11 @@ sub end : Private {
         return;
     }
     
+    # Skip rendering for redirects and no-content responses
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+
     # Normal template rendering for other requests
     $c->forward($c->view('TT')) unless $c->response->body;
 }

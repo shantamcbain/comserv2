@@ -86,10 +86,335 @@ sub auto :Private {
     return 1;
 }
 
-sub redirect_hosted        :Path('/hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
-sub redirect_Hosted        :Path('/Hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
-sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting_signup'), 301); $_[1]->detach }
-sub redirect_accounts      :Path('/accounts') :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting'),  301); $_[1]->detach }
+sub redirect_Hosted        :Path('/Hosted')   :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosted'),  302); $_[1]->detach }
+sub redirect_apply         :Path('/apply')    :Args(0) { $_[1]->response->redirect($_[1]->uri_for('/hosting_signup'), 302); $_[1]->detach }
+
+sub hosted_dashboard :Path('/hosted') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $schema   = $c->model('DBEncy');
+    my $sitename = $c->session->{SiteName} || 'CSC';
+    my $is_admin = $c->session->{is_admin} || 0;
+
+    my $acct = eval { $schema->resultset('HostingAccount')->find({ sitename => $sitename }) };
+
+    my $cost_cfg = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    my $all_plans = [
+        { slug => 'hosting-app',      name => 'App-only (Proxy)',   sku => 'HOST-APP',    monthly => ($cost_cfg ? $cost_cfg->unit_price : 10.00) },
+        { slug => 'hosting-subdomain', name => 'Subdomain + cPanel', sku => 'HOST-CPANEL', monthly => ($cost_cfg ? sprintf('%.2f', $cost_cfg->unit_price * 1.5) : 15.00) },
+    ];
+
+    $c->stash(
+        template  => 'hosting/hosted_dashboard.tt',
+        acct      => $acct,
+        cost_cfg  => $cost_cfg,
+        all_plans => $all_plans,
+        sitename  => $sitename,
+        is_admin  => $is_admin,
+    );
+}
+
+sub hosting_accounts :Path('/accounts') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->response->redirect($c->uri_for('/hosted'));
+        $c->detach;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $status  = $c->req->param('status') || 'all';
+    my $search  = {};
+    $search->{status} = $status unless $status eq 'all';
+
+    my @accounts = eval { $schema->resultset('HostingAccount')->search(
+        $search, { order_by => 'sitename' }
+    )->all };
+
+    my $cost_cfg = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    my @site_accounts = eval { $schema->resultset('SitePointAccount')->search(
+        {}, { order_by => 'sitename' }
+    )->all };
+
+    my $founder_cfg = eval {
+        $schema->resultset('FounderRoyaltyConfig')->search(
+            { active => 1 }, { rows => 1 }
+        )->first;
+    };
+
+    $c->stash(
+        template      => 'hosting/admin_accounts.tt',
+        accounts      => \@accounts,
+        cost_cfg      => $cost_cfg,
+        site_accounts => \@site_accounts,
+        founder_cfg   => $founder_cfg,
+        status_filter => $status,
+    );
+}
+
+sub activate_hosting :Path('/hosting/activate') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->res->status(403);
+        $c->stash(template => 'error.tt');
+        return;
+    }
+
+    my $schema     = $c->model('DBEncy');
+    my $acct_id    = $c->req->param('account_id') or do {
+        $c->flash->{error_msg} = 'account_id required';
+        $c->response->redirect($c->uri_for('/accounts'));
+        return;
+    };
+    my $payment_amount = $c->req->param('payment_amount') || 0;
+
+    my $acct = $schema->resultset('HostingAccount')->find($acct_id);
+    unless ($acct) {
+        $c->flash->{error_msg} = "Hosting account #$acct_id not found.";
+        $c->response->redirect($c->uri_for('/accounts'));
+        return;
+    }
+
+    eval {
+        my $renewal = DateTime->now->add(months => 1)->strftime('%Y-%m-%d');
+        $acct->update({ status => 'active', next_renewal_date => $renewal });
+
+        if ($payment_amount > 0) {
+            my $ps = Comserv::Util::PointSystem->new(c => $c);
+            $ps->apply_hosting_commission($acct, $payment_amount);
+        }
+    };
+    if ($@) {
+        $c->flash->{error_msg} = "Activation error: $@";
+    } else {
+        $c->flash->{success_msg} = "Hosting account for " . $acct->sitename . " activated.";
+    }
+
+    $c->response->redirect($c->uri_for('/accounts'));
+}
+
+sub hosting_cost_admin :Path('/hosting/cost') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        $c->detach;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $cfg    = eval {
+        $schema->resultset('HostingCostConfig')->search(
+            {}, { order_by => { -desc => 'id' }, rows => 1 }
+        )->first;
+    };
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+        eval {
+            if ($cfg) {
+                $cfg->update({
+                    server_cost_monthly     => $p->{server_cost_monthly}     || $cfg->server_cost_monthly,
+                    active_site_count       => $p->{active_site_count}       || $cfg->active_site_count,
+                    overhead_percent        => $p->{overhead_percent}        || $cfg->overhead_percent,
+                    commission_percent      => $p->{commission_percent}      || $cfg->commission_percent,
+                    member_discount_percent => $p->{member_discount_percent} || $cfg->member_discount_percent,
+                    notes                   => $p->{notes},
+                    updated_by              => $c->session->{username},
+                });
+            } else {
+                $cfg = $schema->resultset('HostingCostConfig')->create({
+                    server_cost_monthly     => $p->{server_cost_monthly}     || 0,
+                    active_site_count       => $p->{active_site_count}       || 1,
+                    overhead_percent        => $p->{overhead_percent}        || 20,
+                    commission_percent      => $p->{commission_percent}      || 10,
+                    member_discount_percent => $p->{member_discount_percent} || 10,
+                    notes                   => $p->{notes},
+                    updated_by              => $c->session->{username},
+                });
+            }
+        };
+        if ($@) {
+            $c->flash->{error_msg} = "Save error: $@";
+        } else {
+            $c->flash->{success_msg} = 'Hosting cost config saved.';
+        }
+        $c->response->redirect($c->uri_for('/hosting/cost'));
+        return;
+    }
+
+    $c->stash(
+        template => 'hosting/cost_config.tt',
+        cfg      => $cfg,
+    );
+}
+
+sub setup_hosting :Path('/hosting/setup') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        $c->detach;
+    }
+
+    my $schema = $c->model('DBEncy')->schema;
+    my $dbh    = $schema->storage->dbh;
+    my @log;
+    my @errors;
+
+    my @tables_to_create = (
+        { result => 'SitePointAccount',   table => 'site_point_accounts'   },
+        { result => 'FounderRoyaltyConfig', table => 'founder_royalty_config' },
+        { result => 'HostingCostConfig',  table => 'hosting_cost_config'   },
+    );
+
+    for my $spec (@tables_to_create) {
+        my ($result, $table) = @{$spec}{qw(result table)};
+        eval {
+            my $sth = $dbh->prepare("SHOW TABLES LIKE ?");
+            $sth->execute($table);
+            if ($sth->fetch) {
+                push @log, "Table '$table' already exists — skipped.";
+            } else {
+                my @stmts = $schema->deployment_statements('MySQL');
+                my ($stmt) = grep { /CREATE TABLE\s+`?\Q$table\E`?/i } @stmts;
+                if ($stmt) {
+                    ($stmt) = ($stmt =~ /(CREATE\s+TABLE\b.*)/si);
+                    $stmt =~ s/\s+CONSTRAINT\s+`[^`]+`\s+FOREIGN KEY[^,)]+(?:,\s*)?//gsi;
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                    $dbh->do($stmt);
+                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                    push @log, "Created table '$table' from Result '$result'.";
+                } else {
+                    push @errors, "No CREATE TABLE statement found for '$table'. Check the Result class.";
+                }
+            }
+        };
+        if ($@) {
+            push @errors, "Error creating '$table': $@";
+        }
+    }
+
+    my $now = do {
+        my @t = localtime;
+        sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+    };
+
+    eval {
+        my $existing = $schema->resultset('HostingCostConfig')->search({}, { rows => 1 })->first;
+        if ($existing) {
+            push @log, "hosting_cost_config already has a row (id=" . $existing->id . ") — skipped.";
+        } else {
+            my $row = $schema->resultset('HostingCostConfig')->create({
+                server_cost_monthly     => '50.00',
+                active_site_count       => 5,
+                overhead_percent        => '20.00',
+                commission_percent      => '10.00',
+                member_discount_percent => '10.00',
+                notes                   => 'Initial seed: CAD 50/mo ÷ 5 sites + 20% overhead = CAD 12/site/mo',
+                updated_by              => $c->session->{username},
+            });
+            push @log, "Created hosting_cost_config (id=" . $row->id . "). Unit price: CAD " . $row->unit_price . "/mo.";
+        }
+    };
+    push @errors, "Error seeding hosting_cost_config: $@" if $@;
+
+    eval {
+        my $existing = $schema->resultset('FounderRoyaltyConfig')->search({ active => 1 }, { rows => 1 })->first;
+        if ($existing) {
+            push @log, "founder_royalty_config already has an active row (" . $existing->founder_username . ") — skipped.";
+        } else {
+            my $row = $schema->resultset('FounderRoyaltyConfig')->create({
+                founder_username => 'Shanta',
+                royalty_percent  => '5.00',
+                active           => 1,
+                note             => 'Founder royalty on all hosting revenue',
+            });
+            push @log, "Created founder_royalty_config for Shanta 5% (id=" . $row->id . ").";
+        }
+    };
+    push @errors, "Error seeding founder_royalty_config: $@" if $@;
+
+    my @items = (
+        {
+            sku              => 'HOST-APP',
+            name             => 'CSC App-only Hosting (Proxy)',
+            sitename         => 'CSC',
+            category         => 'Service',
+            item_origin      => 'service',
+            description      => 'App-only hosting via Nginx Proxy Manager. Your Catalyst app served under a CSC subdomain or custom domain. No cPanel.',
+            unit_of_measure  => 'month',
+            unit_price       => '10.00',
+            unit_cost        => '12.00',
+            status           => 'active',
+            show_in_shop     => 0,
+            hide_stock_count => 1,
+            is_consumable    => 0,
+            is_reusable      => 1,
+            is_assemblable   => 0,
+            created_by       => $c->session->{username},
+            updated_by       => $c->session->{username},
+            created_at       => $now,
+            updated_at       => $now,
+        },
+        {
+            sku              => 'HOST-CPANEL',
+            name             => 'CSC Subdomain + cPanel Hosting',
+            sitename         => 'CSC',
+            category         => 'Service',
+            item_origin      => 'service',
+            description      => 'Full cPanel hosting account on WHC.ca with a CSC subdomain or custom domain. Includes email, databases, file manager.',
+            unit_of_measure  => 'month',
+            unit_price       => '15.00',
+            unit_cost        => '18.00',
+            status           => 'active',
+            show_in_shop     => 0,
+            hide_stock_count => 1,
+            is_consumable    => 0,
+            is_reusable      => 1,
+            is_assemblable   => 0,
+            created_by       => $c->session->{username},
+            updated_by       => $c->session->{username},
+            created_at       => $now,
+            updated_at       => $now,
+        },
+    );
+
+    for my $item_data (@items) {
+        eval {
+            my $existing = $schema->resultset('InventoryItem')->find({
+                sku      => $item_data->{sku},
+                sitename => 'CSC',
+            });
+            if ($existing) {
+                push @log, "InventoryItem " . $item_data->{sku} . " already exists (id=" . $existing->id . ") — skipped.";
+            } else {
+                my $row = $schema->resultset('InventoryItem')->create($item_data);
+                push @log, "Created InventoryItem " . $item_data->{sku} . " (id=" . $row->id . ").";
+            }
+        };
+        push @errors, "Error seeding " . $item_data->{sku} . ": $@" if $@;
+    }
+
+    $c->stash(
+        template => 'hosting/setup.tt',
+        log      => \@log,
+        errors   => \@errors,
+    );
+}
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;

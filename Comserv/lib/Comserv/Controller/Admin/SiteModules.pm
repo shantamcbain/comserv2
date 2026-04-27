@@ -15,7 +15,12 @@ has 'logging' => (
 sub begin :Private {
     my ($self, $c) = @_;
 
-    unless ($c->stash->{is_admin}) {
+    my $roles    = $c->session->{roles} || [];
+    my $is_admin = $c->session->{is_admin}
+                || (ref($roles) eq 'ARRAY' && grep { lc($_) eq 'admin' } @$roles)
+                || (!ref($roles) && $roles =~ /\badmin\b/i);
+
+    unless ($is_admin) {
         $c->res->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }));
         $c->detach;
     }
@@ -109,6 +114,10 @@ sub add :Path('/admin/site_modules/add') :Args(0) {
         my $module_name = $c->req->param('module_name') || '';
         my $enabled     = $c->req->param('enabled')  ? 1 : 0;
         my $min_role    = $c->req->param('min_role')    || 'member';
+
+        if ($module_name eq '_custom_') {
+            $module_name = $c->req->param('module_name_custom') || '';
+        }
 
         if ($sitename && $module_name) {
             try {

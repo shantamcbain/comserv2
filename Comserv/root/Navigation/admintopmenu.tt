@@ -7,7 +7,7 @@
    category = 'developer'
    tags = 'server, development, cpanfile, dependencies, perlbrew'
 %]
-[% PageVersion = 'admintopmenu.tt,v 0.5 2025/10/06 ai_assistant Exp ai_assistant ' %]
+[% PageVersion = 'admintopmenu.tt,v 0.6 2026/04/22 P3.2 theme-audit: no hardcoded colours; all CSS-var compliant' %]
 [% IF debug == 1 %]
     [%# PageVersion %]
     [% #INCLUDE 'debug.tt' %]
@@ -23,7 +23,8 @@
             <span class="submenu-header"><a href="/admin" class="dropbtn"><i class="icon-admin"></i>Admin</a></span>
             <div class="submenu">
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
-                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
+                <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
@@ -58,7 +59,7 @@
                 <a href="/documentation?category=admin_guides"><i class="icon-admin-guide"></i>Admin Guides</a>
                 <a href="/documentation"><i class="icon-list"></i>All Documentation</a>
                 <a href="/documentation?category=changelog"><i class="icon-changelog"></i>Changelog</a>
-                <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+                <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/Documentation/Planning"><i class="icon-planning"></i>Planning</a>
                 <a href="/documentation?category=tutorials"><i class="icon-tutorial"></i>Tutorials</a>
                 <a href="/documentation?category=user_guides"><i class="icon-user-guide"></i>User Guides</a>
@@ -281,6 +282,7 @@
                     <a href="/site"><i class="icon-domain"></i>Site Setup</a>
                     <a href="/site/add_site_form"><i class="icon-add"></i>Add Site</a>
                     <a href="/site/list_domains"><i class="icon-domain"></i>All Sites</a>
+                    <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
                 </div>
                 
                 <!-- System Configuration -->
