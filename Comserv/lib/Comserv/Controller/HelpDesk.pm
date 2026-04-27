@@ -411,6 +411,20 @@ sub submit_ticket :Chained('ticket_base') :PathPart('submit') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'submit_ticket',
             "Ticket created: " . $ticket->ticket_number . " (id=" . $ticket->id . ")");
 
+        $self->_notify_site_admins($c,
+            ticket  => $ticket,
+            subject => "[HelpDesk] New ticket " . $ticket->ticket_number . ": " . $ticket->subject,
+            body    => "A new support ticket has been submitted on $site_name.\n\n"
+                     . "Ticket:   " . $ticket->ticket_number . "\n"
+                     . "Subject:  " . $ticket->subject . "\n"
+                     . "Category: " . ($ticket->category || 'other') . "\n"
+                     . "Priority: " . ($ticket->priority || 'medium') . "\n"
+                     . "From:     " . ($ticket->username || $ticket->email || 'Guest') . "\n\n"
+                     . "Description:\n" . $ticket->description . "\n\n"
+                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+            event   => 'submit_ticket',
+        );
+
         $c->stash(
             template      => 'CSC/HelpDesk/ticket_submitted.tt',
             ticket        => $ticket,
@@ -621,6 +635,17 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             }
         }
 
+        $self->_notify_site_admins($c,
+            ticket  => $ticket,
+            subject => "[HelpDesk] Reply on ticket " . $ticket->ticket_number . ": " . $ticket->subject,
+            body    => "A " . ($sender_type eq 'staff' ? 'staff' : 'customer') . " reply has been posted on ticket "
+                     . $ticket->ticket_number . " (" . $site_name . ").\n\n"
+                     . "From: $sender_name" . ($sender_email ? " <$sender_email>" : '') . "\n\n"
+                     . "--- Reply ---\n$body_text\n\n"
+                     . "View ticket: " . $c->uri_for('/HelpDesk/admin/tickets/open'),
+            event   => 'ticket_reply',
+        );
+
         $c->flash->{success_msg} = 'Your reply has been posted.';
 
     } catch {
@@ -762,6 +787,69 @@ sub tickets_alert :Chained('base') :PathPart('admin/tickets_alert') :Args(0) {
     };
     $c->response->headers->header('Cache-Control' => 'no-store');
     $c->response->body('{"open_count":' . ($count + 0) . '}');
+}
+
+=head2 _notify_site_admins
+
+Send an email + application alert to all active admin/helpdesk users for the
+ticket's site whenever a new ticket is submitted or a reply is posted.
+
+=cut
+
+sub _notify_site_admins {
+    my ($self, $c, %args) = @_;
+    my $ticket    = $args{ticket}    or return;
+    my $subject   = $args{subject}   or return;
+    my $body      = $args{body}      or return;
+    my $event     = $args{event}     || 'ticket_event';
+
+    my $schema    = $c->model('DBEncy')->schema;
+    my $site_name = $ticket->site_name || '';
+
+    my @admin_emails;
+    eval {
+        my $site_rec = $schema->resultset('Site')->search(
+            { name => $site_name }, { rows => 1 })->first;
+
+        if ($site_rec) {
+            my @usr_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id   => $site_rec->id,
+                    role      => [qw(admin helpdesk)],
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+
+            for my $ur (@usr_roles) {
+                my $email = eval { $ur->user->email } || '';
+                push @admin_emails, $email if $email && $email =~ /\@/;
+            }
+        }
+
+        if (!@admin_emails) {
+            my @global_admins = $schema->resultset('User')->search(
+                { roles => { -like => '%admin%' } },
+                { columns => ['email'] }
+            )->all;
+            @admin_emails = map { $_->email || () } @global_admins;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_notify_site_admins',
+            "Error finding admin emails: $@");
+    }
+
+    @admin_emails = do { my %seen; grep { $_ && !$seen{$_}++ } @admin_emails };
+
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, $event,
+        "HelpDesk alert [$site_name]: $subject (notifying " . scalar(@admin_emails) . " admin(s))");
+
+    for my $to (@admin_emails) {
+        eval { $c->model('Mail')->send_email($c, $to, $subject, $body) };
+        $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, $event,
+            $@ ? "Admin notify email to $to failed: $@" : "Admin notify email sent to $to");
+    }
 }
 
 sub default :Chained('base') :PathPart('') :Args {
