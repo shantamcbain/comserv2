@@ -206,10 +206,11 @@
         
         <div class="form-group">
             <label for="status">Status:</label>
+            [% SET s = record.get_column('status') %]
             <select id="status" name="status" required>
-                <option value="1" [% IF record.get_column('status') == 1 %]selected[% END %]>NEW</option>
-                <option value="2" [% IF record.get_column('status') == 2 %]selected[% END %]>IN PROGRESS</option>
-                <option value="3" [% IF record.get_column('status') == 3 %]selected[% END %]>DONE</option>
+                <option value="1" [% IF s == 1 || s == 'New' || s == 'NEW' %]selected[% END %]>NEW</option>
+                <option value="2" [% IF s == 2 || s == 'InProgress' || s == 'In Progress' %]selected[% END %]>IN PROGRESS</option>
+                <option value="3" [% IF s == 3 || s == 'Done' || s == 'DONE' || s == 'Completed' %]selected[% END %]>DONE</option>
             </select>
         </div>
         
