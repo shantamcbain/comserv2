@@ -541,11 +541,14 @@ sub daily :Path('/planning/daily') :Args {
         audit_todos => do {
             my @at;
             eval {
+                my %audit_cond = (
+                    subject => { -like => '%Morning Audit%' },
+                    status  => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                );
+                $audit_cond{sitename} = $sitename unless $is_csc;
                 my @roots = $c->model('DBEncy')->resultset('Todo')->search(
-                    { sitename => $sitename,
-                      subject  => { -like => '%Morning Audit%' },
-                      status   => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
-                    { order_by => { -desc => 'start_date' }, rows => 5 }
+                    \%audit_cond,
+                    { order_by => { -desc => 'start_date' }, rows => 10 }
                 )->all;
                 for my $root (@roots) {
                     push @at, { $root->get_columns, is_root => 1 };
@@ -563,10 +566,12 @@ sub daily :Path('/planning/daily') :Args {
         helpdesk_tickets => do {
             my @ht;
             eval {
+                my %hd_cond = ( status => 'open' );
+                $hd_cond{site_name} = $sitename unless $is_csc;
                 @ht = map { { $_->get_columns } }
                     $c->model('DBEncy')->resultset('SupportTicket')->search(
-                        { status => 'open' },
-                        { order_by => { -desc => 'created_at' }, rows => 50 }
+                        \%hd_cond,
+                        { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 50 }
                     )->all;
             };
             \@ht;
@@ -679,7 +684,7 @@ sub _daily_log_action {
                 sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
             };
             my @errs = $schema->resultset('SystemLog')->search(
-                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
+                { level     => { -in => ['warn','error','critical','WARN','ERROR','CRITICAL'] },
                   timestamp => { '>=' => $since } },
                 { order_by => { -desc => 'timestamp' }, rows => 200 }
             )->all;
@@ -763,18 +768,26 @@ sub _daily_log_action {
                             "[$_->{level}] $_->{ts} $_->{file}:$_->{line}\n  $_->{message}"
                         } @entries[0..$shown-1]);
 
-                        my ($ai_subject, $ai_desc, $ai_priority) = ($sub . " — $count error(s) ($today)", $raw_err, 1);
+                        my $top_level = (grep { $_->{level} =~ /^CRITICAL$/i } @entries) ? 'CRITICAL'
+                                      : (grep { $_->{level} =~ /^ERROR$/i   } @entries) ? 'ERROR'
+                                      : 'WARN';
+                        my $default_priority = ($top_level eq 'WARN') ? 3 : 1;
+                        my ($ai_subject, $ai_desc, $ai_priority) = ($sub . " — $count $top_level(s) ($today)", $raw_err, $default_priority);
 
                         if ($ollama) {
                             eval {
-                                my $prompt = "You are a software triage assistant. Given this system error from a Catalyst Perl web app, "
+                                my $prompt = "You are a software triage assistant. Given this system log entry from a Catalyst Perl web app, "
                                     . "create a concise bug todo.\n\n"
                                     . "Error area: $sub\n"
+                                    . "Highest level: $top_level\n"
                                     . "Occurrences: $count\n"
-                                    . "Sample errors:\n$raw_err\n\n"
+                                    . "Sample entries:\n$raw_err\n\n"
+                                    . "Priority rules:\n"
+                                    . "  1 = CRITICAL/ERROR — production broken, generic error page shown, email sent\n"
+                                    . "  2 = functional failure — feature broken but app running\n"
+                                    . "  3 = WARN — degraded but non-breaking\n"
                                     . "Respond with ONLY a JSON object (no markdown, no explanation):\n"
-                                    . '{"subject":"one-line bug title (max 100 chars)","description":"2-3 sentence summary of the issue and suggested fix","priority":1}' . "\n"
-                                    . "Use priority 1 for crashes/data loss, 2 for functional failures, 3 for warnings.";
+                                    . '{"subject":"one-line bug title (max 100 chars)","description":"2-3 sentence summary of the issue and suggested fix","priority":1}';
 
                                 my $resp = $ollama->chat(
                                     messages => [{ role => 'user', content => $prompt }]
@@ -785,9 +798,9 @@ sub _daily_log_action {
                                     if ($parsed && !$@) {
                                         $ai_subject  = substr($parsed->{subject}     || $ai_subject, 0, 200);
                                         $ai_desc     = $parsed->{description} || $ai_desc;
-                                        $ai_priority = $parsed->{priority}    || $ai_priority;
-                                        $ai_priority = 1 if $ai_priority < 1;
-                                        $ai_priority = 3 if $ai_priority > 3;
+                                        $ai_priority = $parsed->{priority} || $default_priority;
+                                        $ai_priority = 1  if $ai_priority < 1;
+                                        $ai_priority = 10 if $ai_priority > 10;
                                         $ai_desc .= "\n\n--- Raw errors ($count occurrence(s)) ---\n$raw_err";
                                     }
                                 }
