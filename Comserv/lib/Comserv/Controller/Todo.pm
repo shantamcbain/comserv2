@@ -397,12 +397,27 @@ sub details :Path('/todo/details') :Args {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
             "AI conv fetch error: $@") if $@;
 
-        my $current_status = $self->normalize_status($todo->get_column('status'));
+        my $current_status   = $self->normalize_status($todo->get_column('status'));
+        my $current_priority = $todo->get_column('priority') // 2;
+        my %priority_options = (
+            1  => 'Critical',
+            2  => 'When we have time',
+            3  => 'Urgent',
+            4  => 'High',
+            5  => 'Medium',
+            6  => 'Medium-Low',
+            7  => 'Low',
+            8  => 'Very Low',
+            9  => 'Minimal',
+            10 => 'Optional'
+        );
 
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
             current_status    => $current_status,
+            current_priority  => $current_priority,
+            build_priority    => \%priority_options,
             accumulative_time => $accumulative_time,
             projects          => $projects,
             todo_intervals    => \@intervals,
