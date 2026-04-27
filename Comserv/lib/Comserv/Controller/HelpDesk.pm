@@ -331,12 +331,14 @@ sub _load_admin_tickets {
         "Loading admin tickets: filter=" . ($status_filter || 'all')
         . " site=$site_name is_csc=" . ($is_csc ? 'yes' : 'no'));
 
+    $self->_auto_close_stale_tickets($c);
+
     try {
         my $schema = $c->model('DBEncy')->schema;
         my %search;
         $search{site_name} = $site_name unless $is_csc;
         if ($status_filter && $status_filter eq 'open') {
-            $search{status} = [qw(open in_progress)];
+            $search{status} = [qw(open in_progress awaiting_response)];
         } elsif ($status_filter) {
             $search{status} = $status_filter;
         }
@@ -572,13 +574,23 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
             return;
         }
 
+        my $reply_now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+
+        if ($sender_type eq 'user' && ($ticket->status eq 'closed' || $ticket->status eq 'resolved')) {
+            $ticket->update({ status => 'open', updated_at => $reply_now, closed_at => undef });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_reply',
+                "Ticket $ticket_number reopened by customer reply");
+        } else {
+            $ticket->update({ updated_at => $reply_now });
+        }
+
         my $msg = $schema->resultset('TicketMessage')->create({
             ticket_id    => $ticket->id,
             sender_type  => $sender_type,
             sender_name  => $sender_name,
             sender_email => $sender_email,
             body         => $body_text,
-            created_at   => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            created_at   => $reply_now,
         });
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'ticket_reply',
             "Message inserted OK: id=" . $msg->id . " ticket_id=" . $ticket->id);
@@ -661,6 +673,246 @@ sub ticket_reply :Chained('ticket_base') :PathPart('reply') :Args(1) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_reply',
             "Error posting reply: $_");
         $c->flash->{error_msg} = 'Error posting reply: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 ticket_update_status
+
+Staff-only action to change a ticket's status and optionally leave an audit note.
+POST /HelpDesk/ticket/update_status/<ticket_number>
+  params: new_status, resolution (optional note)
+
+=cut
+
+sub ticket_update_status :Chained('ticket_base') :PathPart('update_status') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $new_status  = $c->req->params->{new_status}  || '';
+    my $note        = $c->req->params->{resolution}   || '';
+    my $valid_statuses = { open => 1, in_progress => 1, awaiting_response => 1, resolved => 1, closed => 1 };
+
+    unless ($valid_statuses->{$new_status}) {
+        $c->flash->{error_msg} = "Invalid status: $new_status";
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $staff_name  = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name     = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+    my $now         = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $site_name   = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        my $old_status = $ticket->status;
+        my %update = (
+            status     => $new_status,
+            updated_at => $now,
+        );
+        $update{closed_at}  = $now  if $new_status eq 'closed' || $new_status eq 'resolved';
+        $update{resolution} = $note if $note;
+        $ticket->update(\%update);
+
+        my $status_label = {
+            open              => 'Open',
+            in_progress       => 'In Progress',
+            awaiting_response => 'Awaiting Customer Response',
+            resolved          => 'Resolved',
+            closed            => 'Closed',
+        }->{$new_status} || $new_status;
+
+        my $audit_body = "Status changed from \u$old_status to: $status_label";
+        $audit_body   .= "\n\nNote: $note" if $note;
+
+        $schema->resultset('TicketMessage')->create({
+            ticket_id    => $ticket->id,
+            sender_type  => 'staff',
+            sender_name  => $staff_name,
+            sender_email => $c->session->{email} || '',
+            body         => $audit_body,
+            created_at   => $now,
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ticket_update_status',
+            "Ticket $ticket_number status changed: $old_status -> $new_status by $staff_name");
+
+        my $public_ticket_url = do {
+            my $public_domain = '';
+            eval {
+                my $site_rec = $schema->resultset('Site')->search(
+                    { name => $ticket->site_name }, { rows => 1 }
+                )->first;
+                if ($site_rec) {
+                    my $domain_rec = $schema->resultset('SiteDomain')->search(
+                        { site_id => $site_rec->id }, { rows => 1 }
+                    )->first;
+                    $public_domain = $domain_rec->domain if $domain_rec;
+                }
+            };
+            $public_domain
+                ? 'https://' . $public_domain . '/HelpDesk/ticket/view/' . $ticket_number
+                : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
+        };
+
+        if (($new_status eq 'closed' || $new_status eq 'resolved' || $new_status eq 'awaiting_response')
+            && $ticket->email) {
+            my ($email_subject, $email_body);
+            if ($new_status eq 'awaiting_response') {
+                $email_subject = "[Ticket " . $ticket->ticket_number . "] We need your response";
+                $email_body    = "Hello,\n\n"
+                    . "Your support ticket (" . $ticket->ticket_number . ") is awaiting your response.\n\n"
+                    . "Ticket: " . $ticket->subject . "\n\n"
+                    . ($note ? "Staff note: $note\n\n" : '')
+                    . "Please reply at: $public_ticket_url\n\n"
+                    . "If we do not hear back within 14 days, the ticket will be closed automatically.\n\n"
+                    . "Regards,\n$site_name Support Team";
+            } elsif ($new_status eq 'resolved') {
+                $email_subject = "[Ticket " . $ticket->ticket_number . "] Your ticket has been resolved";
+                $email_body    = "Hello,\n\n"
+                    . "Your support ticket (" . $ticket->ticket_number . ") has been marked as resolved.\n\n"
+                    . "Ticket: " . $ticket->subject . "\n\n"
+                    . ($note ? "Resolution: $note\n\n" : '')
+                    . "If this did not resolve your issue, you can reply to reopen: $public_ticket_url\n\n"
+                    . "Regards,\n$site_name Support Team";
+            } elsif ($new_status eq 'closed') {
+                $email_subject = "[Ticket " . $ticket->ticket_number . "] Your ticket has been closed";
+                $email_body    = "Hello,\n\n"
+                    . "Your support ticket (" . $ticket->ticket_number . ") has been closed.\n\n"
+                    . "Ticket: " . $ticket->subject . "\n\n"
+                    . ($note ? "Note: $note\n\n" : '')
+                    . "If you need further assistance, you can reply to reopen the ticket: $public_ticket_url\n\n"
+                    . "Regards,\n$site_name Support Team";
+            }
+            eval { $c->model('Mail')->send_email($c, $ticket->email, $email_subject, $email_body) };
+            $self->logging->log_with_details($c, $@ ? 'error' : 'info', __FILE__, __LINE__, 'ticket_update_status',
+                $@ ? "Status-change email failed: $@" : "Status-change email sent to " . $ticket->email);
+        }
+
+        $c->flash->{success_msg} = "Ticket status updated to: $status_label";
+
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'ticket_update_status',
+            "Error updating status for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error updating ticket status: ' . $_;
+    };
+
+    $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+}
+
+=head2 send_reminder
+
+Staff-only: send a reminder email to the ticket submitter asking them to check their ticket.
+
+=cut
+
+sub send_reminder :Chained('ticket_base') :PathPart('remind') :Args(1) {
+    my ($self, $c, $ticket_number) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    unless ($self->_is_staff($c)) {
+        $c->flash->{error_msg} = 'Permission denied.';
+        $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+        return;
+    }
+
+    my $now       = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
+    my $staff_name = ($c->session->{firstname} || '') . ' ' . ($c->session->{lastname} || '');
+    $staff_name    = $c->session->{username} || 'Staff' unless $staff_name =~ /\S/;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $ticket = $schema->resultset('SupportTicket')->find({ ticket_number => $ticket_number });
+
+        unless ($ticket) {
+            $c->flash->{error_msg} = 'Ticket not found.';
+            $c->res->redirect($c->uri_for('/HelpDesk/admin/tickets/open'));
+            return;
+        }
+
+        unless ($ticket->email) {
+            $c->flash->{error_msg} = 'No email address on this ticket — cannot send reminder.';
+            $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
+            return;
+        }
+
+        my $public_ticket_url = do {
+            my $public_domain = '';
+            eval {
+                my $site_rec = $schema->resultset('Site')->search(
+                    { name => $ticket->site_name }, { rows => 1 }
+                )->first;
+                if ($site_rec) {
+                    my $domain_rec = $schema->resultset('SiteDomain')->search(
+                        { site_id => $site_rec->id }, { rows => 1 }
+                    )->first;
+                    $public_domain = $domain_rec->domain if $domain_rec;
+                }
+            };
+            $public_domain
+                ? 'https://' . $public_domain . '/HelpDesk/ticket/view/' . $ticket_number
+                : $c->uri_for('/HelpDesk/ticket/view/' . $ticket_number)->as_string;
+        };
+
+        my $email_subject = "[Ticket " . $ticket->ticket_number . "] Reminder: your ticket needs attention";
+        my $email_body    = "Hello,\n\n"
+            . "This is a friendly reminder that your support ticket is awaiting your response.\n\n"
+            . "Ticket:  " . $ticket->ticket_number . "\n"
+            . "Subject: " . $ticket->subject . "\n\n"
+            . "Please visit the link below to view and reply:\n$public_ticket_url\n\n"
+            . "If this matter has been resolved, no action is needed.\n"
+            . "Tickets with no response within 14 days are closed automatically.\n\n"
+            . "Regards,\n$site_name Support Team";
+
+        eval { $c->model('Mail')->send_email($c, $ticket->email, $email_subject, $email_body) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_reminder',
+                "Reminder email failed for $ticket_number: $@");
+            $c->flash->{error_msg} = 'Failed to send reminder email.';
+        } else {
+            $schema->resultset('TicketMessage')->create({
+                ticket_id    => $ticket->id,
+                sender_type  => 'staff',
+                sender_name  => $staff_name,
+                sender_email => $c->session->{email} || '',
+                body         => "Reminder email sent to " . $ticket->email,
+                created_at   => $now,
+            });
+            $ticket->update({ updated_at => $now });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_reminder',
+                "Reminder email sent for $ticket_number to " . $ticket->email);
+            $c->flash->{success_msg} = 'Reminder email sent to ' . $ticket->email;
+        }
+
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_reminder',
+            "Error in send_reminder for $ticket_number: $_");
+        $c->flash->{error_msg} = 'Error sending reminder: ' . $_;
     };
 
     $c->res->redirect($c->uri_for('/HelpDesk/ticket/view/' . $ticket_number));
@@ -804,6 +1056,68 @@ Send an email + application alert to all active admin/helpdesk users for the
 ticket's site whenever a new ticket is submitted or a reply is posted.
 
 =cut
+
+sub _auto_close_stale_tickets {
+    my ($self, $c) = @_;
+
+    my $auto_close_days = 14;
+    my $now             = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $cutoff_epoch    = time() - ($auto_close_days * 86400);
+    my $cutoff_dt       = strftime('%Y-%m-%d %H:%M:%S', localtime($cutoff_epoch));
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+
+        my @stale = $schema->resultset('SupportTicket')->search(
+            {
+                status     => 'awaiting_response',
+                updated_at => { '<', $cutoff_dt },
+            },
+            { rows => 50 }
+        )->all;
+
+        for my $ticket (@stale) {
+            $ticket->update({
+                status     => 'closed',
+                closed_at  => $now,
+                updated_at => $now,
+            });
+
+            $schema->resultset('TicketMessage')->create({
+                ticket_id    => $ticket->id,
+                sender_type  => 'staff',
+                sender_name  => 'System',
+                sender_email => '',
+                body         => "Ticket automatically closed after $auto_close_days days with no customer response.",
+                created_at   => $now,
+            });
+
+            if ($ticket->email) {
+                my $site_name = $ticket->site_name || 'Support';
+                eval {
+                    $c->model('Mail')->send_email($c, $ticket->email,
+                        "[Ticket " . $ticket->ticket_number . "] Ticket closed — no response received",
+                        "Hello,\n\n"
+                        . "Your support ticket (" . $ticket->ticket_number . ") has been automatically closed "
+                        . "because no response was received within $auto_close_days days.\n\n"
+                        . "Ticket: " . $ticket->subject . "\n\n"
+                        . "If you still need assistance, please submit a new support ticket.\n\n"
+                        . "Regards,\n$site_name Support Team"
+                    );
+                };
+            }
+
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_auto_close_stale_tickets',
+                "Auto-closed stale ticket " . $ticket->ticket_number . " (awaiting_response > $auto_close_days days)");
+        }
+
+        return scalar @stale;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_auto_close_stale_tickets',
+            "Error during auto-close: $@");
+    }
+}
 
 sub _notify_site_admins {
     my ($self, $c, %args) = @_;
