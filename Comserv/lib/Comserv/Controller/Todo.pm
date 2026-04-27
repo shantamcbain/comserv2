@@ -22,21 +22,25 @@ sub get_status_name {
 }
 
 # Helper method to get priority name from code (1-10 scale)
+sub priority_options {
+    return {
+        1  => 'P1: Critical — system/site broken, stop everything',
+        2  => 'P2: Urgent — blocking key work, must resolve today',
+        3  => 'P3: High — important, complete this sprint',
+        4  => 'P4: Above Normal — scheduled soon, next sprint',
+        5  => 'P5: Medium — standard backlog item',
+        6  => 'P6: Normal — background work, no deadline pressure',
+        7  => 'P7: Low — address when capacity allows',
+        8  => 'P8: Minor — nice to have, no immediate impact',
+        9  => 'P9: Minimal — someday/maybe',
+        10 => 'P10: Optional — wishlist only',
+    };
+}
+
 sub get_priority_name {
     my ($self, $priority_code) = @_;
-    my %priority_map = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    return $priority_map{$priority_code} // "Priority $priority_code";
+    my $map = $self->priority_options;
+    return $map->{$priority_code} // "Priority $priority_code";
 }
 
 # Helper method to convert numeric status to string for database storage
@@ -398,26 +402,14 @@ sub details :Path('/todo/details') :Args {
             "AI conv fetch error: $@") if $@;
 
         my $current_status   = $self->normalize_status($todo->get_column('status'));
-        my $current_priority = $todo->get_column('priority') // 2;
-        my %priority_options = (
-            1  => 'Critical',
-            2  => 'When we have time',
-            3  => 'Urgent',
-            4  => 'High',
-            5  => 'Medium',
-            6  => 'Medium-Low',
-            7  => 'Low',
-            8  => 'Very Low',
-            9  => 'Minimal',
-            10 => 'Optional'
-        );
+        my $current_priority = $todo->get_column('priority') // 5;
 
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
             current_status    => $current_status,
             current_priority  => $current_priority,
-            build_priority    => \%priority_options,
+            build_priority    => $self->priority_options,
             accumulative_time => $accumulative_time,
             projects          => $projects,
             todo_intervals    => \@intervals,
@@ -490,20 +482,6 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
-    # Build priority and status mappings for dropdowns
-    my %priority_options = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    
     my %status_options = (
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -512,11 +490,11 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Add the projects, sitename, and users to the stash
     $c->stash(
-        projects        => $projects,        # Parent projects with nested sub-projects
-        current_project => $current_project, # Selected project for the form (if any)
-        users           => \@users,          # List of users to populate dropdown
-        build_priority  => \%priority_options, # Priority options for dropdown
-        build_status    => \%status_options,   # Status options for dropdown
+        projects        => $projects,
+        current_project => $current_project,
+        users           => \@users,
+        build_priority  => $self->priority_options,
+        build_status    => \%status_options,
         return_to       => $return_to,       # URL to return to after action
         start_date      => $c->request->params->{start_date},
         time_of_day     => $c->request->params->{time_of_day},
@@ -606,20 +584,6 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Format the total time as 'HH:MM'
     my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
-    # Build priority and status mappings for dropdowns
-    my %priority_options = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    
     my %status_options = (
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -627,15 +591,17 @@ sub edit :Path('/todo/edit') :Args(1) {
     );
 
     # Add the todo, projects, and users to the stash
-    my $current_status = $self->normalize_status($todo->get_column('status'));
+    my $current_status   = $self->normalize_status($todo->get_column('status'));
+    my $current_priority = $todo->get_column('priority') // 5;
 
     $c->stash(
         record           => $todo,
         current_status   => $current_status,
+        current_priority => $current_priority,
         projects         => $projects,
         users            => \@users,
         accumulative_time => $accumulative_time,
-        build_priority   => \%priority_options,
+        build_priority   => $self->priority_options,
         build_status     => \%status_options,
         return_to        => $return_to,
         template         => 'todo/edit.tt'
