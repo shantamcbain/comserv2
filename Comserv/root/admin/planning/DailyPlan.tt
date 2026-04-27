@@ -268,7 +268,11 @@
                         <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
                         <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
                         [% IF is_admin %]
+                        [% IF open_log_entry %]
+                        <a href="#log-panel" onclick="toggleLogPanel();return false;" style="padding:4px 12px;border:1px solid #2a7a2a;border-radius:4px;text-decoration:none;font-size:0.82em;color:#2a7a2a;" title="View today's open log entry">🌅 Today's Log</a>
+                        [% ELSE %]
                         <button onclick="dailyLogAction('start')" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;background:transparent;font-size:0.82em;color:#20c997;cursor:pointer;" title="Start your day — creates daily log and audits system errors">🌅 Start Day</button>
+                        [% END %]
                         <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                         <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
                         [% END %]
@@ -1319,7 +1323,9 @@ function dailyLogAction(action) {
         if (d.success) {
             feedback.innerHTML = d.response || d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
             feedback.style.color = '#2a7a2a';
-            setTimeout(function() { window.location.reload(); }, 2000);
+            var dest = window.location.pathname + window.location.search;
+            if (action === 'start') { dest += '#log-panel-open'; }
+            setTimeout(function() { window.location.href = dest; }, 2500);
         } else {
             feedback.innerHTML = d.response || d.error || 'Error';
             feedback.style.color = '#9b0000';
@@ -1339,6 +1345,14 @@ function toggleLogPanel() {
     var panel = document.getElementById('log-panel');
     if (!panel) return;
     panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
+}
+
+if (window.location.hash === '#log-panel-open') {
+    window.addEventListener('load', function() {
+        var panel = document.getElementById('log-panel');
+        if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth' }); }
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    });
 }
 
 function saveLogEntry(entryId) {
