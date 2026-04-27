@@ -283,10 +283,9 @@
                     <label style="font-size:0.82em;font-weight:bold;color:var(--text-muted-color);">Notes for today:</label>
                     <textarea id="morning-notes-inline"
                         style="width:100%;box-sizing:border-box;margin-top:4px;padding:6px 8px;font-size:0.85em;border:1px solid var(--border-color);border-radius:4px;resize:vertical;background:var(--bg-color);color:var(--text-color);"
-                        rows="2"
-                        onblur="saveLogEntry([% open_log_entry.record_id %])"
-                        oninput="document.getElementById('log-desc-edit') && (document.getElementById('log-desc-edit').value = this.value)"
-                    >[% log_details | html %]</textarea>
+                        rows="3"
+                        onblur="saveLogNotes([% open_log_entry.record_id %])"
+                    >[% open_log_entry.notes_only | html %]</textarea>
                     <span id="morning-notes-status" style="font-size:0.75em;color:var(--text-muted-color);"></span>
                 </div>
             </div>
@@ -1390,31 +1389,46 @@ if (window.location.hash === '#log-panel-open') {
 
 function saveLogEntry(entryId) {
     var title = (document.getElementById('log-title-edit') || {}).value || '';
-    var desc  = (document.getElementById('log-desc-edit')  || {}).value
-             || (document.getElementById('morning-notes-inline') || {}).value || '';
+    var desc  = (document.getElementById('log-desc-edit')  || {}).value || '';
     var statusEl  = document.getElementById('log-save-status');
-    var statusEl2 = document.getElementById('morning-notes-status');
-    if (statusEl)  statusEl.textContent  = 'Saving…';
-    if (statusEl2) statusEl2.textContent = 'Saving…';
+    if (statusEl) statusEl.textContent = 'Saving…';
 
     fetch('/planning/update_log_entry', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'entry_id=' + encodeURIComponent(entryId)
-            + '&title='    + encodeURIComponent(title)
+            + '&title='       + encodeURIComponent(title)
             + '&description=' + encodeURIComponent(desc)
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        var msg = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
-        var col = d.success ? '#2a7a2a' : '#9b0000';
-        if (statusEl)  { statusEl.textContent  = msg; statusEl.style.color  = col; }
-        if (statusEl2) { statusEl2.textContent = msg; statusEl2.style.color = col; }
+        if (statusEl) { statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed')); statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000'; }
     })
-    .catch(function(e) {
-        if (statusEl)  { statusEl.textContent  = '❌ Request failed'; statusEl.style.color  = '#9b0000'; }
-        if (statusEl2) { statusEl2.textContent = '❌ Request failed'; statusEl2.style.color = '#9b0000'; }
+    .catch(function() {
+        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
+    });
+}
+
+function saveLogNotes(entryId) {
+    var notes    = (document.getElementById('morning-notes-inline') || {}).value || '';
+    var statusEl = document.getElementById('morning-notes-status');
+    if (statusEl) statusEl.textContent = 'Saving…';
+
+    fetch('/planning/update_log_entry', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'entry_id='    + encodeURIComponent(entryId)
+            + '&description=' + encodeURIComponent(notes)
+            + '&notes_only=1'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (statusEl) { statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed')); statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000'; }
+    })
+    .catch(function() {
+        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }
 </script>
