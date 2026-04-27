@@ -42,10 +42,10 @@
             <td>
                 <select name="status">
                     [% SET s = record.get_column('status') %]
-                    <option value="1" [% IF s == 1 || s == 'New' || s == 'NEW' %]selected[% END %]>New</option>
-                    <option value="2" [% IF s == 2 || s == 'InProgress' || s == 'In Progress' %]selected[% END %]>In Progress</option>
-                    <option value="3" [% IF s == 3 || s == 'Done' || s == 'DONE' || s == 'Completed' %]selected[% END %]>Done</option>
-                    <option value="4" [% IF s == 4 || s == 'Cancelled' %]selected[% END %]>Cancelled</option>
+                    <option value="1" [% IF s == 1 || s eq 'New' || s eq 'NEW' %]selected[% END %]>New</option>
+                    <option value="2" [% IF s == 2 || s eq 'InProgress' || s eq 'In Progress' %]selected[% END %]>In Progress</option>
+                    <option value="3" [% IF s == 3 || s eq 'Done' || s eq 'DONE' || s eq 'Completed' %]selected[% END %]>Done</option>
+                    <option value="4" [% IF s == 4 || s eq 'Cancelled' %]selected[% END %]>Cancelled</option>
                 </select>
             </td></tr>
         <tr><td><label>Priority:</label></td>
