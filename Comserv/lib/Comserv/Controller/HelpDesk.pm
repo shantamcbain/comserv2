@@ -63,6 +63,7 @@ sub base :Chained('/') :PathPart('HelpDesk') :CaptureArgs(0) {
     $c->stash(
         section       => 'helpdesk',
         site_favicon  => '/favicon/helpdesk',
+        css_view_name => '/static/css/helpdesk.css',
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'base', 
@@ -320,17 +321,25 @@ sub _load_admin_tickets {
     my ($self, $c, $status_filter, $title) = @_;
 
     my $site_name  = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
-    my $is_csc     = (lc($site_name) eq 'csc');
+    my $roles      = $c->session->{roles} || [];
+    my @roles_list = ref $roles eq 'ARRAY' ? @$roles : split /,\s*/, $roles;
+    my $is_csc     = (lc($site_name) eq 'csc')
+                  || (grep { lc($_) eq 'admin' } @roles_list
+                      && lc($c->session->{SiteName} || '') eq 'csc');
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_load_admin_tickets',
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_load_admin_tickets',
         "Loading admin tickets: filter=" . ($status_filter || 'all')
-        . " site=$site_name csc_admin=" . ($is_csc ? 'yes' : 'no'));
+        . " site=$site_name is_csc=" . ($is_csc ? 'yes' : 'no'));
 
     try {
         my $schema = $c->model('DBEncy')->schema;
         my %search;
         $search{site_name} = $site_name unless $is_csc;
-        $search{status}    = $status_filter if $status_filter;
+        if ($status_filter && $status_filter eq 'open') {
+            $search{status} = [qw(open in_progress)];
+        } elsif ($status_filter) {
+            $search{status} = $status_filter;
+        }
 
         my @tickets = $schema->resultset('SupportTicket')->search(
             \%search,
