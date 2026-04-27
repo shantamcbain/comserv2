@@ -1,0 +1,94 @@
+[% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.01 2026/04/20' %]
+[% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
+
+<div class="helpdesk-container">
+
+    <nav class="ticket-breadcrumb">
+        <a href="[% c.uri_for('/HelpDesk') %]">HelpDesk</a> &rsaquo;
+        [% IF is_staff %]
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]">Open Tickets</a> &rsaquo;
+        [% ELSE %]
+        <a href="[% c.uri_for('/HelpDesk/ticket/status') %]">My Tickets</a> &rsaquo;
+        [% END %]
+        <span>[% ticket.ticket_number %]</span>
+    </nav>
+
+    [% IF error_msg %]<div class="hd-alert-error">[% error_msg %]</div>[% END %]
+    [% IF success_msg %]<div class="hd-alert-success">[% success_msg %]</div>[% END %]
+
+    <div class="ticket-header-card">
+        <div class="ticket-meta-row">
+            <span class="ticket-number"><code>[% ticket.ticket_number %]</code></span>
+            <span class="ticket-status status-[% ticket.status %]">[% ticket.status | upper %]</span>
+            <span class="ticket-priority priority-[% ticket.priority %]">[% ticket.priority || 'medium' %]</span>
+            [% IF is_staff %]
+            <span class="ticket-site">[% ticket.site_name %]</span>
+            [% END %]
+        </div>
+        <h2 class="ticket-subject">[% ticket.subject %]</h2>
+        <div class="ticket-meta-detail">
+            <span>Category: <strong>[% ticket.category || 'other' %]</strong></span>
+            &bull;
+            <span>Submitted by: <strong>[% ticket.username || ticket.email || 'Guest' %]</strong></span>
+            &bull;
+            <span>Created: <strong>[% ticket.created_at %]</strong></span>
+            [% IF ticket.assigned_to %]
+            &bull;
+            <span>Assigned to: <strong>[% ticket.assigned_to %]</strong></span>
+            [% END %]
+        </div>
+    </div>
+
+    <div class="conversation-thread">
+        <div class="message message-user message-original">
+            <div class="message-header">
+                <span class="message-author">[% ticket.username || ticket.email || 'Customer' %]</span>
+                <span class="message-role-badge badge-user">Customer</span>
+                <span class="message-time">[% ticket.created_at %]</span>
+            </div>
+            <div class="message-body">[% ticket.description | html | replace('\n', '<br>') %]</div>
+        </div>
+
+        [% FOREACH msg IN messages %]
+        <div class="message message-[% msg.sender_type %]">
+            <div class="message-header">
+                <span class="message-author">[% msg.sender_name || msg.sender_email || msg.sender_type %]</span>
+                <span class="message-role-badge badge-[% msg.sender_type %]">
+                    [% msg.sender_type == 'staff' ? 'Support Staff' : 'Customer' %]
+                </span>
+                <span class="message-time">[% msg.created_at %]</span>
+            </div>
+            <div class="message-body">[% msg.body | html | replace('\n', '<br>') %]</div>
+        </div>
+        [% END %]
+    </div>
+
+    [% IF c.session.username %]
+    <div class="reply-box">
+        <h3>
+            [% IF is_staff %]Reply to Customer[% ELSE %]Add Reply[% END %]
+        </h3>
+        <form method="post" action="[% c.uri_for('/HelpDesk/ticket/reply/' _ ticket.ticket_number) %]">
+            <textarea name="reply_body" rows="5" placeholder="Type your reply..." required
+                      class="reply-textarea"></textarea>
+            <div class="reply-actions">
+                <button type="submit" class="btn btn-primary">
+                    [% IF is_staff %]Send Reply &amp; Email Customer[% ELSE %]Send Reply[% END %]
+                </button>
+                [% IF is_staff %]
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="btn btn-secondary">
+                    &larr; Back to Tickets
+                </a>
+                [% END %]
+            </div>
+        </form>
+    </div>
+    [% ELSE %]
+    <div class="reply-box">
+        <p><a href="[% c.uri_for('/user/login') %]">Log in</a> to reply to this ticket.</p>
+    </div>
+    [% END %]
+
+</div>
+
+
