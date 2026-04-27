@@ -223,14 +223,37 @@ sub index :Path :Args(0) {
             "Outstanding invoices query error: $@");
     }
 
+    my $helpdesk_open_tickets = [];
+    my $helpdesk_open_count   = 0;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        my $is_csc    = lc($site_name) eq 'csc';
+        my %hd_where  = (status => [qw(open in_progress)]);
+        $hd_where{site_name} = $site_name unless $is_csc;
+        my @hd_tickets = $c->model('DBEncy')->resultset('SupportTicket')->search(
+            \%hd_where,
+            { order_by => [{ -desc => 'me.created_at' }], rows => 10 }
+        )->all;
+        $helpdesk_open_count   = $is_csc
+            ? $c->model('DBEncy')->resultset('SupportTicket')->search({ status => [qw(open in_progress)] })->count
+            : scalar @hd_tickets;
+        $helpdesk_open_tickets = \@hd_tickets;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "HelpDesk ticket query error: $@");
+    }
+
     $c->stash(
-        template             => 'admin/index.tt',
-        stats                => $stats,
-        recent_activity      => $recent_activity,
-        notifications        => $notifications,
-        pending_hosting       => $pending_hosting,
-        pending_hosting_sites => $pending_hosting_sites,
-        outstanding_invoices  => $outstanding_invoices,
+        template              => 'admin/index.tt',
+        stats                 => $stats,
+        recent_activity       => $recent_activity,
+        notifications         => $notifications,
+        pending_hosting        => $pending_hosting,
+        pending_hosting_sites  => $pending_hosting_sites,
+        outstanding_invoices   => $outstanding_invoices,
+        helpdesk_open_tickets  => $helpdesk_open_tickets,
+        helpdesk_open_count    => $helpdesk_open_count,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
