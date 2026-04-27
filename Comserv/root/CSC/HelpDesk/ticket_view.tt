@@ -1,4 +1,4 @@
-[% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.01 2026/04/20' %]
+[% PageVersion = 'CSC/HelpDesk/ticket_view.tt,v 0.02 2026/04/27' %]
 [% IF c.session.debug_mode == 1 %]<br>[% PageVersion %]</br>[% END %]
 
 <div class="helpdesk-container">
@@ -13,8 +13,19 @@
         <span>[% ticket.ticket_number %]</span>
     </nav>
 
-    [% IF error_msg %]<div class="hd-alert-error">[% error_msg %]</div>[% END %]
-    [% IF success_msg %]<div class="hd-alert-success">[% success_msg %]</div>[% END %]
+    [% IF error_msg || c.flash.error_msg %]
+    <div class="hd-alert-error">[% error_msg || c.flash.error_msg %]</div>
+    [% END %]
+    [% IF success_msg || c.flash.success_msg %]
+    <div class="hd-alert-success">[% success_msg || c.flash.success_msg %]</div>
+    [% END %]
+
+    [% IF !is_staff && (ticket.status == 'closed' || ticket.status == 'resolved') %]
+    <div class="hd-alert-info">
+        <strong>This ticket is [% ticket.status %].</strong>
+        Replying below will automatically reopen it.
+    </div>
+    [% END %]
 
     <div class="ticket-header-card">
         <div class="ticket-meta-row">
@@ -32,12 +43,72 @@
             <span>Submitted by: <strong>[% ticket.username || ticket.email || 'Guest' %]</strong></span>
             &bull;
             <span>Created: <strong>[% ticket.created_at %]</strong></span>
+            [% IF ticket.updated_at %]
+            &bull;
+            <span>Last activity: <strong>[% ticket.updated_at %]</strong></span>
+            [% END %]
             [% IF ticket.assigned_to %]
             &bull;
             <span>Assigned to: <strong>[% ticket.assigned_to %]</strong></span>
             [% END %]
+            [% IF ticket.closed_at %]
+            &bull;
+            <span>Closed: <strong>[% ticket.closed_at %]</strong></span>
+            [% END %]
         </div>
     </div>
+
+    [% IF is_staff %]
+    <div class="ticket-status-panel">
+        <strong>Change Status:</strong>
+        <div class="ticket-status-actions">
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/update_status/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                [% UNLESS ticket.status == 'open' %]
+                <button type="submit" name="new_status" value="open"
+                        class="btn btn-sm btn-secondary">&#9654; Open</button>
+                [% END %]
+                [% UNLESS ticket.status == 'in_progress' %]
+                <button type="submit" name="new_status" value="in_progress"
+                        class="btn btn-sm btn-secondary">&#8987; In Progress</button>
+                [% END %]
+                [% UNLESS ticket.status == 'awaiting_response' %]
+                <button type="submit" name="new_status" value="awaiting_response"
+                        class="btn btn-sm btn-warning"
+                        title="Sets ticket to awaiting customer response and emails the customer">
+                    &#9993; Awaiting Response
+                </button>
+                [% END %]
+                [% UNLESS ticket.status == 'resolved' %]
+                <button type="submit" name="new_status" value="resolved"
+                        class="btn btn-sm btn-success">&#10003; Resolve</button>
+                [% END %]
+                [% UNLESS ticket.status == 'closed' %]
+                <button type="submit" name="new_status" value="closed"
+                        class="btn btn-sm btn-danger">&#10006; Close</button>
+                [% END %]
+            </form>
+
+            [% IF ticket.email && (ticket.status == 'awaiting_response' || ticket.status == 'open' || ticket.status == 'in_progress') %]
+            <form method="post"
+                  action="[% c.uri_for('/HelpDesk/ticket/remind/' _ ticket.ticket_number) %]"
+                  style="display:contents;">
+                <button type="submit" class="btn btn-sm btn-secondary"
+                        title="Send reminder email to [% ticket.email %]">
+                    &#128276; Send Reminder
+                </button>
+            </form>
+            [% END %]
+        </div>
+
+        [% IF ticket.resolution %]
+        <div class="ticket-resolution-note">
+            <strong>Resolution note:</strong> [% ticket.resolution | html %]
+        </div>
+        [% END %]
+    </div>
+    [% END %]
 
     <div class="conversation-thread">
         <div class="message message-user message-original">
@@ -50,12 +121,15 @@
         </div>
 
         [% FOREACH msg IN messages %]
-        <div class="message message-[% msg.sender_type %]">
+        <div class="message message-[% msg.sender_type %]
+                     [% IF msg.sender_name == 'System' %] message-system[% END %]">
             <div class="message-header">
                 <span class="message-author">[% msg.sender_name || msg.sender_email || msg.sender_type %]</span>
+                [% IF msg.sender_name != 'System' %]
                 <span class="message-role-badge badge-[% msg.sender_type %]">
                     [% msg.sender_type == 'staff' ? 'Support Staff' : 'Customer' %]
                 </span>
+                [% END %]
                 <span class="message-time">[% msg.created_at %]</span>
             </div>
             <div class="message-body">[% msg.body | html | replace('\n', '<br>') %]</div>
@@ -64,6 +138,28 @@
     </div>
 
     [% IF c.session.username %]
+    [% IF ticket.status == 'closed' || ticket.status == 'resolved' %]
+    <div class="reply-box">
+        <h3>
+            [% IF is_staff %]Reply (will not reopen)[% ELSE %]Reply to Reopen[% END %]
+        </h3>
+        <form method="post" action="[% c.uri_for('/HelpDesk/ticket/reply/' _ ticket.ticket_number) %]">
+            <textarea name="reply_body" rows="5"
+                      placeholder="[% is_staff ? 'Add a follow-up note...' : 'Describe your issue and this ticket will be reopened...' %]"
+                      required class="reply-textarea"></textarea>
+            <div class="reply-actions">
+                <button type="submit" class="btn btn-primary">
+                    [% IF is_staff %]Post Note[% ELSE %]Send Reply &amp; Reopen Ticket[% END %]
+                </button>
+                [% IF is_staff %]
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="btn btn-secondary">
+                    &larr; Back to Tickets
+                </a>
+                [% END %]
+            </div>
+        </form>
+    </div>
+    [% ELSE %]
     <div class="reply-box">
         <h3>
             [% IF is_staff %]Reply to Customer[% ELSE %]Add Reply[% END %]
@@ -83,6 +179,7 @@
             </div>
         </form>
     </div>
+    [% END %]
     [% ELSE %]
     <div class="reply-box">
         <p><a href="[% c.uri_for('/user/login') %]">Log in</a> to reply to this ticket.</p>
@@ -90,5 +187,3 @@
     [% END %]
 
 </div>
-
-
