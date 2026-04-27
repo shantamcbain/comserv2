@@ -39,9 +39,9 @@
       <strong>[% assembled_cost > 0 ? assembled_cost : '—' %]</strong>
       [% IF assembled_cost > 0 && item.unit_cost %]
         [% IF assembled_cost > item.unit_cost %]
-          <span style="color:#dc3545;font-size:0.85em;">&#9650; over listed cost</span>
+          <span style="color: var(--danger-color, #dc3545);font-size:0.85em;">&#9650; over listed cost</span>
         [% ELSE %]
-          <span style="color:#28a745;font-size:0.85em;">&#9660; under listed cost</span>
+          <span style="color: var(--success-color, #28a745);font-size:0.85em;">&#9660; under listed cost</span>
         [% END %]
       [% END %]
     </td>
@@ -49,6 +49,31 @@
 </table>
 
 [% SET bom_rows = item.bom_components %]
+
+[% IF item.item_origin == '3d_printed' || item.item_origin == '3d_printer' || item.requires_printing %]
+[% SET has_fil_bom = 0 %]
+[% FOREACH comp IN bom_rows %][% IF comp.unit == 'g' %][% SET has_fil_bom = 1 %][% END %][% END %]
+<div style="margin-bottom:14px;padding:0.6em 1em;border-radius:5px;font-size:0.92em;
+  [% IF has_fil_bom && item.print_time_hours %]background:#d4edda;border:1px solid #c3e6cb;color:#155724;
+  [% ELSIF has_fil_bom || item.print_time_hours %]background:#fff3cd;border:1px solid #ffeeba;color:#856404;
+  [% ELSE %]background:#f8d7da;border:1px solid #f5c6cb;color:#721c24;[% END %]">
+  <strong>3D Print Queue status:</strong>
+  [% IF has_fil_bom && item.print_time_hours %]
+    &#10003; Ready — filament grams &amp; print time [% item.print_time_hours %]h configured. Queue will pre-fill automatically.
+  [% ELSIF has_fil_bom %]
+    &#9651; Filament grams set but <strong>print time (print_time_hours) not set</strong> on item.
+    Time field will not pre-fill.
+    <a href="/Inventory/item/edit/[% item.id %]" style="color:inherit;text-decoration:underline;">Edit item</a> to add it.
+  [% ELSIF item.print_time_hours %]
+    &#9651; Print time [% item.print_time_hours %]h set but <strong>no filament BOM line (unit = g)</strong>.
+    Filament grams field will not pre-fill. Add a component above with unit = g.
+  [% ELSE %]
+    &#9888; <strong>Not configured</strong> — no filament BOM (g) and no print time set.
+    Use the 3D Print Wizard below or add a component with unit = g and
+    <a href="/Inventory/item/edit/[% item.id %]" style="color:inherit;text-decoration:underline;">set print_time_hours on the item</a>.
+  [% END %]
+</div>
+[% END %]
 
 <h2>Components</h2>
 
@@ -110,11 +135,11 @@
               style="display:inline;">
           <input type="hidden" name="from" value="bom">
           <input type="submit" value="Remove"
-                 style="background:#dc3545;color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
+                 style="background: var(--danger-color, #dc3545);color:white;border:none;padding:2px 6px;border-radius:3px;cursor:pointer;font-size:0.8em;">
         </form>
       </td>
     </tr>
-    <tr id="edit-row-[% comp.id %]" style="display:none;background:#fffbe6;">
+    <tr id="edit-row-[% comp.id %]" style="display:none;background: var(--caution-bg, #fffbe6);">
       <td colspan="11">
         <form method="POST" action="/Inventory/bom/edit/[% comp.id %]"
               style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:6px;">
@@ -147,7 +172,7 @@
             <input type="text" name="notes" value="[% comp.notes | html %]" style="width:180px;">
           </label>
           <input type="submit" value="Save"
-                 style="background:#28a745;color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
+                 style="background: var(--success-color, #28a745);color:white;border:none;padding:4px 10px;border-radius:3px;cursor:pointer;">
           <button type="button" onclick="toggleEditRow([% comp.id %])"
                   style="padding:4px 10px;cursor:pointer;">Cancel</button>
         </form>
@@ -186,7 +211,7 @@
 <form method="POST" action="/Inventory/bom/add/[% item.id %]"
       onsubmit="patchRedirectToBom(this)">
   <input type="hidden" name="redirect_to" value="bom">
-  <table cellpadding="4" style="border:1px solid #ccc;background:#fafafa;padding:8px;">
+  <table cellpadding="4" style="border:1px solid #ccc;background: var(--bg-secondary, #fafafa);padding:8px;">
     <tr>
       <th><label for="component_item_id">Component Item *</label></th>
       <td>
@@ -199,7 +224,7 @@
           </option>
           [% END %]
         </select>
-        <span id="cost-preview" style="margin-left:8px;color:#555;font-size:0.9em;"></span>
+        <span id="cost-preview" style="margin-left:8px;color: var(--text-muted-color, #555);font-size:0.9em;"></span>
       </td>
     </tr>
     <tr>
@@ -249,7 +274,7 @@
     <tr>
       <td colspan="2">
         <input type="submit" value="Add to BOM"
-               style="background:#28a745;color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
+               style="background: var(--success-color, #28a745);color:white;padding:5px 14px;border:none;border-radius:4px;cursor:pointer;">
       </td>
     </tr>
   </table>
@@ -261,9 +286,9 @@
 
 <hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
 
-<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color:#666">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
+<h2>Add Direct Cost <small style="font-weight:normal;font-size:0.8em;color: var(--text-muted-color, #666)">(electricity, printer depreciation, labour — no stock item needed)</small></h2>
 
-<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+<div style="background:#f0f7ff;border:1px solid #b8d4f0;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color: var(--text-color, #333)">
   <strong>Filament note:</strong> Add filament using <em>Add Component</em> above — select your filament item, qty = grams used (e.g. 407.73), unit = g.
   The filament is a placeholder for cost calculation; actual stock of the chosen colour is deducted manually when you fulfil the order.
 </div>
@@ -302,7 +327,7 @@
       <td>
         <input type="number" id="cost_unit_cost" name="cost_unit_cost" step="0.0001" min="0.0001"
                required style="width:90px;" placeholder="0.17">
-        <span id="cost-line-preview" style="margin-left:10px;color:#555;font-size:0.9em;"></span>
+        <span id="cost-line-preview" style="margin-left:10px;color: var(--text-muted-color, #555);font-size:0.9em;"></span>
       </td>
     </tr>
     <tr>
@@ -327,13 +352,14 @@
 
 [% IF printers && printers.size > 0 %]
 <hr style="margin:24px 0;border:none;border-top:2px solid #e0e0e0;">
-<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color:#666">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
-<div style="background:#fff8e1;border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color:#333">
+<h2>3D Print Wizard <small style="font-weight:normal;font-size:0.8em;color: var(--text-muted-color, #666)">(auto-add filament, electricity &amp; depreciation to BOM)</small></h2>
+<div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffe082;border-radius:4px;padding:10px 14px;margin-bottom:12px;font-size:0.88em;color: var(--text-color, #333)">
   <strong>How it works:</strong> Enter slicer output (grams &amp; print time). The wizard adds filament (cost placeholder),
   electricity (based on printer wattage), and printer depreciation as BOM lines automatically.
   Actual colour stock deduction happens when you fulfil the order.
 </div>
-<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form">
+<form method="POST" action="/Inventory/bom/print_wizard/[% item.id %]" id="print-wizard-form"
+      onsubmit="if(!document.getElementById('pw_hours').value){alert('Please enter a print time.');return false;}">
   <table cellpadding="4" style="border:1px solid #ffe082;background:#fffdf0;padding:8px;width:100%;max-width:680px">
     <tr>
       <th style="text-align:left;width:200px"><label for="pw_printer">Printer *</label></th>
@@ -348,15 +374,17 @@
                   data-depr="[% peq.depreciation_per_hour IF peq %][% '0' UNLESS peq && peq.depreciation_per_hour %]">[% p.name | html %][% IF p.sku %] ([% p.sku | html %])[% END %][% IF peq && peq.wattage %] — [% peq.wattage %]W[% END %]</option>
           [% END %]
         </select>
-        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color:#555"></span>
+        <span id="pw-printer-info" style="margin-left:8px;font-size:0.85em;color: var(--text-muted-color, #555)"></span>
       </td>
     </tr>
     <tr>
-      <th><label for="pw_hours">Print Time (hours) *</label></th>
+      <th><label>Print Time *</label></th>
       <td>
-        <input type="number" id="pw_hours" name="print_hours" step="0.01" min="0.01" required
-               style="width:90px" placeholder="12.02" oninput="pwCalc()">
-        <small style="color:#777"> e.g. 12h 1m = 12.017</small>
+        <input type="hidden" id="pw_hours" name="print_hours" value="">
+        <input type="number" id="pw_h" min="0" max="999" style="width:3.5em;text-align:center" placeholder="0" oninput="pwTimeSync()"> h
+        <input type="number" id="pw_m" min="0" max="59"  style="width:3.2em;text-align:center" placeholder="0" oninput="pwTimeSync()"> m
+        <input type="number" id="pw_s" min="0" max="59"  style="width:3.2em;text-align:center" placeholder="0" oninput="pwTimeSync()"> s
+        <small style="color:#777;margin-left:0.4em;" id="pw_hours_display"></small>
       </td>
     </tr>
     [% IF filament_items && filament_items.size > 0 %]
@@ -414,7 +442,7 @@
   </table>
 </form>
 [% ELSE %]
-<div style="background:#f5f5f5;border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color:#555">
+<div style="background: var(--bg-secondary, #f5f5f5);border:1px solid #ccc;border-radius:4px;padding:10px 14px;margin:16px 0;font-size:0.88em;color: var(--text-muted-color, #555)">
   <strong>3D Print Wizard:</strong> No printer items found. Add an item with "printer" in its name, category, or origin — and set its Wattage and Depreciation/hr — to enable the wizard.
   <a href="/Inventory/item/add">Add item</a>
 </div>
@@ -496,8 +524,23 @@ function pwUpdatePrinter(sel) {
   pwCalc();
 }
 
+function pwTimeSync() {
+  var h = parseInt(document.getElementById('pw_h').value) || 0;
+  var m = parseInt(document.getElementById('pw_m').value) || 0;
+  var s = parseInt(document.getElementById('pw_s').value) || 0;
+  var total = h + m / 60 + s / 3600;
+  document.getElementById('pw_hours').value = total > 0 ? total.toFixed(6) : '';
+  var disp = document.getElementById('pw_hours_display');
+  if (total > 0) {
+    disp.textContent = '= ' + total.toFixed(4) + 'h';
+  } else {
+    disp.textContent = '';
+  }
+  pwCalc();
+}
+
 function pwCalc() {
-  var hours      = parseFloat(document.getElementById('pw_hours')       && document.getElementById('pw_hours').value)       || 0;
+  var hours      = parseFloat(document.getElementById('pw_hours').value) || 0;
   var grams      = parseFloat(document.getElementById('pw_filament_g')  && document.getElementById('pw_filament_g').value)  || 0;
   var kwhRate    = parseFloat(document.getElementById('pw_kwh_rate')     && document.getElementById('pw_kwh_rate').value)    || 0.17;
   var wattPct    = parseFloat(document.getElementById('pw_avg_watt_pct') && document.getElementById('pw_avg_watt_pct').value) || 50;

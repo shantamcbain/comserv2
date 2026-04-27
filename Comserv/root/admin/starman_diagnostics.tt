@@ -75,7 +75,7 @@
 }
 
 .admin-header {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -83,8 +83,8 @@
 }
 
 .admin-section {
-    background: white;
-    border: 1px solid #dee2e6;
+    background: var(--card-bg, rgba(255,255,255,0.88));
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -101,7 +101,7 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     border-radius: 4px;
 }
 
@@ -140,7 +140,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -150,13 +150,13 @@
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--secondary-color, #6c757d);
     color: white;
 }
 
 .output-container {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
     padding: 15px;
 }

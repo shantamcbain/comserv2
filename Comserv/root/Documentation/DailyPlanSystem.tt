@@ -59,8 +59,8 @@
     }
     
     .navigation-menu {
-        background: #f5f5f5;
-        border: 1px solid #ddd;
+        background: var(--bg-secondary, #f5f5f5);
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 4px;
         padding: 20px;
         margin-bottom: 20px;
@@ -68,7 +68,7 @@
     
     .navigation-menu h3 {
         margin-top: 0;
-        color: #333;
+        color: var(--text-color, #333);
         font-size: 1.1em;
     }
     
@@ -176,7 +176,7 @@
             </ul>
             
             <h3>Permission Model (as implemented)</h3>
-            <p style="font-size:0.9em;color:#555;margin-bottom:10px;">
+            <p style="font-size:0.9em;color: var(--text-muted-color, #555);margin-bottom:10px;">
                 Access is controlled in <code>Root.pm::auto</code> via <code>UserSiteRole</code> detection.
                 Admins access planning via <a href="/admin">/admin</a>;
                 users see their profile/role at <a href="/user/profile">/user/profile</a>.
@@ -243,7 +243,7 @@
                     </tr>
                 </tbody>
             </table>
-            <p style="font-size:0.85em;color:#666;margin-top:6px;">
+            <p style="font-size:0.85em;color: var(--text-muted-color, #666);margin-top:6px;">
                 <strong>Implementation note:</strong> CSC text-based plan tabs (DAILY PLAN GUIDE, ZENCODER PROMPT, MASTER PLAN COORDINATION)
                 are conditionally shown only when <code>is_csc = 1</code> in the session.
                 All other SiteNames see only DB-driven tabs (DAILY PRIORITIES, DAILY SCHEDULE, THIS WEEK, MONTH VIEW, PLANNING, GANTT, RESOURCES).
@@ -298,7 +298,7 @@
                     </li>
                     <li>3. Verify schema relationships in database</li>
                 </ul>
-                <p style="background: #fff3cd; border: 1px solid #ffc107; padding: 10px; border-radius: 4px; margin-top: 10px;"><strong>⚠️ Blocker:</strong> API token/key system not yet configured for programmatic database access. Tasks will be managed via browser interface until API endpoints are available.</p>
+                <p style="background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107); padding: 10px; border-radius: 4px; margin-top: 10px;"><strong>⚠️ Blocker:</strong> API token/key system not yet configured for programmatic database access. Tasks will be managed via browser interface until API endpoints are available.</p>
             </div>
 
             <div class="phase-container">

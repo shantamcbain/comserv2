@@ -867,6 +867,12 @@ sub auto_link_herb_data {
     };
 
     # --- constituents text → HerbConstituent junctions ---
+    my $sitename = ($c && blessed($c) && $c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'ENCY') : 'ENCY';
+    my $username = ($c && blessed($c) && $c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
+    my $group    = ($c && blessed($c) && $c->can('session') && $c->session) ? ($c->session->{group}    || '')       : '';
+    my $herb_ref = $form_data->{reference} // '';
+    my $herb_bot = $form_data->{botanical_name} // "herb #$herb_id";
+
     for my $term ($parse_terms->($form_data->{constituents})) {
         my $clean = $term;
         $clean =~ s/\s*\(.*//;
@@ -877,6 +883,24 @@ sub auto_link_herb_data {
                 { rows => 1, order_by => 'record_id' }
             )->first;
         };
+        unless ($rec) {
+            $rec = eval {
+                $self->ency_schema->resultset('Constituent')->create({
+                    name               => $clean,
+                    found_in_herbs     => $herb_bot,
+                    reference          => $herb_ref,
+                    sitename           => $sitename,
+                    username_of_poster => $username,
+                    group_of_poster    => $group,
+                    share              => 0,
+                });
+            };
+            if ($rec) {
+                push @todos, { field => 'constituents', term => $term, auto_created => 1 };
+            } else {
+                push @todos, { field => 'constituents', term => $term };
+            }
+        }
         if ($rec) {
             eval {
                 $self->ency_schema->resultset('HerbConstituent')->find_or_create({
@@ -886,8 +910,6 @@ sub auto_link_herb_data {
                 });
                 $linked++;
             };
-        } else {
-            push @todos, { field => 'constituents', term => $term };
         }
     }
 
@@ -905,17 +927,26 @@ sub auto_link_herb_data {
         }
     }
 
-    # --- create todos for unresolved terms ---
+    # --- create todos for unresolved / auto-created terms ---
     my %seen;
     for my $item (@todos) {
         my $key = "$item->{field}:$item->{term}";
         next if $seen{$key}++;
-        $self->_create_ency_todo($c,
-            "ENCY: Unresolved term in herb#$herb_id",
-            "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
-          . "This term was found in the '$item->{field}' field but does not match any existing ENCY record. "
-          . "Please verify and add it as a new entry if valid."
-        );
+        if ($item->{auto_created}) {
+            $self->_create_ency_todo($c,
+                "ENCY: New constituent stub created for herb#$herb_id",
+                "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
+              . "A stub Constituent record was auto-created for '$item->{term}' and linked to this herb. "
+              . "Please review and complete the constituent entry with full details (chemical formula, class, pharmacological effects, etc.)."
+            );
+        } else {
+            $self->_create_ency_todo($c,
+                "ENCY: Unresolved term in herb#$herb_id",
+                "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
+              . "This term was found in the '$item->{field}' field but could not be auto-created or matched in ENCY. "
+              . "Please verify and add it as a new entry if valid."
+            );
+        }
     }
 
     return ($linked, scalar @todos);

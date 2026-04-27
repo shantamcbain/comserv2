@@ -40,8 +40,13 @@
                 </div>
 
                 <div class="content-section">
-                    <h3><a href="/BMaster/add_yard">Add a Yard</a></h3>
-                    <p>Register a new bee yard location for your operation.</p>
+                    <h3><a href="/Apiary/inspections">Hive Inspections</a></h3>
+                    <p>Record and review detailed hive inspections — queen status, brood patterns, food stores, and frame-by-frame layout diagrams.</p>
+                </div>
+
+                <div class="content-section">
+                    <h3><a href="/BMaster/yards">Yard Management</a></h3>
+                    <p>View and manage all your registered bee yard locations. <a href="/BMaster/add_yard">Add a new yard</a> to expand your operation.</p>
                 </div>
             </div>
 
@@ -50,6 +55,8 @@
                 <h2>Administration</h2>
                 <div class="content-section">
                     <ul>
+                        <li><a href="/BMaster/yards">Manage Yards</a></li>
+                        <li><a href="/BMaster/add_yard">Add a New Yard</a></li>
                         <li><a href="/Apiary/yards_for_site/[% c.session.SiteName %]">View Yards for [% c.session.SiteName || 'this site' %]</a></li>
                     </ul>
                 </div>

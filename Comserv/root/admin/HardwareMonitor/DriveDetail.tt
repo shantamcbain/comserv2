@@ -19,8 +19,8 @@
 .dd-size-bar     { display: inline-block; height: 12px; background: #1976d2; border-radius: 2px; vertical-align: middle; }
 .dd-table        { width: 100%; border-collapse: collapse; }
 .dd-table th, .dd-table td { padding: 7px 10px; border-bottom: 1px solid #eee; text-align: left; }
-.dd-table th     { background: #f5f5f5; font-size: .85em; color: #555; }
-.dd-table tr:hover { background: #f9f9f9; }
+.dd-table th     { background: #f5f5f5; font-size: .85em; color: var(--text-color, #555); }
+.dd-table tr:hover { background: var(--bg-secondary, #f8f9fa); }
 .dd-icon-dir     { color: #1976d2; }
 .dd-icon-file    { color: #757575; }
 .dd-stat         { display: inline-block; margin-right: 24px; }
@@ -31,7 +31,7 @@
 <div class="app-container">
   <div class="page-header">
     <h1>&#128194; Drive Detail: [% mount | html %]</h1>
-    <p style="margin:4px 0 0; color:#666;">
+    <p style="margin:4px 0 0; color: var(--text-muted-color, #666);">
       Host: <strong>[% host | html %]</strong>
       &nbsp;|&nbsp;
       <a href="[% c.uri_for('/admin/hardware_monitor') %]">&larr; Back to Hardware Monitor</a>

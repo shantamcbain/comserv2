@@ -85,9 +85,23 @@ sub new {
     }, $class;
 }
 
+sub new_from_schema {
+    my ($class, %args) = @_;
+    die "new_from_schema requires 'schema'" unless $args{schema};
+    return bless {
+        _c       => undef,
+        _schema  => $args{schema},
+        _logging => Comserv::Util::Logging->instance,
+    }, $class;
+}
+
 sub _c      { $_[0]->{_c} }
 sub _log    { $_[0]->{_logging} }
-sub _schema { $_[0]->_c->model('DBEncy')->schema }
+sub _schema {
+    my $self = shift;
+    return $self->{_schema} if $self->{_schema};
+    return $self->_c->model('DBEncy')->schema;
+}
 
 # ---------------------------------------------------------------------------
 # balance($user_id) -> DECIMAL
@@ -383,6 +397,101 @@ sub record_payment {
 }
 
 # ---------------------------------------------------------------------------
+# credit_site_account(sitename => '3d', amount => N, transaction_type => ..., description => ...)
+# Credits a SiteName's point account (SitePointAccount table).
+# Used for referral commissions paid to the referring SiteName.
+# ---------------------------------------------------------------------------
+sub credit_site_account {
+    my ($self, %args) = @_;
+    my ($sitename, $amount, $type, $desc) =
+        @args{qw(sitename amount transaction_type description)};
+
+    die "credit_site_account: sitename required\n" unless $sitename;
+    die "credit_site_account: amount must be > 0\n"
+        unless looks_like_number($amount) && $amount > 0;
+
+    $self->_schema->txn_do(sub {
+        my $acct = $self->_schema->resultset('SitePointAccount')->find_or_create(
+            { sitename => $sitename },
+            { key => 'sitename' },
+        );
+        $acct->update({
+            balance         => ($acct->balance || 0) + $amount,
+            lifetime_earned => ($acct->lifetime_earned || 0) + $amount,
+        });
+    });
+
+    $self->_log->log_with_details(
+        $self->_c, 'info', __FILE__, __LINE__, 'credit_site_account',
+        "Credited $amount pts to site account '$sitename' (type=$type)"
+    );
+    return 1;
+}
+
+# ---------------------------------------------------------------------------
+# apply_hosting_commission(hosting_account_row, payment_amount)
+# On first hosting payment: credit referring SiteName and founder royalty.
+# Returns hashref { commission => N, royalty => N } or undef if nothing done.
+# ---------------------------------------------------------------------------
+sub apply_hosting_commission {
+    my ($self, $hosting_acct, $payment_amount) = @_;
+    return undef unless $hosting_acct && $payment_amount > 0;
+
+    my $schema = $self->_schema;
+    my $result  = { commission => 0, royalty => 0 };
+
+    my $cost_cfg = $schema->resultset('HostingCostConfig')->search(
+        {}, { order_by => { -desc => 'id' }, rows => 1 }
+    )->first;
+
+    my $commission_pct = ($cost_cfg ? $cost_cfg->commission_percent : 10) / 100;
+    my $referring      = $hosting_acct->referring_sitename;
+
+    if ($referring) {
+        my $commission = sprintf('%.4f', $payment_amount * $commission_pct);
+        eval {
+            $self->credit_site_account(
+                sitename         => $referring,
+                amount           => $commission,
+                transaction_type => 'hosting_commission',
+                description      => sprintf('Hosting commission: %s signed up (%s)',
+                    $hosting_acct->sitename, $hosting_acct->plan_slug // ''),
+            );
+        };
+        $result->{commission} = $commission unless $@;
+    }
+
+    my $founder_cfg = $schema->resultset('FounderRoyaltyConfig')->search(
+        { active => 1 }, { order_by => { -desc => 'id' }, rows => 1 }
+    )->first;
+
+    if ($founder_cfg) {
+        my $royalty_pct     = ($founder_cfg->royalty_percent || 5) / 100;
+        my $royalty_amount  = sprintf('%.4f', $payment_amount * $royalty_pct);
+        my $founder_user    = $schema->resultset('User')
+            ->find({ username => $founder_cfg->founder_username });
+        if ($founder_user && $royalty_amount > 0) {
+            eval {
+                $self->credit(
+                    user_id          => $founder_user->id,
+                    amount           => $royalty_amount,
+                    transaction_type => 'founder_royalty',
+                    description      => sprintf('Founder royalty %s%% on hosting payment: %s (%s)',
+                        $founder_cfg->royalty_percent,
+                        $hosting_acct->sitename,
+                        $hosting_acct->plan_slug // ''),
+                    reference_type   => 'hosting_account',
+                    reference_id     => $hosting_acct->id,
+                );
+            };
+            $result->{royalty} = $royalty_amount unless $@;
+        }
+    }
+
+    return $result;
+}
+
+# ---------------------------------------------------------------------------
 # convert(amount => N, from => 'USD', to => 'CAD') -> DECIMAL
 # Converts an amount between any two currencies using currency_rates.
 # Falls back to 1:1 if either rate is missing.
@@ -464,6 +573,48 @@ sub ledger_for_user {
 use constant DEFAULT_POINT_RATE => 60;
 
 # ---------------------------------------------------------------------------
+# resolve_rate(rule_type => '...', sitename => '...', role => '...') -> DECIMAL
+#
+# Returns the rate from the best matching point_rules row.
+# Match priority: highest priority value wins.
+# Falls back to DEFAULT_POINT_RATE for rule_type=hourly_rate if no rule found.
+# ---------------------------------------------------------------------------
+sub resolve_rate {
+    my ($self, %args) = @_;
+    my $rule_type = $args{rule_type} or return DEFAULT_POINT_RATE;
+    my $sitename  = $args{sitename};
+    my $role      = $args{role};
+    my $today     = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my @where = (
+        rule_type => $rule_type,
+        is_active => 1,
+        [ effective_from => undef, effective_from => { '<=' => $today } ],
+        [ effective_to   => undef, effective_to   => { '>=' => $today } ],
+    );
+
+    my $rs = $self->_schema->resultset('PointRule')->search(
+        {
+            rule_type => $rule_type,
+            is_active => 1,
+            -and => [
+                [ { effective_from => undef }, { effective_from => { '<=' => $today } } ],
+                [ { effective_to   => undef }, { effective_to   => { '>=' => $today } } ],
+            ],
+        },
+        { order_by => { -desc => 'priority' } },
+    );
+
+    while (my $rule = $rs->next) {
+        next if defined $rule->sitename && $rule->sitename ne ($sitename // '');
+        next if defined $rule->role     && $rule->role     ne ($role     // '');
+        return $rule->rate + 0;
+    }
+
+    return DEFAULT_POINT_RATE;
+}
+
+# ---------------------------------------------------------------------------
 # bill_time_log($log_row) -> ($ok, $error_message)
 #
 # Called when a log entry is closed (status=3/DONE).
@@ -499,14 +650,30 @@ sub bill_time_log {
 
     my $todo = $log_row->todo;
 
-    my $rate = $log_row->point_rate
-            // ($todo ? $todo->point_rate : undef)
-            // DEFAULT_POINT_RATE;
-
-    my $points = sprintf('%.4f', ($minutes / 60) * $rate);
-
     my $dev_user = $schema->resultset('User')
         ->find({ username => $log_row->username });
+
+    my $dev_role;
+    if ($dev_user) {
+        my $site = $schema->resultset('Site')->search({ name => ($log_row->sitename // '') })->first;
+        if ($site) {
+            my $usr = $schema->resultset('UserSiteRole')->search(
+                { user_id => $dev_user->id, site_id => $site->id },
+                { order_by => { -asc => 'role' } }
+            )->first;
+            $dev_role = $usr ? $usr->role : undef;
+        }
+    }
+
+    my $rate = $log_row->point_rate
+            // ($todo ? $todo->point_rate : undef)
+            // $self->resolve_rate(
+                rule_type => 'hourly_rate',
+                sitename  => $log_row->sitename,
+                role      => $dev_role,
+            );
+
+    my $points = sprintf('%.4f', ($minutes / 60) * $rate);
 
     my $customer_user_id = $todo ? $todo->user_id : undef;
     my $billable         = $todo ? ($todo->billable // 1) : 0;
@@ -574,10 +741,12 @@ sub bill_time_log {
         $self->_log->log_with_details(
             $self->_c, 'info', __FILE__, __LINE__, 'bill_time_log',
             sprintf(
-                "Processed log #%d: %.4f pts — dev=%s customer=%s",
+                "Processed log #%d: %.4f pts @ %.2f/hr — dev=%s role=%s customer=%s",
                 $log_row->record_id,
                 $points,
+                $rate,
                 $dev_user ? $dev_user->username : '(unknown)',
+                $dev_role // 'unknown',
                 $customer_user_id // '(none)',
             )
         );

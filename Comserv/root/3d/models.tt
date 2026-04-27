@@ -1,0 +1,293 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.models-table { width:100%; border-collapse:collapse; background:var(--secondary-color); border:1px solid var(--border-color); border-radius:6px; overflow:hidden; margin-bottom:1.5em; }
+.models-table th, .models-table td { padding:0.55em 0.85em; border-bottom:1px solid var(--border-color); color:var(--text-color); vertical-align:middle; font-size:0.9em; }
+.models-table th { background:var(--table-header-bg,var(--secondary-color)); font-weight:bold; text-align:left; }
+.models-table tr:last-child td { border-bottom:none; }
+.card { background:var(--secondary-color); border:1px solid var(--border-color); border-radius:8px; padding:1.2em 1.5em; margin-bottom:1.5em; }
+.card h2 { margin:0 0 1em; font-size:1.1em; color:var(--heading-color,var(--text-color)); border-bottom:1px solid var(--border-color); padding-bottom:0.4em; }
+.form-row { display:flex; gap:1em; flex-wrap:wrap; margin-bottom:0.8em; align-items:flex-end; }
+.form-row label { display:flex; flex-direction:column; gap:0.25em; font-size:0.88em; font-weight:bold; color:var(--text-muted-color); }
+.form-row input, .form-row select, .form-row textarea {
+    padding:0.4em 0.6em; border:1px solid var(--border-color); border-radius:4px;
+    background:var(--bg-color,#fff); color:var(--text-color); font-size:0.9em;
+}
+.form-row input[type=file] { padding:0.25em; }
+.badge-linked { background:#28a745; color:#fff; padding:0.15em 0.5em; border-radius:10px; font-size:0.78em; font-weight:bold; }
+.badge-unlinked { background:#ffc107; color:#333; padding:0.15em 0.5em; border-radius:10px; font-size:0.78em; font-weight:bold; }
+.stl-info { font-size:0.8em; color:var(--text-muted-color); }
+.btn-sm { padding:0.25em 0.65em; font-size:0.8em; border:none; border-radius:4px; cursor:pointer; font-weight:bold; color:#fff; }
+.btn-primary { background:var(--accent-color,#007bff); }
+.btn-warning { background:#fd7e14; }
+.btn-danger  { background:#dc3545; }
+
+#stl-drop-zone {
+    border:2px dashed var(--border-color); border-radius:8px; padding:1.5em;
+    text-align:center; color:var(--text-muted-color); transition:border-color 0.2s;
+    cursor:pointer;
+}
+#stl-drop-zone.dragover { border-color:var(--accent-color,#007bff); background:rgba(0,123,255,0.04); }
+#stl-preview { margin-top:0.6em; font-size:0.88em; }
+#stl-calc { margin-top:0.8em; padding:0.7em 1em; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; display:none; }
+.density-row { display:flex; gap:1.5em; font-size:0.88em; margin-top:0.4em; }
+.density-row span { font-weight:bold; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>🗂 3D Model Manager</h1>
+    <div style="display:flex;gap:0.8em;">
+        <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a> |
+        <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a>
+    </div>
+</div>
+
+[% IF c.flash.success_msg %]
+<div style="background:#d4edda;border:1px solid #c3e6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#155724;">
+    [% c.flash.success_msg | html %]
+</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div style="background:#f8d7da;border:1px solid #f5c6cb;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#721c24;">
+    [% c.flash.error_msg | html %]
+</div>
+[% END %]
+
+<div class="card">
+    <h2>⬆ Upload New STL Model</h2>
+    <form method="post" action="/3d/models" enctype="multipart/form-data" id="upload-form">
+        <input type="hidden" name="action" value="upload">
+
+        <div id="stl-drop-zone" onclick="document.getElementById('stl_file').click()">
+            <div>📁 Drop model file here or <strong>click to browse</strong><br>
+            <small style="color:var(--text-muted-color)">.stl .3mf .obj .gcode .step — volume auto-calculated for STL only</small></div>
+            <input type="file" name="stl_file" id="stl_file"
+                   accept=".stl,.STL,.3mf,.3MF,.obj,.OBJ,.gcode,.step,.stp"
+                   style="display:none" required onchange="previewFile(this)">
+            <div id="stl-preview"></div>
+        </div>
+
+        <div id="stl-calc">
+            <strong>STL Analysis (approximate — does not account for infill %)</strong>
+            <div class="density-row">
+                <div>Volume: <span id="calc-vol">—</span> cm³</div>
+                <div>Triangles: <span id="calc-tri">—</span></div>
+            </div>
+            <div class="density-row">
+                <div>PLA (1.24 g/cm³): <span id="calc-pla">—</span> g</div>
+                <div>PETG (1.27 g/cm³): <span id="calc-petg">—</span> g</div>
+                <div>ABS (1.05 g/cm³): <span id="calc-abs">—</span> g</div>
+            </div>
+            <div style="margin-top:0.5em;font-size:0.82em;color:var(--text-muted-color);">
+                ⚠ These are solid-body estimates. Your slicer value (with infill & supports) is more accurate for BOM.
+            </div>
+        </div>
+
+        <div class="form-row" style="margin-top:1em;">
+            <label style="flex:2;min-width:200px;">
+                Model Name *
+                <input type="text" name="model_name" id="model_name" required placeholder="e.g. Coffee Cup Holder" style="width:100%;">
+            </label>
+            <label style="flex:2;min-width:180px;">
+                Link to Inventory Item
+                <select name="item_id" id="item_id" style="width:100%;">
+                    <option value="">— not linked yet —</option>
+                    [% FOREACH it IN all_items %]
+                    <option value="[% it.id %]">[% it.name | html %] ([% it.sku | html %])</option>
+                    [% END %]
+                </select>
+            </label>
+            <label style="min-width:140px;">
+                Slicer Print Time
+                <input type="text" name="print_hours" id="print_hours" placeholder="e.g. 1h 47m" style="width:100%;">
+            </label>
+        </div>
+        <div class="form-row">
+            <label style="flex:3;min-width:250px;">
+                Description
+                <input type="text" name="model_desc" placeholder="Optional description" style="width:100%;">
+            </label>
+            <label style="flex:2;min-width:180px;">
+                Tags (comma-separated)
+                <input type="text" name="model_tags" placeholder="e.g. kitchen, holder, pla" style="width:100%;">
+            </label>
+        </div>
+        <div>
+            <button type="submit" class="btn-sm btn-primary" style="padding:0.5em 1.5em;font-size:0.95em;">
+                ⬆ Upload &amp; Register Model
+            </button>
+        </div>
+    </form>
+</div>
+
+[% IF models && models.size %]
+<div class="card">
+    <h2>📋 Registered Models ([% models.size %])</h2>
+    <table class="models-table">
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Linked Item</th>
+                <th>STL Info</th>
+                <th>Slicer Time</th>
+                <th>File</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH m IN models %]
+        <tr[% IF !m.is_active %] style="opacity:0.5"[% END %]>
+            <td>
+                <strong>[% m.name | html %]</strong>
+                [% IF m.description %]<br><small style="color:var(--text-muted-color)">[% m.description | html %]</small>[% END %]
+            </td>
+            <td>
+                [% IF m.item_id %]
+                <span class="badge-linked">✓ Linked</span>
+                <br><small>[% m.item_name | html %]</small>
+                <br><small style="color:var(--text-muted-color)">[% m.item_sku | html %]</small>
+                [% ELSE %]
+                <span class="badge-unlinked">⚠ Unlinked</span>
+                [% END %]
+            </td>
+            <td class="stl-info">
+                [% IF m.stl_volume_cm3 %]
+                Vol: [% m.stl_volume_cm3 | format('%.2f') %] cm³<br>
+                ~[% m.stl_weight_g | format('%.1f') %] g (PLA)
+                <button type="button" class="btn-sm btn-warning" style="margin-top:0.2em;"
+                        onclick="recalcSTL([% m.id %], this)">↺ Recalc</button>
+                [% ELSE %]
+                <em style="color:var(--text-muted-color)">not parsed</em>
+                [% IF m.nfs_path %]
+                <button type="button" class="btn-sm btn-warning" style="margin-top:0.2em;"
+                        onclick="recalcSTL([% m.id %], this)">▶ Parse STL</button>
+                [% END %]
+                [% END %]
+            </td>
+            <td>[% m.print_time_hours ? m.print_time_hours _ ' h' : '—' %]</td>
+            <td class="stl-info">
+                [% IF m.nfs_path %]
+                <code style="font-size:0.75em;word-break:break-all;">[% m.nfs_path | html %]</code><br>
+                <a href="/3d/model_download/[% m.id %]" class="btn-sm btn-primary" style="margin-top:0.3em;display:inline-block;">⬇ Download</a>
+                [% ELSE %]<em>—</em>[% END %]
+            </td>
+            <td>
+                <form method="post" action="/3d/models" style="display:inline;">
+                    <input type="hidden" name="action" value="link">
+                    <input type="hidden" name="model_id" value="[% m.id %]">
+                    <select name="item_id" style="font-size:0.8em;padding:0.2em;">
+                        <option value="">— unlink —</option>
+                        [% FOREACH it IN all_items %]
+                        <option value="[% it.id %]"
+                            [% IF m.item_id == it.id %]selected[% END %]>
+                            [% it.name | html %]
+                        </option>
+                        [% END %]
+                    </select>
+                    <input type="text" name="print_hours"
+                           value="[% m.print_time_hours | html %]"
+                           placeholder="h" style="width:55px;font-size:0.8em;padding:0.2em;">
+                    <button type="submit" class="btn-sm btn-primary">Save</button>
+                </form>
+                [% IF m.is_active %]
+                <form method="post" action="/3d/models" style="display:inline;margin-left:0.3em;">
+                    <input type="hidden" name="action" value="deactivate">
+                    <input type="hidden" name="model_id" value="[% m.id %]">
+                    <button type="submit" class="btn-sm btn-danger"
+                            onclick="return confirm('Hide this model?')">✕</button>
+                </form>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% ELSE %]
+<div style="text-align:center;padding:2em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
+    No models registered yet. Upload your first STL above.
+</div>
+[% END %]
+
+<script>
+const DROP = document.getElementById('stl-drop-zone');
+const FILE = document.getElementById('stl_file');
+const CALC = document.getElementById('stl-calc');
+
+DROP.addEventListener('dragover', e => { e.preventDefault(); DROP.classList.add('dragover'); });
+DROP.addEventListener('dragleave', () => DROP.classList.remove('dragover'));
+DROP.addEventListener('drop', e => {
+    e.preventDefault();
+    DROP.classList.remove('dragover');
+    if (e.dataTransfer.files.length) {
+        const dt = new DataTransfer();
+        dt.items.add(e.dataTransfer.files[0]);
+        FILE.files = dt.files;
+        previewFile(FILE);
+    }
+});
+
+function previewFile(input) {
+    const f = input.files[0];
+    if (!f) return;
+    document.getElementById('stl-preview').textContent = '📄 ' + f.name + ' (' + (f.size/1024).toFixed(1) + ' KB)';
+
+    if (document.getElementById('model_name').value === '') {
+        let n = f.name.replace(/\.stl$/i, '').replace(/[_\-]+/g, ' ');
+        n = n.replace(/\b\w/g, c => c.toUpperCase());
+        document.getElementById('model_name').value = n;
+    }
+
+    parseSTLClientSide(f);
+}
+
+function parseSTLClientSide(file) {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const buf = e.target.result;
+        const view = new DataView(buf);
+
+        let vol = 0, tris = 0;
+
+        const headerStr = String.fromCharCode(...new Uint8Array(buf, 0, 80));
+        const isBinary = !(headerStr.startsWith('solid') && !headerStr.includes('\0'));
+
+        if (!isBinary && false) {
+        } else {
+            tris = view.getUint32(80, true);
+            for (let i = 0; i < tris; i++) {
+                const base = 84 + i * 50;
+                if (base + 50 > buf.byteLength) break;
+                const x1 = view.getFloat32(base+12, true), y1 = view.getFloat32(base+16, true), z1 = view.getFloat32(base+20, true);
+                const x2 = view.getFloat32(base+24, true), y2 = view.getFloat32(base+28, true), z2 = view.getFloat32(base+32, true);
+                const x3 = view.getFloat32(base+36, true), y3 = view.getFloat32(base+40, true), z3 = view.getFloat32(base+44, true);
+                vol += (x1*(y2*z3 - y3*z2) - y1*(x2*z3 - x3*z2) + z1*(x2*y3 - x3*y2)) / 6.0;
+            }
+        }
+
+        vol = Math.abs(vol) / 1000.0;
+
+        document.getElementById('calc-vol').textContent  = vol.toFixed(4);
+        document.getElementById('calc-tri').textContent  = tris.toLocaleString();
+        document.getElementById('calc-pla').textContent  = (vol * 1.24).toFixed(2);
+        document.getElementById('calc-petg').textContent = (vol * 1.27).toFixed(2);
+        document.getElementById('calc-abs').textContent  = (vol * 1.05).toFixed(2);
+        CALC.style.display = 'block';
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function recalcSTL(modelId, btn) {
+    const orig = btn.textContent;
+    btn.textContent = '…';
+    btn.disabled = true;
+    fetch('/3d/model_stl_info/' + modelId)
+        .then(r => r.json())
+        .then(d => {
+            if (d.error) { alert(d.error); }
+            else { location.reload(); }
+        })
+        .catch(e => alert('Error: ' + e))
+        .finally(() => { btn.textContent = orig; btn.disabled = false; });
+}
+</script>

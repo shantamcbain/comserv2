@@ -172,18 +172,18 @@
       <div style="display:flex;align-items:flex-start;gap:12px;flex-wrap:wrap;">
         <div style="flex:1;min-width:220px;">
           <div style="font-weight:bold;color:#1a5a1a;margin-bottom:6px;">🌅 Today's Log Entry</div>
-          <div style="font-size:.9em;margin-bottom:4px;"><strong>Started:</strong> [% open_log_entry.created_at %]</div>
+          <div style="font-size:.9em;margin-bottom:4px;"><strong>Started:</strong> [% open_log_entry.start_date %] [% open_log_entry.start_time %]</div>
           <div style="font-size:.9em;margin-bottom:8px;"><strong>Title:</strong>
-            <input id="log-title-edit" type="text" value="[% open_log_entry.title | html %]"
+            <input id="log-title-edit" type="text" value="[% open_log_entry.abstract | html %]"
                    style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;">
           </div>
           <div style="font-size:.9em;"><strong>Notes:</strong>
             <textarea id="log-desc-edit" rows="3"
-                      style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;resize:vertical;">[% open_log_entry.description | html %]</textarea>
+                      style="width:100%;box-sizing:border-box;padding:4px 8px;border:1px solid #ccc;border-radius:4px;font-size:.9em;resize:vertical;">[% open_log_entry.details | html %]</textarea>
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:8px;min-width:120px;">
-          <button onclick="saveLogEntry([% open_log_entry.id %])"
+          <button onclick="saveLogEntry([% open_log_entry.record_id %])"
                   style="padding:7px 14px;background:#2a7a2a;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.9em;">
             💾 Save Notes
           </button>
@@ -192,12 +192,12 @@
             🌙 Close Day
           </button>
           <button onclick="document.getElementById('log-panel').style.display='none'"
-                  style="padding:7px 14px;background:#eee;color:#333;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
+                  style="padding:7px 14px;background:#eee;color: var(--text-color, #333);border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.9em;">
             ✖ Dismiss
           </button>
         </div>
       </div>
-      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color:#555;"></div>
+      <div id="log-save-status" style="font-size:.8em;margin-top:6px;color: var(--text-color, #555);"></div>
     </div>
     [% END %]
 
@@ -227,9 +227,6 @@
         [% IF is_csc %]
         <button class="tab-button" onclick="switchTab(event, 'daily-plan-guide')">
             DAILY PLAN GUIDE
-        </button>
-        <button class="tab-button" onclick="switchTab(event, 'zencoder-prompt')">
-            ZENCODER PROMPT
         </button>
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
@@ -304,10 +301,10 @@
                             [%# Priority badge %]
                             [% IF ap.priority %]
                             <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
-                                [% IF ap.priority <= 2 %]background:#dc3545;color:#fff
+                                [% IF ap.priority <= 2 %]background: var(--danger-color, #dc3545);color:#fff
                                 [% ELSIF ap.priority <= 4 %]background:#fd7e14;color:#fff
-                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color:#333
-                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color: var(--text-color, #333)
+                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                 P[% ap.priority %]
                             </span>
                             [% END %]
@@ -315,7 +312,7 @@
                             [%# Status badge %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
                                 [% IF ap.status == 2 %]background:#17a2b8;color:#fff
-                                [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                 [% IF ap.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
                             </span>
 
@@ -326,7 +323,7 @@
 
                             [%# Blocking badge %]
                             [% IF ap.is_blocking %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
                             [% END %]
 
                             [%# Cross-project blocker badge %]
@@ -336,7 +333,7 @@
 
                             [%# Blocked badge %]
                             [% IF is_blocked %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color:#333;" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color: var(--text-color, #333);" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
                             [% END %]
 
                             [%# Site label (CSC all-sites view) %]
@@ -534,14 +531,14 @@
         [% SET view_sitename = filter_site || plan_sitename %]
 
         [%# ── Branch server launcher (CSC admin only) ── %]
-        [% SET _bsite = c.stash.SiteName || c.session.SiteName || 'CSC' %]
-        [% IF is_admin && _bsite == 'CSC' %]
+        [% IF is_admin && is_csc %]
         [% SET cur_branch = c.stash.app_workflow || 'main' %]
         [% SET host       = c.req.uri.host %]
         [% SET scheme     = c.req.uri.scheme %]
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
+            'main'                                     => 3001,
             'planningsystem-59ae'                      => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
@@ -570,6 +567,7 @@
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
+            { name => 'main',                                  port => 3001, label => 'MAIN',                 url => '/Documentation/DailyPlan' },
             { name => 'planningsystem-59ae',                   port => 4001, label => 'PlanningSystem',       url => '/Documentation/DailyPlan' },
             { name => 'aichatsystem-ef4e',                     port => 4010, label => 'AIChatSystem',         url => '/Documentation/DailyPlan' },
             { name => 'schema-managment-system-7eb3',          port => 4002, label => 'SchemaManagement',     url => '/Documentation/DailyPlan' },
@@ -647,14 +645,22 @@
                     <tr style="border-bottom:1px solid var(--border-color);">
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Branch</th>
                         <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Port</th>
+                        <th style="text-align:left;padding:4px 8px;color:var(--text-muted-color);">Start Command</th>
                         <th style="padding:4px 8px;"></th>
                     </tr>
                     [% FOREACH b IN all_branches %]
+                    [% SET b_worktree = (b.name == 'main') ? '/home/shanta/PycharmProjects/comserv2/Comserv' : ('/home/shanta/.zenflow/worktrees/' _ b.name _ '/Comserv') %]
+                    [% SET b_cmd = 'cd ' _ b_worktree _ ' && perl script/comserv_server.pl -p ' _ b.port _ ' -r' %]
                     <tr style="border-bottom:1px solid var(--border-color);[% IF b.name == cur_branch %]background:color-mix(in srgb,#fd7e14 8%,var(--bg-color));[% END %]">
                         <td style="padding:5px 8px;"><code>[% b.label %]</code>
                             [% IF b.name == cur_branch %]<span style="color:#fd7e14;font-size:0.8em;"> ← current</span>[% END %]
                         </td>
                         <td style="padding:5px 8px;"><code>:[% b.port %]</code></td>
+                        <td style="padding:5px 8px;max-width:340px;">
+                            <code id="cmd-[% b.port %]" style="font-size:0.8em;word-break:break-all;">[% b_cmd %]</code>
+                            <button onclick="navigator.clipboard.writeText(document.getElementById('cmd-[% b.port %]').textContent);this.textContent='✓';setTimeout(()=>this.textContent='📋',1500);"
+                                style="padding:1px 6px;border:1px solid var(--border-color);border-radius:3px;background:transparent;color:var(--text-muted-color);cursor:pointer;margin-left:4px;font-size:0.85em;">📋</button>
+                        </td>
                         <td style="padding:5px 8px;white-space:nowrap;">
                             <a href="[% scheme %]://[% host %]:[% b.port %][% b.url %]" target="_blank"
                                style="padding:2px 8px;background:var(--primary-color);color:#fff;border-radius:3px;text-decoration:none;font-size:0.85em;">Open</a>
@@ -742,13 +748,18 @@
         [% END %]
         <div id="project-sortable-list">
         [% SET current_site_label = '' %]
+        [% SET in_site_group = 0 %]
         [% FOREACH proj IN planning_projects %]
-            [%# Site group header for CSC all-sites view %]
+            [%# Site group collapsible container for CSC all-sites view %]
             [% IF is_csc && !filter_site && proj.sitename != current_site_label %]
+            [% IF in_site_group %]</details>[% END %]
             [% SET current_site_label = proj.sitename %]
-            <div class="site-group-header" style="margin:18px 0 6px;padding:4px 10px;background:var(--primary-color);color:#fff;border-radius:4px;font-size:0.85em;font-weight:bold;">
-                🌐 [% proj.sitename %]
-            </div>
+            [% SET in_site_group = 1 %]
+            <details class="site-group" style="margin-bottom:6px;">
+                <summary style="padding:4px 10px;background:var(--primary-color);color:var(--primary-text-color, var(--button-text-color, #fff));border-radius:4px;font-size:0.85em;font-weight:bold;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center;border:1px solid var(--primary-color);">
+                    <span>🌐 [% proj.sitename %]</span>
+                    <span style="font-size:0.9em;opacity:0.8;">▾</span>
+                </summary>
             [% END %]
 
             [%# Project card %]
@@ -766,8 +777,8 @@
                         [% IF proj.status %]
                         <span style="padding:1px 7px;border-radius:3px;font-size:0.75em;font-weight:bold;
                             [% IF proj.status == 'In-Process' || proj.status == 'active' %]background:#17a2b8;color:#fff
-                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background:#28a745;color:#fff
-                            [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                            [% ELSIF proj.status == 'Completed' || proj.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                            [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                             [% proj.status %]
                         </span>
                         [% END %]
@@ -795,8 +806,8 @@
                                 [% IF sub.status %]
                                 <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
                                     [% IF sub.status == 'In-Process' || sub.status == 'active' %]background:#17a2b8;color:#fff
-                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background:#28a745;color:#fff
-                                    [% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% ELSIF sub.status == 'Completed' || sub.status == 'completed' %]background: var(--success-color, #28a745);color:#fff
+                                    [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
                                     [% sub.status %]
                                 </span>
                                 [% END %]
@@ -818,7 +829,7 @@
                             <div style="display:flex;gap:6px;align-items:center;">
                                 [% IF pln.priority %]<span style="font-size:0.78em;color:var(--text-muted-color);">P[% pln.priority %]</span>[% END %]
                                 <span style="padding:1px 6px;border-radius:3px;font-size:0.72em;font-weight:bold;
-                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                                    [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
                                     [% pln.status || 'active' %]
                                 </span>
                                 <a href="/admin/plan/[% pln.id %]" style="font-size:0.78em;color:var(--primary-color);">View</a>
@@ -853,6 +864,7 @@
                 </div>
             </details>
         [% END %]
+        [% IF in_site_group %]</details>[% END %]
         </div>[%# end #project-sortable-list %]
 
         [%# ── Standalone plans (not linked to any project) ── %]
@@ -868,7 +880,7 @@
                 </div>
                 <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
                     <span style="padding:1px 6px;border-radius:3px;font-size:0.75em;font-weight:bold;
-                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color:#333[% ELSE %]background:#6c757d;color:#fff[% END %]">
+                        [% IF pln.status == 'active' %]background:#28a745;color:#fff[% ELSIF pln.status == 'paused' %]background:#ffc107;color: var(--text-color, #333)[% ELSE %]background:#6c757d;color:#fff[% END %]">
                         [% pln.status || 'active' %]
                     </span>
                     <a href="/admin/plan/[% pln.id %]" style="font-size:0.82em;color:var(--primary-color);">View</a>
@@ -901,7 +913,7 @@
         <div style="font-size:0.8em;color:var(--text-muted-color);margin-bottom:10px;">
             Projects that cannot proceed until their dependency delivers. Resolve blockers in order.
             [% IF dep_auto_resolved %]
-            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background:#28a745;color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
+            <span style="margin-left:10px;padding:1px 7px;border-radius:3px;background: var(--success-color, #28a745);color:#fff;">✓ [% dep_auto_resolved %] auto-resolved</span>
             [% END %]
             [% IF dep_auto_detected %]
             <span style="margin-left:6px;padding:1px 7px;border-radius:3px;background:#17a2b8;color:#fff;">+ [% dep_auto_detected %] auto-detected</span>
@@ -928,7 +940,7 @@
                 </td>
                 <td style="padding:7px 4px;text-align:center;">
                     [% IF dep.dependency_type == 'blocks' %]
-                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
+                    <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Hard block — cannot start until dependency delivers">🔒 blocks</span>
                     [% ELSE %]
                     <span style="font-size:0.75em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="Soft requirement">⚠ requires</span>
                     [% END %]
@@ -961,9 +973,9 @@
             <h2 style="margin:0;font-size:1.2em;">📊 Project Timeline — [% IF is_csc && !filter_site %]All Sites[% ELSE %][% plan_sitename %][% END %]</h2>
             <div style="display:flex;gap:8px;align-items:center;font-size:0.8em;">
                 <span style="display:inline-block;width:12px;height:12px;background:#17a2b8;border-radius:2px;"></span>In-Process
-                <span style="display:inline-block;width:12px;height:12px;background:#28a745;border-radius:2px;margin-left:6px;"></span>Completed
-                <span style="display:inline-block;width:12px;height:12px;background:#6c757d;border-radius:2px;margin-left:6px;"></span>Pending
-                <span style="display:inline-block;width:12px;height:12px;background:#dc3545;border-radius:2px;margin-left:6px;"></span>On Hold
+                <span style="display:inline-block;width:12px;height:12px;background: var(--success-color, #28a745);border-radius:2px;margin-left:6px;"></span>Completed
+                <span style="display:inline-block;width:12px;height:12px;background: var(--secondary-color, #6c757d);border-radius:2px;margin-left:6px;"></span>Pending
+                <span style="display:inline-block;width:12px;height:12px;background: var(--danger-color, #dc3545);border-radius:2px;margin-left:6px;"></span>On Hold
             </div>
         </div>
 
@@ -1074,12 +1086,7 @@
     </div>
 
     [% IF is_csc %]
-    <!-- TAB 5: ZENCODER PROMPT (CSC only) -->
-    <div id="zencoder-prompt" class="tab-content">
-        [% INCLUDE "admin/documentation/ZencoderOpeningPrompt.tt" %]
-    </div>
-
-    <!-- TAB 6: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
+    <!-- TAB: MASTER PLAN COORDINATION (CSC only) — coordinator view only; detail lives in DB -->
     <div id="master-plan-coordination" class="tab-content">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
             <h2 style="margin:0;font-size:1.2em;">🗺️ Master Plan Coordination — CSC</h2>
@@ -1183,8 +1190,8 @@
             </button>
         </div>
 
-        <details open style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details open style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 1: Database Schema & Models
             </summary>
             <div style="padding: 15px;">
@@ -1205,8 +1212,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 2: Data Seeding
             </summary>
             <div style="padding: 15px;">
@@ -1224,8 +1231,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 3: Access Control Utilities
             </summary>
             <div style="padding: 15px;">
@@ -1243,8 +1250,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 4: Plan Controller
             </summary>
             <div style="padding: 15px;">
@@ -1264,8 +1271,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 5-6: Templates (Daily, Weekly, Monthly Views)
             </summary>
             <div style="padding: 15px;">
@@ -1285,8 +1292,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 7: Project-Documentation Integration
             </summary>
             <div style="padding: 15px;">
@@ -1305,8 +1312,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 8: Audit Trail Viewer
             </summary>
             <div style="padding: 15px;">
@@ -1324,8 +1331,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 9-10: URL Migration & Todo Controller Integration
             </summary>
             <div style="padding: 15px;">
@@ -1344,8 +1351,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 11: Testing & Verification
             </summary>
             <div style="padding: 15px;">
@@ -1364,8 +1371,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 12: Documentation & Cleanup
             </summary>
             <div style="padding: 15px;">
@@ -1384,8 +1391,8 @@
             </div>
         </details>
 
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin: 20px 0;">
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd);">
                 📊 Phase 13: Production Deployment
             </summary>
             <div style="padding: 15px;">

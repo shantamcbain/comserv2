@@ -37,21 +37,59 @@
         <tr><td><label>Due Date:</label></td>
             <td><input type="date" name="due_date" value="[% record.get_column('due_date') %]"></td></tr>
         <tr><td><label>Time of Day:</label></td>
-            <td><input type="time" name="time_of_day" value="[% record.get_column('time_of_day') %]"></td></tr>
+            <td>
+                <select name="time_of_day">
+                    <option value="">-- Select Time --</option>
+                    [%
+                        USE date;
+                        SET current_time = record.get_column('time_of_day');
+                        IF current_time;
+                            SET current_time_short = current_time.substr(0, 5);
+                        ELSE;
+                            SET current_time_short = '';
+                        END;
+                        FOREACH hour IN [0..23];
+                            SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                            IF hour == 0;
+                                SET hour_12 = 12; SET period = 'AM';
+                            ELSIF hour < 12;
+                                SET hour_12 = hour; SET period = 'AM';
+                            ELSIF hour == 12;
+                                SET hour_12 = 12; SET period = 'PM';
+                            ELSE;
+                                SET hour_12 = hour - 12; SET period = 'PM';
+                            END;
+                            FOREACH minute IN ['00', '30'];
+                                SET time_value_24 = hour_24 _ ':' _ minute;
+                                SET time_display  = hour_12 _ ':' _ minute _ ' ' _ period;
+                    %]
+                    <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                    [%
+                            END;
+                        END;
+                    %]
+                </select>
+            </td></tr>
         <tr><td><label>Status:</label></td>
             <td>
                 <select name="status">
-                    [% SET s = record.get_column('status') %]
-                    <option value="New"        [% IF s == 'New'        || s == 1 %]selected[% END %]>New</option>
-                    <option value="InProgress" [% IF s == 'InProgress' || s == 2 %]selected[% END %]>In Progress</option>
-                    <option value="Done"       [% IF s == 'Done'       || s == 3 %]selected[% END %]>Done</option>
-                    <option value="Cancelled"  [% IF s == 'Cancelled'             %]selected[% END %]>Cancelled</option>
+                    <option value="1" [% IF current_status == 1 %]selected[% END %]>New</option>
+                    <option value="2" [% IF current_status == 2 %]selected[% END %]>In Progress</option>
+                    <option value="3" [% IF current_status == 3 %]selected[% END %]>Done</option>
+                    <option value="4" [% IF current_status == 4 %]selected[% END %]>Cancelled</option>
                 </select>
             </td></tr>
         <tr><td><label>Priority:</label></td>
-            <td><input type="number" name="priority" value="[% record.get_column('priority') %]" size="4"></td></tr>
+            <td>
+                <select name="priority">
+                    [% INCLUDE "todo/priority_select.tt" %]
+                </select>
+            </td></tr>
         <tr><td><label>Est. Hours:</label></td>
             <td><input type="number" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" size="6"></td></tr>
+        <tr><td><label>Accumulated Time:</label></td>
+            <td><input type="text" name="accumulative_time" value="[% accumulative_time | html %]" size="10" placeholder="HH:MM">
+                <small style="color:#888;">(auto-calculated from logs; override if needed)</small></td></tr>
         <tr><td><label>Group:</label></td>
             <td><input type="text" name="group_of_poster" value="[% record.get_column('group_of_poster') | html %]"></td></tr>
         <tr><td><label>Project:</label></td>
@@ -149,7 +187,7 @@
 [% END %]
 
 [% SET task_id = record.get_column('record_id') %]
-<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid #ddd; border-radius:4px; padding:16px; background:#fafafa;">
+<div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid var(--border-color, #ddd); border-radius:4px; padding:16px; background: var(--bg-secondary, #fafafa);">
     <h3 style="margin-top:0;">AI Chat Activity</h3>
     <div id="ai-task-conversations" data-task-id="[% task_id %]">
         <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>

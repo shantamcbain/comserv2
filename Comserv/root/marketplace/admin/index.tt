@@ -26,7 +26,7 @@
   [% IF listings.size %]
   <table style="width:100%;border-collapse:collapse;background:var(--bg-color,#fff);">
     <thead>
-      <tr style="background:var(--bg-secondary,#f8f9fa);border-bottom:2px solid #dee2e6;">
+      <tr style="background:var(--bg-secondary,#f8f9fa);border-bottom:2px solid var(--border-color, #dee2e6);">
         <th style="padding:10px;text-align:left;">ID</th>
         <th style="padding:10px;text-align:left;">Title</th>
         <th style="padding:10px;text-align:left;">Seller</th>
@@ -40,7 +40,7 @@
     </thead>
     <tbody>
       [% FOREACH l IN listings %]
-      <tr style="border-bottom:1px solid #dee2e6;">
+      <tr style="border-bottom:1px solid var(--border-color, #dee2e6);">
         <td style="padding:9px 10px;color:#999;font-size:0.85rem;">[% l.id %]</td>
         <td style="padding:9px 10px;">
           <a href="/marketplace/view/[% l.id %]" style="color:var(--primary-color,#007bff);text-decoration:none;">[% l.title | html %]</a>
@@ -61,7 +61,7 @@
         <td style="padding:9px 10px;text-align:center;">
           <form method="POST" action="/marketplace/delete/[% l.id %]" style="display:inline;"
                 onsubmit="return confirm('Delete listing [% l.id %]?')">
-            <button type="submit" style="padding:3px 8px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Delete</button>
+            <button type="submit" style="padding:3px 8px;background: var(--danger-color, #dc3545);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.8rem;">Delete</button>
           </form>
         </td>
       </tr>
@@ -69,6 +69,6 @@
     </tbody>
   </table>
   [% ELSE %]
-  <p style="color:#666;text-align:center;padding:40px;">No listings found.</p>
+  <p style="color: var(--text-muted-color, #666);text-align:center;padding:40px;">No listings found.</p>
   [% END %]
 </div>

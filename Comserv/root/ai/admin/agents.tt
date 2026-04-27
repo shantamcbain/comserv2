@@ -278,11 +278,11 @@
 }
 
 .access-cell.has-access {
-    color: #28a745;
+    color: var(--success-color, #28a745);
 }
 
 .access-cell.no-access {
-    color: #dc3545;
+    color: var(--danger-color, #dc3545);
     opacity: 0.5;
 }
 

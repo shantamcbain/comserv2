@@ -24,7 +24,7 @@
     </div>
 
     <!-- ALERT BANNER -->
-    <div style="background-color: #fff3cd; border: 2px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px;">
+    <div style="background-color: var(--caution-bg, #fff3cd); border: 2px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px;">
         <h3 style="margin-top: 0; color: #d84315;">⚠️ DRAFT - AWAITING APPROVAL</h3>
         <p style="color: var(--text-color); font-family: var(--body-font); margin: 5px 0;"><strong>This plan has NOT been approved for implementation.</strong> Please review the approach, confirm understanding of db_config.json authority, and approve before proceeding with any changes.</p>
     </div>
@@ -107,7 +107,7 @@
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 20px;">Production Database (Bare-Metal, Outside Proxmox)</h3>
-            <div style="background-color: #fff3e0; border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
+            <div style="background-color: var(--caution-bg, #fff3e0); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0; border-radius: 4px;">
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Host</strong>: 192.168.1.198 (bare-metal server, NOT on Proxmox)</li>
                     <li><strong>Database System</strong>: MariaDB 10.x</li>
@@ -305,7 +305,7 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-large);">Phase 0 Gap: Error Handling & Admin Setup (IMPLEMENT THIS)</h3>
             
-            <div style="background-color: #fff3cd; padding: var(--spacing-medium); border-left: 4px solid #ff9800; margin: var(--spacing-small) 0;">
+            <div style="background-color: var(--caution-bg, #fff3cd); padding: var(--spacing-medium); border-left: 4px solid #ff9800; margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>⚠️ Current Limitation</strong>: Application dies if configuration not found. For K8s-ready deployment:</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><strong>Problem</strong>: RemoteDB.pm line 87 calls <code>die</code> when no configuration found</li>

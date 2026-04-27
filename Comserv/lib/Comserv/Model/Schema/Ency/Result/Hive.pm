@@ -64,6 +64,11 @@ __PACKAGE__->add_columns(
         size => 50,
         is_nullable => 1,
     },
+    configuration_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        comment     => 'FK → hive_configurations — current active configuration for this hive',
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
@@ -78,6 +83,13 @@ __PACKAGE__->belongs_to(
     'Comserv::Model::Schema::Ency::Result::Yard',
     'yard_id',
     { is_deferrable => 1, on_delete => 'RESTRICT' }
+);
+
+__PACKAGE__->belongs_to(
+    'configuration',
+    'Comserv::Model::Schema::Ency::Result::HiveConfiguration',
+    'configuration_id',
+    { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(
@@ -115,6 +127,13 @@ __PACKAGE__->has_many(
     { cascade_delete => 0 }
 );
 
+__PACKAGE__->has_many(
+    'queen_hive_assignments',
+    'Comserv::Model::Schema::Ency::Result::QueenHiveAssignment',
+    'hive_id',
+    { cascade_delete => 0 }
+);
+
 # Custom methods
 sub active_boxes {
     my $self = shift;
@@ -145,6 +164,23 @@ sub display_name {
     my $name = $self->hive_number;
     $name .= " (" . $self->pallet_code . ")" if $self->pallet_code;
     return $name;
+}
+
+sub current_queen {
+    my $self = shift;
+    my $assignment = $self->queen_hive_assignments->search(
+        { removed_date => undef },
+        { order_by => { -desc => 'assigned_date' }, rows => 1, prefetch => 'queen' }
+    )->first;
+    return $assignment ? $assignment->queen : undef;
+}
+
+sub queen_history {
+    my $self = shift;
+    return $self->queen_hive_assignments->search(
+        {},
+        { order_by => { -desc => 'assigned_date' }, prefetch => 'queen' }
+    );
 }
 
 1;

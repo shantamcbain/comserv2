@@ -1,19 +1,19 @@
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Supplier Invoice — [% invoice.invoice_number || invoice.id %]
-  [% IF invoice.status == 'draft' %]<span style="background:#ffc107;color:#333;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">DRAFT</span>[% END %]
-  [% IF invoice.status == 'posted' %]<span style="background:#28a745;color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">POSTED</span>[% END %]
+  [% IF invoice.status == 'draft' %]<span style="background:#ffc107;color: var(--text-color, #333);padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">DRAFT</span>[% END %]
+  [% IF invoice.status == 'posted' %]<span style="background: var(--success-color, #28a745);color:white;padding:2px 8px;border-radius:3px;font-size:0.7em;vertical-align:middle;">POSTED</span>[% END %]
 </h1>
 <p>
   <a href="/Inventory/invoice">← All Invoices</a>
   [% IF invoice.status == 'draft' %]
   &nbsp;|&nbsp;
   <a href="/Inventory/invoice/edit/[% invoice.id %]"
-     style="background:#007bff;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Edit</a>
+     style="background: var(--primary-color, #007bff);color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Edit</a>
   &nbsp;
   <a href="/Inventory/invoice/post/[% invoice.id %]"
      onclick="return confirm('Post this invoice? Stock will be updated and a GL entry created. This cannot be undone.');"
-     style="background:#28a745;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Post Invoice</a>
+     style="background: var(--success-color, #28a745);color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">Post Invoice</a>
   [% END %]
   [% IF invoice.status == 'posted' %]
   &nbsp;|&nbsp;
@@ -28,7 +28,7 @@
      style="background:#6f42c1;color:white;padding:4px 12px;border-radius:3px;text-decoration:none;">&#x2295; Create GL Entry</a>
   [% END %]
   [% IF invoice.gl_entry_id %]
-  &nbsp;|&nbsp;<small style="color:#6c757d;">GL #[% invoice.gl_entry_id %]</small>
+  &nbsp;|&nbsp;<small style="color: var(--text-muted-color, #6c757d);">GL #[% invoice.gl_entry_id %]</small>
   [% END %]
 </p>
 
@@ -59,7 +59,7 @@
 [% IF (is_admin || c.stash.is_admin) && invoice.status != 'paid' && invoice.status != 'voided' %]
 <div style="margin:1.5rem 0;padding:1rem 1.5rem;background:#e8f5e9;border:2px solid #4caf50;border-radius:8px;max-width:520px;">
   <h3 style="margin:0 0 0.5rem;color:#1b5e20;">✅ Mark Paid by Shanta (Admin)</h3>
-  <p style="margin:0 0 0.5rem;font-size:0.9em;color:#333;">
+  <p style="margin:0 0 0.5rem;font-size:0.9em;color: var(--text-color, #333);">
     Use when Shanta paid this invoice personally (debit card, cash, etc.).<br>
     Marks it paid and credits Shanta's point account as compensation.
   </p>
@@ -86,7 +86,7 @@
 [% END %]
 
 [% IF invoice.status == 'outstanding' %]
-<div style="margin:1.5rem 0;padding:1.2rem 1.5rem;background:#fff8e1;border:2px solid #f59e0b;border-radius:8px;max-width:520px;">
+<div style="margin:1.5rem 0;padding:1.2rem 1.5rem;background: var(--caution-bg, #fff8e1);border:2px solid #f59e0b;border-radius:8px;max-width:520px;">
   <h3 style="margin:0 0 0.75rem;color:#92400e;">&#127970; Pay with Points</h3>
   <p style="margin:0 0 0.75rem;color:#78350f;">
     Balance due: <strong>[% invoice.total_amount %] pts</strong>

@@ -238,7 +238,7 @@
         </tr>
       </table>
 
-      <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+      <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>⚠️ Critical Note:</strong> Production database (192.168.1.198) is a bare-metal server <strong>OUTSIDE</strong> Proxmox. During Kubernetes migration, both this bare-metal DB and K8s databases will be kept in sync via MySQL replication. See <a href="[% c.uri_for('/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]" style="color: var(--link-color);">COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt</a> for migration strategy.</p>
       </div>
 

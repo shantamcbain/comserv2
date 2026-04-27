@@ -107,8 +107,11 @@ sub apiary :Path('/BMaster/apiary') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apiary', "BMaster apiary method called");
     push @{$c->stash->{debug_errors}}, "BMaster apiary method called";
 
-    # Redirect to the Apiary controller
-    $c->response->redirect('/Apiary');
+    if ($c->session->{user_id}) {
+        $c->response->redirect($c->uri_for('/Apiary'));
+    } else {
+        $c->stash(template => 'BMaster/apiary.tt');
+    }
 }
 
 # Route for Queen Rearing System
@@ -196,6 +199,66 @@ sub education :Path('/BMaster/education') :Args(0) {
     $c->stash(
         template => 'BMaster/education.tt',
         debug_msg => "Education and Collaboration"
+    );
+}
+
+sub yards :Path('/BMaster/yards') :Args(0) {
+    my ($self, $c) = @_;
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'yards', "BMaster yards method called");
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename};
+    my @yards;
+    eval {
+        @yards = $c->model('DBEncy')->resultset('Yard')->search(
+            { sitename => $sitename },
+            { order_by => 'yard_name' }
+        )->all;
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'yards', "DB error: $@") if $@;
+
+    $c->stash(
+        yards    => \@yards,
+        template => 'BMaster/yards.tt',
+    );
+}
+
+sub add_yard :Path('/BMaster/add_yard') :Args(0) {
+    my ($self, $c) = @_;
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_yard', "BMaster add_yard method called");
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->body_parameters;
+        eval {
+            $c->model('DBEncy')->resultset('Yard')->create({
+                yard_code        => $p->{yard_code},
+                yard_name        => $p->{yard_name},
+                sitename         => $c->session->{SiteName} || $p->{sitename},
+                total_yard_size  => $p->{total_yard_size} || 0,
+                date_established => $p->{date_established} || undef,
+                notes            => $p->{notes} || '',
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_yard', "Create failed: $@");
+            $c->stash->{error_messages} = ["Failed to add yard: $@"];
+        } else {
+            $c->flash->{success_msg} = "Yard '${\$p->{yard_name}}' added successfully.";
+            return $c->response->redirect($c->uri_for('/BMaster/yards'));
+        }
+    }
+
+    $c->stash(template => 'BMaster/add_yard.tt');
+}
+
+sub products :Path('/BMaster/products') :Args(0) {
+    my ($self, $c) = @_;
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', "BMaster products method called");
+    $c->stash(
+        template  => 'BMaster/products.tt',
+        debug_msg => 'Bee Products and Services',
     );
 }
 

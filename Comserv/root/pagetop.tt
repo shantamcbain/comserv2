@@ -31,18 +31,18 @@
 }
 
 .db-env-production {
-    background-color: #dc3545;
-    color: white;
+    background-color: var(--warning-color, #dc3545);
+    color: var(--button-text, #fff);
 }
 
 .db-env-staging {
-    background-color: #ffc107;
-    color: #333;
+    background-color: var(--caution-color, #ffc107);
+    color: var(--text-color, #333);
 }
 
 .db-env-dev {
-    background-color: #28a745;
-    color: white;
+    background-color: var(--success-color, #28a745);
+    color: var(--button-text, #fff);
 }
 
 .k8s-migration-banner {
@@ -364,6 +364,10 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+        [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
+        [% IF c.stash.enabled_modules.item('printing_3d') %]
+            [% INCLUDE 'Navigation/TopDropList3d.tt' %]
+        [% END %]
         </ul>
     </nav>
 

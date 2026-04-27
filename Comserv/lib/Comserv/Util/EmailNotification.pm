@@ -511,6 +511,8 @@ sub send_hosting_signup_notification {
 
     my $timestamp = scalar localtime;
 
+    my $addons_str = $account->requested_addons || 'none';
+
     my $body = qq{
 CSC Hosting Registration Request
 Time: $timestamp
@@ -522,6 +524,7 @@ A SiteName admin has submitted a hosting registration request:
   Domain Type   : ${\($account->domain_type || 'subdomain')}
   Domain        : ${\($account->domain || 'not specified')}
   Contact Email : ${\($account->contact_email || 'not provided')}
+  Add-ons       : $addons_str
   Notes         : ${\($account->notes || 'none')}
 
 ACTION: Review and approve this request at:

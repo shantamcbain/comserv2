@@ -8,6 +8,7 @@ use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::PointSystem;
+use Comserv::Util::Priority qw(priority_options);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -31,7 +32,7 @@ sub begin :Private {
 
 sub BUILD {
     my $self = shift;
-    $self->priority({ map {$_ => $_} (1 .. 10) });
+    $self->priority(priority_options());
     $self->status({
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -510,6 +511,70 @@ sub create_log :Path('/log/create_log') :Args() {
 
     # Redirect to /log after save
     $c->response->redirect($c->uri_for('/log'));
+}
+
+sub log_credits :Path('/log/credits') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $filter  = $c->req->param('filter') || 'pending';
+    my $page    = int($c->req->param('page') || 1);
+    my $per     = 50;
+
+    my %where = (status => 3);
+    if ($filter eq 'pending') {
+        $where{points_processed} = 0;
+    } elsif ($filter eq 'credited') {
+        $where{points_processed} = 1;
+    }
+
+    my $rs = $schema->resultset('Log')->search(
+        \%where,
+        {
+            order_by => { -desc => 'record_id' },
+            page     => $page,
+            rows     => $per,
+        }
+    );
+
+    my @logs   = $rs->all;
+    my $total  = $rs->pager->total_entries;
+    my $pages  = $rs->pager->last_page;
+
+    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'credit_one') {
+        my $log_id = int($c->req->param('log_id') || 0);
+        if ($log_id) {
+            my $log_row = $schema->resultset('Log')->find($log_id);
+            if ($log_row && $log_row->status == 3 && !$log_row->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = eval { $ps->bill_time_log($log_row) };
+                if ($@) {
+                    $c->flash->{error_msg} = "Error crediting log #$log_id: $@";
+                } elsif ($ok) {
+                    $c->flash->{success_msg} = "Log #$log_id credited successfully.";
+                } else {
+                    $c->flash->{error_msg} = "Log #$log_id skipped: $err";
+                }
+            }
+        }
+        $c->res->redirect($c->uri_for('/log/credits', { filter => $filter, page => $page }));
+        $c->detach;
+    }
+
+    $c->stash(
+        logs     => \@logs,
+        filter   => $filter,
+        page     => $page,
+        pages    => $pages,
+        total    => $total,
+        template => 'admin/Logging/LogCredits.tt',
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

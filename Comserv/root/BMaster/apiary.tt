@@ -1,5 +1,5 @@
-[% META title = "Apiary Management System" %]
-[% PageVersion = 'BMaster/apiary.tt,v 0.03 2026/03/17 shanta Exp shanta' %]
+[% META title = "Apiary Management System — BMaster" %]
+[% PageVersion = 'BMaster/apiary.tt,v 0.04 2026/04/26 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -7,75 +7,167 @@
 <div class="app-container">
 
     <div class="page-header">
-        <h1>Apiary Management System</h1>
-        <p class="page-subtitle">A comprehensive overview of your beekeeping operation.</p>
+        <h1>&#127757; Apiary Management System</h1>
+        <p class="page-subtitle">Everything you need to run a healthy, productive beekeeping operation — from your first hive to a full commercial apiary.</p>
     </div>
 
     <div class="content-container">
         <div class="content-primary">
 
+            <!-- Hero CTA -->
             <div class="app-section">
-                <p>This system is designed to provide you with a comprehensive overview of your beekeeping operation. It allows you to track, manage, and plan your apiary activities effectively.</p>
-
-                [% IF no_data %]
-                    <div class="empty-state">
-                        <p>No yards have been added yet. <a href="/BMaster/add_yard" class="btn btn-primary">Please add a Yard</a> to get started.</p>
+                <div class="content-section" style="background: var(--accent-light, #fffbe6); border-left: 4px solid var(--accent-color, #f5a623); padding: 1.5rem;">
+                    <h2>Your Complete Beekeeping Command Centre</h2>
+                    <p>BMaster members get access to a fully integrated apiary management system built by beekeepers, for beekeepers. Track your yards, hives, queens, and colony health — all in one place, all season long.</p>
+                    <div class="form-actions" style="margin-top: 1rem;">
+                        <a href="/user/create_account" class="btn btn-primary">&#10003; Join Free — Get Started Today</a>
+                        <a href="/membership" class="btn btn-secondary">View Membership Plans</a>
                     </div>
-                [% ELSE %]
-                    <div class="content-section">
-                        <h2>Operation Overview</h2>
-                        <p>Start your beekeeping day by reviewing your yard and hive data below. The system tracks changes in the number of frames of bees, brood, and other elements over the course of the season to help you understand the dynamics of your apiary at a glance.</p>
-                        <p><em>Note: Interactive graph display requires the data visualization service to be running.</em></p>
-                    </div>
-                [% END %]
-            </div>
-
-            <div class="app-section">
-                <h2>Key Features</h2>
-
-                <div class="content-section">
-                    <h3>Hive Tracking</h3>
-                    <p>Monitor various aspects of your hives, including:</p>
-                    <ul>
-                        <li>Hive condition and temperament</li>
-                        <li>Number of bees and frames of brood</li>
-                        <li>Frames of honey, foundation, comb, and empty</li>
-                        <li>Weight, disease status, and internal temperature</li>
-                    </ul>
-                </div>
-
-                <div class="content-section">
-                    <h3>Inventory Management</h3>
-                    <p>Keep track of your apiary equipment inventory to plan what is needed for your next yard visit:</p>
-                    <ul>
-                        <li>Tops, brood boxes, entrance reducers</li>
-                        <li>Frames, bottom boards, inner covers, frame feeders</li>
-                    </ul>
-                </div>
-
-                <div class="content-section">
-                    <h3>Seasonal Calendar</h3>
-                    <p>Plan your activities for the season with our integrated calendar. Schedule and manage tasks effectively across all yards and hives.</p>
                 </div>
             </div>
 
+            <!-- Feature: Yards & Hives -->
             <div class="app-section">
-                <h2>Navigate Your Apiary</h2>
+                <h2>&#128205; Yards &amp; Hive Management</h2>
+                <div class="content-section">
+                    <p>Organise your operation by yard (apiary location) and track every hive within each yard. Whether you run one backyard hive or dozens of yards across a region, the system scales with you.</p>
+                    <ul>
+                        <li><strong>Multiple yard locations</strong> — register each site with its address and notes</li>
+                        <li><strong>Hive-by-hive tracking</strong> — name, configuration, age, and status at a glance</li>
+                        <li><strong>Frame counts</strong> — brood, honey, pollen, empty, foundation, and comb frames per box</li>
+                        <li><strong>Hive configuration history</strong> — follow how each hive's equipment evolves over the season</li>
+                        <li><strong>Pallet and box inventory</strong> — know exactly what equipment is out at each yard</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Feature: Hive Inspections -->
+            <div class="app-section">
+                <h2>&#128269; Detailed Hive Inspections</h2>
+                <div class="content-section">
+                    <p>Go beyond a paper notebook. Every inspection is recorded with a full frame-by-frame breakdown, a visual hive diagram, and a timestamped audit trail you can search and compare.</p>
+                    <ul>
+                        <li><strong>Frame-level detail</strong> — record the type and condition of every frame in every box</li>
+                        <li><strong>Visual hive diagram</strong> — colour-coded frame layout: brood (orange), honey (yellow), pollen (green), empty (white), foundation (grey)</li>
+                        <li><strong>Queen status</strong> — link each inspection to the reigning queen, note her laying pattern and temperament</li>
+                        <li><strong>Observations &amp; treatments</strong> — document disease signs, mite washes, feeding, and any treatments applied</li>
+                        <li><strong>Inspection calendar</strong> — schedule upcoming inspections and get a season-at-a-glance view</li>
+                        <li><strong>Seasonal reports</strong> — trend charts that reveal how each hive is progressing across the year</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Feature: Queen Rearing -->
+            <div class="app-section">
+                <h2>&#128027; Queen Rearing &amp; Queen Records</h2>
+                <div class="content-section">
+                    <p>Raise better queens with structured records from graft to introduction. The Queen Rearing module guides you through each stage and keeps a permanent log of every queen in your operation.</p>
+                    <ul>
+                        <li><strong>Queen records</strong> — genetic line, colour marking, parent queen, drone source, acquisition date</li>
+                        <li><strong>Mating &amp; laying status</strong> — track from virgin through mated, laying, superseded, or retired</li>
+                        <li><strong>Graft calendar</strong> — plan your grafting cycles and emergence dates</li>
+                        <li><strong>Hive assignment history</strong> — see exactly which hive every queen has occupied</li>
+                        <li><strong>Queen event log</strong> — grafted, emerged, introduced, treated, moved, replaced — all timestamped</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Feature: Colony Health -->
+            <div class="app-section">
+                <h2>&#128138; Colony Health Monitoring</h2>
+                <div class="content-section">
+                    <p>Stay ahead of disease and pests. The health module helps you log mite counts, disease observations, and treatments so you can act early and keep your colonies strong.</p>
+                    <ul>
+                        <li><strong>Varroa mite tracking</strong> — alcohol wash and sticky board counts with trend history</li>
+                        <li><strong>Disease &amp; pest observations</strong> — log AFB, EFB, nosema, small hive beetle, and more</li>
+                        <li><strong>Treatment records</strong> — oxalic acid, formic, thymol — dosage, dates, and hive-level compliance</li>
+                        <li><strong>Feeding log</strong> — syrup, pollen substitute, type and quantity per hive</li>
+                        <li><strong>Health alerts</strong> — flag hives that need attention before your next yard visit</li>
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Feature: Bee Pasture -->
+            <div class="app-section">
+                <h2>&#127807; Bee Pasture &amp; Forage Planning</h2>
+                <div class="content-section">
+                    <p>Great honey starts with great forage. Use the Bee Pasture database to plan what blooms near your yards throughout the season and identify gaps in your bees' diet.</p>
+                    <ul>
+                        <li><strong>Plant encyclopedia</strong> — hundreds of bee-forage plants with bloom times, nectar and pollen ratings</li>
+                        <li><strong>Forage calendar</strong> — see what's in bloom at your location week by week</li>
+                        <li><strong>Environmental planning</strong> — identify forage gaps and plan plantings to fill them</li>
+                        <li><strong>Citizen science</strong> — contribute pollen observations to help the wider beekeeping community</li>
+                    </ul>
+                    <p><a href="/ENCY/BeePastureView">Browse the Bee Pasture Plant Database &rarr;</a></p>
+                </div>
+            </div>
+
+            <!-- Membership CTA -->
+            <div class="app-section">
+                <div class="content-section" style="text-align: center; padding: 2rem;">
+                    <h2>Ready to Take Control of Your Apiary?</h2>
+                    <p style="font-size: 1.1rem; margin-bottom: 1.5rem;">Join BMaster free and start managing your hives smarter. Upgrade to a full membership to unlock all apiary management tools, inspection history, and queen rearing records.</p>
+                    <div class="form-actions" style="justify-content: center; gap: 1rem; flex-wrap: wrap;">
+                        <a href="/user/create_account" class="btn btn-primary" style="font-size: 1.1rem; padding: 0.75rem 2rem;">&#10003; Create Free Account</a>
+                        <a href="/membership" class="btn btn-secondary" style="font-size: 1.1rem; padding: 0.75rem 2rem;">View Membership Plans</a>
+                        <a href="/user/login" class="btn btn-secondary">Already a member? Log In</a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick links for exploration -->
+            <div class="app-section">
+                <h2>Explore More</h2>
                 <div class="content-section">
                     <ul>
-                        <li><a href="/Apiary/QueenRearing">Queen Rearing System</a></li>
-                        <li><a href="/BMaster/yards">Your Yards</a></li>
+                        <li><a href="/BMaster">&#127968; BMaster Home</a></li>
+                        <li><a href="/ENCY/BeePastureView">&#127807; Bee Pasture Plant Database</a></li>
+                        <li><a href="/BMaster/education">&#128218; Beekeeping Education Resources</a></li>
+                        <li><a href="/workshop">&#128101; Upcoming Workshops</a></li>
+                        <li><a href="/Documentation/BMaster">&#128196; BMaster Documentation</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="page-footer">
                 <div class="footer-actions">
-                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                    <a href="/BMaster" class="btn btn-secondary">&#8592; Back to BMaster Home</a>
                 </div>
             </div>
 
         </div>
+
+        <!-- Sidebar -->
+        <div class="content-sidebar">
+            <div class="sidebar-section">
+                <h3>&#128081; Member Benefits</h3>
+                <ul>
+                    <li>&#10003; Unlimited yards &amp; hives</li>
+                    <li>&#10003; Full inspection history</li>
+                    <li>&#10003; Queen rearing records</li>
+                    <li>&#10003; Colony health tracking</li>
+                    <li>&#10003; Seasonal trend reports</li>
+                    <li>&#10003; Inspection calendar</li>
+                    <li>&#10003; Forage planning tools</li>
+                    <li>&#10003; AI-assisted advice</li>
+                </ul>
+                <div style="margin-top: 1rem;">
+                    <a href="/user/create_account" class="btn btn-primary" style="width: 100%; text-align: center; display: block;">Join Free</a>
+                </div>
+            </div>
+
+            <div class="sidebar-section" style="margin-top: 1.5rem;">
+                <h3>&#128218; Quick Links</h3>
+                <ul>
+                    <li><a href="/ENCY/BeePastureView">Bee Pasture Plants</a></li>
+                    <li><a href="/BMaster/education">Education Resources</a></li>
+                    <li><a href="/workshop">Workshops</a></li>
+                    <li><a href="/BMaster/beehealth">Bee Health Info</a></li>
+                    <li><a href="/BMaster/honey">Honey &amp; Harvest</a></li>
+                </ul>
+            </div>
+        </div>
+
     </div>
 
 </div>

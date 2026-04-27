@@ -18,8 +18,8 @@
     
     <div class="app-section">
         <!-- Completed Tasks Quick Navigation Menu -->
-        <details style="background: #f9f9f9; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px; padding: 0;" open>
-            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid #ddd; user-select: none;">
+        <details style="background: var(--bg-secondary, #f8f9fa); border: 1px solid #ddd; border-radius: 4px; margin-bottom: 20px; padding: 0;" open>
+            <summary style="padding: 15px; cursor: pointer; font-weight: bold; background: #f5f5f5; border-bottom: 1px solid var(--border-color, #ddd); user-select: none;">
                 🎯 Quick Jump to Completed Priority (Click to Expand)
             </summary>
             <div style="padding: 15px;">
@@ -60,7 +60,7 @@
                     <li id="completed-13"><strong><a href="/Documentation/DailyAuditGuide#architecture-simplification">#13: PlanningAgent Phase 2 - DocumentationAgent WRITER Role</a></strong> - Status: Verified & Completed. Roles explicitly defined in <code>coding-standards.yaml</code>.</li>
                     <li id="completed-14"><strong><a href="/Documentation/PriorityTodos#priority-14">#14: Update /updateprompt with Chat System Integration</a></strong> - Status: Verified & Completed. Integrated <code>/updateprompt.pl</code> with AI Chat system.</li>
                     <li id="completed-15"><strong><a href="/Documentation/ApiTokenReferenceGuide">#15: API Key Management Instructions</a></strong> - Status: Verified & Completed. <code>ApiTokenReferenceGuide.tt</code> created and verified.
-                        <div style="margin-top: 10px; background: #f9f9f9; padding: 10px; border-left: 3px solid #4caf50;">
+                        <div style="margin-top: 10px; background: var(--bg-secondary, #f8f9fa); padding: 10px; border-left: 3px solid #4caf50;">
                             <strong>Historical Prerequisites (Moved from PriorityTodos.tt):</strong>
                             <ul style="font-size: 0.9em; margin-bottom: 5px;">
                                 <li>Admin or developer role access</li>
@@ -80,7 +80,7 @@
                     <li><strong><a href="/Documentation/system/Phase0KubernetesReadinessPlan">Plan A.2: Phase 0 Kubernetes Readiness</a></strong> - Status: Verified & Completed (Jan 13, 2026).</li>
                     <li><strong><a href="/Documentation/system/CREDENTIALS_AUDIT_AND_PLAN">Plan A.3: Credentials Audit</a></strong> - Status: Verified & Completed (Jan 13, 2026).</li>
                 </ul>
-                <p style="margin-top: 15px; font-size: 0.9em; color: #555;"><em>Completed by: Cleanup Agent (Chat 110) | Timestamp: 2026-01-25T15:00:00Z</em></p>
+                <p style="margin-top: 15px; font-size: 0.9em; color: var(--text-color, #555);"><em>Completed by: Cleanup Agent (Chat 110) | Timestamp: 2026-01-25T15:00:00Z</em></p>
             </div>
         </details>
 

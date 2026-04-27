@@ -23,7 +23,7 @@
         Status: Active
     </div>
 
-    <div style="background-color: #fff3e0; border: 1px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
+    <div style="background-color: var(--caution-bg, #fff3e0); border: 1px solid #ff9800; padding: 15px; margin: 15px 0; border-radius: 4px;">
         <h3 style="color: #d84315; margin-top: 0;">⚠️ Note: Document Updated for Current Infrastructure</h3>
         <p style="color: var(--text-color); margin: 10px 0;"><strong>This document was originally written for Dell R710 hardware.</strong> It has been updated to reflect the <strong>current production infrastructure</strong> (Dec 23, 2025):</p>
         <ul style="color: var(--text-color); margin: 10px 0; padding-left: 20px;">

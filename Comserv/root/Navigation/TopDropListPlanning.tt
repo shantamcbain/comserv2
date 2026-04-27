@@ -1,5 +1,5 @@
 
-[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.0 2026/03/24 Planning top-menu dropdown — role-gated, SiteName-aware' %]
+[% PageVersion = 'Navigation/TopDropListPlanning.tt,v 1.1 2026/04/22 P3.1 theme-audit: inline style verified CSS-var compliant' %]
 [% IF c.session.debug_mode == 1 %]
     <!-- [% PageVersion %] -->
 [% END %]
@@ -34,11 +34,11 @@
 
 [% IF can_plan %]
 <li class="horizontal-dropdown">
-    <a href="/Documentation/DailyPlan" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
+    <a href="/planning/daily" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
     <div class="dropdown-content">
 
         [%# Core planning links %]
-        <a href="/Documentation/DailyPlan"><i class="icon-calendar"></i>Daily Plan</a>
+        <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
         <a href="/todo"><i class="icon-check-square"></i>Todo System</a>
         <a href="/log"><i class="icon-log"></i>Logs</a>
 

@@ -144,6 +144,26 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    filament_color => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    filament_type => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    print_time_hours => {
+        data_type   => 'decimal',
+        size        => [6, 2],
+        is_nullable => 1,
+    },
+    requires_printing => {
+        data_type     => 'tinyint',
+        is_nullable   => 1,
+        default_value => 0,
+    },
     condition => {
         data_type     => 'varchar',
         size          => 20,
@@ -261,6 +281,27 @@ __PACKAGE__->might_have(
     'Comserv::Model::Schema::Ency::Result::InventoryEquipment',
     { 'foreign.item_id' => 'self.id' },
     { cascade_delete => 1 }
+);
+
+__PACKAGE__->might_have(
+    'queen',
+    'Comserv::Model::Schema::Ency::Result::Queen',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
+__PACKAGE__->has_many(
+    'boxes',
+    'Comserv::Model::Schema::Ency::Result::Box',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
+);
+
+__PACKAGE__->has_many(
+    'hive_frames',
+    'Comserv::Model::Schema::Ency::Result::HiveFrame',
+    { 'foreign.inventory_item_id' => 'self.id' },
+    { cascade_delete => 0 }
 );
 
 __PACKAGE__->has_many(

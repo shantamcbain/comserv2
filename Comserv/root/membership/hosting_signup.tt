@@ -1,42 +1,81 @@
 [% META
-   title = "Register with CSC Hosting"
+   title = "CSC Hosting Registration"
    TemplateType = "Application"
 %]
+[% SET is_edit = hosting_account ? 1 : 0 %]
 
 [% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
 <div class="app-container">
   <div class="page-header">
+    [% IF is_edit %]
+    <h1>&#9998; Edit CSC Hosting Registration — [% site_name | html %]</h1>
+    <p>Update your hosting registration details for <strong>[% site_name | html %]</strong>.
+    Changes to add-ons or plan will be reviewed by CSC before taking effect.</p>
+    [% ELSE %]
     <h1>&#127760; Register [% site_name | html %] with CSC Hosting</h1>
     <p>Complete this form to register <strong>[% site_name | html %]</strong> as a CSC hosting partner.
     Once approved, your members will be able to purchase hosting plans directly from this site.</p>
+    [% END %]
   </div>
 
   <div class="content-container">
     <div class="content-primary">
 
+      [% IF is_update %]
+      <div class="content-section">
+        <h2>Current Account Status</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr>
+              <th>Status</th>
+              <td><span class="status-[% hosting_account.status | html %]">[% hosting_account.status | ucfirst | html %]</span></td>
+            </tr>
+            [% IF hosting_account.plan_slug %]
+            <tr><th>Plan</th><td>[% hosting_account.plan_slug | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.domain %]
+            <tr><th>Domain</th><td><code>[% hosting_account.domain | html %]</code></td></tr>
+            [% END %]
+            [% IF hosting_account.monthly_cost %]
+            <tr><th>Monthly Cost</th><td>CAD [% hosting_account.monthly_cost | format('%.2f') %]/mo</td></tr>
+            [% END %]
+            [% IF hosting_account.next_renewal_date %]
+            <tr><th>Next Renewal</th><td>[% hosting_account.next_renewal_date %]</td></tr>
+            [% END %]
+            [% IF hosting_account.requested_addons %]
+            <tr><th>Active Add-ons</th><td>[% hosting_account.requested_addons | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.contact_email %]
+            <tr><th>Billing Email</th><td>[% hosting_account.contact_email | html %]</td></tr>
+            [% END %]
+          </table>
+        </div>
+      </div>
+      [% END %]
+
       <form method="post" action="[% c.uri_for('/membership/hosting_signup') %]" class="form-standard">
 
         <div class="content-section">
           <h2>Site Information</h2>
-          <p style="color:#666;font-size:0.9rem;">Pre-filled from your site record. Edit if needed before submitting.</p>
+          <p style="color: var(--text-muted-color, #666);font-size:0.9rem;">Pre-filled from your site record. Edit if needed before submitting.</p>
 
           <div class="form-row">
             <div class="form-field">
               <label>SiteName</label>
-              <input type="text" value="[% site_name | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site_name | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
             <div class="form-field">
               <label>Display Name</label>
-              <input type="text" value="[% site.site_display_name | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site.site_display_name | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
           </div>
 
           <div class="form-row">
             <div class="form-field" style="flex:2;">
               <label>Description</label>
-              <input type="text" value="[% site.description | html %]" disabled style="background:#f5f5f5;">
+              <input type="text" value="[% site.description | html %]" disabled style="background: var(--bg-secondary, #f5f5f5);">
             </div>
             <div class="form-field">
               <label for="contact_email">Contact Email <span style="color:#888;font-size:0.85em;">(for CSC billing notices)</span></label>
@@ -48,7 +87,7 @@
           [% IF domains.size %]
           <div class="form-field">
             <label>Registered Domains</label>
-            <div style="background:#f5f5f5;border:1px solid #ddd;border-radius:4px;padding:0.5rem 0.75rem;font-family:monospace;font-size:0.9rem;">
+            <div style="background: var(--bg-secondary, #f5f5f5);border:1px solid var(--border-color, #ddd);border-radius:4px;padding:0.5rem 0.75rem;font-family:monospace;font-size:0.9rem;">
               [% FOREACH d IN domains %][% d.domain | html %][% UNLESS loop.last %],  [% END %][% END %]
             </div>
           </div>
@@ -67,7 +106,7 @@
               <strong>[% hplan.name | html %]</strong>
               — [% hplan.price_currency | html %] [% hplan.price_monthly %]/mo
               [% IF hplan.price_annual %]<span style="color:#888;font-size:0.85em;">(or [% hplan.price_currency | html %] [% hplan.price_annual %]/yr)</span>[% END %]<br>
-              <span style="font-size:0.88rem;color:#555;">[% hplan.description | html %]</span>
+              <span style="font-size:0.88rem;color: var(--text-muted-color, #555);">[% hplan.description | html %]</span>
             </div>
           </label>
           [% END %]
@@ -76,23 +115,27 @@
         <div class="content-section">
           <h2>Domain Setup</h2>
 
+          [% SET saved_domain_type = hosting_account.domain_type || 'subdomain' %]
           <div class="form-row">
             <div class="form-field">
               <label for="domain_type">Domain Type</label>
+              [% SET cur_dtype = hosting_account.domain_type || 'subdomain' %]
               <select name="domain_type" id="domain_type" onchange="toggleDomainFields(this.value)">
-                <option value="subdomain">Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
-                <option value="custom">Custom domain (bring your own)</option>
-                <option value="subpath">CSC sub-path (e.g. csc.ca/yoursite)</option>
+                <option value="subdomain" [% IF cur_dtype == 'subdomain' %]selected[% END %]>Subdomain on a CSC partner domain (e.g. you.forager.com)</option>
+                <option value="custom"    [% IF cur_dtype == 'custom'    %]selected[% END %]>Custom domain (bring your own)</option>
+                <option value="subpath"   [% IF cur_dtype == 'subpath'   %]selected[% END %]>CSC sub-path (e.g. csc.ca/yoursite)</option>
               </select>
             </div>
           </div>
 
+          [% SET saved_parent = hosting_account.parent_domain || '' %]
           <div class="form-row" id="row_parent_domain">
             <div class="form-field">
               <label for="parent_domain">Parent Domain <span style="color:#888;font-size:0.85em;">(the domain your subdomain will live under)</span></label>
               <select name="parent_domain" id="parent_domain">
                 [% FOREACH d IN domains %]
-                <option value="[% d.domain | html %]">[% d.domain | html %]</option>
+                <option value="[% d.domain | html %]"
+                  [% IF saved_parent == d.domain %]selected[% END %]>[% d.domain | html %]</option>
                 [% END %]
                 <option value="">— or type below —</option>
               </select>
@@ -112,27 +155,29 @@
 
         <div class="content-section">
           <h2>Feature Add-ons</h2>
-          <p style="color:#666;font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
+          <p style="color: var(--text-muted-color, #666);font-size:0.9rem;">Select any features you want enabled for your hosted site. CSC will confirm availability and pricing.</p>
           [% SET current_addons = hosting_account.requested_addons || '' %]
+          [% SET saved_addons = current_addons ? current_addons.split(',') : [] %]
           <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:0.75rem;">
             [% FOREACH addon IN [
                 { key = 'beekeeping',  label = '🐝 Beekeeping / Apiary',    hint = 'Hive management, inspections, honey tracking' },
                 { key = 'planning',    label = '📋 Planning Tools',          hint = 'Project planning and task management' },
                 { key = 'ai',          label = '🤖 AI Models',               hint = 'Access to AI chat and form-fill tools' },
                 { key = 'workshops',   label = '🎓 Workshop Calendar',       hint = 'Event scheduling and registration' },
+                { key = 'printing_3d', label = '🖨️ 3D Printing',            hint = 'Printer farm, model catalog, print-on-demand orders' },
                 { key = 'helpdesk',    label = '🎫 HelpDesk',               hint = 'Ticket system for your members' },
                 { key = 'foraging',    label = '🌿 Foraging',               hint = 'Forager community tools and plant/mushroom database' },
                 { key = 'ency',        label = '📖 ENCY',                    hint = 'Encyclopedia of biological life — herbs, animals, insects' },
                 { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
                 { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
             ] %]
-            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid #ddd;border-radius:6px;padding:0.75rem;cursor:pointer;background:#fafafa;">
+            <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid var(--border-color, #ddd);border-radius:6px;padding:0.75rem;cursor:pointer;background: var(--bg-secondary, #fafafa);">
               <input type="checkbox" name="addon_[% addon.key %]" value="1"
-                [% IF current_addons.search(addon.key) %]checked[% END %]
+                [% IF saved_addons.grep('^' _ addon.key _ '$').size %]checked[% END %]
                 style="margin-top:0.2rem;flex-shrink:0;">
               <div>
                 <strong>[% addon.label %]</strong><br>
-                <small style="color:#666;">[% addon.hint %]</small>
+                <small style="color: var(--text-muted-color, #666);">[% addon.hint %]</small>
               </div>
             </label>
             [% END %]
@@ -150,7 +195,11 @@
         </div>
 
         <div class="form-actions">
-          <button type="submit" class="btn btn-primary">Submit Registration →</button>
+          [% IF is_edit %]
+          <button type="submit" class="btn btn-primary">&#9998; Update Registration</button>
+          [% ELSE %]
+          <button type="submit" class="btn btn-primary">Submit Registration &rarr;</button>
+          [% END %]
           <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Cancel</a>
         </div>
 
@@ -175,5 +224,5 @@ function toggleDomainFields(type) {
         labelDomain.textContent = 'Desired Sub-path (e.g. beemaster)';
     }
 }
-toggleDomainFields('subdomain');
+toggleDomainFields('[% hosting_account.domain_type || 'subdomain' %]');
 </script>

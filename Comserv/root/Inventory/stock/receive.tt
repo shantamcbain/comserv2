@@ -9,7 +9,7 @@
   <a href="/Inventory">Dashboard</a>
 </p>
 
-<p style="background:#e8f4fd;border-left:4px solid #007bff;padding:0.75rem 1rem;border-radius:4px;max-width:680px;">
+<p style="background:#e8f4fd;border-left:4px solid var(--primary-color, #007bff);padding:0.75rem 1rem;border-radius:4px;max-width:680px;">
   Enter quantities and unit costs for all items received in this shipment.
   A <strong>draft supplier invoice</strong> will be created — review it, then
   <strong>Post</strong> to update stock levels and create the GL journal entry.
@@ -64,7 +64,7 @@
           [% END %]
           [% END %]
         </select>
-        <small style="color:#666"> — usually 2000 Accounts Payable</small>
+        <small style="color: var(--text-muted-color, #666)"> — usually 2000 Accounts Payable</small>
       </td>
     </tr>
     [% END %]
@@ -76,7 +76,7 @@
 </fieldset>
 
 <h2 style="margin-bottom:0.5rem;">Items Received</h2>
-<p style="color:#666;margin-top:0;font-size:0.9em;">
+<p style="color: var(--text-muted-color, #666);margin-top:0;font-size:0.9em;">
   Enter quantity and unit cost only for items in this shipment. Leave blank to skip.
 </p>
 
@@ -123,11 +123,11 @@
 
 <div style="margin-top:1.5rem;">
   <button type="submit"
-          style="background:#28a745;color:white;border:none;padding:0.6rem 1.8rem;border-radius:5px;font-size:1rem;cursor:pointer;font-weight:bold;">
+          style="background: var(--success-color, #28a745);color:white;border:none;padding:0.6rem 1.8rem;border-radius:5px;font-size:1rem;cursor:pointer;font-weight:bold;">
     &#x2713; Create Draft Invoice
   </button>
   &nbsp;&nbsp;
-  <a href="/Inventory/invoice" style="color:#666;">Cancel</a>
+  <a href="/Inventory/invoice" style="color: var(--text-muted-color, #666);">Cancel</a>
 </div>
 
 </form>
