@@ -143,18 +143,9 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                [% IF open_log_entry %]
-                <a class="dl-btn dl-btn-start" id="dl-start-btn"
-                   href="/log/[% open_log_entry.record_id %]"
-                   style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;text-decoration:none;display:inline-block;"
-                   title="View today's daily log">
-                  🌅 Today's Log
-                </a>
+                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')"
+                        title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
-                [% ELSE %]
-                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
-                <button class="dl-btn dl-btn-end"   id="dl-end-btn"   onclick="dailyLogAction('end')">🌙 End Day</button>
-                [% END %]
                 <span id="dl-feedback"></span>
                 &nbsp;|&nbsp;
                 <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
