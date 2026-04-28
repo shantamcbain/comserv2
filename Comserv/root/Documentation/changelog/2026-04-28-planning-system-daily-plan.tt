@@ -1,0 +1,85 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-planning-system-daily-plan.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Planning System: Daily Plan Enhancements' %]
+[% META description = 'AI-assisted Start Day, audit todos panel, HelpDesk panel, morning notes, live log toolbar' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Planning System: Daily Plan Enhancements</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Feature Enhancement</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>Major overhaul of the Daily Plan interface (<code>/planning/daily</code>): added an AI-assisted Start Day action, an Audit Todos panel, a HelpDesk open-tickets panel, morning notes that preserve auto-generated preamble, an action bar below the tab toolbar, and a live View Log button.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Start Day — AI-Assisted Audit</h2>
+        <ul>
+            <li>POST <code>/planning/daily</code> with <code>action=start_day</code> triggers an AI audit of all open/critical todos.</li>
+            <li>The controller groups blocking todos by controller/subroutine, deduplicates, and passes a structured map to the AI planning agent.</li>
+            <li>AI response is written into the daily log as a "Morning Summary" entry.</li>
+            <li>HelpDesk open-ticket count is fetched via <code>/HelpDesk/admin/tickets_alert</code> and included in the start-day briefing.</li>
+            <li><code>record_id</code> is correctly passed through the end action to avoid FK violation on log save.</li>
+        </ul>
+
+        <h2>Daily Plan Panels (always visible)</h2>
+        <ul>
+            <li><strong>Audit Todos panel</strong> — collapsible, shows any open P1/P2/P3 todos (not filtered to today only). WARN-level errors are included at P3 priority. CRITICAL/ERROR = P1.</li>
+            <li><strong>HelpDesk panel</strong> — collapsible, shows open support tickets. CSC admins see all sites; other site admins see their own.</li>
+            <li><strong>Priorities panel</strong> — existing panel retained.</li>
+            <li>All three panels are always rendered (with empty-state messages) so the page layout is consistent.</li>
+        </ul>
+
+        <h2>Morning Notes</h2>
+        <ul>
+            <li>The morning notes section now shows <em>only</em> the user-editable notes textarea (not the full auto-generated preamble).</li>
+            <li>On save, the auto-generated preamble from the existing log entry is preserved and prepended before the user's notes.</li>
+        </ul>
+
+        <h2>Action Bar &amp; Toolbar</h2>
+        <ul>
+            <li>Action bar is rendered below the tab row (not inside a tab) so it's always visible.</li>
+            <li><strong>Start Day button</strong> replaces the old "Good Morning" hardcoded link.</li>
+            <li><strong>View Log / Today's Log button</strong> toggles the log panel; becomes active when the log is open.</li>
+            <li>Start Day auto-opens the log panel on success.</li>
+        </ul>
+
+        <h2>Log Entry Fixes</h2>
+        <ul>
+            <li>Fixed <code>open_log_entry</code>: now uses <code>record_id</code> not <code>id</code> in the DB search.</li>
+            <li>Username search corrected in the morning summary query.</li>
+            <li>SystemLog column names corrected: <code>file</code> and <code>line</code> (not <code>filename</code>/<code>line_number</code>).</li>
+        </ul>
+
+        <h2>Plan Management</h2>
+        <ul>
+            <li>Plan edit form (<code>GET/POST /admin/plan/edit_form</code>) added with a matching <code>edit.tt</code> template.</li>
+            <li>Plan view now includes a form to link the plan to a project via a dropdown of available projects.</li>
+        </ul>
+
+        <h2>Proxy Debug Message Removed</h2>
+        <ul>
+            <li><code>Root.pm site_setup</code> no longer outputs proxy debug_msg to every page response.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/Planning.pm</code></li>
+            <li><code>lib/Comserv/Controller/Admin/PlanManagement.pm</code></li>
+            <li><code>lib/Comserv/Controller/Root.pm</code></li>
+            <li><code>root/admin/planning/DailyPlan.tt</code></li>
+            <li><code>root/admin/plan/edit.tt</code>, <code>root/admin/plan/view.tt</code></li>
+            <li><code>root/log/details.tt</code></li>
+        </ul>
+    </section>
+</div>

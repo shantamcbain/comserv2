@@ -1,0 +1,99 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-beekeeping-hive-inspection.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Beekeeping: Hive Inspection System' %]
+[% META description = 'New hive inspection module for the Apiary controller: inspection calendar, reports, visual hive diagram, inspection detail recording with feeding and frame data' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Beekeeping: Hive Inspection System</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">New Feature</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>The Apiary controller gained a complete hive inspection module with CRUD inspection records, inspection calendar view, printable inspection reports, and an interactive visual hive diagram. New DB Result classes support inspection details, feeding records, hive frame state, and hive/queen history.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Inspection Routes</h2>
+        <ul>
+            <li><code>/Apiary/inspections</code> — list all inspections</li>
+            <li><code>/Apiary/inspections/new</code> — new inspection form</li>
+            <li><code>/Apiary/inspections/create</code> — POST to save inspection (transactional)</li>
+            <li><code>/Apiary/inspections/view/&lt;id&gt;</code> — view a single inspection</li>
+            <li><code>/Apiary/inspections/edit/&lt;id&gt;</code> — edit form</li>
+            <li><code>/Apiary/inspections/update/&lt;id&gt;</code> — POST update (transactional)</li>
+            <li><code>/Apiary/inspections/reports</code> — printable inspection reports</li>
+        </ul>
+
+        <h2>Visual Hive Diagram</h2>
+        <ul>
+            <li><code>_hive_diagram.tt</code> — SVG/HTML partial that renders a visual representation of a hive's box and frame configuration.</li>
+            <li>Included on inspection view and hive management pages.</li>
+        </ul>
+
+        <h2>Inspection Calendar</h2>
+        <ul>
+            <li><code>inspection_calendar.tt</code> — calendar grid showing inspections by date, linking to individual inspection records.</li>
+        </ul>
+
+        <h2>DB Result Classes Added</h2>
+        <ul>
+            <li><code>Inspection</code> — top-level inspection record (hive, date, inspector, overall observations)</li>
+            <li><code>InspectionDetail</code> — per-box/frame observations within an inspection</li>
+            <li><code>InspectionFeeding</code> — feeding records linked to inspections</li>
+            <li><code>HiveFrame</code> — frame state (drawn, brood, honey, pollen coverage)</li>
+            <li><code>HiveAssembly</code> — hive box configuration records</li>
+            <li><code>HiveConfiguration</code> / <code>HiveConfigurationHistory</code> — hive setup and changes over time</li>
+            <li><code>HiveMovement</code> / <code>FrameMovement</code> — movement audit trail</li>
+            <li><code>QueenEvent</code> / <code>Queen_events</code> — queen events (swarm, supersedure, re-queen)</li>
+            <li><code>QueenHiveAssignment</code> / <code>Queen_hive_assignments</code> — queen-to-hive history</li>
+        </ul>
+
+        <h2>BMaster / Beekeeping Navigation</h2>
+        <ul>
+            <li><code>BMaster/apiary.tt</code> — apiary overview page updated with inspection links.</li>
+            <li><code>BMaster/BMaster.tt</code> — context-aware beekeeping menu.</li>
+            <li><code>Navigation/TopDropListBeekeeping.tt</code> — beekeeping top-nav dropdown.</li>
+            <li>Apiary info page added; redirect loop in guest navigation fixed.</li>
+            <li>Guest navigation improvements for the beekeeping area.</li>
+        </ul>
+
+        <h2>Configuration</h2>
+        <ul>
+            <li><code>ConfigurationBox</code> Result class — hive box configuration options.</li>
+            <li><code>ConfigurationInventory</code> Result class — maps hive configuration to inventory items.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/Apiary.pm</code></li>
+            <li><code>lib/Comserv/Controller/BMaster.pm</code></li>
+            <li><code>lib/Comserv/Model/ApiaryModel.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Inspection.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/InspectionDetail.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/InspectionFeeding.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HiveFrame.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HiveAssembly.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HiveConfiguration.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HiveConfigurationHistory.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HiveMovement.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/FrameMovement.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/QueenEvent.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/QueenHiveAssignment.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/ConfigurationBox.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/ConfigurationInventory.pm</code></li>
+            <li><code>root/Apiary/</code> — all inspection templates + hive diagram</li>
+            <li><code>root/BMaster/apiary.tt</code>, <code>BMaster.tt</code></li>
+            <li><code>root/Navigation/TopDropListBeekeeping.tt</code></li>
+        </ul>
+    </section>
+</div>

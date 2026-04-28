@@ -2125,6 +2125,72 @@
          "site": "CSC",
          "title": "2026 01 21 Cleanup Handoff"
       },
+      "2026-04-28-3d-printing-system": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-3d-printing-system.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "3D Printing System"
+      },
+      "2026-04-28-beekeeping-hive-inspection": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-beekeeping-hive-inspection.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "Beekeeping: Hive Inspection System"
+      },
+      "2026-04-28-helpdesk-ticket-lifecycle": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-helpdesk-ticket-lifecycle.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "HelpDesk Ticket Lifecycle"
+      },
+      "2026-04-28-inventory-shop-hosting-membership": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-inventory-shop-hosting-membership.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "Inventory, Shop, Hosting, Membership & Point System"
+      },
+      "2026-04-28-planning-system-daily-plan": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-planning-system-daily-plan.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "Planning System: Daily Plan Enhancements"
+      },
+      "2026-04-28-todo-priority-system": {
+         "category": "changelog",
+         "format": "tt",
+         "path": "Documentation/changelog/2026-04-28-todo-priority-system.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "Todo Priority System & Enhancements"
+      },
       "AGENT_CONSOLIDATION_PLAN": {
          "category": "admin",
          "description": "**Created**: 2025-12-31 17:22 UTC",
