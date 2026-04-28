@@ -32,9 +32,18 @@
 </p>
 
 [% IF edit_mode %]
+[% IF return_to %]
+<div class="alert alert-info" style="margin-bottom:0.75em;">
+  Adding this glossary term so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
+  &mdash; you will be returned there automatically after saving.
+</div>
+[% END %]
 <form action="[% IF entry.record_id %][% c.uri_for('/ENCY/Glossary/edit') %][% ELSE %][% c.uri_for('/ENCY/Glossary/add') %][% END %]" method="post">
 [% IF entry.record_id %]
 <input type="hidden" name="record_id" value="[% entry.record_id %]" />
+[% END %]
+[% IF return_to %]
+<input type="hidden" name="return_to" value="[% return_to | html %]" />
 [% END %]
 [% END %]
 
@@ -43,7 +52,7 @@
         <td><strong>Term</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="term" value="[% entry.term | html %]" size="60" />
+            <input type="text" name="term" value="[% prefill_term || entry.term | html %]" size="60" />
             [% ELSE %]
             [% entry.term | html %]
             [% END %]

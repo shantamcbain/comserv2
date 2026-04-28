@@ -957,27 +957,50 @@ sub auto_link_herb_data {
 
     # --- create todos for unresolved / auto-created terms ---
     my %seen;
+    my @action_items;
     for my $item (@todos) {
         my $key = "$item->{field}:$item->{term}";
         next if $seen{$key}++;
+        my $short_term = length($item->{term}) > 50 ? substr($item->{term}, 0, 47) . '...' : $item->{term};
         if ($item->{auto_created}) {
+            my $stub_id = $item->{stub_id} // '';
             $self->_create_ency_todo($c,
-                "ENCY: New constituent stub in herb#$herb_id: $item->{field}",
+                "ENCY: Complete stub constituent: $short_term",
                 "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
               . "A stub Constituent record was auto-created for '$item->{term}' and linked to this herb. "
               . "Please review and complete the constituent entry with full details (chemical formula, class, pharmacological effects, etc.)."
             );
+            push @action_items, {
+                field      => $item->{field},
+                term       => $item->{term},
+                type       => 'constituent',
+                stub_id    => $stub_id,
+                add_route  => '/ENCY/Constituent/add',
+                name_param => 'name',
+            };
         } else {
+            my $type = $item->{field} eq 'constituents'        ? 'constituent'
+                     : $item->{field} eq 'therapeutic_action'  ? 'glossary'
+                     : 'glossary';
+            my $add_route  = $type eq 'constituent' ? '/ENCY/Constituent/add' : '/ENCY/Glossary/add';
+            my $name_param = $type eq 'glossary'    ? 'term'                  : 'name';
             $self->_create_ency_todo($c,
-                "ENCY: Unresolved term in herb#$herb_id: $item->{field}",
+                "ENCY: Missing $type: $short_term",
                 "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
-              . "This term was found in the '$item->{field}' field but could not be auto-created or matched in ENCY. "
-              . "Please verify and add it as a new entry if valid."
+              . "This term was found in the '$item->{field}' field but could not be matched in ENCY. "
+              . "Please add it as a new $type entry."
             );
+            push @action_items, {
+                field      => $item->{field},
+                term       => $item->{term},
+                type       => $type,
+                add_route  => $add_route,
+                name_param => $name_param,
+            };
         }
     }
 
-    return ($linked, scalar @todos);
+    return ($linked, scalar @todos, \@action_items);
 }
 
 sub get_constituent_related {
@@ -1704,15 +1727,18 @@ sub auto_resolve_text_fields {
 
     my %seen_todo;
     for my $item (@{ $result{unresolved} }) {
-        my $field  = $item->{field};
-        my $term   = $item->{term};
-        my $subject = "ENCY: Unresolved term in ${entity_type}#${entity_id}: $field";
+        my $field      = $item->{field};
+        my $term       = $item->{term};
+        my $mapping    = $FIELD_MAPPINGS{$field} // {};
+        my $rs_name    = lc($mapping->{resultset} // 'term');
+        my $short_term = length($term) > 50 ? substr($term, 0, 47) . '...' : $term;
+        my $subject    = "ENCY: Missing $rs_name: $short_term";
         $subject = substr($subject, 0, 254);
         next if $seen_todo{$subject}++;
         $self->_create_ency_todo($c, $subject,
             "Field: $field\nTerm: $term\nEntity: $entity_type #$entity_id\n\n"
           . "This term was found in the '$field' field but does not match any existing ENCY record. "
-          . "Please verify and add it as a new Glossary entry if valid."
+          . "Please verify and add it as a new entry if valid."
         );
     }
 
