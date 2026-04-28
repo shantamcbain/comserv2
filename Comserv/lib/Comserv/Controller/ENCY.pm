@@ -862,7 +862,9 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
             $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
-            my $return_to = $c->uri_for('/ENCY/herb_detail/' . $new_id);
+            my $caller_return_to = $form_data->{return_to} // '';
+            my $herb_detail      = $c->uri_for('/ENCY/herb_detail/' . $new_id);
+            my $return_to        = ($caller_return_to && $caller_return_to =~ m{^/}) ? $caller_return_to : $herb_detail;
             if ($action_items && @$action_items) {
                 my $first = $action_items->[0];
                 $c->res->redirect($c->uri_for($first->{add_route},
@@ -882,11 +884,17 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         }
     } else {
         # Display the form
+        my $prefill_botanical = $c->request->param('botanical_name') // '';
+        my $prefill_common    = $c->request->param('common_names')   // '';
+        my $return_to         = $c->request->param('return_to')      // '';
         $self->_stash_image_files($c);
         $c->stash(
-            template       => 'ENCY/add_herb_form.tt',
-            user_role      => $c->session->{roles},
-            ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+            template              => 'ENCY/add_herb_form.tt',
+            user_role             => $c->session->{roles},
+            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+            prefill_botanical     => $prefill_botanical,
+            prefill_common        => $prefill_common,
+            return_to             => $return_to,
         );
     }
 }
