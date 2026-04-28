@@ -1826,20 +1826,26 @@ sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
     my $related      = $c->model('ENCYModel')->get_constituent_related($c, $id);
     my $linked_herbs = $c->model('ENCYModel')->resolve_names_to_herbs($c, $constituent->found_in_herbs);
     my $linked_drugs = $c->model('ENCYModel')->resolve_names_to_drugs($c, $constituent->found_in_drugs);
-    my $herbs_html          = _build_herb_popup_html($c, $constituent->found_in_herbs // '', $linked_herbs);
-    my $drugs_html          = _build_drug_popup_html($c, $constituent->found_in_drugs // '', $linked_drugs);
-    my $therapeutic_html    = _build_glossary_popup_html($c, $constituent->therapeutic_action // '');
+    my $herbs_html              = _build_herb_popup_html($c, $constituent->found_in_herbs // '', $linked_herbs);
+    my $drugs_html              = _build_drug_popup_html($c, $constituent->found_in_drugs // '', $linked_drugs);
+    my $therapeutic_html        = _build_glossary_popup_html($c, $constituent->therapeutic_action // '');
+    my $chemical_class_html     = _build_glossary_popup_html($c, $constituent->chemical_class // '');
+    my $solubility_html         = _build_glossary_popup_html($c, $constituent->solubility // '');
+    my $pharmacological_html    = _build_glossary_popup_html($c, $constituent->pharmacological_effects // '');
     $c->stash(
-        constituent         => $constituent,
-        related_diseases    => $related->{diseases}  // [],
-        related_symptoms    => $related->{symptoms}  // [],
-        linked_herbs        => $linked_herbs,
-        linked_drugs        => $linked_drugs,
-        herbs_html          => $herbs_html,
-        drugs_html          => $drugs_html,
-        therapeutic_html    => $therapeutic_html,
-        edit_mode           => 0,
-        template            => 'ENCY/ConstituentDetail.tt',
+        constituent             => $constituent,
+        related_diseases        => $related->{diseases}  // [],
+        related_symptoms        => $related->{symptoms}  // [],
+        linked_herbs            => $linked_herbs,
+        linked_drugs            => $linked_drugs,
+        herbs_html              => $herbs_html,
+        drugs_html              => $drugs_html,
+        therapeutic_html        => $therapeutic_html,
+        chemical_class_html     => $chemical_class_html,
+        solubility_html         => $solubility_html,
+        pharmacological_html    => $pharmacological_html,
+        edit_mode               => 0,
+        template                => 'ENCY/ConstituentDetail.tt',
     );
 }
 
