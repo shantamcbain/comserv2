@@ -1629,8 +1629,6 @@ my %FIELD_MAPPINGS = (
 );
 
 my %RESULTSET_ADD_ROUTE = (
-    Herb        => { route => '/ENCY/add_herb',          param => 'botanical_name' },
-    Drug        => { route => '/ENCY/Drug/add',          param => 'generic_name'   },
     Constituent => { route => '/ENCY/Constituent/add',   param => 'name'           },
     Glossary    => { route => '/ENCY/Glossary/add',      param => 'term'           },
     Disease     => { route => '/ENCY/Disease/add',       param => 'common_name'    },
