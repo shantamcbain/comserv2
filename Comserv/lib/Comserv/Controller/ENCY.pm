@@ -201,11 +201,15 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked record(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved unresolved term(s) logged as todos." : '';
+            my $constituents_html = _build_constituent_html(
+                $c, $record_id, $updated_herb->constituents // ''
+            );
             $c->stash(
-                success_msg => "Herb updated successfully.$link_msg$todo_msg",
-                herb        => $updated_herb,
-                edit_mode   => 0,
-                template    => 'ENCY/HerbView.tt',
+                success_msg       => "Herb updated successfully.$link_msg$todo_msg",
+                herb              => $updated_herb,
+                constituents_html => $constituents_html,
+                edit_mode         => 0,
+                template          => 'ENCY/HerbView.tt',
             );
             return;
         } else {
@@ -1798,10 +1802,11 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             if ($data->{found_in_herbs}) {
                 $c->model('ENCYModel')->auto_link_herb_constituent($c, $new_id, $data->{found_in_herbs});
             }
+            my $back_linked = $c->model('ENCYModel')->backlink_constituent_to_all_herbs($c, $new_id, $data->{name});
             my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $new_id, $data);
             my $n_linked = scalar @{ $resolve->{linked} || [] };
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
-            $c->flash->{success_msg} = "Constituent added. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+            $c->flash->{success_msg} = "Constituent added. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
         } else {
             $c->flash->{success_msg} = 'Constituent added successfully.';
         }
@@ -1891,12 +1896,13 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             if ($data->{found_in_herbs}) {
                 $c->model('ENCYModel')->auto_link_herb_constituent($c, $record_id, $data->{found_in_herbs});
             }
+            my $back_linked = $c->model('ENCYModel')->backlink_constituent_to_all_herbs($c, $record_id, $data->{name});
             my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $record_id, $data);
             my $n_linked = scalar @{ $resolve->{linked} || [] };
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Constituent updated. Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+            $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
             $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
             return;
         } else {
