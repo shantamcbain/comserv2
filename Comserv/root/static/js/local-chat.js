@@ -2939,6 +2939,61 @@
             return;
         }
 
+        // navigate: open a URL in a new tab without any pre-fill
+        if (actionObj.action === 'navigate') {
+            const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
+            if (navUrl) {
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
+        // navigate_and_fill: store field values in localStorage then open the target page.
+        // The widget init on the target page checks for a pending fill and applies it.
+        if (actionObj.action === 'navigate_and_fill') {
+            const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
+            const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
+            if (nfUrl) {
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
+                try {
+                    localStorage.setItem('ai_pending_fill', JSON.stringify({
+                        url:     nfUrl,
+                        fields:  nfFields,
+                        ts:      Date.now()
+                    }));
+                } catch(e) { console.warn('localStorage write failed', e); }
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                const fieldCount = Object.keys(nfFields).length;
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                    + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
         fetch('/ai/action', {
             method: 'POST',
             credentials: 'include',
@@ -3601,6 +3656,50 @@
                 }
             });
         }
+
+        // Check for a pending navigate_and_fill stored by another tab.
+        // If the current URL matches the stored target, apply the field values and clear.
+        (function() {
+            try {
+                var pending = localStorage.getItem('ai_pending_fill');
+                if (!pending) return;
+                var pdata = JSON.parse(pending);
+                if (!pdata || !pdata.url || !pdata.fields) return;
+                // Expire after 2 minutes
+                if (Date.now() - (pdata.ts || 0) > 120000) {
+                    localStorage.removeItem('ai_pending_fill');
+                    return;
+                }
+                // Normalize both URLs to just pathname+search for comparison
+                var targetPath = pdata.url.replace(/^https?:\/\/[^\/]+/, '');
+                var currentPath = window.location.pathname + window.location.search;
+                if (targetPath !== currentPath) return;
+                // Clear immediately to avoid re-applying on refresh
+                localStorage.removeItem('ai_pending_fill');
+                // Short delay so the page form has rendered
+                setTimeout(function() {
+                    _executeFillForm({ fields: pdata.fields });
+                    // Show notification in widget if it exists
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'System';
+                        var el = document.createElement('div');
+                        el.className = 'message system-message';
+                        el.textContent = '🪄 AI pre-filled form fields. Please review before saving.';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(el);
+                        chatMessages.appendChild(wrapper);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 600);
+            } catch(e) {
+                console.warn('ai_pending_fill check failed:', e);
+            }
+        })();
 
         // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
         if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {

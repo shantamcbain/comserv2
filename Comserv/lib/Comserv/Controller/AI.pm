@@ -8065,17 +8065,25 @@ STEP 2 — LOOKUP from injected data:
   The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
   Check each field — fields showing "(empty)" need to be filled in.
 
-STEP 3 — NAVIGATE: Tell the user which page to open:
-  - Constituent exists (stub) → /ENCY/Constituent/edit?record_id=N
-  - Constituent does not exist → /ENCY/Constituent/add
+STEP 3 — NAVIGATE AND PRE-FILL: Open the correct form and pre-fill it automatically.
+  Using your botanical/chemical knowledge, populate ALL fields you know for the constituent.
+  Emit ONE navigate_and_fill action (on its own line) — the browser will open the form and
+  fill the fields automatically. Replace N with the actual record_id number:
+
+  For an existing stub constituent:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/edit?record_id=N", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS", "iupac_name": "IUPAC", "cas_number": "CAS", "therapeutic_action": "THERAPEUTIC_USES", "pharmacological_effects": "EFFECTS", "found_in_herbs": "HERB1, HERB2", "url": "https://pubchem.ncbi.nlm.nih.gov/compound/CID"}}]
+
+  For a constituent that does not exist yet:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS"}}]
+
+  After the navigate_and_fill line, briefly list the values you suggested so the user can verify them.
 
 STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
   [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
 
-STEP 5 — PRE-FILL: Using your botanical/chemical knowledge, suggest values for each (empty) field.
-  For common plant constituents, provide: chemical_formula, chemical_class, therapeutic_action,
-  pharmacological_effects, found_in_herbs, and a PubChem or Wikipedia url.
-  Present these as a clear list so the user can copy-paste into the edit form.
+STEP 5 — CONFIRM: Tell the user the form has been opened and pre-filled, and ask them to review
+  and save. Example: "I've opened the edit form for constituent #N and pre-filled the fields with
+  the information above. Please review and click Save."
 
 STEP 6 — REMIND when the user says they are done:
   "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
