@@ -5116,11 +5116,12 @@ sub _get_current_ollama_config {
     # Configure the ollama model with the determined host
     try {
         $ollama->set_host($current_host);
-        $current_port = $ollama->port;
+        $ollama->port($config_port);
+        $current_port = $config_port;
         $current_model = $ollama->model;
         
         # Quick connection check (uses 3s timeout via temporary UA)
-        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => 11434, timeout => 3);
+        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => $config_port, timeout => 3);
         if ($check_ollama && $check_ollama->check_connection()) {
             my $models = $ollama->list_models();
             $installed_models = $models if $models && ref($models) eq 'ARRAY';
