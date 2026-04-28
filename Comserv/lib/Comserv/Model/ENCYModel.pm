@@ -1614,7 +1614,7 @@ my %FIELD_MAPPINGS = (
     found_in_herbs        => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
     herbal_alternatives   => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
     herb_drug_interactions=> { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
-    found_in_foods        => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'] },
+    found_in_foods        => { schema => 'forager', resultset => 'Herb',        fields => ['common_names','botanical_name'], label => 'food' },
     found_in_drugs        => { schema => 'ency',    resultset => 'Drug',        fields => ['generic_name','brand_name'] },
     active_ingredients    => { schema => 'ency',    resultset => 'Constituent', fields => ['name','common_name'] },
     constituents          => { schema => 'ency',    resultset => 'Constituent', fields => ['name','common_name'] },
@@ -1759,15 +1759,15 @@ sub auto_resolve_text_fields {
         my $field      = $item->{field};
         my $term       = $item->{term};
         my $mapping    = $FIELD_MAPPINGS{$field} // {};
-        my $rs_name    = lc($mapping->{resultset} // 'term');
+        my $rs_name    = $mapping->{label} || lc($mapping->{resultset} // 'term');
         my $short_term = length($term) > 50 ? substr($term, 0, 47) . '...' : $term;
         my $subject    = "ENCY: Missing $rs_name: $short_term";
         $subject = substr($subject, 0, 254);
         next if $seen_todo{$subject}++;
         $self->_create_ency_todo($c, $subject,
-            "Field: $field\nTerm: $term\nEntity: $entity_type #$entity_id\n\n"
+            "Field: $field\nTerm: $term\nType: $rs_name\nEntity: $entity_type #$entity_id\n\n"
           . "This term was found in the '$field' field but does not match any existing ENCY record. "
-          . "Please verify and add it as a new entry if valid."
+          . "Please verify and add it as a new $rs_name entry if valid."
         );
     }
 
