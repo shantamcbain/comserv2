@@ -122,7 +122,7 @@
             [% IF edit_mode %]
             <textarea name="therapeutic_action" rows="4" cols="60">[% constituent.therapeutic_action | html %]</textarea>
             [% ELSE %]
-            [% constituent.therapeutic_action | html %]
+            [% therapeutic_html %]
             [% END %]
         </td>
     </tr>
@@ -166,18 +166,7 @@
             [% IF edit_mode %]
             <textarea name="found_in_herbs" rows="3" cols="60">[% constituent.found_in_herbs | html %]</textarea>
             [% ELSE %]
-            [% IF linked_herbs && linked_herbs.size %]
-                [% FOREACH lh IN linked_herbs %]
-                    [% IF lh.url %]
-                        <a href="[% lh.url | html %]">[% lh.name | html %]</a>[% IF lh.herb_url %]&nbsp;<a href="[% lh.herb_url | html %]" target="_blank" title="External source" style="font-size:0.75em;">[&#x2197;]</a>[% END %]
-                    [% ELSE %]
-                        [% lh.name | html %]
-                    [% END %]
-                    [% UNLESS loop.last %], [% END %]
-                [% END %]
-            [% ELSIF constituent.found_in_herbs %]
-                [% constituent.found_in_herbs | html %]
-            [% END %]
+            [% herbs_html %]
             [% END %]
         </td>
     </tr>
@@ -197,18 +186,7 @@
             [% IF edit_mode %]
             <textarea name="found_in_drugs" rows="3" cols="60">[% constituent.found_in_drugs | html %]</textarea>
             [% ELSE %]
-            [% IF linked_drugs && linked_drugs.size %]
-                [% FOREACH ld IN linked_drugs %]
-                    [% IF ld.url %]
-                        <a href="[% ld.url | html %]">[% ld.name | html %]</a>
-                    [% ELSE %]
-                        [% ld.name | html %]
-                    [% END %]
-                    [% UNLESS loop.last %], [% END %]
-                [% END %]
-            [% ELSIF constituent.found_in_drugs %]
-                [% constituent.found_in_drugs | html %]
-            [% END %]
+            [% drugs_html %]
             [% END %]
         </td>
     </tr>
@@ -294,4 +272,38 @@
 <input type="submit" value="[% IF constituent.record_id %]Update Constituent[% ELSE %]Add Constituent[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Constituent') %]" class="btn btn-default">Cancel</a>
 </form>
+[% END %]
+
+[% IF !edit_mode %]
+<div id="ency-popup-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9000;background:rgba(0,0,0,0.45);">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:6px;padding:1.5em 2em;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.3);">
+    <button onclick="document.getElementById('ency-popup-modal').style.display='none'" style="float:right;border:none;background:none;font-size:1.4em;cursor:pointer;">&times;</button>
+    <div id="ency-popup-modal-body">Loading&hellip;</div>
+  </div>
+</div>
+<script>
+(function(){
+  function openPopup(url) {
+    var modal = document.getElementById('ency-popup-modal');
+    var body  = document.getElementById('ency-popup-modal-body');
+    body.innerHTML = 'Loading\u2026';
+    modal.style.display = 'block';
+    fetch(url)
+      .then(function(r){ return r.text(); })
+      .then(function(html){ body.innerHTML = html; })
+      .catch(function(){ body.innerHTML = 'Could not load details.'; });
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a.ency-herb-link');
+    if (a) { e.preventDefault(); openPopup('/ENCY/herb_popup/' + a.getAttribute('data-hid')); return; }
+    a = e.target.closest('a.ency-drug-link');
+    if (a) { e.preventDefault(); openPopup('/ENCY/drug_popup/' + a.getAttribute('data-did')); return; }
+    a = e.target.closest('a.ency-glossary-link');
+    if (a) { e.preventDefault(); openPopup('/ENCY/glossary_popup/' + a.getAttribute('data-gid')); return; }
+  });
+  document.getElementById('ency-popup-modal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+})();
+</script>
 [% END %]
