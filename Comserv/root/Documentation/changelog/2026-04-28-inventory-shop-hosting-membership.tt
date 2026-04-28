@@ -1,0 +1,95 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-inventory-shop-hosting-membership.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Inventory, Shop, Hosting, Membership &amp; Point System' %]
+[% META description = 'Complete inventory management system, shop/marketplace, hosting management, membership signup modal, point/credit system with commission hooks' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Inventory, Shop, Hosting, Membership &amp; Point System</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Major Feature Release</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>A large multi-system release merging the <code>inventory-system-104a</code> branch into main. Covers a complete inventory management system (items, BOM, stock, labels, consignment), a shop/marketplace, a full hosting management system with cost configuration, a membership plan-details popup, and a points/credit ledger with commission hooks and an admin log-credits UI.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Inventory System</h2>
+        <ul>
+            <li>Items: add, edit, list with <code>datalist</code> category suggestions (3d_printer, filament, equipment, supplies, etc.).</li>
+            <li><code>unit_price</code> used throughout — <code>selling_price</code> column does not exist in DB and was removed.</li>
+            <li>BOM (Bill of Materials): list and view templates.</li>
+            <li>Stock levels view: <code>/Inventory/stock/levels</code>.</li>
+            <li>Print templates: label, multi-label, BOM print, stock report.</li>
+            <li>Consignment: new, view, list, print. Cross-site consignment with <code>source_sitename</code> selector. Line items use <code>script</code>-element cloning for maximum browser compatibility.</li>
+            <li>Supplier invoice: <code>post_supplier_invoice</code> stock_level find-or-create bug fixed.</li>
+        </ul>
+
+        <h2>Shop &amp; Marketplace</h2>
+        <ul>
+            <li>New <code>Shop</code> controller and templates for a site-hosted shop/marketplace.</li>
+            <li>Cart integration.</li>
+            <li>COA (Chart of Accounts) integration.</li>
+            <li>Items flagged <code>show_in_shop</code> appear in the shop listing.</li>
+            <li>3D store (<code>/3d/store</code>) redirects to <code>/shop</code>; <code>/3d/buy</code> goes to Cart.</li>
+        </ul>
+
+        <h2>Hosting Management</h2>
+        <ul>
+            <li><code>/hosted</code> — hosted dashboard for customers.</li>
+            <li><code>/accounts</code> — admin account management.</li>
+            <li><code>/hosting/activate</code> — activate a hosting account.</li>
+            <li><code>/hosting/cost</code> — admin UI for hosting cost configuration.</li>
+            <li><code>/hosting/setup</code> — creates hosting tables and seeds config via app API (one-time setup endpoint).</li>
+            <li><code>/apply</code> redirects to <code>/hosting_signup</code>.</li>
+            <li>Hosting admin access fixed: redirects to login (not home) when unauthenticated.</li>
+            <li><code>HostingCostConfig</code> Result class added.</li>
+            <li><code>membership/admin/hosting_accounts.tt</code> added to membership admin area.</li>
+        </ul>
+
+        <h2>Membership</h2>
+        <ul>
+            <li><code>PlanDetails.tt</code> now includes a signup popup modal — users can initiate signup from the plan details page without leaving it.</li>
+            <li><code>site_name</code> passed into the <code>plan_details</code> action for correct plan scoping.</li>
+            <li><code>membership/hosting_signup.tt</code> updated.</li>
+        </ul>
+
+        <h2>Point System (<code>Comserv::Util::PointSystem</code>)</h2>
+        <ul>
+            <li>Full credit/debit ledger with <code>SitePointAccount</code> Result class.</li>
+            <li>Methods: <code>balance</code>, <code>ensure_account</code>, <code>apply_joining_bonus</code>, <code>apply_plan_bonus</code>, <code>credit</code>, <code>debit</code>, <code>transfer</code>, <code>record_payment</code>, <code>credit_site_account</code>, <code>apply_hosting_commission</code>.</li>
+            <li><code>Todo.pm award_points</code> — awards points when a todo is completed.</li>
+            <li>Commission hooks fire on hosting activation/renewal.</li>
+            <li><code>PointRule</code> Result class with <code>resolve_rate()</code> helper — looks up the applicable rate for a role (founder royalty config).</li>
+            <li>Admin log-credits UI at <code>/admin/Logging/LogCredits</code>.</li>
+            <li>Batch back-credit script for retroactive point awards.</li>
+            <li><code>FounderRoyaltyConfig</code> Result class added.</li>
+        </ul>
+
+        <h2>Files Changed (key)</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/Inventory.pm</code></li>
+            <li><code>lib/Comserv/Controller/Hosting.pm</code></li>
+            <li><code>lib/Comserv/Controller/Membership.pm</code></li>
+            <li><code>lib/Comserv/Controller/Todo.pm</code> — award_points</li>
+            <li><code>lib/Comserv/Util/PointSystem.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/InventoryItem.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/SitePointAccount.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/FounderRoyaltyConfig.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/HostingCostConfig.pm</code></li>
+            <li><code>root/Inventory/</code> — all item, BOM, stock, consignment, print templates</li>
+            <li><code>root/hosting/</code> — admin_accounts, cost_config, hosted_dashboard, setup</li>
+            <li><code>root/membership/</code> — PlanDetails, hosting_signup, Index, admin/hosting_accounts</li>
+            <li><code>root/admin/Logging/LogCredits.tt</code></li>
+        </ul>
+    </section>
+</div>
