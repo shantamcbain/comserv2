@@ -2191,6 +2191,18 @@
          "site": "CSC",
          "title": "Todo Priority System & Enhancements"
       },
+      "3d_printing": {
+         "category": "features",
+         "format": "tt",
+         "path": "Documentation/features/3d_printing.tt",
+         "roles": [
+            "admin",
+            "developer",
+            "editor"
+         ],
+         "site": "CSC",
+         "title": "3D Printing System"
+      },
       "AGENT_CONSOLIDATION_PLAN": {
          "category": "admin",
          "description": "**Created**: 2025-12-31 17:22 UTC",
@@ -5055,9 +5067,9 @@
          "last_scanned": "Sun Apr 26 10:53:47 2026",
          "path": "Documentation/HelpDeskSystem.tt",
          "roles": [
-            "editor",
             "admin",
-            "developer"
+            "developer",
+            "editor"
          ],
          "site": "CSC",
          "title": "HelpDeskSystem"
@@ -8091,6 +8103,17 @@
          "site": "CSC",
          "title": "Daily Audit Plan - Variance Analysis"
       },
+      "daily_plan": {
+         "category": "features",
+         "format": "tt",
+         "path": "Documentation/features/daily_plan.tt",
+         "roles": [
+            "admin",
+            "developer"
+         ],
+         "site": "CSC",
+         "title": "Daily Plan"
+      },
       "database_configuration": {
          "category": "admin_guides",
          "description": "Database configuration guide for Comserv. Updated Jan 2 with ai_conversations schema changes.",
@@ -9025,6 +9048,18 @@
          ],
          "site": "CSC",
          "title": "Header Template Documentation"
+      },
+      "hive_inspection": {
+         "category": "features",
+         "format": "tt",
+         "path": "Documentation/features/hive_inspection.tt",
+         "roles": [
+            "admin",
+            "developer",
+            "editor"
+         ],
+         "site": "CSC",
+         "title": "Hive Inspection System"
       },
       "hosting_signup_templates": {
          "category": "admin_guides",
