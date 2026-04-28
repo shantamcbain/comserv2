@@ -259,7 +259,7 @@ Record ID:[% herb.record_id %]
         <td>Constituents:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.constituents | ref_links %]
+                [% constituents_html %]
             [% ELSE %]
                 <textarea id="constituents" name="constituents" rows="4" cols="50">[% herb.constituents %]</textarea>
             [% END %]
@@ -505,3 +505,32 @@ Record ID:[% herb.record_id %]
         <input type="submit" value="Update Herb" />
 </form>
 [% END %]
+
+<div id="ency-constituent-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9000;background:rgba(0,0,0,0.45);">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:6px;padding:1.5em 2em;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.3);">
+    <button onclick="document.getElementById('ency-constituent-modal').style.display='none'" style="float:right;border:none;background:none;font-size:1.4em;cursor:pointer;">&times;</button>
+    <div id="ency-constituent-modal-body">Loading&hellip;</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a.ency-constituent-link');
+    if (!a) return;
+    e.preventDefault();
+    var cid = a.getAttribute('data-cid');
+    var modal = document.getElementById('ency-constituent-modal');
+    var body  = document.getElementById('ency-constituent-modal-body');
+    body.innerHTML = 'Loading\u2026';
+    modal.style.display = 'block';
+    fetch('/ENCY/constituent_popup/' + cid)
+      .then(function(r){ return r.text(); })
+      .then(function(html){ body.innerHTML = html; })
+      .catch(function(){ body.innerHTML = 'Could not load constituent details.'; });
+  });
+  document.getElementById('ency-constituent-modal').addEventListener('click', function(e){
+    if (e.target === this) this.style.display = 'none';
+  });
+})();
+</script>
