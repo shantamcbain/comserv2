@@ -4446,13 +4446,15 @@ sub _do_web_search {
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to chat-capable models only.
-    # Exclude: embedding/reranker models, code-only models.
-    # :cloud models (Ollama-routed cloud) are allowed — they work through the same endpoint.
+    # Filter to chat-capable LOCAL models only for auto-tier.
+    # Exclude: embedding/reranker models, code-only models, and :cloud models.
+    # :cloud models require external API keys (e.g. Moonshot) — they return 401 without them.
+    # Users can still manually select :cloud models from the dropdown.
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /starcoder|coder|codellama/i;
+           && $n !~ /starcoder|coder|codellama/i
+           && $n !~ /:cloud$/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
