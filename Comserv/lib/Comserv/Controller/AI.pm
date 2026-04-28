@@ -4004,6 +4004,55 @@ sub _get_module_data {
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
     }
 
+    # --- Constituent live data ---
+    # Inject when the ENCY agent is active and the prompt mentions constituents
+    my $is_ency_constituent = $is_ency_agent
+        && ($prompt =~ /constituent|compound|chemical|phytochemical|alkaloid|flavonoid|terpene|phenol/i);
+    if ($is_ency_constituent) {
+        eval {
+            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
+            if ($ency_schema) {
+                # Extract search term — first word that looks like a constituent name
+                my ($search_term) = ($prompt =~ /\b([A-Za-z][\w\-]{3,})\b/g);
+                $search_term ||= '';
+                my @cons_rows;
+                if ($search_term) {
+                    @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        { -or => [
+                            name        => { like => "%$search_term%" },
+                            common_name => { like => "%$search_term%" },
+                        ]},
+                        { rows => 10, order_by => { -asc => 'record_id' } }
+                    )->all;
+                }
+                if (!@cons_rows) {
+                    @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        {}, { rows => 20, order_by => { -asc => 'name' } }
+                    )->all;
+                }
+                if (@cons_rows) {
+                    my @lines = map {
+                        sprintf("  [#%s] %s%s%s",
+                            $_->record_id,
+                            $_->name,
+                            ($_->common_name ? " (" . $_->common_name . ")" : ""),
+                            ($_->chemical_class ? " | Class: " . $_->chemical_class : ""),
+                        )
+                    } @cons_rows;
+                    push @sections,
+                        "LIVE ENCY CONSTITUENT DATA (search: '" . ($search_term || 'all') . "'):\n"
+                        . join("\n", @lines)
+                        . "\nView all: /ENCY/Constituent | Add new: /ENCY/Constituent/add | Detail: /ENCY/Constituent/ID";
+                } else {
+                    push @sections, "LIVE ENCY CONSTITUENT DATA: No constituents found matching '$search_term'. "
+                        . "Add one at /ENCY/Constituent/add";
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "ENCY constituent fetch error: $@") if $@;
+    }
+
     # --- BMaster / Apiary live data ---
     # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
     my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
@@ -4512,6 +4561,9 @@ Supported actions:
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Create an ENCY constituent (editor/admin on ENCY pages):
+    [ACTION: {"action": "create_constituent", "params": {"name": "Constituent Name", "common_name": "optional", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional"}}]
+  (If the constituent already exists, returns its existing ID and link. If the entry is a stub, a review todo is auto-created.)
 - Sync a schema field (admin/compare_schema page only):
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
     ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
@@ -7463,6 +7515,120 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_constituent ────────────────────────────────────────────────────
+    # Create a new ENCY constituent record and optionally a todo stub.
+    if ($action_name eq 'create_constituent') {
+        my $name = $params->{name} || '';
+        unless ($name) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'name required' }));
+            return;
+        }
+
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        my $can_edit = grep { /^(admin|editor|developer)$/i } @$roles;
+        unless ($can_edit) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Editor or admin role required to create constituents' }));
+            return;
+        }
+
+        my $ency_model = $c->model('ENCYModel');
+        unless ($ency_model) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'ENCY model not available' }));
+            return;
+        }
+
+        my $sitename  = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+        my $username  = $c->session->{username} || 'system';
+        my $group     = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : '';
+
+        my $existing;
+        eval {
+            $existing = $ency_model->ency_schema->resultset('Constituent')->search(
+                { -or => [
+                    name        => { like => $name },
+                    common_name => { like => $name },
+                ]},
+                { rows => 1 }
+            )->first;
+        };
+
+        if ($existing) {
+            $c->response->body(encode_json({
+                success  => JSON::true,
+                message  => "Constituent '$name' already exists: " . $existing->name,
+                existing => JSON::true,
+                id       => $existing->record_id,
+                url      => '/ENCY/Constituent/' . $existing->record_id,
+            }));
+            return;
+        }
+
+        my $data = {
+            name                    => $name,
+            common_name             => $params->{common_name}            || '',
+            chemical_formula        => $params->{chemical_formula}       || '',
+            chemical_class          => $params->{chemical_class}         || '',
+            iupac_name              => $params->{iupac_name}             || '',
+            cas_number              => $params->{cas_number}             || '',
+            therapeutic_action      => $params->{therapeutic_action}     || '',
+            pharmacological_effects => $params->{pharmacological_effects}|| '',
+            toxicity                => $params->{toxicity}               || '',
+            solubility              => $params->{solubility}             || '',
+            found_in_herbs          => $params->{found_in_herbs}         || '',
+            found_in_foods          => $params->{found_in_foods}         || '',
+            found_in_drugs          => $params->{found_in_drugs}         || '',
+            research_notes          => $params->{research_notes}         || '',
+            url                     => $params->{url}                    || '',
+            reference               => $params->{reference}              || '',
+            sitename                => $sitename,
+            username_of_poster      => $username,
+            group_of_poster         => $group,
+            date_time_posted        => \'NOW()',
+            share                   => 0,
+        };
+
+        my ($ok, $new_id) = eval { $ency_model->add_constituent($c, $data) };
+        if ($@ || !$ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "create_constituent failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Constituent creation failed: ' . ($@ || 'unknown error') }));
+            return;
+        }
+
+        my $stub_note = '';
+        unless ($data->{chemical_formula} || $data->{therapeutic_action}) {
+            eval {
+                require Comserv::Model::ENCYModel;
+                $ency_model->_create_ency_todo($c,
+                    "ENCY: New constituent stub '$name' needs review",
+                    "A stub constituent record was created for '$name' via AI. "
+                  . "Please complete the entry with: chemical formula, class, therapeutic action, "
+                  . "pharmacological effects, found_in_herbs, and references.\n"
+                  . "Edit at: /ENCY/Constituent/edit?record_id=$new_id"
+                );
+            };
+            $stub_note = ' A review todo was created.';
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_constituent: id=$new_id name='$name' by=$username");
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => "Constituent '$name' created (ID $new_id).$stub_note "
+                     . "Edit at /ENCY/Constituent/edit?record_id=$new_id",
+            id      => $new_id,
+            url     => "/ENCY/Constituent/$new_id",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
@@ -7833,6 +7999,40 @@ EDITOR WORKFLOW (you have admin/editor access):
 - To link drug-herb interactions: /ENCY/drug_herb_interactions
 - When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
   admin URL for that action — do not just describe what to do.
+
+CONSTITUENT WORKFLOW (admin/editor only):
+The "constituents" field on herb and plant forms is a free-text comma-separated list of constituent
+names (e.g., "Quercetin, Rutin, Apigenin"). When the user mentions a constituent name in a form
+or asks about one, you should:
+
+1. CHECK if it exists: Look at the LIVE ENCY CONSTITUENT DATA injected into this prompt.
+   - If the constituent IS listed → give the user its link: /ENCY/Constituent/ID
+   - If it is NOT listed → offer to create it using the action below OR direct the user to /ENCY/Constituent/add
+
+2. CREATE a constituent when the user says "create the constituent", "add constituent [name]",
+   or similar. Use this action format on its own line in your response:
+   [ACTION: {"action": "create_constituent", "params": {"name": "CONSTITUENT_NAME", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional herb names comma-separated", "common_name": "optional"}}]
+
+3. After creating, a todo review stub is automatically generated if the entry is incomplete.
+   The user can then go to /ENCY/Constituent/edit?record_id=ID to fill in full details.
+
+4. CONSTITUENT FIELDS (all optional except name):
+   - name (required): scientific/IUPAC name e.g. "Quercetin"
+   - common_name: common alias e.g. "Quercetol"
+   - chemical_formula: e.g. "C15H10O7"
+   - chemical_class: e.g. "Flavonoid", "Alkaloid", "Terpene", "Phenol", "Glycoside"
+   - iupac_name: full IUPAC name
+   - cas_number: CAS registry number
+   - therapeutic_action: therapeutic uses text
+   - pharmacological_effects: known effects text
+   - toxicity: toxicity / safety notes
+   - solubility: solubility information
+   - found_in_herbs: comma-separated herb names
+   - found_in_foods: comma-separated food names
+   - found_in_drugs: comma-separated drug names
+   - research_notes: notes from research
+   - url: authoritative reference URL (PubChem, Wikipedia)
+   - reference: citation (PubChem CID, article title, etc.)
 EDITOR
 
     return <<END_PROMPT;
@@ -7844,10 +8044,13 @@ DATABASE SCHEMA — ENCY tables you can reference:
         key_name, ident_character, stem, leaves, flowers, fruit, taste, odour, root,
         distribution, dosage, administration, formulas, contra_indications, chinese, non_med, harvest
 - HerbCategory: links herbs to categories (e.g., Adaptogen, Nervine, Vulnerary)
-- HerbConstituent: links herbs to specific chemical constituents
+- HerbConstituent: links herbs to specific chemical constituents (junction table)
 - HerbDisease: links herbs to diseases/conditions they address
 - HerbSymptom: links herbs to symptoms they help with
-- Constituent: name, description, therapeutic actions
+- Constituent: record_id, name, common_name, chemical_formula, chemical_class, iupac_name,
+               cas_number, molecular_weight, therapeutic_action, toxicity, solubility,
+               found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects,
+               research_notes, image, url, reference
 - Disease: name, description, icd_code
 - Symptom: name, description, body_system
 - Formula: name, description, instructions, FormulaHerb (herb_id, amount, unit)
@@ -7863,15 +8066,19 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
-- Medicinal constituents: /ENCY/constituents
+- Constituent list: /ENCY/Constituent
+- Constituent detail: /ENCY/Constituent/ID
+- Add constituent: /ENCY/Constituent/add
+- Edit constituent: /ENCY/Constituent/edit?record_id=ID
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
 - Formulas: /ENCY/formula
 - Recipes: /ENCY/recipes
 $editor_section
 DATA ALREADY INJECTED:
-The server automatically injects LIVE ENCY HERB/PLANT DATA below when relevant herb records
-are found. ALWAYS use this live data to answer questions — do not ask the user to paste records.
+The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
+when relevant records are found. ALWAYS use this live data to answer questions — do not ask the
+user to paste records.
 
 GUIDELINES:
 - For health questions, always note: "This is educational information only — consult a healthcare provider."
@@ -7879,6 +8086,8 @@ GUIDELINES:
 - When suggesting herb searches, always provide the search URL: /ENCY/search?q=TERM
 - The current user is: $username
 - For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
+- When the user mentions a constituent name and asks you to check if it exists, look at the
+  LIVE ENCY CONSTITUENT DATA. If it's there, give the link. If not, offer to create it.
 END_PROMPT
 }
 
