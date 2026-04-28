@@ -962,14 +962,14 @@ sub auto_link_herb_data {
         next if $seen{$key}++;
         if ($item->{auto_created}) {
             $self->_create_ency_todo($c,
-                "ENCY: New constituent stub created for herb#$herb_id",
+                "ENCY: New constituent stub in herb#$herb_id: $item->{field}",
                 "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
               . "A stub Constituent record was auto-created for '$item->{term}' and linked to this herb. "
               . "Please review and complete the constituent entry with full details (chemical formula, class, pharmacological effects, etc.)."
             );
         } else {
             $self->_create_ency_todo($c,
-                "ENCY: Unresolved term in herb#$herb_id",
+                "ENCY: Unresolved term in herb#$herb_id: $item->{field}",
                 "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
               . "This term was found in the '$item->{field}' field but could not be auto-created or matched in ENCY. "
               . "Please verify and add it as a new entry if valid."
@@ -1545,13 +1545,23 @@ sub find_herb_by_name {
 
 sub _create_ency_todo {
     my ($self, $c, $subject, $description) = @_;
+    my $trunc_subject = substr($subject, 0, 254);
     eval {
+        my $existing = $c->model('DBEncy')->resultset('Todo')->search(
+            { subject => $trunc_subject, status => { '!=' => 3 } },
+            { rows => 1 }
+        )->first;
+        if ($existing) {
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_create_ency_todo',
+                "Skipping duplicate todo (id=${\$existing->id}): $trunc_subject");
+            return 1;
+        }
         my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
         $c->model('DBEncy')->resultset('Todo')->create({
             sitename           => $c->stash->{SiteName} || 'ENCY',
-            subject            => substr($subject, 0, 254),
+            subject            => $trunc_subject,
             description        => $description,
-            status             => 'New',
+            status             => 1,
             priority           => 3,
             share              => 0,
             project_code       => 'ENCY',
@@ -1690,6 +1700,20 @@ sub auto_resolve_text_fields {
                 }
             }
         }
+    }
+
+    my %seen_todo;
+    for my $item (@{ $result{unresolved} }) {
+        my $field  = $item->{field};
+        my $term   = $item->{term};
+        my $subject = "ENCY: Unresolved term in ${entity_type}#${entity_id}: $field";
+        $subject = substr($subject, 0, 254);
+        next if $seen_todo{$subject}++;
+        $self->_create_ency_todo($c, $subject,
+            "Field: $field\nTerm: $term\nEntity: $entity_type #$entity_id\n\n"
+          . "This term was found in the '$field' field but does not match any existing ENCY record. "
+          . "Please verify and add it as a new Glossary entry if valid."
+        );
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto_resolve_text_fields',
