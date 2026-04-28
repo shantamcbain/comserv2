@@ -4017,46 +4017,83 @@ sub _get_module_data {
     }
 
     # --- Constituent live data ---
-    # Inject when the ENCY agent is active and the prompt mentions constituents
+    # Inject when the ENCY agent is active and the prompt mentions constituents or a todo with constituent#N
     my $is_ency_constituent = $is_ency_agent
         && ($prompt =~ /constituent|compound|chemical|phytochemical|alkaloid|flavonoid|terpene|phenol/i);
     if ($is_ency_constituent) {
         eval {
             my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
             if ($ency_schema) {
-                # Extract search term — first word that looks like a constituent name
-                my ($search_term) = ($prompt =~ /\b([A-Za-z][\w\-]{3,})\b/g);
-                $search_term ||= '';
                 my @cons_rows;
-                if ($search_term) {
-                    @cons_rows = $ency_schema->resultset('Constituent')->search(
-                        { -or => [
-                            name        => { like => "%$search_term%" },
-                            common_name => { like => "%$search_term%" },
-                        ]},
-                        { rows => 10, order_by => { -asc => 'record_id' } }
-                    )->all;
-                }
-                if (!@cons_rows) {
-                    @cons_rows = $ency_schema->resultset('Constituent')->search(
-                        {}, { rows => 8, order_by => { -asc => 'name' } }
-                    )->all;
-                }
-                if (@cons_rows) {
-                    my @lines = map {
-                        sprintf("[#%s] %s%s%s",
-                            $_->record_id,
-                            $_->name,
-                            ($_->common_name ? " (" . $_->common_name . ")" : ""),
-                            ($_->chemical_class ? " [" . $_->chemical_class . "]" : ""),
-                        )
-                    } @cons_rows;
-                    push @sections,
-                        "CONSTITUENTS ('" . ($search_term || 'top') . "'): "
-                        . join("; ", @lines)
-                        . " | /ENCY/Constituent | add: /ENCY/Constituent/add";
+                my $search_label = 'top';
+
+                # Priority 1: specific record_id from "constituent#17" or "constituent #17" patterns
+                my ($const_id) = ($prompt =~ /constituent\s*#\s*(\d+)/i);
+                $const_id ||= do {
+                    # Also match a bare "#N" when preceded by "constituent" nearby
+                    my ($n) = ($prompt =~ /#(\d+)/);
+                    ($prompt =~ /constituent/i) ? $n : undef;
+                };
+
+                if ($const_id) {
+                    $search_label = "id=$const_id";
+                    my $rec = $ency_schema->resultset('Constituent')->find($const_id);
+                    if ($rec) {
+                        # Full detail for the specific record so AI can pre-fill edit form
+                        push @sections,
+                            "CONSTITUENT #$const_id DETAIL:\n"
+                            . "  name: "            . ($rec->name                    || '(empty)') . "\n"
+                            . "  common_name: "     . ($rec->common_name             || '(empty)') . "\n"
+                            . "  chemical_formula: ". ($rec->chemical_formula        || '(empty)') . "\n"
+                            . "  chemical_class: "  . ($rec->chemical_class          || '(empty)') . "\n"
+                            . "  iupac_name: "      . ($rec->iupac_name              || '(empty)') . "\n"
+                            . "  cas_number: "      . ($rec->cas_number              || '(empty)') . "\n"
+                            . "  therapeutic_action: " . ($rec->therapeutic_action   || '(empty)') . "\n"
+                            . "  pharmacological_effects: " . ($rec->pharmacological_effects || '(empty)') . "\n"
+                            . "  toxicity: "        . ($rec->toxicity                || '(empty)') . "\n"
+                            . "  found_in_herbs: "  . ($rec->found_in_herbs          || '(empty)') . "\n"
+                            . "  found_in_foods: "  . ($rec->found_in_foods          || '(empty)') . "\n"
+                            . "  url: "             . ($rec->url                     || '(empty)') . "\n"
+                            . "  reference: "       . ($rec->reference               || '(empty)') . "\n"
+                            . "Edit: /ENCY/Constituent/edit?record_id=$const_id";
+                    } else {
+                        push @sections, "CONSTITUENT #$const_id: Not found in DB. Create at /ENCY/Constituent/add";
+                    }
                 } else {
-                    push @sections, "CONSTITUENTS: None found for '$search_term'. Add: /ENCY/Constituent/add";
+                    # Priority 2: keyword search
+                    my ($search_term) = ($prompt =~ /\b([A-Za-z][\w\-]{3,})\b/g);
+                    $search_term ||= '';
+                    if ($search_term) {
+                        $search_label = $search_term;
+                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                            { -or => [
+                                name        => { like => "%$search_term%" },
+                                common_name => { like => "%$search_term%" },
+                            ]},
+                            { rows => 10, order_by => { -asc => 'record_id' } }
+                        )->all;
+                    }
+                    if (!@cons_rows) {
+                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                            {}, { rows => 8, order_by => { -asc => 'name' } }
+                        )->all;
+                    }
+                    if (@cons_rows) {
+                        my @lines = map {
+                            sprintf("[#%s] %s%s%s",
+                                $_->record_id,
+                                $_->name,
+                                ($_->common_name ? " (" . $_->common_name . ")" : ""),
+                                ($_->chemical_class ? " [" . $_->chemical_class . "]" : ""),
+                            )
+                        } @cons_rows;
+                        push @sections,
+                            "CONSTITUENTS ('$search_label'): "
+                            . join("; ", @lines)
+                            . " | /ENCY/Constituent | add: /ENCY/Constituent/add";
+                    } else {
+                        push @sections, "CONSTITUENTS: None found for '$search_label'. Add: /ENCY/Constituent/add";
+                    }
                 }
             }
         };
@@ -8013,6 +8050,36 @@ EDITOR WORKFLOW (you have admin/editor access):
 - To link drug-herb interactions: /ENCY/drug_herb_interactions
 - When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
   admin URL for that action — do not just describe what to do.
+
+TODO-DRIVEN WORKFLOW — when the user pastes a todo subject into the chat:
+When you see text like "P1 NEW BMaster ENCY: Unresolved term in constituent#17 ...", treat it
+as a work task and follow these steps automatically:
+
+STEP 1 — IDENTIFY the action:
+  "Unresolved term in constituent#N"  → fill in the stub constituent record #N
+  "Unresolved term in therapeutic_action" → review glossary entry
+  "Unresolved constituent name [name]"    → create a new constituent named [name]
+  Extract the TODO record_id from the subject text if present (e.g. "#17" after "constituent").
+
+STEP 2 — LOOKUP from injected data:
+  The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
+  Check each field — fields showing "(empty)" need to be filled in.
+
+STEP 3 — NAVIGATE: Tell the user which page to open:
+  - Constituent exists (stub) → /ENCY/Constituent/edit?record_id=N
+  - Constituent does not exist → /ENCY/Constituent/add
+
+STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
+  [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
+
+STEP 5 — PRE-FILL: Using your botanical/chemical knowledge, suggest values for each (empty) field.
+  For common plant constituents, provide: chemical_formula, chemical_class, therapeutic_action,
+  pharmacological_effects, found_in_herbs, and a PubChem or Wikipedia url.
+  Present these as a clear list so the user can copy-paste into the edit form.
+
+STEP 6 — REMIND when the user says they are done:
+  "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
+  [ACTION: {"action": "update_todo_status", "params": {"todo_id": TODO_RECORD_ID, "status": 3}}]"
 
 CONSTITUENT WORKFLOW (admin/editor only):
 The "constituents" field on herb and plant forms is a free-text comma-separated list of constituent
