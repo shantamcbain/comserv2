@@ -1628,6 +1628,38 @@ my %FIELD_MAPPINGS = (
     related_terms         => { schema => 'ency',    resultset => 'Glossary',    fields => ['term'] },
 );
 
+my %RESULTSET_ADD_ROUTE = (
+    Herb        => { route => '/ENCY/add_herb',          param => 'botanical_name' },
+    Drug        => { route => '/ENCY/Drug/add',          param => 'generic_name'   },
+    Constituent => { route => '/ENCY/Constituent/add',   param => 'name'           },
+    Glossary    => { route => '/ENCY/Glossary/add',      param => 'term'           },
+    Disease     => { route => '/ENCY/Disease/add',       param => 'common_name'    },
+    Symptom     => { route => '/ENCY/Symptom/add',       param => 'name'           },
+);
+
+sub action_items_for_unresolved {
+    my ($self, $unresolved_list) = @_;
+    my @items;
+    my %seen;
+    for my $item (@{ $unresolved_list || [] }) {
+        my $field   = $item->{field};
+        my $term    = $item->{term};
+        my $key     = "$field:$term";
+        next if $seen{$key}++;
+        my $mapping = $FIELD_MAPPINGS{$field} or next;
+        my $rs      = $mapping->{resultset};
+        my $route   = $RESULTSET_ADD_ROUTE{$rs} or next;
+        push @items, {
+            field      => $field,
+            term       => $term,
+            type       => lc($rs),
+            add_route  => $route->{route},
+            name_param => $route->{param},
+        };
+    }
+    return \@items;
+}
+
 my @STOP_WORDS = qw(and or the a an of in on at to with for by from as is are was were be been being
                     have has had do does did will would could should may might shall can shall
                     not no nor but if then than also both either neither);

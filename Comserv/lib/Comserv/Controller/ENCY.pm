@@ -2028,8 +2028,18 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
-            $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
+            my $link_msg = $n_linked ? " Auto-linked $n_linked record(s)." : '';
+            my $todo_msg = $n_unres  ? " $n_unres term(s) need attention."  : '';
+            $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s).$link_msg$todo_msg";
+            my $return_to = $c->uri_for('/ENCY/Constituent', $record_id);
+            my $action_items = $c->model('ENCYModel')->action_items_for_unresolved($resolve->{unresolved});
+            if ($action_items && @$action_items) {
+                my $first = $action_items->[0];
+                $c->response->redirect($c->uri_for($first->{add_route},
+                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
+            } else {
+                $c->response->redirect($return_to);
+            }
             return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
