@@ -197,20 +197,18 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         if ($status) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
                 "Herb updated successfully for record_id: $record_id.");
-            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
-            my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
+            my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked record(s)." : '';
-            my $todo_msg = $unresolved   ? " $unresolved unresolved term(s) logged as todos." : '';
-            my $constituents_html = _build_constituent_html(
-                $c, $record_id, $updated_herb->constituents // ''
-            );
-            $c->stash(
-                success_msg       => "Herb updated successfully.$link_msg$todo_msg",
-                herb              => $updated_herb,
-                constituents_html => $constituents_html,
-                edit_mode         => 0,
-                template          => 'ENCY/HerbView.tt',
-            );
+            my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
+            $c->flash->{success_msg} = "Herb updated successfully.$link_msg$todo_msg";
+            my $return_to = $c->uri_for('/ENCY/herb_detail/' . $record_id);
+            if ($action_items && @$action_items) {
+                my $first = $action_items->[0];
+                $c->res->redirect($c->uri_for($first->{add_route},
+                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
+            } else {
+                $c->res->redirect($return_to);
+            }
             return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
@@ -860,11 +858,18 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
 
         if ($ok) {
             my $new_id = $result->record_id;
-            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
+            my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
-            my $todo_msg = $unresolved   ? " $unresolved term(s) logged as todos." : '';
+            my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
             $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
-            $c->res->redirect($c->uri_for($self->action_for('index')));
+            my $return_to = $c->uri_for('/ENCY/herb_detail/' . $new_id);
+            if ($action_items && @$action_items) {
+                my $first = $action_items->[0];
+                $c->res->redirect($c->uri_for($first->{add_route},
+                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
+            } else {
+                $c->res->redirect($return_to);
+            }
         } else {
             $c->stash(
                 error_msg      => "Failed to add herb: $result",
@@ -1907,6 +1912,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
         if ($ok && $new_id) {
             if ($data->{found_in_herbs}) {
@@ -1916,18 +1922,28 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $new_id, $data);
             my $n_linked = scalar @{ $resolve->{linked} || [] };
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
-            $c->flash->{success_msg} = "Constituent added. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+            $c->flash->{success_msg} = "Constituent '$data->{name}' added. Linked to $back_linked herb(s)."
+                . ($n_linked  ? " Auto-linked $n_linked record(s)." : '')
+                . ($n_unres   ? " $n_unres term(s) need attention." : '');
         } else {
-            $c->flash->{success_msg} = 'Constituent added successfully.';
+            $c->flash->{success_msg} = "Constituent '$data->{name}' added successfully.";
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
-        $c->response->redirect($c->uri_for('/ENCY/Constituent'));
+        if ($return_to && $return_to =~ m{^/}) {
+            $c->response->redirect($c->uri_for($return_to));
+        } else {
+            $c->response->redirect($c->uri_for('/ENCY/Constituent'));
+        }
         return;
     }
 
+    my $prefill_name = $c->request->param('name') // '';
+    my $return_to    = $c->request->param('return_to') // '';
     $self->_stash_image_files($c);
     $c->stash(
         edit_mode       => 1,
+        prefill_name    => $prefill_name,
+        return_to       => $return_to,
         ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
         template        => 'ENCY/ConstituentDetail.tt',
     );
@@ -2146,15 +2162,24 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_glossary($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Glossary term added: $data->{term}");
-        $c->flash->{success_msg} = 'Glossary term added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Glossary'));
+        $c->flash->{success_msg} = "Glossary term '$data->{term}' added successfully.";
+        if ($return_to && $return_to =~ m{^/}) {
+            $c->response->redirect($c->uri_for($return_to));
+        } else {
+            $c->response->redirect($c->uri_for('/ENCY/Glossary'));
+        }
         return;
     }
 
+    my $prefill_term = $c->request->param('term') // '';
+    my $return_to    = $c->request->param('return_to') // '';
     $c->stash(
         edit_mode       => 1,
+        prefill_term    => $prefill_term,
+        return_to       => $return_to,
         ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
         template        => 'ENCY/GlossaryDetail.tt',
     );
