@@ -283,13 +283,64 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
     $c->session->{record_id} = $id;
 
+    my $constituents_html = _build_constituent_html(
+        $c, $id, $herb->constituents // ''
+    );
+
     $self->_stash_image_files($c);
     $c->stash(
-        herb      => $herb,
-        edit_mode => 0,
-        template  => 'ENCY/HerbView.tt',
+        herb              => $herb,
+        constituents_html => $constituents_html,
+        edit_mode         => 0,
+        template          => 'ENCY/HerbView.tt',
     );
 }
+
+sub constituent_popup : Path('/ENCY/constituent_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid ID');
+        return;
+    }
+    my $constituent = $c->model('ENCYModel')->get_constituent_by_id($c, $id);
+    unless ($constituent) {
+        $c->response->status(404);
+        $c->response->body('Not found');
+        return;
+    }
+    $c->stash(
+        constituent => $constituent,
+        template    => 'ENCY/partials/ConstituentPopup.tt',
+    );
+}
+
+sub _build_constituent_html {
+    my ($c, $herb_id, $text) = @_;
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    my @hc_rows = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('HerbConstituent')->search(
+            { herb_id => $herb_id },
+            { prefetch => 'constituent' }
+        )->all;
+    };
+    my @sorted = sort { length($b->constituent->name) <=> length($a->constituent->name) } @hc_rows;
+    for my $hc (@sorted) {
+        my $const = $hc->constituent;
+        my $cid   = $const->record_id;
+        my $name  = $const->name;
+        my $pat   = quotemeta($name);
+        my $tip   = $const->common_name ? "$name (" . $const->common_name . ")" : $name;
+        $tip =~ s/"/&quot;/g;
+        my $link  = qq{<a href="#" class="ency-constituent-link" data-cid="$cid" title="$tip">$name</a>};
+        $html =~ s/$pat/$link/gi;
+    }
+    return $html;
+}
+
 sub get_reference_by_id :Local {
     my ( $self, $c, $id ) = @_;
     $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
