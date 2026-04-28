@@ -303,20 +303,49 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
 sub constituent_popup : Path('/ENCY/constituent_popup') : Args(1) {
     my ($self, $c, $id) = @_;
     unless (defined $id && $id =~ /^\d+$/) {
-        $c->response->status(400);
-        $c->response->body('Invalid ID');
-        return;
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
     }
     my $constituent = $c->model('ENCYModel')->get_constituent_by_id($c, $id);
     unless ($constituent) {
-        $c->response->status(404);
-        $c->response->body('Not found');
-        return;
+        $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(
-        constituent => $constituent,
-        template    => 'ENCY/partials/ConstituentPopup.tt',
-    );
+    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt');
+}
+
+sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+    unless ($herb) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt');
+}
+
+sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $drug = eval { $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($id) };
+    unless ($drug) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt');
+}
+
+sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $term = eval { $c->model('ENCYModel')->ency_schema->resultset('Glossary')->find($id) };
+    unless ($term) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt');
 }
 
 sub _build_constituent_html {
@@ -341,6 +370,75 @@ sub _build_constituent_html {
         $tip =~ s/"/&quot;/g;
         my $link  = qq{<a href="#" class="ency-constituent-link" data-cid="$cid" title="$tip">$name</a>};
         $html =~ s/$pat/$link/gi;
+    }
+    return $html;
+}
+
+sub _build_herb_popup_html {
+    my ($c, $text, $linked_herbs) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    return $html unless $linked_herbs && @$linked_herbs;
+    my @with_herb = grep { $_->{herb} } @$linked_herbs;
+    my @sorted    = sort { length($b->{name}) <=> length($a->{name}) } @with_herb;
+    for my $lh (@sorted) {
+        my $herb = $lh->{herb};
+        my $hid  = $herb->record_id;
+        my $name = $lh->{name};
+        my $pat  = quotemeta($name);
+        my $tip  = $herb->botanical_name ? $herb->botanical_name : $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="#" class="ency-herb-link" data-hid="$hid" title="$tip">$name</a>};
+        $html =~ s/(?<![>])$pat(?![<])/$link/gi;
+    }
+    return $html;
+}
+
+sub _build_drug_popup_html {
+    my ($c, $text, $linked_drugs) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    return $html unless $linked_drugs && @$linked_drugs;
+    my @with_drug = grep { $_->{drug} } @$linked_drugs;
+    my @sorted    = sort { length($b->{name}) <=> length($a->{name}) } @with_drug;
+    for my $ld (@sorted) {
+        my $drug = $ld->{drug};
+        my $did  = $drug->record_id;
+        my $name = $ld->{name};
+        my $pat  = quotemeta($name);
+        my $tip  = $drug->generic_name ? $drug->generic_name : $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="#" class="ency-drug-link" data-did="$did" title="$tip">$name</a>};
+        $html =~ s/(?<![>])$pat(?![<])/$link/gi;
+    }
+    return $html;
+}
+
+sub _build_glossary_popup_html {
+    my ($c, $text) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    my @terms = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Glossary')->search(
+            {},
+            { columns => ['record_id', 'term', 'alternate_terms'], order_by => { -desc => \'LENGTH(term)' } }
+        )->all;
+    };
+    for my $t (@terms) {
+        my $gid  = $t->record_id;
+        my $term = $t->term;
+        my $pat  = quotemeta($term);
+        my $link = qq{<a href="#" class="ency-glossary-link" data-gid="$gid" title="Glossary: $term">$term</a>};
+        $html =~ s/\b$pat\b/$link/gi;
     }
     return $html;
 }
@@ -1725,17 +1823,23 @@ sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
     }
 
     $c->session->{record_id} = $id;
-    my $related = $c->model('ENCYModel')->get_constituent_related($c, $id);
+    my $related      = $c->model('ENCYModel')->get_constituent_related($c, $id);
     my $linked_herbs = $c->model('ENCYModel')->resolve_names_to_herbs($c, $constituent->found_in_herbs);
     my $linked_drugs = $c->model('ENCYModel')->resolve_names_to_drugs($c, $constituent->found_in_drugs);
+    my $herbs_html          = _build_herb_popup_html($c, $constituent->found_in_herbs // '', $linked_herbs);
+    my $drugs_html          = _build_drug_popup_html($c, $constituent->found_in_drugs // '', $linked_drugs);
+    my $therapeutic_html    = _build_glossary_popup_html($c, $constituent->therapeutic_action // '');
     $c->stash(
-        constituent      => $constituent,
-        related_diseases => $related->{diseases}  // [],
-        related_symptoms => $related->{symptoms}  // [],
-        linked_herbs     => $linked_herbs,
-        linked_drugs     => $linked_drugs,
-        edit_mode        => 0,
-        template         => 'ENCY/ConstituentDetail.tt',
+        constituent         => $constituent,
+        related_diseases    => $related->{diseases}  // [],
+        related_symptoms    => $related->{symptoms}  // [],
+        linked_herbs        => $linked_herbs,
+        linked_drugs        => $linked_drugs,
+        herbs_html          => $herbs_html,
+        drugs_html          => $drugs_html,
+        therapeutic_html    => $therapeutic_html,
+        edit_mode           => 0,
+        template            => 'ENCY/ConstituentDetail.tt',
     );
 }
 
