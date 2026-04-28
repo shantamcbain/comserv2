@@ -1749,7 +1749,6 @@ sub auto_resolve_text_fields {
                         push @{ $result{unresolved} }, { field => $field, term => $term };
                     }
                 } else {
-                    push @{ $result{unresolved} }, { field => $field, term => $term };
                     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'auto_resolve_text_fields',
                         "Skipped prose fragment '$term' in $entity_type#$entity_id field '$field'");
                 }
