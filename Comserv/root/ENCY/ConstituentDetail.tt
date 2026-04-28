@@ -23,7 +23,10 @@
 [% IF edit_mode %]
 <h1>Editing Constituent: [% constituent.name | html %]</h1>
 [% ELSE %]
-<h1>[% constituent.name | html %]</h1>
+<h1>[% constituent.name | html %][% IF constituent.common_name %] <small style="color:#666;font-size:0.65em;">([% constituent.common_name | html %])</small>[% END %]</h1>
+[% IF constituent.image %]
+<div style="float:right;margin:0 0 1em 1.5em;">[% ency_img_tag(constituent.image, 240, 240) %]</div>
+[% END %]
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Constituent') %]">&larr; Back to Constituents</a>
@@ -77,7 +80,7 @@
             [% IF edit_mode %]
             <input type="text" name="chemical_class" value="[% constituent.chemical_class | html %]" size="50" />
             [% ELSE %]
-            [% constituent.chemical_class | html %]
+            [% chemical_class_html %]
             [% END %]
         </td>
     </tr>
@@ -142,7 +145,7 @@
             [% IF edit_mode %]
             <input type="text" name="solubility" value="[% constituent.solubility | html %]" size="50" />
             [% ELSE %]
-            [% constituent.solubility | html %]
+            [% solubility_html %]
             [% END %]
         </td>
     </tr>
@@ -152,7 +155,7 @@
             [% IF edit_mode %]
             <textarea name="pharmacological_effects" rows="4" cols="60">[% constituent.pharmacological_effects | html %]</textarea>
             [% ELSE %]
-            [% constituent.pharmacological_effects | html %]
+            [% pharmacological_html %]
             [% END %]
         </td>
     </tr>
@@ -254,7 +257,7 @@
             <span style="font-size:0.85em;color: var(--text-muted-color, #666);"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
             [% ELSE %]
             [% IF constituent.image %]
-            [% ency_img_tag(constituent.image, 300, 300) %]
+            <a href="[% constituent.image | html %]" target="_blank">[% constituent.image | html %]</a>
             [% ELSE %]
             <span style="color:#999;font-style:italic;">No image — edit to add one (AI can suggest a PubChem image URL)</span>
             [% END %]
