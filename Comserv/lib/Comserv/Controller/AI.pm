@@ -945,11 +945,25 @@ sub generate :Local :Args(0) {
                     push @trace, "💾 In-memory: " . join(', ', sort keys %in_mem);
                     if (!$in_mem{$use_model}) {
                         my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed_models;
-                        my ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
-                        if ($preferred) {
-                            push @trace, "💾 Switched tier_small '$use_model' → '$preferred' (already in memory)";
-                            $use_model = $preferred;
-                            $ollama->model($use_model);
+                        # When force_large is active (ency/planning/bmaster), only prefer an
+                        # in-memory model if it is >= the size of tier_large. Never downgrade.
+                        my ($preferred);
+                        if ($force_large) {
+                            $preferred = $in_mem{$tier_large} ? $tier_large : undef;
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            } else {
+                                push @trace, "💾 No large model in memory — keeping $use_model (cold start)";
+                            }
+                        } else {
+                            ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            }
                         }
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
@@ -1067,11 +1081,12 @@ sub generate :Local :Args(0) {
                 $_gr = [split /,/, $_gr] unless ref $_gr;
                 grep { /^(admin|developer|editor)$/i } @$_gr;
             };
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 20_000
                               : $_gen_is_admin ? 14_000
                               : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
-                               : $_gen_is_admin                                        ? 10_000
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|bmaster)$/)        ? 16_000
+                               : ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                         ? 10_000
                                : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
@@ -3977,25 +3992,22 @@ sub _get_module_data {
                 my $results = $forager->searchHerbs($c, $search);
                 if ($results && @$results) {
                     my @lines;
-                    my $last = $#$results < 14 ? $#$results : 14;
+                    my $last = $#$results < 7 ? $#$results : 7;
                     for my $h (@{$results}[0..$last]) {
                         my $name   = $h->botanical_name // '';
                         my $common = $h->common_names   // '';
+                        my $id     = $h->record_id      // '';
                         my $nectar = $h->nectar         // '';
                         my $pollen = $h->pollen         // '';
-                        my $apis   = $h->apis           // '';
-                        my $id     = $h->record_id      // '';
-                        push @lines, "  [#$id] $name"
+                        push @lines, "[#$id] $name"
                             . ($common ? " ($common)" : '')
-                            . ($nectar ? " | Nectar: $nectar" : '')
-                            . ($pollen ? " | Pollen: $pollen" : '')
-                            . ($apis   ? " | Bee use: $apis"  : '');
+                            . ($nectar ? " N:$nectar" : '')
+                            . ($pollen ? " P:$pollen" : '');
                     }
                     if (@lines) {
                         push @sections,
-                            "LIVE ENCY HERB/PLANT DATA (search: '$search'):\n"
-                            . join("\n", @lines)
-                            . "\nView full encyclopedia at /ENCY | Bee forage plants at /ENCY/BeePastureView";
+                            "HERBS ('$search'): " . join("; ", @lines)
+                            . " | /ENCY | /ENCY/BeePastureView";
                     }
                 }
             }
@@ -4027,25 +4039,24 @@ sub _get_module_data {
                 }
                 if (!@cons_rows) {
                     @cons_rows = $ency_schema->resultset('Constituent')->search(
-                        {}, { rows => 20, order_by => { -asc => 'name' } }
+                        {}, { rows => 8, order_by => { -asc => 'name' } }
                     )->all;
                 }
                 if (@cons_rows) {
                     my @lines = map {
-                        sprintf("  [#%s] %s%s%s",
+                        sprintf("[#%s] %s%s%s",
                             $_->record_id,
                             $_->name,
                             ($_->common_name ? " (" . $_->common_name . ")" : ""),
-                            ($_->chemical_class ? " | Class: " . $_->chemical_class : ""),
+                            ($_->chemical_class ? " [" . $_->chemical_class . "]" : ""),
                         )
                     } @cons_rows;
                     push @sections,
-                        "LIVE ENCY CONSTITUENT DATA (search: '" . ($search_term || 'all') . "'):\n"
-                        . join("\n", @lines)
-                        . "\nView all: /ENCY/Constituent | Add new: /ENCY/Constituent/add | Detail: /ENCY/Constituent/ID";
+                        "CONSTITUENTS ('" . ($search_term || 'top') . "'): "
+                        . join("; ", @lines)
+                        . " | /ENCY/Constituent | add: /ENCY/Constituent/add";
                 } else {
-                    push @sections, "LIVE ENCY CONSTITUENT DATA: No constituents found matching '$search_term'. "
-                        . "Add one at /ENCY/Constituent/add";
+                    push @sections, "CONSTITUENTS: None found for '$search_term'. Add: /ENCY/Constituent/add";
                 }
             }
         };
