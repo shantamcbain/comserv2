@@ -174,6 +174,47 @@ sub index :Path :Args(0) {
     # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -186,6 +227,7 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
