@@ -7768,6 +7768,17 @@ sub action :Local :Args(0) {
         if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
         if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
 
+        unless ($params->{wizard_confirmed}) {
+            my %prefill = %insp;
+            $prefill{box_details} = $params->{box_details} || [];
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_inspection_wizard',
+                wizard_prefill => \%prefill,
+            }));
+            return;
+        }
+
         my $inspection_row;
         eval { $inspection_row = $schema->resultset('Inspection')->create(\%insp) };
         if ($@ || !$inspection_row) {

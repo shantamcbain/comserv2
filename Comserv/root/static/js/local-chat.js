@@ -3043,7 +3043,7 @@
         document.getElementById('ai-insp-form').addEventListener('submit', function(e) {
             e.preventDefault();
             var fd = new FormData(e.target);
-            var confirmed = { box_details: p.box_details || [] };
+            var confirmed = { box_details: p.box_details || [], wizard_confirmed: 1 };
             fd.forEach(function(val, key) { confirmed[key] = val; });
             confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
             confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
