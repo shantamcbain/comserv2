@@ -7827,6 +7827,13 @@ sub action :Local :Args(0) {
             }
         }
 
+        if (defined $params->{transcript_id} && $params->{transcript_id} =~ /^\d+$/) {
+            eval {
+                $schema->resultset('VoiceTranscript')->search({ id => $params->{transcript_id} + 0 })
+                    ->update({ inspection_id => $inspection_id });
+            };
+        }
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'action', "AI action create_inspection: id=$inspection_id hive=$hive_id by=$current_user details=" . scalar(@detail_rows_created));
 
@@ -9447,15 +9454,25 @@ sub transcribe :Local :Args(0) {
     (my $ext = lc($orig_name)) =~ s/.*\.//;
     $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
 
-    my $tmp_dir  = '/tmp';
-    my $tmp_file = "$tmp_dir/whisper_$$\_" . time() . ".$ext";
+    my $audio_dir = $c->path_to('root', 'uploads', 'audio')->stringify;
+    unless (-d $audio_dir) {
+        eval { require File::Path; File::Path::make_path($audio_dir) };
+    }
 
-    eval { $upload->copy_to($tmp_file) };
-    if ($@ || !-f $tmp_file) {
+    my $timestamp   = time();
+    my $safe_user   = $username;
+    $safe_user      =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $audio_file  = "${audio_dir}/${safe_user}_${timestamp}_$$.${ext}";
+    my $tmp_file    = "/tmp/whisper_$$\_${timestamp}.${ext}";
+
+    eval { $upload->copy_to($audio_file) };
+    if ($@ || !-f $audio_file) {
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
         return;
     }
+    eval { require File::Copy; File::Copy::copy($audio_file, $tmp_file) };
+    $tmp_file = $audio_file unless -f $tmp_file;
 
     my $worktree = $c->path_to('..')->stringify;
     my @python_candidates = (
@@ -9526,7 +9543,7 @@ PYSCRIPT
         waitpid($pid, 0);
     };
 
-    unlink $tmp_file;
+    unlink $tmp_file unless $tmp_file eq $audio_file;
     unlink $py_script_file;
 
     if ($@) {
@@ -9546,13 +9563,33 @@ PYSCRIPT
         return;
     }
 
+    my $model_used = $result->{model} || $whisper_model;
+
+    my $transcript_id;
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $vt = $schema->resultset('VoiceTranscript')->create({
+            username          => $username,
+            original_filename => $orig_name,
+            audio_path        => $audio_file,
+            file_size         => $upload->size,
+            transcript        => $result->{transcript},
+            model_used        => $model_used,
+        });
+        $transcript_id = $vt->id;
+    };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+        'transcribe', "Failed to save voice_transcript record: $@") if $@;
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'transcribe', "Transcribed audio for $username: " . length($result->{transcript}) . " chars");
+        'transcribe', "Transcribed audio for $username: " . length($result->{transcript}) . " chars, transcript_id=" . ($transcript_id // 'unsaved'));
 
     $c->response->body(encode_json({
-        success     => JSON::true,
-        transcript  => $result->{transcript},
-        model_used  => $result->{model} || $whisper_model,
+        success       => JSON::true,
+        transcript    => $result->{transcript},
+        model_used    => $model_used,
+        transcript_id => $transcript_id ? $transcript_id + 0 : undef,
+        audio_path    => $audio_file,
     }));
 }
 

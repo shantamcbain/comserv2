@@ -2931,6 +2931,7 @@
                 if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
                 return;
             }
+            if (data.transcript_id) { state.lastTranscriptId = data.transcript_id; }
             if (inputEl) {
                 inputEl.value = transcript;
                 inputEl.dispatchEvent(new Event('input', { bubbles: true }));
@@ -3044,6 +3045,7 @@
             e.preventDefault();
             var fd = new FormData(e.target);
             var confirmed = { box_details: p.box_details || [], wizard_confirmed: 1 };
+            if (state.lastTranscriptId) { confirmed.transcript_id = state.lastTranscriptId; state.lastTranscriptId = null; }
             fd.forEach(function(val, key) { confirmed[key] = val; });
             confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
             confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
