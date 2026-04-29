@@ -652,10 +652,13 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--primary-color,#0077cc);background:var(--secondary-bg,#f0f7ff);border-radius:4px;margin-bottom:3px;"></div>' +
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
             '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -958,6 +961,66 @@
                 _setPendingImage(e.target.files[0]);
             }
         });
+
+        document.getElementById('audio-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _transcribeAudioFile(e.target.files[0]);
+                e.target.value = '';
+            }
+        });
+
+        (function _initMicRecorder() {
+            var micBtn = document.getElementById('mic-record-btn');
+            if (!micBtn) return;
+            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+            micBtn.style.display = '';
+
+            var _mediaRec = null;
+            var _chunks   = [];
+            var _stream   = null;
+
+            micBtn.addEventListener('click', function() {
+                if (_mediaRec && _mediaRec.state === 'recording') {
+                    _mediaRec.stop();
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    _stream  = stream;
+                    _chunks  = [];
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _mediaRec = new MediaRecorder(stream, { mimeType: mimeType });
+
+                    _mediaRec.ondataavailable = function(ev) {
+                        if (ev.data && ev.data.size > 0) _chunks.push(ev.data);
+                    };
+
+                    _mediaRec.onstop = function() {
+                        stream.getTracks().forEach(function(t) { t.stop(); });
+                        var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
+                        var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                        var file = new File([blob], 'recording.' + ext, { type: blob.type });
+                        _transcribeAudioFile(file);
+                        micBtn.textContent = '⏺';
+                        micBtn.title = 'Record voice inspection';
+                        micBtn.style.background = '';
+                    };
+
+                    _mediaRec.start(1000);
+                    micBtn.textContent = '⏹';
+                    micBtn.title = 'Stop recording';
+                    micBtn.style.background = '#ffd0d0';
+
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '🔴 Recording… click ⏹ to stop'; _statusEl.style.display = ''; }
+                }).catch(function(err) {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
+                });
+            });
+        })();
+
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
             const parts = selectedVal.split('|');
@@ -2834,6 +2897,174 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // ── _transcribeAudioFile ───────────────────────────────────────────────────
+    // Upload an audio File object to /ai/transcribe, show progress, and on success
+    // populate the chat input with the transcript so the user can review + send.
+    function _transcribeAudioFile(file) {
+        var statusEl  = document.getElementById('audio-transcribe-status');
+        var inputEl   = document.getElementById('message-input');
+        var sendBtn   = document.getElementById('send-message');
+
+        if (!file) return;
+
+        var sizeMB = (file.size / 1048576).toFixed(1);
+        if (statusEl) { statusEl.textContent = '⏳ Transcribing ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
+        if (sendBtn) sendBtn.disabled = true;
+
+        var formData = new FormData();
+        formData.append('audio', file, file.name || 'recording.webm');
+
+        fetch('/ai/transcribe', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (!data.success) {
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            var transcript = (data.transcript || '').trim();
+            if (!transcript) {
+                if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
+                return;
+            }
+            if (inputEl) {
+                inputEl.value = transcript;
+                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                inputEl.focus();
+            }
+            if (statusEl) {
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + ') — review and press Send';
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 8000);
+            }
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + ')', 'system-message');
+        })
+        .catch(function(err) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (statusEl) { statusEl.textContent = '⚠️ Transcription request failed: ' + err.message; }
+        });
+    }
+
+    // ── openInspectionWizard ───────────────────────────────────────────────────
+    // Renders an inline inspection review form pre-filled with AI-extracted data.
+    // User can edit all fields before confirming; on confirm sends create_inspection.
+    function openInspectionWizard(prefill) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        var existing = document.getElementById('ai-inspection-wizard');
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.id = 'ai-inspection-wizard';
+
+        var lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'Hive Inspection Review';
+
+        var box = document.createElement('div');
+        box.className = 'message system-message';
+        box.style.cssText = 'padding:12px;max-width:520px;font-size:0.88em;';
+
+        var p = prefill || {};
+        var qs_yes = p.queen_seen        ? 'checked' : '';
+        var qm_yes = p.queen_marked      ? 'checked' : '';
+        var eg_yes = p.eggs_seen         ? 'checked' : '';
+        var lv_yes = p.larvae_seen       ? 'checked' : '';
+        var cb_yes = p.capped_brood_seen ? 'checked' : '';
+        var fd_yes = p.feeding_done      ? 'checked' : '';
+        var today  = new Date().toISOString().slice(0, 10);
+
+        var popOpts = ['', 'very_strong', 'strong', 'moderate', 'weak', 'very_weak'].map(function(v) {
+            var sel = (p.population_estimate || '') === v ? ' selected' : '';
+            var lbl2 = v ? v.replace(/_/g, ' ') : '— select —';
+            return '<option value="' + v + '"' + sel + '>' + lbl2 + '</option>';
+        }).join('');
+        var tempOpts = ['calm', 'moderate', 'aggressive', 'very_aggressive'].map(function(v) {
+            var sel = (p.temperament || 'calm') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v.replace(/_/g, ' ') + '</option>';
+        }).join('');
+        var statusOpts = ['excellent', 'good', 'fair', 'poor', 'critical'].map(function(v) {
+            var sel = (p.overall_status || 'good') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v + '</option>';
+        }).join('');
+
+        box.innerHTML =
+            '<strong style="font-size:1.05em">🐝 Review Hive Inspection</strong>' +
+            '<p style="margin:4px 0 8px;color:#666;font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
+            '<form id="ai-insp-form" style="display:flex;flex-direction:column;gap:5px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Population</label><select name="population_estimate" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + popOpts + '</select></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Temperament</label><select name="temperament" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + tempOpts + '</select></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Overall Status</label><select name="overall_status" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + statusOpts + '</select></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;">' +
+                    '<label><input type="checkbox" name="queen_seen" ' + qs_yes + '> Queen seen</label>' +
+                    '<label><input type="checkbox" name="queen_marked" ' + qm_yes + '> Queen marked</label>' +
+                    '<label><input type="checkbox" name="eggs_seen" ' + eg_yes + '> Eggs</label>' +
+                    '<label><input type="checkbox" name="larvae_seen" ' + lv_yes + '> Larvae</label>' +
+                    '<label><input type="checkbox" name="capped_brood_seen" ' + cb_yes + '> Capped brood</label>' +
+                    '<label><input type="checkbox" name="feeding_done" ' + fd_yes + '> Feeding done</label>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                '</div>' +
+                '<div><label style="font-weight:600;display:block;font-size:0.85em">General notes</label><textarea name="general_notes" rows="3" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
+                '<div><label style="font-weight:600;display:block;font-size:0.85em">Action required</label><textarea name="action_required" rows="2" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
+                '<div><label style="font-weight:600;display:block;font-size:0.85em">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                '<div><label style="font-weight:600;display:block;font-size:0.85em">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:#555;"></div>' +
+                '<div style="display:flex;gap:8px;margin-top:4px;">' +
+                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
+                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.88em;background:#fff">Cancel</button>' +
+                '</div>' +
+            '</form>';
+
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(box);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        document.getElementById('ai-insp-cancel').addEventListener('click', function() {
+            wrapper.remove();
+        });
+
+        document.getElementById('ai-insp-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(e.target);
+            var confirmed = { box_details: p.box_details || [] };
+            fd.forEach(function(val, key) { confirmed[key] = val; });
+            confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
+            confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
+            confirmed.eggs_seen         = e.target.eggs_seen.checked         ? 1 : 0;
+            confirmed.larvae_seen       = e.target.larvae_seen.checked       ? 1 : 0;
+            confirmed.capped_brood_seen = e.target.capped_brood_seen.checked ? 1 : 0;
+            confirmed.feeding_done      = e.target.feeding_done.checked      ? 1 : 0;
+            confirmed.swarm_cells       = parseInt(confirmed.swarm_cells, 10) || 0;
+            confirmed.queen_cells       = parseInt(confirmed.queen_cells, 10) || 0;
+            confirmed.supersedure_cells = parseInt(confirmed.supersedure_cells, 10) || 0;
+
+            var statusDiv = document.getElementById('ai-insp-status');
+            if (statusDiv) { statusDiv.textContent = 'Saving…'; statusDiv.style.display = ''; }
+            e.target.querySelector('[type=submit]').disabled = true;
+
+            executeAIAction({ action: 'create_inspection', params: confirmed });
+
+            setTimeout(function() { wrapper.remove(); }, 1500);
+        });
+    }
+
     // Project creation wizard — renders an inline form in the chat window.
     // Submitted data is sent to /ai/action as a create_project ACTION.
     function openProjectWizard(prefillTitle) {
@@ -2951,6 +3182,10 @@
                 openProjectWizard(result.wizard_title || '');
                 return;
             }
+            if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
+                openInspectionWizard(result.wizard_prefill || actionObj.params || {});
+                return;
+            }
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
             const lbl = document.createElement('div');
@@ -2958,9 +3193,14 @@
             lbl.textContent = 'System';
             const el = document.createElement('div');
             el.className = 'message system-message';
-            el.textContent = result.success
-                ? '✅ ' + (result.message || 'Action completed')
-                : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            if (result.success && result.inspection_id) {
+                el.innerHTML = '✅ ' + (result.message || 'Inspection saved') +
+                    ' <a href="' + (result.url || '/BMaster') + '" target="_blank" style="color:#0077cc;font-weight:bold;">View inspection →</a>';
+            } else {
+                el.textContent = result.success
+                    ? '✅ ' + (result.message || 'Action completed')
+                    : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            }
             wrapper.appendChild(lbl);
             wrapper.appendChild(el);
             chatMessages.appendChild(wrapper);
