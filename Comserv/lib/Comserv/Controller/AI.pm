@@ -9390,6 +9390,7 @@ sub transcribe :Local :Args(0) {
 
     my $worktree = $c->path_to('..')->stringify;
     my @python_candidates = (
+        "$worktree/whisper_venv/bin/python3",
         "$worktree/speechfire/bin/python3",
         "$worktree/venv/bin/python3",
         '/usr/bin/python3',
