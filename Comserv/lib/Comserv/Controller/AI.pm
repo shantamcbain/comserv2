@@ -3916,6 +3916,66 @@ sub _get_module_data {
     my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
+    # Fast-path: when the widget is on /todo/details?record_id=N, inject ONLY that todo
+    # plus any todos that it is blocked by. No need to load all active todos.
+    my $page_path_req = $c->req->param('page_path') || '';
+    # Also check the JSON body path (already parsed into param by Catalyst for form posts;
+    # for JSON bodies we fall back to the stash or request body — safe to do a quick regex check).
+    if (!$page_path_req) {
+        my $raw = eval { $c->req->content } // '';
+        ($page_path_req) = ($raw =~ /"page_path"\s*:\s*"([^"]+)"/) if $raw;
+    }
+    my ($single_todo_id) = ($page_path_req =~ m{/todo/(?:details|view)[?&;](?:.*&)?record_id=(\d+)}i);
+
+    if ($single_todo_id && $want_todos) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+                my $t  = $rs->find($single_todo_id);
+                if ($t) {
+                    my $stat_label = ($t->status // 0) == 1 ? 'NEW'
+                                   : ($t->status // 0) == 2 ? 'IN PROGRESS'
+                                   : ($t->status // 0) == 3 ? 'DONE'
+                                   : 'status=' . ($t->status // '?');
+                    my $block = "CURRENT TODO #$single_todo_id:\n"
+                        . "  Subject:  " . ($t->subject   // 'Untitled') . "\n"
+                        . "  Status:   $stat_label\n"
+                        . "  Priority: P" . ($t->priority // '?') . "\n"
+                        . "  Due:      " . ($t->due_date  // 'none') . "\n"
+                        . "  Project:  " . (do { my $pid = $t->project_id; $pid ? "id=$pid" : 'none' }) . "\n"
+                        . "  Notes:    " . ($t->description // '') . "\n";
+
+                    # Look up any todos this one explicitly blocks or is blocked by
+                    eval {
+                        if ($t->can('blocker_id') && $t->blocker_id) {
+                            my $blocker = $rs->find($t->blocker_id);
+                            if ($blocker) {
+                                $block .= "BLOCKING TODO #" . $t->blocker_id . ":\n"
+                                    . "  Subject: " . ($blocker->subject // '') . "\n"
+                                    . "  Status:  " . (($blocker->status // 0) == 2 ? 'IN PROGRESS' : ($blocker->status // 0) == 3 ? 'DONE' : 'NEW') . "\n";
+                            }
+                        }
+                        # Any other todos that list this one as their blocker
+                        my @blocked_by = $rs->search({ blocker_id => $single_todo_id, status => { '!=' => 3 } })->all;
+                        if (@blocked_by) {
+                            $block .= "TODOS BLOCKED BY THIS (#$single_todo_id):\n";
+                            for my $b (@blocked_by) {
+                                $block .= "  [#" . $b->record_id . "] " . ($b->subject // '') . "\n";
+                            }
+                        }
+                    };
+                    $block .= "Edit at /todo/edit?record_id=$single_todo_id | All todos: /todo";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Single-todo fetch error: $@") if $@;
+        # Skip the bulk todo fetch below since we already have what we need
+        $want_todos = 0;
+    }
+
     if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
