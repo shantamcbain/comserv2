@@ -4611,6 +4611,9 @@ Supported actions:
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Record a hive inspection (BMaster/Apiary — use real hive_id from live data):
+    [ACTION: {"action": "create_inspection", "params": {"hive_id": N, "inspection_date": "YYYY-MM-DD", "overall_status": "good", "queen_seen": true, "eggs_seen": true, "population_estimate": "strong", "temperament": "calm", "general_notes": "narrative text", "box_details": []}}]
+  (The widget will show the user a review form pre-filled with these values before saving.)
 - Create an ENCY constituent (editor/admin on ENCY pages):
     [ACTION: {"action": "create_constituent", "params": {"name": "Constituent Name", "common_name": "optional", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional"}}]
   (If the constituent already exists, returns its existing ID and link. If the entry is a stub, a review todo is auto-created.)
@@ -7680,6 +7683,152 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_inspection ─────────────────────────────────────────────────────
+    if ($action_name eq 'create_inspection') {
+        my $hive_id = $params->{hive_id} or do {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'hive_id required' }));
+            return;
+        };
+
+        my %POPULATION_MAP = (
+            'very strong' => 'very_strong', 'very_strong' => 'very_strong',
+            'strong'      => 'strong',      'good'        => 'strong',
+            'moderate'    => 'moderate',    'medium'      => 'moderate', 'average' => 'moderate',
+            'weak'        => 'weak',        'low'         => 'weak',
+            'very weak'   => 'very_weak',   'very_weak'   => 'very_weak', 'poor'   => 'very_weak',
+        );
+        my %TEMPERAMENT_MAP = (
+            'calm'           => 'calm',           'gentle'    => 'calm',     'docile'  => 'calm',
+            'moderate'       => 'moderate',       'normal'    => 'moderate',
+            'aggressive'     => 'aggressive',     'defensive' => 'aggressive',
+            'very aggressive'=> 'very_aggressive','very_aggressive' => 'very_aggressive', 'hot' => 'very_aggressive',
+        );
+        my %STATUS_MAP = (
+            'excellent' => 'excellent', 'great' => 'excellent',
+            'good'      => 'good',
+            'fair'      => 'fair',      'ok'    => 'fair',  'okay' => 'fair',
+            'poor'      => 'poor',
+            'critical'  => 'critical',  'bad'   => 'critical',
+        );
+        my %WEATHER_MAP = (
+            'sunny'    => 'sunny',   'clear'    => 'sunny',
+            'cloudy'   => 'cloudy',  'overcast' => 'cloudy',
+            'rainy'    => 'rainy',   'rain'     => 'rainy',   'wet' => 'rainy',
+            'windy'    => 'windy',   'breezy'   => 'windy',
+            'warm'     => 'warm',    'hot'      => 'warm',
+            'cold'     => 'cold',    'cool'     => 'cold',
+            'foggy'    => 'foggy',
+        );
+
+        my $normalise = sub {
+            my ($val, $map_ref) = @_;
+            return undef unless defined $val && $val ne '';
+            my $lc = lc($val);
+            return $map_ref->{$lc} || $map_ref->{$val} || $val;
+        };
+
+        my $inspection_date = $params->{inspection_date} || $today;
+        $inspection_date = $today unless $inspection_date =~ /^\d{4}-\d{2}-\d{2}$/;
+
+        my %insp = (
+            hive_id             => $hive_id + 0,
+            inspection_date     => $inspection_date,
+            inspector           => $params->{inspector} || $current_user,
+            inspection_type     => $params->{inspection_type} || 'routine',
+            overall_status      => $normalise->($params->{overall_status}, \%STATUS_MAP) || 'good',
+            queen_seen          => ($params->{queen_seen}  ? 1 : 0),
+            queen_marked        => ($params->{queen_marked}? 1 : 0),
+            eggs_seen           => ($params->{eggs_seen}   ? 1 : 0),
+            larvae_seen         => ($params->{larvae_seen} ? 1 : 0),
+            capped_brood_seen   => ($params->{capped_brood_seen} ? 1 : 0),
+            supersedure_cells   => ($params->{supersedure_cells}  || 0) + 0,
+            swarm_cells         => ($params->{swarm_cells}         || 0) + 0,
+            queen_cells         => ($params->{queen_cells}         || 0) + 0,
+            temperament         => $normalise->($params->{temperament}, \%TEMPERAMENT_MAP) || 'calm',
+            general_notes       => $params->{general_notes}   || '',
+            action_required     => $params->{action_required} || '',
+            feeding_done        => ($params->{feeding_done}   ? 1 : 0),
+            feed_type           => $params->{feed_type}    || undef,
+            feed_amount         => $params->{feed_amount}  || undef,
+        );
+
+        if (defined $params->{population_estimate} && $params->{population_estimate} ne '') {
+            $insp{population_estimate} = $normalise->($params->{population_estimate}, \%POPULATION_MAP);
+        }
+        if (defined $params->{weather_conditions} && $params->{weather_conditions} ne '') {
+            $insp{weather_conditions} = $normalise->($params->{weather_conditions}, \%WEATHER_MAP) // $params->{weather_conditions};
+        }
+        if (defined $params->{temperature} && $params->{temperature} =~ /^-?\d/) {
+            ($insp{temperature} = $params->{temperature}) =~ s/[^\d.\-]//g;
+        }
+        if (defined $params->{next_inspection_date} && $params->{next_inspection_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $insp{next_inspection_date} = $params->{next_inspection_date};
+        }
+        if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
+        if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
+
+        my $inspection_row;
+        eval { $inspection_row = $schema->resultset('Inspection')->create(\%insp) };
+        if ($@ || !$inspection_row) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'action', "create_inspection failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Inspection creation failed: $@" }));
+            return;
+        }
+
+        my $inspection_id = $inspection_row->id;
+
+        my @detail_rows_created;
+        my $box_details = $params->{box_details} || [];
+        if (ref($box_details) eq 'ARRAY') {
+            for my $bd (@$box_details) {
+                next unless ref($bd) eq 'HASH';
+                my %detail = (
+                    inspection_id   => $inspection_id,
+                    detail_type     => $bd->{detail_type}   || 'box_summary',
+                    bees_coverage   => $bd->{bees_coverage} || 'none',
+                    brood_pattern   => $bd->{brood_pattern} || 'good',
+                    brood_percentage=> ($bd->{brood_percentage} || 0) + 0,
+                    honey_percentage=> ($bd->{honey_percentage} || 0) + 0,
+                    pollen_percentage=>($bd->{pollen_percentage}|| 0) + 0,
+                    empty_percentage=> ($bd->{empty_percentage} || 0) + 0,
+                    disease_signs   => $bd->{disease_signs}   || undef,
+                    pest_signs      => $bd->{pest_signs}      || undef,
+                    treatment_applied=> $bd->{treatment_applied} || undef,
+                    notes           => $bd->{notes}           || undef,
+                    queen_cells_count=> ($bd->{queen_cells_count} || 0) + 0,
+                );
+                $detail{box_id}    = $bd->{box_id}   + 0 if defined $bd->{box_id}   && $bd->{box_id}   =~ /^\d+$/;
+                $detail{frame_id}  = $bd->{frame_id} + 0 if defined $bd->{frame_id} && $bd->{frame_id} =~ /^\d+$/;
+                $detail{comb_condition} = $bd->{comb_condition} if $bd->{comb_condition};
+                $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
+
+                my $dr;
+                eval { $dr = $schema->resultset('InspectionDetail')->create(\%detail) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'action', "create_inspection_detail failed: $@");
+                } else {
+                    push @detail_rows_created, $dr->id;
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_inspection: id=$inspection_id hive=$hive_id by=$current_user details=" . scalar(@detail_rows_created));
+
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            inspection_id => $inspection_id + 0,
+            url           => "/Apiary/inspections/view/$inspection_id",
+            detail_count  => scalar(@detail_rows_created) + 0,
+            message       => "Inspection #$inspection_id recorded for hive $hive_id.",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
@@ -7925,7 +8074,7 @@ sub _build_bmaster_system_prompt {
 EDITOR / ADMIN WORKFLOW:
 - Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
 - Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
-- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID  (or use voice — see VOICE INSPECTION WORKFLOW below)
 - Record a treatment: /Apiary/add_treatment?hive_id=ID
 - Record a honey harvest: /Apiary/add_harvest?hive_id=ID
 - Manage queens: /Apiary/QueenRearing
@@ -7998,6 +8147,16 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Workshops (local beekeeping events): /workshop
 - Membership: /membership
 $editor_section
+VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
+You can record a hive inspection by voice directly in this chat widget:
+1. Click the 🎤 button next to the Send button to upload a .m4a / .wav / .mp3 file, OR
+   click ⏺ to record live from your microphone (requires HTTPS or localhost).
+2. The audio is transcribed automatically. The transcript appears in the chat input — review it, then press Send.
+3. Tell me which hive and any details; I will ask follow-up questions and extract the inspection data.
+4. A pre-filled review form appears — edit any fields, then click Save Inspection.
+5. The record is saved to the database and you get a link to view it.
+You can also just type or paste a voice-style inspection note — no audio file needed.
+
 DATA ALREADY INJECTED:
 The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
 ALWAYS use this live data — do not ask the user to describe their apiary setup.
@@ -8020,6 +8179,110 @@ COMMON ISSUES AND IPM APPROACH:
 - Swarming: Natural — manage with splits, adding space, or supering promptly
 
 The current user is: $username
+
+VOICE INSPECTION WORKFLOW:
+When the user says they want to record a hive inspection, OR when you receive a voice transcript,
+follow this multi-turn conversation workflow:
+
+STEP 1 — IDENTIFY THE HIVE:
+Ask "Which hive?" if not stated. Hive can be given by number, queen code, or yard+position.
+Look up the hive_id from LIVE APIARY DATA injected above. NEVER invent a hive_id.
+
+STEP 2 — COLLECT INSPECTION DATA via conversation:
+Ask short, natural follow-up questions in this order (only ask what has not been stated):
+1. Date and time (default: today)
+2. Weather and temperature
+3. Queen: seen? marked? number on tag?
+4. Eggs / larvae / capped brood seen?
+5. Population: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
+6. Temperament: calm, normal, defensive, hot?
+7. For each box (top box first): bees coverage, brood pattern %, honey %, pollen %, empty %
+8. Swarm cells / queen cells / supersedure cells?
+9. Feeding done? What and how much?
+10. Any treatments applied?
+11. Moved any frames? (comb moved to top box or another hive)
+12. General notes or concerns?
+13. Action required?
+14. Next inspection date?
+
+NATURAL LANGUAGE → ENUM MAPPINGS (use these when normalising user speech):
+population_estimate:
+  "lots of bees" / "full" / "packed" / "very strong" → very_strong
+  "strong" / "good population" / "good coverage" → strong
+  "half full" / "moderate" / "average" → moderate
+  "few bees" / "light" / "thin" / "weak" → weak
+  "almost empty" / "very few" / "dying out" / "very weak" → very_weak
+
+temperament:
+  "calm" / "gentle" / "docile" / "easy" → calm
+  "normal" / "ok" / "moderate" → moderate
+  "defensive" / "a bit aggressive" / "stinging" → aggressive
+  "very hot" / "boiling" / "very aggressive" / "dangerous" → very_aggressive
+
+overall_status:
+  "perfect" / "thriving" / "excellent" → excellent
+  "good" / "healthy" / "fine" → good
+  "ok" / "alright" / "fair" / "so-so" → fair
+  "not great" / "struggling" / "poor" → poor
+  "emergency" / "dying" / "failing" / "critical" → critical
+
+bees_coverage (per box):
+  "no bees" / "empty" → none
+  "few bees" / "light coverage" → light
+  "half covered" / "moderate" → moderate
+  "well covered" / "heavy" → heavy
+  "fully covered" / "packed" → full
+
+brood_pattern:
+  "solid" / "great pattern" / "excellent" → excellent
+  "good" / "mostly solid" → good
+  "some gaps" / "fair" → fair
+  "spotty" / "patchy" → spotty
+  "poor" / "scattered" → poor
+
+weather_conditions:
+  "nice" / "sunny" / "clear" → sunny
+  "cloudy" / "overcast" → cloudy
+  "raining" / "wet" / "rainy" → rainy
+  "windy" / "breezy" → windy
+  "warm" / "hot" → warm
+  "cold" / "cool" / "chilly" → cold
+
+STEP 3 — SHOW PRE-FILLED FORM:
+Once you have enough data, emit ONE [ACTION:] block on its own line:
+[ACTION: {"action": "create_inspection", "params": {
+  "hive_id": REAL_HIVE_ID,
+  "inspection_date": "YYYY-MM-DD",
+  "inspector": "USERNAME",
+  "overall_status": "good",
+  "queen_seen": true,
+  "queen_marked": false,
+  "eggs_seen": true,
+  "larvae_seen": true,
+  "capped_brood_seen": true,
+  "population_estimate": "strong",
+  "temperament": "calm",
+  "weather_conditions": "sunny",
+  "temperature": 22,
+  "general_notes": "full narrative here",
+  "action_required": "",
+  "feeding_done": false,
+  "swarm_cells": 0,
+  "queen_cells": 0,
+  "supersedure_cells": 0,
+  "box_details": [
+    {"detail_type": "box_summary", "bees_coverage": "heavy", "brood_pattern": "good",
+     "brood_percentage": 60, "honey_percentage": 20, "pollen_percentage": 10, "empty_percentage": 10}
+  ]
+}}]
+
+Rules:
+- ONLY emit the [ACTION:] block when you have collected enough data (at least hive_id and inspection_date).
+- The widget shows the user a review form pre-filled with your values — they can edit before saving.
+- If the user says the form is wrong, update any values they mention and emit a corrected [ACTION:] block.
+- box_details array: one entry per box, top box first. Include box_id if known from live data.
+- frame_id can be included per box_details entry if user mentions specific frame numbers.
+- For the queen tag number, include it in general_notes (e.g. "Queen #42 seen, marked yellow").
 END_PROMPT
 }
 
@@ -9071,6 +9334,156 @@ sub apply_fix :Local :Args(0) {
         path    => $rel,
         backup  => "$rel.bak",
         message => "File updated. Original backed up as $rel.bak",
+    }));
+}
+
+=head2 transcribe
+
+POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,
+and return { success, transcript, model_used }.  The audio file is saved to /tmp,
+transcribed, then immediately deleted.
+
+Whisper is called via the Python binary in Comserv/speechfire or Comserv/venv.
+If neither is available, returns an error asking the user to install openai-whisper.
+
+=cut
+
+sub transcribe :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_guest = !$username || lc($username) eq 'guest';
+    if ($is_guest) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required to use voice transcription' }));
+        return;
+    }
+
+    my $upload = $c->request->upload('audio');
+    unless ($upload) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'No audio file uploaded (field name: audio)' }));
+        return;
+    }
+
+    my $orig_name = $upload->filename || 'recording.wav';
+    (my $ext = lc($orig_name)) =~ s/.*\.//;
+    $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
+
+    my $tmp_dir  = '/tmp';
+    my $tmp_file = "$tmp_dir/whisper_$$\_" . time() . ".$ext";
+
+    eval { $upload->copy_to($tmp_file) };
+    if ($@ || !-f $tmp_file) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
+        return;
+    }
+
+    my $worktree = $c->path_to('..')->stringify;
+    my @python_candidates = (
+        "$worktree/whisper_venv/bin/python3",
+        "$worktree/speechfire/bin/python3",
+        "$worktree/venv/bin/python3",
+        '/usr/bin/python3',
+        'python3',
+    );
+
+    my $python_bin = '';
+    for my $p (@python_candidates) {
+        next unless $p;
+        my $abs = $p;
+        if ($abs !~ m{^/}) {
+            chomp(my $found = `which $abs 2>/dev/null`);
+            $abs = $found || '';
+        }
+        if ($abs && -x $abs) {
+            my $has_whisper = `"$abs" -c "import whisper" 2>&1`;
+            if ($? == 0) {
+                $python_bin = $abs;
+                last;
+            }
+        }
+    }
+
+    unless ($python_bin) {
+        unlink $tmp_file;
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+        }));
+        return;
+    }
+
+    my $whisper_model = 'base';
+    my $whisper_script = <<'PYSCRIPT';
+import sys, whisper, json, os
+audio_path = sys.argv[1]
+model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
+model = whisper.load_model(model_name)
+result = model.transcribe(audio_path, language='en')
+print(json.dumps({'transcript': result['text'].strip(), 'model': model_name}))
+PYSCRIPT
+
+    my $py_script_file = "/tmp/whisper_run_$$.py";
+    open(my $sfh, '>', $py_script_file) or do {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to write whisper script' }));
+        return;
+    };
+    print $sfh $whisper_script;
+    close $sfh;
+
+    my $json_out = '';
+    my $stderr_out = '';
+    eval {
+        require IPC::Open3;
+        my ($wtr, $rdr, $err_rdr);
+        my $pid = IPC::Open3::open3($wtr, $rdr, $err_rdr,
+            $python_bin, $py_script_file, $tmp_file, $whisper_model);
+        close $wtr;
+        $json_out   = do { local $/; <$rdr> } // '';
+        $stderr_out = do { local $/; <$err_rdr> } // '' if $err_rdr;
+        waitpid($pid, 0);
+    };
+
+    unlink $tmp_file;
+    unlink $py_script_file;
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'transcribe', "Whisper subprocess error: $@");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Transcription failed: $@" }));
+        return;
+    }
+
+    my $result = eval { decode_json($json_out) } if $json_out;
+    unless ($result && $result->{transcript}) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'transcribe', "Whisper returned no transcript. stdout='$json_out' stderr='$stderr_out'");
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Transcription returned empty result' }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'transcribe', "Transcribed audio for $username: " . length($result->{transcript}) . " chars");
+
+    $c->response->body(encode_json({
+        success     => JSON::true,
+        transcript  => $result->{transcript},
+        model_used  => $result->{model} || $whisper_model,
     }));
 }
 
