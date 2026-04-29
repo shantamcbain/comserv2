@@ -3165,6 +3165,16 @@
             }
         } catch(e) {}
 
+        // When opened via task_id=N, store the todo details so every chat request
+        // sends page_path=/todo/details?record_id=N which triggers single-todo context injection.
+        if (window.AI_TASK_CONTEXT && window.AI_TASK_CONTEXT.record_id) {
+            var tc = window.AI_TASK_CONTEXT;
+            state.taskContext = tc;
+            // Override page path so server-side _get_module_data uses single-todo fast-path
+            state.taskPagePath = '/todo/details?record_id=' + tc.record_id;
+            console.debug('[AI] Task context loaded: todo #' + tc.record_id, tc.subject);
+        }
+
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
         loadPersistedState();
@@ -3172,8 +3182,30 @@
         // Initialize agent context and user providers
         loadAgentsConfig().then(function() {
             state.pageContext = detectPageContext();
+            // Override page_path so single-todo context injection triggers for task_id links
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
+            // Auto-select agent based on task subject keywords (same logic as todo/details pages)
+            if (window.AI_TASK_CONTEXT && state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (window.AI_TASK_CONTEXT.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    console.debug('[AI] Task-context agent selected:', picked.id);
+                }
+            }
         }).catch(function() {
             state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
         });
         loadUserProviders().catch(function() {});
 
@@ -3190,7 +3222,10 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
-            if (!state.pageContext) state.pageContext = detectPageContext();
+            if (!state.pageContext) {
+                state.pageContext = detectPageContext();
+                if (state.taskPagePath) state.pageContext.page_path = state.taskPagePath;
+            }
 
             // Client-side navigation interception
             const navMatch = prompt.match(NAV_RE);
