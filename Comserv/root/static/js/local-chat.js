@@ -2919,7 +2919,14 @@
             credentials: 'include',
             body: formData
         })
-        .then(function(r) { return r.json(); })
+        .then(function(r) {
+            if (!r.ok && r.status === 403) throw new Error('Login required — please sign in to use voice transcription.');
+            if (!r.ok && r.status === 503) throw new Error('Whisper not installed on server. Run: pip install openai-whisper in Comserv/whisper_venv');
+            return r.text().then(function(txt) {
+                try { return JSON.parse(txt); }
+                catch(e) { throw new Error('Server returned unexpected response (HTTP ' + r.status + '). The server may be restarting — please try again in a moment.'); }
+            });
+        })
         .then(function(data) {
             if (sendBtn) sendBtn.disabled = false;
             if (!data.success) {

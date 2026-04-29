@@ -9429,10 +9429,14 @@ sub transcribe :Local :Args(0) {
         return;
     }
 
-    my $worktree = $c->path_to('..')->stringify;
+    my $worktree  = $c->path_to('..')->stringify;
+    my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
+        "$app_root/whisper_venv/bin/python3",
         "$worktree/whisper_venv/bin/python3",
+        "$app_root/speechfire/bin/python3",
         "$worktree/speechfire/bin/python3",
+        "$app_root/venv/bin/python3",
         "$worktree/venv/bin/python3",
         '/usr/bin/python3',
         'python3',
@@ -9468,10 +9472,11 @@ sub transcribe :Local :Args(0) {
     my $whisper_model = 'base';
     my $whisper_script = <<'PYSCRIPT';
 import sys, whisper, json, os
+os.environ.setdefault('CUDA_VISIBLE_DEVICES', '')
 audio_path = sys.argv[1]
 model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
-model = whisper.load_model(model_name)
-result = model.transcribe(audio_path, language='en')
+model = whisper.load_model(model_name, device='cpu')
+result = model.transcribe(audio_path, language='en', fp16=False)
 print(json.dumps({'transcript': result['text'].strip(), 'model': model_name}))
 PYSCRIPT
 
