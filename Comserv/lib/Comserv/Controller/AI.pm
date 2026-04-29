@@ -1195,9 +1195,9 @@ sub generate :Local :Args(0) {
                     $ollama->model($tier_small);
                     $ollama->timeout(120);
                     my $retry_start = time();
-                    $response = $use_chat_api
+                    $response = (@$history_items || $system)
                         ? $ollama->chat(messages => \@ollama_msgs)
-                        : $ollama->generate(prompt => $ollama_msgs[-1]->{content});
+                        : $ollama->query(prompt => $ollama_msgs[-1]->{content});
                     my $retry_elapsed = time() - $retry_start;
                     if ($response) {
                         $use_model = $tier_small;
