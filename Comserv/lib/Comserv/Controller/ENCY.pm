@@ -3131,14 +3131,14 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
         if ($type eq 'herb') {
             my @rows = $model->forager_schema->resultset('Herb')->search(
                 { -or => [
-                    common_name    => { like => "%$query%" },
+                    common_names   => { like => "%$query%" },
                     botanical_name => { like => "%$query%" },
                 ]},
-                { rows => 8, order_by => 'common_name' }
+                { rows => 8, order_by => 'common_names' }
             )->all;
             @results = map { {
                 id         => $_->record_id,
-                name       => $_->common_name // '',
+                name       => $_->common_names // '',
                 secondary  => $_->botanical_name // '',
                 url        => '/ENCY/herb_detail/' . $_->record_id,
             } } @rows;
