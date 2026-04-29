@@ -1187,8 +1187,30 @@ sub generate :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
-                $self->_flush_progress($gen_progress_file, \@trace, 1);
-                die "Ollama query failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'generate', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = $use_chat_api
+                        ? $ollama->chat(messages => \@ollama_msgs)
+                        : $ollama->generate(prompt => $ollama_msgs[-1]->{content});
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        $self->_flush_progress($gen_progress_file, \@trace, 1);
+                        die "Ollama query failed: $retry_err";
+                    }
+                } else {
+                    $self->_flush_progress($gen_progress_file, \@trace, 1);
+                    die "Ollama query failed: $error";
+                }
             }
 
             # Normalise response text (chat vs generate API have different keys)
@@ -2452,7 +2474,26 @@ sub chat :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
-                die "Ollama chat failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @chat_trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'chat', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = $ollama->chat(messages => \@ollama_messages);
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @chat_trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        die "Ollama chat failed: $retry_err";
+                    }
+                } else {
+                    die "Ollama chat failed: $error";
+                }
             }
 
             if ($response->{message} && $response->{message}->{content}) {
