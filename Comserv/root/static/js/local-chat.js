@@ -3449,6 +3449,30 @@
                 z-index: 10001;
                 overflow: hidden;
             }
+
+            /* In a detached popup window: fill the entire window so resize works naturally */
+            body.ai-widget-popup .chat-panel {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                border-radius: 0;
+                box-shadow: none;
+                margin: 0;
+            }
+            body.ai-widget-popup .chat-input {
+                flex-shrink: 0;
+            }
+            body.ai-widget-popup #message-input {
+                height: auto;
+                min-height: 40px;
+                max-height: 160px;
+                resize: vertical;
+            }
             
             .chat-header {
                 background-color: var(--accent-color, #FF9900);
@@ -3761,6 +3785,12 @@
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
+        // When running inside the detached popup window, mark <body> so CSS can
+        // override the chat panel to fill 100% of the window.
+        if (window.AI_WIDGET_POPUP) {
+            document.body.classList.add('ai-widget-popup');
+        }
+
         if (PAGE_MODE) {
             // /ai full-page mode: bind to existing DOM, no floating widget
             initPageMode();
@@ -3778,6 +3808,12 @@
                     }
                 }
             });
+
+            // In popup window mode: auto-open the chat panel immediately so the
+            // user sees the chat right away without having to click the bubble.
+            if (window.AI_WIDGET_POPUP) {
+                openChat();
+            }
         }
 
         // Check for a pending navigate_and_fill stored by another tab.
