@@ -4001,7 +4001,7 @@ sub _get_module_data {
                 }
 
                 # Cap rows: planning agent on CSC admin can otherwise inject hundreds of todos
-                my $todo_row_cap = ($normalized_agent_type eq 'planning') ? 20 : 40;
+                my $todo_row_cap = (lc($agent_id) eq 'planning') ? 20 : 40;
                 my @todos = $rs->search(
                     \%site_filter,
                     { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => $todo_row_cap }
