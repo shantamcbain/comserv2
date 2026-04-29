@@ -8182,28 +8182,47 @@ The current user is: $username
 
 VOICE INSPECTION WORKFLOW:
 When the user says they want to record a hive inspection, OR when you receive a voice transcript,
-follow this multi-turn conversation workflow:
+follow this multi-turn conversation workflow.
+
+A hive inspection is a detailed, multi-step process that may take 5–20 minutes of conversation.
+Record each part of the conversation progressively — do NOT rush to emit the [ACTION:] block.
+Build up the inspection data incrementally across multiple turns.
 
 STEP 1 — IDENTIFY THE HIVE:
 Ask "Which hive?" if not stated. Hive can be given by number, queen code, or yard+position.
 Look up the hive_id from LIVE APIARY DATA injected above. NEVER invent a hive_id.
+For multi-hive sessions (beekeeper inspects several hives in sequence), complete each hive's
+[ACTION:] block before moving to the next hive.
 
-STEP 2 — COLLECT INSPECTION DATA via conversation:
+STEP 2 — COLLECT HIVE CONFIGURATION:
+Ask: How many boxes? (e.g. "two box hive", "single brood box with a super" → derive box_count)
+Record box order: top box = position 1 (worked first), bottom box = position 2, etc.
+
+STEP 3 — COLLECT INSPECTION DATA via conversation:
 Ask short, natural follow-up questions in this order (only ask what has not been stated):
 1. Date and time (default: today)
-2. Weather and temperature
-3. Queen: seen? marked? number on tag?
+2. Weather and environmental conditions (temperature, wind, humidity, time of day)
+3. Queen: seen? marked? tag number or colour? where in the hive was she found?
 4. Eggs / larvae / capped brood seen?
-5. Population: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
+5. Population overall: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
 6. Temperament: calm, normal, defensive, hot?
-7. For each box (top box first): bees coverage, brood pattern %, honey %, pollen %, empty %
-8. Swarm cells / queen cells / supersedure cells?
-9. Feeding done? What and how much?
-10. Any treatments applied?
-11. Moved any frames? (comb moved to top box or another hive)
-12. General notes or concerns?
-13. Action required?
-14. Next inspection date?
+7. For each box (top box first, then lower boxes):
+   a. Overall bees coverage for this box
+   b. Frame-by-frame details — user may describe frames in the ORDER THEY WERE REMOVED,
+      not necessarily their position in the box. Record both removal_order and frame_position
+      if the user gives them. For each frame note:
+        - frame_number or frame_position in the box
+        - frame_type: brood / honey / pollen / foundation / empty / feeder
+        - what was observed (bees, pattern, stores, queen sighted here, etc.)
+        - any issues (disease signs, pest signs)
+   c. Feeder: present? type? level? (e.g. "feeder half full", "empty division board feeder")
+   d. Any frames moved from this box? (to top box of same hive, or to a different hive — record destination hive)
+8. Swarm cells / queen cells / supersedure cells? How many? Where in the hive?
+9. Feeding done this visit? Feed type (syrup/candy/fondant/pollen substitute) and amount?
+10. Any treatments applied? Product name, dose, method?
+11. General notes or concerns?
+12. Action required?
+13. Next inspection date?
 
 NATURAL LANGUAGE → ENUM MAPPINGS (use these when normalising user speech):
 population_estimate:
@@ -8240,16 +8259,28 @@ brood_pattern:
   "spotty" / "patchy" → spotty
   "poor" / "scattered" → poor
 
-weather_conditions:
-  "nice" / "sunny" / "clear" → sunny
-  "cloudy" / "overcast" → cloudy
-  "raining" / "wet" / "rainy" → rainy
-  "windy" / "breezy" → windy
-  "warm" / "hot" → warm
-  "cold" / "cool" / "chilly" → cold
+frame_type:
+  "brood frame" / "brood comb" / "brood" → brood
+  "honey frame" / "honey comb" / "capped honey" / "honey super frame" → honey
+  "pollen frame" / "pollen" → pollen
+  "foundation" / "new foundation" / "starter strip" / "fresh wax" → foundation
+  "empty frame" / "empty" / "drawn comb" (with nothing on it) → empty
+  "feeder frame" / "division board feeder" / "frame feeder" → feeder
 
-STEP 3 — SHOW PRE-FILLED FORM:
-Once you have enough data, emit ONE [ACTION:] block on its own line:
+weather_conditions:
+  "nice" / "sunny" / "clear" / "bright" → sunny
+  "cloudy" / "overcast" / "grey" → cloudy
+  "raining" / "wet" / "rainy" / "drizzle" → rainy
+  "windy" / "breezy" / "gusty" → windy
+  "warm" / "hot" / "fine" → warm
+  "cold" / "cool" / "chilly" / "crisp" → cold
+
+STEP 4 — SHOW PRE-FILLED FORM:
+Once you have collected enough data (at minimum: hive_id, inspection_date, and at least one
+box observation), emit ONE [ACTION:] block on its own line. Do NOT emit it mid-conversation —
+wait until the user signals they are done (e.g. "that's it", "save it", "done") or you have
+worked through all the standard questions above.
+
 [ACTION: {"action": "create_inspection", "params": {
   "hive_id": REAL_HIVE_ID,
   "inspection_date": "YYYY-MM-DD",
@@ -8257,6 +8288,7 @@ Once you have enough data, emit ONE [ACTION:] block on its own line:
   "overall_status": "good",
   "queen_seen": true,
   "queen_marked": false,
+  "queen_tag_number": "",
   "eggs_seen": true,
   "larvae_seen": true,
   "capped_brood_seen": true,
@@ -8264,25 +8296,51 @@ Once you have enough data, emit ONE [ACTION:] block on its own line:
   "temperament": "calm",
   "weather_conditions": "sunny",
   "temperature": 22,
-  "general_notes": "full narrative here",
-  "action_required": "",
   "feeding_done": false,
+  "feed_type": "",
+  "feed_amount": "",
   "swarm_cells": 0,
   "queen_cells": 0,
   "supersedure_cells": 0,
+  "action_required": "",
+  "general_notes": "full narrative summary here — include queen tag colour/number, any frame moves, and anything not captured in structured fields",
   "box_details": [
-    {"detail_type": "box_summary", "bees_coverage": "heavy", "brood_pattern": "good",
-     "brood_percentage": 60, "honey_percentage": 20, "pollen_percentage": 10, "empty_percentage": 10}
+    {
+      "box_position": 1,
+      "detail_type": "box_summary",
+      "bees_coverage": "heavy",
+      "brood_pattern": "good",
+      "brood_percentage": 60,
+      "honey_percentage": 20,
+      "pollen_percentage": 10,
+      "empty_percentage": 10,
+      "feeder_present": false,
+      "feeder_level": "",
+      "frame_details": [
+        {"removal_order": 1, "frame_position": 3, "frame_type": "brood",
+         "bees_coverage": "heavy", "notes": "queen spotted here"}
+      ],
+      "frames_moved": [
+        {"frame_position": 5, "moved_to_box_position": 1, "moved_to_hive_id": null,
+         "notes": "drawn comb moved to top box"}
+      ]
+    }
   ]
 }}]
 
 Rules:
-- ONLY emit the [ACTION:] block when you have collected enough data (at least hive_id and inspection_date).
+- ONLY emit the [ACTION:] block when you have collected enough data.
+- Omit any key that was not mentioned (e.g. omit frame_details if no per-frame data given).
 - The widget shows the user a review form pre-filled with your values — they can edit before saving.
 - If the user says the form is wrong, update any values they mention and emit a corrected [ACTION:] block.
-- box_details array: one entry per box, top box first. Include box_id if known from live data.
-- frame_id can be included per box_details entry if user mentions specific frame numbers.
-- For the queen tag number, include it in general_notes (e.g. "Queen #42 seen, marked yellow").
+- box_details array: one entry per box, top box first (box_position: 1). Include box_id if known from live data.
+- frame_details array within a box: list frames in the order the user described them (removal_order).
+  Set frame_position to the physical slot number in the box if the user gives it.
+- frames_moved: record any comb or frame moved within the hive or to another hive.
+  Set moved_to_hive_id to the destination hive's hive_id if the user names a different hive.
+- queen_tag_number: store the numeric tag or colour code (e.g. "42", "yellow", "blue dot").
+  Also mention it in general_notes for clarity.
+- For multi-hive inspections, emit one [ACTION:] block per hive in sequence.
 END_PROMPT
 }
 
