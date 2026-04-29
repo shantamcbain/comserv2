@@ -377,6 +377,49 @@
         }
         
         const agents = state.agentsConfig.agents;
+
+        // On todo/project detail pages, pick the agent based on the todo subject text
+        // rather than the URL — the subject tells us which domain the work belongs to.
+        const isTodoDetail    = pathname.startsWith('/todo/details') || pathname.startsWith('/todo/view');
+        const isProjectDetail = pathname.startsWith('/project/details');
+        if (isTodoDetail || isProjectDetail) {
+            // Gather candidate text: page <h1>, <h2>, <title>, and the first .subject / .todo-subject element
+            const candidateEls = [
+                document.querySelector('h1'),
+                document.querySelector('h2'),
+                document.querySelector('.todo-subject'),
+                document.querySelector('.subject'),
+                document.querySelector('.todo-title'),
+                document.querySelector('[data-todo-subject]'),
+            ];
+            const candidateText = candidateEls
+                .filter(Boolean)
+                .map(function(el) { return el.textContent || el.getAttribute('data-todo-subject') || ''; })
+                .join(' ')
+                .toUpperCase();
+
+            if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                console.debug('Agent selected from todo content: ency');
+                return agents.ency;
+            }
+            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
+                console.debug('Agent selected from todo content: bmaster');
+                return agents.bmaster;
+            }
+            if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                console.debug('Agent selected from todo content: inventory');
+                return agents.inventory;
+            }
+            if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                console.debug('Agent selected from todo content: helpdesk');
+                return agents.helpdesk;
+            }
+            // Todo/project detail with no domain match → use planning agent
+            if (agents.planning) {
+                console.debug('Agent selected for todo/project detail: planning');
+                return agents.planning;
+            }
+        }
         
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
@@ -518,7 +561,7 @@
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname,
+            page_path: pathname + (window.location.search || ''),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
