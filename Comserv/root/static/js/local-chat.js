@@ -977,10 +977,20 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        chatButton.addEventListener('click', function() { openChat(); });
+        // Chat bubble: open as a real moveable browser popup so the user can drag it
+        // to any position on the screen or to a second monitor.
+        // Falls back to the inline panel if the browser blocks popups.
+        chatButton.addEventListener('click', function() { detachToPopup(); });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        document.getElementById('detach-chat').addEventListener('click', function() { detachToPopup(); });
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden
+        document.getElementById('detach-chat').addEventListener('click', function() {
+            if (state._popupWindow && !state._popupWindow.closed) {
+                state._popupWindow.focus();
+            } else {
+                detachToPopup();
+            }
+        });
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -1360,28 +1370,50 @@
         });
     }
     
-    // Open chat in a separate browser window — user can drag it to another monitor.
-    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
-    // footer) so the popup always stays clean regardless of link clicks or refreshes.
+    // Open chat in a separate browser popup window — the user can drag it anywhere on
+    // the screen or to a second monitor.  Uses /ai/widget (no site nav/header/footer).
+    // Falls back to the inline panel if the browser blocks popups.
     function detachToPopup() {
+        // If a popup is already open, bring it to front and return
+        if (state._popupWindow && !state._popupWindow.closed) {
+            state._popupWindow.focus();
+            return;
+        }
+
         const convId = state.currentConversationId;
         const params = [];
         if (convId) params.push('resume=' + encodeURIComponent(convId));
         params.push('from_path='  + encodeURIComponent(window.location.pathname));
         params.push('from_title=' + encodeURIComponent(document.title || ''));
         const url = '/ai/widget' + (params.length ? '?' + params.join('&') : '');
+
+        // Position popup at bottom-right of the current screen, near where the widget sits
+        const popW = 430, popH = 700;
+        const screenRight  = window.screenX + window.outerWidth;
+        const screenBottom = window.screenY + window.outerHeight;
+        const popLeft = Math.max(window.screenX, screenRight  - popW - 24);
+        const popTop  = Math.max(window.screenY, screenBottom - popH - 60);
+
         const popup = window.open(url, 'ai-chat-popup',
-            'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+            'width=' + popW + ',height=' + popH + ',left=' + popLeft + ',top=' + popTop +
+            ',resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+
         if (popup) {
-            closeChat();
-            // Hide the entire widget on the parent page while chat is in the popup
-            const widgetEl = document.querySelector('.local-chat-widget');
-            if (widgetEl) widgetEl.style.display = 'none';
+            state._popupWindow = popup;
+            // Mark the chat button as "popup active" so the user knows where the chat is
+            const chatButton = document.getElementById('chat-button');
+            if (chatButton) {
+                chatButton.classList.add('popup-active');
+                chatButton.title = 'AI chat is open in a separate window — click to bring to front';
+            }
             const _pollPopup = setInterval(function() {
                 if (popup.closed) {
                     clearInterval(_pollPopup);
-                    // Restore the widget on the parent page
-                    if (widgetEl) widgetEl.style.display = '';
+                    state._popupWindow = null;
+                    if (chatButton) {
+                        chatButton.classList.remove('popup-active');
+                        chatButton.title = 'Open AI assistant';
+                    }
                     // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
@@ -1395,8 +1427,10 @@
                 }
             }, 1000);
         } else {
+            // Popup blocked — fall back to inline panel
             const _siD = document.getElementById('chat-status');
-            if (_siD) _siD.textContent = 'Please allow popups for this site to open chat in a separate window';
+            if (_siD) _siD.textContent = 'Popups blocked — enable popups for this site to allow the moveable chat window.';
+            openChat();
         }
     }
 
@@ -3383,6 +3417,17 @@
             .chat-icon {
                 margin-right: 8px;
                 font-size: 1.2em;
+            }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
             }
             
             .chat-panel {
