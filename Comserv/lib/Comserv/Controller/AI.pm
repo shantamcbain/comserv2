@@ -7768,7 +7768,8 @@ sub action :Local :Args(0) {
         if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
         if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
 
-        unless ($params->{wizard_confirmed}) {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        unless ($wiz_confirmed) {
             my %prefill = %insp;
             $prefill{box_details} = $params->{box_details} || [];
             $c->response->body(encode_json({
@@ -9474,8 +9475,12 @@ sub transcribe :Local :Args(0) {
     eval { require File::Copy; File::Copy::copy($audio_file, $tmp_file) };
     $tmp_file = $audio_file unless -f $tmp_file;
 
-    my $worktree = $c->path_to('..')->stringify;
+    my $worktree  = $c->path_to('..')->stringify;
+    my $app_home  = $c->path_to('')->stringify;
     my @python_candidates = (
+        "$app_home/whisper_venv/bin/python3",
+        "$app_home/speechfire/bin/python3",
+        "$app_home/venv/bin/python3",
         "$worktree/whisper_venv/bin/python3",
         "$worktree/speechfire/bin/python3",
         "$worktree/venv/bin/python3",
@@ -9513,10 +9518,11 @@ sub transcribe :Local :Args(0) {
     my $whisper_model = 'base';
     my $whisper_script = <<'PYSCRIPT';
 import sys, whisper, json, os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 audio_path = sys.argv[1]
 model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
-model = whisper.load_model(model_name)
-result = model.transcribe(audio_path, language='en')
+model = whisper.load_model(model_name, device='cpu')
+result = model.transcribe(audio_path, language='en', fp16=False)
 print(json.dumps({'transcript': result['text'].strip(), 'model': model_name}))
 PYSCRIPT
 
