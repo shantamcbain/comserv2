@@ -984,6 +984,46 @@ sub generate :Local :Args(0) {
             # Use a longer timeout when model is NOT in memory (cold start: load + generate)
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
+
+            if ($force_large && $is_cold_start && !$manual_model) {
+                my $fallback_key = '';
+                eval {
+                    my $fb_schema = $c->model('DBEncy')->schema;
+                    my $fb_obj = $fb_schema->resultset('UserApiKeys')->search(
+                        { user_id => $user_id, service => 'grok', is_active => '1' }
+                    )->first;
+                    $fb_obj ||= $fb_schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first if $can_select_model_gen;
+                    $fallback_key = $fb_obj->get_api_key() if $fb_obj && $fb_obj->api_key_encrypted;
+                };
+                if ($fallback_key) {
+                    push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
+                    my $fb_grok = $c->model('Grok');
+                    $fb_grok->api_key($fallback_key);
+                    $fb_grok->model('grok-3-fast');
+                    my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
+                    push @fb_msgs, { role => 'user', content => $prompt };
+                    my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
+                    if ($fb_resp) {
+                        push @trace, "✅ Grok fallback responded";
+                        my $trace_txt = join("\n", @trace);
+                        $c->res->content_type('application/json');
+                        $c->res->body(encode_json({
+                            success        => 1,
+                            response       => $fb_resp,
+                            model          => 'grok-3-fast (cold-start fallback)',
+                            provider       => 'grok',
+                            trace          => $trace_txt,
+                            thinking_trace => \@trace,
+                        }));
+                        $c->res->status(200);
+                        return;
+                    }
+                }
+                push @trace, sprintf("🧊 Cold start — no Grok fallback available; proceeding with %s (may be slow)", $use_model);
+            }
+
             my $timeout_secs = $is_cold_start ? 600 : 480;
             push @trace, $is_cold_start
                 ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
