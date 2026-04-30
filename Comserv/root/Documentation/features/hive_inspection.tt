@@ -20,7 +20,8 @@ An inspection calendar gives a historical overview, and printable reports are av
 
 <h2>Table of Contents</h2>
 <ol>
-    <li><a href="#recording">Recording an Inspection</a></li>
+    <li><a href="#voice">Voice Recording via Chat with AI</a></li>
+    <li><a href="#recording">Recording an Inspection (Form)</a></li>
     <li><a href="#viewing">Viewing an Inspection</a></li>
     <li><a href="#hive-diagram">Hive Diagram</a></li>
     <li><a href="#calendar">Inspection Calendar</a></li>
@@ -32,7 +33,50 @@ An inspection calendar gives a historical overview, and printable reports are av
 
 <hr>
 
-<h2 id="recording">1. Recording an Inspection</h2>
+<h2 id="voice">1. Voice Recording via Chat with AI</h2>
+<p>
+The fastest way to record a hive inspection is by voice, directly in the <strong>Chat with AI</strong> widget
+(the chat bubble at the bottom-right of every page).
+No typing needed — speak naturally while you work the hive and the AI extracts all the data for you.
+</p>
+
+<h3>Two ways to get your voice into the chat</h3>
+<ul>
+    <li>
+        <strong>&#127908; Upload a recording</strong> — Record on your phone (.m4a / .wav / .mp3),
+        then click the <strong>&#127908; microphone button</strong> next to the Send button in the chat widget
+        and select the file. The audio is transcribed automatically using local Whisper AI (no data leaves the server).
+    </li>
+    <li>
+        <strong>&#9210; Live recording</strong> — Click the <strong>&#9210; record button</strong> in the widget
+        to capture audio directly from your microphone (requires HTTPS or localhost).
+        Recording stops when you click again; the transcript appears immediately.
+    </li>
+</ul>
+
+<h3>What happens after transcription</h3>
+<ol>
+    <li>The transcript appears in the chat input field — review or edit it, then press <strong>Send</strong>.</li>
+    <li>Tell the AI which hive and any details. The AI will ask short follow-up questions and build the inspection record incrementally across the conversation.</li>
+    <li>A <strong>pre-filled inspection form</strong> appears in the chat. Review every field, make any corrections, then click <strong>Save Inspection</strong>.</li>
+    <li>The record is saved to the database and you receive a direct link to view it.</li>
+</ol>
+
+<h3>What you can say</h3>
+<ul>
+    <li><strong>Structured:</strong> "Hive 3, two boxes, strong population, saw the queen, no issues" — the AI maps this directly to the inspection schema.</li>
+    <li><strong>Narrative:</strong> "I opened hive three today, weather was warm around 22 degrees, the top box had good coverage, found the queen on frame four..." — the AI normalises your words into the correct fields and enum values.</li>
+    <li><strong>Multi-box / multi-hive:</strong> Describe each box as you work it; the AI records the order you removed frames and the frame-by-frame observations.</li>
+</ul>
+
+<p>
+You can also just type a voice-style inspection note directly in the chat — no audio file needed.
+Ask the AI "how do I record a hive inspection?" for a step-by-step reminder at any time.
+</p>
+
+<hr>
+
+<h2 id="recording">2. Recording an Inspection (Form)</h2>
 <ol>
     <li>Go to <a href="/Apiary/inspections/new">/Apiary/inspections/new</a>.</li>
     <li>Select the <strong>Hive</strong> from the dropdown.</li>
@@ -128,10 +172,12 @@ was in which hive at any point in time.
 
 <hr>
 
-<h2 id="urls">8. URL Reference</h2>
+<h2 id="urls">9. URL Reference</h2>
 <table class="doc-table">
     <thead><tr><th>URL</th><th>Description</th><th>Access</th></tr></thead>
     <tbody>
+        <tr><td><em>Chat widget &#127908;/&#9210; buttons</em></td><td>Voice inspection via AI — transcribe audio, review form, save to DB</td><td>All</td></tr>
+        <tr><td><code>/ai/transcribe</code></td><td>POST endpoint: upload audio file, returns transcript JSON</td><td>All</td></tr>
         <tr><td><code>/Apiary</code></td><td>Apiary overview</td><td>All</td></tr>
         <tr><td><code>/Apiary/inspections</code></td><td>List all inspections</td><td>Admin/staff</td></tr>
         <tr><td><code>/Apiary/inspections/new</code></td><td>New inspection form</td><td>Admin/staff</td></tr>

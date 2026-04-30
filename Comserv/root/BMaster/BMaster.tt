@@ -52,6 +52,11 @@
                         <li><a href="/Apiary/inspections/reports">Inspection Reports</a> — Seasonal summaries and hive health trends</li>
                     </ul>
                     <p>
+                        <strong>&#127908; Record by voice:</strong> Click the &#127908; or &#9210; button in the Chat with AI widget to record or upload an audio inspection note.
+                        The AI transcribes it, extracts the data, and presents a pre-filled form for you to confirm before saving.
+                        Ask the chat widget <em>"how do I record a hive inspection?"</em> for a step-by-step guide.
+                    </p>
+                    <p>
                         <a href="/Apiary/inspections/new" class="btn btn-primary">New Hive Inspection</a>
                         <a href="/Apiary" class="btn btn-secondary">Apiary Overview</a>
                     </p>
