@@ -9906,14 +9906,12 @@ PYSCRIPT
 
             my $json_out = '';
             eval {
-                require IPC::Open3;
-                my ($wtr, $rdr);
-                my $pid = IPC::Open3::open3($wtr, $rdr, undef,
-                    $python_bin, $py_script_file, $tmp_file, $whisper_model,
-                    ($has_diarizer ? '1' : '0'), "$num_speakers");
-                close $wtr;
-                $json_out = do { local $/; <$rdr> } // '';
-                waitpid($pid, 0);
+                my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
+                    $tmp_file, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
+                    or die "Cannot start python: $!";
+                $json_out = do { local $/; <$py_out> } // '';
+                close $py_out;
+                waitpid($py_pid, 0);
             };
 
             unlink $py_script_file;
