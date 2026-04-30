@@ -9818,8 +9818,10 @@ sub transcribe :Local :Args(0) {
     my $torch_hub_dir  = $c->path_to('whisper_venv', '.torch_hub')->stringify;
 
     my $whisper_script = <<"PYSCRIPT";
-import sys, whisper, json, os, torch
+import sys, json, os
 os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TORCH_DEVICE'] = 'cpu'
+import whisper, torch
 torch.hub.set_dir('$torch_hub_dir')
 audio_path = sys.argv[1]
 model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
