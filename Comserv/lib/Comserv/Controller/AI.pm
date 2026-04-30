@@ -9814,7 +9814,7 @@ sub transcribe :Local :Args(0) {
 
     my $has_diarizer = ($want_diarize && `"$python_bin" -c "import simple_diarizer" 2>&1` =~ /^\s*$/) ? 1 : 0;
 
-    my $whisper_model  = 'base';
+    my $whisper_model  = 'small';
     my $torch_hub_dir  = $c->path_to('whisper_venv', '.torch_hub')->stringify;
 
     my $whisper_script = <<"PYSCRIPT";
@@ -9937,6 +9937,7 @@ PYSCRIPT
             my $audio_row = $schema->resultset('File')->create({
                 file_name   => $orig_name,
                 nfs_path    => $nfs_audio_file,
+                file_type   => 'audio',
                 file_format => 'audio/' . $ext,
                 file_size   => $upload->size,
                 source_type => 'nfs',

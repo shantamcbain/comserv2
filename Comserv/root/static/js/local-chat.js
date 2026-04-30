@@ -652,7 +652,7 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
-            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--secondary-color,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
@@ -886,9 +886,9 @@
         (function initTextareaGrow() {
             const ta = document.getElementById('message-input');
             if (!ta) return;
+            const max = 200;
             ta.addEventListener('input', function() {
                 this.style.height = 'auto';
-                const max = 140;
                 this.style.height = Math.min(this.scrollHeight, max) + 'px';
                 this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
             });
@@ -3223,7 +3223,7 @@
 
         var card = document.createElement('div');
         card.className = 'message system-message';
-        card.style.cssText = 'background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:12px;max-width:520px;';
+        card.style.cssText = 'background:var(--table-header-bg,#f9f9f9);border:1px solid var(--border-color,#ddd);border-radius:8px;padding:12px;max-width:520px;color:var(--text-color,#222);';
 
         var heading = document.createElement('div');
         heading.textContent = title;
@@ -3231,7 +3231,7 @@
         card.appendChild(heading);
 
         var msgEl = document.createElement('div');
-        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+        msgEl.style.cssText = 'font-size:12px;color:var(--text-color,#555);margin-top:6px;';
         card.appendChild(msgEl);
 
         var form = _makeWizardForm(fields, function(f) {
@@ -3249,12 +3249,12 @@
         var saveBtn = document.createElement('button');
         saveBtn.textContent = 'Save';
         saveBtn.type = 'submit';
-        saveBtn.style.cssText = 'background:#2196f3;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
+        saveBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
         saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
         var cancelBtn = document.createElement('button');
         cancelBtn.textContent = 'Cancel';
         cancelBtn.type = 'button';
-        cancelBtn.style.cssText = 'background:#eee;border:1px solid #ccc;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
+        cancelBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
         cancelBtn.onclick = function() { wrapper.remove(); };
         btnRow.appendChild(saveBtn);
         btnRow.appendChild(cancelBtn);
@@ -3721,8 +3721,8 @@
                 border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
                 color: var(--text-color); transition: background 0.15s;
             }
-            .wh-item:hover { background: var(--secondary-color); }
-            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-item:hover { background: var(--table-header-bg); }
+            .wh-item.active { background: var(--table-header-bg); border-left: 3px solid var(--link-color); }
             .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
             .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
