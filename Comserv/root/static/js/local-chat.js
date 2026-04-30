@@ -937,10 +937,13 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        // Chat bubble: open as a real moveable browser popup so the user can drag it
-        // to any position on the screen or to a second monitor.
-        // Falls back to the inline panel if the browser blocks popups.
-        chatButton.addEventListener('click', function() { detachToPopup(); });
+        // Chat bubble click:
+        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
+        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
+        //   Falls back to the inline panel if the browser blocks popups.
+        chatButton.addEventListener('click', function() {
+            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+        });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
         // ⤢ button: focus / re-open the popup window if it was closed or hidden
