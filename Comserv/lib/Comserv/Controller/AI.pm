@@ -9748,34 +9748,25 @@ sub transcribe :Local :Args(0) {
     (my $ext = lc($orig_name)) =~ s/.*\.//;
     $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
 
-    my $audio_dir = $c->path_to('root', 'uploads', 'audio')->stringify;
-    unless (-d $audio_dir) {
-        eval { require File::Path; File::Path::make_path($audio_dir) };
-    }
+    my $job_id   = time() . '_' . $$;
+    my $tmp_dir  = '/tmp';
+    my $tmp_file = "$tmp_dir/whisper_job_${job_id}.${ext}";
 
-    my $timestamp   = time();
-    my $safe_user   = $username;
-    $safe_user      =~ s/[^a-zA-Z0-9_-]/_/g;
-    my $audio_file  = "${audio_dir}/${safe_user}_${timestamp}_$$.${ext}";
-    my $tmp_file    = "/tmp/whisper_$$\_${timestamp}.${ext}";
-
-    eval { $upload->copy_to($audio_file) };
-    if ($@ || !-f $audio_file) {
+    eval { $upload->copy_to($tmp_file) };
+    if ($@ || !-f $tmp_file) {
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
         return;
     }
-    eval { require File::Copy; File::Copy::copy($audio_file, $tmp_file) };
-    $tmp_file = $audio_file unless -f $tmp_file;
 
     my $worktree  = $c->path_to('..')->stringify;
-    my $app_home  = $c->path_to('')->stringify;
+    my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
-        "$app_home/whisper_venv/bin/python3",
-        "$app_home/speechfire/bin/python3",
-        "$app_home/venv/bin/python3",
+        "$app_root/whisper_venv/bin/python3",
         "$worktree/whisper_venv/bin/python3",
+        "$app_root/speechfire/bin/python3",
         "$worktree/speechfire/bin/python3",
+        "$app_root/venv/bin/python3",
         "$worktree/venv/bin/python3",
         '/usr/bin/python3',
         'python3',
@@ -9803,7 +9794,7 @@ sub transcribe :Local :Args(0) {
         $c->response->status(503);
         $c->response->body(encode_json({
             success => JSON::false,
-            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/whisper_venv)',
         }));
         return;
     }
@@ -9834,9 +9825,12 @@ wresult = model.transcribe(audio_path, language='en', fp16=False)
 segments_out = []
 if want_diarize:
     try:
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
         from simple_diarizer.diarizer import Diarizer
         diar = Diarizer(embed_model='ecapa', cluster_method='sc')
         spk_segs = diar.diarize(audio_path, num_speakers=num_speakers)
+        sys.stdout = _real_stdout
         def get_speaker(start, end):
             best = 'UNKNOWN'
             best_overlap = 0
@@ -9854,6 +9848,8 @@ if want_diarize:
                 'text': seg['text'].strip()
             })
     except Exception as e:
+        try: sys.stdout = _real_stdout
+        except NameError: pass
         segments_out = [{'start': s['start'], 'end': s['end'], 'speaker': 'SPEAKER_0', 'text': s['text'].strip()} for s in wresult['segments']]
 else:
     for seg in wresult['segments']:
@@ -9862,7 +9858,10 @@ else:
 print(json.dumps({'transcript': wresult['text'].strip(), 'model': model_name, 'segments': segments_out}))
 PYSCRIPT
 
-    my $py_script_file = "/tmp/whisper_run_$$.py";
+    my $py_script_file = "$tmp_dir/whisper_job_${job_id}.py";
+    my $result_file    = "$tmp_dir/whisper_job_${job_id}_result.json";
+    my $status_file    = "$tmp_dir/whisper_job_${job_id}.status";
+
     open(my $sfh, '>', $py_script_file) or do {
         unlink $tmp_file;
         $c->response->status(500);
@@ -9872,125 +9871,187 @@ PYSCRIPT
     print $sfh $whisper_script;
     close $sfh;
 
-    my $json_out = '';
-    my $stderr_out = '';
-    eval {
-        require IPC::Open3;
-        my ($wtr, $rdr, $err_rdr);
-        my $pid = IPC::Open3::open3($wtr, $rdr, $err_rdr,
-            $python_bin, $py_script_file, $tmp_file, $whisper_model,
-            ($has_diarizer ? '1' : '0'), "$num_speakers");
-        close $wtr;
-        $json_out   = do { local $/; <$rdr> } // '';
-        $stderr_out = do { local $/; <$err_rdr> } // '' if $err_rdr;
-        waitpid($pid, 0);
-    };
-
-    unlink $tmp_file unless $tmp_file eq $audio_file;
-    unlink $py_script_file;
-
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'transcribe', "Whisper subprocess error: $@");
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => "Transcription failed: $@" }));
-        return;
-    }
-
-    my $result = eval { decode_json($json_out) } if $json_out;
-    unless ($result && $result->{transcript}) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            'transcribe', "Whisper returned no transcript. stdout='$json_out' stderr='$stderr_out'");
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Transcription returned empty result' }));
-        return;
-    }
-
-    my $model_used = $result->{model} || $whisper_model;
-    my $segments   = $result->{segments} || [];
-
-    my $nfs_base    = $c->config->{workshop_upload_dir} || '/data/nfs';
-    my $audio_nfs   = "${nfs_base}/bmaster/audio";
+    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs      = "${nfs_base}/bmaster/audio";
     my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
-    eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
-
+    my $timestamp      = time();
     my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
     my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
-    my ($audio_file_id, $transcript_file_id);
+    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size    = $upload->size;
 
-    eval { require File::Copy; File::Copy::copy($audio_file, $nfs_audio_file) };
-    unless ($@) {
-        my $transcript_json = encode_json({
-            transcript => $result->{transcript},
-            segments   => $segments,
-            model_used => $model_used,
-            recorded_by => $username,
-            original_filename => $orig_name,
-        });
-        open(my $tfh, '>:utf8', $nfs_transcript_file) or warn "Cannot write transcript JSON: $!";
-        print $tfh $transcript_json if $tfh;
-        close $tfh if $tfh;
-
-        my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
-        eval {
-            my $schema = $c->model('DBEncy');
-            my $audio_row = $schema->resultset('File')->create({
-                file_name   => $orig_name,
-                nfs_path    => $nfs_audio_file,
-                file_type   => 'audio',
-                file_format => 'audio/' . $ext,
-                file_size   => $upload->size,
-                source_type => 'nfs',
-                sitename    => $sitename,
-                description => "Hive inspection audio recorded by $username",
-                user_id     => undef,
-            });
-            $audio_file_id = $audio_row->id;
-
-            my $trans_row = $schema->resultset('File')->create({
-                file_name   => "${safe_user}_${timestamp}_$$.json",
-                nfs_path    => $nfs_transcript_file,
-                file_format => 'application/json',
-                file_size   => length($transcript_json),
-                source_type => 'nfs',
-                sitename    => $sitename,
-                description => "Whisper transcript for inspection audio ($orig_name)",
-                user_id     => undef,
-            });
-            $transcript_file_id = $trans_row->id;
-        };
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-            'transcribe', "Failed to save file records: $@") if $@;
+    {
+        open(my $sf, '>', $status_file) or do { };
+        print $sf encode_json({ status => 'processing', started => $timestamp });
+        close $sf;
     }
 
-    my $transcript_id;
-    eval {
-        my $schema = $c->model('DBEncy')->schema;
-        my $vt = $schema->resultset('VoiceTranscript')->create({
-            username          => $username,
-            original_filename => $orig_name,
-            audio_path        => $nfs_audio_file || $audio_file,
-            file_size         => $upload->size,
-            transcript        => $result->{transcript},
-            model_used        => $model_used,
-        });
-        $transcript_id = $vt->id;
-    };
+    require POSIX;
+    my $child = fork();
+    if (!defined $child) {
+        unlink $tmp_file, $py_script_file, $status_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to start background transcription' }));
+        return;
+    }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'transcribe', "Transcribed audio for $username: " . length($result->{transcript}) . " chars, diarized=" . ($has_diarizer ? 'yes' : 'no'));
+    if ($child == 0) {
+        my $grandchild = fork();
+        if (defined $grandchild && $grandchild == 0) {
+            POSIX::setsid();
+            open(STDIN,  '<', '/dev/null');
+            open(STDOUT, '>', '/dev/null');
+            open(STDERR, '>>', '/tmp/whisper_bg.log');
+
+            my $json_out   = '';
+            my $stderr_out = '';
+            eval {
+                require IPC::Open3;
+                my ($wtr, $rdr, $err_rdr);
+                my $pid = IPC::Open3::open3($wtr, $rdr, $err_rdr,
+                    $python_bin, $py_script_file, $tmp_file, $whisper_model,
+                    ($has_diarizer ? '1' : '0'), "$num_speakers");
+                close $wtr;
+                $json_out   = do { local $/; <$rdr> } // '';
+                $stderr_out = do { local $/; <$err_rdr> } // '' if $err_rdr;
+                waitpid($pid, 0);
+            };
+
+            unlink $py_script_file;
+
+            if ($@ || !$json_out) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $result = eval { decode_json($json_out) };
+            unless ($result && $result->{transcript}) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $model_used = $result->{model} || $whisper_model;
+            my $segments   = $result->{segments} || [];
+
+            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
+            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
+            unlink $tmp_file;
+
+            my $nfs_ok = !$@;
+            if ($nfs_ok) {
+                my $transcript_json = encode_json({
+                    transcript => $result->{transcript},
+                    segments   => $segments,
+                    model_used => $model_used,
+                    recorded_by => $username,
+                    original_filename => $orig_name,
+                });
+                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+            }
+
+            open(my $rf, '>', $result_file);
+            print $rf encode_json({
+                success            => JSON::true,
+                transcript         => $result->{transcript},
+                model_used         => $model_used,
+                segments           => $segments,
+                diarized           => $has_diarizer ? JSON::true : JSON::false,
+                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
+                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                orig_name          => $orig_name,
+                file_size          => $upload_size,
+                sitename           => $sitename,
+                username           => $username,
+                ext                => $ext,
+            });
+            close $rf;
+
+            open(my $sf, '>', $status_file);
+            print $sf encode_json({ status => 'done' });
+            close $sf;
+
+            POSIX::_exit(0);
+        }
+        POSIX::_exit(0);
+    }
+
+    waitpid($child, 0);
 
     $c->response->body(encode_json({
-        success              => JSON::true,
-        transcript           => $result->{transcript},
-        model_used           => $model_used,
-        segments             => $segments,
-        diarized             => $has_diarizer ? JSON::true : JSON::false,
-        transcript_id        => $transcript_id ? $transcript_id + 0 : undef,
-        audio_file_id        => $audio_file_id   ? $audio_file_id + 0   : undef,
-        transcript_file_id   => $transcript_file_id ? $transcript_file_id + 0 : undef,
-        audio_nfs_path       => $nfs_audio_file || $audio_file,
+        success => JSON::true,
+        job_id  => $job_id,
+        status  => 'processing',
     }));
+}
+
+sub transcribe_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    my $job_id = $c->request->param('job_id') // '';
+    unless ($job_id =~ /^\d+_\d+$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid job_id' }));
+        return;
+    }
+
+    my $status_file = "/tmp/whisper_job_${job_id}.status";
+    unless (-f $status_file) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Job not found or expired' }));
+        return;
+    }
+
+    my $status_json = do { local $/; open(my $f, '<', $status_file) or return; <$f> };
+    my $status = eval { decode_json($status_json) } || { status => 'processing' };
+
+    if ($status->{status} eq 'done') {
+        my $result_file = "/tmp/whisper_job_${job_id}_result.json";
+        my $result_json = do { local $/; open(my $f, '<', $result_file) or do { $c->response->body(encode_json({success=>JSON::false,error=>'Result missing'})); return; }; <$f> };
+        my $result = eval { decode_json($result_json) } || { success => JSON::false, error => 'Invalid result' };
+        unlink $status_file, $result_file;
+
+        if ($result->{success} && $result->{audio_nfs_path}) {
+            eval {
+                my $schema  = $c->model('DBEncy');
+                my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
+                my $audio_row = $schema->resultset('File')->create({
+                    file_name   => $result->{orig_name},
+                    nfs_path    => $result->{audio_nfs_path},
+                    file_type   => 'audio',
+                    file_format => 'audio/' . ($result->{ext} || 'wav'),
+                    file_size   => $result->{file_size} || 0,
+                    source_type => 'nfs',
+                    sitename    => $sitename,
+                    description => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                    user_id     => undef,
+                });
+                $result->{audio_file_id} = $audio_row->id + 0;
+
+                if ($result->{transcript_nfs_path}) {
+                    my $trans_row = $schema->resultset('File')->create({
+                        file_name   => ($result->{orig_name} || 'transcript') . '.json',
+                        nfs_path    => $result->{transcript_nfs_path},
+                        file_format => 'application/json',
+                        source_type => 'nfs',
+                        sitename    => $sitename,
+                        description => "Whisper transcript for " . ($result->{orig_name} || ''),
+                        user_id     => undef,
+                    });
+                    $result->{transcript_file_id} = $trans_row->id + 0;
+                }
+            };
+        }
+
+        delete $result->{$_} for qw(audio_nfs_path transcript_nfs_path orig_name file_size sitename username ext);
+        $c->response->body(encode_json($result));
+    } elsif ($status->{status} eq 'error') {
+        unlink $status_file;
+        $c->response->body(encode_json({ success => JSON::false, error => $status->{error} || 'Transcription failed' }));
+    } else {
+        $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

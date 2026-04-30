@@ -2908,19 +2908,15 @@
         if (!file) return;
 
         var sizeMB = (file.size / 1048576).toFixed(1);
-        if (statusEl) { statusEl.textContent = '⏳ Transcribing ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
+        if (statusEl) { statusEl.textContent = '⏳ Uploading ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
         if (sendBtn) sendBtn.disabled = true;
 
         var formData = new FormData();
         formData.append('audio', file, file.name || 'recording.webm');
+        formData.append('diarize', '1');
+        formData.append('num_speakers', '2');
 
-        fetch('/ai/transcribe', {
-            method: 'POST',
-            credentials: 'include',
-            body: formData
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
+        function _handleTranscriptResult(data) {
             if (sendBtn) sendBtn.disabled = false;
             if (!data.success) {
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
@@ -2937,19 +2933,76 @@
             if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
             if (inputEl) {
                 inputEl.value = transcript;
+                inputEl.style.height = 'auto';
+                inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
+                inputEl.style.overflowY = inputEl.scrollHeight > 200 ? 'auto' : 'hidden';
                 inputEl.dispatchEvent(new Event('input', { bubbles: true }));
                 inputEl.focus();
             }
             var diarizedNote = data.diarized ? ' (speakers separated)' : '';
             if (statusEl) {
                 statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
-                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 8000);
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
             }
             addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+        }
+
+        function _pollTranscribeStatus(jobId, attempt) {
+            attempt = attempt || 0;
+            if (attempt > 120) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
+                return;
+            }
+            var elapsed = Math.round(attempt * 5);
+            if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
+            setTimeout(function() {
+                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'processing') {
+                        _pollTranscribeStatus(jobId, attempt + 1);
+                    } else {
+                        _handleTranscriptResult(data);
+                    }
+                })
+                .catch(function() {
+                    _pollTranscribeStatus(jobId, attempt + 1);
+                });
+            }, 5000);
+        }
+
+        fetch('/ai/transcribe', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        })
+        .then(function(r) {
+            if (!r.ok && r.status === 403) throw new Error('Login required — please sign in to use voice transcription.');
+            if (!r.ok && r.status === 503) throw new Error('Whisper not installed on server. Run: pip install openai-whisper in Comserv/whisper_venv');
+            return r.text().then(function(txt) {
+                try { return JSON.parse(txt); }
+                catch(e) { throw new Error('Server returned unexpected response (HTTP ' + r.status + '). The server may be restarting — please try again in a moment.'); }
+            });
+        })
+        .then(function(data) {
+            if (!data.success) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            if (data.job_id) {
+                if (statusEl) { statusEl.textContent = '⏳ Transcription started — checking progress…'; }
+                _pollTranscribeStatus(data.job_id, 1);
+            } else {
+                _handleTranscriptResult(data);
+            }
         })
         .catch(function(err) {
             if (sendBtn) sendBtn.disabled = false;
-            if (statusEl) { statusEl.textContent = '⚠️ Transcription request failed: ' + err.message; }
+            if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
         });
     }
 
