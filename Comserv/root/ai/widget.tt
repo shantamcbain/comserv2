@@ -232,8 +232,8 @@
     <script src="/static/js/local-chat.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        var btn = document.getElementById('chat-button');
-        if (btn) btn.click();
+        // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.
+        // Do NOT click the chat button here — that would call detachToPopup() and loop.
 
         document.addEventListener('click', function(e) {
             var anchor = e.target.closest('a[href]');
