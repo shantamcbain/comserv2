@@ -2931,8 +2931,29 @@
             if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
             if (data.transcript_file_id) { state.lastTranscriptFileId = data.transcript_file_id; }
             if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
+
+            var displayText = transcript;
+            if (data.diarized && data.segments && data.segments.length) {
+                var lines = [];
+                var lastSpeaker = null;
+                data.segments.forEach(function(seg) {
+                    var spk = seg.speaker || 'SPEAKER_0';
+                    var label = spk === 'SPEAKER_0' ? 'Instructor' : spk === 'SPEAKER_1' ? 'Student' : spk;
+                    var mins = Math.floor((seg.start || 0) / 60);
+                    var secs = Math.round((seg.start || 0) % 60);
+                    var ts = '[' + mins + ':' + (secs < 10 ? '0' : '') + secs + ']';
+                    if (spk !== lastSpeaker) {
+                        lines.push('\n' + label + ' ' + ts + ': ' + (seg.text || '').trim());
+                        lastSpeaker = spk;
+                    } else {
+                        lines.push((seg.text || '').trim());
+                    }
+                });
+                displayText = lines.join(' ').trim();
+            }
+
             if (inputEl) {
-                inputEl.value = transcript;
+                inputEl.value = displayText;
                 inputEl.style.height = 'auto';
                 inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
                 inputEl.style.overflowY = inputEl.scrollHeight > 200 ? 'auto' : 'hidden';
