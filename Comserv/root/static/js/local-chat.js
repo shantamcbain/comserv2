@@ -2931,17 +2931,21 @@
                 if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
                 return;
             }
-            if (data.transcript_id) { state.lastTranscriptId = data.transcript_id; }
+            if (data.transcript_id)      { state.lastTranscriptId     = data.transcript_id; }
+            if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
+            if (data.transcript_file_id) { state.lastTranscriptFileId = data.transcript_file_id; }
+            if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
             if (inputEl) {
                 inputEl.value = transcript;
                 inputEl.dispatchEvent(new Event('input', { bubbles: true }));
                 inputEl.focus();
             }
+            var diarizedNote = data.diarized ? ' (speakers separated)' : '';
             if (statusEl) {
-                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + ') — review and press Send';
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
                 setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 8000);
             }
-            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + ')', 'system-message');
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
         })
         .catch(function(err) {
             if (sendBtn) sendBtn.disabled = false;
@@ -3162,6 +3166,137 @@
         });
     }
 
+    function _makeWizardForm(fields, onConfirm) {
+        var form = document.createElement('form');
+        form.onsubmit = function(e) { e.preventDefault(); onConfirm(form); };
+        fields.forEach(function(f) {
+            var row = document.createElement('div');
+            row.style.cssText = 'margin:4px 0;display:flex;gap:6px;align-items:center;';
+            var label = document.createElement('label');
+            label.textContent = f.label;
+            label.style.cssText = 'width:160px;font-size:12px;color:#555;flex-shrink:0;';
+            var input = document.createElement('input');
+            input.name = f.name;
+            input.value = f.value !== undefined ? f.value : '';
+            input.type = f.type || 'text';
+            input.style.cssText = 'flex:1;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:13px;';
+            if (f.required) input.required = true;
+            row.appendChild(label);
+            row.appendChild(input);
+            form.appendChild(row);
+        });
+        return form;
+    }
+
+    function _postWizardAction(actionName, params, msgEl) {
+        msgEl.textContent = '⏳ Saving…';
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionName, params: params })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
+                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:#0077cc;font-weight:bold;">View →</a>' : '');
+                if (result.action) { executeAIAction({ action: 'ignore', _result: result }); }
+            } else {
+                msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
+            }
+        })
+        .catch(function(e) { msgEl.textContent = '⚠️ Request failed: ' + e.message; });
+    }
+
+    function _openSimpleWizard(title, fields, actionName, extraParams, nextAction, nextParams) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        var id = 'ai-' + actionName + '-wizard';
+        var existing = document.getElementById(id);
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.id = id;
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.style.cssText = 'margin:8px 0;';
+
+        var card = document.createElement('div');
+        card.className = 'message system-message';
+        card.style.cssText = 'background:#fff8e1;border:1px solid #ffc107;border-radius:8px;padding:12px;max-width:520px;';
+
+        var heading = document.createElement('div');
+        heading.textContent = title;
+        heading.style.cssText = 'font-weight:bold;font-size:14px;margin-bottom:8px;';
+        card.appendChild(heading);
+
+        var msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+        card.appendChild(msgEl);
+
+        var form = _makeWizardForm(fields, function(f) {
+            var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
+            fields.forEach(function(fd) {
+                var inp = f.elements[fd.name];
+                if (inp) params[fd.name] = inp.value;
+            });
+            _postWizardAction(actionName, params, msgEl);
+        });
+        card.insertBefore(form, msgEl);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;';
+        var saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.type = 'submit';
+        saveBtn.style.cssText = 'background:#2196f3;color:#fff;border:none;border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
+        saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.style.cssText = 'background:#eee;border:1px solid #ccc;border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
+        cancelBtn.onclick = function() { wrapper.remove(); };
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(cancelBtn);
+        card.appendChild(btnRow);
+        card.appendChild(msgEl);
+        wrapper.appendChild(card);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function openYardWizard(prefill, nextAction, nextParams) {
+        _openSimpleWizard('🏡 Create Yard', [
+            { name: 'yard_name',       label: 'Yard Name *',      value: prefill.yard_name  || '', required: true },
+            { name: 'yard_code',       label: 'Yard Code *',      value: prefill.yard_code  || '', required: true },
+            { name: 'yard_size',       label: 'Capacity (hives)', value: prefill.yard_size  || 10,  type: 'number' },
+            { name: 'total_yard_size', label: 'Total Size (hives)',value: prefill.total_yard_size || 10, type: 'number' },
+            { name: 'notes',           label: 'Notes',            value: prefill.notes      || '' },
+        ], 'create_yard', {}, nextAction, nextParams);
+    }
+
+    function openHiveWizard(prefill, nextAction, nextParams) {
+        var yardField = { name: 'yard_id', label: 'Yard ID *', value: prefill.yard_id || '', required: true, type: 'number' };
+        _openSimpleWizard('🐝 Register Hive', [
+            { name: 'hive_number', label: 'Hive Number *', value: prefill.hive_number || '', required: true },
+            yardField,
+            { name: 'queen_code',  label: 'Queen Code',   value: prefill.queen_code  || '' },
+            { name: 'notes',       label: 'Notes',        value: prefill.notes       || '' },
+        ], 'create_hive', {}, nextAction, nextParams);
+    }
+
+    function openQueenWizard(prefill, nextAction, nextParams) {
+        _openSimpleWizard('👑 Record Queen', [
+            { name: 'tag_number',    label: 'Tag / Number',    value: prefill.tag_number    || '' },
+            { name: 'color_marking', label: 'Colour Marking',  value: prefill.color_marking || '' },
+            { name: 'birth_date',    label: 'Birth Date',      value: prefill.birth_date    || '', type: 'date' },
+            { name: 'breed',         label: 'Breed',           value: prefill.breed         || 'unknown' },
+            { name: 'mating_status', label: 'Mating Status',   value: prefill.mating_status || 'mated' },
+            { name: 'health_status', label: 'Health Status',   value: prefill.health_status || 'healthy' },
+            { name: 'notes',         label: 'Notes',           value: prefill.notes         || '' },
+        ], 'create_queen', { hive_id: prefill.hive_id || undefined }, nextAction, nextParams);
+    }
+
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
@@ -3185,7 +3320,23 @@
                 return;
             }
             if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
-                openInspectionWizard(result.wizard_prefill || actionObj.params || {});
+                var prefill = result.wizard_prefill || actionObj.params || {};
+                if (state.lastAudioFileId)      { prefill.audio_file_id      = state.lastAudioFileId; }
+                if (state.lastTranscriptFileId) { prefill.transcript_file_id = state.lastTranscriptFileId; }
+                if (state.lastTranscriptId)     { prefill.transcript_id      = state.lastTranscriptId; }
+                openInspectionWizard(prefill);
+                return;
+            }
+            if (result.action === 'open_yard_wizard') {
+                openYardWizard(result.wizard_prefill || {}, result.next_action, result.next_params);
+                return;
+            }
+            if (result.action === 'open_hive_wizard') {
+                openHiveWizard(result.wizard_prefill || {}, result.next_action, result.next_params);
+                return;
+            }
+            if (result.action === 'open_queen_wizard') {
+                openQueenWizard(result.wizard_prefill || {}, result.next_action, result.next_params);
                 return;
             }
             const wrapper = document.createElement('div');
