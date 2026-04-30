@@ -9904,17 +9904,15 @@ PYSCRIPT
             open(STDOUT, '>', '/dev/null');
             open(STDERR, '>>', '/tmp/whisper_bg.log');
 
-            my $json_out   = '';
-            my $stderr_out = '';
+            my $json_out = '';
             eval {
                 require IPC::Open3;
-                my ($wtr, $rdr, $err_rdr);
-                my $pid = IPC::Open3::open3($wtr, $rdr, $err_rdr,
+                my ($wtr, $rdr);
+                my $pid = IPC::Open3::open3($wtr, $rdr, undef,
                     $python_bin, $py_script_file, $tmp_file, $whisper_model,
                     ($has_diarizer ? '1' : '0'), "$num_speakers");
                 close $wtr;
-                $json_out   = do { local $/; <$rdr> } // '';
-                $stderr_out = do { local $/; <$err_rdr> } // '' if $err_rdr;
+                $json_out = do { local $/; <$rdr> } // '';
                 waitpid($pid, 0);
             };
 
