@@ -107,7 +107,7 @@ sub  create_project :Local :Args(0) {
 
     # Get username safely
     my $username = '';
-    if ($c->user_exists) {
+    if ($c->user_exists && defined($c->user)) {
         $username = $c->user->username;
     } elsif ($c->session->{username}) {
         $username = $c->session->{username};
