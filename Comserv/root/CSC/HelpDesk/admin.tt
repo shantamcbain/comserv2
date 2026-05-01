@@ -35,13 +35,13 @@
             <div class="admin-card">
                 <h3>Open Tickets</h3>
                 <p>View and manage all open support tickets.</p>
-                <a href="/HelpDesk/admin/tickets/open" class="btn btn-primary">View Open Tickets</a>
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="btn btn-primary">View Open Tickets</a>
             </div>
             
             <div class="admin-card">
-                <h3>Closed Tickets</h3>
-                <p>View archive of resolved support tickets.</p>
-                <a href="/HelpDesk/admin/tickets/closed" class="btn btn-primary">View Closed Tickets</a>
+                <h3>All Tickets</h3>
+                <p>View all support tickets across all statuses.</p>
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/all') %]" class="btn btn-primary">View All Tickets</a>
             </div>
             
             <div class="admin-card">

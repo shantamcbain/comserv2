@@ -1,0 +1,153 @@
+[% PageVersion = 'Documentation/features/3d_printing.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = '3D Printing System' %]
+[% META description = 'How to use the 3D printing system: model library, printer farm, print queue, store, orders' %]
+[% META roles = 'admin developer editor' %]
+
+<h1>3D Printing System</h1>
+<p><em>Last updated: April 28, 2026</em></p>
+
+<h2>Overview</h2>
+<p>
+The 3D Printing system manages a 3D printer farm, a library of printable models, a customer-facing
+store, and a print-job queue. Models are linked to inventory items so stock levels update automatically
+when jobs are fulfilled. The store is unified with the Shop system.
+</p>
+
+<hr>
+
+<h2>Table of Contents</h2>
+<ol>
+    <li><a href="#models">Model Library</a></li>
+    <li><a href="#upload">Uploading a Model (STL / 3MF / OBJ / GCode)</a></li>
+    <li><a href="#store">Store &amp; Customer Orders</a></li>
+    <li><a href="#queue">Print Queue</a></li>
+    <li><a href="#printers">Printer Farm</a></li>
+    <li><a href="#consignment">Consignment Integration</a></li>
+    <li><a href="#admin">Admin Dashboard</a></li>
+    <li><a href="#urls">URL Reference</a></li>
+</ol>
+
+<hr>
+
+<h2 id="models">1. Model Library</h2>
+<p>
+The model library at <a href="/3d/models">/3d/models</a> lists all uploaded models.
+Each model record stores:
+</p>
+<ul>
+    <li><strong>Name</strong> — display name</li>
+    <li><strong>File path</strong> — where the uploaded file is stored</li>
+    <li><strong>Linked inventory item</strong> — the finished-goods inventory item this model produces</li>
+    <li><strong>Geometry info</strong> — triangle count and estimated bounding box (from STL parser)</li>
+    <li><strong>show_in_shop</strong> — whether this model appears in the public store</li>
+</ul>
+<p>Browse the public model gallery at <a href="/3d/browse">/3d/browse</a>. Click a model for its detail page.</p>
+
+<hr>
+
+<h2 id="upload">2. Uploading a Model</h2>
+<ol>
+    <li>Go to <a href="/3d/admin">/3d/admin</a> and click <strong>Upload Model</strong>.</li>
+    <li>Select a file: <code>.stl</code>, <code>.3mf</code>, <code>.obj</code>, or <code>.gcode</code>.</li>
+    <li>Fill in the model name and select the linked inventory item (the finished good this model produces).</li>
+    <li>Click <strong>Upload</strong>. The file is saved via FileManager.</li>
+    <li>For STL files, the system automatically parses the geometry: triangle count and bounding-box dimensions are extracted and stored.</li>
+    <li>Non-STL files skip the geometry step without error.</li>
+</ol>
+<p>
+If an upload fails, the error appears in the flash message — it will not fail silently.
+</p>
+<p>
+To view geometry stats for an uploaded model: <a href="/3d/model_stl_info/&lt;id&gt;">/3d/model_stl_info/&lt;id&gt;</a>
+</p>
+
+<hr>
+
+<h2 id="store">3. Store &amp; Customer Orders</h2>
+<p>
+The 3D store is unified with the main Shop system. Visiting <a href="/3d/store">/3d/store</a> redirects to <a href="/shop">/shop</a>.
+Items are shown in the shop when their linked inventory item has <code>show_in_shop = Yes</code>.
+</p>
+<p><strong>Customer order flow:</strong></p>
+<ol>
+    <li>Customer browses <a href="/shop">/shop</a> and adds a 3D-print item to cart.</li>
+    <li>Alternatively, they visit <a href="/3d/order">/3d/order</a> to place a direct print order.</li>
+    <li>The <strong>Add to Cart</strong> button at <a href="/3d/buy">/3d/buy</a> also goes to the Cart.</li>
+    <li>Customers view their order history at <a href="/3d/my_orders">/3d/my_orders</a>.</li>
+</ol>
+
+<hr>
+
+<h2 id="queue">4. Print Queue</h2>
+<p>
+The print queue at <a href="/3d/queue">/3d/queue</a> lists all pending print jobs, grouped by model and filament.
+Staff use this to plan what to print next.
+</p>
+<ul>
+    <li><strong>Mark as Printed</strong> — POST to <a href="/3d/queue_print">/3d/queue_print</a> to mark a job as completed. This updates the linked inventory stock level.</li>
+    <li><strong>Queue Sync</strong> — <a href="/3d/queue_sync">/3d/queue_sync</a> reconciles the queue with inventory and consignment records, fixing any mismatches from manual edits.</li>
+</ul>
+
+<hr>
+
+<h2 id="printers">5. Printer Farm</h2>
+<p>
+Manage your physical printers at <a href="/3d/printers">/3d/printers</a>.
+Each printer is an inventory item with category <code>3d_printer</code>, <code>3dprinter</code>, or <code>equipment</code> (and variants).
+</p>
+<ul>
+    <li>The printers list links to each printer's inventory item page for full asset details.</li>
+    <li>Add a new printer: create an inventory item with category <code>3d_printer</code> and the printer will appear in the farm list automatically.</li>
+    <li>If the <code>inventory_equipment</code> table does not exist, the printers page still loads — the equipment section shows an empty state rather than crashing.</li>
+</ul>
+
+<hr>
+
+<h2 id="consignment">6. Consignment Integration</h2>
+<p>
+Finished 3D prints can be consigned to other sites (e.g. a co-op shop or arts market booth).
+</p>
+<ol>
+    <li>From the <a href="/3d/admin">/3d/admin</a> dashboard, click <strong>Consign Items</strong>.</li>
+    <li>Select the destination site (<code>source_sitename</code> selector).</li>
+    <li>Add line items. For each line, select the item and optionally a colour/filament option from the dropdown (populated from <code>shop_options</code>).</li>
+    <li>Options chosen are stored in the line notes.</li>
+    <li>Submit to create the consignment record, which appears in <a href="/Inventory/consignment/list">/Inventory/consignment/list</a>.</li>
+</ol>
+
+<hr>
+
+<h2 id="admin">7. Admin Dashboard</h2>
+<p><a href="/3d/admin">/3d/admin</a> provides:</p>
+<ul>
+    <li>Overview stats: models uploaded, jobs in queue, printers active</li>
+    <li>Quick links to upload a model, manage printers, view queue, consign items</li>
+    <li>Search across models and inventory items (<a href="/3d/search_deeper">/3d/search_deeper</a>)</li>
+</ul>
+
+<hr>
+
+<h2 id="urls">8. URL Reference</h2>
+<table class="doc-table">
+    <thead><tr><th>URL</th><th>Description</th><th>Access</th></tr></thead>
+    <tbody>
+        <tr><td><code>/3d</code></td><td>3D printing home</td><td>All</td></tr>
+        <tr><td><code>/3d/browse</code></td><td>Public model browser</td><td>All</td></tr>
+        <tr><td><code>/3d/model/&lt;id&gt;</code></td><td>Model detail page</td><td>All</td></tr>
+        <tr><td><code>/3d/model_download/&lt;id&gt;</code></td><td>Download model file</td><td>All (if enabled)</td></tr>
+        <tr><td><code>/3d/store</code></td><td>Redirects to /shop</td><td>All</td></tr>
+        <tr><td><code>/3d/buy</code></td><td>Redirects to Cart</td><td>All</td></tr>
+        <tr><td><code>/3d/order</code></td><td>Place a print order</td><td>Logged in</td></tr>
+        <tr><td><code>/3d/my_orders</code></td><td>Customer's order history</td><td>Logged in</td></tr>
+        <tr><td><code>/3d/queue</code></td><td>Print job queue</td><td>Admin</td></tr>
+        <tr><td><code>/3d/queue_print</code></td><td>Mark job as printed</td><td>Admin</td></tr>
+        <tr><td><code>/3d/queue_sync</code></td><td>Sync queue with inventory</td><td>Admin</td></tr>
+        <tr><td><code>/3d/printers</code></td><td>Printer farm list</td><td>Admin</td></tr>
+        <tr><td><code>/3d/models</code></td><td>Model library management</td><td>Admin</td></tr>
+        <tr><td><code>/3d/model_stl_info/&lt;id&gt;</code></td><td>STL geometry stats</td><td>Admin</td></tr>
+        <tr><td><code>/3d/admin</code></td><td>Admin dashboard</td><td>Admin</td></tr>
+        <tr><td><code>/3d/search_deeper</code></td><td>Deep inventory search</td><td>Admin</td></tr>
+    </tbody>
+</table>

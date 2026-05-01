@@ -1,0 +1,122 @@
+[% PageVersion = 'Documentation/features/daily_plan.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Daily Plan' %]
+[% META description = 'How to use the Daily Plan: Start Day, Audit Todos, HelpDesk panel, morning notes, log' %]
+[% META roles = 'admin developer' %]
+
+<h1>Daily Plan</h1>
+<p><em>Last updated: April 28, 2026</em></p>
+
+<h2>Overview</h2>
+<p>
+The Daily Plan at <a href="/planning/daily">/planning/daily</a> is the starting point for each work session.
+It gives you an at-a-glance view of what needs attention: open P1–P3 todos, open HelpDesk tickets,
+and your morning priorities — all in one place.
+The <strong>Start Day</strong> action runs an AI-assisted audit of blocking work and writes a morning summary into your daily log.
+</p>
+
+<hr>
+
+<h2>Table of Contents</h2>
+<ol>
+    <li><a href="#layout">Page Layout</a></li>
+    <li><a href="#start-day">Start Day</a></li>
+    <li><a href="#audit-todos">Audit Todos Panel</a></li>
+    <li><a href="#helpdesk-panel">HelpDesk Panel</a></li>
+    <li><a href="#morning-notes">Morning Notes</a></li>
+    <li><a href="#log">Daily Log</a></li>
+    <li><a href="#priorities">Priorities Panel</a></li>
+</ol>
+
+<hr>
+
+<h2 id="layout">1. Page Layout</h2>
+<p>The page has three always-visible collapsible panels and an action bar below the tab toolbar:</p>
+<ul>
+    <li><strong>Audit Todos</strong> — P1/P2/P3 open todos</li>
+    <li><strong>HelpDesk</strong> — open support tickets</li>
+    <li><strong>Priorities</strong> — your current priority list</li>
+</ul>
+<p>
+The action bar (below the tabs) contains the <strong>Start Day</strong> button and the <strong>View Log / Today's Log</strong> button.
+These are always visible regardless of which panel is open.
+</p>
+<p>All three panels render even when empty, showing a friendly empty-state message so the layout stays consistent.</p>
+
+<hr>
+
+<h2 id="start-day">2. Start Day</h2>
+<p>Click <strong>Start Day</strong> to trigger an AI-assisted audit of your work queue.</p>
+<p>What happens:</p>
+<ol>
+    <li>The controller fetches all open/critical todos (P1–P3 across all linked projects).</li>
+    <li>Todos are grouped by controller/subroutine and deduplicated.</li>
+    <li>The HelpDesk open-ticket count is fetched from <code>/HelpDesk/admin/tickets_alert</code>.</li>
+    <li>All of this is passed to the AI planning agent as a structured briefing prompt.</li>
+    <li>The AI response is written into today's daily log as a <strong>Morning Summary</strong> entry.</li>
+    <li>The log panel opens automatically so you can read the summary.</li>
+</ol>
+<p>
+The morning summary gives you an overview of what is blocking, what HelpDesk tickets need attention,
+and suggested priorities for the day — drawn from the actual state of your todo queue, not guesswork.
+</p>
+
+<hr>
+
+<h2 id="audit-todos">3. Audit Todos Panel</h2>
+<p>
+The Audit Todos panel shows all <strong>open todos with priority P1, P2, or P3</strong> that have not been completed.
+It is <em>not</em> filtered to today — it shows any open high-priority work regardless of date,
+so nothing falls through the cracks.
+</p>
+<p>
+CRITICAL and ERROR level application log entries also appear here at P1 priority.
+WARN level entries appear at P3.
+This means if the application logged an error overnight, it surfaces here at the start of day.
+</p>
+
+<hr>
+
+<h2 id="helpdesk-panel">4. HelpDesk Panel</h2>
+<p>
+The HelpDesk panel shows open support tickets from all sites (CSC admin) or your site only (other site admins).
+Click any ticket to go to the full ticket thread.
+</p>
+<p>If there are no open tickets, the panel shows a "No open tickets" message.</p>
+
+<hr>
+
+<h2 id="morning-notes">5. Morning Notes</h2>
+<p>
+The morning notes section shows a text area for your personal notes.
+The auto-generated preamble (date, weather, system status — written by Start Day) is preserved separately;
+when you save your notes, the preamble is prepended automatically.
+This means you only need to type <em>your</em> notes — the system-generated context is never lost.
+</p>
+
+<hr>
+
+<h2 id="log">6. Daily Log</h2>
+<p>
+The <strong>Today's Log / View Log</strong> button in the action bar toggles the daily log panel.
+The button highlights when the log is open.
+</p>
+<p>Log entries are created and updated at <code>/planning/daily_log</code> and <code>/planning/update_log_entry</code>.</p>
+<p>Each log entry records:</p>
+<ul>
+    <li>Date and user</li>
+    <li>Morning summary (from Start Day)</li>
+    <li>Personal notes</li>
+    <li>Time entries linked to todos or free text</li>
+</ul>
+
+<hr>
+
+<h2 id="priorities">7. Priorities Panel</h2>
+<p>
+The Priorities panel shows your current list of prioritised tasks for the day.
+Items can be reordered, checked off, or linked to todos.
+The Start Day button previously called "Good Morning" — that hardcoded link has been replaced
+by the Start Day button which connects to the full planning workflow.
+</p>

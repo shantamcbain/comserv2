@@ -2090,13 +2090,15 @@ sub _apply_json_roles_to_memory {
     my $memory_pages = $self->documentation_pages;
     my $synced = 0;
     foreach my $page_name (keys %$json_pages) {
-        if (exists $memory_pages->{$page_name} && ref $json_pages->{$page_name}->{roles} eq 'ARRAY') {
-            $memory_pages->{$page_name}->{roles} = $json_pages->{$page_name}->{roles};
+        if (exists $memory_pages->{$page_name}) {
+            my $jp = $json_pages->{$page_name};
+            $memory_pages->{$page_name}->{roles} = $jp->{roles} if ref $jp->{roles} eq 'ARRAY';
+            $memory_pages->{$page_name}->{site}  = $jp->{site}  if defined $jp->{site};
             $synced++;
         }
     }
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_apply_json_roles_to_memory',
-        "Synced roles from JSON config into memory for $synced pages");
+        "Synced roles+site from JSON config into memory for $synced pages");
 }
 
 # Helper method to clean data structure for JSON encoding

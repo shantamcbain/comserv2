@@ -1,0 +1,99 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-3d-printing-system.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = '3D Printing System' %]
+[% META description = 'STL file upload and parser, model manager, printer farm, print queue, store integration with Shop, consignment from 3D admin' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>3D Printing System</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">New System</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>New <code>3d</code> controller providing a complete 3D printing management system: STL/OBJ/3MF/GCode file upload with STL geometry parsing, a model library linked to inventory items, a printer farm tracker, a print job queue with consignment integration, and a customer-facing store (unified with the Shop system).</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Routes</h2>
+        <ul>
+            <li><code>/3d</code> — index page</li>
+            <li><code>/3d/browse</code> — public model browser</li>
+            <li><code>/3d/model/&lt;id&gt;</code> — model detail page</li>
+            <li><code>/3d/model_download/&lt;id&gt;</code> — download model file</li>
+            <li><code>/3d/store</code> — redirects to <code>/shop</code> (unified with Shop system)</li>
+            <li><code>/3d/buy</code> — redirects to Cart</li>
+            <li><code>/3d/order</code> — place a print order</li>
+            <li><code>/3d/my_orders</code> — customer order history</li>
+            <li><code>/3d/queue</code> — print job queue (admin)</li>
+            <li><code>/3d/queue_print</code> — mark job as printed</li>
+            <li><code>/3d/queue_sync</code> — sync queue with inventory/consignment</li>
+            <li><code>/3d/printers</code> — printer farm management</li>
+            <li><code>/3d/admin</code> — admin dashboard</li>
+            <li><code>/3d/models</code> — model library management</li>
+            <li><code>/3d/model_stl_info/&lt;id&gt;</code> — geometry stats for a model</li>
+            <li><code>/3d/search_deeper</code> — deeper inventory search</li>
+        </ul>
+
+        <h2>STL Upload &amp; Parser</h2>
+        <ul>
+            <li>File uploads handled by <code>FileManager</code>; accepts <code>.stl</code>, <code>.3mf</code>, <code>.obj</code>, <code>.gcode</code>.</li>
+            <li>Built-in <code>_parse_stl</code> method reads binary STL headers, counts triangles, estimates bounding box dimensions.</li>
+            <li>NaN guards prevent failures on non-STL files passed to the parser.</li>
+            <li>Upload errors are surfaced in flash messages (no silent fail).</li>
+        </ul>
+
+        <h2>Model Manager</h2>
+        <ul>
+            <li><code>Printing3dModel</code> Result class — stores model metadata and file path.</li>
+            <li>Models link to Inventory items via foreign key, enabling stock tracking.</li>
+            <li><code>show_in_shop</code> flag controls marketplace visibility.</li>
+        </ul>
+
+        <h2>Printer Farm</h2>
+        <ul>
+            <li><code>Printing3dPrinter</code> / <code>Printing3dPrinters</code> Result classes.</li>
+            <li>Category filter on the printers page broadened to match <code>3d_printer</code>, <code>3dprinter</code>, <code>equipment</code>, and variants.</li>
+            <li>Asset links corrected to <code>/Inventory/item/view</code>.</li>
+            <li>Evals split per table: missing <code>inventory_equipment</code> table no longer silently kills the whole page.</li>
+        </ul>
+
+        <h2>Print Queue</h2>
+        <ul>
+            <li><code>Printing3dJob</code> Result class with consignment columns for queue-to-consignment integration.</li>
+            <li><code>queue_sync</code> reconciles the print queue with the inventory/consignment system.</li>
+        </ul>
+
+        <h2>Consignment Integration</h2>
+        <ul>
+            <li>"Consign from 3D admin" link added to the 3D admin dashboard.</li>
+            <li>Cross-site consignment with <code>source_sitename</code> selector.</li>
+            <li>Consignment form line items use <code>shop_options</code> for colour/filament selectors; options stored in line notes.</li>
+        </ul>
+
+        <h2>Navigation</h2>
+        <ul>
+            <li><code>TopDropList3d.tt</code> — new top-nav dropdown for 3D printing.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/3d.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Printing3dJob.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Printing3dModel.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Printing3dPrinter.pm</code></li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Printing3dPrinters.pm</code></li>
+            <li><code>root/3d/</code> — admin, browse, index, model_detail, models, my_orders, order, printers, queue, queue_print, queue_sync, store templates</li>
+            <li><code>root/Navigation/TopDropList3d.tt</code></li>
+            <li><code>root/Inventory/consignment/new.tt</code>, <code>list.tt</code>, <code>view.tt</code>, <code>print.tt</code></li>
+        </ul>
+    </section>
+</div>

@@ -1665,6 +1665,8 @@ sub site_setup {
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
 
+    $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
     # Primary attempt: lookup by SiteName (as provided)
@@ -2000,6 +2002,17 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
 
     $c->response->content_type('image/svg+xml');
     $c->response->headers->header('Cache-Control' => 'public, max-age=3600');
+    $c->response->body($svg);
+}
+
+sub helpdesk_favicon :Path('/favicon/helpdesk') :Args(0) {
+    my ($self, $c) = @_;
+    my $svg = q{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>};
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
     $c->response->body($svg);
 }
 

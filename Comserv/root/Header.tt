@@ -32,12 +32,16 @@
     [%- SET fallback_icon = site_favicon
             ? site_favicon
             : '/favicon/site/' _ site_name_enc -%]
+    [% IF site_favicon %]
+    <link rel="icon" type="image/svg+xml" href="[% site_favicon %]">
     [% IF req_port %]
+    [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
+    <link rel="alternate icon" sizes="32x32" href="[% port_icon_url %]">
+    [% END %]
+    [% ELSIF req_port %]
     [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
     <link rel="icon" type="image/svg+xml" href="[% port_icon_url %]">
     <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
-    [% ELSIF site_favicon %]
-    <link rel="shortcut icon" href="[% site_favicon %]">
     [% ELSE %]
     <link rel="icon" type="image/svg+xml" href="/favicon/site/[% site_name_enc %]">
     [% END %]
@@ -102,7 +106,10 @@
     <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
     [% END %]
 
-    <!-- Local SVG icon solution (no external dependencies) -->
+    <!-- FontAwesome for icons not covered by the SVG mask set -->
+    <link rel="stylesheet" type="text/css" href="/static/css/fontawesome/all.min.css">
+
+    <!-- Local SVG icon solution (overrides selected FA icons with themed SVGs) -->
     <link rel="stylesheet" type="text/css" href="/static/css/svg-icons.css">
 
     <!-- Fix for icons to respect theme colors -->
