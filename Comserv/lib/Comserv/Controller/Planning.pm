@@ -655,8 +655,8 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
         message          => $result->{todo_created}
             ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)"
             : ($result->{error_count}
-                ? "$result->{error_count} area(s) already have open todos"
-                : "No new errors found in the last 24h"),
+                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences"
+                : "No errors found in the last 24h"),
     }));
 }
 
@@ -736,23 +736,23 @@ sub _run_audit_scan {
 
         if ($existing_audit) {
             $todo_created = 0;
-            # Check if new error areas exist without a child todo yet
             my $root_id = $existing_audit->record_id;
             my $ollama;
             eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
             for my $sub (sort keys %groups) {
                 my $safe_sub = $sub;
                 $safe_sub =~ s/[%_]/\\$&/g;
-                my $exists;
+                my $open_exists;
                 eval {
-                    $exists = $schema->resultset('Todo')->search(
+                    $open_exists = $schema->resultset('Todo')->search(
                         { parent_id  => $root_id,
                           subject    => { -like => "%$safe_sub%" },
-                          start_date => $today },
+                          start_date => $today,
+                          status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
                         { rows => 1 }
                     )->first;
                 };
-                next if $exists;
+                next if $open_exists;
                 my @entries = @{ $groups{$sub} };
                 my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $user_id,
                     $today, $sub, \@entries, $root_id, $ollama);
