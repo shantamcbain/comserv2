@@ -401,7 +401,7 @@
                 <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
                     [% IF active_priorities && active_priorities.size %]
-                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;">[% active_priorities.size %] todo[% IF active_priorities.size != 1 %]s[% END %]</span>
+                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;"><span id="ap-visible-count">[% active_priorities.size %]</span> todo[% IF active_priorities.size != 1 %]s[% END %]</span>
                     [% END %]
                     [% IF filter_site || filter_project %]
                     <a href="/planning/daily#planning" style="font-size:0.78em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear filters</a>
@@ -410,6 +410,21 @@
 
                 [%# ── Filter Bar ── %]
                 <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+
+                    [%# Role filter row %]
+                    [% IF ap_role_cats && ap_role_cats.size > 1 %]
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Role:</span>
+                        [% FOREACH rc IN ap_role_cats %]
+                        <button id="role-btn-[% rc %]" onclick="toggleRole('[% rc %]')" data-role="[% rc %]"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;text-transform:capitalize;">
+                            [% rc %]
+                        </button>
+                        [% END %]
+                        <button onclick="selectAllRoles()" id="role-btn-all"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">All</button>
+                    </div>
+                    [% END %]
 
                     [%# Site filter row (CSC only) %]
                     [% IF is_csc && plan_sitenames && plan_sitenames.size %]
@@ -463,6 +478,7 @@
                     data-score="[% ap.ap_score || 9999 %]"
                     data-project="[% ap.project_name | html %]"
                     data-due="[% ap.due_date || '9999-12-31' %]"
+                    data-role-cats="[% ap.role_cats || 'general' %]"
                     style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
                     border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
                     background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
@@ -651,6 +667,86 @@
                 var qs = params.toString();
                 window.location.href = '/planning/daily' + (qs ? '?' + qs : '') + '#planning';
             }
+
+            var _activeRoles = null;
+
+            function initRoleFilters() {
+                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
+                if (!btns.length) return;
+                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
+                var stored = sessionStorage.getItem('ap_active_roles');
+                var roles = null;
+                if (stored) {
+                    try { roles = JSON.parse(stored); } catch(e) { roles = null; }
+                }
+                if (!roles || !Array.isArray(roles) || !roles.length) {
+                    roles = allRoleNames.slice();
+                }
+                _activeRoles = roles;
+                _applyRoleButtonStyles(btns, roles);
+                applyRoleFilter();
+            }
+
+            function _applyRoleButtonStyles(btns, activeRoles) {
+                var allActive = true;
+                btns.forEach(function(btn) {
+                    var isActive = activeRoles.indexOf(btn.dataset.role) !== -1;
+                    if (!isActive) allActive = false;
+                    btn.style.background  = isActive ? 'var(--primary-color)' : 'transparent';
+                    btn.style.color       = isActive ? '#fff' : 'var(--text-color)';
+                    btn.style.borderColor = isActive ? 'var(--primary-color)' : 'var(--border-color)';
+                });
+                var allBtn = document.getElementById('role-btn-all');
+                if (allBtn) {
+                    allBtn.style.background  = allActive ? 'var(--primary-color)' : 'transparent';
+                    allBtn.style.color       = allActive ? '#fff' : 'var(--text-color)';
+                    allBtn.style.borderColor = allActive ? 'var(--primary-color)' : 'var(--border-color)';
+                }
+            }
+
+            function toggleRole(role) {
+                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
+                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
+                if (!_activeRoles) { _activeRoles = allRoleNames.slice(); }
+                var idx = _activeRoles.indexOf(role);
+                if (idx === -1) {
+                    _activeRoles.push(role);
+                } else {
+                    if (_activeRoles.length === 1) {
+                        _activeRoles = allRoleNames.slice();
+                    } else {
+                        _activeRoles.splice(idx, 1);
+                    }
+                }
+                sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
+                _applyRoleButtonStyles(btns, _activeRoles);
+                applyRoleFilter();
+            }
+
+            function selectAllRoles() {
+                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
+                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
+                _activeRoles = allRoleNames.slice();
+                sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
+                _applyRoleButtonStyles(btns, _activeRoles);
+                applyRoleFilter();
+            }
+
+            function applyRoleFilter() {
+                if (!_activeRoles) return;
+                var cards = document.querySelectorAll('#priorities-list > [data-role-cats]');
+                var visible = 0;
+                cards.forEach(function(card) {
+                    var cardRoles = (card.dataset.roleCats || 'general').split(',');
+                    var show = _activeRoles.some(function(r){ return cardRoles.indexOf(r) !== -1; });
+                    card.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                var countEl = document.getElementById('ap-visible-count');
+                if (countEl) countEl.textContent = visible;
+            }
+
+            document.addEventListener('DOMContentLoaded', initRoleFilters);
             function sortTodos(by) {
                 var list = document.getElementById('priorities-list');
                 if (!list) return;
