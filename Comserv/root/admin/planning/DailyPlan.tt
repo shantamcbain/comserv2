@@ -411,14 +411,16 @@
                 [%# ── Filter Bar ── %]
                 <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
 
-                    [%# Role filter row %]
-                    [% IF ap_role_cats && ap_role_cats.size > 1 %]
+                    [%# Role filter row — uses actual user profile roles %]
+                    [% SET _wt_roles = [] %]
+                    [% FOREACH ur IN ap_user_roles %][% IF ur == 'developer' || ur == 'devops' || ur == 'editor' || ur == 'admin' %][% _wt_roles.push(ur) %][% END %][% END %]
+                    [% IF _wt_roles.size > 1 %]
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                         <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Role:</span>
-                        [% FOREACH rc IN ap_role_cats %]
-                        <button id="role-btn-[% rc %]" onclick="toggleRole('[% rc %]')" data-role="[% rc %]"
+                        [% FOREACH wr IN _wt_roles %]
+                        <button id="role-btn-[% wr %]" onclick="toggleRole('[% wr %]')" data-role="[% wr %]"
                             style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;text-transform:capitalize;">
-                            [% rc %]
+                            [% IF wr == 'developer' %]Developer[% ELSIF wr == 'devops' %]DevOps[% ELSIF wr == 'editor' %]Editor[% ELSIF wr == 'admin' %]Admin[% ELSE %][% wr %][% END %]
                         </button>
                         [% END %]
                         <button onclick="selectAllRoles()" id="role-btn-all"
@@ -426,17 +428,15 @@
                     </div>
                     [% END %]
 
-                    [%# Site filter row (CSC only) %]
+                    [%# Site filter row (CSC only) — client-side, no redirect %]
                     [% IF is_csc && plan_sitenames && plan_sitenames.size %]
                     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
                         <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Site:</span>
-                        <a href="/planning/daily[% IF filter_project %]?filter_project=[% filter_project %][% END %]#planning"
-                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
-                           [% IF !filter_site %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">All</a>
+                        <button id="site-btn-all" onclick="applySiteFilter('')"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">All</button>
                         [% FOREACH sname IN plan_sitenames %]
-                        <a href="/planning/daily?filter_site=[% sname %][% IF filter_project %]&filter_project=[% filter_project %][% END %]#planning"
-                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
-                           [% IF filter_site == sname %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">[% sname %]</a>
+                        <button id="site-btn-[% sname %]" onclick="applySiteFilter('[% sname %]')" data-site="[% sname %]"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">[% sname %]</button>
                         [% END %]
                     </div>
                     [% END %]
@@ -445,11 +445,11 @@
                     <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                         <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Focus:</span>
                         [% IF ap_projects && ap_projects.size %]
-                        <select id="ap-project-filter" onchange="applyProjectFilter(this.value)"
-                            style="font-size:0.78em;padding:3px 6px;border:1px solid [% IF filter_project %]var(--primary-color)[% ELSE %]var(--border-color)[% END %];border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:220px;">
+                        <select id="ap-project-filter" onchange="applyProjectFilterLocal(this.value)"
+                            style="font-size:0.78em;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:220px;">
                             <option value="">All Projects</option>
                             [% FOREACH proj IN ap_projects %]
-                            <option value="[% proj.project_id %]" [% IF filter_project == proj.project_id %]selected[% END %]>
+                            <option value="[% proj.project_id %]">
                                 [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
                             </option>
                             [% END %]
@@ -477,7 +477,9 @@
                     data-priority="[% ap.priority || 99 %]"
                     data-score="[% ap.ap_score || 9999 %]"
                     data-project="[% ap.project_name | html %]"
+                    data-project-id="[% ap.project_id || '' %]"
                     data-due="[% ap.due_date || '9999-12-31' %]"
+                    data-site="[% ap.sitename || '' %]"
                     data-role-cats="[% ap.role_cats || 'general' %]"
                     style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
                     border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
@@ -657,34 +659,48 @@
                 evt.stopPropagation();
                 location.reload();
             }
-            function applyProjectFilter(projId) {
-                var params = new URLSearchParams(window.location.search);
-                if (projId) {
-                    params.set('filter_project', projId);
-                } else {
-                    params.delete('filter_project');
-                }
-                var qs = params.toString();
-                window.location.href = '/planning/daily' + (qs ? '?' + qs : '') + '#planning';
+            var _activeRoles  = null;
+            var _activeSite   = '';
+            var _activeProject = '';
+
+            function applyAllFilters() {
+                var cards = document.querySelectorAll('#priorities-list > div[id^="ap-row-"]');
+                var visible = 0;
+                cards.forEach(function(card) {
+                    var showRole = true;
+                    if (_activeRoles && _activeRoles.length) {
+                        var cardRoles = (card.dataset.roleCats || 'general').split(',');
+                        if (cardRoles.indexOf('general') !== -1) {
+                            showRole = true;
+                        } else {
+                            showRole = _activeRoles.some(function(r) {
+                                if (r === 'devops') return cardRoles.indexOf('developer') !== -1 || cardRoles.indexOf('admin') !== -1;
+                                return cardRoles.indexOf(r) !== -1;
+                            });
+                        }
+                    }
+                    var showSite = !_activeSite || (card.dataset.site || '') === _activeSite;
+                    var showProject = !_activeProject || String(card.dataset.projectId || '') === String(_activeProject);
+                    var show = showRole && showSite && showProject;
+                    card.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                var countEl = document.getElementById('ap-visible-count');
+                if (countEl) countEl.textContent = visible;
             }
 
-            var _activeRoles = null;
-
-            function initRoleFilters() {
-                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
-                if (!btns.length) return;
-                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
-                var stored = sessionStorage.getItem('ap_active_roles');
-                var roles = null;
-                if (stored) {
-                    try { roles = JSON.parse(stored); } catch(e) { roles = null; }
+            function initFilters() {
+                var roleBtns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
+                if (roleBtns.length) {
+                    var allRoleNames = Array.from(roleBtns).map(function(b){ return b.dataset.role; });
+                    var stored = sessionStorage.getItem('ap_active_roles');
+                    var roles = null;
+                    if (stored) { try { roles = JSON.parse(stored); } catch(e) { roles = null; } }
+                    if (!roles || !Array.isArray(roles) || !roles.length) { roles = allRoleNames.slice(); }
+                    _activeRoles = roles;
+                    _applyRoleButtonStyles(roleBtns, roles);
                 }
-                if (!roles || !Array.isArray(roles) || !roles.length) {
-                    roles = allRoleNames.slice();
-                }
-                _activeRoles = roles;
-                _applyRoleButtonStyles(btns, roles);
-                applyRoleFilter();
+                applyAllFilters();
             }
 
             function _applyRoleButtonStyles(btns, activeRoles) {
@@ -712,15 +728,11 @@
                 if (idx === -1) {
                     _activeRoles.push(role);
                 } else {
-                    if (_activeRoles.length === 1) {
-                        _activeRoles = allRoleNames.slice();
-                    } else {
-                        _activeRoles.splice(idx, 1);
-                    }
+                    _activeRoles = (_activeRoles.length === 1) ? allRoleNames.slice() : _activeRoles.filter(function(r){ return r !== role; });
                 }
                 sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
                 _applyRoleButtonStyles(btns, _activeRoles);
-                applyRoleFilter();
+                applyAllFilters();
             }
 
             function selectAllRoles() {
@@ -729,24 +741,40 @@
                 _activeRoles = allRoleNames.slice();
                 sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
                 _applyRoleButtonStyles(btns, _activeRoles);
-                applyRoleFilter();
+                applyAllFilters();
             }
 
-            function applyRoleFilter() {
-                if (!_activeRoles) return;
-                var cards = document.querySelectorAll('#priorities-list > [data-role-cats]');
-                var visible = 0;
-                cards.forEach(function(card) {
-                    var cardRoles = (card.dataset.roleCats || 'general').split(',');
-                    var show = _activeRoles.some(function(r){ return cardRoles.indexOf(r) !== -1; });
-                    card.style.display = show ? '' : 'none';
-                    if (show) visible++;
+            function applySiteFilter(site) {
+                _activeSite = site;
+                var allSiteBtn = document.getElementById('site-btn-all');
+                var siteBtns   = document.querySelectorAll('[id^="site-btn-"]:not(#site-btn-all)');
+                var activeStyle   = 'var(--primary-color)';
+                var inactiveStyle = 'transparent';
+                if (allSiteBtn) {
+                    var isAll = (site === '');
+                    allSiteBtn.style.background  = isAll ? activeStyle : inactiveStyle;
+                    allSiteBtn.style.color       = isAll ? '#fff' : 'var(--text-color)';
+                    allSiteBtn.style.borderColor = isAll ? activeStyle : 'var(--border-color)';
+                }
+                siteBtns.forEach(function(btn) {
+                    var active = btn.dataset.site === site;
+                    btn.style.background  = active ? activeStyle : inactiveStyle;
+                    btn.style.color       = active ? '#fff' : 'var(--text-color)';
+                    btn.style.borderColor = active ? activeStyle : 'var(--border-color)';
                 });
-                var countEl = document.getElementById('ap-visible-count');
-                if (countEl) countEl.textContent = visible;
+                applyAllFilters();
             }
 
-            document.addEventListener('DOMContentLoaded', initRoleFilters);
+            function applyProjectFilterLocal(projId) {
+                _activeProject = projId || '';
+                var sel = document.getElementById('ap-project-filter');
+                if (sel) {
+                    sel.style.borderColor = projId ? 'var(--primary-color)' : 'var(--border-color)';
+                }
+                applyAllFilters();
+            }
+
+            document.addEventListener('DOMContentLoaded', initFilters);
             function sortTodos(by) {
                 var list = document.getElementById('priorities-list');
                 if (!list) return;
