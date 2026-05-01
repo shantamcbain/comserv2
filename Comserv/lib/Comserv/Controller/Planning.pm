@@ -554,14 +554,36 @@ sub daily :Path('/planning/daily') :Args {
                     \%audit_cond,
                     { order_by => { -desc => 'start_date' }, rows => 10 }
                 )->all;
+                my %proj_cache;
+                my $resolve_proj = sub {
+                    my $todo = shift;
+                    my $pid  = $todo->get_column('project_id') // '';
+                    return $proj_cache{$pid} if exists $proj_cache{$pid};
+                    my $name = '';
+                    if ($pid) {
+                        eval {
+                            my $p = $c->model('DBEncy')->resultset('Project')->find($pid);
+                            $name = $p->name if $p;
+                        };
+                    }
+                    $proj_cache{$pid} = $name;
+                    return $name;
+                };
+
                 for my $root (@roots) {
-                    push @at, { $root->get_columns, is_root => 1 };
+                    my %cols = $root->get_columns;
+                    $cols{project_name} = $resolve_proj->($root);
+                    push @at, { %cols, is_root => 1 };
                     my @children = $c->model('DBEncy')->resultset('Todo')->search(
                         { parent_id => $root->record_id,
                           status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
                         { order_by => { -asc => 'priority' } }
                     )->all;
-                    push @at, map { { $_->get_columns, is_root => 0 } } @children;
+                    for my $ch (@children) {
+                        my %cc = $ch->get_columns;
+                        $cc{project_name} = $resolve_proj->($ch);
+                        push @at, { %cc, is_root => 0 };
+                    }
                 }
             };
             \@at;
