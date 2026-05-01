@@ -96,6 +96,8 @@ __PACKAGE__->add_columns(
 
 __PACKAGE__->set_primary_key('id');
 
+__PACKAGE__->add_unique_constraint( ticket_number_unique => ['ticket_number'] );
+
 __PACKAGE__->belongs_to(
     conversation => 'Comserv::Model::Schema::Ency::Result::AiConversation',
     'conversation_id',
