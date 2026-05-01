@@ -2044,12 +2044,35 @@ sub complete_password_setup :Local {
 sub list_users :Local :Args(0) {
     my ($self, $c) = @_;
 
-    # Fetch the list of users and pass it to the view
-    my @users = $c->model('DBEncy::User')->all;
-    $c->stash(users => \@users);
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'list_users')) {
+        $c->res->redirect($c->uri_for('/user/login'));
+        return;
+    }
 
-    # Display the list of users
-    $c->stash(template => 'user/list_users.tt');
+    my $q      = $c->req->param('q')    || '';
+    my $field  = $c->req->param('by')   || 'email';
+    my $schema = $c->model('DBEncy');
+
+    my @users;
+    if ($q) {
+        my $like = { -like => '%' . $q . '%' };
+        my %where = $field eq 'username' ? (username   => $like)
+                  : $field eq 'roles'    ? (roles      => $like)
+                  :                        (email      => $like);
+        @users = $schema->resultset('User')->search(\%where,
+            { order_by => { -asc => 'username' } })->all;
+    } else {
+        @users = $schema->resultset('User')->search({},
+            { order_by => { -asc => 'username' } })->all;
+    }
+
+    $c->stash(
+        users    => \@users,
+        q        => $q,
+        by       => $field,
+        template => 'user/list_users.tt',
+    );
 }
 sub edit_user :Local :Args(1) {
     my ($self, $c) = @_;

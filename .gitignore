@@ -47,6 +47,13 @@ workspace.xml
 /local/
 Comserv/local/
 
+# Python virtual environments (never commit — large + contain false-positive secret patterns)
+Comserv/whisper_venv/
+Comserv/venv/
+Comserv/speechfire/
+**/venv/
+**/.venv/
+
 # Configuration files
 /Comserv/db_config.json
 /Comserv/db_config.json.template

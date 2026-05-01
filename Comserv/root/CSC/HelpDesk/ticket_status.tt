@@ -17,6 +17,19 @@
     <div class="alert-success">[% success_msg %]</div>
     [% END %]
 
+    [% IF is_admin_view %]
+    <div class="admin-ticket-nav">
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]"
+           class="btn [% status_filter == 'open' ? 'btn-primary' : 'btn-outline' %]">Open</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/resolved') %]"
+           class="btn [% status_filter == 'resolved' ? 'btn-primary' : 'btn-outline' %]">Resolved</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/closed') %]"
+           class="btn [% status_filter == 'closed' ? 'btn-primary' : 'btn-outline' %]">Closed</a>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets') %]"
+           class="btn [% status_filter == 'all' ? 'btn-primary' : 'btn-outline' %]">All</a>
+    </div>
+    [% END %]
+
     <div class="ticket-search">
         <form method="get" id="ticket-lookup-form"
               onsubmit="event.preventDefault(); var n=document.getElementById('ticket_id').value.trim(); if(n) window.location='/HelpDesk/ticket/view/'+encodeURIComponent(n);">

@@ -680,6 +680,34 @@ sub add_constituent {
     return (1, $new_rec ? $new_rec->record_id : undef);
 }
 
+sub backlink_constituent_to_all_herbs {
+    my ($self, $c, $constituent_id, $name) = @_;
+    return unless $constituent_id && $name;
+    my $linked = 0;
+    my $pat    = quotemeta($name);
+    eval {
+        my @herbs = $self->forager_schema->resultset('Herb')->search(
+            { constituents => { like => "%$name%" } },
+            { columns => ['record_id', 'constituents'] }
+        )->all;
+        for my $herb (@herbs) {
+            if (($herb->constituents // '') =~ /(?:^|[,;\s])$pat(?:[,;\s(]|$)/i) {
+                $self->ency_schema->resultset('HerbConstituent')->find_or_create({
+                    herb_id        => $herb->record_id,
+                    constituent_id => $constituent_id,
+                    plant_part     => '',
+                });
+                $linked++;
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'backlink_constituent_to_all_herbs',
+            "Error back-linking constituent $constituent_id ($name): $@");
+    }
+    return $linked;
+}
+
 sub update_constituent {
     my ($self, $c, $id, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_constituent', "Updating constituent with ID: $id");
