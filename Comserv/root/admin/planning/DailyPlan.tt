@@ -403,67 +403,65 @@
                     [% IF active_priorities && active_priorities.size %]
                     <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;"><span id="ap-visible-count">[% active_priorities.size %]</span> todo[% IF active_priorities.size != 1 %]s[% END %]</span>
                     [% END %]
-                    [% IF filter_site || filter_project %]
-                    <a href="/planning/daily#planning" style="font-size:0.78em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear filters</a>
-                    [% END %]
+
                 </div>
 
-                [%# ── Filter Bar ── %]
-                <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+                [%# ── Filter Bar — compact single row with collapsible dropdowns ── %]
+                <div id="ap-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:5px 10px;margin-bottom:12px;">
 
-                    [%# Role filter row — uses actual user profile roles %]
-                    [% SET _wt_roles = [] %]
-                    [% FOREACH ur IN ap_user_roles %][% IF ur == 'developer' || ur == 'devops' || ur == 'editor' || ur == 'admin' %][% _wt_roles.push(ur) %][% END %][% END %]
-                    [% IF _wt_roles.size > 1 %]
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Role:</span>
-                        [% FOREACH wr IN _wt_roles %]
-                        <button id="role-btn-[% wr %]" onclick="toggleRole('[% wr %]')" data-role="[% wr %]"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;text-transform:capitalize;">
-                            [% IF wr == 'developer' %]Developer[% ELSIF wr == 'devops' %]DevOps[% ELSIF wr == 'editor' %]Editor[% ELSIF wr == 'admin' %]Admin[% ELSE %][% wr %][% END %]
-                        </button>
-                        [% END %]
-                        <button onclick="selectAllRoles()" id="role-btn-all"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">All</button>
-                    </div>
-                    [% END %]
-
-                    [%# Site filter row (CSC only) — client-side, no redirect %]
-                    [% IF is_csc && plan_sitenames && plan_sitenames.size %]
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Site:</span>
-                        <button id="site-btn-all" onclick="applySiteFilter('')"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">All</button>
-                        [% FOREACH sname IN plan_sitenames %]
-                        <button id="site-btn-[% sname %]" onclick="applySiteFilter('[% sname %]')" data-site="[% sname %]"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">[% sname %]</button>
-                        [% END %]
-                    </div>
-                    [% END %]
-
-                    [%# Project + Sort row %]
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Focus:</span>
-                        [% IF ap_projects && ap_projects.size %]
-                        <select id="ap-project-filter" onchange="applyProjectFilterLocal(this.value)"
-                            style="font-size:0.78em;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:220px;">
-                            <option value="">All Projects</option>
-                            [% FOREACH proj IN ap_projects %]
-                            <option value="[% proj.project_id %]">
-                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
-                            </option>
+                    [%# Role multi-select — uses actual user profile roles %]
+                    [% IF ap_user_roles && ap_user_roles.size > 1 %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="role-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Role: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:140px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH ur IN ap_user_roles %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="role-cb" value="[% ur %]" checked onchange="applyAllFilters()">
+                                [% ur %]
+                            </label>
                             [% END %]
-                        </select>
-                        [% END %]
+                        </div>
+                    </details>
+                    [% END %]
 
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;margin-left:4px;">Sort:</span>
-                        <button onclick="sortTodos('priority')" id="sort-priority"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
-                        <button onclick="sortTodos('project')" id="sort-project"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
-                        <button onclick="sortTodos('due')" id="sort-due"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due Date</button>
-                    </div>
+                    [%# Site multi-select (CSC only) %]
+                    [% IF is_csc && plan_sitenames && plan_sitenames.size %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH sname IN plan_sitenames %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
+                                [% sname %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
+                    [%# Focus: project single-select %]
+                    [% IF ap_projects && ap_projects.size %]
+                    <select id="ap-project-filter" onchange="applyProjectFilterLocal(this.value)"
+                        style="font-size:0.78em;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:200px;">
+                        <option value="">Focus: All</option>
+                        [% FOREACH proj IN ap_projects %]
+                        <option value="[% proj.project_id %]">
+                            [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                    [% END %]
+
+                    [%# Sort buttons %]
+                    <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;">Sort:</span>
+                    <button onclick="sortTodos('priority')" id="sort-priority"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
+                    <button onclick="sortTodos('project')" id="sort-project"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
+                    <button onclick="sortTodos('due')" id="sort-due"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due</button>
+                    <a href="#planning" onclick="clearAllFilters();return false;"
+                        style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
                 </div>
 
                 [% IF active_priorities && active_priorities.size %]
@@ -659,27 +657,26 @@
                 evt.stopPropagation();
                 location.reload();
             }
-            var _activeRoles  = null;
-            var _activeSite   = '';
             var _activeProject = '';
 
             function applyAllFilters() {
+                var allRoleCbs    = document.querySelectorAll('.role-cb');
+                var checkedRoles  = new Set(Array.from(document.querySelectorAll('.role-cb:checked')).map(function(cb){ return cb.value; }));
+                var allRoleVals   = new Set(Array.from(allRoleCbs).map(function(cb){ return cb.value; }));
+                var allSiteCbs    = document.querySelectorAll('.site-cb');
+                var checkedSites  = new Set(Array.from(document.querySelectorAll('.site-cb:checked')).map(function(cb){ return cb.value; }));
+                var siteFiltered  = allSiteCbs.length > 0 && checkedSites.size < allSiteCbs.length;
+
                 var cards = document.querySelectorAll('#priorities-list > div[id^="ap-row-"]');
                 var visible = 0;
                 cards.forEach(function(card) {
-                    var showRole = true;
-                    if (_activeRoles && _activeRoles.length) {
-                        var cardRoles = (card.dataset.roleCats || 'general').split(',');
-                        if (cardRoles.indexOf('general') !== -1) {
-                            showRole = true;
-                        } else {
-                            showRole = _activeRoles.some(function(r) {
-                                if (r === 'devops') return cardRoles.indexOf('developer') !== -1 || cardRoles.indexOf('admin') !== -1;
-                                return cardRoles.indexOf(r) !== -1;
-                            });
-                        }
-                    }
-                    var showSite = !_activeSite || (card.dataset.site || '') === _activeSite;
+                    var cardRoles = (card.dataset.roleCats || 'general').split(',');
+                    var showRole = cardRoles.some(function(cr) {
+                        if (cr === 'general') return true;
+                        if (!allRoleVals.has(cr)) return true;
+                        return checkedRoles.has(cr);
+                    });
+                    var showSite    = !siteFiltered || checkedSites.has(card.dataset.site || '');
                     var showProject = !_activeProject || String(card.dataset.projectId || '') === String(_activeProject);
                     var show = showRole && showSite && showProject;
                     card.style.display = show ? '' : 'none';
@@ -687,91 +684,50 @@
                 });
                 var countEl = document.getElementById('ap-visible-count');
                 if (countEl) countEl.textContent = visible;
+                _updateDropdownSummaries();
             }
 
-            function initFilters() {
-                var roleBtns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
-                if (roleBtns.length) {
-                    var allRoleNames = Array.from(roleBtns).map(function(b){ return b.dataset.role; });
-                    var stored = sessionStorage.getItem('ap_active_roles');
-                    var roles = null;
-                    if (stored) { try { roles = JSON.parse(stored); } catch(e) { roles = null; } }
-                    if (!roles || !Array.isArray(roles) || !roles.length) { roles = allRoleNames.slice(); }
-                    _activeRoles = roles;
-                    _applyRoleButtonStyles(roleBtns, roles);
+            function _updateDropdownSummaries() {
+                var roleSummary = document.getElementById('role-summary');
+                if (roleSummary) {
+                    var all = document.querySelectorAll('.role-cb');
+                    var checked = document.querySelectorAll('.role-cb:checked');
+                    roleSummary.textContent = (all.length === checked.length)
+                        ? 'Role: All \u25be'
+                        : 'Role: ' + Array.from(checked).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
                 }
-                applyAllFilters();
-            }
-
-            function _applyRoleButtonStyles(btns, activeRoles) {
-                var allActive = true;
-                btns.forEach(function(btn) {
-                    var isActive = activeRoles.indexOf(btn.dataset.role) !== -1;
-                    if (!isActive) allActive = false;
-                    btn.style.background  = isActive ? 'var(--primary-color)' : 'transparent';
-                    btn.style.color       = isActive ? '#fff' : 'var(--text-color)';
-                    btn.style.borderColor = isActive ? 'var(--primary-color)' : 'var(--border-color)';
-                });
-                var allBtn = document.getElementById('role-btn-all');
-                if (allBtn) {
-                    allBtn.style.background  = allActive ? 'var(--primary-color)' : 'transparent';
-                    allBtn.style.color       = allActive ? '#fff' : 'var(--text-color)';
-                    allBtn.style.borderColor = allActive ? 'var(--primary-color)' : 'var(--border-color)';
+                var siteSummary = document.getElementById('site-summary');
+                if (siteSummary) {
+                    var allS = document.querySelectorAll('.site-cb');
+                    var checkedS = document.querySelectorAll('.site-cb:checked');
+                    siteSummary.textContent = (allS.length === checkedS.length)
+                        ? 'Site: All \u25be'
+                        : 'Site: ' + Array.from(checkedS).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
                 }
-            }
-
-            function toggleRole(role) {
-                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
-                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
-                if (!_activeRoles) { _activeRoles = allRoleNames.slice(); }
-                var idx = _activeRoles.indexOf(role);
-                if (idx === -1) {
-                    _activeRoles.push(role);
-                } else {
-                    _activeRoles = (_activeRoles.length === 1) ? allRoleNames.slice() : _activeRoles.filter(function(r){ return r !== role; });
-                }
-                sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
-                _applyRoleButtonStyles(btns, _activeRoles);
-                applyAllFilters();
-            }
-
-            function selectAllRoles() {
-                var btns = document.querySelectorAll('[id^="role-btn-"]:not(#role-btn-all)');
-                var allRoleNames = Array.from(btns).map(function(b){ return b.dataset.role; });
-                _activeRoles = allRoleNames.slice();
-                sessionStorage.setItem('ap_active_roles', JSON.stringify(_activeRoles));
-                _applyRoleButtonStyles(btns, _activeRoles);
-                applyAllFilters();
-            }
-
-            function applySiteFilter(site) {
-                _activeSite = site;
-                var allSiteBtn = document.getElementById('site-btn-all');
-                var siteBtns   = document.querySelectorAll('[id^="site-btn-"]:not(#site-btn-all)');
-                var activeStyle   = 'var(--primary-color)';
-                var inactiveStyle = 'transparent';
-                if (allSiteBtn) {
-                    var isAll = (site === '');
-                    allSiteBtn.style.background  = isAll ? activeStyle : inactiveStyle;
-                    allSiteBtn.style.color       = isAll ? '#fff' : 'var(--text-color)';
-                    allSiteBtn.style.borderColor = isAll ? activeStyle : 'var(--border-color)';
-                }
-                siteBtns.forEach(function(btn) {
-                    var active = btn.dataset.site === site;
-                    btn.style.background  = active ? activeStyle : inactiveStyle;
-                    btn.style.color       = active ? '#fff' : 'var(--text-color)';
-                    btn.style.borderColor = active ? activeStyle : 'var(--border-color)';
-                });
-                applyAllFilters();
             }
 
             function applyProjectFilterLocal(projId) {
                 _activeProject = projId || '';
                 var sel = document.getElementById('ap-project-filter');
-                if (sel) {
-                    sel.style.borderColor = projId ? 'var(--primary-color)' : 'var(--border-color)';
-                }
+                if (sel) { sel.style.borderColor = projId ? 'var(--primary-color)' : 'var(--border-color)'; }
                 applyAllFilters();
+            }
+
+            function clearAllFilters() {
+                document.querySelectorAll('.role-cb,.site-cb').forEach(function(cb){ cb.checked = true; });
+                _activeProject = '';
+                var sel = document.getElementById('ap-project-filter');
+                if (sel) { sel.value = ''; sel.style.borderColor = 'var(--border-color)'; }
+                applyAllFilters();
+            }
+
+            function initFilters() {
+                applyAllFilters();
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.ap-dropdown')) {
+                        document.querySelectorAll('.ap-dropdown[open]').forEach(function(d){ d.removeAttribute('open'); });
+                    }
+                });
             }
 
             document.addEventListener('DOMContentLoaded', initFilters);
