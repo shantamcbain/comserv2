@@ -395,10 +395,20 @@ sub daily :Path('/planning/daily') :Args {
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
         my @ap_role_cats_list = sort keys %ap_role_cats_seen;
+
+        my @ap_all_sitenames;
+        if ($is_csc) {
+            eval {
+                my $site_rows = $c->model('Site')->get_all_sites($c);
+                @ap_all_sitenames = sort map { $_->name } @$site_rows;
+            };
+        }
+
         $c->stash(
-            ap_projects   => \@ap_projects_list,
-            ap_role_cats  => \@ap_role_cats_list,
-            ap_user_roles => $user_roles,
+            ap_projects      => \@ap_projects_list,
+            ap_role_cats     => \@ap_role_cats_list,
+            ap_user_roles    => $user_roles,
+            ap_all_sitenames => \@ap_all_sitenames,
         );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',

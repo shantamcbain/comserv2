@@ -421,12 +421,12 @@
                     </details>
                     [% END %]
 
-                    [%# Site multi-select (CSC only) %]
-                    [% IF is_csc && plan_sitenames && plan_sitenames.size %]
+                    [%# Site multi-select (CSC only) — all sites from site table %]
+                    [% IF is_csc && ap_all_sitenames && ap_all_sitenames.size %]
                     <details class="ap-dropdown" style="position:relative;display:inline-block;">
                         <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
                         <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
-                            [% FOREACH sname IN plan_sitenames %]
+                            [% FOREACH sname IN ap_all_sitenames %]
                             <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
                                 <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
                                 [% sname %]
