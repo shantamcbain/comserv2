@@ -652,13 +652,13 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
-            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--primary-color,#0077cc);background:var(--secondary-bg,#f0f7ff);border-radius:4px;margin-bottom:3px;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
-            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
-            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
-            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -886,9 +886,9 @@
         (function initTextareaGrow() {
             const ta = document.getElementById('message-input');
             if (!ta) return;
+            const max = 200;
             ta.addEventListener('input', function() {
                 this.style.height = 'auto';
-                const max = 140;
                 this.style.height = Math.min(this.scrollHeight, max) + 'px';
                 this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
             });
@@ -2943,11 +2943,91 @@
         if (!file) return;
 
         var sizeMB = (file.size / 1048576).toFixed(1);
-        if (statusEl) { statusEl.textContent = '⏳ Transcribing ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
+        if (statusEl) { statusEl.textContent = '⏳ Uploading ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
         if (sendBtn) sendBtn.disabled = true;
 
         var formData = new FormData();
         formData.append('audio', file, file.name || 'recording.webm');
+        formData.append('diarize', '1');
+        formData.append('num_speakers', '2');
+
+        function _handleTranscriptResult(data) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (!data.success) {
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            var transcript = (data.transcript || '').trim();
+            if (!transcript) {
+                if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
+                return;
+            }
+            if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
+            if (data.transcript_file_id) { state.lastTranscriptFileId = data.transcript_file_id; }
+            if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
+
+            var displayText = transcript;
+            if (data.diarized && data.segments && data.segments.length) {
+                var lines = [];
+                var lastSpeaker = null;
+                data.segments.forEach(function(seg) {
+                    var spk = seg.speaker || 'SPEAKER_0';
+                    var label = spk === 'SPEAKER_0' ? 'Instructor' : spk === 'SPEAKER_1' ? 'Student' : spk;
+                    var mins = Math.floor((seg.start || 0) / 60);
+                    var secs = Math.round((seg.start || 0) % 60);
+                    var ts = '[' + mins + ':' + (secs < 10 ? '0' : '') + secs + ']';
+                    if (spk !== lastSpeaker) {
+                        lines.push('\n' + label + ' ' + ts + ': ' + (seg.text || '').trim());
+                        lastSpeaker = spk;
+                    } else {
+                        lines.push((seg.text || '').trim());
+                    }
+                });
+                displayText = lines.join(' ').trim();
+            }
+
+            if (inputEl) {
+                inputEl.value = displayText;
+                inputEl.style.height = 'auto';
+                inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
+                inputEl.style.overflowY = inputEl.scrollHeight > 200 ? 'auto' : 'hidden';
+                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                inputEl.focus();
+            }
+            var diarizedNote = data.diarized ? ' (speakers separated)' : '';
+            if (statusEl) {
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
+            }
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+        }
+
+        function _pollTranscribeStatus(jobId, attempt) {
+            attempt = attempt || 0;
+            if (attempt > 120) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
+                return;
+            }
+            var elapsed = Math.round(attempt * 5);
+            if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
+            setTimeout(function() {
+                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'processing') {
+                        _pollTranscribeStatus(jobId, attempt + 1);
+                    } else {
+                        _handleTranscriptResult(data);
+                    }
+                })
+                .catch(function() {
+                    _pollTranscribeStatus(jobId, attempt + 1);
+                });
+            }, 5000);
+        }
 
         fetch('/ai/transcribe', {
             method: 'POST',
@@ -2963,31 +3043,150 @@
             });
         })
         .then(function(data) {
-            if (sendBtn) sendBtn.disabled = false;
             if (!data.success) {
+                if (sendBtn) sendBtn.disabled = false;
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
                 return;
             }
-            var transcript = (data.transcript || '').trim();
-            if (!transcript) {
-                if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
-                return;
+            if (data.job_id) {
+                if (statusEl) { statusEl.textContent = '⏳ Transcription started (job ' + data.job_id + ') — checking progress…'; }
+                _pollTranscribeStatus(data.job_id, 1);
+            } else {
+                _handleTranscriptResult(data);
             }
-            if (inputEl) {
-                inputEl.value = transcript;
-                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
-                inputEl.focus();
-            }
-            if (statusEl) {
-                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + ') — review and press Send';
-                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 8000);
-            }
-            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + ')', 'system-message');
         })
         .catch(function(err) {
             if (sendBtn) sendBtn.disabled = false;
-            if (statusEl) { statusEl.textContent = '⚠️ Transcription request failed: ' + err.message; }
+            if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
         });
+    }
+
+    function _makeWizardForm(fields, onConfirm) {
+        var form = document.createElement('form');
+        form.onsubmit = function(e) { e.preventDefault(); onConfirm(form); };
+        fields.forEach(function(f) {
+            var row = document.createElement('div');
+            row.style.cssText = 'margin:4px 0;display:flex;gap:6px;align-items:center;';
+            var label = document.createElement('label');
+            label.textContent = f.label;
+            label.style.cssText = 'width:160px;font-size:12px;color:var(--text-color,#555);flex-shrink:0;';
+            var input = document.createElement('input');
+            input.name = f.name;
+            input.value = f.value !== undefined ? f.value : '';
+            input.type = f.type || 'text';
+            input.style.cssText = 'flex:1;padding:4px 6px;border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:13px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+            if (f.required) input.required = true;
+            row.appendChild(label);
+            row.appendChild(input);
+            form.appendChild(row);
+        });
+        return form;
+    }
+
+    function _postWizardAction(actionName, params, msgEl) {
+        msgEl.textContent = '⏳ Saving…';
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionName, params: params })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
+                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:#0077cc;font-weight:bold;">View →</a>' : '');
+            } else {
+                msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
+            }
+        })
+        .catch(function(e) { msgEl.textContent = '⚠️ Request failed: ' + e.message; });
+    }
+
+    function _openSimpleWizard(title, fields, actionName, extraParams) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        var id = 'ai-' + actionName + '-wizard';
+        var existing = document.getElementById(id);
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.id = id;
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.style.cssText = 'margin:8px 0;';
+
+        var card = document.createElement('div');
+        card.className = 'message system-message';
+        card.style.cssText = 'background:var(--table-header-bg,#f9f9f9);border:1px solid var(--border-color,#ddd);border-radius:8px;padding:12px;max-width:520px;color:var(--text-color,#222);';
+
+        var heading = document.createElement('div');
+        heading.textContent = title;
+        heading.style.cssText = 'font-weight:bold;font-size:14px;margin-bottom:8px;';
+        card.appendChild(heading);
+
+        var msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+
+        var form = _makeWizardForm(fields, function(f) {
+            var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
+            fields.forEach(function(fd) {
+                var inp = f.elements[fd.name];
+                if (inp) params[fd.name] = inp.value;
+            });
+            _postWizardAction(actionName, params, msgEl);
+        });
+        card.appendChild(form);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;';
+        var saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.type = 'submit';
+        saveBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
+        saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
+        cancelBtn.onclick = function() { wrapper.remove(); };
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(cancelBtn);
+        card.appendChild(btnRow);
+        card.appendChild(msgEl);
+        wrapper.appendChild(card);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function openYardWizard(prefill) {
+        _openSimpleWizard('🏡 Create Yard', [
+            { name: 'yard_name',       label: 'Yard Name *',      value: prefill.yard_name  || '', required: true },
+            { name: 'yard_code',       label: 'Yard Code *',      value: prefill.yard_code  || '', required: true },
+            { name: 'yard_size',       label: 'Capacity (hives)', value: prefill.yard_size  || 10, type: 'number' },
+            { name: 'total_yard_size', label: 'Total Size (hives)',value: prefill.total_yard_size || 10, type: 'number' },
+            { name: 'notes',           label: 'Notes',            value: prefill.notes      || '' },
+        ], 'create_yard', {});
+    }
+
+    function openHiveWizard(prefill) {
+        _openSimpleWizard('🐝 Register Hive', [
+            { name: 'hive_number', label: 'Hive Number *', value: prefill.hive_number || '', required: true },
+            { name: 'yard_id',     label: 'Yard ID *',     value: prefill.yard_id    || '', required: true, type: 'number' },
+            { name: 'queen_code',  label: 'Queen Code',    value: prefill.queen_code || '' },
+            { name: 'notes',       label: 'Notes',         value: prefill.notes      || '' },
+        ], 'create_hive', {});
+    }
+
+    function openQueenWizard(prefill) {
+        _openSimpleWizard('👑 Record Queen', [
+            { name: 'tag_number',    label: 'Tag / Number',   value: prefill.tag_number    || '' },
+            { name: 'color_marking', label: 'Colour Marking', value: prefill.color_marking || '' },
+            { name: 'birth_date',    label: 'Birth Date',     value: prefill.birth_date    || '', type: 'date' },
+            { name: 'breed',         label: 'Breed',          value: prefill.breed         || 'unknown' },
+            { name: 'mating_status', label: 'Mating Status',  value: prefill.mating_status || 'mated' },
+            { name: 'health_status', label: 'Health Status',  value: prefill.health_status || 'healthy' },
+            { name: 'notes',         label: 'Notes',          value: prefill.notes         || '' },
+        ], 'create_queen', { hive_id: prefill.hive_id || undefined });
     }
 
     // ── openInspectionWizard ───────────────────────────────────────────────────
@@ -3035,21 +3234,25 @@
             return '<option value="' + v + '"' + sel + '>' + v + '</option>';
         }).join('');
 
+        var inpStyle = 'width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var selStyle = 'width:100%;padding:3px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var lblStyle = 'font-weight:600;display:block;font-size:0.85em;color:var(--text-color,#333);';
+
         box.innerHTML =
-            '<strong style="font-size:1.05em">🐝 Review Hive Inspection</strong>' +
-            '<p style="margin:4px 0 8px;color:#666;font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
+            '<strong style="font-size:1.05em;color:var(--text-color,#222)">🐝 Review Hive Inspection</strong>' +
+            '<p style="margin:4px 0 8px;color:var(--text-color,#555);font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
             '<form id="ai-insp-form" style="display:flex;flex-direction:column;gap:5px;">' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Population</label><select name="population_estimate" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + popOpts + '</select></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Temperament</label><select name="temperament" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + tempOpts + '</select></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Overall Status</label><select name="overall_status" style="width:100%;padding:3px;border:1px solid #ccc;border-radius:3px;">' + statusOpts + '</select></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="' + lblStyle + '">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Population</label><select name="population_estimate" style="' + selStyle + '">' + popOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Temperament</label><select name="temperament" style="' + selStyle + '">' + tempOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Overall Status</label><select name="overall_status" style="' + selStyle + '">' + statusOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="' + inpStyle + '"></div>' +
                 '</div>' +
-                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;">' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;color:var(--text-color,#333);">' +
                     '<label><input type="checkbox" name="queen_seen" ' + qs_yes + '> Queen seen</label>' +
                     '<label><input type="checkbox" name="queen_marked" ' + qm_yes + '> Queen marked</label>' +
                     '<label><input type="checkbox" name="eggs_seen" ' + eg_yes + '> Eggs</label>' +
@@ -3058,18 +3261,18 @@
                     '<label><input type="checkbox" name="feeding_done" ' + fd_yes + '> Feeding done</label>' +
                 '</div>' +
                 '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                    '<div><label style="font-weight:600;display:block;font-size:0.85em">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
+                    '<div><label style="' + lblStyle + '">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="' + inpStyle + '"></div>' +
                 '</div>' +
-                '<div><label style="font-weight:600;display:block;font-size:0.85em">General notes</label><textarea name="general_notes" rows="3" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
-                '<div><label style="font-weight:600;display:block;font-size:0.85em">Action required</label><textarea name="action_required" rows="2" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
-                '<div><label style="font-weight:600;display:block;font-size:0.85em">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                '<div><label style="font-weight:600;display:block;font-size:0.85em">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid #ccc;border-radius:3px;"></div>' +
-                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:#555;"></div>' +
+                '<div><label style="' + lblStyle + '">General notes</label><textarea name="general_notes" rows="3" style="' + inpStyle + 'resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Action required</label><textarea name="action_required" rows="2" style="' + inpStyle + 'resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="' + inpStyle + '"></div>' +
+                '<div><label style="' + lblStyle + '">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="' + inpStyle + '"></div>' +
+                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:var(--text-color,#555);"></div>' +
                 '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
-                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.88em;background:#fff">Cancel</button>' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#0077cc);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
+                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
                 '</div>' +
             '</form>';
 
@@ -3155,8 +3358,8 @@
                     }).join('') +
                 '</div>' +
                 '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
-                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;background:#fff">Cancel</button>' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
+                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
                 '</div>' +
             '</form>';
 
@@ -3225,7 +3428,22 @@
                 return;
             }
             if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
-                openInspectionWizard(result.wizard_prefill || actionObj.params || {});
+                var prefill = result.wizard_prefill || actionObj.params || {};
+                if (state.lastAudioFileId)      { prefill.audio_file_id      = state.lastAudioFileId; }
+                if (state.lastTranscriptFileId) { prefill.transcript_file_id = state.lastTranscriptFileId; }
+                openInspectionWizard(prefill);
+                return;
+            }
+            if (result.action === 'open_yard_wizard') {
+                openYardWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_hive_wizard') {
+                openHiveWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_queen_wizard') {
+                openQueenWizard(result.wizard_prefill || {});
                 return;
             }
             const wrapper = document.createElement('div');
@@ -3645,8 +3863,8 @@
                 border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
                 color: var(--text-color); transition: background 0.15s;
             }
-            .wh-item:hover { background: var(--secondary-color); }
-            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-item:hover { background: var(--table-header-bg); }
+            .wh-item.active { background: var(--table-header-bg); border-left: 3px solid var(--link-color); }
             .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
             .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
