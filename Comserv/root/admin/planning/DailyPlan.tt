@@ -287,15 +287,15 @@
                     [% SET audit_rank = 0 %]
                     [% FOREACH at IN audit_todos %]
                     [% SET audit_rank = audit_rank + 1 %]
-                    <div id="ap-row-[% at.record_id %]" style="display:grid;grid-template-columns:28px 1fr auto;align-items:start;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:6px;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
+                    <div id="ap-row-[% at.record_id %]" style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
 
-                        [%# Rank badge — grid col 1 %]
-                        <span style="width:26px;height:26px;border-radius:50%;background:#c45d00;color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">
-                            [% IF at.is_root %]⚠[% ELSE %]↳[% END %]
+                        [%# Rank badge — col 1 %]
+                        <span style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                            <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
                         </span>
 
-                        [%# Main content — grid col 2 %]
-                        <div style="min-width:0;overflow:hidden;">
+                        [%# Main content — col 2 %]
+                        <div style="display:table-cell;vertical-align:top;">
                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                                 [%# Priority badge %]
                                 [% IF at.priority %]
@@ -342,17 +342,17 @@
                             </div>
                         </div>
 
-                        [%# Quick actions — grid col 3 %]
-                        <div style="display:flex;flex-direction:column;gap:4px;padding-top:2px;">
+                        [%# Quick actions — col 3 %]
+                        <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
                             <a href="/todo/details?record_id=[% at.record_id %]"
-                               style="font-size:0.75em;color:var(--primary-color);text-decoration:none;white-space:nowrap;">View →</a>
+                               style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                             <a href="/log/log_form?todo_record_id=[% at.record_id %]"
-                               style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add a time log for this todo">📋 Log</a>
+                               style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
                             [% IF is_admin %]
                             <button onclick="quickClose([% at.record_id %])"
-                                style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done and clear from audit">✓ Done</button>
+                                style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
                             [% END %]
-                        </div>
+                        </span>
                     </div>
                     [% END %]
                     [% ELSE %]
@@ -476,15 +476,15 @@
                     data-due="[% ap.due_date || '9999-12-31' %]"
                     data-site="[% ap.sitename || '' %]"
                     data-role-cats="[% ap.role_cats || 'general' %]"
-                    style="display:grid;grid-template-columns:28px 1fr auto;align-items:start;gap:10px;padding:10px 12px;margin-bottom:6px;border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
-                    [%# Rank badge — grid col 1 %]
-                    <span class="rank-badge" style="width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">
-                        [% rank %]
+                    [%# Rank badge — col 1 %]
+                    <span class="rank-badge" style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                        <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.73em;font-weight:bold;">[% rank %]</span>
                     </span>
 
-                    [%# Main content — grid col 2 %]
-                    <div style="min-width:0;overflow:hidden;">
+                    [%# Main content — col 2 %]
+                    <div style="display:table-cell;vertical-align:top;">
                         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                             [%# Priority badge %]
                             [% IF ap.priority %]
@@ -546,17 +546,17 @@
                         </div>
                     </div>
 
-                    [%# Quick actions — grid col 3 %]
-                    <div style="display:flex;flex-direction:column;gap:4px;padding-top:2px;">
+                    [%# Quick actions — col 3 %]
+                    <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
                         <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;white-space:nowrap;">View →</a>
+                           style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                         <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                           style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add a time log for this todo">📋 Log</a>
+                           style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
                         [% IF is_admin %]
                         <button onclick="quickClose([% ap.record_id %])"
-                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done and create log">✓ Done</button>
+                            style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
                         [% END %]
-                    </div>
+                    </span>
                 </div>
                 [% END %]
                 </div>[%# end #priorities-list %]
