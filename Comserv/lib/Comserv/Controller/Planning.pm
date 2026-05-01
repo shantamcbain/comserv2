@@ -236,7 +236,9 @@ sub daily :Path('/planning/daily') :Args {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch orphan plans: $@") if $@;
 
-    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_site    = $c->req->param('filter_site')    || '';
+    my $filter_project = $c->req->param('filter_project') || '';
+
     if ($is_csc && $filter_site) {
         @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
@@ -262,8 +264,12 @@ sub daily :Path('/planning/daily') :Args {
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
-        $ap_cond{sitename} = $sitename unless $is_csc;
-        $ap_cond{user_id}  = $user_id  unless $can_see_all;
+        if ($is_csc && $filter_site) {
+            $ap_cond{sitename} = $filter_site;
+        } elsif (!$is_csc) {
+            $ap_cond{sitename} = $sitename;
+        }
+        $ap_cond{user_id} = $user_id unless $can_see_all;
 
         my %cross_blocker_projects;
         my %cross_blocker_names;
@@ -304,13 +310,14 @@ sub daily :Path('/planning/daily') :Args {
                     { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
-                rows => 60,
+                rows => 100,
             }
         )->all;
 
-        my %row_by_id  = map { $_->record_id => $_ } @rows;
+        my %row_by_id       = map { $_->record_id => $_ } @rows;
         my %proj_cache;
-        my $now_epoch  = time();
+        my %ap_projects_seen;
+        my $now_epoch       = time();
 
         my @scored;
         for my $todo (@rows) {
@@ -358,15 +365,30 @@ sub daily :Path('/planning/daily') :Args {
                     $proj_cache{$h{project_id}} = $p ? $p->name : '';
                 }
                 $h{project_name} = $proj_cache{$h{project_id}};
+                $ap_projects_seen{$h{project_id}} //= {
+                    project_id   => $h{project_id},
+                    project_name => $proj_cache{$h{project_id}} || $h{project_code} || "Project #$h{project_id}",
+                    project_code => $h{project_code} || '',
+                    sitename     => $h{sitename}     || '',
+                };
             }
 
             push @scored, \%h;
         }
 
-        @active_priorities = (sort {
+        my @all_sorted = sort {
             $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority}
-        } @scored)[0..24];
-        @active_priorities = grep { defined } @active_priorities;
+        } @scored;
+
+        if ($filter_project) {
+            @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
+        }
+
+        @active_priorities = grep { defined } @all_sorted[0..24];
+
+        my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
+                               values %ap_projects_seen;
+        $c->stash(ap_projects => \@ap_projects_list);
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch active priorities: $@") if $@;
@@ -464,6 +486,7 @@ sub daily :Path('/planning/daily') :Args {
         orphan_plans      => \@orphan_plans,
         plan_sitenames    => \@plan_sitenames,
         filter_site       => $filter_site,
+        filter_project    => $filter_project,
         all_plans         => \@all_plans,
         is_admin          => $c->stash->{is_admin},
 
