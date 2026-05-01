@@ -271,14 +271,16 @@
             </details>
 
             [%# ── Audit Todos (always visible, collapsible) ── %]
-            <details style="margin-bottom:8px;">
+            <details id="audit-panel" style="margin-bottom:8px;" open>
                 <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#c45d00 10%,var(--bg-color));border:1px solid #c45d00;list-style:none;display:flex;align-items:center;gap:8px;">
                     <span style="font-weight:bold;color:#c45d00;">🚨 Application Error Audit</span>
                     [% IF audit_todos && audit_todos.size %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] todo(s) from today's system log scan</span>
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] item(s)</span>
                     [% ELSE %]
-                    <span style="font-size:0.85em;color:var(--text-muted-color);">no errors found — click Start Day to run audit</span>
+                    <span id="audit-status-msg" style="font-size:0.85em;color:var(--text-muted-color);">no unresolved errors</span>
                     [% END %]
+                    <button id="btn-refresh-audit" onclick="refreshAudit(event)"
+                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #c45d00;border-radius:3px;background:transparent;color:#c45d00;cursor:pointer;" title="Re-scan system log for new errors">↻ Refresh</button>
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
                     [% IF audit_todos && audit_todos.size %]
@@ -363,7 +365,7 @@
             </details>
 
             [%# ── Open HelpDesk Tickets (always visible, collapsible) ── %]
-            <details style="margin-bottom:12px;">
+            <details id="helpdesk-panel" style="margin-bottom:12px;" open>
                 <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#9b0000 10%,var(--bg-color));border:1px solid #9b0000;list-style:none;display:flex;align-items:center;gap:8px;">
                     <span style="font-weight:bold;color:#9b0000;">🎫 Open HelpDesk Tickets</span>
                     [% IF helpdesk_tickets && helpdesk_tickets.size %]
@@ -371,6 +373,8 @@
                     [% ELSE %]
                     <span style="font-size:0.85em;color:var(--text-muted-color);">none open</span>
                     [% END %]
+                    <button onclick="refreshPage(event)"
+                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #9b0000;border-radius:3px;background:transparent;color:#9b0000;cursor:pointer;" title="Re-check open HelpDesk tickets">↻ Refresh</button>
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #9b0000;border-top:none;border-radius:0 0 4px 4px;">
                     [% IF helpdesk_tickets && helpdesk_tickets.size %]
@@ -552,6 +556,38 @@
                     if (d.ok) { alert('Triaged ' + d.count + ' stale todos. Reloading…'); location.reload(); }
                     else { alert('Error: ' + (d.error || 'unknown')); }
                 }).catch(function(e){ alert('Error: ' + e); });
+            }
+            function refreshAudit(evt) {
+                evt.stopPropagation();
+                var btn = document.getElementById('btn-refresh-audit');
+                if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+                var msg = document.getElementById('audit-status-msg');
+                fetch('/planning/refresh_audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.success) {
+                        var text = d.message || 'Scan complete';
+                        if (d.created_count > 0) {
+                            alert(text + '. Reloading page to show new todos…');
+                            location.reload();
+                        } else {
+                            if (msg) msg.textContent = text;
+                            if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+                        }
+                    } else {
+                        if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+                        alert('Refresh failed: ' + (d.error || 'unknown error'));
+                    }
+                }).catch(function(e){
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+                    alert('Error: ' + e);
+                });
+            }
+            function refreshPage(evt) {
+                evt.stopPropagation();
+                location.reload();
             }
             </script>
 
