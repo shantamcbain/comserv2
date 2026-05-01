@@ -1281,8 +1281,30 @@ sub generate :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
-                $self->_flush_progress($gen_progress_file, \@trace, 1);
-                die "Ollama query failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'generate', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = (@$history_items || $system)
+                        ? $ollama->chat(messages => \@ollama_msgs)
+                        : $ollama->query(prompt => $ollama_msgs[-1]->{content});
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        $self->_flush_progress($gen_progress_file, \@trace, 1);
+                        die "Ollama query failed: $retry_err";
+                    }
+                } else {
+                    $self->_flush_progress($gen_progress_file, \@trace, 1);
+                    die "Ollama query failed: $error";
+                }
             }
 
             # Normalise response text (chat vs generate API have different keys)
@@ -2546,7 +2568,26 @@ sub chat :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
-                die "Ollama chat failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @chat_trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'chat', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = $ollama->chat(messages => \@ollama_messages);
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @chat_trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        die "Ollama chat failed: $retry_err";
+                    }
+                } else {
+                    die "Ollama chat failed: $error";
+                }
             }
 
             if ($response->{message} && $response->{message}->{content}) {
@@ -4767,6 +4808,9 @@ Supported actions:
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Record a hive inspection (BMaster/Apiary — use real hive_id from live data):
+    [ACTION: {"action": "create_inspection", "params": {"hive_id": N, "inspection_date": "YYYY-MM-DD", "overall_status": "good", "queen_seen": true, "eggs_seen": true, "population_estimate": "strong", "temperament": "calm", "general_notes": "narrative text", "box_details": []}}]
+  (The widget will show the user a review form pre-filled with these values before saving.)
 - Create an ENCY constituent (editor/admin on ENCY pages):
     [ACTION: {"action": "create_constituent", "params": {"name": "Constituent Name", "common_name": "optional", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional"}}]
   (If the constituent already exists, returns its existing ID and link. If the entry is a stub, a review todo is auto-created.)
@@ -7836,6 +7880,391 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_yard ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_yard') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my %prefill = (
+            yard_code      => $params->{yard_code}      || '',
+            yard_name      => $params->{yard_name}      || '',
+            yard_size      => $params->{yard_size}      || 10,
+            total_yard_size=> $params->{total_yard_size}|| 10,
+            notes          => $params->{notes}          || '',
+            sitename       => $c->session->{SiteName}   || 'BMaster',
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_yard_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the yard details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{yard_code} && $prefill{yard_name}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'yard_code and yard_name are required' }));
+            return;
+        }
+
+        my $yard_row;
+        eval {
+            $yard_row = $schema->resultset('Yard')->create({
+                %prefill,
+                current          => 0,
+                status           => 'active',
+                date_time_posted => DateTime->now->stringify,
+                comments         => $params->{comments} || '',
+                image            => '',
+            });
+        };
+        if ($@ || !$yard_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create yard: $@" }));
+            return;
+        }
+        my $yard_id = $yard_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_yard: id=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            yard_id  => $yard_id + 0,
+            url      => "/Apiary/yards/view/$yard_id",
+            message  => "Yard '$prefill{yard_name}' created (id=$yard_id). Now you can add hives to it.",
+        }));
+        return;
+    }
+
+    # ── create_hive ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_hive') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $yard_id = $params->{yard_id};
+        unless ($yard_id) {
+            my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+            unless (@yards) {
+                $c->response->body(encode_json({
+                    success => JSON::true,
+                    action  => 'open_yard_wizard',
+                    wizard_prefill => { yard_name => $params->{yard_name} || '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                    message => 'No yards exist yet. Please create a yard first.',
+                }));
+                return;
+            }
+            if (@yards == 1) {
+                $yard_id = $yards[0]->id;
+            } else {
+                $c->response->body(encode_json({
+                    success       => JSON::true,
+                    action        => 'open_hive_wizard',
+                    wizard_prefill => {
+                        hive_number => $params->{hive_number} || '',
+                        yards       => [map { { id => $_->id, name => $_->yard_name, code => $_->yard_code } } @yards],
+                    },
+                    message => 'Multiple yards found — please select which yard this hive belongs to.',
+                }));
+                return;
+            }
+        }
+
+        my %prefill = (
+            hive_number => $params->{hive_number} || '',
+            yard_id     => $yard_id + 0,
+            queen_code  => $params->{queen_code}  || '',
+            pallet_code => $params->{pallet_code} || '',
+            status      => 'active',
+            sitename    => $sitename,
+            notes       => $params->{notes}       || '',
+            created_by  => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_hive_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the hive details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{hive_number}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'hive_number is required' }));
+            return;
+        }
+
+        my $hive_row;
+        eval { $hive_row = $schema->resultset('Hive')->create(\%prefill) };
+        if ($@ || !$hive_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create hive: $@" }));
+            return;
+        }
+        my $hive_id = $hive_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_hive: id=$hive_id hive_number=$prefill{hive_number} yard=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            hive_id    => $hive_id + 0,
+            hive_number=> $prefill{hive_number},
+            url        => "/Apiary/hives/view/$hive_id",
+            message    => "Hive $prefill{hive_number} created (id=$hive_id). You can now record an inspection.",
+        }));
+        return;
+    }
+
+    # ── create_queen ──────────────────────────────────────────────────────────
+    if ($action_name eq 'create_queen') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+        my $today = DateTime->now->ymd;
+
+        my %prefill = (
+            tag_number       => $params->{tag_number}       || '',
+            color_marking    => $params->{color_marking}    || '',
+            birth_date       => $params->{birth_date}       || $today,
+            breed            => $params->{breed}            || 'unknown',
+            origin           => $params->{origin}           || 'local',
+            mating_status    => $params->{mating_status}    || 'mated',
+            introduction_date=> $params->{introduction_date}|| $today,
+            removal_date     => $params->{removal_date}     || '9999-12-31',
+            performance_rating => ($params->{performance_rating} || 0) + 0,
+            health_status    => $params->{health_status}    || 'healthy',
+            laying_status    => $params->{laying_status}    || 'laying_well',
+            temperament_rating => $params->{temperament_rating} || 'calm',
+            status           => 'active',
+            purpose          => $params->{purpose}          || 'production',
+            sitename         => $sitename,
+            notes            => $params->{notes}            || '',
+            created_by       => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_queen_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the queen details before saving.',
+            }));
+            return;
+        }
+
+        my $queen_row;
+        eval { $queen_row = $schema->resultset('Queen')->create(\%prefill) };
+        if ($@ || !$queen_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create queen: $@" }));
+            return;
+        }
+        my $queen_id = $queen_row->id;
+
+        if ($params->{hive_id}) {
+            eval {
+                $schema->resultset('QueenHiveAssignment')->create({
+                    queen_id   => $queen_id,
+                    hive_id    => $params->{hive_id} + 0,
+                    start_date => $today,
+                    status     => 'active',
+                    notes      => "Assigned by AI from voice inspection",
+                });
+            };
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_queen: id=$queen_id tag=$prefill{tag_number} by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            queen_id => $queen_id + 0,
+            url      => "/Apiary/queens/view/$queen_id",
+            message  => "Queen recorded (id=$queen_id, tag=$prefill{tag_number}).",
+        }));
+        return;
+    }
+
+    # ── create_inspection ─────────────────────────────────────────────────────
+    if ($action_name eq 'create_inspection') {
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $hive_id = $params->{hive_id};
+        unless ($hive_id) {
+            my $hive_number = $params->{hive_number} || '';
+            if ($hive_number) {
+                my $hive_row = $schema->resultset('Hive')->search(
+                    { hive_number => $hive_number, sitename => $sitename },
+                    { rows => 1 }
+                )->first;
+                if ($hive_row) {
+                    $hive_id = $hive_row->id;
+                } else {
+                    my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+                    unless (@yards) {
+                        $c->response->body(encode_json({
+                            success => JSON::true,
+                            action  => 'open_yard_wizard',
+                            wizard_prefill => { yard_name => '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                            message => "Hive $hive_number not found and no yards exist. Please create a yard first, then the hive.",
+                            next_action => 'create_hive',
+                            next_params => { hive_number => $hive_number },
+                        }));
+                        return;
+                    }
+                    $c->response->body(encode_json({
+                        success        => JSON::true,
+                        action         => 'open_hive_wizard',
+                        wizard_prefill => {
+                            hive_number => $hive_number,
+                            yard_id     => @yards == 1 ? $yards[0]->id + 0 : undef,
+                            yards       => [map { { id => $_->id + 0, name => $_->yard_name, code => $_->yard_code } } @yards],
+                        },
+                        message => "Hive $hive_number not found in the system. Please fill in the details to register it first.",
+                        next_action => 'create_inspection',
+                        next_params => $params,
+                    }));
+                    return;
+                }
+            } else {
+                $c->response->status(400);
+                $c->response->body(encode_json({ success => JSON::false, error => 'hive_id or hive_number required' }));
+                return;
+            }
+        };
+
+        my %POPULATION_MAP = (
+            'very strong' => 'very_strong', 'very_strong' => 'very_strong',
+            'strong'      => 'strong',      'good'        => 'strong',
+            'moderate'    => 'moderate',    'medium'      => 'moderate', 'average' => 'moderate',
+            'weak'        => 'weak',        'low'         => 'weak',
+            'very weak'   => 'very_weak',   'very_weak'   => 'very_weak', 'poor'   => 'very_weak',
+        );
+        my %TEMPERAMENT_MAP = (
+            'calm'           => 'calm',           'gentle'    => 'calm',     'docile'  => 'calm',
+            'moderate'       => 'moderate',       'normal'    => 'moderate',
+            'aggressive'     => 'aggressive',     'defensive' => 'aggressive',
+            'very aggressive'=> 'very_aggressive','very_aggressive' => 'very_aggressive', 'hot' => 'very_aggressive',
+        );
+        my %STATUS_MAP = (
+            'excellent' => 'excellent', 'great' => 'excellent',
+            'good'      => 'good',
+            'fair'      => 'fair',      'ok'    => 'fair',  'okay' => 'fair',
+            'poor'      => 'poor',
+            'critical'  => 'critical',  'bad'   => 'critical',
+        );
+        my %WEATHER_MAP = (
+            'sunny'    => 'sunny',   'clear'    => 'sunny',
+            'cloudy'   => 'cloudy',  'overcast' => 'cloudy',
+            'rainy'    => 'rainy',   'rain'     => 'rainy',   'wet' => 'rainy',
+            'windy'    => 'windy',   'breezy'   => 'windy',
+            'warm'     => 'warm',    'hot'      => 'warm',
+            'cold'     => 'cold',    'cool'     => 'cold',
+            'foggy'    => 'foggy',
+        );
+
+        my $normalise = sub {
+            my ($val, $map_ref) = @_;
+            return undef unless defined $val && $val ne '';
+            my $lc = lc($val);
+            return $map_ref->{$lc} || $map_ref->{$val} || $val;
+        };
+
+        my $inspection_date = $params->{inspection_date} || $today;
+        $inspection_date = $today unless $inspection_date =~ /^\d{4}-\d{2}-\d{2}$/;
+
+        my %insp = (
+            hive_id             => $hive_id + 0,
+            inspection_date     => $inspection_date,
+            inspector           => $params->{inspector} || $current_user,
+            inspection_type     => $params->{inspection_type} || 'routine',
+            overall_status      => $normalise->($params->{overall_status}, \%STATUS_MAP) || 'good',
+            queen_seen          => ($params->{queen_seen}  ? 1 : 0),
+            queen_marked        => ($params->{queen_marked}? 1 : 0),
+            eggs_seen           => ($params->{eggs_seen}   ? 1 : 0),
+            larvae_seen         => ($params->{larvae_seen} ? 1 : 0),
+            capped_brood_seen   => ($params->{capped_brood_seen} ? 1 : 0),
+            supersedure_cells   => ($params->{supersedure_cells}  || 0) + 0,
+            swarm_cells         => ($params->{swarm_cells}         || 0) + 0,
+            queen_cells         => ($params->{queen_cells}         || 0) + 0,
+            temperament         => $normalise->($params->{temperament}, \%TEMPERAMENT_MAP) || 'calm',
+            general_notes       => $params->{general_notes}   || '',
+            action_required     => $params->{action_required} || '',
+            feeding_done        => ($params->{feeding_done}   ? 1 : 0),
+            feed_type           => $params->{feed_type}    || undef,
+            feed_amount         => $params->{feed_amount}  || undef,
+        );
+
+        if (defined $params->{population_estimate} && $params->{population_estimate} ne '') {
+            $insp{population_estimate} = $normalise->($params->{population_estimate}, \%POPULATION_MAP);
+        }
+        if (defined $params->{weather_conditions} && $params->{weather_conditions} ne '') {
+            $insp{weather_conditions} = $normalise->($params->{weather_conditions}, \%WEATHER_MAP) // $params->{weather_conditions};
+        }
+        if (defined $params->{temperature} && $params->{temperature} =~ /^-?\d/) {
+            ($insp{temperature} = $params->{temperature}) =~ s/[^\d.\-]//g;
+        }
+        if (defined $params->{next_inspection_date} && $params->{next_inspection_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $insp{next_inspection_date} = $params->{next_inspection_date};
+        }
+        if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
+        if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
+
+        my $inspection_row;
+        eval { $inspection_row = $schema->resultset('Inspection')->create(\%insp) };
+        if ($@ || !$inspection_row) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'action', "create_inspection failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Inspection creation failed: $@" }));
+            return;
+        }
+
+        my $inspection_id = $inspection_row->id;
+
+        my @detail_rows_created;
+        my $box_details = $params->{box_details} || [];
+        if (ref($box_details) eq 'ARRAY') {
+            for my $bd (@$box_details) {
+                next unless ref($bd) eq 'HASH';
+                my %detail = (
+                    inspection_id   => $inspection_id,
+                    detail_type     => $bd->{detail_type}   || 'box_summary',
+                    bees_coverage   => $bd->{bees_coverage} || 'none',
+                    brood_pattern   => $bd->{brood_pattern} || 'good',
+                    brood_percentage=> ($bd->{brood_percentage} || 0) + 0,
+                    honey_percentage=> ($bd->{honey_percentage} || 0) + 0,
+                    pollen_percentage=>($bd->{pollen_percentage}|| 0) + 0,
+                    empty_percentage=> ($bd->{empty_percentage} || 0) + 0,
+                    disease_signs   => $bd->{disease_signs}   || undef,
+                    pest_signs      => $bd->{pest_signs}      || undef,
+                    treatment_applied=> $bd->{treatment_applied} || undef,
+                    notes           => $bd->{notes}           || undef,
+                    queen_cells_count=> ($bd->{queen_cells_count} || 0) + 0,
+                );
+                $detail{box_id}    = $bd->{box_id}   + 0 if defined $bd->{box_id}   && $bd->{box_id}   =~ /^\d+$/;
+                $detail{frame_id}  = $bd->{frame_id} + 0 if defined $bd->{frame_id} && $bd->{frame_id} =~ /^\d+$/;
+                $detail{comb_condition} = $bd->{comb_condition} if $bd->{comb_condition};
+                $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
+
+                my $dr;
+                eval { $dr = $schema->resultset('InspectionDetail')->create(\%detail) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'action', "create_inspection_detail failed: $@");
+                } else {
+                    push @detail_rows_created, $dr->id;
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_inspection: id=$inspection_id hive=$hive_id by=$current_user details=" . scalar(@detail_rows_created));
+
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            inspection_id => $inspection_id + 0,
+            url           => "/Apiary/inspections/view/$inspection_id",
+            detail_count  => scalar(@detail_rows_created) + 0,
+            message       => "Inspection #$inspection_id recorded for hive $hive_id.",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
@@ -8081,7 +8510,7 @@ sub _build_bmaster_system_prompt {
 EDITOR / ADMIN WORKFLOW:
 - Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
 - Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
-- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID  (or use voice — see VOICE INSPECTION WORKFLOW below)
 - Record a treatment: /Apiary/add_treatment?hive_id=ID
 - Record a honey harvest: /Apiary/add_harvest?hive_id=ID
 - Manage queens: /Apiary/QueenRearing
@@ -8154,6 +8583,16 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Workshops (local beekeeping events): /workshop
 - Membership: /membership
 $editor_section
+VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
+You can record a hive inspection by voice directly in this chat widget:
+1. Click the 🎤 button next to the Send button to upload a .m4a / .wav / .mp3 file, OR
+   click ⏺ to record live from your microphone (requires HTTPS or localhost).
+2. The audio is transcribed automatically. The transcript appears in the chat input — review it, then press Send.
+3. Tell me which hive and any details; I will ask follow-up questions and extract the inspection data.
+4. A pre-filled review form appears — edit any fields, then click Save Inspection.
+5. The record is saved to the database and you get a link to view it.
+You can also just type or paste a voice-style inspection note — no audio file needed.
+
 DATA ALREADY INJECTED:
 The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
 ALWAYS use this live data — do not ask the user to describe their apiary setup.
@@ -8176,6 +8615,196 @@ COMMON ISSUES AND IPM APPROACH:
 - Swarming: Natural — manage with splits, adding space, or supering promptly
 
 The current user is: $username
+
+VOICE INSPECTION WORKFLOW:
+When the user says they want to record a hive inspection, OR when you receive a voice transcript,
+follow this multi-turn conversation workflow.
+
+A hive inspection is a detailed, multi-step process that may take 5–20 minutes of conversation.
+Record each part of the conversation progressively — do NOT rush to emit the [ACTION:] block.
+Build up the inspection data incrementally across multiple turns.
+
+MULTI-SPEAKER / DIARIZED TRANSCRIPTS:
+If the transcript contains speaker labels (SPEAKER_0, SPEAKER_1, UNKNOWN, etc.), treat the
+conversation as a dialogue between a teacher/inspector and a student/observer.
+Rules for extracting inspection data from a diarized transcript:
+- Both speakers may identify a frame type (honey, brood, foundation, etc.)
+- The teacher/instructor's identification ALWAYS takes precedence if they correct the student
+- If the student says "is that honey?" and the teacher says "yes" or "that's capped honey" — record honey
+- If the student says "that's brood" and the teacher says "no, that's capped honey" — record honey
+- If only one speaker names the frame type and the other does not correct it — record what was said
+- Combine information from BOTH speakers: student may ask the question that reveals the data;
+  teacher may give the answer that provides the value (e.g. "How many frames of brood?" "Three full frames")
+- UNKNOWN segments (very short utterances, ambient sound) may be ignored for data extraction
+- Do NOT discard the student's speech — it may contain hive numbers, counts, or corrections
+- Summarise the full dialogue in general_notes including any teaching commentary of value
+
+STEP 1 — CHECK SETUP (yards, hives, queens):
+Before recording an inspection, the system needs a yard and hive to exist.
+If no hive is found by the hive number mentioned in the transcript or conversation:
+  → Emit [ACTION: {"action": "create_hive", "params": {"hive_number": "X"}}]
+    The widget will show a form to register the hive. If no yards exist either, it will first show
+    the yard creation form, then the hive form.
+If the user mentions a queen number/tag/colour that is not yet in the system:
+  → After creating the inspection, suggest emitting [ACTION: {"action": "create_queen", "params": {...}}]
+    with hive_id set so the queen is automatically assigned to the hive.
+Example create_yard action:
+[ACTION: {"action": "create_yard", "params": {"yard_name": "Main Yard", "yard_code": "MAIN", "yard_size": 20, "total_yard_size": 20}}]
+Example create_hive action:
+[ACTION: {"action": "create_hive", "params": {"hive_number": "24", "yard_id": YARD_ID, "notes": ""}}]
+
+STEP 2 — IDENTIFY THE HIVE:
+Ask "Which hive?" if not stated. Hive can be given by number, queen code, or yard+position.
+Look up the hive_id from LIVE APIARY DATA injected above.
+If the hive is not in the live data, use hive_number in the params and the system will look it up
+or guide the user to register it first.
+For multi-hive sessions (beekeeper inspects several hives in sequence), complete each hive's
+[ACTION:] block before moving to the next hive.
+
+STEP 3 — COLLECT HIVE CONFIGURATION:
+Ask: How many boxes? (e.g. "two box hive", "single brood box with a super" → derive box_count)
+Record box order: top box = position 1 (worked first), bottom box = position 2, etc.
+
+STEP 4 — COLLECT INSPECTION DATA via conversation:
+Ask short, natural follow-up questions in this order (only ask what has not been stated):
+1. Date and time (default: today)
+2. Weather and environmental conditions (temperature, wind, humidity, time of day)
+3. Queen: seen? marked? tag number or colour? where in the hive was she found?
+4. Eggs / larvae / capped brood seen?
+5. Population overall: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
+6. Temperament: calm, normal, defensive, hot?
+7. For each box (top box first, then lower boxes):
+   a. Overall bees coverage for this box
+   b. Frame-by-frame details — user may describe frames in the ORDER THEY WERE REMOVED,
+      not necessarily their position in the box. Record both removal_order and frame_position
+      if the user gives them. For each frame note:
+        - frame_number or frame_position in the box
+        - frame_type: brood / honey / pollen / foundation / empty / feeder
+        - what was observed (bees, pattern, stores, queen sighted here, etc.)
+        - any issues (disease signs, pest signs)
+   c. Feeder: present? type? level? (e.g. "feeder half full", "empty division board feeder")
+   d. Any frames moved from this box? (to top box of same hive, or to a different hive — record destination hive)
+8. Swarm cells / queen cells / supersedure cells? How many? Where in the hive?
+9. Feeding done this visit? Feed type (syrup/candy/fondant/pollen substitute) and amount?
+10. Any treatments applied? Product name, dose, method?
+11. General notes or concerns?
+12. Action required?
+13. Next inspection date?
+
+NATURAL LANGUAGE → ENUM MAPPINGS (use these when normalising user speech):
+population_estimate:
+  "lots of bees" / "full" / "packed" / "very strong" → very_strong
+  "strong" / "good population" / "good coverage" → strong
+  "half full" / "moderate" / "average" → moderate
+  "few bees" / "light" / "thin" / "weak" → weak
+  "almost empty" / "very few" / "dying out" / "very weak" → very_weak
+
+temperament:
+  "calm" / "gentle" / "docile" / "easy" → calm
+  "normal" / "ok" / "moderate" → moderate
+  "defensive" / "a bit aggressive" / "stinging" → aggressive
+  "very hot" / "boiling" / "very aggressive" / "dangerous" → very_aggressive
+
+overall_status:
+  "perfect" / "thriving" / "excellent" → excellent
+  "good" / "healthy" / "fine" → good
+  "ok" / "alright" / "fair" / "so-so" → fair
+  "not great" / "struggling" / "poor" → poor
+  "emergency" / "dying" / "failing" / "critical" → critical
+
+bees_coverage (per box):
+  "no bees" / "empty" → none
+  "few bees" / "light coverage" → light
+  "half covered" / "moderate" → moderate
+  "well covered" / "heavy" → heavy
+  "fully covered" / "packed" → full
+
+brood_pattern:
+  "solid" / "great pattern" / "excellent" → excellent
+  "good" / "mostly solid" → good
+  "some gaps" / "fair" → fair
+  "spotty" / "patchy" → spotty
+  "poor" / "scattered" → poor
+
+frame_type:
+  "brood frame" / "brood comb" / "brood" → brood
+  "honey frame" / "honey comb" / "capped honey" / "honey super frame" → honey
+  "pollen frame" / "pollen" → pollen
+  "foundation" / "new foundation" / "starter strip" / "fresh wax" → foundation
+  "empty frame" / "empty" / "drawn comb" (with nothing on it) → empty
+  "feeder frame" / "division board feeder" / "frame feeder" → feeder
+
+weather_conditions:
+  "nice" / "sunny" / "clear" / "bright" → sunny
+  "cloudy" / "overcast" / "grey" → cloudy
+  "raining" / "wet" / "rainy" / "drizzle" → rainy
+  "windy" / "breezy" / "gusty" → windy
+  "warm" / "hot" / "fine" → warm
+  "cold" / "cool" / "chilly" / "crisp" → cold
+
+AUDIO AND PHOTO ATTACHMENTS:
+- When the transcript came from a voice recording, the widget passes audio_file_id and
+  transcript_file_id in the action params. Always include these in the create_inspection params
+  so the audio and transcript are linked to the inspection record in the file management system.
+- If the user says they have photos of the hive, queen, or frames, reply:
+  "To add photos: go to the inspection record after saving, then use the File Manager to upload
+  images. You can also use the 🖼 button in the chat to discuss what a photo shows before adding it."
+- Photos are linked to the inspection via the File Manager using reference_id = inspection_id.
+
+STEP 5 — SHOW PRE-FILLED FORM:
+Once you have collected enough data (at minimum: hive_id or hive_number, inspection_date, and at
+least one box observation), emit ONE [ACTION:] block on its own line. Do NOT emit it mid-conversation —
+wait until the user signals they are done (e.g. "that's it", "save it", "done") or you have
+worked through all the standard questions above.
+
+[ACTION: {"action": "create_inspection", "params": {
+  "hive_id": REAL_HIVE_ID_OR_OMIT_IF_UNKNOWN,
+  "hive_number": "HIVE_NUMBER_AS_STRING_FALLBACK",
+  "audio_file_id": AUDIO_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "transcript_file_id": TRANSCRIPT_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "inspection_date": "YYYY-MM-DD",
+  "inspector": "USERNAME",
+  "overall_status": "good",
+  "queen_seen": true,
+  "queen_marked": false,
+  "queen_tag_number": "",
+  "eggs_seen": true,
+  "larvae_seen": true,
+  "capped_brood_seen": true,
+  "population_estimate": "strong",
+  "temperament": "calm",
+  "weather_conditions": "sunny",
+  "temperature": 22,
+  "feeding_done": false,
+  "feed_type": "",
+  "feed_amount": "",
+  "swarm_cells": 0,
+  "queen_cells": 0,
+  "supersedure_cells": 0,
+  "action_required": "",
+  "general_notes": "full narrative summary here — include queen tag colour/number, any frame moves, and anything not captured in structured fields",
+  "box_details": [
+    {
+      "box_position": 1,
+      "detail_type": "box_summary",
+      "bees_coverage": "heavy",
+      "brood_pattern": "good",
+      "brood_percentage": 60,
+      "honey_percentage": 20,
+      "frames": [
+        {"frame_number": 1, "frame_type": "brood", "notes": "solid brood pattern"},
+        {"frame_number": 2, "frame_type": "honey", "notes": "capped honey"}
+      ]
+    }
+  ]
+}}]
+
+Rules:
+- ONLY emit the [ACTION:] block when you have collected enough data (at least hive_id or hive_number and inspection_date).
+- The widget shows the user a review form pre-filled with your values — they can edit before saving.
+- If the user says the form is wrong, update any values they mention and emit a corrected [ACTION:] block.
+- box_details array: one entry per box, top box first. Include box_id if known from live data.
+- For the queen tag number, include it in both queen_tag_number field and general_notes.
 END_PROMPT
 }
 
@@ -9243,6 +9872,349 @@ sub apply_fix :Local :Args(0) {
         backup  => "$rel.bak",
         message => "File updated. Original backed up as $rel.bak",
     }));
+}
+
+=head2 transcribe
+
+POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,
+and return { success, transcript, model_used }.  The audio file is saved to /tmp,
+transcribed, then immediately deleted.
+
+Whisper is called via the Python binary in Comserv/speechfire or Comserv/venv.
+If neither is available, returns an error asking the user to install openai-whisper.
+
+=cut
+
+sub transcribe :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_guest = !$username || lc($username) eq 'guest';
+    if ($is_guest) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required to use voice transcription' }));
+        return;
+    }
+
+    my $upload = $c->request->upload('audio');
+    unless ($upload) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'No audio file uploaded (field name: audio)' }));
+        return;
+    }
+
+    my $orig_name = $upload->filename || 'recording.wav';
+    (my $ext = lc($orig_name)) =~ s/.*\.//;
+    $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
+
+    my $job_id   = time() . '_' . $$;
+    my $tmp_dir  = '/tmp';
+    my $tmp_file = "$tmp_dir/whisper_job_${job_id}.${ext}";
+
+    eval { $upload->copy_to($tmp_file) };
+    if ($@ || !-f $tmp_file) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
+        return;
+    }
+
+    my $worktree  = $c->path_to('..')->stringify;
+    my $app_root  = $c->path_to('.')->stringify;
+    my @python_candidates = (
+        "$app_root/whisper_venv/bin/python3",
+        "$worktree/whisper_venv/bin/python3",
+        "$app_root/speechfire/bin/python3",
+        "$worktree/speechfire/bin/python3",
+        "$app_root/venv/bin/python3",
+        "$worktree/venv/bin/python3",
+        '/usr/bin/python3',
+        'python3',
+    );
+
+    my $python_bin = '';
+    for my $p (@python_candidates) {
+        next unless $p;
+        my $abs = $p;
+        if ($abs !~ m{^/}) {
+            chomp(my $found = `which $abs 2>/dev/null`);
+            $abs = $found || '';
+        }
+        if ($abs && -x $abs) {
+            my $has_whisper = `"$abs" -c "import whisper" 2>&1`;
+            if ($? == 0) {
+                $python_bin = $abs;
+                last;
+            }
+        }
+    }
+
+    unless ($python_bin) {
+        unlink $tmp_file;
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+        }));
+        return;
+    }
+
+    my $want_diarize = ($c->request->param('diarize') || $c->request->body_parameters->{diarize} || '') ? 1 : 0;
+    my $num_speakers = int($c->request->param('num_speakers') || $c->request->body_parameters->{num_speakers} || 2);
+    $num_speakers = 2 if $num_speakers < 2 || $num_speakers > 8;
+
+    my $has_diarizer = ($want_diarize && `"$python_bin" -c "import simple_diarizer" 2>&1` =~ /^\s*$/) ? 1 : 0;
+
+    my $whisper_model  = 'small';
+    my $torch_hub_dir  = $c->path_to('whisper_venv', '.torch_hub')->stringify;
+
+    my $whisper_script = <<"PYSCRIPT";
+import sys, json, os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TORCH_DEVICE'] = 'cpu'
+import whisper, torch
+torch.hub.set_dir('$torch_hub_dir')
+audio_path = sys.argv[1]
+model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
+want_diarize = sys.argv[3] == '1' if len(sys.argv) > 3 else False
+num_speakers = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+
+model = whisper.load_model(model_name, device='cpu')
+wresult = model.transcribe(audio_path, language='en', fp16=False)
+
+segments_out = []
+if want_diarize:
+    try:
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
+        from simple_diarizer.diarizer import Diarizer
+        diar = Diarizer(embed_model='ecapa', cluster_method='sc')
+        spk_segs = diar.diarize(audio_path, num_speakers=num_speakers)
+        sys.stdout = _real_stdout
+        def get_speaker(start, end):
+            best = 'UNKNOWN'
+            best_overlap = 0
+            for s in spk_segs:
+                overlap = min(end, s['end']) - max(start, s['start'])
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = f"SPEAKER_{s['label']}"
+            return best
+        for seg in wresult['segments']:
+            segments_out.append({
+                'start': round(seg['start'], 1),
+                'end':   round(seg['end'], 1),
+                'speaker': get_speaker(seg['start'], seg['end']),
+                'text': seg['text'].strip()
+            })
+    except Exception as e:
+        try: sys.stdout = _real_stdout
+        except NameError: pass
+        segments_out = [{'start': s['start'], 'end': s['end'], 'speaker': 'SPEAKER_0', 'text': s['text'].strip()} for s in wresult['segments']]
+else:
+    for seg in wresult['segments']:
+        segments_out.append({'start': round(seg['start'],1), 'end': round(seg['end'],1), 'speaker': None, 'text': seg['text'].strip()})
+
+print(json.dumps({'transcript': wresult['text'].strip(), 'model': model_name, 'segments': segments_out}))
+PYSCRIPT
+
+    my $py_script_file = "$tmp_dir/whisper_job_${job_id}.py";
+    my $result_file    = "$tmp_dir/whisper_job_${job_id}_result.json";
+    my $status_file    = "$tmp_dir/whisper_job_${job_id}.status";
+
+    open(my $sfh, '>', $py_script_file) or do {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to write whisper script' }));
+        return;
+    };
+    print $sfh $whisper_script;
+    close $sfh;
+
+    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs      = "${nfs_base}/bmaster/audio";
+    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
+    my $timestamp      = time();
+    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
+    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
+    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size    = $upload->size;
+
+    {
+        open(my $sf, '>', $status_file) or do { };
+        print $sf encode_json({ status => 'processing', started => $timestamp });
+        close $sf;
+    }
+
+    require POSIX;
+    my $child = fork();
+    if (!defined $child) {
+        unlink $tmp_file, $py_script_file, $status_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to start background transcription' }));
+        return;
+    }
+
+    if ($child == 0) {
+        my $grandchild = fork();
+        if (defined $grandchild && $grandchild == 0) {
+            POSIX::setsid();
+            open(STDIN,  '<', '/dev/null');
+            open(STDOUT, '>', '/dev/null');
+            open(STDERR, '>>', '/tmp/whisper_bg.log');
+
+            my $json_out = '';
+            eval {
+                my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
+                    $tmp_file, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
+                    or die "Cannot start python: $!";
+                $json_out = do { local $/; <$py_out> } // '';
+                close $py_out;
+                waitpid($py_pid, 0);
+            };
+
+            unlink $py_script_file;
+
+            if ($@ || !$json_out) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $result = eval { decode_json($json_out) };
+            unless ($result && $result->{transcript}) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $model_used = $result->{model} || $whisper_model;
+            my $segments   = $result->{segments} || [];
+
+            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
+            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
+            unlink $tmp_file;
+
+            my $nfs_ok = !$@;
+            if ($nfs_ok) {
+                my $transcript_json = encode_json({
+                    transcript => $result->{transcript},
+                    segments   => $segments,
+                    model_used => $model_used,
+                    recorded_by => $username,
+                    original_filename => $orig_name,
+                });
+                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+            }
+
+            open(my $rf, '>', $result_file);
+            print $rf encode_json({
+                success            => JSON::true,
+                transcript         => $result->{transcript},
+                model_used         => $model_used,
+                segments           => $segments,
+                diarized           => $has_diarizer ? JSON::true : JSON::false,
+                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
+                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                orig_name          => $orig_name,
+                file_size          => $upload_size,
+                sitename           => $sitename,
+                username           => $username,
+                ext                => $ext,
+            });
+            close $rf;
+
+            open(my $sf, '>', $status_file);
+            print $sf encode_json({ status => 'done' });
+            close $sf;
+
+            POSIX::_exit(0);
+        }
+        POSIX::_exit(0);
+    }
+
+    waitpid($child, 0);
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        job_id  => $job_id,
+        status  => 'processing',
+    }));
+}
+
+sub transcribe_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    my $job_id = $c->request->param('job_id') // '';
+    unless ($job_id =~ /^\d+_\d+$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid job_id' }));
+        return;
+    }
+
+    my $status_file = "/tmp/whisper_job_${job_id}.status";
+    unless (-f $status_file) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Job not found or expired' }));
+        return;
+    }
+
+    my $status_json = do { local $/; open(my $f, '<', $status_file) or return; <$f> };
+    my $status = eval { decode_json($status_json) } || { status => 'processing' };
+
+    if ($status->{status} eq 'done') {
+        my $result_file = "/tmp/whisper_job_${job_id}_result.json";
+        my $result_json = do { local $/; open(my $f, '<', $result_file) or do { $c->response->body(encode_json({success=>JSON::false,error=>'Result missing'})); return; }; <$f> };
+        my $result = eval { decode_json($result_json) } || { success => JSON::false, error => 'Invalid result' };
+        unlink $status_file, $result_file;
+
+        if ($result->{success} && $result->{audio_nfs_path}) {
+            eval {
+                my $schema  = $c->model('DBEncy');
+                my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
+                my $audio_row = $schema->resultset('File')->create({
+                    file_name   => $result->{orig_name},
+                    nfs_path    => $result->{audio_nfs_path},
+                    file_type   => 'audio',
+                    file_format => 'audio/' . ($result->{ext} || 'wav'),
+                    file_size   => $result->{file_size} || 0,
+                    source_type => 'nfs',
+                    sitename    => $sitename,
+                    description => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                    user_id     => undef,
+                });
+                $result->{audio_file_id} = $audio_row->id + 0;
+
+                if ($result->{transcript_nfs_path}) {
+                    my $trans_row = $schema->resultset('File')->create({
+                        file_name   => ($result->{orig_name} || 'transcript') . '.json',
+                        nfs_path    => $result->{transcript_nfs_path},
+                        file_format => 'application/json',
+                        source_type => 'nfs',
+                        sitename    => $sitename,
+                        description => "Whisper transcript for " . ($result->{orig_name} || ''),
+                        user_id     => undef,
+                    });
+                    $result->{transcript_file_id} = $trans_row->id + 0;
+                }
+            };
+        }
+
+        delete $result->{$_} for qw(audio_nfs_path transcript_nfs_path orig_name file_size sitename username ext);
+        $c->response->body(encode_json($result));
+    } elsif ($status->{status} eq 'error') {
+        unlink $status_file;
+        $c->response->body(encode_json({ success => JSON::false, error => $status->{error} || 'Transcription failed' }));
+    } else {
+        $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;
