@@ -48,6 +48,12 @@
         siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
+    // Per-tab nonce: generated fresh each time the script runs in a new JS context.
+    // sessionStorage is tab-isolated, but tab duplication copies it.  We detect
+    // duplication by writing this nonce into sessionStorage on first use; if the
+    // stored nonce differs from ours the tab was duplicated and should start fresh.
+    const _TAB_NONCE = Math.random().toString(36).slice(2);
+
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
     // when the widget was opened as a popup/detached window)
     function loadPersistedState() {
@@ -58,6 +64,19 @@
                 console.debug('Restored conversation ID from popup param:', state.currentConversationId);
                 return;
             }
+
+            // Detect duplicated tabs: if the stored nonce doesn't match ours, the
+            // sessionStorage was inherited from another tab → start fresh.
+            const storedNonce = sessionStorage.getItem('ai_tab_nonce');
+            if (storedNonce && storedNonce !== _TAB_NONCE) {
+                console.debug('[AI] Duplicated tab detected — starting fresh conversation');
+                sessionStorage.removeItem('currentConversationId');
+                sessionStorage.removeItem('chatMessages');
+                sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+                return;
+            }
+            sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+
             const savedConvId = sessionStorage.getItem('currentConversationId');
             if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
                 state.currentConversationId = parseInt(savedConvId);
@@ -248,12 +267,14 @@
         var agent = state.agentsConfig.agents[agentKey];
         if (!agent) return;
         state.agentOverride = agentKey;
+        state.currentAgent = agent;
         var ctx = detectPageContext() || {};
         ctx.agent_id   = agent.id;
         ctx.agent_name = agent.display_name;
         if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
         state.pageContext = ctx;
         _updateAgentBanner(agentKey);
+        updatePageLabel();
     }
 
     function _updateAgentBanner(agentKey) {
@@ -1455,20 +1476,47 @@
         }
     }
 
-    // Update the page label in the widget header to show what page is being assisted
+    // Update the page label in the widget header to show what page is being assisted.
+    // Shows: [Site] · Page Title · agent badge  — all in one readable line.
     function updatePageLabel() {
         const labelEl = document.getElementById('chat-page-label');
         if (!labelEl) return;
+
         const ctx = state.pageContext;
         let pagePath = (ctx && ctx.page_path) || window.location.pathname;
-        // In popup mode use the originating page path
         if (window.AI_WIDGET_POPUP) {
             pagePath = window.AI_DETACHED_FROM_PATH || pagePath;
         }
-        // Show only last two segments for brevity: /Foo/Bar → Foo/Bar
-        const label = pagePath.replace(/^\//, '').replace(/\/$/, '') || '/';
-        labelEl.textContent = label;
-        labelEl.title = 'Assisting page: ' + pagePath;
+
+        // Human-readable page title: prefer document.title, fall back to last path segment
+        let pageTitle = '';
+        try {
+            pageTitle = (window.AI_WIDGET_POPUP ? (window.AI_DETACHED_FROM_TITLE || '') : document.title) || '';
+            pageTitle = pageTitle.replace(/\s*[|\-–—]\s*.*$/, '').trim(); // strip site suffix
+        } catch(e) {}
+        if (!pageTitle) {
+            pageTitle = pagePath.split('/').filter(Boolean).pop() || '/';
+        }
+        // Truncate long titles
+        if (pageTitle.length > 32) pageTitle = pageTitle.slice(0, 30) + '…';
+
+        // Site name badge
+        const site = state.siteName || '';
+
+        // Active agent label
+        const agentLabel = (state.currentAgent && (state.currentAgent.display_name || state.currentAgent.id)) || '';
+
+        // Build label HTML
+        let html = '';
+        if (site) html += '<span class="chat-ctx-badge chat-ctx-site" title="Site">' + _escH(site) + '</span> ';
+        html += '<span class="chat-ctx-page" title="' + _escH('Page: ' + pagePath) + '">' + _escH(pageTitle) + '</span>';
+        if (agentLabel) html += ' <span class="chat-ctx-badge chat-ctx-agent" title="Agent">' + _escH(agentLabel) + '</span>';
+
+        labelEl.innerHTML = html;
+    }
+
+    function _escH(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // ── Form Fill Button ─────────────────────────────────────────────────────
@@ -3827,10 +3875,32 @@
             .chat-header-drag:active { cursor: grabbing; }
 
             .chat-header h3 {
-                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis;
+                margin: 0; font-size: 14px; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
             }
-            
+
+            .chat-header-title-group {
+                display: flex; align-items: baseline; gap: 5px;
+                flex: 1; min-width: 0; overflow: hidden;
+            }
+
+            .chat-page-label {
+                font-size: 11px; opacity: 0.88; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+                display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
+            }
+            .chat-ctx-page {
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                flex-shrink: 1; min-width: 0;
+            }
+            .chat-ctx-badge {
+                display: inline-block; border-radius: 3px; padding: 0 4px;
+                font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+                white-space: nowrap; flex-shrink: 0; line-height: 1.5;
+            }
+            .chat-ctx-site  { background: rgba(255,255,255,0.28); }
+            .chat-ctx-agent { background: rgba(0,0,0,0.22); }
+
             .chat-header-buttons {
                 display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
