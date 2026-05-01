@@ -282,20 +282,82 @@
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
                     [% IF audit_todos && audit_todos.size %]
+                    [% SET audit_rank = 0 %]
                     [% FOREACH at IN audit_todos %]
-                    <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;">
-                        [% IF at.is_root %]
-                        <span style="font-weight:bold;color:#c45d00;min-width:16px;">⚠</span>
-                        [% ELSE %]
-                        <span style="color:var(--text-muted-color);min-width:16px;padding-left:12px;">↳</span>
-                        [% END %]
-                        <span style="background:var(--primary-color);color:#fff;border-radius:3px;padding:1px 5px;font-size:0.78em;flex-shrink:0;">P[% at.priority %]</span>
-                        <a href="/todo/details?record_id=[% at.record_id %]" style="color:var(--text-color);text-decoration:none;flex:1;">[% at.subject | html %]</a>
-                        <a href="/log/log_form?todo_record_id=[% at.record_id %]" style="font-size:0.8em;color:var(--text-muted-color);flex-shrink:0;">📋 Log</a>
+                    [% SET audit_rank = audit_rank + 1 %]
+                    <div id="ap-row-[% at.record_id %]" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
+                        border-radius:6px;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];
+                        background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
+
+                        [%# Rank badge %]
+                        <span style="min-width:26px;height:26px;border-radius:50%;background:#c45d00;color:#fff;
+                            display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
+                            [% IF at.is_root %]⚠[% ELSE %]↳[% END %]
+                        </span>
+
+                        [%# Main content %]
+                        <div style="flex:1;min-width:0;">
+                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+                                [%# Priority badge %]
+                                [% IF at.priority %]
+                                <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
+                                    [% IF at.priority <= 2 %]background:var(--danger-color,#dc3545);color:#fff
+                                    [% ELSIF at.priority <= 4 %]background:#fd7e14;color:#fff
+                                    [% ELSIF at.priority <= 6 %]background:#ffc107;color:var(--text-color,#333)
+                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
+                                    P[% at.priority %]
+                                </span>
+                                [% END %]
+
+                                [%# Status badge %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
+                                    [% IF at.status == 2 %]background:#17a2b8;color:#fff
+                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
+                                    [% IF at.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
+                                </span>
+
+                                [%# Root / child label %]
+                                [% IF at.is_root %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
+                                [% END %]
+
+                                [%# Site label %]
+                                [% IF is_csc && at.sitename && at.sitename != 'CSC' %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% at.sitename %]</span>
+                                [% END %]
+                            </div>
+
+                            [%# Subject link %]
+                            <a href="/todo/details?record_id=[% at.record_id %]"
+                               style="font-weight:bold;color:var(--text-color);text-decoration:none;font-size:0.95em;">
+                                [% at.subject || '(No subject)' %]
+                            </a>
+
+                            [%# Meta line %]
+                            <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
+                                [% IF at.project_name %]<span>📁 [% at.project_name %]</span>
+                                [% ELSIF at.project_code && at.project_code != 'system' %]<span>📁 [% at.project_code %]</span>[% END %]
+                                [% IF at.due_date %]<span>📅 Due: [% at.due_date %]</span>[% END %]
+                                [% IF at.start_date %]<span>🗓 [% at.start_date %]</span>[% END %]
+                                [% IF at.sitename %]<span>[% at.sitename %]</span>[% END %]
+                            </div>
+                        </div>
+
+                        [%# Quick actions %]
+                        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                            <a href="/todo/details?record_id=[% at.record_id %]"
+                               style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                            <a href="/log/log_form?todo_record_id=[% at.record_id %]"
+                               style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;text-align:center;" title="Add a time log for this todo">📋 Log</a>
+                            [% IF is_admin %]
+                            <button onclick="quickClose([% at.record_id %])"
+                                style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
+                            [% END %]
+                        </div>
                     </div>
                     [% END %]
                     [% ELSE %]
-                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos for today. Click <strong>🌅 Start Day</strong> to scan the application error log and create todos for any issues found.</p>
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos. Click <strong>🌅 Start Day</strong> to scan the application error log.</p>
                     [% END %]
                 </div>
             </details>
