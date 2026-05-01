@@ -561,21 +561,13 @@
                 evt.stopPropagation();
                 var btn = document.getElementById('btn-refresh-audit');
                 if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
-                var msg = document.getElementById('audit-status-msg');
                 fetch('/planning/refresh_audit', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
                     if (d.success) {
-                        var text = d.message || 'Scan complete';
-                        if (d.created_count > 0) {
-                            alert(text + '. Reloading page to show new todos…');
-                            location.reload();
-                        } else {
-                            if (msg) msg.textContent = text;
-                            if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
-                        }
+                        location.reload();
                     } else {
                         if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
                         alert('Refresh failed: ' + (d.error || 'unknown error'));
