@@ -554,14 +554,14 @@
                     </div>
 
                     [%# Quick actions %]
-                    <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                    <div style="display:flex;flex-direction:column;align-items:flex-start;gap:4px;flex-shrink:0;padding-top:2px;">
                         <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;white-space:nowrap;">View →</a>
                         <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                           style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;text-align:center;" title="Add a time log for this todo">📋 Log</a>
+                           style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add a time log for this todo">📋 Log</a>
                         [% IF is_admin %]
                         <button onclick="quickClose([% ap.record_id %])"
-                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
+                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done and create log">✓ Done</button>
                         [% END %]
                     </div>
                 </div>
