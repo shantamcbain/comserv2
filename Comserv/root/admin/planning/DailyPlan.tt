@@ -398,23 +398,78 @@
 
             [%# ── CURRENT ACTIVE PRIORITIES ── %]
             <div style="margin-bottom:24px;">
-                <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);">
+                <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
+                    [% IF active_priorities && active_priorities.size %]
+                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;">[% active_priorities.size %] todo[% IF active_priorities.size != 1 %]s[% END %]</span>
+                    [% END %]
+                    [% IF filter_site || filter_project %]
+                    <a href="/planning/daily#planning" style="font-size:0.78em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear filters</a>
+                    [% END %]
+                </div>
+
+                [%# ── Filter Bar ── %]
+                <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+
+                    [%# Site filter row (CSC only) %]
+                    [% IF is_csc && plan_sitenames && plan_sitenames.size %]
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Site:</span>
+                        <a href="/planning/daily[% IF filter_project %]?filter_project=[% filter_project %][% END %]#planning"
+                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
+                           [% IF !filter_site %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">All</a>
+                        [% FOREACH sname IN plan_sitenames %]
+                        <a href="/planning/daily?filter_site=[% sname %][% IF filter_project %]&filter_project=[% filter_project %][% END %]#planning"
+                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
+                           [% IF filter_site == sname %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">[% sname %]</a>
+                        [% END %]
+                    </div>
+                    [% END %]
+
+                    [%# Project + Sort row %]
+                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Focus:</span>
+                        [% IF ap_projects && ap_projects.size %]
+                        <select id="ap-project-filter" onchange="applyProjectFilter(this.value)"
+                            style="font-size:0.78em;padding:3px 6px;border:1px solid [% IF filter_project %]var(--primary-color)[% ELSE %]var(--border-color)[% END %];border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:220px;">
+                            <option value="">All Projects</option>
+                            [% FOREACH proj IN ap_projects %]
+                            <option value="[% proj.project_id %]" [% IF filter_project == proj.project_id %]selected[% END %]>
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
+                            </option>
+                            [% END %]
+                        </select>
+                        [% END %]
+
+                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;margin-left:4px;">Sort:</span>
+                        <button onclick="sortTodos('priority')" id="sort-priority"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
+                        <button onclick="sortTodos('project')" id="sort-project"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
+                        <button onclick="sortTodos('due')" id="sort-due"
+                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due Date</button>
+                    </div>
                 </div>
 
                 [% IF active_priorities && active_priorities.size %]
+                <div id="priorities-list">
                 [% SET rank = 0 %]
                 [% FOREACH ap IN active_priorities %]
                 [% SET rank = rank + 1 %]
                 [%# Determine if this todo is blocked by an incomplete blocker %]
                 [% SET is_blocked = ap.blocked_by_todo_id && !ap.blocker_done %]
-                <div id="ap-row-[% ap.record_id %]" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
+                <div id="ap-row-[% ap.record_id %]"
+                    data-priority="[% ap.priority || 99 %]"
+                    data-score="[% ap.ap_score || 9999 %]"
+                    data-project="[% ap.project_name | html %]"
+                    data-due="[% ap.due_date || '9999-12-31' %]"
+                    style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
                     border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
                     background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
                     opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
                     [%# Rank badge %]
-                    <span style="min-width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;
+                    <span class="rank-badge" style="min-width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;
                         display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
                         [% rank %]
                     </span>
@@ -495,11 +550,16 @@
                     </div>
                 </div>
                 [% END %]
+                </div>[%# end #priorities-list %]
 
                 [% ELSE %]
                 <div style="text-align:center;padding:30px;color:var(--text-muted-color);background:var(--bg-secondary);border-radius:6px;">
-                    <p style="margin:0 0 10px;">No active todos found for your role and site.</p>
+                    <p style="margin:0 0 10px;">No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
+                    [% IF filter_project || filter_site %]
+                    <a href="/planning/daily#planning" style="color:var(--primary-color);">✕ Clear filters</a>
+                    [% ELSE %]
                     <a href="/todo/addtodo" style="color:var(--primary-color);">+ Create your first todo</a>
+                    [% END %]
                 </div>
                 [% END %]
             </div>
@@ -580,6 +640,51 @@
             function refreshPage(evt) {
                 evt.stopPropagation();
                 location.reload();
+            }
+            function applyProjectFilter(projId) {
+                var params = new URLSearchParams(window.location.search);
+                if (projId) {
+                    params.set('filter_project', projId);
+                } else {
+                    params.delete('filter_project');
+                }
+                var qs = params.toString();
+                window.location.href = '/planning/daily' + (qs ? '?' + qs : '') + '#planning';
+            }
+            function sortTodos(by) {
+                var list = document.getElementById('priorities-list');
+                if (!list) return;
+                var cards = Array.from(list.querySelectorAll('[data-priority]'));
+                cards.sort(function(a, b) {
+                    if (by === 'priority') {
+                        var pa = parseInt(a.dataset.priority || 99);
+                        var pb = parseInt(b.dataset.priority || 99);
+                        if (pa !== pb) return pa - pb;
+                        return parseInt(a.dataset.score || 9999) - parseInt(b.dataset.score || 9999);
+                    } else if (by === 'project') {
+                        var na = (a.dataset.project || '').toLowerCase();
+                        var nb = (b.dataset.project || '').toLowerCase();
+                        return na < nb ? -1 : na > nb ? 1 : 0;
+                    } else if (by === 'due') {
+                        var da = a.dataset.due || '9999-12-31';
+                        var db = b.dataset.due || '9999-12-31';
+                        return da < db ? -1 : da > db ? 1 : 0;
+                    }
+                    return 0;
+                });
+                cards.forEach(function(card, i) {
+                    var badge = card.querySelector('.rank-badge');
+                    if (badge) badge.textContent = i + 1;
+                    list.appendChild(card);
+                });
+                ['priority', 'project', 'due'].forEach(function(s) {
+                    var btn = document.getElementById('sort-' + s);
+                    if (!btn) return;
+                    var active = (s === by);
+                    btn.style.background     = active ? 'var(--primary-color)' : 'transparent';
+                    btn.style.color          = active ? '#fff' : 'var(--text-color)';
+                    btn.style.borderColor    = active ? 'var(--primary-color)' : 'var(--border-color)';
+                });
             }
             </script>
 
