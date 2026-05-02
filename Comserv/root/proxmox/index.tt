@@ -6,6 +6,21 @@
 <div class="container">
     <h1>Proxmox VE Dashboard</h1>
     <p class="text-muted small">[% PageVersion %]</p>
+
+[% IF servers && servers.size > 0 %]
+<div class="server-switcher" style="margin-bottom:1em; padding:0.5em 0.75em; background:#f5f5f5; border:1px solid #ddd; border-radius:4px; display:flex; align-items:center; gap:0.75em; flex-wrap:wrap;">
+    <strong>Server:</strong>
+    [% FOREACH srv IN servers %]
+        [% IF srv.id == server_id %]
+            <span style="font-weight:bold; padding:3px 10px; background:#FF9900; color:#fff; border-radius:3px;">[% srv.name || srv.id | html %]</span>
+        [% ELSE %]
+            <a href="[% c.uri_for('/proxmox') %]?server_id=[% srv.id | uri %]"
+               style="padding:3px 10px; background:#fff; border:1px solid #ccc; border-radius:3px; text-decoration:none; color:#333;">[% srv.name || srv.id | html %]</a>
+        [% END %]
+    [% END %]
+    <a href="[% c.uri_for('/proxmox_servers') %]" style="margin-left:auto; font-size:0.85em; color:#666;">Manage Servers</a>
+</div>
+[% END %]
 [% IF error_msg %]
 <div class="error-message">
     [% error_msg %]

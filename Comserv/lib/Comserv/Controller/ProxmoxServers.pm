@@ -38,8 +38,8 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_index')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -79,8 +79,8 @@ sub add_server_form :Path('add') :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_add_form')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -107,8 +107,8 @@ sub add_server :Path('add_server') :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_add')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -192,8 +192,8 @@ sub edit_server_form :Path('edit') :Args(1) {
     my ($self, $c, $server_id) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_edit_form')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -234,8 +234,8 @@ sub edit_server :Path('edit_server') :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_edit')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -313,8 +313,8 @@ sub delete_server :Path('delete') :Args(1) {
     my ($self, $c, $server_id) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_delete')) {
-        $c->flash->{error_msg} = 'You must be an administrator to manage Proxmox servers.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -344,7 +344,7 @@ sub test_connection :Path('test') :Args(1) {
     my ($self, $c, $server_id) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_servers_test')) {
+    unless ($admin_auth->is_csc_admin($c)) {
         $c->response->content_type('application/json');
         $c->response->body('{"success":false,"error":"Access denied: admin required"}');
         return;
@@ -460,27 +460,25 @@ sub test_connection :Path('test') :Args(1) {
         push @{$c->stash->{debug_msg}}, "Token Value: " .
             ($credentials->{token_value} ? "Present (length: " . length($credentials->{token_value}) . ")" : "MISSING");
 
-        # Warning: The Proxmox model doesn't ACCEPT_CONTEXT, so we need to pass the context separately
         $proxmox = $c->model('Proxmox');
 
-        # Manually set the properties since the model doesn't accept them in the constructor
-        $proxmox->{proxmox_host} = $credentials->{host} if $credentials->{host};
-        $proxmox->{api_url_base} = $credentials->{api_url_base} if $credentials->{api_url_base};
-        $proxmox->{node} = $credentials->{node} || 'pve';
-        $proxmox->{image_url_base} = $credentials->{image_url_base} if $credentials->{image_url_base};
-        $proxmox->{c} = $c;  # Make sure the model has access to the context
-
-        # Log the model configuration
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_connection',
-            "Proxmox model configured with: " .
-            "Host=" . $proxmox->{proxmox_host} . ", " .
-            "API URL=" . $proxmox->{api_url_base} . ", " .
-            "Node=" . $proxmox->{node});
+        # Set credentials via Moose accessors
+        my $api_url = $credentials->{api_url_base}
+            || 'https://' . $credentials->{host} . ':8006/api2/json';
+        $proxmox->api_url_base($api_url);
+        $proxmox->node($credentials->{node} || 'pve');
+        $proxmox->token_user($credentials->{token_user}  || '');
+        $proxmox->token_value($credentials->{token_value} || '');
+        $proxmox->credentials_loaded(1);
 
         push @{$c->stash->{debug_msg}}, "Proxmox model configured with:";
-        push @{$c->stash->{debug_msg}}, "  Host: " . $proxmox->{proxmox_host};
-        push @{$c->stash->{debug_msg}}, "  API URL: " . $proxmox->{api_url_base};
-        push @{$c->stash->{debug_msg}}, "  Node: " . $proxmox->{node};
+        push @{$c->stash->{debug_msg}}, "  API URL: " . $proxmox->api_url_base;
+        push @{$c->stash->{debug_msg}}, "  Node: "    . $proxmox->node;
+        push @{$c->stash->{debug_msg}}, "  Token User: " . $proxmox->token_user;
+
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'test_connection',
+            "Proxmox model configured: api_url=" . $proxmox->api_url_base .
+            " node=" . $proxmox->node . " token_user=" . $proxmox->token_user);
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'test_connection', "Proxmox model initialized successfully");
         push @{$c->stash->{debug_msg}}, "Proxmox model initialized successfully";
@@ -528,14 +526,10 @@ sub test_connection :Path('test') :Args(1) {
         local $SIG{ALRM} = sub { die "Connection timed out after 10 seconds\n" };
         alarm(10);
 
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_connection', "Calling authenticate_with_token method...");
-        push @{$c->stash->{debug_msg}}, "Calling authenticate_with_token method...";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_connection', "Calling check_connection method...");
+        push @{$c->stash->{debug_msg}}, "Calling check_connection method...";
 
-        # Use the token authentication method instead of username/password
-        $auth_success = $proxmox->authenticate_with_token(
-            $credentials->{token_user},
-            $credentials->{token_value}
-        );
+        $auth_success = $proxmox->check_connection();
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'test_connection',
             "Authentication result: " . ($auth_success ? "SUCCESS" : "FAILED"));

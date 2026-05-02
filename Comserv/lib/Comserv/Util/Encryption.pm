@@ -43,11 +43,10 @@ sub encrypt {
     my $key = $class->_get_encryption_key($namespace);
     
     my $cipher = Crypt::CBC->new(
-        -key             => $key,
-        -cipher          => 'Crypt::OpenSSL::AES',
-        -header          => 'salt',
-        -iterations      => 1,
-        -randomiv        => 1
+        -key         => $key,
+        -cipher      => 'Crypt::OpenSSL::AES',
+        -header      => 'salt',
+        -nodeprecate => 1
     );
     
     my $encrypted = $cipher->encrypt($plaintext);
@@ -157,43 +156,49 @@ sub _get_encryption_key {
     my $key_file = $class->_get_key_file_path($namespace);
     
     if (-f $key_file) {
-        try {
+        my $key = eval {
             open my $fh, '<:raw', $key_file or die "Failed to open: $!";
-            my $key = do { local $/; <$fh> };
+            my $data = do { local $/; <$fh> };
             close $fh;
-            
-            if (length($key) == 32) {
-                return $key;
-            }
-        } catch {
-            $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key",
-                "Failed to read encryption key file ($namespace): $_");
-            die "Failed to read encryption key file: $_";
+            $data;
         };
+        if ($@) {
+            $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key",
+                "Failed to read encryption key file ($namespace): $@");
+            die "Failed to read encryption key file: $@";
+        }
+        if (defined $key && length($key) >= 16) {
+            return $key;
+        }
     }
-    
-    # Generate new key
+
+    # Generate new key — 32 raw bytes from /dev/urandom (AES-256)
     $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, "_get_encryption_key",
         "No encryption key found for namespace '$namespace', generating new one");
-    
-    my $key = makerandom(Size => 256);
-    
+
+    my $key;
+    if (open my $urandom, '<:raw', '/dev/urandom') {
+        read($urandom, $key, 32) == 32 or die "Short read from /dev/urandom";
+        close $urandom;
+    } else {
+        $key = makerandom(Size => 256);
+    }
+
     $class->_ensure_config_dir();
-    try {
+    eval {
         open my $fh, '>:raw', $key_file or die "Failed to open: $!";
         print $fh $key;
         close $fh;
-        
         chmod 0600, $key_file or die "Failed to chmod: $!";
-        
         $logging->log_with_details(undef, 'info', __FILE__, __LINE__, "_get_encryption_key",
             "Generated and saved encryption key for namespace '$namespace' at $key_file");
-    } catch {
-        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key",
-            "Failed to save encryption key file ($namespace): $_");
-        die "Failed to save encryption key file: $_";
     };
-    
+    if ($@) {
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, "_get_encryption_key",
+            "Failed to save encryption key file ($namespace): $@");
+        die "Failed to save encryption key file: $@";
+    }
+
     return $key;
 }
 
