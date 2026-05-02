@@ -108,9 +108,74 @@ The Proxmox integration uses API tokens stored in the <code>proxmox_credentials.
 
 <ol><li>Loaded by the <code>Comserv::Util::ProxmoxCredentials</code> module</li></ol>
 
-<ol><li>Deobfuscated and provided to the Proxmox model</li></ol>
+<ol><li>Decrypted using AES-256 from the namespace key file (<code>config/.proxmox_encryption_key</code>)</li></ol>
 
-<ol><li>Used in the HTTP Authorization header for all API requests</li></ol>
+<ol><li>Used in the HTTP Authorization header for all API requests in the format:<br>
+<code>PVEAPIToken=USER@REALM!TOKENID=UUID</code></li></ol>
+
+
+
+<h2>Creating a Proxmox API Token</h2>
+
+
+
+<p>Follow these steps in the Proxmox web UI (<code>https://YOUR-HOST:8006</code>) to create a token that the application can use:</p>
+
+<h3>Step 1 — Create the token</h3>
+<ol>
+  <li>Log in as <code>root</code></li>
+  <li>Go to <strong>Datacenter → Permissions → API Tokens</strong></li>
+  <li>Click <strong>Add</strong></li>
+  <li>Set:
+    <ul>
+      <li><strong>User:</strong> <code>root@pam</code></li>
+      <li><strong>Token ID:</strong> choose any name (e.g. <code>api</code>)</li>
+      <li><strong>Privilege Separation:</strong> <em>uncheck this box</em></li>
+    </ul>
+  </li>
+  <li>Click <strong>Add</strong> — Proxmox shows the UUID <strong>once only</strong>. Copy it immediately.</li>
+</ol>
+
+<p><strong>Why uncheck Privilege Separation?</strong> When checked, the token has no permissions by default and must have roles assigned explicitly. When unchecked, the token inherits all permissions of the owning user (<code>root@pam</code>), which is the simplest setup.</p>
+
+<h3>Step 2 — If Privilege Separation was already enabled (token sees no VMs)</h3>
+<p>If you already created the token with Privilege Separation <em>enabled</em>, you must grant it a role:</p>
+<ol>
+  <li>Go to <strong>Datacenter → Permissions</strong></li>
+  <li>Click <strong>Add → API Token Permission</strong></li>
+  <li>Set:
+    <ul>
+      <li><strong>Path:</strong> <code>/</code></li>
+      <li><strong>API Token:</strong> <code>root@pam!api</code> (or your token name)</li>
+      <li><strong>Role:</strong> <code>Administrator</code></li>
+      <li><strong>Propagate:</strong> ✓ checked</li>
+    </ul>
+  </li>
+  <li>Click <strong>Add</strong></li>
+</ol>
+<p>Without this step the token authenticates successfully (returns 200) but sees no VMs, nodes, or containers — all lists return empty.</p>
+
+<h3>Step 3 — Add the server to the application</h3>
+<ol>
+  <li>Go to <strong>Manage Proxmox Servers → Add a Server</strong></li>
+  <li>Fill in:
+    <ul>
+      <li><strong>Server ID</strong> — unique identifier (letters, numbers, underscores)</li>
+      <li><strong>Display Name</strong> — friendly label</li>
+      <li><strong>Hostname/IP</strong> — e.g. <code>192.168.1.2</code></li>
+      <li><strong>Node Name</strong> — leave as <code>pve</code>; the application auto-discovers the real node name from the API</li>
+      <li><strong>Paste Full Token</strong> — paste the complete string Proxmox showed you:<br>
+          <code>root@pam!api=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx</code><br>
+          The form splits it into <em>Token User</em> and <em>Token Value</em> automatically.</li>
+    </ul>
+  </li>
+  <li>Click <strong>Save</strong></li>
+  <li>Click <strong>Test Connection</strong> — the result shows the Proxmox version and authentication status</li>
+</ol>
+
+<h3>Step 4 — View VMs</h3>
+<p>Go to <strong>/proxmox</strong>. The dashboard auto-selects the first saved server. If you have multiple servers, use the server switcher bar at the top to switch between them.</p>
+<p>The application auto-discovers the node name from the Proxmox API (e.g. <code>proxmox720</code>) so you do not need to enter the correct node name manually.</p>
 
 
 
