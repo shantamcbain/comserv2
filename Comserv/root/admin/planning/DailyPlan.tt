@@ -287,18 +287,15 @@
                     [% SET audit_rank = 0 %]
                     [% FOREACH at IN audit_todos %]
                     [% SET audit_rank = audit_rank + 1 %]
-                    <div id="ap-row-[% at.record_id %]" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
-                        border-radius:6px;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];
-                        background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
+                    <div id="ap-row-[% at.record_id %]" style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
 
-                        [%# Rank badge %]
-                        <span style="min-width:26px;height:26px;border-radius:50%;background:#c45d00;color:#fff;
-                            display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
-                            [% IF at.is_root %]⚠[% ELSE %]↳[% END %]
+                        [%# Rank badge — col 1 %]
+                        <span style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                            <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
                         </span>
 
-                        [%# Main content %]
-                        <div style="flex:1;min-width:0;">
+                        [%# Main content — col 2 %]
+                        <div style="display:table-cell;vertical-align:top;">
                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                                 [%# Priority badge %]
                                 [% IF at.priority %]
@@ -345,17 +342,17 @@
                             </div>
                         </div>
 
-                        [%# Quick actions %]
-                        <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                        [%# Quick actions — col 3 %]
+                        <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
                             <a href="/todo/details?record_id=[% at.record_id %]"
-                               style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                               style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                             <a href="/log/log_form?todo_record_id=[% at.record_id %]"
-                               style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;text-align:center;" title="Add a time log for this todo">📋 Log</a>
+                               style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
                             [% IF is_admin %]
                             <button onclick="quickClose([% at.record_id %])"
-                                style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
+                                style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
                             [% END %]
-                        </div>
+                        </span>
                     </div>
                     [% END %]
                     [% ELSE %]
@@ -401,54 +398,67 @@
                 <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
                     <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
                     [% IF active_priorities && active_priorities.size %]
-                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;">[% active_priorities.size %] todo[% IF active_priorities.size != 1 %]s[% END %]</span>
+                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;"><span id="ap-visible-count">[% active_priorities.size %]</span> todo[% IF active_priorities.size != 1 %]s[% END %]</span>
                     [% END %]
-                    [% IF filter_site || filter_project %]
-                    <a href="/planning/daily#planning" style="font-size:0.78em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear filters</a>
-                    [% END %]
+
                 </div>
 
-                [%# ── Filter Bar ── %]
-                <div style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:8px 12px;margin-bottom:12px;display:flex;flex-direction:column;gap:8px;">
+                [%# ── Filter Bar — compact single row with collapsible dropdowns ── %]
+                <div id="ap-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:5px 10px;margin-bottom:12px;">
 
-                    [%# Site filter row (CSC only) %]
-                    [% IF is_csc && plan_sitenames && plan_sitenames.size %]
-                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Site:</span>
-                        <a href="/planning/daily[% IF filter_project %]?filter_project=[% filter_project %][% END %]#planning"
-                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
-                           [% IF !filter_site %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">All</a>
-                        [% FOREACH sname IN plan_sitenames %]
-                        <a href="/planning/daily?filter_site=[% sname %][% IF filter_project %]&filter_project=[% filter_project %][% END %]#planning"
-                           style="font-size:0.75em;padding:2px 10px;border-radius:12px;text-decoration:none;border:1px solid var(--border-color);
-                           [% IF filter_site == sname %]background:var(--primary-color);color:#fff;border-color:var(--primary-color)[% ELSE %]color:var(--text-color)[% END %]">[% sname %]</a>
-                        [% END %]
-                    </div>
+                    [%# Role multi-select — uses actual user profile roles %]
+                    [% IF ap_user_roles && ap_user_roles.size > 1 %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="role-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Role: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:140px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH ur IN ap_user_roles %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="role-cb" value="[% ur %]" checked onchange="applyAllFilters()">
+                                [% ur %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
                     [% END %]
 
-                    [%# Project + Sort row %]
-                    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;min-width:44px;">Focus:</span>
-                        [% IF ap_projects && ap_projects.size %]
-                        <select id="ap-project-filter" onchange="applyProjectFilter(this.value)"
-                            style="font-size:0.78em;padding:3px 6px;border:1px solid [% IF filter_project %]var(--primary-color)[% ELSE %]var(--border-color)[% END %];border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:220px;">
-                            <option value="">All Projects</option>
-                            [% FOREACH proj IN ap_projects %]
-                            <option value="[% proj.project_id %]" [% IF filter_project == proj.project_id %]selected[% END %]>
-                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
-                            </option>
+                    [%# Site multi-select (CSC only) — all sites from site table %]
+                    [% IF is_csc && ap_all_sitenames && ap_all_sitenames.size %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH sname IN ap_all_sitenames %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
+                                [% sname %]
+                            </label>
                             [% END %]
-                        </select>
-                        [% END %]
+                        </div>
+                    </details>
+                    [% END %]
 
-                        <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;margin-left:4px;">Sort:</span>
-                        <button onclick="sortTodos('priority')" id="sort-priority"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
-                        <button onclick="sortTodos('project')" id="sort-project"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
-                        <button onclick="sortTodos('due')" id="sort-due"
-                            style="font-size:0.75em;padding:2px 10px;border-radius:12px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due Date</button>
-                    </div>
+                    [%# Focus: project single-select %]
+                    [% IF ap_projects && ap_projects.size %]
+                    <select id="ap-project-filter" onchange="applyProjectFilterLocal(this.value)"
+                        style="font-size:0.78em;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:200px;">
+                        <option value="">Focus: All</option>
+                        [% FOREACH proj IN ap_projects %]
+                        <option value="[% proj.project_id %]">
+                            [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
+                        </option>
+                        [% END %]
+                    </select>
+                    [% END %]
+
+                    [%# Sort buttons %]
+                    <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;">Sort:</span>
+                    <button onclick="sortTodos('priority')" id="sort-priority"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
+                    <button onclick="sortTodos('project')" id="sort-project"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
+                    <button onclick="sortTodos('due')" id="sort-due"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due</button>
+                    <a href="#planning" onclick="clearAllFilters();return false;"
+                        style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
                 </div>
 
                 [% IF active_priorities && active_priorities.size %]
@@ -462,20 +472,19 @@
                     data-priority="[% ap.priority || 99 %]"
                     data-score="[% ap.ap_score || 9999 %]"
                     data-project="[% ap.project_name | html %]"
+                    data-project-id="[% ap.project_id || '' %]"
                     data-due="[% ap.due_date || '9999-12-31' %]"
-                    style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
-                    border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
-                    background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
-                    opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+                    data-site="[% ap.sitename || '' %]"
+                    data-role-cats="[% ap.role_cats || 'general' %]"
+                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
-                    [%# Rank badge %]
-                    <span class="rank-badge" style="min-width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;
-                        display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
-                        [% rank %]
+                    [%# Rank badge — col 1 %]
+                    <span class="rank-badge" style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                        <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.73em;font-weight:bold;">[% rank %]</span>
                     </span>
 
-                    [%# Main content %]
-                    <div style="flex:1;min-width:0;">
+                    [%# Main content — col 2 %]
+                    <div style="display:table-cell;vertical-align:top;">
                         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                             [%# Priority badge %]
                             [% IF ap.priority %]
@@ -537,17 +546,17 @@
                         </div>
                     </div>
 
-                    [%# Quick actions %]
-                    <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                    [%# Quick actions — col 3 %]
+                    <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
                         <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                           style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                         <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                           style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;text-align:center;" title="Add a time log for this todo">📋 Log</a>
+                           style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
                         [% IF is_admin %]
                         <button onclick="quickClose([% ap.record_id %])"
-                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
+                            style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
                         [% END %]
-                    </div>
+                    </span>
                 </div>
                 [% END %]
                 </div>[%# end #priorities-list %]
@@ -641,16 +650,80 @@
                 evt.stopPropagation();
                 location.reload();
             }
-            function applyProjectFilter(projId) {
-                var params = new URLSearchParams(window.location.search);
-                if (projId) {
-                    params.set('filter_project', projId);
-                } else {
-                    params.delete('filter_project');
-                }
-                var qs = params.toString();
-                window.location.href = '/planning/daily' + (qs ? '?' + qs : '') + '#planning';
+            var _activeProject = '';
+
+            function applyAllFilters() {
+                var allRoleCbs    = document.querySelectorAll('.role-cb');
+                var checkedRoles  = new Set(Array.from(document.querySelectorAll('.role-cb:checked')).map(function(cb){ return cb.value; }));
+                var allRoleVals   = new Set(Array.from(allRoleCbs).map(function(cb){ return cb.value; }));
+                var allSiteCbs    = document.querySelectorAll('.site-cb');
+                var checkedSites  = new Set(Array.from(document.querySelectorAll('.site-cb:checked')).map(function(cb){ return cb.value; }));
+                var siteFiltered  = allSiteCbs.length > 0 && checkedSites.size < allSiteCbs.length;
+
+                var cards = document.querySelectorAll('#priorities-list > div[id^="ap-row-"]');
+                var visible = 0;
+                cards.forEach(function(card) {
+                    var cardRoles = (card.dataset.roleCats || 'general').split(',');
+                    var showRole = cardRoles.some(function(cr) {
+                        if (cr === 'general') return true;
+                        if (!allRoleVals.has(cr)) return true;
+                        return checkedRoles.has(cr);
+                    });
+                    var showSite    = !siteFiltered || checkedSites.has(card.dataset.site || '');
+                    var showProject = !_activeProject || String(card.dataset.projectId || '') === String(_activeProject);
+                    var show = showRole && showSite && showProject;
+                    card.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                var countEl = document.getElementById('ap-visible-count');
+                if (countEl) countEl.textContent = visible;
+                _updateDropdownSummaries();
             }
+
+            function _updateDropdownSummaries() {
+                var roleSummary = document.getElementById('role-summary');
+                if (roleSummary) {
+                    var all = document.querySelectorAll('.role-cb');
+                    var checked = document.querySelectorAll('.role-cb:checked');
+                    roleSummary.textContent = (all.length === checked.length)
+                        ? 'Role: All \u25be'
+                        : 'Role: ' + Array.from(checked).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
+                }
+                var siteSummary = document.getElementById('site-summary');
+                if (siteSummary) {
+                    var allS = document.querySelectorAll('.site-cb');
+                    var checkedS = document.querySelectorAll('.site-cb:checked');
+                    siteSummary.textContent = (allS.length === checkedS.length)
+                        ? 'Site: All \u25be'
+                        : 'Site: ' + Array.from(checkedS).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
+                }
+            }
+
+            function applyProjectFilterLocal(projId) {
+                _activeProject = projId || '';
+                var sel = document.getElementById('ap-project-filter');
+                if (sel) { sel.style.borderColor = projId ? 'var(--primary-color)' : 'var(--border-color)'; }
+                applyAllFilters();
+            }
+
+            function clearAllFilters() {
+                document.querySelectorAll('.role-cb,.site-cb').forEach(function(cb){ cb.checked = true; });
+                _activeProject = '';
+                var sel = document.getElementById('ap-project-filter');
+                if (sel) { sel.value = ''; sel.style.borderColor = 'var(--border-color)'; }
+                applyAllFilters();
+            }
+
+            function initFilters() {
+                applyAllFilters();
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.ap-dropdown')) {
+                        document.querySelectorAll('.ap-dropdown[open]').forEach(function(d){ d.removeAttribute('open'); });
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', initFilters);
             function sortTodos(by) {
                 var list = document.getElementById('priorities-list');
                 if (!list) return;

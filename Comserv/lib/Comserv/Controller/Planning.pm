@@ -317,6 +317,7 @@ sub daily :Path('/planning/daily') :Args {
         my %row_by_id       = map { $_->record_id => $_ } @rows;
         my %proj_cache;
         my %ap_projects_seen;
+        my %ap_role_cats_seen;
         my $now_epoch       = time();
 
         my @scored;
@@ -373,6 +374,11 @@ sub daily :Path('/planning/daily') :Args {
                 };
             }
 
+            $h{role_cats} = $self->_classify_todo_roles(
+                $h{project_name} // '', $h{project_code} // '', $h{subject} // ''
+            );
+            $ap_role_cats_seen{$_} = 1 for split ',', $h{role_cats};
+
             push @scored, \%h;
         }
 
@@ -388,7 +394,22 @@ sub daily :Path('/planning/daily') :Args {
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
-        $c->stash(ap_projects => \@ap_projects_list);
+        my @ap_role_cats_list = sort keys %ap_role_cats_seen;
+
+        my @ap_all_sitenames;
+        if ($is_csc) {
+            eval {
+                my $site_rows = $c->model('Site')->get_all_sites($c);
+                @ap_all_sitenames = sort map { $_->name } @$site_rows;
+            };
+        }
+
+        $c->stash(
+            ap_projects      => \@ap_projects_list,
+            ap_role_cats     => \@ap_role_cats_list,
+            ap_user_roles    => $user_roles,
+            ap_all_sitenames => \@ap_all_sitenames,
+        );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch active priorities: $@") if $@;
@@ -705,6 +726,29 @@ sub daily_log :Path('/planning/daily_log') :Args(0) {
 
     my $result = $self->_daily_log_action($c, $action, $username, $user_id);
     $c->response->body(encode_json($result));
+}
+
+=head2 _classify_todo_roles
+
+Classify a todo into one or more role categories based on project name,
+project code, and subject keywords.  Returns a comma-separated string
+from the set: developer, editor, admin, general.
+
+=cut
+
+sub _classify_todo_roles {
+    my ($self, $project_name, $project_code, $subject) = @_;
+    my $text = lc(join(' ', grep { defined $_ && $_ ne '' }
+        $project_name // '', $project_code // '', $subject // ''));
+    my @roles;
+    push @roles, 'editor'
+        if $text =~ /\b(ency|encyclopedia|document|content|wiki|article|unresolved|constituent|glossary|editorial|text.?content|page.?content)\b/;
+    push @roles, 'admin'
+        if $text =~ /\b(helpdesk|help.desk|ticket|server.?health|health.?monitor|disk|security|backup|smtp|certificate|ssl|dns|network|deploy|docker|container|production.?server|prod.?server)\b/;
+    push @roles, 'developer'
+        if $text =~ /\b(catalyst|schema|database|db|migration|module|controller|api|script|perl|javascript|js|css|html|refactor|implement|debug|build|3d.?print|inventory|shop|workshop|membership|planning|points|comserv|infrastructure|upgrade|fix|test|code|system|json|endpoint)\b/;
+    push @roles, 'general' unless @roles;
+    return join(',', @roles);
 }
 
 =head2 _run_audit_scan
