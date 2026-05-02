@@ -398,6 +398,49 @@
         }
         
         const agents = state.agentsConfig.agents;
+
+        // On todo/project detail pages, pick the agent based on the todo subject text
+        // rather than the URL — the subject tells us which domain the work belongs to.
+        const isTodoDetail    = pathname.startsWith('/todo/details') || pathname.startsWith('/todo/view');
+        const isProjectDetail = pathname.startsWith('/project/details');
+        if (isTodoDetail || isProjectDetail) {
+            // Gather candidate text: page <h1>, <h2>, <title>, and the first .subject / .todo-subject element
+            const candidateEls = [
+                document.querySelector('h1'),
+                document.querySelector('h2'),
+                document.querySelector('.todo-subject'),
+                document.querySelector('.subject'),
+                document.querySelector('.todo-title'),
+                document.querySelector('[data-todo-subject]'),
+            ];
+            const candidateText = candidateEls
+                .filter(Boolean)
+                .map(function(el) { return el.textContent || el.getAttribute('data-todo-subject') || ''; })
+                .join(' ')
+                .toUpperCase();
+
+            if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                console.debug('Agent selected from todo content: ency');
+                return agents.ency;
+            }
+            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
+                console.debug('Agent selected from todo content: bmaster');
+                return agents.bmaster;
+            }
+            if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                console.debug('Agent selected from todo content: inventory');
+                return agents.inventory;
+            }
+            if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                console.debug('Agent selected from todo content: helpdesk');
+                return agents.helpdesk;
+            }
+            // Todo/project detail with no domain match → use planning agent
+            if (agents.planning) {
+                console.debug('Agent selected for todo/project detail: planning');
+                return agents.planning;
+            }
+        }
         
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
@@ -539,7 +582,7 @@
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname,
+            page_path: pathname + (window.location.search || ''),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -1414,9 +1457,9 @@
         });
     }
     
-    // Open chat in a separate browser window — user can drag it to another monitor.
-    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
-    // footer) so the popup always stays clean regardless of link clicks or refreshes.
+    // Open chat in a separate browser popup window — the user can drag it anywhere on
+    // the screen or to a second monitor.  Uses /ai/widget (no site nav/header/footer).
+    // Falls back to the inline panel if the browser blocks popups.
     function detachToPopup() {
         // If a popup is already open, bring it to front and return
         if (state._popupWindow && !state._popupWindow.closed) {
@@ -1444,6 +1487,7 @@
 
         if (popup) {
             state._popupWindow = popup;
+            // Mark the chat button as "popup active" so the user knows where the chat is
             const chatButton = document.getElementById('chat-button');
             if (chatButton) {
                 chatButton.classList.add('popup-active');
@@ -1457,6 +1501,7 @@
                         chatButton.classList.remove('popup-active');
                         chatButton.title = 'Open AI assistant';
                     }
+                    // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
                         if (popupConvId) {
@@ -3463,6 +3508,61 @@
             return;
         }
 
+        // navigate: open a URL in a new tab without any pre-fill
+        if (actionObj.action === 'navigate') {
+            const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
+            if (navUrl) {
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
+        // navigate_and_fill: store field values in localStorage then open the target page.
+        // The widget init on the target page checks for a pending fill and applies it.
+        if (actionObj.action === 'navigate_and_fill') {
+            const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
+            const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
+            if (nfUrl) {
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
+                try {
+                    localStorage.setItem('ai_pending_fill', JSON.stringify({
+                        url:     nfUrl,
+                        fields:  nfFields,
+                        ts:      Date.now()
+                    }));
+                } catch(e) { console.warn('localStorage write failed', e); }
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                const fieldCount = Object.keys(nfFields).length;
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                    + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
         fetch('/ai/action', {
             method: 'POST',
             credentials: 'include',
@@ -3615,6 +3715,16 @@
             }
         } catch(e) {}
 
+        // When opened via task_id=N, store the todo details so every chat request
+        // sends page_path=/todo/details?record_id=N which triggers single-todo context injection.
+        if (window.AI_TASK_CONTEXT && window.AI_TASK_CONTEXT.record_id) {
+            var tc = window.AI_TASK_CONTEXT;
+            state.taskContext = tc;
+            // Override page path so server-side _get_module_data uses single-todo fast-path
+            state.taskPagePath = '/todo/details?record_id=' + tc.record_id;
+            console.debug('[AI] Task context loaded: todo #' + tc.record_id, tc.subject);
+        }
+
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
         loadPersistedState();
@@ -3622,8 +3732,30 @@
         // Initialize agent context and user providers
         loadAgentsConfig().then(function() {
             state.pageContext = detectPageContext();
+            // Override page_path so single-todo context injection triggers for task_id links
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
+            // Auto-select agent based on task subject keywords (same logic as todo/details pages)
+            if (window.AI_TASK_CONTEXT && state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (window.AI_TASK_CONTEXT.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    console.debug('[AI] Task-context agent selected:', picked.id);
+                }
+            }
         }).catch(function() {
             state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
         });
         loadUserProviders().catch(function() {});
 
@@ -3640,7 +3772,10 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
-            if (!state.pageContext) state.pageContext = detectPageContext();
+            if (!state.pageContext) {
+                state.pageContext = detectPageContext();
+                if (state.taskPagePath) state.pageContext.page_path = state.taskPagePath;
+            }
 
             // Client-side navigation interception
             const navMatch = prompt.match(NAV_RE);
@@ -3798,6 +3933,17 @@
             .chat-icon {
                 margin-right: 8px;
                 font-size: 1.2em;
+            }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
             }
             
             .chat-panel {
@@ -4218,6 +4364,50 @@
                 openChat();
             }
         }
+
+        // Check for a pending navigate_and_fill stored by another tab.
+        // If the current URL matches the stored target, apply the field values and clear.
+        (function() {
+            try {
+                var pending = localStorage.getItem('ai_pending_fill');
+                if (!pending) return;
+                var pdata = JSON.parse(pending);
+                if (!pdata || !pdata.url || !pdata.fields) return;
+                // Expire after 2 minutes
+                if (Date.now() - (pdata.ts || 0) > 120000) {
+                    localStorage.removeItem('ai_pending_fill');
+                    return;
+                }
+                // Normalize both URLs to just pathname+search for comparison
+                var targetPath = pdata.url.replace(/^https?:\/\/[^\/]+/, '');
+                var currentPath = window.location.pathname + window.location.search;
+                if (targetPath !== currentPath) return;
+                // Clear immediately to avoid re-applying on refresh
+                localStorage.removeItem('ai_pending_fill');
+                // Short delay so the page form has rendered
+                setTimeout(function() {
+                    _executeFillForm({ fields: pdata.fields });
+                    // Show notification in widget if it exists
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'System';
+                        var el = document.createElement('div');
+                        el.className = 'message system-message';
+                        el.textContent = '🪄 AI pre-filled form fields. Please review before saving.';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(el);
+                        chatMessages.appendChild(wrapper);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 600);
+            } catch(e) {
+                console.warn('ai_pending_fill check failed:', e);
+            }
+        })();
 
         // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
         if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {

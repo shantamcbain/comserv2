@@ -174,6 +174,47 @@ sub index :Path :Args(0) {
     # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -186,6 +227,7 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -638,6 +680,13 @@ sub generate :Local :Args(0) {
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
+        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+        # planning agent gets less room because its own prompt already includes the project list.
+        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+        if (length($module_data_gen) > $inject_cap) {
+            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+        }
         $system .= "\n\n" . $module_data_gen;
     }
     my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
@@ -985,6 +1034,11 @@ sub generate :Local :Args(0) {
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
 
+            # For force_large agents (planning/ency/bmaster) a cold start of phi4/14b
+            # can take 5-10+ minutes and always times out. Auto-fall back to Grok when:
+            #   - force_large is active (not a manual model override)
+            #   - the selected large model is NOT in memory
+            #   - a Grok API key is configured for this user
             if ($force_large && $is_cold_start && !$manual_model) {
                 my $fallback_key = '';
                 eval {
@@ -3945,6 +3999,66 @@ sub _get_module_data {
     my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
+    # Fast-path: when the widget is on /todo/details?record_id=N, inject ONLY that todo
+    # plus any todos that it is blocked by. No need to load all active todos.
+    my $page_path_req = $c->req->param('page_path') || '';
+    # Also check the JSON body path (already parsed into param by Catalyst for form posts;
+    # for JSON bodies we fall back to the stash or request body — safe to do a quick regex check).
+    if (!$page_path_req) {
+        my $raw = eval { $c->req->content } // '';
+        ($page_path_req) = ($raw =~ /"page_path"\s*:\s*"([^"]+)"/) if $raw;
+    }
+    my ($single_todo_id) = ($page_path_req =~ m{/todo/(?:details|view)[?&;](?:.*&)?record_id=(\d+)}i);
+
+    if ($single_todo_id && $want_todos) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+                my $t  = $rs->find($single_todo_id);
+                if ($t) {
+                    my $stat_label = ($t->status // 0) == 1 ? 'NEW'
+                                   : ($t->status // 0) == 2 ? 'IN PROGRESS'
+                                   : ($t->status // 0) == 3 ? 'DONE'
+                                   : 'status=' . ($t->status // '?');
+                    my $block = "CURRENT TODO #$single_todo_id:\n"
+                        . "  Subject:  " . ($t->subject   // 'Untitled') . "\n"
+                        . "  Status:   $stat_label\n"
+                        . "  Priority: P" . ($t->priority // '?') . "\n"
+                        . "  Due:      " . ($t->due_date  // 'none') . "\n"
+                        . "  Project:  " . (do { my $pid = $t->project_id; $pid ? "id=$pid" : 'none' }) . "\n"
+                        . "  Notes:    " . ($t->description // '') . "\n";
+
+                    # Look up any todos this one explicitly blocks or is blocked by
+                    eval {
+                        if ($t->can('blocker_id') && $t->blocker_id) {
+                            my $blocker = $rs->find($t->blocker_id);
+                            if ($blocker) {
+                                $block .= "BLOCKING TODO #" . $t->blocker_id . ":\n"
+                                    . "  Subject: " . ($blocker->subject // '') . "\n"
+                                    . "  Status:  " . (($blocker->status // 0) == 2 ? 'IN PROGRESS' : ($blocker->status // 0) == 3 ? 'DONE' : 'NEW') . "\n";
+                            }
+                        }
+                        # Any other todos that list this one as their blocker
+                        my @blocked_by = $rs->search({ blocker_id => $single_todo_id, status => { '!=' => 3 } })->all;
+                        if (@blocked_by) {
+                            $block .= "TODOS BLOCKED BY THIS (#$single_todo_id):\n";
+                            for my $b (@blocked_by) {
+                                $block .= "  [#" . $b->record_id . "] " . ($b->subject // '') . "\n";
+                            }
+                        }
+                    };
+                    $block .= "Edit at /todo/edit?record_id=$single_todo_id | All todos: /todo";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Single-todo fetch error: $@") if $@;
+        # Skip the bulk todo fetch below since we already have what we need
+        $want_todos = 0;
+    }
+
     if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -3969,9 +4083,11 @@ sub _get_module_data {
                     $site_filter{sitename} = $site_name;
                 }
 
+                # Cap rows: planning agent on CSC admin can otherwise inject hundreds of todos
+                my $todo_row_cap = (lc($agent_id) eq 'planning') ? 20 : 40;
                 my @todos = $rs->search(
                     \%site_filter,
-                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 40 }
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => $todo_row_cap }
                 );
 
                 if (@todos) {
@@ -8734,17 +8850,25 @@ STEP 2 — LOOKUP from injected data:
   The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
   Check each field — fields showing "(empty)" need to be filled in.
 
-STEP 3 — NAVIGATE: Tell the user which page to open:
-  - Constituent exists (stub) → /ENCY/Constituent/edit?record_id=N
-  - Constituent does not exist → /ENCY/Constituent/add
+STEP 3 — NAVIGATE AND PRE-FILL: Open the correct form and pre-fill it automatically.
+  Using your botanical/chemical knowledge, populate ALL fields you know for the constituent.
+  Emit ONE navigate_and_fill action (on its own line) — the browser will open the form and
+  fill the fields automatically. Replace N with the actual record_id number:
+
+  For an existing stub constituent:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/edit?record_id=N", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS", "iupac_name": "IUPAC", "cas_number": "CAS", "therapeutic_action": "THERAPEUTIC_USES", "pharmacological_effects": "EFFECTS", "found_in_herbs": "HERB1, HERB2", "url": "https://pubchem.ncbi.nlm.nih.gov/compound/CID"}}]
+
+  For a constituent that does not exist yet:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS"}}]
+
+  After the navigate_and_fill line, briefly list the values you suggested so the user can verify them.
 
 STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
   [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
 
-STEP 5 — PRE-FILL: Using your botanical/chemical knowledge, suggest values for each (empty) field.
-  For common plant constituents, provide: chemical_formula, chemical_class, therapeutic_action,
-  pharmacological_effects, found_in_herbs, and a PubChem or Wikipedia url.
-  Present these as a clear list so the user can copy-paste into the edit form.
+STEP 5 — CONFIRM: Tell the user the form has been opened and pre-filled, and ask them to review
+  and save. Example: "I've opened the edit form for constituent #N and pre-filled the fields with
+  the information above. Please review and click Save."
 
 STEP 6 — REMIND when the user says they are done:
   "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
@@ -8962,6 +9086,13 @@ sub _build_planning_system_prompt {
 
     return <<END_PROMPT;
 You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## AGENT ROUTING — check first before answering:
+If the user's prompt clearly belongs to a specialist agent, say so BEFORE answering:
+- Contains "ENCY", "herb", "constituent", "botanical", "Quercetin", or similar → "💡 Tip: Switch the agent to **Encyclopedia (ENCY)** for a better answer on this topic."
+- Contains "BMaster", "hive", "apiary", "inspection", "varroa", "queen" → "💡 Tip: Switch the agent to **BMaster** for beekeeping-specific help."
+- Contains "inventory", "stock", "SKU", "BOM" → "💡 Tip: Switch to **Inventory** agent."
+Give the hint on its own line, then continue with whatever partial help you can offer.
 
 ## DAILY LOG ENTRIES — handle immediately with NO extra questions:
 When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
