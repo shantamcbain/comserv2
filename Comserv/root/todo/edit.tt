@@ -125,8 +125,7 @@
     <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
-            <label for="sitename">Site Name:</label>
-            <input type="text" id="sitename" name="sitename" value="[% record.get_column('sitename') %]" required>
+            [% INCLUDE 'todo/site_list.tt' %]
         </div>
         
         <div class="form-group">

@@ -584,6 +584,12 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $current_status   = $self->normalize_status($todo->get_column('status'));
     my $current_priority = $todo->get_column('priority') // 5;
 
+    my $edit_sites = [];
+    eval {
+        my $site_model = $c->model('Site');
+        $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
+    };
+
     $c->stash(
         record           => $todo,
         current_status   => $current_status,
@@ -594,6 +600,8 @@ sub edit :Path('/todo/edit') :Args(1) {
         build_priority   => $self->priority_options,
         build_status     => \%status_options,
         return_to        => $return_to,
+        sites            => $edit_sites,
+        form_data        => { sitename => $todo->get_column('sitename') },
         template         => 'todo/edit.tt'
     );
 
