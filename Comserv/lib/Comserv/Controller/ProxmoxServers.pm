@@ -116,14 +116,23 @@ sub add_server :Path('add_server') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_server', "Processing add server form submission");
 
     # Get form parameters
-    my $server_id = $c->req->params->{server_id} || 'default';
+    my $server_id   = $c->req->params->{server_id} || 'default';
+    my $token_user  = $c->req->params->{token_user}  || '';
+    my $token_value = $c->req->params->{token_value} || '';
+
+    # If user pasted the full token string (USER@REALM!TOKENID=UUID) into token_user,
+    # auto-split it so they don't have to manually separate the two parts.
+    if ($token_user =~ /^([^=]+)=([0-9a-f\-]{36})\s*$/i && !$token_value) {
+        ($token_user, $token_value) = ($1, $2);
+    }
+
     my $credentials = {
-        name => $c->req->params->{name} || $server_id,
-        host => $c->req->params->{host} || '',
-        api_url_base => $c->req->params->{api_url_base} || '',
-        token_user => $c->req->params->{token_user} || '',
-        token_value => $c->req->params->{token_value} || '',
-        node => $c->req->params->{node} || 'pve',
+        name           => $c->req->params->{name} || $server_id,
+        host           => $c->req->params->{host} || '',
+        api_url_base   => $c->req->params->{api_url_base} || '',
+        token_user     => $token_user,
+        token_value    => $token_value,
+        node           => $c->req->params->{node} || 'pve',
         image_url_base => $c->req->params->{image_url_base} || '',
     };
     

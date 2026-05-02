@@ -1001,16 +1001,12 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        // Chat bubble click:
-        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
-        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
-        //   Falls back to the inline panel if the browser blocks popups.
-        chatButton.addEventListener('click', function() {
-            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
-        });
+        // Chat bubble click: always opens the inline floating panel.
+        // The ⤢ button is the dedicated "detach to separate window" action.
+        chatButton.addEventListener('click', function() { openChat(); });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        // ⤢ button: focus / re-open the popup window if it was closed or hidden
+        // ⤢ button: open / focus the detached popup window
         document.getElementById('detach-chat').addEventListener('click', function() {
             if (state._popupWindow && !state._popupWindow.closed) {
                 state._popupWindow.focus();
@@ -4179,6 +4175,7 @@
                 background-color: #fafafa;
                 border-top: 1px solid #ddd;
                 color: #555;
+                flex-shrink: 0;
             }
             
             .chat-status.connected {
@@ -4212,6 +4209,8 @@
                 align-items: center;
                 gap: 10px;
                 font-size: 13px;
+                flex-shrink: 0;
+                flex-wrap: wrap;
             }
             
             .provider-selector label {
@@ -4249,9 +4248,13 @@
             }
             
             .chat-input {
-                padding: 10px;
+                padding: 8px 10px;
                 border-top: 1px solid var(--border-color);
                 display: flex;
+                flex-direction: column;
+                gap: 4px;
+                flex-shrink: 0;   /* never shrink — always visible at bottom */
+                background: var(--background-color, #fff);
             }
             
             #message-input {
@@ -4259,11 +4262,16 @@
                 border: 1px solid #ccc;
                 border-radius: 4px;
                 padding: 8px;
-                resize: none;
+                resize: vertical;
+                min-height: 40px;
+                max-height: 120px;
                 height: 40px;
-                margin-right: 8px;
+                margin-right: 0;
                 background-color: #fff;
                 color: #222;
+                overflow-y: auto;
+                font-family: inherit;
+                font-size: inherit;
             }
             
             #send-message {
