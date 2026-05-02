@@ -13,6 +13,11 @@
 [% ELSIF auth_error && auth_error != 'none' %]
 <div class="error-message">
     [% auth_error %]
+    <p style="margin-top:0.75em;">
+        <a href="[% c.uri_for('/proxmox_servers') %]">Manage Proxmox Servers</a>
+        &nbsp;&mdash;&nbsp;
+        <a href="[% c.uri_for('/proxmox_servers/add') %]">Add a Server</a>
+    </p>
 </div>
 [% END %]
 
