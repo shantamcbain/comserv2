@@ -20,14 +20,21 @@
 
 <h1>Add New Herb</h1>
 
+[% IF return_to %]
+<div class="alert alert-info" style="margin-bottom:0.75em;">
+  Adding this herb so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
+  &mdash; you will be returned there automatically after saving.
+</div>
+[% END %]
 
 <form method="POST" action="/ENCY/add_herb">
+[% IF return_to %]<input type="hidden" name="return_to" value="[% return_to | html %]" />[% END %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
-    <input type="text" id="botanical_name" name="botanical_name" required><br>
+    <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
 
     <label for="common_names">Common Names:</label><br>
-    <input type="text" id="common_names" name="common_names" required><br>
+    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
 
     <label for="therapeutic_action">Therapeutic Action:</label><br>
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
