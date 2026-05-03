@@ -165,14 +165,14 @@ __PACKAGE__->add_unique_constraint(
 # Relationships
 __PACKAGE__->belongs_to(
     'parent_queen',
-    'Comserv::Model::Schema::Ency::Result::QueenEnhanced',
+    'Comserv::Model::Schema::Ency::Result::Beekeeping::QueenEnhanced',
     'parent_queen_id',
     { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(
     'offspring_queens',
-    'Comserv::Model::Schema::Ency::Result::QueenEnhanced',
+    'Comserv::Model::Schema::Ency::Result::Beekeeping::QueenEnhanced',
     'parent_queen_id',
     { cascade_delete => 0 }
 );
@@ -442,7 +442,7 @@ sub calculate_performance_score {
 
 =head1 NAME
 
-Comserv::Model::Schema::Ency::Result::QueenEnhanced - Enhanced Queen tracking with comprehensive lifecycle management
+Comserv::Model::Schema::Ency::Result::Beekeeping::QueenEnhanced - Enhanced Queen tracking with comprehensive lifecycle management
 
 =head1 DESCRIPTION
 
