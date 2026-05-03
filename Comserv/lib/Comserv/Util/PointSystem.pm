@@ -725,6 +725,51 @@ sub bill_time_log {
                 }
             }
 
+            if ($billable && $todo && $todo->project_id) {
+                my $project = eval { $schema->resultset('Project')->find($todo->project_id) };
+                if ($project && $project->sitename && $project->sitename ne 'CSC') {
+                    my $ar_acct  = eval { $schema->resultset('CoaAccount')->find({ accno => '1100' }) };
+                    my $rev_acct = eval { $schema->resultset('CoaAccount')->find({ accno => '4250' }) };
+                    if ($ar_acct && $rev_acct) {
+                        my $today   = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+                        my $ref     = sprintf('BIL-LOG-%d', $log_row->record_id);
+                        my $gl_desc = sprintf('Client billing — %s — %s — %.2f hrs',
+                            $project->sitename,
+                            $log_row->abstract // 'work session',
+                            $minutes / 60,
+                        );
+                        my $gl = $schema->resultset('GlEntry')->create({
+                            reference   => $ref,
+                            description => $gl_desc,
+                            entry_type  => 'sale',
+                            post_date   => $today,
+                            approved    => 1,
+                            currency    => 'CAD',
+                            sitename    => 'CSC',
+                        });
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl->id,
+                            account_id  => $ar_acct->id,
+                            amount      => $points + 0,
+                            memo        => 'AR — ' . $gl_desc,
+                            sort_order  => 1,
+                        });
+                        $schema->resultset('GlEntryLine')->create({
+                            gl_entry_id => $gl->id,
+                            account_id  => $rev_acct->id,
+                            amount      => -($points + 0),
+                            memo        => 'Revenue — ' . $gl_desc,
+                            sort_order  => 2,
+                        });
+                        $self->_log->log_with_details(
+                            $self->_c, 'info', __FILE__, __LINE__, 'bill_time_log',
+                            sprintf('GL entry %s created for client %s (%.4f pts)',
+                                $ref, $project->sitename, $points)
+                        );
+                    }
+                }
+            }
+
             $log_row->update({ points_processed => 1 });
         });
     };

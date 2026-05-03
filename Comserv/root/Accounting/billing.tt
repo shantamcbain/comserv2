@@ -1,0 +1,139 @@
+[% PageVersion = 'Accounting/billing.tt,v 0.01 2026/05/03 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg   %]<div class="error">[%   c.flash.error_msg   | html %]</div>[% END %]
+[% IF report_error %]
+<div class="error" style="font-size:0.85em;">Report error: [% report_error | html %]</div>
+[% END %]
+
+<div class="app-container">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;">
+    <h1 style="margin:0;">&#128176; Billable Time Report</h1>
+    <a href="/Accounting" style="font-size:0.85em;color:var(--primary-color);">← Accounting</a>
+  </div>
+
+  [%# ── Filters ──────────────────────────────────────────────────────── %]
+  <form method="GET" action="/Accounting/billing"
+        style="background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:8px;padding:1rem;margin:1rem 0;display:flex;flex-wrap:wrap;gap:0.75rem;align-items:flex-end;">
+
+    <div>
+      <label style="display:block;font-size:0.8em;font-weight:bold;margin-bottom:3px;">From</label>
+      <input type="date" name="date_from" value="[% date_from | html %]"
+             style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);">
+    </div>
+
+    <div>
+      <label style="display:block;font-size:0.8em;font-weight:bold;margin-bottom:3px;">To</label>
+      <input type="date" name="date_to" value="[% date_to | html %]"
+             style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);">
+    </div>
+
+    [% IF is_csc %]
+    <div>
+      <label style="display:block;font-size:0.8em;font-weight:bold;margin-bottom:3px;">Client</label>
+      <select name="client_sitename"
+              style="padding:4px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);">
+        <option value="">— All clients —</option>
+        [% FOREACH cl IN client_list %]
+        <option value="[% cl | html %]"[% IF cl == filter_client %] selected[% END %]>[% cl | html %]</option>
+        [% END %]
+      </select>
+    </div>
+    [% END %]
+
+    <button type="submit"
+            style="padding:5px 18px;border:1px solid var(--primary-color);border-radius:4px;background:var(--primary-color);color:#fff;cursor:pointer;font-size:0.9em;">
+      Filter
+    </button>
+    [% IF date_from || date_to || filter_client %]
+    <a href="/Accounting/billing"
+       style="padding:5px 12px;border:1px solid var(--border-color);border-radius:4px;font-size:0.85em;color:var(--text-muted-color);text-decoration:none;">
+      ✕ Clear
+    </a>
+    [% END %]
+  </form>
+
+  [%# ── Results ──────────────────────────────────────────────────────── %]
+  [% IF rows && rows.size %]
+
+    [% FOREACH row IN rows %]
+    <div class="content-section" style="margin-bottom:1.5rem;">
+
+      [%# Client header %]
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:0.75rem;padding-bottom:0.5rem;border-bottom:2px solid var(--primary-color);">
+        <h2 style="margin:0;font-size:1.1em;color:var(--primary-color);">
+          &#127760; [% row.client | html %]
+        </h2>
+        <div style="display:flex;gap:1.5rem;font-size:0.88em;">
+          <span><strong>[% row.total_hrs %]</strong> hrs</span>
+          <span><strong>$[% row.total_amt %] CAD</strong></span>
+        </div>
+      </div>
+
+      [%# Projects under this client %]
+      [% FOREACH proj IN row.project_list %]
+      <details style="margin-bottom:0.6rem;" open>
+        <summary style="cursor:pointer;padding:6px 10px;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:4px;display:flex;justify-content:space-between;list-style:none;-webkit-appearance:none;">
+          <span style="font-weight:bold;">&#128193; [% proj.name | html %]</span>
+          <span style="font-size:0.85em;color:var(--text-muted-color);">
+            [% proj.total_hrs %] hrs &nbsp;·&nbsp; $[% proj.total_amt %] CAD
+          </span>
+        </summary>
+
+        <table style="width:100%;border-collapse:collapse;font-size:0.85em;margin-top:4px;">
+          <thead>
+            <tr style="background:var(--bg-secondary);font-size:0.8em;text-align:left;">
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);">Log #</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);">Date</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);">Developer</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);">Description</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);text-align:right;">Hrs</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);text-align:right;">Rate</th>
+              <th style="padding:5px 8px;border-bottom:1px solid var(--border-color);text-align:right;">Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            [% FOREACH entry IN proj.logs %]
+            <tr style="border-bottom:1px solid var(--border-color);">
+              <td style="padding:5px 8px;">
+                <a href="/log/[% entry.log_id %]" style="color:var(--primary-color);">#[% entry.log_id %]</a>
+              </td>
+              <td style="padding:5px 8px;">[% entry.date | html %]</td>
+              <td style="padding:5px 8px;">[% entry.username | html %]</td>
+              <td style="padding:5px 8px;">[% entry.abstract | html %]</td>
+              <td style="padding:5px 8px;text-align:right;">[% entry.hours %]</td>
+              <td style="padding:5px 8px;text-align:right;">[% entry.rate %]</td>
+              <td style="padding:5px 8px;text-align:right;">$[% entry.amount %]</td>
+            </tr>
+            [% END %]
+          </tbody>
+          <tfoot>
+            <tr style="font-weight:bold;background:var(--bg-secondary);">
+              <td colspan="4" style="padding:5px 8px;text-align:right;">Project Total:</td>
+              <td style="padding:5px 8px;text-align:right;">[% proj.total_hrs %]</td>
+              <td style="padding:5px 8px;"></td>
+              <td style="padding:5px 8px;text-align:right;">$[% proj.total_amt %]</td>
+            </tr>
+          </tfoot>
+        </table>
+      </details>
+      [% END %]
+
+      [%# Client grand total %]
+      <div style="text-align:right;padding:6px 10px;font-weight:bold;font-size:0.95em;border-top:1px solid var(--border-color);margin-top:0.5rem;">
+        [% row.client | html %] Total: <span style="color:var(--primary-color);">[% row.total_hrs %] hrs &nbsp;·&nbsp; $[% row.total_amt %] CAD</span>
+      </div>
+    </div>
+    [% END %]
+
+  [% ELSE %]
+  <div style="text-align:center;padding:40px;color:var(--text-muted-color);background:var(--bg-secondary);border-radius:8px;">
+    <p style="margin:0 0 8px;font-size:1.1em;">No billable time entries found[% IF date_from || date_to || filter_client %] for the selected filters[% END %].</p>
+    <p style="margin:0;font-size:0.85em;">
+      Time logs must be <strong>status = Done</strong> and linked to a <strong>billable todo</strong> attached to a <strong>project</strong>.
+    </p>
+  </div>
+  [% END %]
+
+</div>

@@ -163,6 +163,10 @@
       </h2>
       <ul style="list-style:none;padding:0;margin:0;">
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
+          <a href="/Accounting/billing" style="font-weight:bold;">&#128176; Billable Time Report</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">Hours logged per client / project — generates GL entries</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
           <a href="/Inventory/print/stock" target="_blank">Stock Level Report</a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #f0f0f0;">
