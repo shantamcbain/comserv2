@@ -1802,26 +1802,23 @@ my @_PROSE_VERB_PATS = (
     qr/\b(absorbs|secretes|excretes|synthesizes|breaks|digests|moistens)\b/i,
 );
 
-my $_LEADING_VERB_RE = qr/
+my $_LEADING_VERB_RE = qr{
     ^(?:
-        # TCM / herbal action verbs (base and conjugated)
-        moisten s? | clear s? | tonif(?:y|ies) | drain s? | nourish(?:es)? |
-        disperse?s? | resolv(?:e|es) | transform s? | strengthen s? | soften s? |
-        warm s? | cool s? | purg(?:e|es) | regulat(?:e|es) | invigorat(?:e|es) |
-        supplement s? | fortif(?:y|ies) | purif(?:y|ies) | promot(?:e|es) |
-        enhanc(?:e|es) | facilitat(?:e|es) | moderat(?:e|es) | alleviat(?:e|es) |
-        reliev(?:e|es) | expel s? | scatter s? | astringe?s? | consolidat(?:e|es) |
-        # General medical/pharmacological action verbs
-        inhibit s? | stimulat(?:e|es) | activat(?:e|es) | modulat(?:e|es) |
-        regulat(?:e|es) | mediat(?:e|es) | trigger s? | induc(?:e|es) |
-        block s? | bind s? | releas(?:e|es) | break s? | digest s? |
-        absorb s? | excret(?:e|es) | secret(?:e|es) | scaveng(?:e|es) |
-        neutraliz(?:e|es) | detoxif(?:y|ies) | metaboliz(?:e|es) | oxidiz(?:e|es) |
-        catalyz(?:e|es) | protect s? | support s? | prevent s? |
-        # Ends in -ens (nearly always a verb in this domain)
+        moisten|moistens|clears?|tonif(?:y|ies)|drains?|nourish(?:es)?|
+        disperses?|resolves?|transforms?|strengthens?|softens?|
+        warms?|cools?|purges?|regulates?|invigorates?|
+        supplements?|fortif(?:y|ies)|purif(?:y|ies)|promotes?|
+        enhances?|facilitates?|moderates?|alleviates?|
+        relieves?|expels?|scatters?|astringes?|consolidates?|
+        inhibits?|stimulates?|activates?|modulates?|
+        mediates?|triggers?|induces?|
+        blocks?|binds?|releases?|breaks?|digests?|
+        absorbs?|excretes?|secretes?|scavenges?|
+        neutralizes?|detoxif(?:y|ies)|metabolizes?|oxidizes?|
+        catalyzes?|protects?|supports?|prevents?|
         \w+ens
     )\b
-/xi;
+}xi;
 
 sub _draft_clean_term {
     my ($self, $rs, $term) = @_;
