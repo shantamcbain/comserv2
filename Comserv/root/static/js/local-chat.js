@@ -1881,6 +1881,63 @@
             }
         }
 
+        // Client-side fast path: "enter the invoice" when accounting agent is active.
+        // Parses bill text from chat history and fires navigate_and_fill directly.
+        if (_agentId === 'accounting') {
+            const _pu2 = prompt.toUpperCase();
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT)\b/.test(_pu2);
+            if (_enterIntent) {
+                const _chatMsgs = document.getElementById('chat-messages');
+                let _billText = prompt;
+                if (_chatMsgs) {
+                    _chatMsgs.querySelectorAll('.message').forEach(function(el) {
+                        _billText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _nfFields = {};
+                const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{2})/);
+                if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                const _dateM = _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (_dateM) _nfFields.invoice_date = _dateM[3] + '-' + _dateM[1] + '-' + _dateM[2];
+                const _payNumM = _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
+                if (_payNumM) _nfFields.invoice_number = _payNumM[1];
+                if (/Auto\s*Pay/i.test(_billText)) {
+                    const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
+                    _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
+                }
+                const _supplierM = _billText.match(/Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink/i);
+                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                _nfFields.description_0 = 'Account Payment';
+                _nfFields.quantity_0 = '1';
+                _nfFields.notes = _supplierName + ' autopay'
+                    + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                    + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
+                if (_nfFields.unit_cost_0) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening invoice form…';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    const _w = document.createElement('div');
+                    _w.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl = document.createElement('div');
+                    _lbl.className = 'msg-label';
+                    _lbl.textContent = 'Accounting Agent';
+                    const _el = document.createElement('div');
+                    _el.className = 'message ai-message';
+                    _el.innerHTML = 'Opening invoice form for <strong>' + _supplierName + '</strong>. '
+                        + 'Please select the supplier from the dropdown, then review and save.<br>'
+                        + '<small>Amount: $' + _nfFields.unit_cost_0
+                        + (_nfFields.invoice_date ? ' | Date: ' + _nfFields.invoice_date : '')
+                        + (_nfFields.auto_pay_method ? ' | ' + _nfFields.auto_pay_method : '') + '</small>';
+                    _w.appendChild(_lbl);
+                    _w.appendChild(_el);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_w); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
