@@ -41,7 +41,7 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    animal => 'Comserv::Model::Schema::Ency::Result::Animal',
+    animal => 'Comserv::Model::Schema::Ency::Result::Ency::Animal',
     'animal_id',
     { is_foreign_key_constraint => 0 },
 );

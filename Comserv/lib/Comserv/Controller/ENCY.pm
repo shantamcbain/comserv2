@@ -547,7 +547,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
                     $name = $e ? ($e->name || '') : '';
                     $url  = '/ENCY/Constituent/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'animal') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Animal')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Animal')->find($link->entity_id);
                     $name = $e ? ($e->common_name || '') : '';
                     $url  = '/ENCY/Animal/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'insect') {

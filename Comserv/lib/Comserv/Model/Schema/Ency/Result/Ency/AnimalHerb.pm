@@ -35,7 +35,7 @@ __PACKAGE__->set_primary_key('id');
 __PACKAGE__->add_unique_constraint(['animal_id', 'herb_id', 'interaction_type']);
 
 __PACKAGE__->belongs_to(
-    animal => 'Comserv::Model::Schema::Ency::Result::Animal',
+    animal => 'Comserv::Model::Schema::Ency::Result::Ency::Animal',
     'animal_id',
 );
 

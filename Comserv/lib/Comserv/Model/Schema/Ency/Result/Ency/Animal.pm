@@ -1,4 +1,4 @@
-package Comserv::Model::Schema::Ency::Result::Animal;
+package Comserv::Model::Schema::Ency::Result::Ency::Animal;
 
 use strict;
 use warnings;
