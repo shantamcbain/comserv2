@@ -33,9 +33,15 @@
 </p>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 <form action="[% IF disease.record_id %][% c.uri_for('/ENCY/Disease/edit') %][% ELSE %][% c.uri_for('/ENCY/Disease/add') %][% END %]" method="post">
 [% IF disease.record_id %]
 <input type="hidden" name="record_id" value="[% disease.record_id %]" />
+[% END %]
+[% IF return_to %]
+<input type="hidden" name="return_to"     value="[% return_to    | html %]" />
+<input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
+<input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
 [% END %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 [% END %]

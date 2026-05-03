@@ -36,7 +36,8 @@
 </p>
 
 [% IF edit_mode %]
-[% IF return_to %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
+[% IF return_to && !(resolve_field || resolve_type) %]
 <div class="alert alert-info" style="margin-bottom:0.75em;">
   Adding this constituent so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
   &mdash; you will be returned there automatically after saving.
@@ -47,7 +48,9 @@
 <input type="hidden" name="record_id" value="[% constituent.record_id %]" />
 [% END %]
 [% IF return_to %]
-<input type="hidden" name="return_to" value="[% return_to | html %]" />
+<input type="hidden" name="return_to"     value="[% return_to    | html %]" />
+<input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
+<input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
 [% END %]
 [% END %]
 
