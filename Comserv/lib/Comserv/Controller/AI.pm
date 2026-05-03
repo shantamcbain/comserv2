@@ -4234,7 +4234,7 @@ sub _get_module_data {
 
                 if ($const_id) {
                     $search_label = "id=$const_id";
-                    my $rec = $ency_schema->resultset('Constituent')->find($const_id);
+                    my $rec = $ency_schema->resultset('Ency::Constituent')->find($const_id);
                     if ($rec) {
                         # Full detail for the specific record so AI can pre-fill edit form
                         push @sections,
@@ -4262,7 +4262,7 @@ sub _get_module_data {
                     $search_term ||= '';
                     if ($search_term) {
                         $search_label = $search_term;
-                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
                             { -or => [
                                 name        => { like => "%$search_term%" },
                                 common_name => { like => "%$search_term%" },
@@ -4271,7 +4271,7 @@ sub _get_module_data {
                         )->all;
                     }
                     if (!@cons_rows) {
-                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
                             {}, { rows => 8, order_by => { -asc => 'name' } }
                         )->all;
                     }
@@ -4306,7 +4306,7 @@ sub _get_module_data {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
                 # Fetch yards for this site
-                my @yards = $schema->resultset('Yard')->search(
+                my @yards = $schema->resultset('Beekeeping::Yard')->search(
                     { sitename => $site_name },
                     { order_by => 'yard_name' }
                 )->all;
@@ -4314,7 +4314,7 @@ sub _get_module_data {
                 if (@yards) {
                     my @yard_lines;
                     for my $y (@yards) {
-                        my $hive_count = $schema->resultset('Hive')->search({
+                        my $hive_count = $schema->resultset('Beekeeping::Hive')->search({
                             yard_id => $y->id,
                             status  => 'active',
                         })->count;
@@ -4329,12 +4329,12 @@ sub _get_module_data {
 
                         # Show hives if bmaster agent or hive keywords
                         if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
-                            my @hives = $schema->resultset('Hive')->search(
+                            my @hives = $schema->resultset('Beekeeping::Hive')->search(
                                 { yard_id => $y->id },
                                 { order_by => 'hive_number', rows => 10 }
                             )->all;
                             for my $h (@hives) {
-                                my $last_insp = $schema->resultset('Inspection')->search(
+                                my $last_insp = $schema->resultset('Beekeeping::Inspection')->search(
                                     { hive_id => $h->id },
                                     { order_by => { -desc => 'inspection_date' }, rows => 1 }
                                 )->first;
@@ -7799,7 +7799,7 @@ sub action :Local :Args(0) {
 
         my $existing;
         eval {
-            $existing = $ency_model->ency_schema->resultset('Constituent')->search(
+            $existing = $ency_model->ency_schema->resultset('Ency::Constituent')->search(
                 { -or => [
                     name        => { like => $name },
                     common_name => { like => $name },
@@ -7909,7 +7909,7 @@ sub action :Local :Args(0) {
 
         my $yard_row;
         eval {
-            $yard_row = $schema->resultset('Yard')->create({
+            $yard_row = $schema->resultset('Beekeeping::Yard')->create({
                 %prefill,
                 current          => 0,
                 status           => 'active',
@@ -7941,7 +7941,7 @@ sub action :Local :Args(0) {
 
         my $yard_id = $params->{yard_id};
         unless ($yard_id) {
-            my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+            my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
             unless (@yards) {
                 $c->response->body(encode_json({
                     success => JSON::true,
@@ -7994,7 +7994,7 @@ sub action :Local :Args(0) {
         }
 
         my $hive_row;
-        eval { $hive_row = $schema->resultset('Hive')->create(\%prefill) };
+        eval { $hive_row = $schema->resultset('Beekeeping::Hive')->create(\%prefill) };
         if ($@ || !$hive_row) {
             $c->response->body(encode_json({ success => JSON::false, error => "Failed to create hive: $@" }));
             return;
@@ -8049,7 +8049,7 @@ sub action :Local :Args(0) {
         }
 
         my $queen_row;
-        eval { $queen_row = $schema->resultset('Queen')->create(\%prefill) };
+        eval { $queen_row = $schema->resultset('Beekeeping::Queen')->create(\%prefill) };
         if ($@ || !$queen_row) {
             $c->response->body(encode_json({ success => JSON::false, error => "Failed to create queen: $@" }));
             return;
@@ -8058,7 +8058,7 @@ sub action :Local :Args(0) {
 
         if ($params->{hive_id}) {
             eval {
-                $schema->resultset('QueenHiveAssignment')->create({
+                $schema->resultset('Beekeeping::QueenHiveAssignment')->create({
                     queen_id   => $queen_id,
                     hive_id    => $params->{hive_id} + 0,
                     start_date => $today,
@@ -8087,14 +8087,14 @@ sub action :Local :Args(0) {
         unless ($hive_id) {
             my $hive_number = $params->{hive_number} || '';
             if ($hive_number) {
-                my $hive_row = $schema->resultset('Hive')->search(
+                my $hive_row = $schema->resultset('Beekeeping::Hive')->search(
                     { hive_number => $hive_number, sitename => $sitename },
                     { rows => 1 }
                 )->first;
                 if ($hive_row) {
                     $hive_id = $hive_row->id;
                 } else {
-                    my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+                    my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
                     unless (@yards) {
                         $c->response->body(encode_json({
                             success => JSON::true,
@@ -8205,7 +8205,7 @@ sub action :Local :Args(0) {
         if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
 
         my $inspection_row;
-        eval { $inspection_row = $schema->resultset('Inspection')->create(\%insp) };
+        eval { $inspection_row = $schema->resultset('Beekeeping::Inspection')->create(\%insp) };
         if ($@ || !$inspection_row) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                 'action', "create_inspection failed: $@");
@@ -8242,7 +8242,7 @@ sub action :Local :Args(0) {
                 $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
 
                 my $dr;
-                eval { $dr = $schema->resultset('InspectionDetail')->create(\%detail) };
+                eval { $dr = $schema->resultset('Beekeeping::InspectionDetail')->create(\%detail) };
                 if ($@) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                         'action', "create_inspection_detail failed: $@");

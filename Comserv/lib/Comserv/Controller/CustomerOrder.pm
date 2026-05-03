@@ -67,7 +67,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
         my $error;
         eval {
             $schema->txn_do(sub {
-                my $order = $schema->resultset('InventoryCustomerOrder')->create({
+                my $order = $schema->resultset('Accounting::InventoryCustomerOrder')->create({
                     sitename       => $sitename,
                     customer_name  => $params->{customer_name},
                     customer_email => $params->{customer_email} || undef,
@@ -87,7 +87,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
                     my $price = 0;
                     my $item;
                     if ($l->{item_id}) {
-                        eval { $item = $schema->resultset('InventoryItem')->find($l->{item_id}) };
+                        eval { $item = $schema->resultset('Accounting::InventoryItem')->find($l->{item_id}) };
                         $price = $item ? ($item->unit_price || 0) : 0;
                     }
                     my $lt = $qty * $price;
@@ -115,7 +115,7 @@ sub order_new :Path('/CustomerOrder/new') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -141,7 +141,7 @@ sub order_list :Path('/CustomerOrder') :Args(0) {
     my $sitename = $self->_sitename($c);
     my @orders;
     eval {
-        @orders = $self->_schema($c)->resultset('InventoryCustomerOrder')->search(
+        @orders = $self->_schema($c)->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename },
             { order_by => { -desc => 'created_at' } }
         )->all;
@@ -166,7 +166,7 @@ sub order_view :Path('/CustomerOrder/view') :Args(1) {
     }
     my $order;
     eval {
-        $order = $self->_schema($c)->resultset('InventoryCustomerOrder')->find(
+        $order = $self->_schema($c)->resultset('Accounting::InventoryCustomerOrder')->find(
             $id, { prefetch => { lines => 'item' } }
         );
     };
@@ -190,7 +190,7 @@ sub order_status :Path('/CustomerOrder/status') :Args(1) {
     }
     my $status = $c->req->body_parameters->{status};
     eval {
-        my $order = $self->_schema($c)->resultset('InventoryCustomerOrder')->find($id);
+        my $order = $self->_schema($c)->resultset('Accounting::InventoryCustomerOrder')->find($id);
         $order->update({ status => $status }) if $order;
     };
     $c->flash->{error_msg}   = "Update failed: $@" if $@;
@@ -214,7 +214,7 @@ sub customer_list :Path('/CustomerOrder/customers') :Args(0) {
     my %customers;
 
     eval {
-        my @orders = $schema->resultset('InventoryCustomerOrder')->search(
+        my @orders = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename },
             { columns  => [qw(customer_name customer_email customer_phone created_at status)],
               order_by => { -desc => 'created_at' } }
@@ -237,7 +237,7 @@ sub customer_list :Path('/CustomerOrder/customers') :Args(0) {
     };
 
     eval {
-        my @invoices = $schema->resultset('InventoryCustomerInvoice')->search(
+        my @invoices = $schema->resultset('Accounting::InventoryCustomerInvoice')->search(
             { sitename => $sitename },
             { columns  => [qw(customer_name customer_email invoice_date total_amount payment_status)],
               order_by => { -desc => 'invoice_date' } }
@@ -293,11 +293,11 @@ sub customer_view :Path('/CustomerOrder/customer') :Args(0) {
         } else {
             $search{customer_name}  = $name;
         }
-        @orders = $schema->resultset('InventoryCustomerOrder')->search(
+        @orders = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             \%search,
             { prefetch => 'lines', order_by => { -desc => 'created_at' } }
         )->all;
-        @invoices = $schema->resultset('InventoryCustomerInvoice')->search(
+        @invoices = $schema->resultset('Accounting::InventoryCustomerInvoice')->search(
             \%search,
             { order_by => { -desc => 'invoice_date' } }
         )->all;

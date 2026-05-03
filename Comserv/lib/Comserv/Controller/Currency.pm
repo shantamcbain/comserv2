@@ -70,7 +70,7 @@ sub balance :Path('balance') :Args(0) {
     eval {
         my $ps = Comserv::Util::PointSystem->new(c => $c);
 
-        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+        my $acct = $c->model('DBEncy')->resultset('Accounting::PointAccount')
             ->find({ user_id => $user_id });
         if ($acct) {
             $bal             = $acct->balance + 0;
@@ -125,7 +125,7 @@ sub history :Path('history') :Args(0) {
         my $ps = Comserv::Util::PointSystem->new(c => $c);
         $bal = $ps->balance($user_id);
 
-        my $rs = $c->model('DBEncy')->resultset('PointLedger')->search(
+        my $rs = $c->model('DBEncy')->resultset('Accounting::PointLedger')->search(
             [
                 { to_user_id   => $user_id },
                 { from_user_id => $user_id },
@@ -183,7 +183,7 @@ sub purchase :Path('purchase') :Args(0) {
     eval {
         my $ps = Comserv::Util::PointSystem->new(c => $c);
         $balance  = $ps->balance($c->session->{user_id});
-        @packages = $c->model('DBEncy')->resultset('PointPackage')
+        @packages = $c->model('DBEncy')->resultset('Accounting::PointPackage')
             ->search({ is_active => 1 }, { order_by => 'sort_order' })->all;
     };
     if ($@) {

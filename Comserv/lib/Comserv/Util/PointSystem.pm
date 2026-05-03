@@ -109,7 +109,7 @@ sub _schema {
 # ---------------------------------------------------------------------------
 sub balance {
     my ($self, $user_id) = @_;
-    my $acct = $self->_schema->resultset('PointAccount')
+    my $acct = $self->_schema->resultset('Accounting::PointAccount')
         ->find({ user_id => $user_id });
     return $acct ? $acct->balance + 0 : 0;
 }
@@ -121,7 +121,7 @@ sub balance {
 # ---------------------------------------------------------------------------
 sub ensure_account {
     my ($self, $user_id) = @_;
-    return $self->_schema->resultset('PointAccount')->find_or_create(
+    return $self->_schema->resultset('Accounting::PointAccount')->find_or_create(
         { user_id => $user_id },
         { key => 'uq_point_accounts_user' },
     );
@@ -135,7 +135,7 @@ sub ensure_account {
 sub apply_joining_bonus {
     my ($self, $user_id) = @_;
 
-    my $already = $self->_schema->resultset('PointLedger')->search({
+    my $already = $self->_schema->resultset('Accounting::PointLedger')->search({
         to_user_id       => $user_id,
         transaction_type => 'joining_bonus',
     })->count;
@@ -186,7 +186,7 @@ sub credit {
 
     my $ledger;
     $self->_schema->txn_do(sub {
-        my $acct = $self->_schema->resultset('PointAccount')->search(
+        my $acct = $self->_schema->resultset('Accounting::PointAccount')->search(
             { user_id => $user_id },
             { for => 'update' },
         )->single || $self->ensure_account($user_id);
@@ -198,7 +198,7 @@ sub credit {
             lifetime_earned => ($acct->lifetime_earned || 0) + $amount,
         });
 
-        $ledger = $self->_schema->resultset('PointLedger')->create({
+        $ledger = $self->_schema->resultset('Accounting::PointLedger')->create({
             from_user_id     => undef,
             to_user_id       => $user_id,
             amount           => $amount,
@@ -237,7 +237,7 @@ sub debit {
 
     try {
         $self->_schema->txn_do(sub {
-            my $acct = $self->_schema->resultset('PointAccount')->search(
+            my $acct = $self->_schema->resultset('Accounting::PointAccount')->search(
                 { user_id => $user_id },
                 { for => 'update' },
             )->single;
@@ -253,7 +253,7 @@ sub debit {
                 lifetime_spent => ($acct->lifetime_spent || 0) + $amount,
             });
 
-            $self->_schema->resultset('PointLedger')->create({
+            $self->_schema->resultset('Accounting::PointLedger')->create({
                 from_user_id     => $user_id,
                 to_user_id       => $args{from_user_id},
                 amount           => $amount,
@@ -297,7 +297,7 @@ sub transfer {
 
     try {
         $self->_schema->txn_do(sub {
-            my $from_acct = $self->_schema->resultset('PointAccount')->search(
+            my $from_acct = $self->_schema->resultset('Accounting::PointAccount')->search(
                 { user_id => $from },
                 { for => 'update' },
             )->single;
@@ -305,7 +305,7 @@ sub transfer {
             die "Sender has insufficient points\n"
                 unless $from_acct && $from_acct->balance >= $amount;
 
-            my $to_acct = $self->_schema->resultset('PointAccount')->search(
+            my $to_acct = $self->_schema->resultset('Accounting::PointAccount')->search(
                 { user_id => $to },
                 { for => 'update' },
             )->single || $self->ensure_account($to);
@@ -322,7 +322,7 @@ sub transfer {
                 lifetime_earned => ($to_acct->lifetime_earned || 0) + $amount,
             });
 
-            $self->_schema->resultset('PointLedger')->create({
+            $self->_schema->resultset('Accounting::PointLedger')->create({
                 from_user_id     => $from,
                 to_user_id       => $to,
                 amount           => $amount,
@@ -364,7 +364,7 @@ sub record_payment {
 
     my $pmt;
     $self->_schema->txn_do(sub {
-        $pmt = $self->_schema->resultset('PaymentTransaction')->create({
+        $pmt = $self->_schema->resultset('Accounting::PaymentTransaction')->create({
             user_id                 => $args{user_id},
             payable_type            => $args{payable_type},
             payable_id              => $args{payable_id},
@@ -411,7 +411,7 @@ sub credit_site_account {
         unless looks_like_number($amount) && $amount > 0;
 
     $self->_schema->txn_do(sub {
-        my $acct = $self->_schema->resultset('SitePointAccount')->find_or_create(
+        my $acct = $self->_schema->resultset('Accounting::SitePointAccount')->find_or_create(
             { sitename => $sitename },
             { key => 'sitename' },
         );
@@ -440,7 +440,7 @@ sub apply_hosting_commission {
     my $schema = $self->_schema;
     my $result  = { commission => 0, royalty => 0 };
 
-    my $cost_cfg = $schema->resultset('HostingCostConfig')->search(
+    my $cost_cfg = $schema->resultset('Accounting::HostingCostConfig')->search(
         {}, { order_by => { -desc => 'id' }, rows => 1 }
     )->first;
 
@@ -461,7 +461,7 @@ sub apply_hosting_commission {
         $result->{commission} = $commission unless $@;
     }
 
-    my $founder_cfg = $schema->resultset('FounderRoyaltyConfig')->search(
+    my $founder_cfg = $schema->resultset('Accounting::FounderRoyaltyConfig')->search(
         { active => 1 }, { order_by => { -desc => 'id' }, rows => 1 }
     )->first;
 
@@ -501,7 +501,7 @@ sub convert {
     my ($amount, $from, $to) = @args{qw(amount from to)};
     return $amount if $from eq $to;
 
-    my $rs = $self->_schema->resultset('CurrencyRate');
+    my $rs = $self->_schema->resultset('Accounting::CurrencyRate');
     my $from_row = $rs->find({ currency_code => $from });
     my $to_row   = $rs->find({ currency_code => $to   });
 
@@ -525,12 +525,12 @@ sub display_amount {
 
     my $currency_code = 'CAD';
     if ($site) {
-        my $pref = $self->_schema->resultset('SiteCurrencyPreference')
+        my $pref = $self->_schema->resultset('Accounting::SiteCurrencyPreference')
             ->find({ site_id => $site->id });
         $currency_code = $pref->currency_code if $pref;
     }
 
-    my $rate_row = $self->_schema->resultset('CurrencyRate')
+    my $rate_row = $self->_schema->resultset('Accounting::CurrencyRate')
         ->find({ currency_code => $currency_code });
 
     my $converted = $rate_row
@@ -553,7 +553,7 @@ sub display_amount {
 sub ledger_for_user {
     my ($self, $user_id, $limit) = @_;
     $limit ||= 50;
-    return $self->_schema->resultset('PointLedger')->search(
+    return $self->_schema->resultset('Accounting::PointLedger')->search(
         [
             { to_user_id   => $user_id },
             { from_user_id => $user_id },
@@ -593,7 +593,7 @@ sub resolve_rate {
         [ effective_to   => undef, effective_to   => { '>=' => $today } ],
     );
 
-    my $rs = $self->_schema->resultset('PointRule')->search(
+    my $rs = $self->_schema->resultset('Accounting::PointRule')->search(
         {
             rule_type => $rule_type,
             is_active => 1,
@@ -703,7 +703,7 @@ sub bill_time_log {
             }
 
             if ($billable && $customer_user_id) {
-                my $acct = $schema->resultset('PointAccount')
+                my $acct = $schema->resultset('Accounting::PointAccount')
                     ->find({ user_id => $customer_user_id });
 
                 if ($acct && $acct->balance >= $points) {

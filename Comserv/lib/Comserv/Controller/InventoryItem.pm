@@ -1,4 +1,4 @@
-package Comserv::Model::Schema::Ency::Result::InventoryItem;
+package Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem;
 use strict;
 use warnings;
 use base 'DBIx::Class::Core';
@@ -185,31 +185,31 @@ __PACKAGE__->add_unique_constraint(unique_sku => ['sku']);
 
 __PACKAGE__->belongs_to(
     'marketplace_listing',
-    'Comserv::Model::Schema::Ency::Result::MarketplaceListing',
+    'Comserv::Model::Schema::Ency::Result::Accounting::MarketplaceListing',
     { 'foreign.id' => 'self.marketplace_listing_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 __PACKAGE__->has_many(
-    'stock_levels' => 'Comserv::Model::Schema::Ency::Result::InventoryStockLevel',
+    'stock_levels' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryStockLevel',
     { 'foreign.item_id' => 'self.id' },
     { cascade_delete => 1 }
 );
 
 __PACKAGE__->has_many(
-    'transactions' => 'Comserv::Model::Schema::Ency::Result::InventoryTransaction',
+    'transactions' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryTransaction',
     { 'foreign.item_id' => 'self.id' },
     { cascade_delete => 0 }
 );
 
 __PACKAGE__->has_many(
-    'assignments' => 'Comserv::Model::Schema::Ency::Result::InventoryAssignment',
+    'assignments' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryAssignment',
     { 'foreign.item_id' => 'self.id' },
     { cascade_delete => 0 }
 );
 
 __PACKAGE__->has_many(
-    'item_suppliers' => 'Comserv::Model::Schema::Ency::Result::InventoryItemSupplier',
+    'item_suppliers' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemSupplier',
     { 'foreign.item_id' => 'self.id' },
     { cascade_delete => 1 }
 );
@@ -220,40 +220,40 @@ __PACKAGE__->many_to_many(
 
 __PACKAGE__->belongs_to(
     'inventory_account',
-    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
     { 'foreign.id' => 'self.inventory_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 __PACKAGE__->belongs_to(
     'income_account',
-    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
     { 'foreign.id' => 'self.income_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 __PACKAGE__->belongs_to(
     'expense_account',
-    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
     { 'foreign.id' => 'self.expense_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 __PACKAGE__->belongs_to(
     'returns_account',
-    'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
     { 'foreign.id' => 'self.returns_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL' }
 );
 
 __PACKAGE__->has_many(
-    'bom_components' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
+    'bom_components' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemBOM',
     { 'foreign.parent_item_id' => 'self.id' },
     { cascade_delete => 1 }
 );
 
 __PACKAGE__->has_many(
-    'bom_used_in' => 'Comserv::Model::Schema::Ency::Result::InventoryItemBOM',
+    'bom_used_in' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemBOM',
     { 'foreign.component_item_id' => 'self.id' },
     { cascade_delete => 0 }
 );

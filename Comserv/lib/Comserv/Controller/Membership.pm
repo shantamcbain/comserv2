@@ -121,7 +121,7 @@ sub index :Path :Args(0) {
             "CSC hosting plans query failed: $@") if $@;
 
         eval {
-            $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { sitename => $site_name },
                 { rows => 1 }
             )->single;
@@ -183,7 +183,7 @@ sub hosting_signup :Local :Args(0) {
             $csc_hosting_plans = \@plans;
         }
 
-        $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { sitename => $site_name }, { rows => 1 }
         )->single;
     };
@@ -210,7 +210,7 @@ sub hosting_signup :Local :Args(0) {
                     updated_at         => \'NOW()',
                 });
             } else {
-                $c->model('DBEncy')->resultset('HostingAccount')->create({
+                $c->model('DBEncy')->resultset('Accounting::HostingAccount')->create({
                     sitename           => $site_name,
                     plan_slug          => $p->{plan_slug},
                     domain             => $p->{domain},
@@ -229,7 +229,7 @@ sub hosting_signup :Local :Args(0) {
         if ($@) {
             $c->stash->{error_msg} = ($hosting_account ? "Update" : "Registration") . " failed: $@";
         } else {
-            my $new_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my $new_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { sitename => $site_name }, { rows => 1 }
             )->single;
             if ($hosting_account) {
@@ -631,7 +631,7 @@ sub csc_account :Local :Args(0) {
         "CSC membership query failed: $@") if $@;
 
     eval {
-        $hosting_account = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { sitename => $site_name },
             { rows => 1 }
         )->single;

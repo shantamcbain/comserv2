@@ -86,11 +86,11 @@ sub index :Path('/shop') :Args(0) {
 
     my (@items, @categories);
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%where,
             { prefetch => 'stock_levels', order_by => $order_by }
         )->all;
-        @categories = $schema->resultset('InventoryItem')->search(
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', show_in_shop => 1, category => { '!=' => undef } },
             { columns => ['category'], distinct => 1, order_by => 'category' }
         )->all;
@@ -125,11 +125,11 @@ sub item :Path('/shop/item') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1 },
             { prefetch => 'stock_levels' }
         );
-        $item ||= $schema->resultset('InventoryItem')->find(
+        $item ||= $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename },
             { prefetch => 'stock_levels' }
         ) if $self->_is_admin($c);
@@ -154,7 +154,7 @@ sub item :Path('/shop/item') :Args(1) {
         next unless ($opt->{type} // '') eq 'filament_stock';
         my @filament_values;
         eval {
-            my @filaments = $schema->resultset('InventoryItem')->search(
+            my @filaments = $schema->resultset('Accounting::InventoryItem')->search(
                 {
                     'me.sitename' => $sitename,
                     'me.status'   => 'active',
@@ -240,7 +240,7 @@ sub admin :Path('/shop/admin') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%where,
             { order_by => [qw(category name)] }
         )->all;
@@ -277,7 +277,7 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
     my $sitename = $self->_sitename($c);
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($id) };
 
     unless ($item && $item->sitename eq $sitename) {
         $c->flash->{error_msg} = 'Item not found.';
@@ -418,7 +418,7 @@ sub toggle_shop :Path('/shop/admin/toggle') :Args(1) {
     my $sitename = $self->_sitename($c);
 
     eval {
-        my $item = $schema->resultset('InventoryItem')->find(
+        my $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename }
         );
         if ($item) {
@@ -457,7 +457,7 @@ sub reset_visibility :Path('/shop/admin/reset_visibility') :Args(0) {
     my $sitename = $self->_sitename($c);
     my $count    = 0;
     eval {
-        $count = $schema->resultset('InventoryItem')->search(
+        $count = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename }
         )->update({ show_in_shop => 0 });
     };
