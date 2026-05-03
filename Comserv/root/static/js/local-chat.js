@@ -431,6 +431,10 @@
                 console.debug('Agent selected from todo content: inventory');
                 return agents.inventory;
             }
+            if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bLEDGER\b|\bGL ENTRY\b|\bACCOUNTS PAYABLE\b/.test(candidateText) && agents.accounting) {
+                console.debug('Agent selected from todo content: accounting');
+                return agents.accounting;
+            }
             if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
                 console.debug('Agent selected from todo content: helpdesk');
                 return agents.helpdesk;
@@ -1001,12 +1005,16 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        // Chat bubble click: always opens the inline floating panel.
-        // The ⤢ button is the dedicated "detach to separate window" action.
-        chatButton.addEventListener('click', function() { openChat(); });
+        // Chat bubble click:
+        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
+        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
+        //   Falls back to the inline panel if the browser blocks popups.
+        chatButton.addEventListener('click', function() {
+            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+        });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        // ⤢ button: open / focus the detached popup window
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden
         document.getElementById('detach-chat').addEventListener('click', function() {
             if (state._popupWindow && !state._popupWindow.closed) {
                 state._popupWindow.focus();
@@ -1856,6 +1864,23 @@
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
+        // Prompt-based agent override: switch to accounting agent when invoice/accounting keywords detected
+        let _agentId   = state.pageContext.agent_id;
+        let _agentName = state.pageContext.agent_name;
+        let _agentSys  = state.pageContext.system_prompt;
+        if (!state.userModelOverride && state.agentsConfig && state.agentsConfig.agents) {
+            const _pu = prompt.toUpperCase();
+            if (/\bINVOICE\b|\bACCOUNTING\b|\bGL ENTRY\b|\bACCOUNTS PAYABLE\b|\bCOA\b|CHART OF ACCOUNTS|\bSUPPLIER BILL\b|\bENTER.*BILL\b|\bPOST.*EXPENSE\b/.test(_pu)) {
+                const _aa = state.agentsConfig.agents.accounting;
+                if (_aa && _agentId !== 'accounting') {
+                    console.debug('Prompt keyword \u2192 switching to accounting agent');
+                    _agentId   = _aa.id;
+                    _agentName = _aa.display_name || 'Accounting Assistant';
+                    _agentSys  = _aa.system_prompt || _agentSys;
+                }
+            }
+        }
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
@@ -1863,9 +1888,9 @@
             page_context: state.pageContext.page_type,
             page_path: state.pageContext.page_path,
             page_title: state.pageContext.page_title,
-            system: state.pageContext.system_prompt,
-            agent_id: state.pageContext.agent_id,
-            agent_name: state.pageContext.agent_name,
+            system: _agentSys,
+            agent_id: _agentId,
+            agent_name: _agentName,
             page_content: extractPageContent()
         };
 
