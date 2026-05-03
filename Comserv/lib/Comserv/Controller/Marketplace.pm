@@ -26,7 +26,7 @@ sub _categories {
     my ($self, $c, %extra_where) = @_;
     my @cats;
     eval {
-        @cats = $self->_schema($c)->resultset('MarketplaceCategory')->search(
+        @cats = $self->_schema($c)->resultset('Accounting::MarketplaceCategory')->search(
             { active => 1, %extra_where },
             { order_by => { -asc => 'sort_order' } }
         )->all;
@@ -70,11 +70,11 @@ sub index :Path('/marketplace') :Args(0) {
 
     my (@listings, $total);
     eval {
-        @listings = $schema->resultset('MarketplaceListing')->search(
+        @listings = $schema->resultset('Accounting::MarketplaceListing')->search(
             \%where,
             { order_by => $order_by, rows => $per_page, offset => ($page - 1) * $per_page }
         )->all;
-        $total = $schema->resultset('MarketplaceListing')->count(\%where);
+        $total = $schema->resultset('Accounting::MarketplaceListing')->count(\%where);
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
@@ -106,7 +106,7 @@ sub view :Path('/marketplace/view') :Args(1) {
 
     my $listing;
     eval {
-        $listing = $self->_schema($c)->resultset('MarketplaceListing')->find($id);
+        $listing = $self->_schema($c)->resultset('Accounting::MarketplaceListing')->find($id);
         $listing->update({ views => $listing->views + 1 }) if $listing;
     };
     if ($@) {
@@ -154,7 +154,7 @@ sub add :Path('/marketplace/add') :Args(0) {
         my $ltype = $p->{listing_type} || 'sale';
         $ltype = 'sale' unless $ltype =~ /^(sale|wanted|job)$/;
         my $listing = eval {
-            $schema->resultset('MarketplaceListing')->create({
+            $schema->resultset('Accounting::MarketplaceListing')->create({
                 seller_username => $c->session->{username},
                 sitename        => $self->_sitename($c),
                 listing_type    => $ltype,
@@ -194,7 +194,7 @@ sub edit :Path('/marketplace/edit') :Args(1) {
     }
 
     my $schema  = $self->_schema($c);
-    my $listing = $schema->resultset('MarketplaceListing')->find($id);
+    my $listing = $schema->resultset('Accounting::MarketplaceListing')->find($id);
 
     unless ($listing && ($listing->seller_username eq ($c->session->{username}//'') || $self->_is_admin($c))) {
         $c->flash->{error_msg} = 'Listing not found or permission denied.';
@@ -259,7 +259,7 @@ sub delete :Path('/marketplace/delete') :Args(1) {
         $c->res->redirect($c->uri_for('/user/login')); $c->detach;
     }
 
-    my $listing = $self->_schema($c)->resultset('MarketplaceListing')->find($id);
+    my $listing = $self->_schema($c)->resultset('Accounting::MarketplaceListing')->find($id);
     if ($listing && ($listing->seller_username eq ($c->session->{username}//'') || $self->_is_admin($c))) {
         $listing->delete;
         $c->flash->{success_msg} = 'Listing deleted.';
@@ -278,7 +278,7 @@ sub sold :Path('/marketplace/sold') :Args(1) {
         $c->res->redirect($c->uri_for('/user/login')); $c->detach;
     }
 
-    my $listing = $self->_schema($c)->resultset('MarketplaceListing')->find($id);
+    my $listing = $self->_schema($c)->resultset('Accounting::MarketplaceListing')->find($id);
     if ($listing && ($listing->seller_username eq ($c->session->{username}//'') || $self->_is_admin($c))) {
         $listing->update({ status => 'sold' });
     }
@@ -307,7 +307,7 @@ sub admin_index :Path('/admin/marketplace') :Args(0) {
 
     my @listings;
     eval {
-        @listings = $schema->resultset('MarketplaceListing')->search(
+        @listings = $schema->resultset('Accounting::MarketplaceListing')->search(
             \%where,
             { order_by => { -desc => 'created_at' } }
         )->all;
@@ -346,7 +346,7 @@ sub admin_categories :Path('/admin/marketplace/categories') :Args(0) {
             my $name = $p->{name} // '';
             my $slug = lc($name); $slug =~ s/[^a-z0-9]+/-/g; $slug =~ s/^-|-$//g;
             eval {
-                $schema->resultset('MarketplaceCategory')->create({
+                $schema->resultset('Accounting::MarketplaceCategory')->create({
                     sitename   => $self->_sitename($c),
                     name       => $name,
                     slug       => $slug,
@@ -354,7 +354,7 @@ sub admin_categories :Path('/admin/marketplace/categories') :Args(0) {
                 });
             };
         } elsif ($action eq 'delete') {
-            my $cat = $schema->resultset('MarketplaceCategory')->find($p->{id});
+            my $cat = $schema->resultset('Accounting::MarketplaceCategory')->find($p->{id});
             $cat->delete if $cat;
         }
         $c->res->redirect($c->uri_for('/admin/marketplace/categories'));
@@ -363,7 +363,7 @@ sub admin_categories :Path('/admin/marketplace/categories') :Args(0) {
 
     my @categories;
     eval {
-        @categories = $schema->resultset('MarketplaceCategory')->search(
+        @categories = $schema->resultset('Accounting::MarketplaceCategory')->search(
             {}, { order_by => { -asc => 'sort_order' } }
         )->all;
     };

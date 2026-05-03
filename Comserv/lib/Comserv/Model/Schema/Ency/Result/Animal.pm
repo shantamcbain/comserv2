@@ -142,12 +142,12 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('record_id');
 
 __PACKAGE__->has_many(
-    disease_animals => 'Comserv::Model::Schema::Ency::Result::DiseaseAnimal',
+    disease_animals => 'Comserv::Model::Schema::Ency::Result::Ency::DiseaseAnimal',
     'animal_id',
 );
 
 __PACKAGE__->has_many(
-    animal_herbs => 'Comserv::Model::Schema::Ency::Result::AnimalHerb',
+    animal_herbs => 'Comserv::Model::Schema::Ency::Result::Ency::AnimalHerb',
     'animal_id',
 );
 

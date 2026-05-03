@@ -94,7 +94,7 @@ sub get_reference_by_id {
 
     $self->logging->log_with_details($c,'info', __FILE__, __LINE__, 'get_reference_by_id', "Fetching reference with ID $id");
 
-    my $reference = $self->ency_schema->resultset('Reference')->find($id);
+    my $reference = $self->ency_schema->resultset('Ency::Reference')->find($id);
     if ($reference) {
         $self->logging->log_with_details($c,'info', __FILE__, __LINE__, 'get_reference_by_id', "Reference with ID $id fetched successfully.");
     } else {
@@ -110,7 +110,7 @@ sub create_reference {
 
     my $reference;
     eval {
-        $reference = $self->ency_schema->resultset('Reference')->create($data);
+        $reference = $self->ency_schema->resultset('Ency::Reference')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_reference', "Reference created successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -246,7 +246,7 @@ sub get_animal_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_animal_related', "Fetching related data for animal ID: $id");
     my %related;
     eval {
-        my @animal_herbs = $self->ency_schema->resultset('AnimalHerb')->search({ animal_id => $id })->all;
+        my @animal_herbs = $self->ency_schema->resultset('Ency::AnimalHerb')->search({ animal_id => $id })->all;
         if (@animal_herbs) {
             my @herb_ids = map { $_->herb_id } @animal_herbs;
             my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
@@ -255,10 +255,10 @@ sub get_animal_related {
             $related{herbs} = [];
         }
 
-        my @disease_animals = $self->ency_schema->resultset('DiseaseAnimal')->search({ animal_id => $id })->all;
+        my @disease_animals = $self->ency_schema->resultset('Ency::DiseaseAnimal')->search({ animal_id => $id })->all;
         if (@disease_animals) {
             my @disease_ids = map { $_->disease_id } @disease_animals;
-            my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
+            my @diseases = $self->ency_schema->resultset('Ency::Disease')->search({ record_id => { -in => \@disease_ids } })->all;
             $related{diseases} = \@diseases;
         } else {
             $related{diseases} = [];
@@ -278,7 +278,7 @@ sub add_insect {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_insect', "Adding new insect: " . ($data->{common_name} || ''));
     eval {
-        $self->ency_schema->resultset('Insect')->create($data);
+        $self->ency_schema->resultset('Ency::Insect')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_insect', "Insect added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -295,7 +295,7 @@ sub update_insect {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Insect')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Insect')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_insect', "No insect found with ID: $id");
         return (0, "Insect with ID $id not found.");
@@ -313,7 +313,7 @@ sub update_insect {
 
 sub get_insect_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Insect')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Insect')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_insect_by_id', "Insect with ID $id fetched successfully.");
     } else {
@@ -333,7 +333,7 @@ sub list_insects {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Insect')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Insect')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -347,7 +347,7 @@ sub search_insects {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_insects', "Searching insects for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Insect')->search(
+        @results = $self->ency_schema->resultset('Ency::Insect')->search(
             { -or => [
                 common_name     => { like => "%$query%" },
                 scientific_name => { like => "%$query%" },
@@ -367,7 +367,7 @@ sub get_insect_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_insect_related', "Fetching related data for insect ID: $id");
     my %related;
     eval {
-        my @insect_herbs = $self->ency_schema->resultset('InsectHerb')->search({ insect_id => $id })->all;
+        my @insect_herbs = $self->ency_schema->resultset('Ency::InsectHerb')->search({ insect_id => $id })->all;
         if (@insect_herbs) {
             my @herb_ids = map { $_->herb_id } @insect_herbs;
             my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
@@ -376,10 +376,10 @@ sub get_insect_related {
             $related{herbs} = [];
         }
 
-        my @disease_insects = $self->ency_schema->resultset('DiseaseInsect')->search({ insect_id => $id })->all;
+        my @disease_insects = $self->ency_schema->resultset('Ency::DiseaseInsect')->search({ insect_id => $id })->all;
         if (@disease_insects) {
             my @disease_ids = map { $_->disease_id } @disease_insects;
-            my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
+            my @diseases = $self->ency_schema->resultset('Ency::Disease')->search({ record_id => { -in => \@disease_ids } })->all;
             $related{diseases} = \@diseases;
         } else {
             $related{diseases} = [];
@@ -399,7 +399,7 @@ sub add_disease {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Adding new disease: " . ($data->{common_name} || ''));
     eval {
-        $self->ency_schema->resultset('Disease')->create($data);
+        $self->ency_schema->resultset('Ency::Disease')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -416,7 +416,7 @@ sub update_disease {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Disease')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Disease')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_disease', "No disease found with ID: $id");
         return (0, "Disease with ID $id not found.");
@@ -434,7 +434,7 @@ sub update_disease {
 
 sub get_disease_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Disease')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Disease')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_disease_by_id', "Disease with ID $id fetched successfully.");
     } else {
@@ -454,7 +454,7 @@ sub list_diseases {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Disease')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Disease')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -468,7 +468,7 @@ sub search_diseases {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_diseases', "Searching diseases for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Disease')->search(
+        @results = $self->ency_schema->resultset('Ency::Disease')->search(
             { -or => [
                 common_name     => { like => "%$query%" },
                 scientific_name => { like => "%$query%" },
@@ -488,15 +488,15 @@ sub get_disease_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_disease_related', "Fetching related data for disease ID: $id");
     my %related;
     eval {
-        my @disease_symptoms = $self->ency_schema->resultset('DiseaseSymptom')->search({ disease_id => $id })->all;
+        my @disease_symptoms = $self->ency_schema->resultset('Ency::DiseaseSymptom')->search({ disease_id => $id })->all;
         if (@disease_symptoms) {
             my @symptom_ids = map { $_->symptom_id } @disease_symptoms;
-            $related{symptoms} = [$self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
+            $related{symptoms} = [$self->ency_schema->resultset('Ency::Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
         } else {
             $related{symptoms} = [];
         }
 
-        my @disease_herbs = $self->ency_schema->resultset('DiseaseHerb')->search({ disease_id => $id })->all;
+        my @disease_herbs = $self->ency_schema->resultset('Ency::DiseaseHerb')->search({ disease_id => $id })->all;
         if (@disease_herbs) {
             my @herb_ids = map { $_->herb_id } @disease_herbs;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -504,7 +504,7 @@ sub get_disease_related {
             $related{herbs} = [];
         }
 
-        my @disease_animals = $self->ency_schema->resultset('DiseaseAnimal')->search({ disease_id => $id })->all;
+        my @disease_animals = $self->ency_schema->resultset('Ency::DiseaseAnimal')->search({ disease_id => $id })->all;
         if (@disease_animals) {
             my @animal_ids = map { $_->animal_id } @disease_animals;
             $related{animals} = [$self->ency_schema->resultset('Animal')->search({ record_id => { -in => \@animal_ids } })->all];
@@ -512,18 +512,18 @@ sub get_disease_related {
             $related{animals} = [];
         }
 
-        my @disease_insects = $self->ency_schema->resultset('DiseaseInsect')->search({ disease_id => $id })->all;
+        my @disease_insects = $self->ency_schema->resultset('Ency::DiseaseInsect')->search({ disease_id => $id })->all;
         if (@disease_insects) {
             my @insect_ids = map { $_->insect_id } @disease_insects;
-            $related{insects} = [$self->ency_schema->resultset('Insect')->search({ record_id => { -in => \@insect_ids } })->all];
+            $related{insects} = [$self->ency_schema->resultset('Ency::Insect')->search({ record_id => { -in => \@insect_ids } })->all];
         } else {
             $related{insects} = [];
         }
 
-        my @constituent_diseases = $self->ency_schema->resultset('ConstituentDisease')->search({ disease_id => $id })->all;
+        my @constituent_diseases = $self->ency_schema->resultset('Ency::ConstituentDisease')->search({ disease_id => $id })->all;
         if (@constituent_diseases) {
             my @constituent_ids = map { $_->constituent_id } @constituent_diseases;
-            $related{constituents} = [$self->ency_schema->resultset('Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
+            $related{constituents} = [$self->ency_schema->resultset('Ency::Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
         } else {
             $related{constituents} = [];
         }
@@ -542,7 +542,7 @@ sub add_symptom {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_symptom', "Adding new symptom: " . ($data->{name} || ''));
     eval {
-        $self->ency_schema->resultset('Symptom')->create($data);
+        $self->ency_schema->resultset('Ency::Symptom')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_symptom', "Symptom added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -559,7 +559,7 @@ sub update_symptom {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Symptom')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Symptom')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_symptom', "No symptom found with ID: $id");
         return (0, "Symptom with ID $id not found.");
@@ -577,7 +577,7 @@ sub update_symptom {
 
 sub get_symptom_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Symptom')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Symptom')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_symptom_by_id', "Symptom with ID $id fetched successfully.");
     } else {
@@ -597,7 +597,7 @@ sub list_symptoms {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Symptom')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Symptom')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -611,7 +611,7 @@ sub search_symptoms {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_symptoms', "Searching symptoms for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Symptom')->search(
+        @results = $self->ency_schema->resultset('Ency::Symptom')->search(
             { -or => [
                 name        => { like => "%$query%" },
                 common_name => { like => "%$query%" },
@@ -631,15 +631,15 @@ sub get_symptom_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_symptom_related', "Fetching related data for symptom ID: $id");
     my %related;
     eval {
-        my @disease_symptoms = $self->ency_schema->resultset('DiseaseSymptom')->search({ symptom_id => $id })->all;
+        my @disease_symptoms = $self->ency_schema->resultset('Ency::DiseaseSymptom')->search({ symptom_id => $id })->all;
         if (@disease_symptoms) {
             my @disease_ids = map { $_->disease_id } @disease_symptoms;
-            $related{diseases} = [$self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all];
+            $related{diseases} = [$self->ency_schema->resultset('Ency::Disease')->search({ record_id => { -in => \@disease_ids } })->all];
         } else {
             $related{diseases} = [];
         }
 
-        my @herb_symptoms = $self->ency_schema->resultset('HerbSymptom')->search({ symptom_id => $id })->all;
+        my @herb_symptoms = $self->ency_schema->resultset('Ency::HerbSymptom')->search({ symptom_id => $id })->all;
         if (@herb_symptoms) {
             my @herb_ids = map { $_->herb_id } @herb_symptoms;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -647,10 +647,10 @@ sub get_symptom_related {
             $related{herbs} = [];
         }
 
-        my @constituent_symptoms = $self->ency_schema->resultset('ConstituentSymptom')->search({ symptom_id => $id })->all;
+        my @constituent_symptoms = $self->ency_schema->resultset('Ency::ConstituentSymptom')->search({ symptom_id => $id })->all;
         if (@constituent_symptoms) {
             my @constituent_ids = map { $_->constituent_id } @constituent_symptoms;
-            $related{constituents} = [$self->ency_schema->resultset('Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
+            $related{constituents} = [$self->ency_schema->resultset('Ency::Constituent')->search({ record_id => { -in => \@constituent_ids } })->all];
         } else {
             $related{constituents} = [];
         }
@@ -670,7 +670,7 @@ sub add_constituent {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Adding new constituent: " . ($data->{name} || ''));
     my $new_rec;
     eval {
-        $new_rec = $self->ency_schema->resultset('Constituent')->create($data);
+        $new_rec = $self->ency_schema->resultset('Ency::Constituent')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -692,7 +692,7 @@ sub backlink_constituent_to_all_herbs {
         )->all;
         for my $herb (@herbs) {
             if (($herb->constituents // '') =~ /(?:^|[,;\s])$pat(?:[,;\s(]|$)/i) {
-                $self->ency_schema->resultset('HerbConstituent')->find_or_create({
+                $self->ency_schema->resultset('Ency::HerbConstituent')->find_or_create({
                     herb_id        => $herb->record_id,
                     constituent_id => $constituent_id,
                     plant_part     => '',
@@ -717,7 +717,7 @@ sub update_constituent {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Constituent')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Constituent')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_constituent', "No constituent found with ID: $id");
         return (0, "Constituent with ID $id not found.");
@@ -735,7 +735,7 @@ sub update_constituent {
 
 sub get_constituent_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Constituent')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Constituent')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_constituent_by_id', "Constituent with ID $id fetched successfully.");
     } else {
@@ -755,7 +755,7 @@ sub list_constituents {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Constituent')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Constituent')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -769,7 +769,7 @@ sub search_constituents {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_constituents', "Searching constituents for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Constituent')->search(
+        @results = $self->ency_schema->resultset('Ency::Constituent')->search(
             { -or => [
                 name        => { like => "%$query%" },
                 common_name => { like => "%$query%" },
@@ -823,7 +823,7 @@ sub resolve_names_to_drugs {
         $name =~ s/^\s+|\s+$//g;
         next unless length($name) > 2;
         my $drug = eval {
-            $self->ency_schema->resultset('Drug')->search(
+            $self->ency_schema->resultset('Ency::Drug')->search(
                 { -or => [
                     brand_name   => { like => "%$name%" },
                     generic_name => { like => "%$name%" },
@@ -856,7 +856,7 @@ sub auto_link_herb_constituent {
                 { rows => 1, order_by => 'record_id' }
             )->first;
             if ($herb) {
-                my $existing = $self->ency_schema->resultset('HerbConstituent')->search(
+                my $existing = $self->ency_schema->resultset('Ency::HerbConstituent')->search(
                     {
                         herb_id        => $herb->record_id,
                         constituent_id => $constituent_id,
@@ -865,7 +865,7 @@ sub auto_link_herb_constituent {
                     { rows => 1 }
                 )->first;
                 unless ($existing) {
-                    $self->ency_schema->resultset('HerbConstituent')->create({
+                    $self->ency_schema->resultset('Ency::HerbConstituent')->create({
                         herb_id        => $herb->record_id,
                         constituent_id => $constituent_id,
                         plant_part     => '',
@@ -906,14 +906,14 @@ sub auto_link_herb_data {
         $clean =~ s/\s*\(.*//;
         $clean =~ s/\s+$//;
         my $rec = eval {
-            $self->ency_schema->resultset('Constituent')->search(
+            $self->ency_schema->resultset('Ency::Constituent')->search(
                 { -or => [ name => { like => "%$clean%" }, common_name => { like => "%$clean%" } ] },
                 { rows => 1, order_by => 'record_id' }
             )->first;
         };
         unless ($rec) {
             $rec = eval {
-                $self->ency_schema->resultset('Constituent')->create({
+                $self->ency_schema->resultset('Ency::Constituent')->create({
                     name               => $clean,
                     found_in_herbs     => $herb_bot,
                     reference          => $herb_ref,
@@ -931,7 +931,7 @@ sub auto_link_herb_data {
         }
         if ($rec) {
             eval {
-                $self->ency_schema->resultset('HerbConstituent')->find_or_create({
+                $self->ency_schema->resultset('Ency::HerbConstituent')->find_or_create({
                     herb_id        => $herb_id,
                     constituent_id => $rec->record_id,
                     plant_part     => '',
@@ -945,7 +945,7 @@ sub auto_link_herb_data {
     for my $term ($parse_terms->($form_data->{therapeutic_action})) {
         next if $term =~ /\s{2,}|^\d+$/;
         my $rec = eval {
-            $self->ency_schema->resultset('Glossary')->search(
+            $self->ency_schema->resultset('Ency::Glossary')->search(
                 { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
                 { rows => 1, order_by => 'record_id' }
             )->first;
@@ -1008,7 +1008,7 @@ sub get_constituent_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_constituent_related', "Fetching related data for constituent ID: $id");
     my %related;
     eval {
-        my @herb_constituents = $self->ency_schema->resultset('HerbConstituent')->search({ constituent_id => $id })->all;
+        my @herb_constituents = $self->ency_schema->resultset('Ency::HerbConstituent')->search({ constituent_id => $id })->all;
         if (@herb_constituents) {
             my @herb_ids = map { $_->herb_id } @herb_constituents;
             $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
@@ -1016,18 +1016,18 @@ sub get_constituent_related {
             $related{herbs} = [];
         }
 
-        my @constituent_diseases = $self->ency_schema->resultset('ConstituentDisease')->search({ constituent_id => $id })->all;
+        my @constituent_diseases = $self->ency_schema->resultset('Ency::ConstituentDisease')->search({ constituent_id => $id })->all;
         if (@constituent_diseases) {
             my @disease_ids = map { $_->disease_id } @constituent_diseases;
-            $related{diseases} = [$self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all];
+            $related{diseases} = [$self->ency_schema->resultset('Ency::Disease')->search({ record_id => { -in => \@disease_ids } })->all];
         } else {
             $related{diseases} = [];
         }
 
-        my @constituent_symptoms = $self->ency_schema->resultset('ConstituentSymptom')->search({ constituent_id => $id })->all;
+        my @constituent_symptoms = $self->ency_schema->resultset('Ency::ConstituentSymptom')->search({ constituent_id => $id })->all;
         if (@constituent_symptoms) {
             my @symptom_ids = map { $_->symptom_id } @constituent_symptoms;
-            $related{symptoms} = [$self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
+            $related{symptoms} = [$self->ency_schema->resultset('Ency::Symptom')->search({ record_id => { -in => \@symptom_ids } })->all];
         } else {
             $related{symptoms} = [];
         }
@@ -1046,7 +1046,7 @@ sub add_glossary {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Adding new glossary term: " . ($data->{term} || ''));
     eval {
-        $self->ency_schema->resultset('Glossary')->create($data);
+        $self->ency_schema->resultset('Ency::Glossary')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Glossary term added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -1063,7 +1063,7 @@ sub update_glossary {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Glossary')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Glossary')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_glossary', "No glossary term found with ID: $id");
         return (0, "Glossary term with ID $id not found.");
@@ -1081,7 +1081,7 @@ sub update_glossary {
 
 sub get_glossary_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Glossary')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Glossary')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_glossary_by_id', "Glossary term with ID $id fetched successfully.");
     } else {
@@ -1101,7 +1101,7 @@ sub list_glossary {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Glossary')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Glossary')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -1115,7 +1115,7 @@ sub search_glossary {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_glossary', "Searching glossary for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Glossary')->search(
+        @results = $self->ency_schema->resultset('Ency::Glossary')->search(
             { -or => [
                 term            => { like => "%$query%" },
                 alternate_terms => { like => "%$query%" },
@@ -1295,7 +1295,7 @@ sub add_drug {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Adding new drug: " . ($data->{brand_name} || ''));
     my $record;
     eval {
-        $record = $self->ency_schema->resultset('Drug')->create($data);
+        $record = $self->ency_schema->resultset('Ency::Drug')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_drug', "Drug added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -1313,7 +1313,7 @@ sub update_drug {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Drug')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Drug')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_drug', "No drug found with ID: $id");
         return (0, "Drug with ID $id not found.");
@@ -1331,7 +1331,7 @@ sub update_drug {
 
 sub get_drug_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Drug')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Drug')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_drug_by_id', "Drug with ID $id fetched successfully.");
     } else {
@@ -1351,7 +1351,7 @@ sub list_drugs {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Drug')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Drug')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -1366,7 +1366,7 @@ sub search_drugs {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_drugs', "Searching drugs for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Drug')->search(
+        @results = $self->ency_schema->resultset('Ency::Drug')->search(
             { -or => [
                 brand_name   => { like => "%$query%" },
                 generic_name => { like => "%$query%" },
@@ -1388,25 +1388,25 @@ sub get_drug_related {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_drug_related', "Fetching related data for drug ID: $id");
     my %related;
     eval {
-        my @drug_diseases = $self->ency_schema->resultset('DrugDisease')->search({ drug_id => $id })->all;
+        my @drug_diseases = $self->ency_schema->resultset('Ency::DrugDisease')->search({ drug_id => $id })->all;
         if (@drug_diseases) {
             my @disease_ids = map { $_->disease_id } @drug_diseases;
-            my @diseases = $self->ency_schema->resultset('Disease')->search({ record_id => { -in => \@disease_ids } })->all;
+            my @diseases = $self->ency_schema->resultset('Ency::Disease')->search({ record_id => { -in => \@disease_ids } })->all;
             $related{diseases} = \@diseases;
         } else {
             $related{diseases} = [];
         }
 
-        my @drug_symptoms = $self->ency_schema->resultset('DrugSymptom')->search({ drug_id => $id })->all;
+        my @drug_symptoms = $self->ency_schema->resultset('Ency::DrugSymptom')->search({ drug_id => $id })->all;
         if (@drug_symptoms) {
             my @symptom_ids = map { $_->symptom_id } @drug_symptoms;
-            my @symptoms = $self->ency_schema->resultset('Symptom')->search({ record_id => { -in => \@symptom_ids } })->all;
+            my @symptoms = $self->ency_schema->resultset('Ency::Symptom')->search({ record_id => { -in => \@symptom_ids } })->all;
             $related{symptoms} = \@symptoms;
         } else {
             $related{symptoms} = [];
         }
 
-        my @drug_herb_ints = $self->ency_schema->resultset('DrugHerbInteraction')->search({ drug_id => $id })->all;
+        my @drug_herb_ints = $self->ency_schema->resultset('Ency::DrugHerbInteraction')->search({ drug_id => $id })->all;
         if (@drug_herb_ints) {
             $related{herb_interactions} = \@drug_herb_ints;
         } else {
@@ -1464,7 +1464,7 @@ sub add_formula {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_formula', "Adding formula: " . ($data->{name} || ''));
     my $record;
     eval {
-        $record = $self->ency_schema->resultset('Formula')->create($data);
+        $record = $self->ency_schema->resultset('Ency::Formula')->create($data);
     } or do {
         my $error = $@ || 'Unknown error';
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_formula', "Error: $error");
@@ -1475,7 +1475,7 @@ sub add_formula {
 
 sub update_formula {
     my ($self, $c, $id, $data) = @_;
-    my $record = $self->ency_schema->resultset('Formula')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Formula')->find($id);
     return (0, "Formula $id not found.") unless $record;
     eval { $record->update($data); } or do {
         my $error = $@ || 'Unknown error';
@@ -1487,7 +1487,7 @@ sub update_formula {
 sub get_formula_by_id {
     my ($self, $c, $id) = @_;
     my $record;
-    eval { $record = $self->ency_schema->resultset('Formula')->find($id); } or do {};
+    eval { $record = $self->ency_schema->resultset('Ency::Formula')->find($id); } or do {};
     return $record;
 }
 
@@ -1500,7 +1500,7 @@ sub list_formulas {
     $attrs{page} = $opts->{page} if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Formula')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Formula')->search($where, \%attrs)->all;
         1;
     } or do {
         my $err = $@ || 'unknown';
@@ -1514,7 +1514,7 @@ sub search_formulas {
     my ($self, $c, $query) = @_;
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Formula')->search(
+        @results = $self->ency_schema->resultset('Ency::Formula')->search(
             { -or => [
                 name        => { like => "%$query%" },
                 indications => { like => "%$query%" },
@@ -1533,7 +1533,7 @@ sub get_formula_with_herbs {
     return unless $formula;
     my @herb_links;
     eval {
-        @herb_links = $self->ency_schema->resultset('FormulaHerb')->search(
+        @herb_links = $self->ency_schema->resultset('Ency::FormulaHerb')->search(
             { formula_id => $id },
             { order_by => 'id' }
         )->all;
@@ -1541,7 +1541,7 @@ sub get_formula_with_herbs {
     } or do {};
     my @disease_links;
     eval {
-        @disease_links = $self->ency_schema->resultset('FormulaDisease')->search(
+        @disease_links = $self->ency_schema->resultset('Ency::FormulaDisease')->search(
             { formula_id => $id },
             { order_by => 'id' }
         )->all;
@@ -1879,7 +1879,7 @@ sub link_entity_reference {
         "Linking $entity_type #$entity_id to reference #$reference_id");
     my $result;
     eval {
-        $result = $self->ency_schema->resultset('EntityReference')->find_or_create({
+        $result = $self->ency_schema->resultset('Ency::EntityReference')->find_or_create({
             entity_type  => $entity_type,
             entity_id    => $entity_id,
             reference_id => $reference_id,
@@ -1898,7 +1898,7 @@ sub unlink_entity_reference {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'unlink_entity_reference',
         "Unlinking $entity_type #$entity_id from reference #$reference_id");
     eval {
-        $self->ency_schema->resultset('EntityReference')->search({
+        $self->ency_schema->resultset('Ency::EntityReference')->search({
             entity_type  => $entity_type,
             entity_id    => $entity_id,
             reference_id => $reference_id,
@@ -1917,7 +1917,7 @@ sub get_references_for {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_references_for',
         "Getting references for $entity_type #$entity_id");
     my @refs = eval {
-        $self->ency_schema->resultset('EntityReference')->search(
+        $self->ency_schema->resultset('Ency::EntityReference')->search(
             { entity_type => $entity_type, entity_id => $entity_id },
             { prefetch => 'reference', order_by => 'me.reference_id' }
         )->all;

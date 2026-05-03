@@ -327,7 +327,7 @@ sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
     unless (defined $id && $id =~ /^\d+$/) {
         $c->response->status(400); $c->response->body('Invalid ID'); return;
     }
-    my $drug = eval { $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($id) };
+    my $drug = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Drug')->find($id) };
     unless ($drug) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
@@ -339,7 +339,7 @@ sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
     unless (defined $id && $id =~ /^\d+$/) {
         $c->response->status(400); $c->response->body('Invalid ID'); return;
     }
-    my $term = eval { $c->model('ENCYModel')->ency_schema->resultset('Glossary')->find($id) };
+    my $term = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->find($id) };
     unless ($term) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
@@ -353,7 +353,7 @@ sub _build_constituent_html {
     $html =~ s/</&lt;/g;
     $html =~ s/>/&gt;/g;
     my @hc_rows = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('HerbConstituent')->search(
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::HerbConstituent')->search(
             { herb_id => $herb_id },
             { prefetch => 'constituent' }
         )->all;
@@ -426,7 +426,7 @@ sub _build_glossary_popup_html {
     $html =~ s/</&lt;/g;
     $html =~ s/>/&gt;/g;
     my @terms = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('Glossary')->search(
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
             {},
             { columns => ['record_id', 'term', 'alternate_terms'], order_by => { -desc => \'LENGTH(term)' } }
         )->all;
@@ -455,7 +455,7 @@ sub Reference :Path('/ENCY/Reference') :Args(0) {
 
     my @refs;
     eval {
-        @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+        @refs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->search(
             {},
             { order_by => { -asc => 'reference_id' }, prefetch => 'publisher_record' }
         )->all;
@@ -486,7 +486,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     }
 
     my $ref = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('Reference')->find($id);
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->find($id);
     };
     unless ($ref) {
         $c->stash(error_msg => "Reference #$id not found.", template => 'ENCY/ReferenceList.tt');
@@ -525,7 +525,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     # Load formal entity links (junction rows) for this reference
     my @entity_links;
     eval {
-        my @links = $c->model('ENCYModel')->ency_schema->resultset('EntityReference')->search(
+        my @links = $c->model('ENCYModel')->ency_schema->resultset('Ency::EntityReference')->search(
             { reference_id => $id },
             { order_by => ['entity_type', 'entity_id'] }
         )->all;
@@ -539,11 +539,11 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
                     $name = $e ? ($e->common_names || 'Herb #' . $link->entity_id) : '';
                     $url  = '/ENCY/herb_detail/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'disease') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Disease')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Disease')->find($link->entity_id);
                     $name = $e ? ($e->common_name || $e->scientific_name || '') : '';
                     $url  = '/ENCY/Disease/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'constituent') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Constituent')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Constituent')->find($link->entity_id);
                     $name = $e ? ($e->name || '') : '';
                     $url  = '/ENCY/Constituent/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'animal') {
@@ -551,15 +551,15 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
                     $name = $e ? ($e->common_name || '') : '';
                     $url  = '/ENCY/Animal/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'insect') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Insect')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Insect')->find($link->entity_id);
                     $name = $e ? ($e->common_name || '') : '';
                     $url  = '/ENCY/Insect/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'drug') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Drug')->find($link->entity_id);
                     $name = $e ? ($e->drug_name || '') : '';
                     $url  = '/ENCY/Drug/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'formula') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Formula')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Formula')->find($link->entity_id);
                     $name = $e ? ($e->formula_name || '') : '';
                     $url  = '/ENCY/Formula/' . $link->entity_id;
                 }
@@ -576,7 +576,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     # Load linked authors for this reference
     my @ref_authors;
     eval {
-        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('ReferenceAuthor')->search(
+        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('Ency::ReferenceAuthor')->search(
             { reference_id => $id },
             { order_by => 'author_id' }
         )->all;
@@ -613,7 +613,7 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
         my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
         my $new_ref;
         eval {
-            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
+            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->create({
                 title             => $p->{title}             // '',
                 author            => $p->{author}            // '',
                 publisher         => $p->{publisher}         // '',
@@ -661,7 +661,7 @@ sub Author_list :Path('/ENCY/Author') :Args(0) {
 
     my @authors;
     eval {
-        @authors = $c->model('ENCYModel')->ency_schema->resultset('Author')->search(
+        @authors = $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->search(
             {}, { order_by => { -asc => 'full_name' } }
         )->all;
     };
@@ -687,7 +687,7 @@ sub Author_id :Path('/ENCY/Author') :Args(1) {
         return;
     }
 
-    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Author')->find($id) };
+    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->find($id) };
     unless ($author) {
         $c->stash(error_msg => "Author #$id not found.", template => 'ENCY/AuthorList.tt');
         return;
@@ -749,7 +749,7 @@ sub Author_add :Path('/ENCY/Author/add') :Args(0) {
         my $p = $c->request->body_parameters;
         my $new_author;
         eval {
-            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Author')->create({
+            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->create({
                 full_name          => $p->{full_name}          || 'Unknown',
                 credentials        => $p->{credentials}        // '',
                 affiliation        => $p->{affiliation}        // '',
@@ -2959,17 +2959,17 @@ sub ency_admin : Path('/ENCY/admin') : Args(0) {
     my $refs_missing_author = 0;
     my $refs_missing_isbn = 0;
     eval {
-        $refs_missing_title  = $ency->resultset('Reference')->count({ -or => [ title  => undef, title  => '' ] });
-        $refs_missing_author = $ency->resultset('Reference')->count({ -or => [ author => undef, author => '' ] });
-        $refs_missing_isbn   = $ency->resultset('Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
+        $refs_missing_title  = $ency->resultset('Ency::Reference')->count({ -or => [ title  => undef, title  => '' ] });
+        $refs_missing_author = $ency->resultset('Ency::Reference')->count({ -or => [ author => undef, author => '' ] });
+        $refs_missing_isbn   = $ency->resultset('Ency::Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
     };
 
     # ── Publisher / Author / ReferenceAuthor counts ──────────────────────────
-    eval { $counts{publisher}        = $ency->resultset('Publisher')->count };
+    eval { $counts{publisher}        = $ency->resultset('Ency::Publisher')->count };
     $counts{publisher} //= 0;
-    eval { $counts{author}           = $ency->resultset('Author')->count };
+    eval { $counts{author}           = $ency->resultset('Ency::Author')->count };
     $counts{author} //= 0;
-    eval { $counts{reference_author} = $ency->resultset('ReferenceAuthor')->count };
+    eval { $counts{reference_author} = $ency->resultset('Ency::ReferenceAuthor')->count };
     $counts{reference_author} //= 0;
 
     # ── Unresolved ENCY todos ────────────────────────────────────────────────
@@ -3019,7 +3019,7 @@ sub api_references : Path('/ENCY/api/references') : Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_references', "Searching references q=$q");
     my @results;
     eval {
-        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->search(
             { -or => [
                 title  => { like => "%$q%" },
                 author => { like => "%$q%" },
@@ -3143,7 +3143,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url        => '/ENCY/herb_detail/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'disease') {
-            my @rows = $model->ency_schema->resultset('Disease')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Disease')->search(
                 { common_name => { like => "%$query%" } },
                 { rows => 8, order_by => 'common_name' }
             )->all;
@@ -3154,7 +3154,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url       => '/ENCY/Disease/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'symptom') {
-            my @rows = $model->ency_schema->resultset('Symptom')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Symptom')->search(
                 { -or => [
                     name        => { like => "%$query%" },
                     common_name => { like => "%$query%" },
@@ -3168,7 +3168,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url       => '/ENCY/Symptom/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'constituent') {
-            my @rows = $model->ency_schema->resultset('Constituent')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Constituent')->search(
                 { -or => [
                     name        => { like => "%$query%" },
                     common_name => { like => "%$query%" },

@@ -78,11 +78,11 @@ sub index :Path('/Inventory') :Args(0) {
 
     my ($item_count, $low_stock, $supplier_count, $location_count);
     eval {
-        $item_count     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' })->count;
-        $supplier_count = $schema->resultset('InventorySupplier')->search({ sitename => $sitename, status => 'active' })->count;
-        $location_count = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
+        $item_count     = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' })->count;
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')->search({ sitename => $sitename, status => 'active' })->count;
+        $location_count = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' })->count;
 
-        my @items = $schema->resultset('InventoryItem')->search(
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { prefetch => 'stock_levels' }
         );
@@ -131,7 +131,7 @@ sub items :Path('/Inventory/items') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
@@ -155,7 +155,7 @@ sub _load_coa_accounts {
     my $sitename = $self->_sitename($c);
     my @accounts;
     eval {
-        @accounts = $self->_schema($c)->resultset('CoaAccount')->search(
+        @accounts = $self->_schema($c)->resultset('Accounting::CoaAccount')->search(
             { sitename => $sitename, obsolete => 0 },
             { order_by => 'accno' }
         )->all;
@@ -174,7 +174,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => [
                 'stock_levels', 'item_suppliers', 'assignments',
@@ -191,7 +191,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @transactions;
     eval {
-        @transactions = $schema->resultset('InventoryTransaction')->search(
+        @transactions = $schema->resultset('Accounting::InventoryTransaction')->search(
             { item_id => $id },
             { prefetch => ['location', 'gl_entry'], order_by => { -desc => 'transaction_date' }, rows => 20 }
         );
@@ -199,7 +199,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @all_items;
     eval {
-        @all_items = $schema->resultset('InventoryItem')->search(
+        @all_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', id => { '!=' => $id } },
             { columns => ['id','name','sku','unit_of_measure'], order_by => 'name' }
         )->all;
@@ -207,7 +207,7 @@ sub item_view :Path('/Inventory/item/view') :Args(1) {
 
     my @all_suppliers;
     eval {
-        @all_suppliers = $schema->resultset('InventorySupplier')->search(
+        @all_suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename, status => 'active' },
             { columns => ['id','name'], order_by => 'name' }
         )->all;
@@ -238,7 +238,7 @@ sub item_add :Path('/Inventory/item/add') :Args(0) {
 
         my $new_item;
         eval {
-            $new_item = $schema->resultset('InventoryItem')->create({
+            $new_item = $schema->resultset('Accounting::InventoryItem')->create({
                 sitename            => $sitename,
                 sku                 => $params->{sku},
                 name                => $params->{name},
@@ -301,7 +301,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($id) };
     if ($@ || !$item) {
         $c->stash->{error_msg} = 'Item not found';
         $c->res->redirect($c->uri_for('/Inventory/items'));
@@ -344,7 +344,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
 
     my @stock_levels;
     eval {
-        @stock_levels = $schema->resultset('InventoryStockLevel')->search(
+        @stock_levels = $schema->resultset('Accounting::InventoryStockLevel')->search(
             { item_id => $item->id },
             { prefetch => 'location', order_by => 'location.name' }
         )->all;
@@ -352,7 +352,7 @@ sub item_edit :Path('/Inventory/item/edit') :Args(1) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename },
             { order_by => 'name' }
         )->all;
@@ -376,7 +376,7 @@ sub item_delete :Path('/Inventory/item/delete') :Args(1) {
 
     my $schema = $self->_schema($c);
     eval {
-        my $item = $schema->resultset('InventoryItem')->find($id);
+        my $item = $schema->resultset('Accounting::InventoryItem')->find($id);
         $item->update({ status => 'deleted', updated_at => $self->_now() }) if $item;
     };
     if ($@) {
@@ -398,7 +398,7 @@ sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $item_id },
             { prefetch => 'equipment' }
         );
@@ -414,7 +414,7 @@ sub equipment_edit :Path('/Inventory/equipment') :Args(1) {
         my $p = $c->req->body_parameters;
         my $now = $self->_now();
         eval {
-            $schema->resultset('InventoryEquipment')->update_or_create(
+            $schema->resultset('Accounting::InventoryEquipment')->update_or_create(
                 {
                     item_id               => $item_id,
                     wattage               => $p->{wattage}               || undef,
@@ -461,7 +461,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
     my $from     = $params->{redirect_to} || 'bom';
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         unless ($parent && $parent->sitename eq $sitename) {
             die "Item not found\n";
         }
@@ -474,7 +474,7 @@ sub bom_add :Path('/Inventory/bom/add') :Args(1) {
 
         my $scrap = ($params->{scrap_factor} || 0) / 100;
 
-        $schema->resultset('InventoryItemBOM')->update_or_create({
+        $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $params->{component_item_id},
             quantity          => $params->{quantity}    || 1,
@@ -519,11 +519,11 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
     my $avg_watt_pct  = $params->{avg_watt_pct}  || 50;
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         die "Item not found\n" unless $parent && $parent->sitename eq $sitename;
         die "Not assemblable\n" unless $parent->is_assemblable;
 
-        my $printer = $schema->resultset('InventoryItem')->find($printer_id);
+        my $printer = $schema->resultset('Accounting::InventoryItem')->find($printer_id);
         die "Printer not found\n" unless $printer;
 
         my $now = $self->_now();
@@ -531,7 +531,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
         if ($filament_g > 0) {
             my $filament_item_id = $params->{filament_item_id};
             unless ($filament_item_id) {
-                my $default_fil = $schema->resultset('InventoryItem')->search({
+                my $default_fil = $schema->resultset('Accounting::InventoryItem')->search({
                     sitename     => $sitename,
                     filament_type => { '!=' => undef },
                     status       => 'active',
@@ -540,7 +540,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             }
             if ($filament_item_id) {
                 my $scrap = ($params->{filament_scrap} || 2) / 100;
-                $schema->resultset('InventoryItemBOM')->update_or_create({
+                $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                     parent_item_id    => $parent_id,
                     component_item_id => $filament_item_id,
                     quantity          => $filament_g,
@@ -560,8 +560,8 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             my $elec_sku  = 'COST-ELEC-' . uc($printer->sku || 'PRINTER');
             $elec_sku =~ s/[^A-Z0-9-]/-/g;
             $elec_sku = substr($elec_sku, 0, 50);
-            my $elec_item = $schema->resultset('InventoryItem')->find({ sku => $elec_sku })
-                || $schema->resultset('InventoryItem')->create({
+            my $elec_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $elec_sku })
+                || $schema->resultset('Accounting::InventoryItem')->create({
                     sitename            => $sitename,
                     sku                 => $elec_sku,
                     name                => $printer->name . ' — Electricity',
@@ -578,7 +578,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     updated_at          => $now,
                 });
             $elec_item->update({ unit_cost => $kwh_rate, updated_at => $now });
-            $schema->resultset('InventoryItemBOM')->update_or_create({
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                 parent_item_id    => $parent_id,
                 component_item_id => $elec_item->id,
                 quantity          => $kwh,
@@ -594,8 +594,8 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
             my $depr_sku = 'COST-DEPR-' . uc($printer->sku || 'PRINTER');
             $depr_sku =~ s/[^A-Z0-9-]/-/g;
             $depr_sku = substr($depr_sku, 0, 50);
-            my $depr_item = $schema->resultset('InventoryItem')->find({ sku => $depr_sku })
-                || $schema->resultset('InventoryItem')->create({
+            my $depr_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $depr_sku })
+                || $schema->resultset('Accounting::InventoryItem')->create({
                     sitename            => $sitename,
                     sku                 => $depr_sku,
                     name                => $printer->name . ' — Depreciation',
@@ -612,7 +612,7 @@ sub bom_print_wizard :Path('/Inventory/bom/print_wizard') :Args(1) {
                     updated_at          => $now,
                 });
             $depr_item->update({ unit_cost => $equip->depreciation_per_hour, updated_at => $now });
-            $schema->resultset('InventoryItemBOM')->update_or_create({
+            $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
                 parent_item_id    => $parent_id,
                 component_item_id => $depr_item->id,
                 quantity          => $print_hours,
@@ -643,7 +643,7 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
     my $params   = $c->req->body_parameters;
 
     eval {
-        my $parent = $schema->resultset('InventoryItem')->find($parent_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($parent_id);
         unless ($parent && $parent->sitename eq $sitename) {
             die "Item not found\n";
         }
@@ -661,8 +661,8 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
 
         my $now = $self->_now();
 
-        my $cost_item = $schema->resultset('InventoryItem')->find({ sku => $sku })
-            || $schema->resultset('InventoryItem')->create({
+        my $cost_item = $schema->resultset('Accounting::InventoryItem')->find({ sku => $sku })
+            || $schema->resultset('Accounting::InventoryItem')->create({
                 sitename            => $sitename,
                 sku                 => $sku,
                 name                => $label,
@@ -685,7 +685,7 @@ sub bom_add_direct_cost :Path('/Inventory/bom/add_cost') :Args(1) {
             updated_at      => $now,
         });
 
-        $schema->resultset('InventoryItemBOM')->update_or_create({
+        $schema->resultset('Accounting::InventoryItemBOM')->update_or_create({
             parent_item_id    => $parent_id,
             component_item_id => $cost_item->id,
             quantity          => $qty,
@@ -712,9 +712,9 @@ sub bom_remove :Path('/Inventory/bom/remove') :Args(1) {
     my $from = $c->req->params->{from} || 'item';
 
     eval {
-        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        my $bom = $schema->resultset('Accounting::InventoryItemBOM')->find($bom_id);
         if ($bom) {
-            my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+            my $parent = $schema->resultset('Accounting::InventoryItem')->find($bom->parent_item_id);
             die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
             $parent_id = $bom->parent_item_id;
             $bom->delete;
@@ -743,7 +743,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $item_id },
             { prefetch => [
                 'inventory_account', 'income_account', 'expense_account', 'returns_account',
@@ -764,7 +764,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @all_items;
     eval {
-        @all_items = $schema->resultset('InventoryItem')->search(
+        @all_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', id => { '!=' => $item_id } },
             { columns => ['id','name','sku','unit_of_measure','unit_cost'], order_by => 'name' }
         )->all;
@@ -772,7 +772,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @assemblable_items;
     eval {
-        @assemblable_items = $schema->resultset('InventoryItem')->search(
+        @assemblable_items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', is_assemblable => 1 },
             { columns => ['id','name','sku'], order_by => 'name' }
         )->all;
@@ -780,7 +780,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @printers;
     eval {
-        @printers = $schema->resultset('InventoryItem')->search(
+        @printers = $schema->resultset('Accounting::InventoryItem')->search(
             {
                 'me.sitename' => $sitename,
                 'me.status'   => 'active',
@@ -796,7 +796,7 @@ sub bom_view :Path('/Inventory/bom') :Args(1) {
 
     my @filament_items;
     eval {
-        @filament_items = $schema->resultset('InventoryItem')->search(
+        @filament_items = $schema->resultset('Accounting::InventoryItem')->search(
             {
                 'me.sitename' => $sitename,
                 'me.status'   => 'active',
@@ -838,9 +838,9 @@ sub bom_edit_line :Path('/Inventory/bom/edit') :Args(1) {
     my $parent_id;
 
     eval {
-        my $bom = $schema->resultset('InventoryItemBOM')->find($bom_id);
+        my $bom = $schema->resultset('Accounting::InventoryItemBOM')->find($bom_id);
         die "BOM line not found\n" unless $bom;
-        my $parent = $schema->resultset('InventoryItem')->find($bom->parent_item_id);
+        my $parent = $schema->resultset('Accounting::InventoryItem')->find($bom->parent_item_id);
         die "Access denied\n" unless $parent && $parent->sitename eq $sitename;
         $parent_id = $bom->parent_item_id;
 
@@ -872,7 +872,7 @@ sub bom_list :Path('/Inventory/bom/list') :Args(0) {
 
     my @assemblable;
     eval {
-        @assemblable = $schema->resultset('InventoryItem')->search(
+        @assemblable = $schema->resultset('Accounting::InventoryItem')->search(
             { 'me.sitename' => $sitename, 'me.is_assemblable' => 1, 'me.status' => 'active' },
             {
                 prefetch => { 'bom_components' => 'component_item' },
@@ -908,7 +908,7 @@ sub suppliers :Path('/Inventory/suppliers') :Args(0) {
 
     my @suppliers;
     eval {
-        @suppliers = $schema->resultset('InventorySupplier')->search(
+        @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
             \%search,
             { order_by => 'name' }
         );
@@ -937,7 +937,7 @@ sub supplier_add :Path('/Inventory/supplier/add') :Args(0) {
         my $now    = $self->_now();
 
         eval {
-            $schema->resultset('InventorySupplier')->create({
+            $schema->resultset('Accounting::InventorySupplier')->create({
                 sitename       => $sitename,
                 name           => $params->{name},
                 contact_name   => $params->{contact_name},
@@ -983,7 +983,7 @@ sub supplier_edit :Path('/Inventory/supplier/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $supplier;
-    eval { $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename }) };
+    eval { $supplier = $schema->resultset('Accounting::InventorySupplier')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$supplier) {
         $c->stash->{error_msg} = 'Supplier not found';
         $c->res->redirect($c->uri_for('/Inventory/suppliers'));
@@ -1031,7 +1031,7 @@ sub supplier_delete :Path('/Inventory/supplier/delete') :Args(1) {
     my $sitename = $self->_sitename($c);
     my $schema   = $self->_schema($c);
     eval {
-        my $supplier = $schema->resultset('InventorySupplier')->find({ id => $id, sitename => $sitename });
+        my $supplier = $schema->resultset('Accounting::InventorySupplier')->find({ id => $id, sitename => $sitename });
         $supplier->update({ status => 'inactive', updated_at => $self->_now() }) if $supplier;
     };
     if ($@) {
@@ -1053,7 +1053,7 @@ sub supplier_view :Path('/Inventory/supplier/view') :Args(1) {
 
     my $supplier;
     eval {
-        $supplier = $schema->resultset('InventorySupplier')->find(
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->find(
             { id => $id, sitename => $sitename },
             { prefetch => { 'item_suppliers' => 'item' } }
         );
@@ -1083,7 +1083,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
     my $item_id  = $params->{item_id};
 
     eval {
-        my $existing = $schema->resultset('InventoryItemSupplier')->find({
+        my $existing = $schema->resultset('Accounting::InventoryItemSupplier')->find({
             item_id     => $item_id,
             supplier_id => $params->{supplier_id},
         });
@@ -1094,7 +1094,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
                 notes        => $params->{notes}        || undef,
             });
         } else {
-            $schema->resultset('InventoryItemSupplier')->create({
+            $schema->resultset('Accounting::InventoryItemSupplier')->create({
                 item_id      => $item_id,
                 supplier_id  => $params->{supplier_id},
                 supplier_sku => $params->{supplier_sku} || undef,
@@ -1104,7 +1104,7 @@ sub item_supplier_add :Path('/Inventory/item_supplier/add') :Args(0) {
             });
         }
         if ($params->{is_preferred} && $params->{is_preferred} eq '1') {
-            $schema->resultset('InventoryItemSupplier')->search({
+            $schema->resultset('Accounting::InventoryItemSupplier')->search({
                 item_id    => $item_id,
                 supplier_id => { '!=' => $params->{supplier_id} },
             })->update({ is_preferred => 0 });
@@ -1127,7 +1127,7 @@ sub item_supplier_remove :Path('/Inventory/item_supplier/remove') :Args(1) {
     my $schema  = $self->_schema($c);
     my $item_id;
     eval {
-        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        my $link = $schema->resultset('Accounting::InventoryItemSupplier')->find($id);
         if ($link) {
             $item_id = $link->item_id;
             $link->delete;
@@ -1150,10 +1150,10 @@ sub item_supplier_set_preferred :Path('/Inventory/item_supplier/preferred') :Arg
     my $schema  = $self->_schema($c);
     my $item_id;
     eval {
-        my $link = $schema->resultset('InventoryItemSupplier')->find($id);
+        my $link = $schema->resultset('Accounting::InventoryItemSupplier')->find($id);
         if ($link) {
             $item_id = $link->item_id;
-            $schema->resultset('InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
+            $schema->resultset('Accounting::InventoryItemSupplier')->search({ item_id => $item_id })->update({ is_preferred => 0 });
             $link->update({ is_preferred => 1 });
         }
     };
@@ -1184,7 +1184,7 @@ sub locations :Path('/Inventory/locations') :Args(0) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             \%search,
             { order_by => 'name' }
         );
@@ -1213,7 +1213,7 @@ sub location_add :Path('/Inventory/location/add') :Args(0) {
         my $now    = $self->_now();
 
         eval {
-            $schema->resultset('InventoryLocation')->create({
+            $schema->resultset('Accounting::InventoryLocation')->create({
                 sitename      => $sitename,
                 name          => $params->{name},
                 description   => $params->{description},
@@ -1251,7 +1251,7 @@ sub location_edit :Path('/Inventory/location/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $location;
-    eval { $location = $schema->resultset('InventoryLocation')->find({ id => $id, sitename => $sitename }) };
+    eval { $location = $schema->resultset('Accounting::InventoryLocation')->find({ id => $id, sitename => $sitename }) };
     if ($@ || !$location) {
         $c->stash->{error_msg} = 'Location not found';
         $c->res->redirect($c->uri_for('/Inventory/locations'));
@@ -1297,11 +1297,11 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
     my $schema   = $self->_schema($c);
 
     my (@items, @suppliers, @coa_accounts);
-    eval { @items     = $schema->resultset('InventoryItem')->search(
+    eval { @items     = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+    eval { @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
-    eval { @coa_accounts = $schema->resultset('CoaAccount')->search(
+    eval { @coa_accounts = $schema->resultset('Accounting::CoaAccount')->search(
         { obsolete => 0 }, { order_by => 'accno' })->all };
 
     if ($c->req->method eq 'POST') {
@@ -1351,7 +1351,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
-                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
                     sitename       => $sitename,
                     supplier_id    => $supplier_id,
                     invoice_number => $inv_number,
@@ -1367,7 +1367,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
                 });
 
                 for my $ln (@lines_data) {
-                    $schema->resultset('InventorySupplierInvoiceLine')->create({
+                    $schema->resultset('Accounting::InventorySupplierInvoiceLine')->create({
                         invoice_id  => $invoice->id,
                         item_id     => $ln->{item_id},
                         description => $ln->{description},
@@ -1379,7 +1379,7 @@ sub stock_receive :Path('/Inventory/stock/receive') :Args(0) {
 
                     # Also update item unit_cost if currently blank
                     if ($ln->{unit_cost} > 0) {
-                        my $it = $schema->resultset('InventoryItem')->find($ln->{item_id});
+                        my $it = $schema->resultset('Accounting::InventoryItem')->find($ln->{item_id});
                         if ($it && !($it->unit_cost && $it->unit_cost > 0)) {
                             $it->update({ unit_cost => $ln->{unit_cost}, updated_at => $self->_now() });
                         }
@@ -1422,8 +1422,8 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
     my (@items, @locations);
     eval {
-        @items     = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @items     = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
     };
 
     if ($c->req->method eq 'POST') {
@@ -1437,7 +1437,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
 
         eval {
             $schema->txn_do(sub {
-                my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+                my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                     { item_id => $item_id, location_id => $loc_id },
                     { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
                 );
@@ -1454,7 +1454,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
 
                 # Update item unit_cost if provided and item cost is blank
-                my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+                my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
                 if ($item_rec && $params->{unit_cost} && $params->{unit_cost} > 0) {
                     $item_rec->update({ unit_cost => $params->{unit_cost}, updated_at => $now })
                         unless $item_rec->unit_cost && $item_rec->unit_cost > 0;
@@ -1466,7 +1466,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     my $unit_cost  = $params->{unit_cost} || $item_rec->unit_cost || 0;
                     my $value      = $qty * $unit_cost;
                     my $ref        = 'INV-' . $item_id . '-' . time();
-                    my $gl = $schema->resultset('GlEntry')->create({
+                    my $gl = $schema->resultset('Accounting::GlEntry')->create({
                         reference   => $ref,
                         description => ucfirst($type) . ': ' . ($item_rec->name || "Item $item_id") . " x$qty",
                         entry_type  => 'inventory',
@@ -1488,7 +1488,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                             $cr_acct = $item_rec->inventory_accno_id;
                         }
                         if ($dr_acct) {
-                            $schema->resultset('GlEntryLine')->create({
+                            $schema->resultset('Accounting::GlEntryLine')->create({
                                 gl_entry_id => $gl_entry_id,
                                 account_id  => $dr_acct,
                                 amount      => $value,
@@ -1497,7 +1497,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                             });
                         }
                         if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                            $schema->resultset('GlEntryLine')->create({
+                            $schema->resultset('Accounting::GlEntryLine')->create({
                                 gl_entry_id => $gl_entry_id,
                                 account_id  => $cr_acct,
                                 amount      => -$value,
@@ -1508,7 +1508,7 @@ sub stock_adjust :Path('/Inventory/stock/adjust') :Args(0) {
                     }
                 }
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     item_id          => $item_id,
                     location_id      => $loc_id,
                     transaction_type => $type,
@@ -1565,14 +1565,14 @@ sub stock_levels :Path('/Inventory/stock/levels') :Args(0) {
         my %item_search = (sitename => $sitename, status => 'active');
         $item_search{id} = $item_id if $item_id;
 
-        @items     = $schema->resultset('InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
-        @locations = $schema->resultset('InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
+        @items     = $schema->resultset('Accounting::InventoryItem')->search(\%item_search, { order_by => 'name' })->all;
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' })->all;
 
         for my $item (@items) {
             my %sl_search = (item_id => $item->id);
             $sl_search{location_id} = $location_id if $location_id;
 
-            my @sls = $schema->resultset('InventoryStockLevel')->search(
+            my @sls = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 \%sl_search,
                 { prefetch => 'location', order_by => 'location.name' }
             )->all;
@@ -1636,7 +1636,7 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
 
     my (@transactions, @items, $total_count);
     eval {
-        @items = $schema->resultset('InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
+        @items = $schema->resultset('Accounting::InventoryItem')->search({ sitename => $sitename, status => 'active' }, { order_by => 'name' });
 
         my %search = (sitename => $sitename);
         $search{item_id}          = $item_id if $item_id;
@@ -1650,9 +1650,9 @@ sub stock_transactions :Path('/Inventory/stock/transactions') :Args(0) {
             }
         }
 
-        $total_count = $schema->resultset('InventoryTransaction')->search(\%search)->count;
+        $total_count = $schema->resultset('Accounting::InventoryTransaction')->search(\%search)->count;
 
-        @transactions = $schema->resultset('InventoryTransaction')->search(
+        @transactions = $schema->resultset('Accounting::InventoryTransaction')->search(
             \%search,
             {
                 prefetch => ['item', 'location'],
@@ -1700,7 +1700,7 @@ sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
     }
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($item_id) };
 
     unless ($item) {
         $c->flash->{error_msg} = 'Item not found';
@@ -1716,7 +1716,7 @@ sub push_to_marketplace :Path('/Inventory/push_to_marketplace') :Args(0) {
 
     my $listing;
     eval {
-        $listing = $schema->resultset('MarketplaceListing')->create({
+        $listing = $schema->resultset('Accounting::MarketplaceListing')->create({
             seller_username => $c->session->{username} || 'admin',
             sitename        => $sitename,
             title           => $item->name,
@@ -1754,7 +1754,7 @@ sub api_items :Path('/Inventory/api/items') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'sku' }
         );
@@ -1787,7 +1787,7 @@ sub api_suppliers :Path('/Inventory/api/suppliers') :Args(0) {
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
     my @suppliers;
     eval {
-        @suppliers = $self->_schema($c)->resultset('InventorySupplier')->search(
+        @suppliers = $self->_schema($c)->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -1803,7 +1803,7 @@ sub api_items_with_accounts :Path('/Inventory/api/items_with_accounts') :Args(0)
     my $sitename = $c->req->params->{sitename} || $self->_sitename($c);
     my @items;
     eval {
-        @items = $self->_schema($c)->resultset('InventoryItem')->search(
+        @items = $self->_schema($c)->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -1839,7 +1839,7 @@ sub api_stock :Path('/Inventory/api/stock') :Args(0) {
 
     my @stock;
     eval {
-        @stock = $schema->resultset('InventoryStockLevel')->search(
+        @stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
             \%search,
             { join => ['item', 'location'] }
         );
@@ -1874,7 +1874,7 @@ sub invoice_list :Path('/Inventory/invoice') :Args(0) {
     my @invoices;
     my $list_error;
     eval {
-        @invoices = $self->_schema($c)->resultset('InventorySupplierInvoice')->search(
+        @invoices = $self->_schema($c)->resultset('Accounting::InventorySupplierInvoice')->search(
             { 'me.sitename' => $sitename },
             { prefetch => 'supplier', order_by => { -desc => 'me.invoice_date' } }
         )->all;
@@ -1916,7 +1916,7 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
                 my $shipping_amt = $params->{shipping_amount} || 0;
                 my $discount_amt = $params->{discount_amount} || 0;
 
-                my $invoice = $schema->resultset('InventorySupplierInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
                     sitename             => $sitename,
                     supplier_id          => $params->{supplier_id},
                     invoice_number       => $params->{invoice_number},
@@ -1975,18 +1975,18 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
     eval {
         my %seen_sup;
         @suppliers = grep { !$seen_sup{ lc($_->name) }++ }
-            $schema->resultset('InventorySupplier')->search(
+            $schema->resultset('Accounting::InventorySupplier')->search(
                 { sitename => $sitename, status => 'active' },
                 { order_by => 'name' }
             )->all;
     };
 
     my @items;
-    eval { @items = $schema->resultset('InventoryItem')->search(
+    eval { @items = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
 
     my @locations;
-    eval { @locations = $schema->resultset('InventoryLocation')->search(
+    eval { @locations = $schema->resultset('Accounting::InventoryLocation')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
 
     $c->stash(
@@ -2006,7 +2006,7 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2088,13 +2088,13 @@ sub invoice_edit :Path('/Inventory/invoice/edit') :Args(1) {
     }
 
     my @suppliers;
-    eval { @suppliers = $schema->resultset('InventorySupplier')->search(
+    eval { @suppliers = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
     my @items;
-    eval { @items = $schema->resultset('InventoryItem')->search(
+    eval { @items = $schema->resultset('Accounting::InventoryItem')->search(
         { sitename => $sitename, status => 'active' }, { order_by => 'name' })->all };
     my @locations;
-    eval { @locations = $schema->resultset('InventoryLocation')->search(
+    eval { @locations = $schema->resultset('Accounting::InventoryLocation')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
 
     $c->stash(
@@ -2115,7 +2115,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2136,11 +2136,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             # Ensure a default location exists for this site so stock always posts
             my $default_loc;
             eval {
-                ($default_loc) = $schema->resultset('InventoryLocation')->search(
+                ($default_loc) = $schema->resultset('Accounting::InventoryLocation')->search(
                     { sitename => $sitename, name => 'Default' }
                 )->all;
                 unless ($default_loc) {
-                    $default_loc = $schema->resultset('InventoryLocation')->create({
+                    $default_loc = $schema->resultset('Accounting::InventoryLocation')->create({
                         sitename => $sitename,
                         name     => 'Default',
                         status   => 'active',
@@ -2161,11 +2161,11 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
 
                 my ($sl, $sl_err);
                 eval {
-                    $sl = $schema->resultset('InventoryStockLevel')->find({
+                    $sl = $schema->resultset('Accounting::InventoryStockLevel')->find({
                         item_id => $line->item_id, location_id => $loc_id
                     });
                     unless ($sl) {
-                        $sl = $schema->resultset('InventoryStockLevel')->create({
+                        $sl = $schema->resultset('Accounting::InventoryStockLevel')->create({
                             item_id           => $line->item_id,
                             location_id       => $loc_id,
                             quantity_on_hand  => 0,
@@ -2186,7 +2186,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
                 }
 
                 eval {
-                    $schema->resultset('InventoryTransaction')->create({
+                    $schema->resultset('Accounting::InventoryTransaction')->create({
                         item_id          => $line->item_id,
                         location_id      => $loc_id,
                         transaction_type => 'receive',
@@ -2206,7 +2206,7 @@ sub invoice_post :Path('/Inventory/invoice/post') :Args(1) {
             $c->stash->{_stock_skipped} = $stock_skipped || 0;
 
             if ($invoice->ap_account_id && $invoice->total_amount > 0) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'AP',
@@ -2276,7 +2276,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => ['item'] } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2289,7 +2289,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
 
     eval {
         $schema->txn_do(sub {
-            my $default_loc = $schema->resultset('InventoryLocation')->find_or_create(
+            my $default_loc = $schema->resultset('Accounting::InventoryLocation')->find_or_create(
                 { sitename => $sitename, name => 'Default' },
                 { key => 'sitename_name' }
             );
@@ -2300,7 +2300,7 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                 my $item_nm = $line->item ? $line->item->name : "item #${\$line->item_id}";
 
                 # Skip if a 'receive' transaction already exists for this item+invoice
-                my $already = $schema->resultset('InventoryTransaction')->search({
+                my $already = $schema->resultset('Accounting::InventoryTransaction')->search({
                     item_id          => $line->item_id,
                     location_id      => $loc_id,
                     transaction_type => 'receive',
@@ -2313,13 +2313,13 @@ sub invoice_reprocess_stock :Path('/Inventory/invoice/reprocess_stock') :Args(1)
                     next;
                 }
 
-                my $sl = $schema->resultset('InventoryStockLevel')->find_or_create(
+                my $sl = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                     { item_id => $line->item_id, location_id => $loc_id },
                     { key => 'item_id_location_id' }
                 );
                 $sl->update({ quantity_on_hand => ($sl->quantity_on_hand || 0) + $line->quantity });
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     item_id          => $line->item_id,
                     location_id      => $loc_id,
                     transaction_type => 'receive',
@@ -2353,7 +2353,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     my $schema   = $self->_schema($c);
 
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find(
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find(
         $id, { prefetch => { lines => 'item' } }) };
 
     unless ($invoice && $invoice->sitename eq $sitename) {
@@ -2368,7 +2368,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
     # Find AP account: prefer invoice's own, fall back to first COA account starting with '2'
     my $ap_acct_id = $invoice->ap_account_id;
     unless ($ap_acct_id) {
-        my $ap = eval { $schema->resultset('CoaAccount')->search(
+        my $ap = eval { $schema->resultset('Accounting::CoaAccount')->search(
             { accno => { -like => '2%' }, obsolete => 0 },
             { order_by => 'accno', rows => 1 }
         )->single };
@@ -2382,7 +2382,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
 
     eval {
         $schema->txn_do(sub {
-            my $gl = $schema->resultset('GlEntry')->create({
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
                 sitename    => $sitename,
                 reference   => 'AP-' . ($invoice->invoice_number || $invoice->id),
                 entry_type  => 'AP',
@@ -2402,7 +2402,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
             for my $line ($invoice->lines->all) {
                 my $acct_id = $line->account_id;
                 unless ($acct_id) {
-                    my $exp = eval { $schema->resultset('CoaAccount')->search(
+                    my $exp = eval { $schema->resultset('Accounting::CoaAccount')->search(
                         { accno => { -like => '5%' }, obsolete => 0 },
                         { order_by => 'accno', rows => 1 }
                     )->single };
@@ -2421,7 +2421,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
 
             # Payment GL: if invoice is paid, also record DR AP / CR clearing
             if (($invoice->status || '') eq 'paid' && $invoice->total_amount > 0) {
-                my $pay_gl = $schema->resultset('GlEntry')->create({
+                my $pay_gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     reference   => 'PAY-' . ($invoice->invoice_number || $invoice->id),
                     entry_type  => 'general',
@@ -2436,7 +2436,7 @@ sub invoice_create_gl :Path('/Inventory/invoice/create_gl') :Args(1) {
                     sort_order => 1,
                 });
                 # CR side: find Points/Equity clearing account (3xxx) or use AP account as memo-only
-                my $pts_acct = eval { $schema->resultset('CoaAccount')->search(
+                my $pts_acct = eval { $schema->resultset('Accounting::CoaAccount')->search(
                     { accno => { -like => '3%' }, obsolete => 0 },
                     { order_by => 'accno', rows => 1 }
                 )->single };
@@ -2464,7 +2464,7 @@ sub invoice_view :Path('/Inventory/invoice/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
     eval {
-        $invoice = $self->_schema($c)->resultset('InventorySupplierInvoice')->find(
+        $invoice = $self->_schema($c)->resultset('Accounting::InventorySupplierInvoice')->find(
             $id, { prefetch => ['supplier', 'ap_account', 'tax_account', 'shipping_account',
                                 'discount_account', { lines => ['item', 'account', 'location'] }] }
         );
@@ -2484,7 +2484,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find($id) };
     unless ($invoice && $invoice->sitename eq $sitename) {
         $c->flash->{error_msg} = 'Invoice not found';
         return $c->res->redirect($c->uri_for('/Inventory/invoice'));
@@ -2523,7 +2523,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
 
             # Update the corresponding CSC customer invoice (AR) to paid
             eval {
-                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                my $csc_inv = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
                     sitename       => 'CSC',
                     invoice_number => $invoice->invoice_number,
                 })->single;
@@ -2539,13 +2539,13 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
             $c->log->warn("CSC AR invoice update failed: $@") if $@;
 
             if ($auto_pay) {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 $ha->update({ auto_pay => 1 }) if $ha;
             }
 
             # Mark paid_at on the hosting_account so CSC dashboard can show it
             eval {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 if ($ha) {
                     my $note = 'PAID:' . $invoice->invoice_number . ':' . DateTime->now->strftime('%Y-%m-%d');
                     my $existing = $ha->notes || '';
@@ -2555,7 +2555,7 @@ sub invoice_pay_points :Path('/Inventory/invoice/pay_points') :Args(1) {
 
             # Email both CSC and the paying SiteName
             eval {
-                my $ha = $schema->resultset('HostingAccount')->search({ sitename => $sitename })->single;
+                my $ha = $schema->resultset('Accounting::HostingAccount')->search({ sitename => $sitename })->single;
                 my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
                 $notifier->send_invoice_payment_notification($c,
                     invoice_number => $invoice->invoice_number,
@@ -2590,12 +2590,12 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
 
     if ($confirmed_id) {
         my $inv;
-        eval { $inv = $schema->resultset('InventorySupplierInvoice')->find($confirmed_id) };
+        eval { $inv = $schema->resultset('Accounting::InventorySupplierInvoice')->find($confirmed_id) };
         if ($inv && $inv->sitename eq $sitename && $inv->auto_pay && $inv->status ne 'paid') {
             eval {
                 $inv->update({ status => 'paid', updated_at => DateTime->now->strftime('%Y-%m-%d %H:%M:%S') });
 
-                my $csc_inv = $schema->resultset('InventoryCustomerInvoice')->search({
+                my $csc_inv = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
                     sitename       => 'CSC',
                     invoice_number => $inv->invoice_number,
                 })->single;
@@ -2621,7 +2621,7 @@ sub process_auto_pay :Path('/Inventory/invoice/process_auto_pay') :Args(0) {
     # Show list of auto-pay invoices needing confirmation (past due date)
     my @due_invoices;
     eval {
-        @due_invoices = $schema->resultset('InventorySupplierInvoice')->search(
+        @due_invoices = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
             {
                 sitename => $sitename,
                 auto_pay => 1,
@@ -2657,7 +2657,7 @@ sub invoice_paid_by_shanta :Path('/Inventory/invoice/paid_by_shanta') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
     my $invoice;
-    eval { $invoice = $schema->resultset('InventorySupplierInvoice')->find($id) };
+    eval { $invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->find($id) };
     unless ($invoice) {
         $c->flash->{error_msg} = 'Invoice not found';
         return $c->res->redirect($c->uri_for('/Inventory/invoice'));
@@ -2718,7 +2718,7 @@ sub _next_customer_invoice_number {
     my ($self, $c, $sitename) = @_;
     my $count = 0;
     eval {
-        $count = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
+        $count = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->search(
             { sitename => $sitename }
         )->count;
     };
@@ -2731,7 +2731,7 @@ sub customer_invoice_list :Path('/Inventory/sales') :Args(0) {
     my @invoices;
     my $err;
     eval {
-        @invoices = $self->_schema($c)->resultset('InventoryCustomerInvoice')->search(
+        @invoices = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->search(
             { 'me.sitename' => $sitename },
             { prefetch => ['lines'], order_by => { -desc => 'me.invoice_date' } }
         )->all;
@@ -2753,7 +2753,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
     my $prefill_order;
     if (my $order_id = $c->req->params->{from_order}) {
         eval {
-            $prefill_order = $schema->resultset('InventoryCustomerOrder')->find(
+            $prefill_order = $schema->resultset('Accounting::InventoryCustomerOrder')->find(
                 $order_id, { prefetch => { lines => 'item' } }
             );
         };
@@ -2776,7 +2776,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
                 my $inv_num = $params->{invoice_number}
                     || $self->_next_customer_invoice_number($c, $sitename);
 
-                my $invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+                my $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->create({
                     sitename          => $sitename,
                     customer_order_id => $params->{customer_order_id} || undef,
                     customer_name     => $params->{customer_name},
@@ -2806,7 +2806,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
                     my ($inc_id, $cogs_id, $inv_id);
                     if ($l->{item_id}) {
-                        my $item = eval { $schema->resultset('InventoryItem')->find($l->{item_id}) };
+                        my $item = eval { $schema->resultset('Accounting::InventoryItem')->find($l->{item_id}) };
                         if ($item) {
                             $inc_id  = $l->{income_account_id}    || $item->income_accno_id     || undef;
                             $cogs_id = $l->{cogs_account_id}      || $item->expense_accno_id    || undef;
@@ -2843,7 +2843,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
     my @items;
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -2851,7 +2851,7 @@ sub customer_invoice_new :Path('/Inventory/sales/new') :Args(0) {
 
     my @orders;
     eval {
-        @orders = $schema->resultset('InventoryCustomerOrder')->search(
+        @orders = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename, status => { -in => ['confirmed', 'pending'] } },
             { order_by => { -desc => 'created_at' } }
         )->all;
@@ -2872,7 +2872,7 @@ sub customer_invoice_view :Path('/Inventory/sales/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $invoice;
     eval {
-        $invoice = $self->_schema($c)->resultset('InventoryCustomerInvoice')->find(
+        $invoice = $self->_schema($c)->resultset('Accounting::InventoryCustomerInvoice')->find(
             $id, { prefetch => ['customer_order', 'ar_account', 'income_account', 'tax_account',
                                 { lines => ['item', 'income_account', 'cogs_account'] }] }
         );
@@ -2893,7 +2893,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
 
     eval {
         $schema->txn_do(sub {
-            my $invoice = $schema->resultset('InventoryCustomerInvoice')->find(
+            my $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->find(
                 $id, { prefetch => { lines => 'item' } }
             );
             die "Invoice not found\n" unless $invoice;
@@ -2924,14 +2924,14 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 }
 
                 if ($line->item_id) {
-                    my $sold_item = eval { $schema->resultset('InventoryItem')->find($line->item_id) };
+                    my $sold_item = eval { $schema->resultset('Accounting::InventoryItem')->find($line->item_id) };
 
                     if ($sold_item && $sold_item->is_assemblable) {
                         # For assemblable (3D-printed / assembled) items: deduct BOM components
                         # instead of the finished item (printed-on-demand — no finished stock).
                         my $qty_multiplier = $line->quantity || 1;
                         my @bom = eval {
-                            $schema->resultset('InventoryItemBOM')->search(
+                            $schema->resultset('Accounting::InventoryItemBOM')->search(
                                 { parent_item_id => $line->item_id },
                                 { prefetch => 'component_item' }
                             )->all;
@@ -2942,7 +2942,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                                          * $qty_multiplier
                                          * (1 + ($bom_line->scrap_factor || 0));
 
-                            my $comp_sl = $schema->resultset('InventoryStockLevel')->find(
+                            my $comp_sl = $schema->resultset('Accounting::InventoryStockLevel')->find(
                                 { item_id => $bom_line->component_item_id }
                             );
                             if ($comp_sl) {
@@ -2950,7 +2950,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                                 $comp_sl->update({ quantity_on_hand => $new_qty });
                             }
                             my $comp_name = eval { $bom_line->component_item->name } || 'component';
-                            $schema->resultset('InventoryTransaction')->create({
+                            $schema->resultset('Accounting::InventoryTransaction')->create({
                                 item_id          => $bom_line->component_item_id,
                                 sitename         => $sitename,
                                 transaction_type => 'use',
@@ -2967,14 +2967,14 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                         }
                     } else {
                         # Non-assemblable items: deduct finished stock directly
-                        my $sl = $schema->resultset('InventoryStockLevel')->find(
+                        my $sl = $schema->resultset('Accounting::InventoryStockLevel')->find(
                             { item_id => $line->item_id }
                         );
                         if ($sl) {
                             my $new_qty = ($sl->quantity_on_hand || 0) - ($line->quantity || 0);
                             $sl->update({ quantity_on_hand => $new_qty });
                         }
-                        $schema->resultset('InventoryTransaction')->create({
+                        $schema->resultset('Accounting::InventoryTransaction')->create({
                             item_id          => $line->item_id,
                             sitename         => $sitename,
                             transaction_type => 'sell',
@@ -2998,7 +2998,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
             }
 
             if (@gl_lines && $invoice->ar_account_id) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     reference   => $invoice->invoice_number,
                     description => 'Sales invoice - ' . $invoice->customer_name,
                     entry_date  => $invoice->invoice_date,
@@ -3008,7 +3008,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
                 });
                 for my $l (@gl_lines) {
                     next unless $l->{accno_id};
-                    $schema->resultset('GlEntryLine')->create({
+                    $schema->resultset('Accounting::GlEntryLine')->create({
                         entry_id  => $gl->id,
                         accno_id  => $l->{accno_id},
                         amount    => $l->{amount},
@@ -3021,7 +3021,7 @@ sub customer_invoice_post :Path('/Inventory/sales/post') :Args(1) {
             $invoice->update({ status => 'posted', updated_at => $now });
 
             if ($invoice->customer_order_id) {
-                my $order = $schema->resultset('InventoryCustomerOrder')->find($invoice->customer_order_id);
+                my $order = $schema->resultset('Accounting::InventoryCustomerOrder')->find($invoice->customer_order_id);
                 $order->update({ status => 'completed', updated_at => $now }) if $order;
             }
         });
@@ -3049,7 +3049,7 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => 'stock_levels' }
         );
@@ -3062,7 +3062,7 @@ sub print_label :Path('/Inventory/print/label') :Args(1) {
 
     my @locations;
     eval {
-        @locations = $schema->resultset('InventoryLocation')->search(
+        @locations = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename, status => 'active' },
             { columns => ['id','name'], order_by => 'name' }
         )->all;
@@ -3096,14 +3096,14 @@ sub print_labels_multi :Path('/Inventory/print/labels') :Args(0) {
 
     if (@item_ids) {
         eval {
-            @items = $schema->resultset('InventoryItem')->search(
+            @items = $schema->resultset('Accounting::InventoryItem')->search(
                 { id => { -in => \@item_ids }, sitename => $sitename },
                 { order_by => ['category','name'] }
             )->all;
         };
     } else {
         eval {
-            @items = $schema->resultset('InventoryItem')->search(
+            @items = $schema->resultset('Accounting::InventoryItem')->search(
                 { sitename => $sitename, status => 'active' },
                 { order_by => ['category','name'] }
             )->all;
@@ -3133,7 +3133,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
     eval {
         my %search = (sitename => $sitename, status => 'active');
         $search{category} = $category if $category;
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
@@ -3164,7 +3164,7 @@ sub print_stock_report :Path('/Inventory/print/stock') :Args(0) {
 
     my @categories;
     eval {
-        my @cat_rows = $schema->resultset('InventoryItem')->search(
+        my @cat_rows = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', category => { '!=' => undef } },
             { columns => ['category'], distinct => 1, order_by => 'category' }
         )->all;
@@ -3193,7 +3193,7 @@ sub print_bom :Path('/Inventory/print/bom') :Args(1) {
 
     my $item;
     eval {
-        $item = $schema->resultset('InventoryItem')->find(
+        $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id },
             { prefetch => [
                 { 'bom_components' => 'component_item' },
@@ -3274,7 +3274,7 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
     my @log;
     for my $f (@filaments) {
         my $exists = eval {
-            $schema->resultset('InventoryItem')->search({
+            $schema->resultset('Accounting::InventoryItem')->search({
                 sitename => $target_site,
                 sku      => $f->{sku},
             })->count;
@@ -3300,7 +3300,7 @@ sub seed_filaments :Path('/Inventory/seed_filaments') :Args(0) {
                 updated_at      => $now,
             );
             eval { $row{description} = $f->{brand} . ' filament for 3D printing. 1kg spool.' };
-            $schema->resultset('InventoryItem')->create(\%row);
+            $schema->resultset('Accounting::InventoryItem')->create(\%row);
         };
         if ($@) {
             push @log, "$f->{sku}: ERROR — $@";
@@ -3589,7 +3589,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                 { item_id => $item_id, location_id => ($loc_id || \'NULL') },
                 { default => { quantity_on_hand => 0, quantity_reserved => 0, quantity_on_order => 0 } }
             ) if $loc_id;
@@ -3604,12 +3604,12 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                 $stock->update({ quantity_on_hand => $new_qty, updated_at => $now });
             }
 
-            my $item_rec = $schema->resultset('InventoryItem')->find($item_id);
+            my $item_rec = $schema->resultset('Accounting::InventoryItem')->find($item_id);
             if ($item_rec && ($item_rec->inventory_accno_id || $item_rec->expense_accno_id)) {
                 my $unit_cost = $params->{unit_cost} || $item_rec->unit_cost || 0;
                 my $value     = $qty * $unit_cost;
                 my $ref       = 'API-TXN-' . $item_id . '-' . time();
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     reference   => $ref,
                     description => ucfirst($type) . ' (API): ' . ($item_rec->name || "Item $item_id") . " x$qty",
                     entry_type  => 'inventory',
@@ -3631,7 +3631,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                         $cr_acct = $item_rec->inventory_accno_id;
                     }
                     if ($dr_acct) {
-                        $schema->resultset('GlEntryLine')->create({
+                        $schema->resultset('Accounting::GlEntryLine')->create({
                             gl_entry_id => $gl_entry_id,
                             account_id  => $dr_acct,
                             amount      => $value,
@@ -3640,7 +3640,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                         });
                     }
                     if ($cr_acct && $cr_acct != ($dr_acct || 0)) {
-                        $schema->resultset('GlEntryLine')->create({
+                        $schema->resultset('Accounting::GlEntryLine')->create({
                             gl_entry_id => $gl_entry_id,
                             account_id  => $cr_acct,
                             amount      => -$value,
@@ -3651,7 +3651,7 @@ sub api_transaction :Path('/Inventory/api/transaction') :Args(0) {
                 }
             }
 
-            my $txn = $schema->resultset('InventoryTransaction')->create({
+            my $txn = $schema->resultset('Accounting::InventoryTransaction')->create({
                 item_id          => $item_id,
                 location_id      => $loc_id || undef,
                 transaction_type => $type,
@@ -3705,7 +3705,7 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
 
         if ($action eq 'delete') {
             eval {
-                my $partner = $schema->resultset('InventoryConsignmentPartner')->find($p->{partner_id});
+                my $partner = $schema->resultset('Accounting::InventoryConsignmentPartner')->find($p->{partner_id});
                 $partner->delete if $partner && $partner->sitename eq $sitename;
             };
             $c->flash->{error_msg} = "Delete failed: $@" if $@;
@@ -3727,10 +3727,10 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
                     created_by         => $c->session->{username} || 'admin',
                 );
                 if ($id) {
-                    my $partner = $schema->resultset('InventoryConsignmentPartner')->find($id);
+                    my $partner = $schema->resultset('Accounting::InventoryConsignmentPartner')->find($id);
                     $partner->update(\%data) if $partner && $partner->sitename eq $sitename;
                 } else {
-                    $schema->resultset('InventoryConsignmentPartner')->create(\%data);
+                    $schema->resultset('Accounting::InventoryConsignmentPartner')->create(\%data);
                 }
             };
             $c->flash->{error_msg}   = "Save failed: $@" if $@;
@@ -3741,7 +3741,7 @@ sub consignment_partners :Path('/Inventory/consignment/partners') :Args(0) {
     }
 
     my (@partners, $edit_partner);
-    eval { @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+    eval { @partners = $schema->resultset('Accounting::InventoryConsignmentPartner')->search(
         { sitename => $sitename }, { order_by => 'name' })->all };
     my $edit_id = $c->req->params->{edit};
     if ($edit_id) {
@@ -3768,7 +3768,7 @@ sub consignment_list :Path('/Inventory/consignment') :Args(0) {
 
     my @consignments;
     eval {
-        @consignments = $schema->resultset('InventoryConsignment')->search(
+        @consignments = $schema->resultset('Accounting::InventoryConsignment')->search(
             \%where,
             { prefetch => ['partner', { 'lines' => 'item' }], order_by => { -desc => 'me.date_sent' } }
         )->all;
@@ -3797,7 +3797,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
             die "Partner required\n" unless $p->{partner_id};
             die "Date sent required\n" unless $p->{date_sent};
 
-            my $consignment = $schema->resultset('InventoryConsignment')->create({
+            my $consignment = $schema->resultset('Accounting::InventoryConsignment')->create({
                 sitename         => $inv_sitename,
                 partner_id       => $p->{partner_id},
                 reference_number => $p->{reference_number} || undef,
@@ -3831,7 +3831,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                 my $line_note = $opts_str
                     ? ($user_note ? "$opts_str $user_note" : $opts_str)
                     : $user_note || undef;
-                $schema->resultset('InventoryConsignmentLine')->create({
+                $schema->resultset('Accounting::InventoryConsignmentLine')->create({
                     consignment_id    => $consignment->id,
                     item_id           => $item_id,
                     quantity_sent     => $qty,
@@ -3840,7 +3840,7 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
                     retail_price      => $retail_price || undef,
                     notes             => $line_note    || undef,
                 });
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $inv_sitename,
                     item_id          => $item_id,
                     transaction_type => 'consignment_out',
@@ -3870,11 +3870,11 @@ sub consignment_new :Path('/Inventory/consignment/new') :Args(0) {
     my $source_sitename = $c->req->params->{source_sitename} || $sitename;
     my (@partners, @items, @all_sitenames, @avail_filaments);
     eval {
-        @partners = $schema->resultset('InventoryConsignmentPartner')->search(
+        @partners = $schema->resultset('Accounting::InventoryConsignmentPartner')->search(
             { sitename => $source_sitename, status => 'active' }, { order_by => 'name' })->all;
     };
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $source_sitename, status => 'active', show_in_shop => 1 },
             { columns => [qw(id name sku unit_price unit_cost unit_of_measure category item_origin)],
               order_by => 'name' })->all;
@@ -3936,7 +3936,7 @@ sub consignment_view :Path('/Inventory/consignment/view') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->find(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
@@ -3973,7 +3973,7 @@ sub consignment_queue :Path('/Inventory/consignment/queue') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->find(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         );
@@ -4037,7 +4037,7 @@ sub consignment_print :Path('/Inventory/consignment/print') :Args(1) {
 
     my $consignment;
     eval {
-        $consignment = $schema->resultset('InventoryConsignment')->search(
+        $consignment = $schema->resultset('Accounting::InventoryConsignment')->search(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', { 'lines' => 'item' }] }
         )->first;
@@ -4079,7 +4079,7 @@ sub consignment_delete :Path('/Inventory/consignment/delete') :Args(1) {
     }
 
     eval {
-        my $con = $schema->resultset('InventoryConsignment')->find(
+        my $con = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename }
         ) or die "Not found\n";
         die "Cannot delete a settled consignment\n" if $con->status eq 'settled';
@@ -4108,7 +4108,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
     my $p = $c->req->body_parameters;
 
     eval {
-        my $consignment = $schema->resultset('InventoryConsignment')->find(
+        my $consignment = $schema->resultset('Accounting::InventoryConsignment')->find(
             { 'me.id' => $id, 'me.sitename' => $sitename },
             { prefetch => ['partner', 'lines'] }
         ) or die "Consignment not found\n";
@@ -4125,7 +4125,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
         my @qty_returns = $c->req->params->get_all('qty_return');
 
         for my $i (0 .. $#line_ids) {
-            my $line = $schema->resultset('InventoryConsignmentLine')->find($line_ids[$i]);
+            my $line = $schema->resultset('Accounting::InventoryConsignmentLine')->find($line_ids[$i]);
             next unless $line && $line->consignment_id == $id;
 
             my $new_sold   = ($qty_solds[$i]   || 0) + ($line->quantity_sold     || 0);
@@ -4139,7 +4139,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                 $total_net   += $gross * (1 - $commission_pct / 100);
                 $total_comm  += $gross * ($commission_pct / 100);
 
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $sitename,
                     item_id          => $line->item_id,
                     transaction_type => 'consignment_sold',
@@ -4153,7 +4153,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                 });
             }
             if (($qty_returns[$i] || 0) > 0) {
-                $schema->resultset('InventoryTransaction')->create({
+                $schema->resultset('Accounting::InventoryTransaction')->create({
                     sitename         => $sitename,
                     item_id          => $line->item_id,
                     transaction_type => 'consignment_return',
@@ -4184,7 +4184,7 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
             my $comm_account_id   = $p->{comm_account_id}   || undef;
 
             if ($income_account_id && $ar_account_id) {
-                my $gl = $schema->resultset('GlEntry')->create({
+                my $gl = $schema->resultset('Accounting::GlEntry')->create({
                     sitename    => $sitename,
                     entry_date  => $now,
                     description => sprintf('Consignment settlement — %s (%.0f%% commission)',
@@ -4193,19 +4193,19 @@ sub consignment_settle :Path('/Inventory/consignment/settle') :Args(1) {
                     created_by  => $c->session->{username} || 'admin',
                     created_at  => $now,
                 });
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl->id, account_id => $ar_account_id,
                     debit => sprintf('%.2f', $total_net), credit => 0,
                     description => 'Consignment net receivable',
                 });
                 if ($comm_account_id && $total_comm > 0) {
-                    $schema->resultset('GlEntryLine')->create({
+                    $schema->resultset('Accounting::GlEntryLine')->create({
                         gl_entry_id => $gl->id, account_id => $comm_account_id,
                         debit => sprintf('%.2f', $total_comm), credit => 0,
                         description => 'Consignment commission expense',
                     });
                 }
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl->id, account_id => $income_account_id,
                     debit => 0, credit => sprintf('%.2f', $total_gross),
                     description => 'Consignment sales revenue',
