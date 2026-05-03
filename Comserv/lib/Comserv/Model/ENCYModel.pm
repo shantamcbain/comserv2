@@ -944,6 +944,8 @@ sub auto_link_herb_data {
     # --- therapeutic_action terms → Glossary lookup; create todo if missing ---
     for my $term ($parse_terms->($form_data->{therapeutic_action})) {
         next if $term =~ /\s{2,}|^\d+$/;
+        next if $term =~ /:/;
+        next if scalar(split /\s+/, $term) > 4;
         my $rec = eval {
             $self->ency_schema->resultset('Glossary')->search(
                 { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
@@ -1794,7 +1796,32 @@ my @_PROSE_VERB_PATS = (
     qr/\b(influences|promotes|stimulates|reduces|increases|decreases|improves)\b/i,
     qr/\b(beneficially|effectively|primarily|mainly|generally|typically)\b/i,
     qr/\b(historically|traditionally|commonly)\b/i,
+    qr/\b(inhibits|activates|modulates|regulates|mediates|facilitates|enhances)\b/i,
+    qr/\b(prevents|protects|supports|triggers|induces|blocks|binds|releases)\b/i,
+    qr/\b(scavenges|neutralizes|detoxifies|metabolizes|oxidizes|catalyzes)\b/i,
+    qr/\b(absorbs|secretes|excretes|synthesizes|breaks|digests|moistens)\b/i,
 );
+
+my $_LEADING_VERB_RE = qr/
+    ^(?:
+        # TCM / herbal action verbs (base and conjugated)
+        moisten s? | clear s? | tonif(?:y|ies) | drain s? | nourish(?:es)? |
+        disperse?s? | resolv(?:e|es) | transform s? | strengthen s? | soften s? |
+        warm s? | cool s? | purg(?:e|es) | regulat(?:e|es) | invigorat(?:e|es) |
+        supplement s? | fortif(?:y|ies) | purif(?:y|ies) | promot(?:e|es) |
+        enhanc(?:e|es) | facilitat(?:e|es) | moderat(?:e|es) | alleviat(?:e|es) |
+        reliev(?:e|es) | expel s? | scatter s? | astringe?s? | consolidat(?:e|es) |
+        # General medical/pharmacological action verbs
+        inhibit s? | stimulat(?:e|es) | activat(?:e|es) | modulat(?:e|es) |
+        regulat(?:e|es) | mediat(?:e|es) | trigger s? | induc(?:e|es) |
+        block s? | bind s? | releas(?:e|es) | break s? | digest s? |
+        absorb s? | excret(?:e|es) | secret(?:e|es) | scaveng(?:e|es) |
+        neutraliz(?:e|es) | detoxif(?:y|ies) | metaboliz(?:e|es) | oxidiz(?:e|es) |
+        catalyz(?:e|es) | protect s? | support s? | prevent s? |
+        # Ends in -ens (nearly always a verb in this domain)
+        \w+ens
+    )\b
+/xi;
 
 sub _draft_clean_term {
     my ($self, $rs, $term) = @_;
@@ -1814,6 +1841,8 @@ sub _draft_clean_term {
     return '' if $term =~ /^\d+$/ || $term =~ /[<>{}]/ || $term =~ /^\W/ || length($term) < 3;
     return '' if $term =~ /\d{2,}/;
     return '' if $term =~ /\band\b.*\band\b/i;
+
+    return '' if $term =~ $_LEADING_VERB_RE;
 
     for my $pat (@_PROSE_VERB_PATS) {
         return '' if $term =~ $pat;
