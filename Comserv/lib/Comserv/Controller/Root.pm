@@ -1919,6 +1919,17 @@ sub begin :Private {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
+
+    eval {
+        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { status => 'active' },
+            { order_by => 'sitename' }
+        )->all;
+        $c->stash->{nav_hosting_accounts} = \@ha;
+    };
+    if ($@) {
+        $c->stash->{nav_hosting_accounts} = [];
+    }
 }
 
 sub _port_label {
