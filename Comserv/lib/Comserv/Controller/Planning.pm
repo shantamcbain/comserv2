@@ -766,6 +766,26 @@ sub _run_audit_scan {
     my (%groups, $error_count, $todo_created) = ();
     my @subjects;
 
+    my $system_project_id = 1;
+    eval {
+        my $sp = $schema->resultset('Project')->search(
+            { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+            { order_by => { -asc => 'id' }, rows => 1 }
+        )->first;
+        $system_project_id = $sp->id if $sp;
+    };
+
+    my $admin_user_id = $user_id || 0;
+    unless ($admin_user_id) {
+        eval {
+            my $admin = $schema->resultset('User')->search(
+                { rolename => 'admin' }, { rows => 1 }
+            )->first;
+            $admin_user_id = $admin->id if $admin;
+        };
+    }
+    $admin_user_id ||= 178;
+
     eval {
         my $since = do {
             my @t = localtime(time - 86400);
@@ -821,8 +841,8 @@ sub _run_audit_scan {
                 };
                 next if $open_exists;
                 my @entries = @{ $groups{$sub} };
-                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $user_id,
-                    $today, $sub, \@entries, $root_id, $ollama);
+                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
                 push @subjects, $ai_subject if $ai_subject;
                 $todo_created++ if $ai_subject;
             }
@@ -845,7 +865,8 @@ sub _run_audit_scan {
                     sitename            => $sitename,
                     developer           => $username,
                     username_of_poster  => $username,
-                    user_id             => $user_id || 0,
+                    user_id             => $admin_user_id,
+                    project_id          => $system_project_id,
                     last_mod_by         => $username,
                     last_mod_date       => $today,
                     date_time_posted    => $today . ' 00:00:00',
@@ -855,7 +876,7 @@ sub _run_audit_scan {
                     estimated_man_hours => 0,
                     accumulative_time   => '00:00:00',
                     group_of_poster     => 'admin',
-                    project_code        => 'system',
+                    project_code        => 'PLANNING',
                     share               => 0,
                 });
             };
@@ -865,8 +886,8 @@ sub _run_audit_scan {
                 my $root_id = $root_todo->record_id;
                 for my $sub (sort keys %groups) {
                     my @entries = @{ $groups{$sub} };
-                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $user_id,
-                        $today, $sub, \@entries, $root_id, $ollama);
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
                     push @subjects, $ai_subject if $ai_subject;
                 }
             }
@@ -877,7 +898,8 @@ sub _run_audit_scan {
 }
 
 sub _build_error_todo {
-    my ($self, $schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama) = @_;
+    my ($self, $schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama, $fallback_project_id) = @_;
+    $fallback_project_id //= 1;
     my @entries  = @$entries;
     my $count    = scalar @entries;
     my $shown    = $count > 3 ? 3 : $count;
@@ -918,6 +940,31 @@ sub _build_error_todo {
         };
     }
 
+    my $matched_project_id = $fallback_project_id;
+    my $matched_project_code = 'PLANNING';
+    eval {
+        my $first_entry = $entries[0];
+        my $search_term;
+        if ($sub =~ /Controller::(\w+)/) {
+            $search_term = $1;
+        } elsif ($first_entry && $first_entry->{file} && $first_entry->{file} =~ m{/(\w+)\.pm$}i) {
+            $search_term = $1;
+        }
+        if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
+            my $proj = $schema->resultset('Project')->search(
+                { -or => [
+                    { name         => { -like => "%$search_term%" } },
+                    { project_code => { -like => "%$search_term%" } },
+                ]},
+                { rows => 1 }
+            )->first;
+            if ($proj) {
+                $matched_project_id   = $proj->id;
+                $matched_project_code = $proj->project_code || 'PLANNING';
+            }
+        }
+    };
+
     eval {
         $schema->resultset('Todo')->create({
             subject             => $ai_subject,
@@ -930,7 +977,8 @@ sub _build_error_todo {
             sitename            => $sitename,
             developer           => $username,
             username_of_poster  => $username,
-            user_id             => $user_id || 0,
+            user_id             => $user_id || 178,
+            project_id          => $matched_project_id,
             last_mod_by         => $username,
             last_mod_date       => $today,
             date_time_posted    => $today . ' 00:00:00',
@@ -940,7 +988,7 @@ sub _build_error_todo {
             estimated_man_hours => 0,
             accumulative_time   => '00:00:00',
             group_of_poster     => 'admin',
-            project_code        => 'system',
+            project_code        => $matched_project_code,
             share               => 0,
         });
     };

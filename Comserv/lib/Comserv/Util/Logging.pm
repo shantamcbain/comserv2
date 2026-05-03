@@ -473,8 +473,16 @@ sub log_with_details {
                 # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")
                 # both carry the controller/module name which we can match
                 # against project_name or project_code in the Project table.
-                my $matched_project_id   = undef;
-                my $matched_project_code = 'system';
+                my $fallback_project_id   = 1;
+                my $matched_project_id    = undef;
+                my $matched_project_code  = 'PLANNING';
+                eval {
+                    my $sp = $c->model('DBEncy')->resultset('Project')->search(
+                        { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+                        { order_by => { -asc => 'id' }, rows => 1 }
+                    )->first;
+                    $fallback_project_id = $sp->id if $sp;
+                };
                 eval {
                     my $search_term;
                     if ($sub_name =~ /Controller::(\w+)/) {
@@ -482,7 +490,7 @@ sub log_with_details {
                     } elsif ($file && $file =~ m{/(\w+)\.pm$}i) {
                         $search_term = $1;
                     }
-                    if ($search_term && $search_term ne 'unknown') {
+                    if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
                         my $proj = $c->model('DBEncy')->resultset('Project')->search(
                             { -or => [
                                 { name         => { -like => "%$search_term%" } },
@@ -492,10 +500,13 @@ sub log_with_details {
                         )->first;
                         if ($proj) {
                             $matched_project_id   = $proj->id;
-                            $matched_project_code = $proj->project_code || 'system';
+                            $matched_project_code = $proj->project_code || 'PLANNING';
                         }
                     }
                 };
+                $matched_project_id //= $fallback_project_id;
+
+                my $effective_uid = defined($uid) ? $uid : 178;
 
                 my %create_args = (
                     subject             => $todo_subject,
@@ -506,6 +517,8 @@ sub log_with_details {
                     sitename            => $sitename,
                     developer           => $username,
                     username_of_poster  => $username,
+                    user_id             => $effective_uid,
+                    project_id          => $matched_project_id,
                     last_mod_by         => $username,
                     last_mod_date       => $now_date,
                     date_time_posted    => $now_date . ' 00:00:00',
@@ -518,8 +531,6 @@ sub log_with_details {
                     project_code        => $matched_project_code,
                     share               => 0,
                 );
-                $create_args{user_id}    = $uid                  if defined $uid;
-                $create_args{project_id} = $matched_project_id   if defined $matched_project_id;
                 $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
             }
         };
