@@ -157,7 +157,7 @@ sub add_animal {
     my ($self, $c, $data) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_animal', "Adding new animal: " . ($data->{common_name} || ''));
     eval {
-        $self->ency_schema->resultset('Animal')->create($data);
+        $self->ency_schema->resultset('Ency::Animal')->create($data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_animal', "Animal added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -174,7 +174,7 @@ sub update_animal {
     unless (ref($data) eq 'HASH') {
         return (0, "Invalid data structure (Expected HASHREF).");
     }
-    my $record = $self->ency_schema->resultset('Animal')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Animal')->find($id);
     unless ($record) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_animal', "No animal found with ID: $id");
         return (0, "Animal with ID $id not found.");
@@ -192,7 +192,7 @@ sub update_animal {
 
 sub get_animal_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Animal')->find($id);
+    my $record = $self->ency_schema->resultset('Ency::Animal')->find($id);
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_animal_by_id', "Animal with ID $id fetched successfully.");
     } else {
@@ -212,7 +212,7 @@ sub list_animals {
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Animal')->search($where, \%attrs)->all;
+        @results = $self->ency_schema->resultset('Ency::Animal')->search($where, \%attrs)->all;
         1;
     } or do {
         my $error = $@ || 'Unknown error';
@@ -226,7 +226,7 @@ sub search_animals {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'search_animals', "Searching animals for: $query");
     my @results;
     eval {
-        @results = $self->ency_schema->resultset('Animal')->search(
+        @results = $self->ency_schema->resultset('Ency::Animal')->search(
             { -or => [
                 common_name     => { like => "%$query%" },
                 scientific_name => { like => "%$query%" },
@@ -507,7 +507,7 @@ sub get_disease_related {
         my @disease_animals = $self->ency_schema->resultset('Ency::DiseaseAnimal')->search({ disease_id => $id })->all;
         if (@disease_animals) {
             my @animal_ids = map { $_->animal_id } @disease_animals;
-            $related{animals} = [$self->ency_schema->resultset('Animal')->search({ record_id => { -in => \@animal_ids } })->all];
+            $related{animals} = [$self->ency_schema->resultset('Ency::Animal')->search({ record_id => { -in => \@animal_ids } })->all];
         } else {
             $related{animals} = [];
         }
