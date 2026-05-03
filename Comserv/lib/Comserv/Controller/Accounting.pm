@@ -262,6 +262,8 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '4000', description => 'Sales Revenue',                 category => 'I' },
         { accno => '4100', description => 'Sales Returns & Allowances',    category => 'I', is_contra => 1 },
         { accno => '4200', description => 'Service Revenue',               category => 'I' },
+        { accno => '4250', description => 'Developer / IT Services Revenue', category => 'I' },
+        { accno => '4260', description => 'Developer Services — GST/HST Collected', category => 'L' },
         { accno => '4900', description => 'Other Income',                  category => 'I' },
         # Cost of Goods Sold / Expenses
         { accno => '5000', description => 'Cost of Goods Sold',            category => 'E' },
@@ -334,12 +336,14 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
         { accno => '3100', description => 'Retained Earnings',             category => 'Q' },
         { accno => '4000', description => 'Sales Revenue',                 category => 'I' },
         { accno => '4100', description => 'Sales Returns & Allowances',    category => 'I', is_contra => 1 },
-        { accno => '4200', description => 'Service Revenue',               category => 'I' },
-        { accno => '4210', description => '3D Print Sales',                 category => 'I' },
-        { accno => '4215', description => '3D Print Service Revenue',       category => 'I' },
-        { accno => '4220', description => 'Honey & Apiary Sales',           category => 'I' },
-        { accno => '4230', description => 'Craft & Handmade Sales',         category => 'I' },
-        { accno => '4900', description => 'Other Income',                   category => 'I' },
+        { accno => '4200', description => 'Service Revenue',                  category => 'I' },
+        { accno => '4210', description => '3D Print Sales',                  category => 'I' },
+        { accno => '4215', description => '3D Print Service Revenue',        category => 'I' },
+        { accno => '4220', description => 'Honey & Apiary Sales',            category => 'I' },
+        { accno => '4230', description => 'Craft & Handmade Sales',          category => 'I' },
+        { accno => '4250', description => 'Developer / IT Services Revenue', category => 'I' },
+        { accno => '4260', description => 'Developer Services — GST/HST Collected', category => 'L' },
+        { accno => '4900', description => 'Other Income',                    category => 'I' },
         { accno => '5000', description => 'Cost of Goods Sold',             category => 'E' },
         { accno => '5100', description => 'Purchases',                      category => 'E' },
         { accno => '5200', description => 'Purchase Discounts',             category => 'E', is_contra => 1 },
@@ -718,6 +722,136 @@ sub _fetch_rate {
 
     return 1 unless $cached && $cached->{rates};
     return $cached->{rates}{ uc($to) } // 1;
+}
+
+# -------------------------------------------------------------------------
+# GET /Accounting/billing
+# Billable time report grouped by client (project.sitename).
+# CSC sees all clients; other sites see only their own.
+# Filters: date_from, date_to, client_sitename
+# -------------------------------------------------------------------------
+
+sub billing :Path('/Accounting/billing') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'billing', 'Billing report');
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $is_csc   = ($sitename eq 'CSC');
+
+    my $date_from      = $c->req->params->{date_from}      || '';
+    my $date_to        = $c->req->params->{date_to}        || '';
+    my $filter_client  = $c->req->params->{client_sitename} || '';
+
+    my (%search, @rows, $report_error);
+
+    eval {
+        $search{'me.status'} = 3;
+
+        if ($date_from) { $search{'me.start_date'} = { '>=' => $date_from } }
+        if ($date_to)   {
+            my $existing = $search{'me.start_date'};
+            if (ref $existing eq 'HASH') {
+                $search{'me.start_date'} = { '>=' => $date_from, '<=' => $date_to };
+            } else {
+                $search{'me.start_date'} = { '<=' => $date_to };
+            }
+        }
+
+        my @logs = $schema->resultset('Log')->search(
+            \%search,
+            {
+                prefetch => { todo => 'project' },
+                order_by => { -desc => 'me.start_date' },
+            }
+        )->all;
+
+        my %by_client;
+
+        for my $log (@logs) {
+            my $todo    = $log->todo    or next;
+            my $project = $todo->project or next;
+
+            my $client = $project->sitename || 'Unknown';
+            next unless $todo->billable;
+            next if !$is_csc && $client ne $sitename;
+            next if $filter_client && $client ne $filter_client;
+
+            my $time_str = $log->time // '00:00:00';
+            my ($hh, $mm) = split /:/, $time_str;
+            my $hours = (int($hh || 0)) + (int($mm || 0) / 60);
+
+            my $rate   = $log->point_rate // $todo->point_rate // 60;
+            my $amount = sprintf('%.2f', $hours * $rate);
+
+            $by_client{$client} ||= {
+                client   => $client,
+                projects => {},
+                total_hrs => 0,
+                total_amt => 0,
+            };
+            $by_client{$client}{total_hrs} += $hours;
+            $by_client{$client}{total_amt} += $amount;
+
+            my $proj_name = $project->name || $project->project_code || "Project #" . $project->id;
+            $by_client{$client}{projects}{$proj_name} ||= {
+                name      => $proj_name,
+                logs      => [],
+                total_hrs => 0,
+                total_amt => 0,
+            };
+            $by_client{$client}{projects}{$proj_name}{total_hrs} += $hours;
+            $by_client{$client}{projects}{$proj_name}{total_amt} += $amount;
+            push @{ $by_client{$client}{projects}{$proj_name}{logs} }, {
+                log_id   => $log->record_id,
+                date     => $log->start_date || '',
+                abstract => $log->abstract || '(no description)',
+                username => $log->username || '',
+                hours    => sprintf('%.2f', $hours),
+                rate     => $rate + 0,
+                amount   => $amount + 0,
+            };
+        }
+
+        for my $client (sort keys %by_client) {
+            my $c_data = $by_client{$client};
+            $c_data->{total_hrs} = sprintf('%.2f', $c_data->{total_hrs});
+            $c_data->{total_amt} = sprintf('%.2f', $c_data->{total_amt});
+            my @proj_list = sort { $a->{name} cmp $b->{name} }
+                            values %{ $c_data->{projects} };
+            for my $p (@proj_list) {
+                $p->{total_hrs} = sprintf('%.2f', $p->{total_hrs});
+                $p->{total_amt} = sprintf('%.2f', $p->{total_amt});
+            }
+            $c_data->{project_list} = \@proj_list;
+            push @rows, $c_data;
+        }
+    };
+    $report_error = $@ if $@;
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'billing', "Billing report error: $report_error")
+        if $report_error;
+
+    my @client_list;
+    if ($is_csc) {
+        eval {
+            @client_list = map { $_->sitename }
+                $schema->resultset('Project')->search(
+                    {},
+                    { columns => ['sitename'], distinct => 1, order_by => 'sitename' }
+                )->all;
+        };
+    }
+
+    $c->stash(
+        rows         => \@rows,
+        date_from    => $date_from,
+        date_to      => $date_to,
+        filter_client => $filter_client,
+        client_list  => \@client_list,
+        is_csc       => $is_csc,
+        report_error => $report_error,
+        template     => 'Accounting/billing.tt',
+    );
 }
 
 sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {

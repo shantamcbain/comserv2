@@ -15,7 +15,7 @@
     [% IF form_data.parent_id %]
     <input type="hidden" name="parent_id" value="[% form_data.parent_id %]">
     [% END %]
-  [% INCLUDE "todo/site_list.tt" %]<br>
+  [% INCLUDE "todo/site_list.tt" label_text="Client / Owner SiteName (who commissioned this work)" %]<br>
 
     <label for="name">Project Name:</label><br>
     <input type="text" id="name" name="name" value="[% form_data.name %]" required><br>
