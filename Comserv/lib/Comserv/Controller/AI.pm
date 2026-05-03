@@ -9535,6 +9535,19 @@ When the user asks you to create or update data, respond with a JSON action bloc
 To post a manual GL entry:
 {"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
 
+To open the supplier invoice form and pre-fill it from a bill the user has pasted:
+Parse the bill text, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. Freedom Mobile autopay Apr 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+
+Rules for navigate_and_fill invoice entry:
+- supplier_id is a dropdown — tell the user the supplier name and ask them to select it after the form opens.
+- If the supplier does not exist, suggest they go to /Inventory/supplier/add first.
+- Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
+- If the bill shows "$22.40 total, tax included" with no breakdown, set tax_amount to 0 and unit_cost_0 to the full amount.
+- auto_pay_method: fill only if the bill shows "Auto Pay" or similar (e.g. "Visa Auto Pay").
+- After the action line, briefly list the values you used so the user can verify before saving.
+
 Only use actions when the user explicitly requests a data change.  Always confirm
 the details before executing.
 
