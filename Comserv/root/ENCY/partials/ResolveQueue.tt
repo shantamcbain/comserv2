@@ -1,0 +1,33 @@
+[%#
+  ResolveQueue.tt — shown on add forms when the editor arrived via the resolve workflow.
+  Required stash keys: return_to, resolve_field, resolve_type, resolve_remaining
+  Optional: resolve_term (the term being added — usually already in prefill_name/prefill_term)
+%]
+[% IF return_to && (resolve_field || resolve_type) %]
+<div class="resolve-queue-bar" style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:0.75em 1em;margin-bottom:1em;">
+  <strong>Resolve workflow</strong>
+  [% IF resolve_type %] &mdash; adding a new <em>[% resolve_type | html %]</em>[% END %]
+  [% IF resolve_field %] from field <code>[% resolve_field | html %]</code>[% END %].
+  [% IF resolve_remaining > 0 %]
+  <span style="margin-left:0.5em;color:#856404;">([% resolve_remaining %] more item[% resolve_remaining > 1 ? 's' : '' %] after this one)</span>
+  [% END %]
+  <div style="margin-top:0.5em;display:flex;gap:0.5em;flex-wrap:wrap;align-items:center;">
+    <form method="POST" action="[% c.uri_for('/ENCY/resolve_skip') %]" style="display:inline;margin:0;">
+      <input type="hidden" name="term"          value="[% resolve_term || prefill_term || prefill_name || '' | html %]" />
+      <input type="hidden" name="field"         value="[% resolve_field | html %]" />
+      <input type="hidden" name="type"          value="[% resolve_type  | html %]" />
+      <input type="hidden" name="create_ticket" value="0" />
+      <button type="submit" class="btn btn-sm btn-secondary">Skip this term</button>
+    </form>
+    <form method="POST" action="[% c.uri_for('/ENCY/resolve_skip') %]" style="display:inline;margin:0;">
+      <input type="hidden" name="term"          value="[% resolve_term || prefill_term || prefill_name || '' | html %]" />
+      <input type="hidden" name="field"         value="[% resolve_field | html %]" />
+      <input type="hidden" name="type"          value="[% resolve_type  | html %]" />
+      <input type="hidden" name="create_ticket" value="1" />
+      <button type="submit" class="btn btn-sm btn-warning">Skip &amp; create ticket</button>
+    </form>
+    <a href="[% return_to | html %]" class="btn btn-sm btn-outline-danger"
+       onclick="return confirm('Abandon the remaining resolve items and return?')">Abandon &amp; return</a>
+  </div>
+</div>
+[% END %]
