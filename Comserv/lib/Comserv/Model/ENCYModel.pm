@@ -1842,7 +1842,8 @@ sub _draft_clean_term {
     return '' if $term =~ /\d{2,}/;
     return '' if $term =~ /\band\b.*\band\b/i;
 
-    return '' if $term =~ $_LEADING_VERB_RE;
+    my %_NOUN_ONLY_RS = map { $_ => 1 } qw(Glossary Constituent Herb Drug);
+    return '' if $_NOUN_ONLY_RS{$rs} && $term =~ $_LEADING_VERB_RE;
 
     for my $pat (@_PROSE_VERB_PATS) {
         return '' if $term =~ $pat;
