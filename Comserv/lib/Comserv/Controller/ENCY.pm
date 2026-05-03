@@ -202,11 +202,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
             $c->flash->{success_msg} = "Herb updated successfully.$link_msg$todo_msg";
             my $return_to = $c->uri_for('/ENCY/herb_detail/' . $record_id);
-            if ($action_items && @$action_items) {
-                my $first = $action_items->[0];
-                $c->res->redirect($c->uri_for($first->{add_route},
-                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
-            } else {
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
                 $c->res->redirect($return_to);
             }
             return;
@@ -865,11 +861,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             my $caller_return_to = $form_data->{return_to} // '';
             my $herb_detail      = $c->uri_for('/ENCY/herb_detail/' . $new_id);
             my $return_to        = ($caller_return_to && $caller_return_to =~ m{^/}) ? $caller_return_to : $herb_detail;
-            if ($action_items && @$action_items) {
-                my $first = $action_items->[0];
-                $c->res->redirect($c->uri_for($first->{add_route},
-                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
-            } else {
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
                 $c->res->redirect($return_to);
             }
         } else {
@@ -1465,18 +1457,27 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_disease($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added: $data->{common_name}");
         $c->flash->{success_msg} = 'Disease added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Disease');
         return;
     }
 
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
-        template        => 'ENCY/DiseaseDetail.tt',
+        edit_mode         => 1,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        template          => 'ENCY/DiseaseDetail.tt',
     );
 }
 
@@ -1686,18 +1687,27 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_symptom($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_symptom', "Symptom added: $data->{name}");
         $c->flash->{success_msg} = 'Symptom added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Symptom'));
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Symptom');
         return;
     }
 
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
-        template        => 'ENCY/SymptomDetail.tt',
+        edit_mode         => 1,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
+        template          => 'ENCY/SymptomDetail.tt',
     );
 }
 
@@ -1937,23 +1947,25 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             $c->flash->{success_msg} = "Constituent '$data->{name}' added successfully.";
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
-        if ($return_to && $return_to =~ m{^/}) {
-            $c->response->redirect($c->uri_for($return_to));
-        } else {
-            $c->response->redirect($c->uri_for('/ENCY/Constituent'));
-        }
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Constituent');
         return;
     }
 
-    my $prefill_name = $c->request->param('name') // '';
-    my $return_to    = $c->request->param('return_to') // '';
+    my $prefill_name      = $c->request->param('name')          // '';
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        prefill_name    => $prefill_name,
-        return_to       => $return_to,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
-        template        => 'ENCY/ConstituentDetail.tt',
+        edit_mode         => 1,
+        prefill_name      => $prefill_name,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
+        template          => 'ENCY/ConstituentDetail.tt',
     );
 }
 
@@ -2039,13 +2051,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             my $link_msg = $n_linked ? " Auto-linked $n_linked record(s)." : '';
             my $todo_msg = $n_unres  ? " $n_unres term(s) need attention."  : '';
             $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s).$link_msg$todo_msg";
-            my $return_to = $c->uri_for('/ENCY/Constituent', $record_id);
+            my $return_to    = $c->uri_for('/ENCY/Constituent', $record_id);
             my $action_items = $c->model('ENCYModel')->action_items_for_unresolved($resolve->{unresolved});
-            if ($action_items && @$action_items) {
-                my $first = $action_items->[0];
-                $c->response->redirect($c->uri_for($first->{add_route},
-                    { $first->{name_param} => $first->{term}, return_to => $return_to }));
-            } else {
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
                 $c->response->redirect($return_to);
             }
             return;
@@ -2184,22 +2192,24 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         $c->model('ENCYModel')->add_glossary($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Glossary term added: $data->{term}");
         $c->flash->{success_msg} = "Glossary term '$data->{term}' added successfully.";
-        if ($return_to && $return_to =~ m{^/}) {
-            $c->response->redirect($c->uri_for($return_to));
-        } else {
-            $c->response->redirect($c->uri_for('/ENCY/Glossary'));
-        }
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Glossary');
         return;
     }
 
-    my $prefill_term = $c->request->param('term') // '';
-    my $return_to    = $c->request->param('return_to') // '';
+    my $prefill_term      = $c->request->param('term')          // '';
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $c->stash(
-        edit_mode       => 1,
-        prefill_term    => $prefill_term,
-        return_to       => $return_to,
-        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
-        template        => 'ENCY/GlossaryDetail.tt',
+        edit_mode         => 1,
+        prefill_term      => $prefill_term,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        template          => 'ENCY/GlossaryDetail.tt',
     );
 }
 
@@ -3188,6 +3198,66 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
     };
     require JSON;
     $c->response->body(JSON::encode_json({ results => \@results }));
+}
+
+sub _start_resolve_workflow {
+    my ($self, $c, $action_items, $return_to) = @_;
+    return 0 unless $action_items && @$action_items;
+    my @queue = @$action_items;
+    my $first = shift @queue;
+    $c->session->{ency_resolve_queue}     = \@queue;
+    $c->session->{ency_resolve_return_to} = $return_to;
+    $c->response->redirect($c->uri_for($first->{add_route}, {
+        $first->{name_param} => $first->{term},
+        return_to            => $return_to,
+        resolve_field        => $first->{field},
+        resolve_type         => $first->{type},
+    }));
+    return 1;
+}
+
+sub _advance_resolve_queue {
+    my ($self, $c, $fallback_return_to) = @_;
+    my $queue     = $c->session->{ency_resolve_queue} || [];
+    my $return_to = $c->session->{ency_resolve_return_to} || $fallback_return_to || '/ENCY';
+    if (@$queue) {
+        my @remaining = @$queue;
+        my $next = shift @remaining;
+        $c->session->{ency_resolve_queue} = \@remaining;
+        $c->response->redirect($c->uri_for($next->{add_route}, {
+            $next->{name_param} => $next->{term},
+            return_to           => $return_to,
+            resolve_field       => $next->{field},
+            resolve_type        => $next->{type},
+        }));
+    } else {
+        delete $c->session->{ency_resolve_queue};
+        delete $c->session->{ency_resolve_return_to};
+        $c->response->redirect($c->uri_for($return_to));
+    }
+}
+
+sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
+    my ($self, $c) = @_;
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $p             = $c->request->body_parameters;
+    my $create_ticket = $p->{create_ticket} // 0;
+    my $term          = $p->{term}          // '';
+    my $field         = $p->{field}         // '';
+    my $type          = $p->{type}          // '';
+    if ($create_ticket && $term) {
+        my $short = length($term) > 50 ? substr($term, 0, 47) . '...' : $term;
+        $c->model('ENCYModel')->_create_ency_todo($c,
+            "ENCY: Editor review needed - $type: $short",
+            "Field: $field\nType: $type\nTerm: $term\n\n"
+          . "An editor skipped this term during the resolve workflow. "
+          . "Please verify whether it should be added as a new $type entry."
+        );
+    }
+    $self->_advance_resolve_queue($c, '/ENCY');
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -20,7 +20,8 @@
 
 <h1>Add New Herb</h1>
 
-[% IF return_to %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
+[% IF return_to && !(resolve_field || resolve_type) %]
 <div class="alert alert-info" style="margin-bottom:0.75em;">
   Adding this herb so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
   &mdash; you will be returned there automatically after saving.
