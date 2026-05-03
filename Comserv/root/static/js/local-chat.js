@@ -1880,6 +1880,11 @@
                 }
             }
         }
+        // When accounting agent is active AND the prompt looks like a pasted bill,
+        // inject the navigate_and_fill instruction so Grok emits the ACTION block.
+        if (_agentId === 'accounting' && /\$\s*[\d,]+\.\d{2}/.test(prompt) && /Payment|Invoice|Receipt|Bill/i.test(prompt)) {
+            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "PAY_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER autopay #PAY_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Account Payment", "auto_pay_method": "Visa Auto Pay"}}]\nReplace all placeholders with values parsed from the pasted bill. After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        }
 
         // Client-side fast path: "enter the invoice" when accounting agent is active.
         // Parses bill text from chat history and fires navigate_and_fill directly.
