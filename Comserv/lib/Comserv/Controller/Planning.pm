@@ -1087,7 +1087,7 @@ sub _daily_log_action {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
             "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
-        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
+        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
         my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
