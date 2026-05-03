@@ -164,14 +164,14 @@ __PACKAGE__->add_unique_constraint(
 
 __PACKAGE__->belongs_to(
     'parent_queen',
-    'Comserv::Model::Schema::Ency::Result::Queen',
+    'Comserv::Model::Schema::Ency::Result::Beekeeping::Queen',
     'parent_queen_id',
     { is_deferrable => 1, on_delete => 'SET NULL', join_type => 'LEFT' }
 );
 
 __PACKAGE__->has_many(
     'offspring_queens',
-    'Comserv::Model::Schema::Ency::Result::Queen',
+    'Comserv::Model::Schema::Ency::Result::Beekeeping::Queen',
     'parent_queen_id',
     { cascade_delete => 0 }
 );
