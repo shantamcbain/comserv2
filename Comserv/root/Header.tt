@@ -137,8 +137,11 @@
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% cv %]">
 
     [% IF is_admin %]
-    <!-- Admin-only Health Monitoring -->
+    <!-- Admin-only styles -->
     <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    [% END %]
+    [% IF is_admin && SiteName == 'CSC' %]
+    <!-- CSC-admin-only Health Monitoring -->
     <script src="/static/js/HealthMonitor.js"></script>
     [% END %]
 
