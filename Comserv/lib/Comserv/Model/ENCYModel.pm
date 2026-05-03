@@ -944,6 +944,8 @@ sub auto_link_herb_data {
     # --- therapeutic_action terms → Glossary lookup; create todo if missing ---
     for my $term ($parse_terms->($form_data->{therapeutic_action})) {
         next if $term =~ /\s{2,}|^\d+$/;
+        next if $term =~ /:/;
+        next if scalar(split /\s+/, $term) > 4;
         my $rec = eval {
             $self->ency_schema->resultset('Ency::Glossary')->search(
                 { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
@@ -1794,7 +1796,29 @@ my @_PROSE_VERB_PATS = (
     qr/\b(influences|promotes|stimulates|reduces|increases|decreases|improves)\b/i,
     qr/\b(beneficially|effectively|primarily|mainly|generally|typically)\b/i,
     qr/\b(historically|traditionally|commonly)\b/i,
+    qr/\b(inhibits|activates|modulates|regulates|mediates|facilitates|enhances)\b/i,
+    qr/\b(prevents|protects|supports|triggers|induces|blocks|binds|releases)\b/i,
+    qr/\b(scavenges|neutralizes|detoxifies|metabolizes|oxidizes|catalyzes)\b/i,
+    qr/\b(absorbs|secretes|excretes|synthesizes|breaks|digests|moistens)\b/i,
 );
+
+my $_LEADING_VERB_RE = qr{
+    ^(?:
+        moisten|moistens|clears?|tonif(?:y|ies)|drains?|nourish(?:es)?|
+        disperses?|resolves?|transforms?|strengthens?|softens?|
+        warms?|cools?|purges?|regulates?|invigorates?|
+        supplements?|fortif(?:y|ies)|purif(?:y|ies)|promotes?|
+        enhances?|facilitates?|moderates?|alleviates?|
+        relieves?|expels?|scatters?|astringes?|consolidates?|
+        inhibits?|stimulates?|activates?|modulates?|
+        mediates?|triggers?|induces?|
+        blocks?|binds?|releases?|breaks?|digests?|
+        absorbs?|excretes?|secretes?|scavenges?|
+        neutralizes?|detoxif(?:y|ies)|metabolizes?|oxidizes?|
+        catalyzes?|protects?|supports?|prevents?|
+        \w+ens
+    )\b
+}xi;
 
 sub _draft_clean_term {
     my ($self, $rs, $term) = @_;
@@ -1814,6 +1838,9 @@ sub _draft_clean_term {
     return '' if $term =~ /^\d+$/ || $term =~ /[<>{}]/ || $term =~ /^\W/ || length($term) < 3;
     return '' if $term =~ /\d{2,}/;
     return '' if $term =~ /\band\b.*\band\b/i;
+
+    my %_NOUN_ONLY_RS = map { $_ => 1 } qw(Glossary Constituent Herb Drug);
+    return '' if $_NOUN_ONLY_RS{$rs} && $term =~ $_LEADING_VERB_RE;
 
     for my $pat (@_PROSE_VERB_PATS) {
         return '' if $term =~ $pat;
