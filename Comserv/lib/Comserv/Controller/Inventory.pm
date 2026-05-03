@@ -1910,6 +1910,7 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
             }
         }
 
+        my $saved_invoice;
         eval {
             $schema->txn_do(sub {
                 my $tax_amt      = $params->{tax_amount}      || 0;
@@ -1959,13 +1960,83 @@ sub invoice_new :Path('/Inventory/invoice/new') :Args(0) {
 
                 my $grand_total = $line_total_sum + $tax_amt + $shipping_amt - $discount_amt;
                 $invoice->update({ total_amount => $grand_total });
+                $saved_invoice = $invoice;
             });
         };
         if ($@) {
             $c->stash->{error_msg} = "Failed to save invoice: $@";
             $c->stash->{submitted} = $c->req->body_parameters;
         } else {
-            $c->flash->{success_msg} = 'Invoice saved as draft. Review and Post when ready.';
+            my $todo_created = 0;
+            if ($saved_invoice) {
+                my $supplier_name = '';
+                eval {
+                    my $sup = $schema->resultset('InventorySupplier')->find($saved_invoice->supplier_id);
+                    $supplier_name = $sup->name if $sup;
+                };
+                $supplier_name ||= 'Unknown Supplier';
+
+                my $inv_num   = $saved_invoice->invoice_number || ('#' . $saved_invoice->id);
+                my $inv_total = sprintf('$%.2f', $saved_invoice->total_amount || 0);
+                my $inv_date  = $saved_invoice->invoice_date || '';
+                my $inv_url   = $c->uri_for('/Inventory/invoice/view', [$saved_invoice->id]);
+                my $poster    = $c->session->{username} || 'system';
+                my $now_date  = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+                my $now_dt    = $now_date . ' ' . do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
+
+                my $admin_user = eval {
+                    $schema->resultset('Member')->search(
+                        { roles => { -like => '%admin%' }, sitename => $sitename },
+                        { rows => 1, order_by => 'username' }
+                    )->single;
+                };
+                my $assignee = ($admin_user ? $admin_user->username : undef) || 'admin';
+
+                eval {
+                    $schema->resultset('Todo')->create({
+                        subject              => "Review Draft Invoice: $supplier_name $inv_num $inv_total",
+                        description          => "Draft supplier invoice entered by $poster on $inv_date.\n"
+                                             . "Supplier: $supplier_name | Amount: $inv_total\n"
+                                             . "Please verify details, assign GL accounts, and Post.\n"
+                                             . "View invoice: $inv_url",
+                        status               => 'todo',
+                        priority             => 'medium',
+                        developer            => $assignee,
+                        sitename             => $sitename,
+                        date_time_posted     => $now_dt,
+                        username_of_poster   => $poster,
+                        last_mod_by          => $poster,
+                        last_mod_date        => $now_date,
+                        parent_todo          => '',
+                        estimated_man_hours  => 0,
+                        accumulative_time    => '00:00:00',
+                        group_of_poster      => 'admin',
+                        project_code         => 'accounting',
+                        share                => 0,
+                    });
+                    $todo_created = 1;
+                };
+                $c->log->warn("Failed to create accounting todo: $@") if $@;
+
+                if ($admin_user) {
+                    my $admin_email = eval { $admin_user->email } || '';
+                    if ($admin_email) {
+                        eval {
+                            my $notifier = Comserv::Util::EmailNotification->new(logging => $self->logging);
+                            $notifier->send_error_notification($c, $admin_email,
+                                "Action Required: Draft Invoice $inv_num from $supplier_name",
+                                "A new draft supplier invoice has been entered and requires accounting review.\n\n"
+                                . "Supplier: $supplier_name\nInvoice #: $inv_num\nDate: $inv_date\nAmount: $inv_total\n"
+                                . "Entered by: $poster\n\nView and post: $inv_url"
+                            );
+                        };
+                        $c->log->warn("Failed to send accounting notification email: $@") if $@;
+                    }
+                }
+            }
+
+            my $todo_note = $todo_created ? ' An accounting review todo has been created.' : '';
+            $c->flash->{success_msg} = 'Invoice saved as draft.' . $todo_note . ' Accounting will review before posting.';
             $c->res->redirect($c->uri_for('/Inventory/invoice'));
             return;
         }
