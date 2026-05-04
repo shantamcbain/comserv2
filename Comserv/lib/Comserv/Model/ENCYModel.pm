@@ -893,6 +893,7 @@ sub auto_link_herb_data {
                map  {
                    (my $t = $_) =~ s/^\s+|\s+$//g;
                    $t =~ s/\s*\[(?:ref)?\?\]//g;
+                   $t =~ s/\s*\[\d+\]//g;
                    $t
                }
                split /[,;\n]+/, $text;
@@ -908,6 +909,7 @@ sub auto_link_herb_data {
     for my $term ($parse_terms->($form_data->{constituents})) {
         my $clean = $term;
         $clean =~ s/\s*\(.*//;
+        $clean =~ s/\s*\[\d+\]//g;
         $clean =~ s/\s+$//;
         my $rec = eval {
             $self->ency_schema->resultset('Ency::Constituent')->search(
@@ -950,6 +952,7 @@ sub auto_link_herb_data {
         next if $term =~ /\s{2,}|^\d+$/;
         next if $term =~ /:/;
         next if scalar(split /\s+/, $term) > 4;
+        next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
         my $rec = eval {
             $self->ency_schema->resultset('Ency::Glossary')->search(
                 { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
