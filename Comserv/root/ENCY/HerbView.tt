@@ -78,7 +78,7 @@ Record ID:[% herb.record_id %]
         <td>Parts Used:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.parts_used | ref_links %]
+                [% parts_used_html %]
             [% ELSE %]
                 <input type="text" id="parts_used" name="parts_used" value="[% herb.parts_used %]" size="50" />
             [% END %]
