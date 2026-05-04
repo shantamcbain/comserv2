@@ -236,9 +236,15 @@
             'HelpDesk':   'helpdesk',
         };
 
-        // Restore previously saved agent selection, or auto-select by site
+        // Restore previously saved agent selection, or auto-select by site.
+        // URL-based match always wins over saved preference (so navigating to /ENCY
+        // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
-        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+        var urlAgent = selectAgentForPage();
+        if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
+            sel.value = urlAgent.id;
+            _applyAgentOverride(urlAgent.id);
+        } else if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
         } else if (state.siteName && siteAgentMap[state.siteName]) {
@@ -1858,6 +1864,53 @@
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
             const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
+        }
+
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
+
+        // ENCY fast path: navigate to constituent#N page or add form directly.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
         }
 
         // Build request payload with page context and agent info
