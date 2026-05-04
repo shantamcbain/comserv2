@@ -3,7 +3,6 @@
   Shows the field-entry conventions and marker codes. Always visible to both
   human editors and AI-filled forms (it renders outside all textareas).
 %]
-[% IF edit_mode %]
 <div class="ency-entry-guide" style="background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;padding:0.75em 1em;margin-bottom:1.25em;font-size:0.88em;">
   <strong>Entry conventions for linked fields:</strong>
   <ul style="margin:0.4em 0 0.4em 1.2em;padding:0;">
@@ -15,4 +14,3 @@
         &mdash; a reference-check todo will be created on save</li>
   </ul>
 </div>
-[% END %]
