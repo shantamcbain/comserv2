@@ -3051,7 +3051,15 @@
                     });
                 }
             } else {
-                el.value = value !== null && value !== undefined ? String(value) : '';
+                var strVal;
+                if (Array.isArray(value)) {
+                    strVal = value.join('; ');
+                } else if (value !== null && typeof value === 'object') {
+                    strVal = Object.values(value).join('; ');
+                } else {
+                    strVal = value !== null && value !== undefined ? String(value) : '';
+                }
+                el.value = strVal;
             }
 
             // Fire change/input events so any JS listeners react
