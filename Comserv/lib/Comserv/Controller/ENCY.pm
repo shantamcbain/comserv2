@@ -2148,7 +2148,7 @@ sub glossary_detail : Path('/ENCY/Glossary') : Args(1) {
 
     $c->session->{record_id} = $id;
     $c->stash(
-        term      => $term,
+        entry     => $term,
         edit_mode => 0,
         template  => 'ENCY/GlossaryDetail.tt',
     );
@@ -2230,7 +2230,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         resolve_field     => $resolve_field,
         resolve_type      => $resolve_type,
         resolve_remaining => $resolve_remaining,
-        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields (alternate_terms, related_terms, examples) use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) definition and context must be plain prose — NOT semicolon-separated. (3) examples: list individual example terms/herbs/drugs semicolon-separated, no prose sentences.',
         template          => 'ENCY/GlossaryDetail.tt',
     );
 }
@@ -2303,7 +2303,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
                 "Failed to update glossary term: $msg");
             $c->stash(
                 error_msg => "Failed to update glossary term: $msg",
-                term      => { %{ $term->get_columns }, %$data },
+                entry     => { %{ $term->get_columns }, %$data },
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
@@ -2312,9 +2312,9 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
     }
 
     $c->stash(
-        term            => $term,
+        entry           => $term,
         edit_mode       => 1,
-        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields (alternate_terms, related_terms, examples) use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) definition and context must be plain prose — NOT semicolon-separated. (3) examples: list individual example terms/herbs/drugs semicolon-separated, no prose sentences.',
         template        => 'ENCY/GlossaryDetail.tt',
     );
 }
