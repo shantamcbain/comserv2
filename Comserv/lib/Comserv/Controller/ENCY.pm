@@ -2193,7 +2193,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         unless ($data->{term}) {
             $c->stash(
                 error_msg => "Term is required.",
-                term      => $data,
+                entry     => $data,
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
@@ -2203,7 +2203,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         unless ($data->{definition}) {
             $c->stash(
                 error_msg => "Definition is required.",
-                term      => $data,
+                entry     => $data,
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
