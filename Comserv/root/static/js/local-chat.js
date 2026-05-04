@@ -236,9 +236,15 @@
             'HelpDesk':   'helpdesk',
         };
 
-        // Restore previously saved agent selection, or auto-select by site
+        // Restore previously saved agent selection, or auto-select by site.
+        // URL-based match always wins over saved preference (so navigating to /ENCY
+        // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
-        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+        var urlAgent = selectAgentForPage();
+        if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
+            sel.value = urlAgent.id;
+            _applyAgentOverride(urlAgent.id);
+        } else if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
         } else if (state.siteName && siteAgentMap[state.siteName]) {
@@ -1887,6 +1893,16 @@
         const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
         if (_agentId === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
             _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        }
+
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (_agentId === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
         }
 
         // Client-side fast path: "enter/open the invoice form" when accounting agent is active.

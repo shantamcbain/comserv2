@@ -8962,6 +8962,21 @@ GUIDELINES:
 - For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
 - When the user mentions a constituent name and asks you to check if it exists, look at the
   LIVE ENCY CONSTITUENT DATA. If it's there, give the link. If not, offer to create it.
+
+ACTIONS YOU CAN PERFORM:
+When the user asks to add a constituent or fix an unresolved constituent term, read the injected
+todo/DB data to find the term name, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME", "found_in_herbs": "HERB_NAME_IF_KNOWN", "therapeutic_action": "IF_KNOWN"}}]
+
+Rules:
+- Extract the term name from the injected todo description or DB data — do NOT ask the user for it.
+- Only include fields you can actually determine from the available data.
+- After the ACTION line, confirm the term name and which herb it came from.
+- If the todo says "Unresolved term in constituent#N", look in the injected data for the actual term string.
+
+When the user asks to add a glossary term, use:
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Glossary/add", "fields": {"term": "TERM_NAME", "definition": "IF_KNOWN"}}]
 END_PROMPT
 }
 
