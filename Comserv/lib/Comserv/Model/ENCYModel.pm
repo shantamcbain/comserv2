@@ -1974,7 +1974,7 @@ sub preprocess_field_markers {
     my @existing_ref_ids;
     if ($entity_id) {
         my @existing_refs = eval { $self->get_references_for($c, $entity_type, $entity_id) };
-        @existing_ref_ids = map { $_->record_id } @existing_refs if @existing_refs;
+        @existing_ref_ids = map { $_->reference_id } @existing_refs if @existing_refs;
     }
 
     for my $field (sort keys %cleaned) {
