@@ -3255,7 +3255,7 @@ sub _advance_resolve_queue {
     } else {
         delete $c->session->{ency_resolve_queue};
         delete $c->session->{ency_resolve_return_to};
-        $c->response->redirect($c->uri_for($return_to));
+        $c->response->redirect($return_to =~ /^https?:\/\// ? $return_to : $c->uri_for($return_to));
     }
 }
 
@@ -3279,7 +3279,7 @@ sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
           . "Please verify whether it should be added as a new $type entry."
         );
     }
-    $self->_advance_resolve_queue($c, '/ENCY');
+    $self->_advance_resolve_queue($c, $c->session->{ency_resolve_return_to} || '/ENCY');
 }
 
 __PACKAGE__->meta->make_immutable;
