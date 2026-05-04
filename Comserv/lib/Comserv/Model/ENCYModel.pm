@@ -964,6 +964,23 @@ sub auto_link_herb_data {
         }
     }
 
+    # --- parts_used terms → Glossary lookup ---
+    for my $term ($parse_terms->($form_data->{parts_used})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        next if $term =~ /:/;
+        next if scalar(split /\s+/, $term) > 4;
+        next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        unless ($rec) {
+            push @todos, { field => 'parts_used', term => $term };
+        }
+    }
+
     # --- create todos for unresolved / auto-created terms ---
     my %seen;
     my @action_items;
@@ -1974,12 +1991,6 @@ sub preprocess_field_markers {
     my %cleaned = %$data;
     my @todos;
 
-    my @existing_ref_ids;
-    if ($entity_id) {
-        my @existing_refs = eval { $self->get_references_for($c, $entity_type, $entity_id) };
-        @existing_ref_ids = map { $_->reference_id } @existing_refs if @existing_refs;
-    }
-
     for my $field (sort keys %cleaned) {
         next if $_SKIP_MARKER_FIELDS{$field};
         my $text = $cleaned{$field};
@@ -2018,17 +2029,12 @@ sub preprocess_field_markers {
                     };
                 }
                 if ($has_ref) {
-                    if (@existing_ref_ids) {
-                        $raw .= ' ' . join('', map { "[$_]" } @existing_ref_ids);
-                        $modified = 1;
-                    } else {
-                        push @todos, {
-                            subject => "ENCY: Verify reference — $short",
-                            body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
-                                     . "This term was flagged [ref?] during data entry.\n"
-                                     . "Please find and add authoritative references for this term.",
-                        };
-                    }
+                    push @todos, {
+                        subject => "ENCY: Verify reference — $short",
+                        body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
+                                 . "This term was flagged [ref?] during data entry.\n"
+                                 . "Please find and add authoritative references for this term.",
+                    };
                 }
             }
             push @new_terms, $raw if length($raw);
