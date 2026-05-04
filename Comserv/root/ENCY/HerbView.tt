@@ -58,7 +58,7 @@ Record ID:[% herb.record_id %]
         <td>Common Names:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.common_names %]
+                [% herb.common_names | ref_links %]
             [% ELSE %]
                 <input type="text" id="common_names" name="common_names" value="[% herb.common_names %]" size="50" />
             [% END %]
@@ -78,7 +78,7 @@ Record ID:[% herb.record_id %]
         <td>Parts Used:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.parts_used %]
+                [% herb.parts_used | ref_links %]
             [% ELSE %]
                 <input type="text" id="parts_used" name="parts_used" value="[% herb.parts_used %]" size="50" />
             [% END %]
@@ -88,7 +88,7 @@ Record ID:[% herb.record_id %]
         <td>Sister Plants:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.sister_plants %]
+                [% herb.sister_plants | ref_links %]
             [% ELSE %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
@@ -113,7 +113,7 @@ Record ID:[% herb.record_id %]
         <td>Identifying Character:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.ident_character %]
+                [% herb.ident_character | ref_links %]
             [% ELSE %]
                 <input type="text" id="ident_character" name="ident_character" value="[% herb.ident_character %]" size="50" />
             [% END %]
@@ -123,7 +123,7 @@ Record ID:[% herb.record_id %]
         <td>Stem:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.stem %]
+                [% herb.stem | ref_links %]
             [% ELSE %]
                 <input type="text" id="stem" name="stem" value="[% herb.stem %]" size="50" />
             [% END %]
@@ -133,7 +133,7 @@ Record ID:[% herb.record_id %]
         <td>Leaves:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.leaves %]
+                [% herb.leaves | ref_links %]
             [% ELSE %]
                 <input type="text" id="leaves" name="leaves" value="[% herb.leaves %]" size="50" />
             [% END %]
@@ -143,7 +143,7 @@ Record ID:[% herb.record_id %]
         <td>Flowers:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.flowers %]
+                [% herb.flowers | ref_links %]
             [% ELSE %]
                 <input type="text" id="flowers" name="flowers" value="[% herb.flowers %]" size="50" />
             [% END %]
@@ -153,7 +153,7 @@ Record ID:[% herb.record_id %]
         <td>Fruit:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.fruit %]
+                [% herb.fruit | ref_links %]
             [% ELSE %]
                 <input type="text" id="fruit" name="fruit" value="[% herb.fruit %]" size="50" />
             [% END %]
@@ -163,7 +163,7 @@ Record ID:[% herb.record_id %]
         <td>Taste:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.taste %]
+                [% herb.taste | ref_links %]
             [% ELSE %]
                 <input type="text" id="taste" name="taste" value="[% herb.taste %]" size="50" />
             [% END %]
@@ -173,7 +173,7 @@ Record ID:[% herb.record_id %]
         <td>Odour:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.odour %]
+                [% herb.odour | ref_links %]
             [% ELSE %]
                 <input type="text" id="odour" name="odour" value="[% herb.odour %]" size="50" />
             [% END %]
@@ -183,7 +183,7 @@ Record ID:[% herb.record_id %]
         <td>Root:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.root %]
+                [% herb.root | ref_links %]
             [% ELSE %]
                 <input type="text" id="root" name="root" value="[% herb.root %]" size="50" />
             [% END %]
@@ -207,7 +207,7 @@ Record ID:[% herb.record_id %]
         <td>Distribution:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.distribution %]
+                [% herb.distribution | ref_links %]
             [% ELSE %]
                 <input type="text" id="distribution" name="distribution" value="[% herb.distribution %]" size="50" />
             [% END %]
@@ -217,7 +217,7 @@ Record ID:[% herb.record_id %]
         <td>Cultivation:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.cultivation %]
+                [% herb.cultivation | ref_links %]
             [% ELSE %]
                 <input type="text" id="cultivation" name="cultivation" value="[% herb.cultivation %]" size="50" />
             [% END %]
@@ -227,7 +227,7 @@ Record ID:[% herb.record_id %]
         <td>Harvest:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.harvest %]
+                [% herb.harvest | ref_links %]
             [% ELSE %]
                 <input type="text" id="harvest" name="harvest" value="[% herb.harvest %]" size="50" />
             [% END %]
@@ -382,7 +382,7 @@ Record ID:[% herb.record_id %]
         <td>Pollinator:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.pollinator %]
+                [% herb.pollinator | ref_links %]
             [% ELSE %]
                 <input type="text" id="pollinator" name="pollinator" value="[% herb.pollinator %]" size="50" />
             [% END %]
