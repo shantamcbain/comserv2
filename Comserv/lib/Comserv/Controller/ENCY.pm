@@ -240,11 +240,20 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
                          . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
                          . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
                          . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
-                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known. '
-                         . 'IMPORTANT FORMATTING: For all multi-value fields (therapeutic_action, constituents, '
-                         . 'parts_used, sister_plants, medical_uses, solvents, formulas, contra_indications) '
-                         . 'separate each item with a SEMICOLON (;) not a comma. Use noun phrases only — '
-                         . 'no prose sentences. Example constituents: "mucilage; flavonoids; vitamin C; potassium"',
+                         . 'allopathic, herbal, TCM, Ayurvedic, naturopathic, and homeopathic perspectives where known. '
+                         . 'IMPORTANT FORMATTING — read carefully: '
+                         . '(1) SEMICOLONS: all multi-value fields (therapeutic_action, constituents, parts_used, '
+                         . 'sister_plants, medical_uses, solvents, formulas, contra_indications) use SEMICOLONS (;) '
+                         . 'as the only separator — NOT commas. Use noun phrases, not prose sentences. '
+                         . '(2) PRACTITIONER PREFIXES in therapeutic_action, medical_uses, preparation, vetrinary: '
+                         . 'use "Allopathic:" NOT "Conventional:" — do not use "Conventional" as it implies a norm. '
+                         . 'Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. '
+                         . 'Each prefix group is itself separated from the next by a semicolon. '
+                         . 'Within each group, individual terms are also semicolon-separated. '
+                         . 'Example therapeutic_action: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat; Ayurvedic: cooling; Naturopathic: gut soothing" '
+                         . '(3) CONSTITUENTS: commas INSIDE parentheses are part of the term and must stay — '
+                         . 'only replace top-level commas with semicolons. '
+                         . 'Example: "Mucilage (polysaccharides), vitamins (A, C, K), flavonoids" → "Mucilage (polysaccharides); vitamins (A, C, K); flavonoids"',
         template        => 'ENCY/HerbView.tt',
     );
 
@@ -876,7 +885,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
                 error_msg      => "Failed to add herb: $result",
                 template       => 'ENCY/add_herb_form.tt',
                 user_role      => $c->session->{roles},
-                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: Separate all multi-value fields (therapeutic_action, constituents, parts_used, sister_plants, medical_uses, solvents, contra_indications) with a SEMICOLON (;) not a comma. Use noun phrases only. Example: constituents = "mucilage; flavonoids; vitamin C; potassium"',
+                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: commas inside parentheses stay — only top-level commas become semicolons. Example: "Mucilage (polysaccharides), vitamins (A, C, K)" → "Mucilage (polysaccharides); vitamins (A, C, K)"',
                 form_data      => $form_data,
             );
             $self->_stash_image_files($c);
@@ -890,7 +899,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         $c->stash(
             template              => 'ENCY/add_herb_form.tt',
             user_role             => $c->session->{roles},
-            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: Separate all multi-value fields (therapeutic_action, constituents, parts_used, sister_plants, medical_uses, solvents, contra_indications) with a SEMICOLON (;) not a comma. Use noun phrases only. Example: constituents = "mucilage; flavonoids; vitamin C; potassium"',
+            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: commas inside parentheses stay — only top-level commas become semicolons. Example: "Mucilage (polysaccharides), vitamins (A, C, K)" → "Mucilage (polysaccharides); vitamins (A, C, K)"',
             prefill_botanical     => $prefill_botanical,
             prefill_common        => $prefill_common,
             return_to             => $return_to,
@@ -1973,7 +1982,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         resolve_field     => $resolve_field,
         resolve_type      => $resolve_type,
         resolve_remaining => $resolve_remaining,
-        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: Separate ALL multi-value fields with a SEMICOLON (;) not a comma. Use noun phrases only — no prose sentences.',
+        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only, no prose sentences. (2) PRACTITIONER PREFIXES in therapeutic_action: use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both the prefix groups and terms within groups are semicolon-separated. (3) Commas inside parentheses (e.g. "vitamins (A, C, K)") are part of the term — leave them; only replace top-level commas with semicolons.',
         template          => 'ENCY/ConstituentDetail.tt',
     );
 }
@@ -2086,7 +2095,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     $c->stash(
         constituent     => $constituent,
         edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: Separate ALL multi-value fields with a SEMICOLON (;) not a comma. Use noun phrases only — no prose sentences.',
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only, no prose sentences. (2) PRACTITIONER PREFIXES in therapeutic_action: use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both the prefix groups and terms within groups are semicolon-separated. (3) Commas inside parentheses (e.g. "vitamins (A, C, K)") are part of the term — leave them; only replace top-level commas with semicolons.',
         template        => 'ENCY/ConstituentDetail.tt',
     );
 }
