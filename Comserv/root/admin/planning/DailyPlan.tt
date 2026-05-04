@@ -476,7 +476,7 @@
                     data-due="[% ap.due_date || '9999-12-31' %]"
                     data-site="[% ap.sitename || '' %]"
                     data-role-cats="[% ap.role_cats || 'general' %]"
-                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_overdue %]#dc3545[% ELSIF ap.due_today %]#ffc107[% ELSIF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.is_overdue %]color-mix(in srgb,#dc3545 6%,var(--bg-color))[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
                     [%# Rank badge — col 1 %]
                     <span class="rank-badge" style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
@@ -524,6 +524,13 @@
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color: var(--text-color, #333);" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
                             [% END %]
 
+                            [%# Overdue / due-today badge %]
+                            [% IF ap.is_overdue %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Overdue by [% 0 - ap.days_until_due %] day(s)">🔴 OVERDUE</span>
+                            [% ELSIF ap.due_today %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#ffc107;color:#333;" title="Due today">⚡ DUE TODAY</span>
+                            [% END %]
+
                             [%# Site label (CSC all-sites view) %]
                             [% IF is_csc && ap.sitename && ap.sitename != 'CSC' %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% ap.sitename %]</span>
@@ -539,7 +546,7 @@
                         [%# Meta line: project, due date, blocked-by %]
                         <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
                             [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
-                            [% IF ap.due_date %]<span>📅 Due: [% ap.due_date %]</span>[% END %]
+                            [% IF ap.due_date %]<span[% IF ap.is_overdue %] style="color:#dc3545;font-weight:bold;"[% ELSIF ap.due_today %] style="color:#856404;font-weight:bold;"[% END %]>📅 Due: [% ap.due_date %]</span>[% END %]
                             [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
                             [% IF ap.is_cross_blocker && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
                             [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
