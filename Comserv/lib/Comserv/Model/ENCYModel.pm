@@ -950,17 +950,19 @@ sub auto_link_herb_data {
     # --- therapeutic_action terms → Glossary lookup; create todo if missing ---
     for my $term ($parse_terms->($form_data->{therapeutic_action})) {
         next if $term =~ /\s{2,}|^\d+$/;
-        next if $term =~ /:/;
-        next if scalar(split /\s+/, $term) > 4;
-        next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        (my $lookup = $term) =~ s/^\s*[A-Za-z][\w\s]{1,25}:\s*//;
+        next unless length($lookup) > 2;
+        next if scalar(split /\s+/, $lookup) > 3;
+        next if $lookup =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        next if $lookup =~ /^\w+ing\s/i;
         my $rec = eval {
             $self->ency_schema->resultset('Ency::Glossary')->search(
-                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { -or => [ term => { like => "%$lookup%" }, alternate_terms => { like => "%$lookup%" } ] },
                 { rows => 1, order_by => 'record_id' }
             )->first;
         };
         unless ($rec) {
-            push @todos, { field => 'therapeutic_action', term => $term };
+            push @todos, { field => 'therapeutic_action', term => $lookup };
         }
     }
 
