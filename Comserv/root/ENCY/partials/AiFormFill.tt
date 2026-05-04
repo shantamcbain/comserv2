@@ -257,10 +257,18 @@
 
                     // Normalise AI value to string
                     var val;
+                    function flattenAiValue(v) {
+                        if (v === null || v === undefined) return '';
+                        if (Array.isArray(v)) return v.map(flattenAiValue).filter(Boolean).join('; ');
+                        if (typeof v === 'object') {
+                            return Object.values(v).map(flattenAiValue).filter(Boolean).join('; ');
+                        }
+                        return String(v);
+                    }
                     if (Array.isArray(aiValue)) {
-                        val = aiValue.join('\n');
+                        val = aiValue.map(flattenAiValue).join('; ');
                     } else if (typeof aiValue === 'object') {
-                        val = Object.entries(aiValue).map(function(e){ return e[0] + ': ' + e[1]; }).join('\n');
+                        val = flattenAiValue(aiValue);
                     } else {
                         val = String(aiValue);
                     }
