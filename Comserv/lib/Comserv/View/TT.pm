@@ -27,6 +27,7 @@ __PACKAGE__->config(
         },
         ref_links => sub {
             my $text = shift;
+            $text =~ s/\s*\[(?:ref\?)?\?\]\s*//g;
             $text =~ s{&}{&amp;}g;
             $text =~ s{<}{&lt;}g;
             $text =~ s{>}{&gt;}g;
