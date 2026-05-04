@@ -306,15 +306,23 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my $sister_plants_html = _build_sister_plants_html(
         $c, $herb->sister_plants // ''
     );
+    my $therapeutic_action_html = _build_glossary_popup_html(
+        $c, $herb->therapeutic_action // ''
+    );
+    my $medical_uses_html = _build_glossary_popup_html(
+        $c, $herb->medical_uses // ''
+    );
 
     $self->_stash_image_files($c);
     $c->stash(
-        herb               => $herb,
-        constituents_html  => $constituents_html,
-        parts_used_html    => $parts_used_html,
-        sister_plants_html => $sister_plants_html,
-        edit_mode          => 0,
-        template           => 'ENCY/HerbView.tt',
+        herb                    => $herb,
+        constituents_html       => $constituents_html,
+        parts_used_html         => $parts_used_html,
+        sister_plants_html      => $sister_plants_html,
+        therapeutic_action_html => $therapeutic_action_html,
+        medical_uses_html       => $medical_uses_html,
+        edit_mode               => 0,
+        template                => 'ENCY/HerbView.tt',
     );
 }
 
