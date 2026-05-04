@@ -1970,6 +1970,45 @@
             }
         }
 
+        // ENCY fast path: when ENCY agent is active and the prompt or chat history mentions
+        // "Unresolved term in constituent#N", navigate directly to that constituent's page.
+        // When adding a named constituent, navigate to the add form pre-filled.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '…';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
