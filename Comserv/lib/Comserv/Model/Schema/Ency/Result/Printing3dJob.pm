@@ -154,13 +154,13 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    filament_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    filament_item => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem',
     'filament_item_id',
     { join_type => 'left' }
 );
 
 __PACKAGE__->belongs_to(
-    consignment => 'Comserv::Model::Schema::Ency::Result::InventoryConsignment',
+    consignment => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryConsignment',
     'consignment_id',
     { join_type => 'left' }
 );

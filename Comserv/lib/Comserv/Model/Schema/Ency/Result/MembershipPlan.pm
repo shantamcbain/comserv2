@@ -228,7 +228,7 @@ sub effective_price_monthly {
 }
 
 __PACKAGE__->belongs_to(
-    inventory_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    inventory_item => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem',
     'inventory_item_id',
     { join_type => 'LEFT', on_delete => 'SET NULL', is_foreign_key_constraint => 1 }
 );

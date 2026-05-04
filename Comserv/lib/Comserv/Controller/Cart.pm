@@ -66,7 +66,7 @@ sub _generate_invoice_number {
     my $schema = $self->_schema($c);
     my $count;
     eval {
-        $count = $schema->resultset('InventoryCustomerInvoice')->search(
+        $count = $schema->resultset('Accounting::InventoryCustomerInvoice')->search(
             { invoice_number => { like => "CUST-$date-%" } }
         )->count;
     };
@@ -94,14 +94,14 @@ sub price_list :Path('/Cart/price_list') :Args(0) {
 
     my (@items, @categories, @workshops);
     eval {
-        @items = $schema->resultset('InventoryItem')->search(
+        @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%search,
             {
                 prefetch => 'stock_levels',
                 order_by => ['category', 'name'],
             }
         );
-        @categories = $schema->resultset('InventoryItem')->search(
+        @categories = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', category => { '!=' => undef } },
             { columns  => ['category'], distinct => 1, order_by => 'category' }
         );
@@ -195,7 +195,7 @@ sub add_to_cart :Path('/Cart/add') :Args(0) {
     }
 
     my $item;
-    eval { $item = $schema->resultset('InventoryItem')->find($item_id) };
+    eval { $item = $schema->resultset('Accounting::InventoryItem')->find($item_id) };
 
     unless ($item) {
         $c->flash->{error_msg} = 'Item not found';
@@ -364,7 +364,7 @@ sub place_order :Path('/Cart/place_order') :Args(0) {
     eval {
         $schema->txn_do(sub {
 
-            $invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+            $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->create({
                 sitename         => $sitename,
                 invoice_number   => $invoice_number,
                 customer_name    => $params->{customer_name},
@@ -392,7 +392,7 @@ sub place_order :Path('/Cart/place_order') :Args(0) {
             for my $key (sort keys %$cart) {
                 my $line = $cart->{$key};
                 $sort++;
-                $schema->resultset('InventoryCustomerInvoiceLine')->create({
+                $schema->resultset('Accounting::InventoryCustomerInvoiceLine')->create({
                     invoice_id => $invoice->id,
                     item_id    => $line->{item_id} || undef,
                     sku        => $line->{sku},
@@ -456,7 +456,7 @@ sub confirm :Path('/Cart/confirm') :Args(1) {
     my $schema  = $self->_schema($c);
     my $invoice;
     eval {
-        $invoice = $schema->resultset('InventoryCustomerInvoice')->find(
+        $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->find(
             $invoice_id,
             { prefetch => 'lines' }
         );
@@ -513,7 +513,7 @@ sub orders :Path('/Cart/orders') :Args(0) {
 
     my @invoices;
     eval {
-        @invoices = $schema->resultset('InventoryCustomerInvoice')->search(
+        @invoices = $schema->resultset('Accounting::InventoryCustomerInvoice')->search(
             \%search,
             { order_by => { -desc => 'created_at' }, rows => 100 }
         );
@@ -539,7 +539,7 @@ sub order_view :Path('/Cart/order') :Args(1) {
     my $schema  = $self->_schema($c);
     my $invoice;
     eval {
-        $invoice = $schema->resultset('InventoryCustomerInvoice')->find(
+        $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->find(
             $id,
             { prefetch => 'lines' }
         );
@@ -576,7 +576,7 @@ sub order_status :Path('/Cart/order_status') :Args(1) {
     my $schema  = $self->_schema($c);
 
     eval {
-        my $invoice = $schema->resultset('InventoryCustomerInvoice')->find($id);
+        my $invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->find($id);
         if ($invoice) {
             $invoice->update({
                 status         => $params->{status}         || $invoice->status,

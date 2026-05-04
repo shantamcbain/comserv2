@@ -348,7 +348,19 @@ sub daily :Path('/planning/daily') :Args {
                 $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
             }
 
-            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
+            my $due_bonus = 0;
+            if (my $due = $h{due_date}) {
+                if ($due =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    my $due_epoch = POSIX::mktime(0, 0, 23, $3, $2 - 1, $1 - 1900);
+                    my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                    $h{days_until_due} = $days_until_due;
+                    if    ($days_until_due < 0)  { $due_bonus = -5; $h{is_overdue} = 1; }
+                    elsif ($days_until_due == 0) { $due_bonus = -3; $h{due_today}  = 1; }
+                    elsif ($days_until_due <= 3) { $due_bonus = -1; }
+                }
+            }
+
+            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus + $due_bonus) + $stale_penalty;
 
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
@@ -766,13 +778,33 @@ sub _run_audit_scan {
     my (%groups, $error_count, $todo_created) = ();
     my @subjects;
 
+    my $system_project_id = 1;
+    eval {
+        my $sp = $schema->resultset('Project')->search(
+            { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+            { order_by => { -asc => 'id' }, rows => 1 }
+        )->first;
+        $system_project_id = $sp->id if $sp;
+    };
+
+    my $admin_user_id = $user_id || 0;
+    unless ($admin_user_id) {
+        eval {
+            my $admin = $schema->resultset('User')->search(
+                { rolename => 'admin' }, { rows => 1 }
+            )->first;
+            $admin_user_id = $admin->id if $admin;
+        };
+    }
+    $admin_user_id ||= 178;
+
     eval {
         my $since = do {
             my @t = localtime(time - 86400);
             sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
         };
         my @errs = $schema->resultset('SystemLog')->search(
-            { level     => { -in => ['warn','error','critical','WARN','ERROR','CRITICAL'] },
+            { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
               timestamp => { '>=' => $since } },
             { order_by => { -desc => 'timestamp' }, rows => 200 }
         )->all;
@@ -821,8 +853,8 @@ sub _run_audit_scan {
                 };
                 next if $open_exists;
                 my @entries = @{ $groups{$sub} };
-                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $user_id,
-                    $today, $sub, \@entries, $root_id, $ollama);
+                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
                 push @subjects, $ai_subject if $ai_subject;
                 $todo_created++ if $ai_subject;
             }
@@ -845,7 +877,8 @@ sub _run_audit_scan {
                     sitename            => $sitename,
                     developer           => $username,
                     username_of_poster  => $username,
-                    user_id             => $user_id || 0,
+                    user_id             => $admin_user_id,
+                    project_id          => $system_project_id,
                     last_mod_by         => $username,
                     last_mod_date       => $today,
                     date_time_posted    => $today . ' 00:00:00',
@@ -855,7 +888,7 @@ sub _run_audit_scan {
                     estimated_man_hours => 0,
                     accumulative_time   => '00:00:00',
                     group_of_poster     => 'admin',
-                    project_code        => 'system',
+                    project_code        => 'PLANNING',
                     share               => 0,
                 });
             };
@@ -865,8 +898,8 @@ sub _run_audit_scan {
                 my $root_id = $root_todo->record_id;
                 for my $sub (sort keys %groups) {
                     my @entries = @{ $groups{$sub} };
-                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $user_id,
-                        $today, $sub, \@entries, $root_id, $ollama);
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
                     push @subjects, $ai_subject if $ai_subject;
                 }
             }
@@ -877,7 +910,8 @@ sub _run_audit_scan {
 }
 
 sub _build_error_todo {
-    my ($self, $schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama) = @_;
+    my ($self, $schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama, $fallback_project_id) = @_;
+    $fallback_project_id //= 1;
     my @entries  = @$entries;
     my $count    = scalar @entries;
     my $shown    = $count > 3 ? 3 : $count;
@@ -918,6 +952,31 @@ sub _build_error_todo {
         };
     }
 
+    my $matched_project_id = $fallback_project_id;
+    my $matched_project_code = 'PLANNING';
+    eval {
+        my $first_entry = $entries[0];
+        my $search_term;
+        if ($sub =~ /Controller::(\w+)/) {
+            $search_term = $1;
+        } elsif ($first_entry && $first_entry->{file} && $first_entry->{file} =~ m{/(\w+)\.pm$}i) {
+            $search_term = $1;
+        }
+        if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
+            my $proj = $schema->resultset('Project')->search(
+                { -or => [
+                    { name         => { -like => "%$search_term%" } },
+                    { project_code => { -like => "%$search_term%" } },
+                ]},
+                { rows => 1 }
+            )->first;
+            if ($proj) {
+                $matched_project_id   = $proj->id;
+                $matched_project_code = $proj->project_code || 'PLANNING';
+            }
+        }
+    };
+
     eval {
         $schema->resultset('Todo')->create({
             subject             => $ai_subject,
@@ -930,7 +989,8 @@ sub _build_error_todo {
             sitename            => $sitename,
             developer           => $username,
             username_of_poster  => $username,
-            user_id             => $user_id || 0,
+            user_id             => $user_id || 178,
+            project_id          => $matched_project_id,
             last_mod_by         => $username,
             last_mod_date       => $today,
             date_time_posted    => $today . ' 00:00:00',
@@ -940,7 +1000,7 @@ sub _build_error_todo {
             estimated_man_hours => 0,
             accumulative_time   => '00:00:00',
             group_of_poster     => 'admin',
-            project_code        => 'system',
+            project_code        => $matched_project_code,
             share               => 0,
         });
     };
@@ -1087,7 +1147,7 @@ sub _daily_log_action {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
             "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
-        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
+        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
         my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
         my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
