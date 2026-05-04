@@ -300,11 +300,15 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my $constituents_html = _build_constituent_html(
         $c, $id, $herb->constituents // ''
     );
+    my $parts_used_html = _build_glossary_term_links_html(
+        $c, $herb->parts_used // ''
+    );
 
     $self->_stash_image_files($c);
     $c->stash(
         herb              => $herb,
         constituents_html => $constituents_html,
+        parts_used_html   => $parts_used_html,
         edit_mode         => 0,
         template          => 'ENCY/HerbView.tt',
     );
@@ -451,6 +455,36 @@ sub _build_glossary_popup_html {
         $html =~ s/\b$pat\b/$link/gi;
     }
     return $html;
+}
+
+sub _build_glossary_term_links_html {
+    my ($c, $text) = @_;
+    return '' unless defined $text && length($text);
+    my @parts;
+    for my $raw (split /\s*;\s*/, $text) {
+        $raw =~ s/^\s+|\s+$//g;
+        next unless length($raw);
+        (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        my $escaped = $clean;
+        $escaped =~ s/&/&amp;/g;
+        $escaped =~ s/</&lt;/g;
+        $escaped =~ s/>/&gt;/g;
+        my $rec = eval {
+            $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$clean%" }, alternate_terms => { like => "%$clean%" } ] },
+                { rows => 1, order_by => { -asc => \'LENGTH(term)' } }
+            )->first;
+        };
+        if ($rec) {
+            my $gid  = $rec->record_id;
+            my $tip  = $rec->term;
+            $tip =~ s/"/&quot;/g;
+            push @parts, qq{<a href="#" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$escaped</a>};
+        } else {
+            push @parts, $escaped;
+        }
+    }
+    return join('; ', @parts);
 }
 
 sub get_reference_by_id :Local {
