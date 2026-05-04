@@ -115,7 +115,7 @@ __PACKAGE__->belongs_to(
     'site_id'
 );
 __PACKAGE__->belongs_to(
-    'reference' => 'Comserv::Model::Schema::Ency::Result::Reference',
+    'reference' => 'Comserv::Model::Schema::Ency::Result::Ency::Reference',
     'reference_id'
 );
 __PACKAGE__->belongs_to(
