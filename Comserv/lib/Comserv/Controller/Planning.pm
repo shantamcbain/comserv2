@@ -792,7 +792,7 @@ sub _run_audit_scan {
             sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
         };
         my @errs = $schema->resultset('SystemLog')->search(
-            { level     => { -in => ['warn','error','critical','WARN','ERROR','CRITICAL'] },
+            { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
               timestamp => { '>=' => $since } },
             { order_by => { -desc => 'timestamp' }, rows => 200 }
         )->all;
