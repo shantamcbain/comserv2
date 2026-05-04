@@ -1971,10 +1971,21 @@ sub preprocess_field_markers {
     my %cleaned = %$data;
     my @todos;
 
+    my @existing_ref_ids;
+    if ($entity_id) {
+        my @existing_refs = eval { $self->get_references_for($c, $entity_type, $entity_id) };
+        @existing_ref_ids = map { $_->record_id } @existing_refs if @existing_refs;
+    }
+
     for my $field (sort keys %cleaned) {
         next if $_SKIP_MARKER_FIELDS{$field};
         my $text = $cleaned{$field};
-        next unless defined $text && $text =~ /\[(?:\?|ref\?)\]/;
+        next unless defined $text && length($text);
+
+        my $has_markers = ($text =~ /\[(?:\?|ref\?)\]/);
+        my $has_bad_semi = ($text =~ /;[^ \n]/);
+
+        next unless $has_markers || $has_bad_semi;
 
         my @new_terms;
         my $modified = 0;
@@ -2004,25 +2015,24 @@ sub preprocess_field_markers {
                     };
                 }
                 if ($has_ref) {
-                    push @todos, {
-                        subject => "ENCY: Verify reference — $short",
-                        body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
-                                 . "This term was flagged [ref?] during data entry.\n"
-                                 . "Please find and add authoritative references for this term.",
-                    };
+                    if (@existing_ref_ids) {
+                        $raw .= ' ' . join('', map { "[$_]" } @existing_ref_ids);
+                        $modified = 1;
+                    } else {
+                        push @todos, {
+                            subject => "ENCY: Verify reference — $short",
+                            body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
+                                     . "This term was flagged [ref?] during data entry.\n"
+                                     . "Please find and add authoritative references for this term.",
+                        };
+                    }
                 }
             }
             push @new_terms, $raw if length($raw);
         }
 
-        if ($modified) {
+        if ($modified || $has_bad_semi) {
             $cleaned{$field} = join('; ', @new_terms);
-        } else {
-            my $val = $cleaned{$field};
-            if (defined $val && $val =~ /\[(?:ref)?\?\]/) {
-                $val =~ s/\s*\[(?:ref)?\?\]//g;
-                $cleaned{$field} = $val;
-            }
         }
     }
 
