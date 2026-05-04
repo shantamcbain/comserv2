@@ -1957,12 +1957,9 @@ sub get_references_for {
     return map { $_->reference } @refs;
 }
 
-my %_MARKER_FIELDS = map { $_ => 1 } qw(
-    therapeutic_action pharmacological_effects
-    found_in_herbs found_in_foods found_in_drugs
-    constituents sister_plants
-    indications contraindications side_effects
-    related_terms herbal_alternatives active_ingredients
+my %_SKIP_MARKER_FIELDS = map { $_ => 1 } qw(
+    record_id date_time_posted username_of_poster group_of_poster
+    share image url reference
 );
 
 sub preprocess_field_markers {
@@ -1970,7 +1967,8 @@ sub preprocess_field_markers {
     my %cleaned = %$data;
     my @todos;
 
-    for my $field (keys %_MARKER_FIELDS) {
+    for my $field (sort keys %cleaned) {
+        next if $_SKIP_MARKER_FIELDS{$field};
         my $text = $cleaned{$field};
         next unless defined $text && $text =~ /\[(?:\?|ref\?)\]/;
 
