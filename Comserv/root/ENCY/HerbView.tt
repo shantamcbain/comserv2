@@ -241,7 +241,7 @@ Record ID:[% herb.record_id %]
         <td>Therapeutic Action:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.therapeutic_action | ref_links %]
+                [% therapeutic_action_html %]
             [% ELSE %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="therapeutic_action" name="therapeutic_action" rows="4" cols="50">[% herb.therapeutic_action %]</textarea>
@@ -252,7 +252,7 @@ Record ID:[% herb.record_id %]
         <td>Medical Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.medical_uses | ref_links %]
+                [% medical_uses_html %]
             [% ELSE %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="medical_uses" name="medical_uses" rows="4" cols="50">[% herb.medical_uses %]</textarea>
