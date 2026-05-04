@@ -37,18 +37,19 @@
     <label for="common_names">Common Names:</label><br>
     <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
 
-[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <label for="therapeutic_action">Therapeutic Action:</label>
-    <small style="color:#555;display:block;">Named therapeutic categories; semicolon-separated. e.g. <em>demulcent; diuretic; anti-inflammatory</em></small>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
 
-    <label for="parts_used">Parts Used:</label><br>
+    <label for="parts_used">Parts Used:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="parts_used" name="parts_used"></textarea><br>
 
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments"></textarea><br>
 
-    <label for="medical_uses">Medical Uses:</label><br>
+    <label for="medical_uses">Medical Uses:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="medical_uses" name="medical_uses" required></textarea><br>
 
     <label for="homiopathic">Homeopathic Uses:</label><br>
@@ -114,7 +115,7 @@
         <input type="text" id="apis" name="apis" maxlength="100" required>
     </div>
     <label for="constituents">Constituents:</label>
-    <small style="color:#555;display:block;">Compound/constituent names; semicolon-separated. e.g. <em>quercetin; mucilage; rutin</em></small>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
@@ -126,7 +127,8 @@
     <label for="culinary">Culinary Uses:</label><br>
     <textarea id="culinary" name="culinary"></textarea><br>
 
-    <label for="contra_indications">Contra Indications:</label><br>
+    <label for="contra_indications">Contra Indications:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>
 
     <label for="dosage">Dosage:</label><br>
@@ -145,7 +147,7 @@
     <textarea id="cultivation" name="cultivation"></textarea><br>
 
     <label for="sister_plants">Sister Plants:</label>
-    <small style="color:#555;display:block;">Related plant names; semicolon-separated. e.g. <em>Trifolium pratense; Medicago sativa</em></small>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
 
     <label for="harvest">Harvest:</label><br>
