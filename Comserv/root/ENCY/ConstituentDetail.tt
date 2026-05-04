@@ -129,15 +129,13 @@
     </tr>
 </table>
 
-[% IF edit_mode %][% PROCESS 'ENCY/partials/MarkerLegend.tt' %][% END %]
 <h2>Pharmacology</h2>
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
-        <td><strong>Therapeutic Action</strong>
-            [% IF edit_mode %]<br><small style="font-weight:normal;color:#555;">Named therapeutic categories; semicolon-separated.<br>e.g. <em>demulcent; anti-inflammatory; adaptogen</em></small>[% END %]
-        </td>
+        <td><strong>Therapeutic Action</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="therapeutic_action" rows="4" cols="60">[% constituent.therapeutic_action | html %]</textarea>
             [% ELSE %]
             [% therapeutic_html %]
@@ -165,11 +163,10 @@
         </td>
     </tr>
     <tr>
-        <td><strong>Pharmacological Effects</strong>
-            [% IF edit_mode %]<br><small style="font-weight:normal;color:#555;">Biochemical mechanisms as noun phrases; semicolon-separated.<br>e.g. <em>COX-2 inhibition; immune modulation; histamine release</em></small>[% END %]
-        </td>
+        <td><strong>Pharmacological Effects</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="pharmacological_effects" rows="4" cols="60">[% constituent.pharmacological_effects | html %]</textarea>
             [% ELSE %]
             [% pharmacological_html %]
@@ -181,11 +178,10 @@
 <h2>Found In</h2>
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
-        <td><strong>Found in Herbs</strong>
-            [% IF edit_mode %]<br><small style="font-weight:normal;color:#555;">Herb common or botanical names; semicolon-separated.</small>[% END %]
-        </td>
+        <td><strong>Found in Herbs</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="found_in_herbs" rows="3" cols="60">[% constituent.found_in_herbs | html %]</textarea>
             [% ELSE %]
             [% herbs_html %]
@@ -193,11 +189,10 @@
         </td>
     </tr>
     <tr>
-        <td><strong>Found in Foods</strong>
-            [% IF edit_mode %]<br><small style="font-weight:normal;color:#555;">Food names; semicolon-separated.<br>e.g. <em>okra; chia seeds; aloe vera</em></small>[% END %]
-        </td>
+        <td><strong>Found in Foods</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="found_in_foods" rows="3" cols="60">[% constituent.found_in_foods | html %]</textarea>
             [% ELSE %]
             [% constituent.found_in_foods | html %]
@@ -205,11 +200,10 @@
         </td>
     </tr>
     <tr>
-        <td><strong>Found in Drugs</strong>
-            [% IF edit_mode %]<br><small style="font-weight:normal;color:#555;">Drug or medication names; semicolon-separated.<br>e.g. <em>psyllium (Metamucil); pectin-based laxatives</em></small>[% END %]
-        </td>
+        <td><strong>Found in Drugs</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="found_in_drugs" rows="3" cols="60">[% constituent.found_in_drugs | html %]</textarea>
             [% ELSE %]
             [% drugs_html %]
