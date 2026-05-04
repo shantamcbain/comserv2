@@ -20,7 +20,7 @@
 [% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
-<h1>Editing Glossary Term: [% entry.term | html %]</h1>
+<h1>[% IF entry.record_id %]Editing Glossary Term: [% entry.term | html %][% ELSIF prefill_term %]Add New Glossary Term: [% prefill_term | html %][% ELSE %]Add New Glossary Term[% END %]</h1>
 [% ELSE %]
 <h1>[% entry.term | html %]</h1>
 [% END %]
