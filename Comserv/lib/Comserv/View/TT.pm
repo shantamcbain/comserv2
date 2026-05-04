@@ -1,6 +1,7 @@
 package Comserv::View::TT;
 use Moose;
 use namespace::autoclean;
+use JSON::MaybeXS ();
 extends 'Catalyst::View::TT';
 
 __PACKAGE__->config(
@@ -11,6 +12,10 @@ __PACKAGE__->config(
     PLUGINS     => { DateTime => {} },
     ENCODING => 'UTF-8',
     FILTERS => {
+        json => sub {
+            my $val = shift;
+            return JSON::MaybeXS->new(utf8 => 0, allow_nonref => 1)->encode($val);
+        },
         js => sub {
             my $text = shift;
             $text =~ s/\\/\\\\/g;

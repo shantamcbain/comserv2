@@ -4501,4 +4501,37 @@
             window.openHelpDeskChat = _hdOpenAndGreet;
         }
     });
+
+    // Global API: open the chat widget pre-loaded with a task context.
+    // Called from todo/details.tt "Chat about this task" button.
+    // taskContext: { record_id, subject, description, status, due_date, project }
+    window.openAIChatWithTask = function(taskContext) {
+        if (!taskContext || !taskContext.record_id) { openChat(); return; }
+        state.taskContext = taskContext;
+        state.taskPagePath = '/todo/details?record_id=' + taskContext.record_id;
+        if (!state.pageContext) state.pageContext = detectPageContext();
+        state.pageContext.page_path = state.taskPagePath;
+        // Auto-select agent based on task subject
+        loadAgentsConfig().then(function() {
+            if (state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (taskContext.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    state.pageContext.agent_id   = picked.id;
+                    state.pageContext.agent_name = picked.display_name;
+                    if (picked.system_prompt) state.pageContext.system_prompt = picked.system_prompt;
+                    populateAgentPicker();
+                }
+            }
+            openChat();
+        }).catch(function() { openChat(); });
+    };
 })();

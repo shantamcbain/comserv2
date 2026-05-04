@@ -1957,5 +1957,77 @@ sub get_references_for {
     return map { $_->reference } @refs;
 }
 
+my %_MARKER_FIELDS = map { $_ => 1 } qw(
+    therapeutic_action pharmacological_effects
+    found_in_herbs found_in_foods found_in_drugs
+    constituents sister_plants
+    indications contraindications side_effects
+    related_terms herbal_alternatives active_ingredients
+);
+
+sub preprocess_field_markers {
+    my ($self, $c, $entity_type, $entity_id, $data) = @_;
+    my %cleaned = %$data;
+    my @todos;
+
+    for my $field (keys %_MARKER_FIELDS) {
+        my $text = $cleaned{$field};
+        next unless defined $text && $text =~ /\[(?:\?|ref\?)\]/;
+
+        my @new_terms;
+        my $modified = 0;
+
+        for my $raw (split /[,;\n\r|]+/, $text) {
+            $raw =~ s/^\s+|\s+$//g;
+            next unless length($raw);
+
+            my $flag;
+            if ($raw =~ s/\s*\[ref\?\]\s*$//) {
+                $flag = 'reference';
+                $modified = 1;
+            } elsif ($raw =~ s/\s*\[\?\]\s*$//) {
+                $flag = 'research';
+                $modified = 1;
+            }
+            $raw =~ s/\s+$//;
+
+            if ($flag && length($raw)) {
+                my $short       = length($raw) > 60 ? substr($raw, 0, 57) . '...' : $raw;
+                my $entity_ref  = $entity_id ? "$entity_type #$entity_id" : "$entity_type (new)";
+                if ($flag eq 'research') {
+                    push @todos, {
+                        subject => "ENCY: Research needed — $short",
+                        body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
+                                 . "This term was flagged [?] during data entry as needing further research.\n"
+                                 . "Please research, verify the term, and update the $field entry.",
+                    };
+                } else {
+                    push @todos, {
+                        subject => "ENCY: Verify reference — $short",
+                        body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
+                                 . "This term was flagged [ref?] during data entry.\n"
+                                 . "Please find and add authoritative references for this term.",
+                    };
+                }
+            }
+            push @new_terms, $raw if length($raw);
+        }
+
+        if ($modified) {
+            $cleaned{$field} = join('; ', @new_terms);
+        }
+    }
+
+    for my $todo (@todos) {
+        $self->_create_ency_todo($c, $todo->{subject}, $todo->{body});
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'preprocess_field_markers',
+        sprintf("Marker processing for %s#%s: %d todo(s) created",
+            $entity_type, $entity_id // 'new', scalar @todos));
+
+    return (\%cleaned, scalar @todos);
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

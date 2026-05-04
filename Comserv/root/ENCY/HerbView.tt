@@ -37,6 +37,8 @@ Record ID:[% herb.record_id %]
 <form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
 <input type="hidden" name="record_id" value="[% herb.record_id %]" />
 [% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
+[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 [% END %]
 
 <table>
@@ -236,7 +238,9 @@ Record ID:[% herb.record_id %]
         <th colspan="2"><h2>Medical</h2></th>
     </tr>
     <tr>
-        <td>Therapeutic Action:</td>
+        <td>Therapeutic Action:
+            [% IF edit_mode %]<br><small style="color:#555;">Named therapeutic categories; semicolon-separated.<br>e.g. <em>demulcent; diuretic; anti-inflammatory</em></small>[% END %]
+        </td>
         <td>
             [% IF !edit_mode %]
                 [% herb.therapeutic_action | ref_links %]
@@ -256,7 +260,9 @@ Record ID:[% herb.record_id %]
         </td>
     </tr>
     <tr>
-        <td>Constituents:</td>
+        <td>Constituents:
+            [% IF edit_mode %]<br><small style="color:#555;">Constituent names; semicolon-separated.<br>e.g. <em>mucilage; flavonoids; vitamin C</em></small>[% END %]
+        </td>
         <td>
             [% IF !edit_mode %]
                 [% constituents_html %]
