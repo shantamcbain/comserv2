@@ -90,6 +90,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% herb.sister_plants %]
             [% ELSE %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
             [% END %]
         </td>
@@ -233,22 +234,16 @@ Record ID:[% herb.record_id %]
         </td>
     </tr>
 
-    [% IF edit_mode %]
-    <tr>
-        <td colspan="2" style="padding:0.5em 0;">[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]</td>
-    </tr>
-    [% END %]
     <tr>
         <th colspan="2"><h2>Medical</h2></th>
     </tr>
     <tr>
-        <td>Therapeutic Action:
-            [% IF edit_mode %]<br><small style="color:#555;">Named therapeutic categories; semicolon-separated.<br>e.g. <em>demulcent; diuretic; anti-inflammatory</em></small>[% END %]
-        </td>
+        <td>Therapeutic Action:</td>
         <td>
             [% IF !edit_mode %]
                 [% herb.therapeutic_action | ref_links %]
             [% ELSE %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="therapeutic_action" name="therapeutic_action" rows="4" cols="50">[% herb.therapeutic_action %]</textarea>
             [% END %]
         </td>
@@ -259,18 +254,18 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% herb.medical_uses | ref_links %]
             [% ELSE %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="medical_uses" name="medical_uses" rows="4" cols="50">[% herb.medical_uses %]</textarea>
             [% END %]
         </td>
     </tr>
     <tr>
-        <td>Constituents:
-            [% IF edit_mode %]<br><small style="color:#555;">Constituent names; semicolon-separated.<br>e.g. <em>mucilage; flavonoids; vitamin C</em></small>[% END %]
-        </td>
+        <td>Constituents:</td>
         <td>
             [% IF !edit_mode %]
                 [% constituents_html %]
             [% ELSE %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="constituents" name="constituents" rows="4" cols="50">[% herb.constituents %]</textarea>
             [% END %]
         </td>
@@ -321,6 +316,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% herb.contra_indications | ref_links %]
             [% ELSE %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="contra_indications" name="contra_indications" rows="4" cols="50">[% herb.contra_indications %]</textarea>
             [% END %]
         </td>
