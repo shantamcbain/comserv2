@@ -1876,8 +1876,76 @@
             }
         }
 
+        // When accounting agent is active AND the prompt looks like a pasted bill,
+        // inject the navigate_and_fill instruction so Grok emits the ACTION block.
+        const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
+            && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
+        const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
+        if (state.pageContext.agent_id === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
+            state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        }
+
+        // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
+        // Parses bill text from chat history and fires navigate_and_fill directly.
+        if (state.pageContext.agent_id === 'accounting') {
+            const _pu2 = prompt.toUpperCase();
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            if (_enterIntent) {
+                const _chatMsgs = document.getElementById('chat-messages');
+                let _billText = prompt;
+                if (_chatMsgs) {
+                    _chatMsgs.querySelectorAll('.message').forEach(function(el) {
+                        _billText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _nfFields = {};
+                const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
+                if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (_dateM) {
+                    _nfFields.invoice_date = _dateM[0].includes('-')
+                        ? _dateM[0]
+                        : (_dateM[3] + '-' + _dateM[1] + '-' + _dateM[2]);
+                }
+                const _invNumM = _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
+                    || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
+                if (_invNumM) _nfFields.invoice_number = _invNumM[1];
+                if (/Auto\s*Pay/i.test(_billText)) {
+                    const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
+                    _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
+                }
+                const _supplierM = _billText.match(/Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio/i);
+                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                _nfFields.description_0 = 'Service charge';
+                _nfFields.quantity_0 = '1';
+                _nfFields.notes = _supplierName + ' invoice'
+                    + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                    + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
+                if (_nfFields.unit_cost_0) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening invoice form\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    const _wAcc = document.createElement('div');
+                    _wAcc.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lblAcc = document.createElement('div');
+                    _lblAcc.className = 'msg-label';
+                    _lblAcc.textContent = 'Accounting Agent';
+                    const _elAcc = document.createElement('div');
+                    _elAcc.className = 'message ai-message';
+                    _elAcc.innerHTML = 'Opening invoice form pre-filled with the detected bill details.';
+                    _wAcc.appendChild(_lblAcc);
+                    _wAcc.appendChild(_elAcc);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // ENCY fast path: navigate to constituent#N page or add form directly.
-        if (state.pageContext.agent_id === 'ency') {
+        if (_agentId === 'ency') {
             const _pu4 = prompt.toUpperCase();
             const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
                 || /\bCONSTITUENT\b/.test(_pu4);
