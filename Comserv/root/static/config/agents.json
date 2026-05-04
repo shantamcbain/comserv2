@@ -235,7 +235,14 @@
                 "/ENCY/plants",
                 "/ENCY/BeePastureView",
                 "/ENCY/BotanicalNameView",
-                "/ENCY/constituents"
+                "/ENCY/constituents",
+                "/ENCY/Constituent",
+                "/ENCY/Glossary",
+                "/ENCY/edit_herb",
+                "/ENCY/add_herb",
+                "/ENCY/herb",
+                "/ENCY/view_herb",
+                "/ENCY/search"
             ],
             "capabilities": {
                 "search_docs": true,
