@@ -348,7 +348,19 @@ sub daily :Path('/planning/daily') :Args {
                 $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
             }
 
-            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
+            my $due_bonus = 0;
+            if (my $due = $h{due_date}) {
+                if ($due =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    my $due_epoch = POSIX::mktime(0, 0, 23, $3, $2 - 1, $1 - 1900);
+                    my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                    $h{days_until_due} = $days_until_due;
+                    if    ($days_until_due < 0)  { $due_bonus = -5; $h{is_overdue} = 1; }
+                    elsif ($days_until_due == 0) { $due_bonus = -3; $h{due_today}  = 1; }
+                    elsif ($days_until_due <= 3) { $due_bonus = -1; }
+                }
+            }
+
+            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus + $due_bonus) + $stale_penalty;
 
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
