@@ -191,7 +191,9 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             share              => $p->{share}              // 0,
         };
 
-        # Attempt to update the herb record and handle success or failure
+        my ($form_data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', $record_id, $form_data);
+        $form_data = $form_data_clean;
+
         my ($status, $error_message) = $c->model('ENCYModel')->update_herb($c, $record_id, $form_data);
 
         if ($status) {
@@ -846,10 +848,11 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             date_time_posted => \'NOW()',
         };
 
-        # Use the existing logging system to log the new herb data
+        my ($new_herb_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', undef, $new_herb);
+        $new_herb = $new_herb_clean;
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
 
-        # Save the new herb using the ENCYModel
         my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
         if ($ok) {
@@ -1931,6 +1934,8 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         }
 
         my $return_to = $p->{return_to} // '';
+        my ($data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', undef, $data);
+        $data = $data_clean;
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
         if ($ok && $new_id) {
             if ($data->{found_in_herbs}) {
@@ -2035,6 +2040,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
         my $mw_raw = $p->{molecular_weight} // '';
         ($mw_raw) = ($mw_raw =~ /(\d+(?:\.\d+)?)/);
         $data->{molecular_weight} = defined $mw_raw ? $mw_raw : undef;
+
+        my ($data_clean_ec, $n_markers_ec) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', $record_id, $data);
+        $data = $data_clean_ec;
 
         my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
 

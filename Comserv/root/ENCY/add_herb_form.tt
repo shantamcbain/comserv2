@@ -31,13 +31,15 @@
 <form method="POST" action="/ENCY/add_herb">
 [% IF return_to %]<input type="hidden" name="return_to" value="[% return_to | html %]" />[% END %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
+[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
 
     <label for="common_names">Common Names:</label><br>
     <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
 
-    <label for="therapeutic_action">Therapeutic Action:</label><br>
+    <label for="therapeutic_action">Therapeutic Action:</label>
+    <small style="color:#555;display:block;">Named therapeutic categories; semicolon-separated. e.g. <em>demulcent; diuretic; anti-inflammatory</em></small>
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
 
     <label for="parts_used">Parts Used:</label><br>
@@ -111,7 +113,8 @@
         <label for="apis">Apis:</label>
         <input type="text" id="apis" name="apis" maxlength="100" required>
     </div>
-    <label for="constituents">Constituents:</label><br>
+    <label for="constituents">Constituents:</label>
+    <small style="color:#555;display:block;">Compound/constituent names; semicolon-separated. e.g. <em>quercetin; mucilage; rutin</em></small>
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
@@ -141,7 +144,8 @@
     <label for="cultivation">Cultivation:</label><br>
     <textarea id="cultivation" name="cultivation"></textarea><br>
 
-    <label for="sister_plants">Sister Plants:</label><br>
+    <label for="sister_plants">Sister Plants:</label>
+    <small style="color:#555;display:block;">Related plant names; semicolon-separated. e.g. <em>Trifolium pratense; Medicago sativa</em></small>
     <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
 
     <label for="harvest">Harvest:</label><br>
