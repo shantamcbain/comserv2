@@ -88,7 +88,7 @@ Record ID:[% herb.record_id %]
         <td>Sister Plants:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.sister_plants | ref_links %]
+                [% sister_plants_html %]
             [% ELSE %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
