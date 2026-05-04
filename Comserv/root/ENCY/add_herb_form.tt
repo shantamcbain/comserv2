@@ -31,13 +31,13 @@
 <form method="POST" action="/ENCY/add_herb">
 [% IF return_to %]<input type="hidden" name="return_to" value="[% return_to | html %]" />[% END %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
-[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
 
     <label for="common_names">Common Names:</label><br>
     <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
 
+[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <label for="therapeutic_action">Therapeutic Action:</label>
     <small style="color:#555;display:block;">Named therapeutic categories; semicolon-separated. e.g. <em>demulcent; diuretic; anti-inflammatory</em></small>
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>

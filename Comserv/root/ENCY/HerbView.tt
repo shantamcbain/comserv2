@@ -37,7 +37,6 @@ Record ID:[% herb.record_id %]
 <form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
 <input type="hidden" name="record_id" value="[% herb.record_id %]" />
 [% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
-[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
 [% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 [% END %]
 
@@ -234,6 +233,11 @@ Record ID:[% herb.record_id %]
         </td>
     </tr>
 
+    [% IF edit_mode %]
+    <tr>
+        <td colspan="2" style="padding:0.5em 0;">[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]</td>
+    </tr>
+    [% END %]
     <tr>
         <th colspan="2"><h2>Medical</h2></th>
     </tr>
