@@ -1983,27 +1983,27 @@ sub preprocess_field_markers {
             $raw =~ s/^\s+|\s+$//g;
             next unless length($raw);
 
-            my $flag;
-            if ($raw =~ s/\s*\[ref\?\]\s*$//) {
-                $flag = 'reference';
-                $modified = 1;
-            } elsif ($raw =~ s/\s*\[\?\]\s*$//) {
-                $flag = 'research';
+            my ($has_ref, $has_research) = (0, 0);
+            $has_ref      = 1 if $raw =~ /\[ref\?\]/;
+            $has_research = 1 if $raw =~ /\[\?\]/;
+            if ($has_ref || $has_research) {
+                $raw =~ s/\s*\[(?:ref)?\?\]//g;
+                $raw =~ s/\s+$//;
                 $modified = 1;
             }
-            $raw =~ s/\s+$//;
 
-            if ($flag && length($raw)) {
-                my $short       = length($raw) > 60 ? substr($raw, 0, 57) . '...' : $raw;
-                my $entity_ref  = $entity_id ? "$entity_type #$entity_id" : "$entity_type (new)";
-                if ($flag eq 'research') {
+            if (($has_ref || $has_research) && length($raw)) {
+                my $short      = length($raw) > 60 ? substr($raw, 0, 57) . '...' : $raw;
+                my $entity_ref = $entity_id ? "$entity_type #$entity_id" : "$entity_type (new)";
+                if ($has_research) {
                     push @todos, {
                         subject => "ENCY: Research needed — $short",
                         body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
                                  . "This term was flagged [?] during data entry as needing further research.\n"
                                  . "Please research, verify the term, and update the $field entry.",
                     };
-                } else {
+                }
+                if ($has_ref) {
                     push @todos, {
                         subject => "ENCY: Verify reference — $short",
                         body    => "Field: $field\nTerm: $raw\nEntity: $entity_ref\n\n"
