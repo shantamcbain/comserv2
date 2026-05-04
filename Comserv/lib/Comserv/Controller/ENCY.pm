@@ -191,7 +191,9 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             share              => $p->{share}              // 0,
         };
 
-        # Attempt to update the herb record and handle success or failure
+        my ($form_data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', $record_id, $form_data);
+        $form_data = $form_data_clean;
+
         my ($status, $error_message) = $c->model('ENCYModel')->update_herb($c, $record_id, $form_data);
 
         if ($status) {
@@ -238,7 +240,11 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
                          . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
                          . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
                          . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
-                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known.',
+                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known. '
+                         . 'IMPORTANT FORMATTING: For all multi-value fields (therapeutic_action, constituents, '
+                         . 'parts_used, sister_plants, medical_uses, solvents, formulas, contra_indications) '
+                         . 'separate each item with a SEMICOLON (;) not a comma. Use noun phrases only — '
+                         . 'no prose sentences. Example constituents: "mucilage; flavonoids; vitamin C; potassium"',
         template        => 'ENCY/HerbView.tt',
     );
 
@@ -846,10 +852,11 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             date_time_posted => \'NOW()',
         };
 
-        # Use the existing logging system to log the new herb data
+        my ($new_herb_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', undef, $new_herb);
+        $new_herb = $new_herb_clean;
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
 
-        # Save the new herb using the ENCYModel
         my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
         if ($ok) {
@@ -869,7 +876,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
                 error_msg      => "Failed to add herb: $result",
                 template       => 'ENCY/add_herb_form.tt',
                 user_role      => $c->session->{roles},
-                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: Separate all multi-value fields (therapeutic_action, constituents, parts_used, sister_plants, medical_uses, solvents, contra_indications) with a SEMICOLON (;) not a comma. Use noun phrases only. Example: constituents = "mucilage; flavonoids; vitamin C; potassium"',
                 form_data      => $form_data,
             );
             $self->_stash_image_files($c);
@@ -883,7 +890,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         $c->stash(
             template              => 'ENCY/add_herb_form.tt',
             user_role             => $c->session->{roles},
-            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: Separate all multi-value fields (therapeutic_action, constituents, parts_used, sister_plants, medical_uses, solvents, contra_indications) with a SEMICOLON (;) not a comma. Use noun phrases only. Example: constituents = "mucilage; flavonoids; vitamin C; potassium"',
             prefill_botanical     => $prefill_botanical,
             prefill_common        => $prefill_common,
             return_to             => $return_to,
@@ -1931,6 +1938,8 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         }
 
         my $return_to = $p->{return_to} // '';
+        my ($data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', undef, $data);
+        $data = $data_clean;
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
         if ($ok && $new_id) {
             if ($data->{found_in_herbs}) {
@@ -1964,7 +1973,7 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
         resolve_field     => $resolve_field,
         resolve_type      => $resolve_type,
         resolve_remaining => $resolve_remaining,
-        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
+        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: Separate ALL multi-value fields with a SEMICOLON (;) not a comma. Use noun phrases only — no prose sentences.',
         template          => 'ENCY/ConstituentDetail.tt',
     );
 }
@@ -2036,6 +2045,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
         ($mw_raw) = ($mw_raw =~ /(\d+(?:\.\d+)?)/);
         $data->{molecular_weight} = defined $mw_raw ? $mw_raw : undef;
 
+        my ($data_clean_ec, $n_markers_ec) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', $record_id, $data);
+        $data = $data_clean_ec;
+
         my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
 
         if ($status) {
@@ -2074,7 +2086,7 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     $c->stash(
         constituent     => $constituent,
         edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: Separate ALL multi-value fields with a SEMICOLON (;) not a comma. Use noun phrases only — no prose sentences.',
         template        => 'ENCY/ConstituentDetail.tt',
     );
 }
