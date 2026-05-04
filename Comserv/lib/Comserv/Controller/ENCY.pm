@@ -2230,7 +2230,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         resolve_field     => $resolve_field,
         resolve_type      => $resolve_type,
         resolve_remaining => $resolve_remaining,
-        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields (alternate_terms, related_terms, examples) use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) definition and context must be plain prose — NOT semicolon-separated. (3) examples: list individual example terms/herbs/drugs semicolon-separated, no prose sentences.',
+        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. CRITICAL: Return a FLAT JSON object ONLY — every value must be a plain string, NO nested objects, NO arrays. Keep the total response under 800 characters. FORMATTING: (1) alternate_terms and related_terms: semicolon-separated noun phrases. (2) definition: 1-3 sentences of plain prose, no sub-headings. (3) context: 1 sentence. (4) examples: semicolon-separated short noun phrases only. (5) category: single word or short phrase (e.g. pharmacology, botany, TCM).',
         template          => 'ENCY/GlossaryDetail.tt',
     );
 }
@@ -2314,7 +2314,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
     $c->stash(
         entry           => $term,
         edit_mode       => 1,
-        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields (alternate_terms, related_terms, examples) use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) definition and context must be plain prose — NOT semicolon-separated. (3) examples: list individual example terms/herbs/drugs semicolon-separated, no prose sentences.',
+        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. CRITICAL: Return a FLAT JSON object ONLY — every value must be a plain string, NO nested objects, NO arrays. Keep the total response under 800 characters. FORMATTING: (1) alternate_terms and related_terms: semicolon-separated noun phrases. (2) definition: 1-3 sentences of plain prose, no sub-headings. (3) context: 1 sentence. (4) examples: semicolon-separated short noun phrases only. (5) category: single word or short phrase (e.g. pharmacology, botany, TCM).',
         template        => 'ENCY/GlossaryDetail.tt',
     );
 }
