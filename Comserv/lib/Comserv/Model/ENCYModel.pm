@@ -890,7 +890,11 @@ sub auto_link_herb_data {
         my ($text) = @_;
         return () unless $text;
         return grep { length($_) > 2 }
-               map  { (my $t = $_) =~ s/^\s+|\s+$//g; $t }
+               map  {
+                   (my $t = $_) =~ s/^\s+|\s+$//g;
+                   $t =~ s/\s*\[(?:ref)?\?\]//g;
+                   $t
+               }
                split /[,;\n]+/, $text;
     };
 
@@ -2013,6 +2017,12 @@ sub preprocess_field_markers {
 
         if ($modified) {
             $cleaned{$field} = join('; ', @new_terms);
+        } else {
+            my $val = $cleaned{$field};
+            if (defined $val && $val =~ /\[(?:ref)?\?\]/) {
+                $val =~ s/\s*\[(?:ref)?\?\]//g;
+                $cleaned{$field} = $val;
+            }
         }
     }
 
