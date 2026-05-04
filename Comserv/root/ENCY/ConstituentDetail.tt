@@ -36,13 +36,6 @@
 </p>
 
 [% IF edit_mode %]
-[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
-[% IF return_to && !(resolve_field || resolve_type) %]
-<div class="alert alert-info" style="margin-bottom:0.75em;">
-  Adding this constituent so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
-  &mdash; you will be returned there automatically after saving.
-</div>
-[% END %]
 <form action="[% IF constituent.record_id %][% c.uri_for('/ENCY/Constituent/edit') %][% ELSE %][% c.uri_for('/ENCY/Constituent/add') %][% END %]" method="post">
 [% IF constituent.record_id %]
 <input type="hidden" name="record_id" value="[% constituent.record_id %]" />
@@ -51,6 +44,14 @@
 <input type="hidden" name="return_to"     value="[% return_to    | html %]" />
 <input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
 <input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
+[% END %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
+[% IF return_to && !(resolve_field || resolve_type) %]
+<div class="alert alert-info" style="margin-bottom:0.75em;">
+  Adding this constituent so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
+  &mdash; you will be returned there automatically after saving.
+</div>
 [% END %]
 [% END %]
 
@@ -148,7 +149,7 @@
             [% IF edit_mode %]
             <textarea name="toxicity" rows="3" cols="60">[% constituent.toxicity | html %]</textarea>
             [% ELSE %]
-            [% constituent.toxicity | html %]
+            [% constituent.toxicity | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -156,6 +157,7 @@
         <td><strong>Solubility</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <input type="text" name="solubility" value="[% constituent.solubility | html %]" size="50" />
             [% ELSE %]
             [% solubility_html %]
@@ -195,7 +197,7 @@
             [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="found_in_foods" rows="3" cols="60">[% constituent.found_in_foods | html %]</textarea>
             [% ELSE %]
-            [% constituent.found_in_foods | html %]
+            [% constituent.found_in_foods | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -220,7 +222,7 @@
             [% IF edit_mode %]
             <textarea name="research_notes" rows="5" cols="60">[% constituent.research_notes | html %]</textarea>
             [% ELSE %]
-            [% constituent.research_notes | html %]
+            [% constituent.research_notes | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -252,7 +254,7 @@
             [% IF edit_mode %]
             <textarea name="reference" rows="3" cols="60">[% constituent.reference | html %]</textarea>
             [% ELSE %]
-            [% constituent.reference | html %]
+            [% constituent.reference | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -270,11 +272,10 @@
         <td><strong>Image</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="image" value="[% constituent.image | html %]" size="60" />
-            <span style="font-size:0.85em;color: var(--text-muted-color, #666);"> (paste a Wikipedia or PubChem image URL; AI can suggest one)</span>
+            [% ency_img_picker('image', constituent.image) %]
             [% ELSE %]
             [% IF constituent.image %]
-            <a href="[% constituent.image | html %]" target="_blank">[% constituent.image | html %]</a>
+            [% ency_img_tag(constituent.image, 240, 240) %]
             [% ELSE %]
             <span style="color:#999;font-style:italic;">No image — edit to add one (AI can suggest a PubChem image URL)</span>
             [% END %]
@@ -287,7 +288,6 @@
 [% PROCESS 'ENCY/partials/FormalRefs.tt' %]
 [% END %]
 [% IF edit_mode %]
-[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF constituent.record_id %]Update Constituent[% ELSE %]Add Constituent[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Constituent') %]" class="btn btn-default">Cancel</a>
