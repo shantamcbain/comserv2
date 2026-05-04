@@ -28,10 +28,10 @@ __PACKAGE__->config(
         ref_links => sub {
             my $text = shift;
             $text =~ s/\s*\[(?:ref\?)?\?\]\s*//g;
+            $text =~ s/\s*\[\d+\]\s*//g;
             $text =~ s{&}{&amp;}g;
             $text =~ s{<}{&lt;}g;
             $text =~ s{>}{&gt;}g;
-            $text =~ s{\[(\d+)\]}{<a href="/ENCY/Reference/$1" title="Reference #$1" class="ency-ref-link">[$1]</a>}g;
             return $text;
         },
     },

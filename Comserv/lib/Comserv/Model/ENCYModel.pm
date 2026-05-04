@@ -981,6 +981,26 @@ sub auto_link_herb_data {
         }
     }
 
+    # --- sister_plants terms → ENCY Herb lookup; create todo if missing ---
+    for my $term ($parse_terms->($form_data->{sister_plants})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        next if $term =~ /:/;
+        next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Herb')->search(
+                { -or => [
+                    common_names   => { like => "%$term%" },
+                    botanical_name => { like => "%$term%" },
+                    key_name       => { like => "%$term%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        unless ($rec) {
+            push @todos, { field => 'sister_plants', term => $term, type => 'herb_todo' };
+        }
+    }
+
     # --- create todos for unresolved / auto-created terms ---
     my %seen;
     my @action_items;
@@ -1005,8 +1025,18 @@ sub auto_link_herb_data {
                 name_param => 'name',
             };
         } else {
+            if (($item->{type} // '') eq 'herb_todo') {
+                $self->_create_ency_todo($c,
+                    "ENCY: Missing herb in sister_plants: $short_term",
+                    "Field: sister_plants\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
+                  . "'$item->{term}' appears in sister_plants but is not yet in the ENCY herb database. "
+                  . "Please add it as a new herb entry."
+                );
+                next;
+            }
             my $type = $item->{field} eq 'constituents'        ? 'constituent'
                      : $item->{field} eq 'therapeutic_action'  ? 'glossary'
+                     : $item->{field} eq 'parts_used'          ? 'glossary'
                      : 'glossary';
             my $add_route  = $type eq 'constituent' ? '/ENCY/Constituent/add' : '/ENCY/Glossary/add';
             my $name_param = $type eq 'glossary'    ? 'term'                  : 'name';

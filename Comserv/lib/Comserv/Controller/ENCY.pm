@@ -303,14 +303,18 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my $parts_used_html = _build_glossary_term_links_html(
         $c, $herb->parts_used // ''
     );
+    my $sister_plants_html = _build_sister_plants_html(
+        $c, $herb->sister_plants // ''
+    );
 
     $self->_stash_image_files($c);
     $c->stash(
-        herb              => $herb,
-        constituents_html => $constituents_html,
-        parts_used_html   => $parts_used_html,
-        edit_mode         => 0,
-        template          => 'ENCY/HerbView.tt',
+        herb               => $herb,
+        constituents_html  => $constituents_html,
+        parts_used_html    => $parts_used_html,
+        sister_plants_html => $sister_plants_html,
+        edit_mode          => 0,
+        template           => 'ENCY/HerbView.tt',
     );
 }
 
@@ -451,10 +455,44 @@ sub _build_glossary_popup_html {
         my $gid  = $t->record_id;
         my $term = $t->term;
         my $pat  = quotemeta($term);
-        my $link = qq{<a href="#" class="ency-glossary-link" data-gid="$gid" title="Glossary: $term">$term</a>};
+        my $link = qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $term">$term</a>};
         $html =~ s/\b$pat\b/$link/gi;
     }
     return $html;
+}
+
+sub _build_sister_plants_html {
+    my ($c, $text) = @_;
+    return '' unless defined $text && length($text);
+    my @parts;
+    for my $raw (split /\s*;\s*/, $text) {
+        $raw =~ s/^\s+|\s+$//g;
+        next unless length($raw);
+        (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        my $escaped = $clean;
+        $escaped =~ s/&/&amp;/g;
+        $escaped =~ s/</&lt;/g;
+        $escaped =~ s/>/&gt;/g;
+        my $rec = eval {
+            $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->search(
+                { -or => [
+                    common_names  => { like => "%$clean%" },
+                    botanical_name => { like => "%$clean%" },
+                    key_name       => { like => "%$clean%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        if ($rec) {
+            my $hid = $rec->record_id;
+            my $tip = $rec->botanical_name || $clean;
+            $tip =~ s/"/&quot;/g;
+            push @parts, qq{<a href="/ENCY/herb_detail/$hid" class="ency-herb-link" data-hid="$hid" title="$tip">$escaped</a>};
+        } else {
+            push @parts, $escaped;
+        }
+    }
+    return join('; ', @parts);
 }
 
 sub _build_glossary_term_links_html {
@@ -479,7 +517,7 @@ sub _build_glossary_term_links_html {
             my $gid  = $rec->record_id;
             my $tip  = $rec->term;
             $tip =~ s/"/&quot;/g;
-            push @parts, qq{<a href="#" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$escaped</a>};
+            push @parts, qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$escaped</a>};
         } else {
             push @parts, $escaped;
         }
