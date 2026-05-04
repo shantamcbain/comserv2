@@ -514,8 +514,8 @@
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
                             [% END %]
 
-                            [%# Cross-project blocker badge %]
-                            [% IF ap.is_cross_blocker %]
+                            [%# Cross-project blocker badge — only on explicitly blocking todos %]
+                            [% IF ap.is_cross_blocker && ap.is_blocking %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#6f42c1;color:#fff;" title="[% ap.blocking_names %] [% ap.blocking_count > 1 ? 'are' : 'is' %] waiting on this project — complete first">🔗 unblocks [% ap.blocking_count %]</span>
                             [% END %]
 
@@ -548,7 +548,7 @@
                             [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
                             [% IF ap.due_date %]<span[% IF ap.is_overdue %] style="color:#dc3545;font-weight:bold;"[% ELSIF ap.due_today %] style="color:#856404;font-weight:bold;"[% END %]>📅 Due: [% ap.due_date %]</span>[% END %]
                             [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
-                            [% IF ap.is_cross_blocker && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
+                            [% IF ap.is_cross_blocker && ap.is_blocking && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
                             [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
                         </div>
                     </div>
