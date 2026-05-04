@@ -672,7 +672,7 @@ sub view :Path('/Documentation') :Args(1) {
 
         # Check site access
         if ($metadata->{site} ne 'all' && $metadata->{site} ne $site_name && !$is_admin) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to page $page: site mismatch ($metadata->{site} vs $site_name)");
             $c->response->status(403);
             $c->stash(
@@ -702,7 +702,7 @@ sub view :Path('/Documentation') :Args(1) {
         }
 
         unless ($has_role) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to page $page: insufficient role ($user_role)");
             $c->response->status(403);
             $c->stash(
@@ -932,7 +932,7 @@ sub view :Path('/Documentation') :Args(1) {
         }
 
         unless ($unreg_ok) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view',
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
                 "Access denied to unregistered page $page: insufficient role ($user_role)");
             $c->response->status(403);
             $c->stash(
