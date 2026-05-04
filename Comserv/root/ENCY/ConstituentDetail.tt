@@ -36,7 +36,6 @@
 </p>
 
 [% IF edit_mode %]
-[% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
 [% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 [% IF return_to && !(resolve_field || resolve_type) %]
 <div class="alert alert-info" style="margin-bottom:0.75em;">
@@ -130,6 +129,7 @@
     </tr>
 </table>
 
+[% IF edit_mode %][% PROCESS 'ENCY/partials/MarkerLegend.tt' %][% END %]
 <h2>Pharmacology</h2>
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
