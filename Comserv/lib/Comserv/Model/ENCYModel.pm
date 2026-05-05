@@ -881,6 +881,24 @@ sub auto_link_herb_constituent {
     return $linked;
 }
 
+my $_LEADING_VERB_RE_EARLY = qr{
+    ^(?:
+        moisten|moistens|clears?|tonif(?:y|ies)|drains?|nourish(?:es)?|
+        disperses?|resolves?|transforms?|strengthens?|softens?|
+        warms?|cools?|purges?|regulates?|invigorates?|
+        supplements?|fortif(?:y|ies)|purif(?:y|ies)|promotes?|
+        enhances?|facilitates?|moderates?|alleviates?|
+        relieves?|expels?|scatters?|astringes?|consolidates?|
+        inhibits?|stimulates?|activates?|modulates?|
+        mediates?|triggers?|induces?|
+        blocks?|binds?|releases?|breaks?|digests?|
+        absorbs?|excretes?|secretes?|scavenges?|
+        neutralizes?|detoxif(?:y|ies)|metabolizes?|oxidizes?|
+        catalyzes?|protects?|supports?|prevents?|
+        \w+ens
+    )\b
+}xi;
+
 sub auto_link_herb_data {
     my ($self, $c, $herb_id, $form_data) = @_;
     return unless $herb_id;
@@ -1034,7 +1052,109 @@ sub auto_link_herb_data {
         }
     }
 
-    # --- create todos for unresolved / auto-created terms ---
+    # shared helper: strip practitioner prefix and leading verb phrase
+    my $_clean_medical_term = sub {
+        my ($raw) = @_;
+        (my $t = $raw) =~ s/^\s*[A-Za-z][\w\s]{1,25}:\s*//;   # strip "Allopathic: " etc.
+        $t =~ s/^(?:used?\s+(?:for|in|as)|treats?\s*|for\s+|in\s+cases?\s+of\s*|as\s+(?:a\s+)?)\s*//i;
+        $t =~ s/^\s+|\s+$//g;
+        return $t;
+    };
+
+    # shared helper: look up a term in Disease, Symptom, Glossary; return found type or undef
+    my $_lookup_medical = sub {
+        my ($term) = @_;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Disease')->search(
+                { -or => [ common_name => { like => "%$term%" }, scientific_name => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'disease' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Symptom')->search(
+                { name => { like => "%$term%" } },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'symptom' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'glossary' if $rec;
+        return undef;
+    };
+
+    # --- medical_uses terms → Disease, Symptom, Glossary lookup ---
+    for my $term ($parse_terms->($form_data->{medical_uses})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        my $lookup = $_clean_medical_term->($term);
+        next unless length($lookup) > 2;
+        next if scalar(split /\s+/, $lookup) > 5;
+        next if $lookup =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        next if $lookup =~ $_LEADING_VERB_RE_EARLY;
+        my $found = $_lookup_medical->($lookup);
+        unless ($found) {
+            push @todos, { field => 'medical_uses', term => $lookup, lookup_type => 'disease' };
+        }
+    }
+
+    # --- contra_indications terms → Disease, Symptom, Glossary lookup ---
+    for my $term ($parse_terms->($form_data->{contra_indications})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        my $lookup = $_clean_medical_term->($term);
+        next unless length($lookup) > 2;
+        next if scalar(split /\s+/, $lookup) > 5;
+        next if $lookup =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        next if $lookup =~ $_LEADING_VERB_RE_EARLY;
+        my $found = $_lookup_medical->($lookup);
+        unless ($found) {
+            push @todos, { field => 'contra_indications', term => $lookup, lookup_type => 'disease' };
+        }
+    }
+
+    # --- Glossary-only lookup for administration, preparation, formulas, vetrinary ---
+    for my $gfield (qw(administration preparation formulas vetrinary)) {
+        for my $term ($parse_terms->($form_data->{$gfield} // '')) {
+            next if $term =~ /\s{2,}|^\d+$/;
+            next if $term =~ /:/;
+            next if scalar(split /\s+/, $term) > 3;
+            next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+            next if $term =~ $_LEADING_VERB_RE_EARLY;
+            my $rec = eval {
+                $self->ency_schema->resultset('Ency::Glossary')->search(
+                    { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                    { rows => 1, order_by => 'record_id' }
+                )->first;
+            };
+            unless ($rec) {
+                push @todos, { field => $gfield, term => $term };
+            }
+        }
+    }
+
+    # --- create todos and action items for all unresolved / auto-created terms ---
+    my %_type_route = (
+        constituent => { route => '/ENCY/Constituent/add', param => 'name'        },
+        glossary    => { route => '/ENCY/Glossary/add',    param => 'term'        },
+        disease     => { route => '/ENCY/Disease/add',     param => 'common_name' },
+        symptom     => { route => '/ENCY/Symptom/add',     param => 'name'        },
+    );
+    my %_field_type = (
+        constituents       => 'constituent',
+        therapeutic_action => 'glossary',
+        parts_used         => 'glossary',
+        medical_uses       => 'disease',
+        contra_indications => 'disease',
+        administration     => 'glossary',
+        preparation        => 'glossary',
+        formulas           => 'glossary',
+        vetrinary          => 'glossary',
+    );
+
     my %seen;
     my @action_items;
     for my $item (@todos) {
@@ -1071,12 +1191,8 @@ sub auto_link_herb_data {
                 );
                 next;
             }
-            my $type = $item->{field} eq 'constituents'        ? 'constituent'
-                     : $item->{field} eq 'therapeutic_action'  ? 'glossary'
-                     : $item->{field} eq 'parts_used'          ? 'glossary'
-                     : 'glossary';
-            my $add_route  = $type eq 'constituent' ? '/ENCY/Constituent/add' : '/ENCY/Glossary/add';
-            my $name_param = $type eq 'glossary'    ? 'term'                  : 'name';
+            my $type       = $item->{lookup_type} || $_field_type{$item->{field}} || 'glossary';
+            my $route_info = $_type_route{$type} || $_type_route{glossary};
             $self->_create_ency_todo($c,
                 "ENCY: Missing $type: $short_term",
                 "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
@@ -1087,8 +1203,8 @@ sub auto_link_herb_data {
                 field      => $item->{field},
                 term       => $item->{term},
                 type       => $type,
-                add_route  => $add_route,
-                name_param => $name_param,
+                add_route  => $route_info->{route},
+                name_param => $route_info->{param},
             };
         }
     }
