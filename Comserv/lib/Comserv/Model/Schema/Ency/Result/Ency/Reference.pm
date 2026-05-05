@@ -95,6 +95,26 @@ __PACKAGE__->add_columns(reference_id => {
         is_nullable   => 0,
         default_value => 1,
     },
+    source_type => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    external_id => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    external_db => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+    },
+    source_bias_rating => {
+        data_type   => 'tinyint',
+        size        => 1,
+        is_nullable => 1,
+    },
 );
 __PACKAGE__->set_primary_key('reference_id');
 
