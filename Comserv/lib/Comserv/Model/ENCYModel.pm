@@ -2335,5 +2335,139 @@ sub list_organisms {
     return \@results;
 }
 
+sub ncbi_lookup_for_herb {
+    my ($self, $c, $herb_id) = @_;
+
+    my $herb = $self->get_herb_by_id($c, $herb_id);
+    return (0, "Herb not found") unless $herb;
+
+    my $botanical = $herb->botanical_name;
+    return (0, "Herb has no botanical name") unless $botanical;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ncbi_lookup_for_herb',
+        "Looking up NCBI for herb $herb_id: $botanical");
+
+    my $ext_model = $c->model('ExternalDB');
+    my $ncbi_data = $ext_model->ncbi_search_taxonomy($c, $botanical);
+    return (0, "No NCBI record found for '$botanical'") unless $ncbi_data;
+
+    $ncbi_data->{herb_id}       = $herb_id;
+    $ncbi_data->{botanical_name} = $botanical;
+
+    return (1, $ncbi_data);
+}
+
+sub link_herb_to_organism {
+    my ($self, $c, $herb_id, $organism_id) = @_;
+
+    my $herb = $self->ency_schema->resultset('Ency::Herb')->find($herb_id);
+    return (0, "Herb $herb_id not found") unless $herb;
+
+    eval {
+        $herb->update({ organism_id => $organism_id });
+    } or do {
+        my $err = $@ || 'unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'link_herb_to_organism',
+            "Failed to link herb $herb_id to organism $organism_id: $err");
+        return (0, $err);
+    };
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'link_herb_to_organism',
+        "Herb $herb_id linked to organism $organism_id");
+    return (1, "Linked");
+}
+
+sub find_or_create_organism_from_ncbi {
+    my ($self, $c, $ncbi_data) = @_;
+    return undef unless $ncbi_data && $ncbi_data->{ncbi_tax_id};
+
+    my $existing = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => $ncbi_data->{ncbi_tax_id} }
+    )->first;
+    return $existing if $existing;
+
+    my $new_org;
+    eval {
+        $new_org = $self->ency_schema->resultset('Ency::Organism')->create({
+            common_name         => $ncbi_data->{common_name}   || $ncbi_data->{scientific_name},
+            scientific_name     => $ncbi_data->{scientific_name},
+            organism_type       => $ncbi_data->{organism_type} || 'plant',
+            kingdom             => $ncbi_data->{kingdom}       || '',
+            phylum              => $ncbi_data->{phylum}        || '',
+            class_name          => $ncbi_data->{class_name}    || '',
+            order_name          => $ncbi_data->{order_name}    || '',
+            family_name         => $ncbi_data->{family_name}   || '',
+            genus               => $ncbi_data->{genus}         || '',
+            species             => $ncbi_data->{species}       || '',
+            ncbi_tax_id         => $ncbi_data->{ncbi_tax_id},
+            description         => "Imported from NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
+            sitename            => 'ENCY',
+            username_of_poster  => $c->session->{username} || 'system',
+            group_of_poster     => $c->session->{group}    || 'system',
+            date_time_posted    => \'NOW()',
+            share               => 1,
+        });
+    } or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'find_or_create_organism_from_ncbi',
+            "Failed to create organism: " . ($@ || 'unknown'));
+        return undef;
+    };
+
+    if ($new_org) {
+        $c->model('ExternalDB')->save_external_id(
+            $c,
+            $self->ency_schema,
+            'organism',
+            $new_org->record_id,
+            { db_name    => 'NCBI',
+              external_id => $ncbi_data->{ncbi_tax_id},
+              source_url  => $ncbi_data->{source_url} || '' }
+        );
+    }
+
+    return $new_org;
+}
+
+sub accept_ncbi_fields_to_herb {
+    my ($self, $c, $herb_id, $ncbi_data, $accepted_fields) = @_;
+    my $herb = $self->ency_schema->resultset('Ency::Herb')->find($herb_id);
+    return (0, "Herb not found") unless $herb;
+
+    my %field_map = (
+        common_name  => 'common_names',
+    );
+
+    my %updates;
+    for my $ncbi_field (@{ $accepted_fields // [] }) {
+        my $herb_field = $field_map{$ncbi_field} // $ncbi_field;
+        next unless exists $ncbi_data->{$ncbi_field};
+        my $new_val = $ncbi_data->{$ncbi_field};
+        next unless defined $new_val && $new_val ne '';
+
+        if ($herb_field eq 'common_names') {
+            my $existing = $herb->common_names // '';
+            my %seen = map { lc($_) => 1 }
+                       grep { $_ ne '' }
+                       map  { my $t = $_; $t =~ s/^\s+|\s+$//g; $t }
+                       split /;/, $existing;
+            unless ($seen{ lc($new_val) }) {
+                $updates{common_names} = $existing
+                    ? "$existing; $new_val"
+                    : $new_val;
+            }
+        } else {
+            $updates{$herb_field} = $new_val;
+        }
+    }
+
+    if (%updates) {
+        eval { $herb->update(\%updates) } or do {
+            return (0, "Update failed: " . ($@ || 'unknown'));
+        };
+    }
+
+    return (1, \%updates);
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
