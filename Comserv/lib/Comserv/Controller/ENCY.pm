@@ -313,6 +313,17 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         $c, $herb->medical_uses // ''
     );
 
+    my %field_html;
+    for my $f (qw(
+        common_names comments ident_character stem leaves flowers fruit
+        taste odour root distribution cultivation harvest solvents dosage
+        administration formulas contra_indications preparation chinese
+        vetrinary homiopathic non_med culinary history pollinator
+        pollennotes nectarnotes
+    )) {
+        $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '');
+    }
+
     $self->_stash_image_files($c);
     $c->stash(
         herb                    => $herb,
@@ -321,6 +332,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         sister_plants_html      => $sister_plants_html,
         therapeutic_action_html => $therapeutic_action_html,
         medical_uses_html       => $medical_uses_html,
+        field_html              => \%field_html,
         edit_mode               => 0,
         template                => 'ENCY/HerbView.tt',
     );
@@ -450,6 +462,8 @@ sub _build_glossary_popup_html {
     my ($c, $text) = @_;
     return '' unless defined $text && length($text);
     my $html = $text;
+    $html =~ s/\s*\[(?:ref\?)?\?\]//g;
+    $html =~ s/\s*\[\d+\]//g;
     $html =~ s/&/&amp;/g;
     $html =~ s/</&lt;/g;
     $html =~ s/>/&gt;/g;
@@ -477,6 +491,7 @@ sub _build_sister_plants_html {
         $raw =~ s/^\s+|\s+$//g;
         next unless length($raw);
         (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        $clean =~ s/\s*\[(?:ref\?)?\?\]//g;
         my $escaped = $clean;
         $escaped =~ s/&/&amp;/g;
         $escaped =~ s/</&lt;/g;
@@ -511,6 +526,7 @@ sub _build_glossary_term_links_html {
         $raw =~ s/^\s+|\s+$//g;
         next unless length($raw);
         (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        $clean =~ s/\s*\[(?:ref\?)?\?\]//g;
         my $escaped = $clean;
         $escaped =~ s/&/&amp;/g;
         $escaped =~ s/</&lt;/g;

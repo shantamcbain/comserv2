@@ -983,6 +983,26 @@ sub auto_link_herb_data {
         }
     }
 
+    # --- chinese field terms → Glossary lookup; create todo if missing ---
+    for my $term ($parse_terms->($form_data->{chinese})) {
+        next if $term =~ /\s{2,}|^\d+$/;
+        next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
+        (my $romanized = $term) =~ s/[^\x00-\x7F]//g;
+        $romanized =~ s/\s*\([^)]*\)\s*//g;
+        $romanized =~ s/^\s+|\s+$//g;
+        next unless length($romanized) > 2;
+        next if scalar(split /\s+/, $romanized) > 5;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$romanized%" }, alternate_terms => { like => "%$romanized%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        unless ($rec) {
+            push @todos, { field => 'chinese', term => $romanized };
+        }
+    }
+
     # --- sister_plants terms → ENCY Herb lookup; create todo if missing ---
     for my $term ($parse_terms->($form_data->{sister_plants})) {
         next if $term =~ /\s{2,}|^\d+$/;
