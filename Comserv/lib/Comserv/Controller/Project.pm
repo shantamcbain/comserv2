@@ -459,9 +459,6 @@ sub fetch_projects_with_subprojects :Private {
     my $is_admin = $c->stash->{is_admin} || 0;
     my $is_csc_admin = $is_admin && (uc($SiteName) eq 'CSC');
 
-    # Sites that share project visibility with CSC
-    my %shares_csc_projects = map { $_ => 1 } qw(ENCY);
-
     # Check if SiteName is defined
     if (!$SiteName) {
         $self->logging->log_with_details(
@@ -471,17 +468,12 @@ sub fetch_projects_with_subprojects :Private {
     }
 
     # Fetch top-level projects (those without a parent)
-    # CSC admins see all sites; ENCY and similar sites see own + CSC; others see only own
+    # CSC admins see all sites; all others see only their own SiteName
+    # Sub-projects are fetched by parent_id (no sitename filter) so they appear regardless of sitename
     my @top_projects;
     eval {
         my %search_cond = (parent_id => undef);
-        unless ($is_csc_admin) {
-            if ($shares_csc_projects{uc($SiteName)}) {
-                $search_cond{sitename} = { -in => [$SiteName, 'CSC'] };
-            } else {
-                $search_cond{sitename} = $SiteName;
-            }
-        }
+        $search_cond{sitename} = $SiteName unless $is_csc_admin;
         @top_projects = $schema->resultset('Project')->search(
             \%search_cond,
             { order_by => { -asc => 'name' } }
