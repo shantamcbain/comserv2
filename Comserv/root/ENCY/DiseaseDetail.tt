@@ -52,7 +52,7 @@
         <td><strong>Common Name</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="common_name" value="[% disease.common_name | html %]" size="50" />
+            <input type="text" name="common_name" value="[% prefill_common_name || disease.common_name | html %]" size="50" />
             [% ELSE %]
             [% disease.common_name | html %]
             [% END %]
