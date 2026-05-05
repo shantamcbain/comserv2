@@ -983,7 +983,7 @@ sub auto_link_herb_data {
         }
     }
 
-    # --- chinese field terms → Glossary lookup; create todo if missing ---
+    # --- chinese field terms → Herb lookup first, then Glossary; skip if it names the current herb ---
     for my $term ($parse_terms->($form_data->{chinese})) {
         next if $term =~ /\s{2,}|^\d+$/;
         next if $term =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
@@ -992,14 +992,25 @@ sub auto_link_herb_data {
         $romanized =~ s/^\s+|\s+$//g;
         next unless length($romanized) > 2;
         next if scalar(split /\s+/, $romanized) > 5;
-        my $rec = eval {
+        my $herb_match = eval {
+            $self->ency_schema->resultset('Ency::Herb')->search(
+                { -or => [
+                    common_names   => { like => "%$romanized%" },
+                    botanical_name => { like => "%$romanized%" },
+                    key_name       => { like => "%$romanized%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        next if $herb_match;
+        my $gloss_match = eval {
             $self->ency_schema->resultset('Ency::Glossary')->search(
                 { -or => [ term => { like => "%$romanized%" }, alternate_terms => { like => "%$romanized%" } ] },
                 { rows => 1, order_by => 'record_id' }
             )->first;
         };
-        unless ($rec) {
-            push @todos, { field => 'chinese', term => $romanized };
+        unless ($gloss_match) {
+            push @todos, { field => 'chinese', term => $romanized, type => 'herb_todo' };
         }
     }
 
@@ -1048,11 +1059,15 @@ sub auto_link_herb_data {
             };
         } else {
             if (($item->{type} // '') eq 'herb_todo') {
+                my $field_label = $item->{field} eq 'chinese' ? 'chinese name field' : 'sister_plants';
+                my $detail = $item->{field} eq 'chinese'
+                    ? "'$item->{term}' appears in the Chinese name field but does not match any herb or glossary term in ENCY. "
+                    . "Please verify: is this a TCM plant name that should be added as a new herb entry?"
+                    : "'$item->{term}' appears in sister_plants but is not yet in the ENCY herb database. "
+                    . "Please add it as a new herb entry.";
                 $self->_create_ency_todo($c,
-                    "ENCY: Missing herb in sister_plants: $short_term",
-                    "Field: sister_plants\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n"
-                  . "'$item->{term}' appears in sister_plants but is not yet in the ENCY herb database. "
-                  . "Please add it as a new herb entry."
+                    "ENCY: Unrecognised term in $field_label: $short_term",
+                    "Field: $item->{field}\nTerm: $item->{term}\nEntity: herb #$herb_id\n\n$detail"
                 );
                 next;
             }
