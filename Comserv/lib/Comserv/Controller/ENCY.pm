@@ -1650,19 +1650,21 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
         return;
     }
 
-    my $return_to         = $c->request->param('return_to')     // '';
-    my $resolve_field     = $c->request->param('resolve_field') // '';
-    my $resolve_type      = $c->request->param('resolve_type')  // '';
-    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
+    my $prefill_common_name = $c->request->param('common_name') // '';
+    my $return_to           = $c->request->param('return_to')     // '';
+    my $resolve_field       = $c->request->param('resolve_field') // '';
+    my $resolve_type        = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining   = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode         => 1,
-        return_to         => $return_to,
-        resolve_field     => $resolve_field,
-        resolve_type      => $resolve_type,
-        resolve_remaining => $resolve_remaining,
-        ency_ai_prompt    => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
-        template          => 'ENCY/DiseaseDetail.tt',
+        edit_mode           => 1,
+        prefill_common_name => $prefill_common_name,
+        return_to           => $return_to,
+        resolve_field       => $resolve_field,
+        resolve_type        => $resolve_type,
+        resolve_remaining   => $resolve_remaining,
+        ency_ai_prompt      => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        template            => 'ENCY/DiseaseDetail.tt',
     );
 }
 
@@ -1880,6 +1882,7 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
         return;
     }
 
+    my $prefill_name      = $c->request->param('name')          // '';
     my $return_to         = $c->request->param('return_to')     // '';
     my $resolve_field     = $c->request->param('resolve_field') // '';
     my $resolve_type      = $c->request->param('resolve_type')  // '';
@@ -1887,6 +1890,7 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
     $self->_stash_image_files($c);
     $c->stash(
         edit_mode         => 1,
+        prefill_name      => $prefill_name,
         return_to         => $return_to,
         resolve_field     => $resolve_field,
         resolve_type      => $resolve_type,

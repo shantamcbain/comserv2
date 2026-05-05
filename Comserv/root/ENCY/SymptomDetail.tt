@@ -43,6 +43,7 @@
 <input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
 <input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
 [% END %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <h2>Clinical Info</h2>
@@ -51,7 +52,7 @@
         <td><strong>Name</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="name" value="[% symptom.name | html %]" size="50" />
+            <input type="text" name="name" value="[% prefill_name || symptom.name | html %]" size="50" />
             [% ELSE %]
             [% symptom.name | html %]
             [% END %]
