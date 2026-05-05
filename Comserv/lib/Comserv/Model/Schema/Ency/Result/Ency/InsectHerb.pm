@@ -41,7 +41,7 @@ __PACKAGE__->belongs_to(
 );
 
 __PACKAGE__->belongs_to(
-    herb => 'Comserv::Model::Schema::Forager::Result::Herb',
+    herb => 'Comserv::Model::Schema::Ency::Result::Ency::Herb',
     'herb_id',
     { is_foreign_key_constraint => 0 },
 );
