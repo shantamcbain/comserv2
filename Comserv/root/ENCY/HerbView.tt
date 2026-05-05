@@ -18,6 +18,15 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
+<style>
+.field-term-preview{background:#f0f7ff;border-left:3px solid #4a90d9;padding:0.3em 0.6em;margin-bottom:0.35em;font-size:0.88em;border-radius:0 3px 3px 0;}
+.field-term-preview em{color:#555;font-style:normal;font-weight:600;margin-right:0.4em;}
+.field-term-preview a{color:#1a5fa8;text-decoration:underline dotted;}
+</style>
+[% MACRO term_preview(html) BLOCK %]
+[% IF html %]<div class="field-term-preview"><em>Saved:</em> [% html %]</div>[% END %]
+[% END %]
+
 [% IF !edit_mode %]
     <h1>[% herb.botanical_name | html %]</h1>
 [% ELSE %]
@@ -80,6 +89,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% parts_used_html %]
             [% ELSE %]
+                [% term_preview(field_html.parts_used) %]
                 <input type="text" id="parts_used" name="parts_used" value="[% herb.parts_used %]" size="50" />
             [% END %]
         </td>
@@ -90,6 +100,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% sister_plants_html %]
             [% ELSE %]
+                [% term_preview(field_html.sister_plants) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
             [% END %]
@@ -125,6 +136,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.stem %]
             [% ELSE %]
+                [% term_preview(field_html.stem) %]
                 <input type="text" id="stem" name="stem" value="[% herb.stem %]" size="50" />
             [% END %]
         </td>
@@ -135,6 +147,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.leaves %]
             [% ELSE %]
+                [% term_preview(field_html.leaves) %]
                 <input type="text" id="leaves" name="leaves" value="[% herb.leaves %]" size="50" />
             [% END %]
         </td>
@@ -165,6 +178,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.taste %]
             [% ELSE %]
+                [% term_preview(field_html.taste) %]
                 <input type="text" id="taste" name="taste" value="[% herb.taste %]" size="50" />
             [% END %]
         </td>
@@ -243,6 +257,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% therapeutic_action_html %]
             [% ELSE %]
+                [% term_preview(field_html.therapeutic_action) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="therapeutic_action" name="therapeutic_action" rows="4" cols="50">[% herb.therapeutic_action %]</textarea>
             [% END %]
@@ -254,6 +269,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% medical_uses_html %]
             [% ELSE %]
+                [% term_preview(field_html.medical_uses) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="medical_uses" name="medical_uses" rows="4" cols="50">[% herb.medical_uses %]</textarea>
             [% END %]
@@ -265,6 +281,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% constituents_html %]
             [% ELSE %]
+                [% term_preview(constituents_html) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="constituents" name="constituents" rows="4" cols="50">[% herb.constituents %]</textarea>
             [% END %]
@@ -286,6 +303,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.dosage %]
             [% ELSE %]
+                [% term_preview(field_html.dosage) %]
                 <input type="text" id="dosage" name="dosage" value="[% herb.dosage %]" size="50" />
             [% END %]
         </td>
@@ -296,6 +314,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.administration %]
             [% ELSE %]
+                [% term_preview(field_html.administration) %]
                 <input type="text" id="administration" name="administration" value="[% herb.administration %]" size="50" />
             [% END %]
         </td>
@@ -306,6 +325,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.formulas %]
             [% ELSE %]
+                [% term_preview(field_html.formulas) %]
                 <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
             [% END %]
         </td>
@@ -316,6 +336,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.contra_indications %]
             [% ELSE %]
+                [% term_preview(field_html.contra_indications) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="contra_indications" name="contra_indications" rows="4" cols="50">[% herb.contra_indications %]</textarea>
             [% END %]
@@ -327,6 +348,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.preparation %]
             [% ELSE %]
+                [% term_preview(field_html.preparation) %]
                 <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
             [% END %]
         </td>
@@ -337,6 +359,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.chinese %]
             [% ELSE %]
+                [% term_preview(field_html.chinese) %]
                 <input type="text" id="chinese" name="chinese" value="[% herb.chinese %]" size="50" />
             [% END %]
         </td>
@@ -347,6 +370,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.vetrinary %]
             [% ELSE %]
+                [% term_preview(field_html.vetrinary) %]
                 <input type="text" id="vetrinary" name="vetrinary" value="[% herb.vetrinary %]" size="50" />
             [% END %]
         </td>
@@ -357,6 +381,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.homiopathic %]
             [% ELSE %]
+                [% term_preview(field_html.homiopathic) %]
                 <input type="text" id="homiopathic" name="homiopathic" value="[% herb.homiopathic %]" size="50" />
             [% END %]
         </td>
