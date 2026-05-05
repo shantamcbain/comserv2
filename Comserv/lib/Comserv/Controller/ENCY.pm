@@ -3480,6 +3480,190 @@ sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
     $self->_advance_resolve_queue($c, $c->session->{ency_resolve_return_to} || '/ENCY');
 }
 
+# ─── Organism routes ────────────────────────────────────────────────────────
+
+sub organism_list : Path('/ENCY/Organism') : Args(0) {
+    my ($self, $c) = @_;
+    my $type   = $c->request->parameters->{organism_type} // '';
+    my $search = $c->request->parameters->{q}             // '';
+    my $where  = {};
+    $where->{organism_type} = $type   if $type;
+    if ($search) {
+        $where->{-or} = [
+            common_name     => { like => "%$search%" },
+            scientific_name => { like => "%$search%" },
+        ];
+    }
+    my $organisms = $c->model('ENCYModel')->list_organisms($c, { where => $where });
+    $c->stash(
+        organisms     => $organisms,
+        organism_type => $type,
+        search        => $search,
+        template      => 'ENCY/OrganismList.tt',
+    );
+}
+
+sub organism_detail : Path('/ENCY/Organism') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid organism ID');
+        return;
+    }
+    my $organism = $c->model('ENCYModel')->get_organism_by_id($c, $id);
+    unless ($organism) {
+        $c->response->status(404);
+        $c->stash(error_message => "Organism #$id not found.", template => 'error.tt');
+        return;
+    }
+    $c->stash(
+        organism  => $organism,
+        edit_mode => 0,
+        template  => 'ENCY/OrganismDetail.tt',
+    );
+}
+
+sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Organism/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->stash(error_msg => "You do not have permission to add organisms.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name         => $p->{common_name}         // '',
+            scientific_name     => $p->{scientific_name}     // '',
+            organism_type       => $p->{organism_type}       || 'animal',
+            kingdom             => $p->{kingdom}             // '',
+            phylum              => $p->{phylum}              // '',
+            class_name          => $p->{class_name}          // '',
+            order_name          => $p->{order_name}          // '',
+            family_name         => $p->{family_name}         // '',
+            genus               => $p->{genus}               // '',
+            species             => $p->{species}             // '',
+            ncbi_tax_id         => ($p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            iucn_id             => $p->{iucn_id}             // '',
+            description         => $p->{description}         // '',
+            habitat             => $p->{habitat}             // '',
+            medicinal_uses      => $p->{medicinal_uses}      // '',
+            therapeutic_uses    => $p->{therapeutic_uses}    // '',
+            sub_population_note => $p->{sub_population_note} // '',
+            image               => $p->{image}               // '',
+            url                 => $p->{url}                 // '',
+            reference           => $p->{reference}           // '',
+            sitename            => $p->{sitename}            // 'ENCY',
+            username_of_poster  => $c->session->{username},
+            group_of_poster     => $c->session->{group},
+            date_time_posted    => \'NOW()',
+            share               => 1,
+        };
+        unless ($data->{common_name}) {
+            $c->stash(error_msg => "Common name is required.", organism => $data, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            return;
+        }
+        $c->model('ENCYModel')->add_organism($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{common_name}");
+        $c->flash->{success_msg} = 'Organism added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Organism'));
+        return;
+    }
+
+    my $prefill_common_name = $c->request->param('common_name') // '';
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode           => 1,
+        prefill_common_name => $prefill_common_name,
+        ency_ai_prompt      => 'common_name, scientific_name, organism_type (one of: human, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        template            => 'ENCY/OrganismDetail.tt',
+    );
+}
+
+sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Organism/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->stash(error_msg => "You do not have permission to edit organisms.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    my $record_id = $c->request->param('record_id') // $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->redirect($c->uri_for('/ENCY/Organism'));
+        return;
+    }
+
+    my $organism = $c->model('ENCYModel')->get_organism_by_id($c, $record_id);
+    unless ($organism) {
+        $c->stash(error_msg => "Organism #$record_id not found.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name         => $p->{common_name}         // '',
+            scientific_name     => $p->{scientific_name}     // '',
+            organism_type       => $p->{organism_type}       || 'animal',
+            kingdom             => $p->{kingdom}             // '',
+            phylum              => $p->{phylum}              // '',
+            class_name          => $p->{class_name}          // '',
+            order_name          => $p->{order_name}          // '',
+            family_name         => $p->{family_name}         // '',
+            genus               => $p->{genus}               // '',
+            species             => $p->{species}             // '',
+            ncbi_tax_id         => ($p->{ncbi_tax_id} && $p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     && $p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            iucn_id             => $p->{iucn_id}             // '',
+            description         => $p->{description}         // '',
+            habitat             => $p->{habitat}             // '',
+            medicinal_uses      => $p->{medicinal_uses}      // '',
+            therapeutic_uses    => $p->{therapeutic_uses}    // '',
+            sub_population_note => $p->{sub_population_note} // '',
+            image               => $p->{image}               // '',
+            url                 => $p->{url}                 // '',
+            reference           => $p->{reference}           // '',
+        };
+        unless ($data->{common_name}) {
+            $c->stash(error_msg => "Common name is required.", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            return;
+        }
+        my ($ok, $msg) = $c->model('ENCYModel')->update_organism($c, $record_id, $data);
+        if ($ok) {
+            $c->flash->{success_msg} = 'Organism updated successfully.';
+            $c->response->redirect($c->uri_for('/ENCY/Organism', $record_id));
+        } else {
+            $c->stash(error_msg => "Failed to update: $msg", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        }
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        organism       => $organism,
+        edit_mode      => 1,
+        ency_ai_prompt => 'common_name, scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        template       => 'ENCY/OrganismDetail.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;
