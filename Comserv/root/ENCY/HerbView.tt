@@ -58,7 +58,7 @@ Record ID:[% herb.record_id %]
         <td>Common Names:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.common_names | ref_links %]
+                [% field_html.common_names %]
             [% ELSE %]
                 <input type="text" id="common_names" name="common_names" value="[% herb.common_names %]" size="50" />
             [% END %]
@@ -99,7 +99,7 @@ Record ID:[% herb.record_id %]
         <td>Comments:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.comments | ref_links %]
+                [% field_html.comments %]
             [% ELSE %]
                 <textarea id="comments" name="comments" rows="4" cols="50">[% herb.comments %]</textarea>
             [% END %]
@@ -113,7 +113,7 @@ Record ID:[% herb.record_id %]
         <td>Identifying Character:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.ident_character | ref_links %]
+                [% field_html.ident_character %]
             [% ELSE %]
                 <input type="text" id="ident_character" name="ident_character" value="[% herb.ident_character %]" size="50" />
             [% END %]
@@ -123,7 +123,7 @@ Record ID:[% herb.record_id %]
         <td>Stem:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.stem | ref_links %]
+                [% field_html.stem %]
             [% ELSE %]
                 <input type="text" id="stem" name="stem" value="[% herb.stem %]" size="50" />
             [% END %]
@@ -133,7 +133,7 @@ Record ID:[% herb.record_id %]
         <td>Leaves:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.leaves | ref_links %]
+                [% field_html.leaves %]
             [% ELSE %]
                 <input type="text" id="leaves" name="leaves" value="[% herb.leaves %]" size="50" />
             [% END %]
@@ -143,7 +143,7 @@ Record ID:[% herb.record_id %]
         <td>Flowers:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.flowers | ref_links %]
+                [% field_html.flowers %]
             [% ELSE %]
                 <input type="text" id="flowers" name="flowers" value="[% herb.flowers %]" size="50" />
             [% END %]
@@ -153,7 +153,7 @@ Record ID:[% herb.record_id %]
         <td>Fruit:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.fruit | ref_links %]
+                [% field_html.fruit %]
             [% ELSE %]
                 <input type="text" id="fruit" name="fruit" value="[% herb.fruit %]" size="50" />
             [% END %]
@@ -163,7 +163,7 @@ Record ID:[% herb.record_id %]
         <td>Taste:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.taste | ref_links %]
+                [% field_html.taste %]
             [% ELSE %]
                 <input type="text" id="taste" name="taste" value="[% herb.taste %]" size="50" />
             [% END %]
@@ -173,7 +173,7 @@ Record ID:[% herb.record_id %]
         <td>Odour:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.odour | ref_links %]
+                [% field_html.odour %]
             [% ELSE %]
                 <input type="text" id="odour" name="odour" value="[% herb.odour %]" size="50" />
             [% END %]
@@ -183,7 +183,7 @@ Record ID:[% herb.record_id %]
         <td>Root:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.root | ref_links %]
+                [% field_html.root %]
             [% ELSE %]
                 <input type="text" id="root" name="root" value="[% herb.root %]" size="50" />
             [% END %]
@@ -207,7 +207,7 @@ Record ID:[% herb.record_id %]
         <td>Distribution:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.distribution | ref_links %]
+                [% field_html.distribution %]
             [% ELSE %]
                 <input type="text" id="distribution" name="distribution" value="[% herb.distribution %]" size="50" />
             [% END %]
@@ -217,7 +217,7 @@ Record ID:[% herb.record_id %]
         <td>Cultivation:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.cultivation | ref_links %]
+                [% field_html.cultivation %]
             [% ELSE %]
                 <input type="text" id="cultivation" name="cultivation" value="[% herb.cultivation %]" size="50" />
             [% END %]
@@ -227,7 +227,7 @@ Record ID:[% herb.record_id %]
         <td>Harvest:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.harvest | ref_links %]
+                [% field_html.harvest %]
             [% ELSE %]
                 <input type="text" id="harvest" name="harvest" value="[% herb.harvest %]" size="50" />
             [% END %]
@@ -274,7 +274,7 @@ Record ID:[% herb.record_id %]
         <td>Solvents:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.solvents | ref_links %]
+                [% field_html.solvents %]
             [% ELSE %]
                 <input type="text" id="solvents" name="solvents" value="[% herb.solvents %]" size="50" />
             [% END %]
@@ -284,7 +284,7 @@ Record ID:[% herb.record_id %]
         <td>Dosage:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.dosage | ref_links %]
+                [% field_html.dosage %]
             [% ELSE %]
                 <input type="text" id="dosage" name="dosage" value="[% herb.dosage %]" size="50" />
             [% END %]
@@ -294,7 +294,7 @@ Record ID:[% herb.record_id %]
         <td>Administration:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.administration | ref_links %]
+                [% field_html.administration %]
             [% ELSE %]
                 <input type="text" id="administration" name="administration" value="[% herb.administration %]" size="50" />
             [% END %]
@@ -304,7 +304,7 @@ Record ID:[% herb.record_id %]
         <td>Formulas:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.formulas | ref_links %]
+                [% field_html.formulas %]
             [% ELSE %]
                 <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
             [% END %]
@@ -314,7 +314,7 @@ Record ID:[% herb.record_id %]
         <td>Contra Indications:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.contra_indications | ref_links %]
+                [% field_html.contra_indications %]
             [% ELSE %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="contra_indications" name="contra_indications" rows="4" cols="50">[% herb.contra_indications %]</textarea>
@@ -325,7 +325,7 @@ Record ID:[% herb.record_id %]
         <td>Preparation:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.preparation | ref_links %]
+                [% field_html.preparation %]
             [% ELSE %]
                 <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
             [% END %]
@@ -335,7 +335,7 @@ Record ID:[% herb.record_id %]
         <td>Chinese:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.chinese | ref_links %]
+                [% field_html.chinese %]
             [% ELSE %]
                 <input type="text" id="chinese" name="chinese" value="[% herb.chinese %]" size="50" />
             [% END %]
@@ -345,7 +345,7 @@ Record ID:[% herb.record_id %]
         <td>Veterinary:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.vetrinary | ref_links %]
+                [% field_html.vetrinary %]
             [% ELSE %]
                 <input type="text" id="vetrinary" name="vetrinary" value="[% herb.vetrinary %]" size="50" />
             [% END %]
@@ -355,7 +355,7 @@ Record ID:[% herb.record_id %]
         <td>Homeopathic:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.homiopathic | ref_links %]
+                [% field_html.homiopathic %]
             [% ELSE %]
                 <input type="text" id="homiopathic" name="homiopathic" value="[% herb.homiopathic %]" size="50" />
             [% END %]
@@ -382,7 +382,7 @@ Record ID:[% herb.record_id %]
         <td>Pollinator:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.pollinator | ref_links %]
+                [% field_html.pollinator %]
             [% ELSE %]
                 <input type="text" id="pollinator" name="pollinator" value="[% herb.pollinator %]" size="50" />
             [% END %]
@@ -405,7 +405,7 @@ Record ID:[% herb.record_id %]
         <td>Pollen Notes:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.pollennotes | ref_links %]
+                [% field_html.pollennotes %]
             [% ELSE %]
                 <textarea id="pollennotes" name="pollennotes" rows="4" cols="50">[% herb.pollennotes %]</textarea>
             [% END %]
@@ -429,7 +429,7 @@ Record ID:[% herb.record_id %]
         <td>Nectar Notes:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.nectarnotes | ref_links %]
+                [% field_html.nectarnotes %]
             [% ELSE %]
                 <textarea id="nectarnotes" name="nectarnotes" rows="4" cols="50">[% herb.nectarnotes %]</textarea>
             [% END %]
@@ -443,7 +443,7 @@ Record ID:[% herb.record_id %]
         <td>Non-Medical Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.non_med | ref_links %]
+                [% field_html.non_med %]
             [% ELSE %]
                 <textarea id="non_med" name="non_med" rows="4" cols="50">[% herb.non_med %]</textarea>
             [% END %]
@@ -453,7 +453,7 @@ Record ID:[% herb.record_id %]
         <td>Culinary Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.culinary | ref_links %]
+                [% field_html.culinary %]
             [% ELSE %]
                 <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" required />
             [% END %]
@@ -463,7 +463,7 @@ Record ID:[% herb.record_id %]
         <td>History:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.history | ref_links %]
+                [% field_html.history %]
             [% ELSE %]
                 <textarea id="history" name="history" rows="4" cols="50">[% herb.history %]</textarea>
             [% END %]
