@@ -226,6 +226,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
 
+    my $entities_edit = _fetch_linkable_entities($c);
     my %field_html_edit;
     for my $f (qw(
         common_names comments ident_character stem leaves flowers fruit
@@ -235,12 +236,12 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         pollennotes nectarnotes
     )) {
         my $val = eval { $herb->$f } // '';
-        $field_html_edit{$f} = _build_glossary_popup_html($c, $val) if length($val);
+        $field_html_edit{$f} = _build_glossary_popup_html($c, $val, $entities_edit) if length($val);
     }
     $field_html_edit{parts_used}         = _build_glossary_term_links_html($c, eval { $herb->parts_used }         // '');
     $field_html_edit{sister_plants}      = _build_sister_plants_html(      $c, eval { $herb->sister_plants }      // '');
-    $field_html_edit{therapeutic_action} = _build_glossary_popup_html(     $c, eval { $herb->therapeutic_action } // '');
-    $field_html_edit{medical_uses}       = _build_glossary_popup_html(     $c, eval { $herb->medical_uses }       // '');
+    $field_html_edit{therapeutic_action} = _build_glossary_popup_html(     $c, eval { $herb->therapeutic_action } // '', $entities_edit);
+    $field_html_edit{medical_uses}       = _build_glossary_popup_html(     $c, eval { $herb->medical_uses }       // '', $entities_edit);
 
     $c->stash(
         herb            => $herb,
@@ -315,6 +316,8 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
     $c->session->{record_id} = $id;
 
+    my $entities = _fetch_linkable_entities($c);
+
     my $constituents_html = _build_constituent_html(
         $c, $id, $herb->constituents // ''
     );
@@ -325,10 +328,10 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         $c, $herb->sister_plants // ''
     );
     my $therapeutic_action_html = _build_glossary_popup_html(
-        $c, $herb->therapeutic_action // ''
+        $c, $herb->therapeutic_action // '', $entities
     );
     my $medical_uses_html = _build_glossary_popup_html(
-        $c, $herb->medical_uses // ''
+        $c, $herb->medical_uses // '', $entities
     );
 
     my %field_html;
@@ -339,7 +342,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         vetrinary homiopathic non_med culinary history pollinator
         pollennotes nectarnotes
     )) {
-        $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '');
+        $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '', $entities);
     }
 
     $self->_stash_image_files($c);
@@ -476,8 +479,66 @@ sub _build_drug_popup_html {
     return $html;
 }
 
+sub _fetch_linkable_entities {
+    my ($c) = @_;
+    my @glossary = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
+            {},
+            { columns => ['record_id', 'term'], order_by => { -desc => \'LENGTH(term)' } }
+        )->all;
+    };
+    my @diseases = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Disease')->search(
+            {},
+            { columns => ['record_id', 'common_name', 'scientific_name'], order_by => { -desc => \'LENGTH(common_name)' } }
+        )->all;
+    };
+    my @symptoms = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Symptom')->search(
+            {},
+            { columns => ['record_id', 'name'], order_by => { -desc => \'LENGTH(name)' } }
+        )->all;
+    };
+    return { glossary => \@glossary, diseases => \@diseases, symptoms => \@symptoms };
+}
+
+sub _apply_entity_links {
+    my ($html, $entities) = @_;
+    for my $t (@{ $entities->{glossary} || [] }) {
+        my $gid  = $t->record_id;
+        my $term = $t->term;
+        next unless $term && length($term) > 2;
+        my $pat  = quotemeta($term);
+        my $tip  = $term;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$term</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    for my $d (@{ $entities->{diseases} || [] }) {
+        my $did  = $d->record_id;
+        my $name = $d->common_name;
+        next unless $name && length($name) > 2;
+        my $pat  = quotemeta($name);
+        my $tip  = $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Disease/$did" class="ency-disease-link" data-did="$did" title="Disease: $tip">$name</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    for my $s (@{ $entities->{symptoms} || [] }) {
+        my $sid  = $s->record_id;
+        my $name = $s->name;
+        next unless $name && length($name) > 2;
+        my $pat  = quotemeta($name);
+        my $tip  = $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Symptom/$sid" class="ency-symptom-link" data-sid="$sid" title="Symptom: $tip">$name</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    return $html;
+}
+
 sub _build_glossary_popup_html {
-    my ($c, $text) = @_;
+    my ($c, $text, $entities) = @_;
     return '' unless defined $text && length($text);
     my $html = $text;
     $html =~ s/\s*\[(?:ref\?)?\?\]//g;
@@ -485,18 +546,11 @@ sub _build_glossary_popup_html {
     $html =~ s/&/&amp;/g;
     $html =~ s/</&lt;/g;
     $html =~ s/>/&gt;/g;
-    my @terms = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
-            {},
-            { columns => ['record_id', 'term', 'alternate_terms'], order_by => { -desc => \'LENGTH(term)' } }
-        )->all;
-    };
-    for my $t (@terms) {
-        my $gid  = $t->record_id;
-        my $term = $t->term;
-        my $pat  = quotemeta($term);
-        my $link = qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $term">$term</a>};
-        $html =~ s/\b$pat\b/$link/gi;
+    if ($entities) {
+        $html = _apply_entity_links($html, $entities);
+    } else {
+        my $ents = _fetch_linkable_entities($c);
+        $html = _apply_entity_links($html, $ents);
     }
     return $html;
 }
@@ -1980,12 +2034,13 @@ sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
     my $related      = $c->model('ENCYModel')->get_constituent_related($c, $id);
     my $linked_herbs = $c->model('ENCYModel')->resolve_names_to_herbs($c, $constituent->found_in_herbs);
     my $linked_drugs = $c->model('ENCYModel')->resolve_names_to_drugs($c, $constituent->found_in_drugs);
+    my $const_ents              = _fetch_linkable_entities($c);
     my $herbs_html              = _build_herb_popup_html($c, $constituent->found_in_herbs // '', $linked_herbs);
     my $drugs_html              = _build_drug_popup_html($c, $constituent->found_in_drugs // '', $linked_drugs);
-    my $therapeutic_html        = _build_glossary_popup_html($c, $constituent->therapeutic_action // '');
-    my $chemical_class_html     = _build_glossary_popup_html($c, $constituent->chemical_class // '');
-    my $solubility_html         = _build_glossary_popup_html($c, $constituent->solubility // '');
-    my $pharmacological_html    = _build_glossary_popup_html($c, $constituent->pharmacological_effects // '');
+    my $therapeutic_html        = _build_glossary_popup_html($c, $constituent->therapeutic_action // '',   $const_ents);
+    my $chemical_class_html     = _build_glossary_popup_html($c, $constituent->chemical_class // '',       $const_ents);
+    my $solubility_html         = _build_glossary_popup_html($c, $constituent->solubility // '',           $const_ents);
+    my $pharmacological_html    = _build_glossary_popup_html($c, $constituent->pharmacological_effects // '', $const_ents);
     $c->stash(
         constituent             => $constituent,
         related_diseases        => $related->{diseases}  // [],
@@ -2208,10 +2263,11 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
 
     $self->_stash_image_files($c);
 
+    my $entities_const = _fetch_linkable_entities($c);
     my %field_html_const;
     for my $f (qw(chemical_class toxicity solubility pharmacological_effects therapeutic_action research_notes found_in_foods)) {
         my $val = eval { $constituent->$f } // '';
-        $field_html_const{$f} = _build_glossary_popup_html($c, $val) if length($val);
+        $field_html_const{$f} = _build_glossary_popup_html($c, $val, $entities_const) if length($val);
     }
     {
         my $lh = $c->model('ENCYModel')->resolve_names_to_herbs($c, eval { $constituent->found_in_herbs } // '');
