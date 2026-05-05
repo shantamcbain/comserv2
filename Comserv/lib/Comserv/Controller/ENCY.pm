@@ -225,8 +225,26 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     $self->_stash_image_files($c);
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
+
+    my %field_html_edit;
+    for my $f (qw(
+        common_names comments ident_character stem leaves flowers fruit
+        taste odour root distribution cultivation harvest solvents dosage
+        administration formulas contra_indications preparation chinese
+        vetrinary homiopathic non_med culinary history pollinator
+        pollennotes nectarnotes
+    )) {
+        my $val = eval { $herb->$f } // '';
+        $field_html_edit{$f} = _build_glossary_popup_html($c, $val) if length($val);
+    }
+    $field_html_edit{parts_used}         = _build_glossary_term_links_html($c, eval { $herb->parts_used }         // '');
+    $field_html_edit{sister_plants}      = _build_sister_plants_html(      $c, eval { $herb->sister_plants }      // '');
+    $field_html_edit{therapeutic_action} = _build_glossary_popup_html(     $c, eval { $herb->therapeutic_action } // '');
+    $field_html_edit{medical_uses}       = _build_glossary_popup_html(     $c, eval { $herb->medical_uses }       // '');
+
     $c->stash(
         herb            => $herb,
+        field_html      => \%field_html_edit,
         edit_mode       => 1,
         is_admin        => $is_admin,
         is_editor       => $is_editor,
@@ -2189,8 +2207,22 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     }
 
     $self->_stash_image_files($c);
+
+    my %field_html_const;
+    for my $f (qw(chemical_class toxicity solubility pharmacological_effects therapeutic_action research_notes found_in_foods)) {
+        my $val = eval { $constituent->$f } // '';
+        $field_html_const{$f} = _build_glossary_popup_html($c, $val) if length($val);
+    }
+    {
+        my $lh = $c->model('ENCYModel')->resolve_names_to_herbs($c, eval { $constituent->found_in_herbs } // '');
+        my $ld = $c->model('ENCYModel')->resolve_names_to_drugs($c, eval { $constituent->found_in_drugs } // '');
+        $field_html_const{found_in_herbs} = _build_herb_popup_html($c, eval { $constituent->found_in_herbs } // '', $lh);
+        $field_html_const{found_in_drugs} = _build_drug_popup_html($c, eval { $constituent->found_in_drugs } // '', $ld);
+    }
+
     $c->stash(
         constituent     => $constituent,
+        field_html      => \%field_html_const,
         edit_mode       => 1,
         ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only, no prose sentences. (2) PRACTITIONER PREFIXES in therapeutic_action: use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both the prefix groups and terms within groups are semicolon-separated. (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "vitamins (A, C, K), minerals (potassium, magnesium)" → "vitamin A; vitamin C; vitamin K; potassium; magnesium"',
         template        => 'ENCY/ConstituentDetail.tt',
