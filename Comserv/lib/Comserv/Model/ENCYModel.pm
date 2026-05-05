@@ -2239,5 +2239,57 @@ sub preprocess_field_markers {
     return (\%cleaned, scalar @todos);
 }
 
+sub add_organism {
+    my ($self, $c, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Adding organism: " . ($data->{common_name} || ''));
+    my $rec;
+    eval {
+        $rec = $self->ency_schema->resultset('Ency::Organism')->create($data);
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_organism', "Error adding organism: $error");
+    };
+    return $rec;
+}
+
+sub update_organism {
+    my ($self, $c, $id, $data) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_organism', "Updating organism ID: $id");
+    return (0, "Missing record ID.") unless $id;
+    return (0, "Invalid data.") unless ref($data) eq 'HASH';
+    my $record = $self->ency_schema->resultset('Ency::Organism')->find($id);
+    return (0, "Organism #$id not found.") unless $record;
+    eval {
+        $record->update($data);
+    } or do {
+        my $error = $@ || 'Unknown error';
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_organism', "Error: $error");
+        return (0, "Failed to update organism #$id: $error");
+    };
+    return (1, "Organism #$id updated successfully.");
+}
+
+sub get_organism_by_id {
+    my ($self, $c, $id) = @_;
+    return $self->ency_schema->resultset('Ency::Organism')->find($id);
+}
+
+sub list_organisms {
+    my ($self, $c, $opts) = @_;
+    $opts ||= {};
+    my $where = $opts->{where} || {};
+    my %attrs;
+    $attrs{order_by} = $opts->{order_by} || 'common_name';
+    $attrs{rows}     = $opts->{rows}     if $opts->{rows};
+    $attrs{page}     = $opts->{page}     if $opts->{page};
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Ency::Organism')->search($where, \%attrs)->all;
+    } or do {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_organisms', "Error: " . ($@ || 'Unknown'));
+    };
+    return \@results;
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
