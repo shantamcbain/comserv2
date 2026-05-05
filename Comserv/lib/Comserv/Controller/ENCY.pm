@@ -125,8 +125,8 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         return; # Do not redirect; just render the view with an error message
     }
 
-    # Retrieve the herb record (use DBForager directly, same as herb_detail)
-    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
+    # Retrieve the herb record from ENCY database
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
@@ -285,10 +285,10 @@ sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 
     # Fetch the herbal data
-    my $forager_data = $c->model('DBForager')->get_herbal_data();
+    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
 
     # Pass the data to the template
-    my $herbal_data = $forager_data;  # Add 'my' here
+    my $herbal_data = $forager_data;
     $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
@@ -301,7 +301,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Fetching herb details for ID: $id");
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $id);
 
     unless ($herb) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'herb_detail', "Herb not found for ID: $id");
@@ -376,7 +376,7 @@ sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
     unless (defined $id && $id =~ /^\d+$/) {
         $c->response->status(400); $c->response->body('Invalid ID'); return;
     }
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $id);
     unless ($herb) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
@@ -715,7 +715,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
             my $url   = '';
             eval {
                 if ($link->entity_type eq 'herb') {
-                    my $e = $c->model('ENCYModel')->forager_schema->resultset('Herb')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->find($link->entity_id);
                     $name = $e ? ($e->common_names || 'Herb #' . $link->entity_id) : '';
                     $url  = '/ENCY/herb_detail/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'disease') {
@@ -2532,7 +2532,7 @@ sub search :Path('/ENCY/search') :Args(0) {
 
     my $ency_model = $c->model('ENCYModel');
 
-    my $herbs        = $query ? $c->model('DBForager')->searchHerbs($c, $query) : [];
+    my $herbs        = $query ? $ency_model->search_herbs($c, $query) : [];
     my $animals      = $query ? $ency_model->search_animals($c, $query)      : [];
     my $insects      = $query ? $ency_model->search_insects($c, $query)      : [];
     my $diseases     = $query ? $ency_model->search_diseases($c, $query)     : [];
@@ -2593,11 +2593,11 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
 
     # Fetch bee forage plants data
-    my $bee_plants = $c->model('DBForager')->get_bee_forage_plants();
+    my $bee_plants = $c->model('ENCYModel')->get_bee_forage_plants($c);
 
     # If no specific bee forage plants method exists, use the general herbal data
     if (!$bee_plants || !@$bee_plants) {
-        $bee_plants = $c->model('DBForager')->get_herbal_data();
+        $bee_plants = $c->model('ENCYModel')->get_herbal_data($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
         push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
     }
@@ -2636,7 +2636,7 @@ sub legacy : Path('/ENCY/legacy') : Args(1) {
 sub herb_list : Path('/ENCY/Herb') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_list', 'Entered herb_list');
-    my $forager_data = $c->model('DBForager')->get_herbal_data();
+    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
     $c->stash(herbal_data => $forager_data, template => 'ENCY/BotanicalNameView.tt');
 }
 
@@ -3359,7 +3359,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
     eval {
         my $model = $c->model('ENCYModel');
         if ($type eq 'herb') {
-            my @rows = $model->forager_schema->resultset('Herb')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Herb')->search(
                 { -or => [
                     common_names   => { like => "%$query%" },
                     botanical_name => { like => "%$query%" },

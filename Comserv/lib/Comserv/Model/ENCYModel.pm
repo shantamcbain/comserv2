@@ -37,7 +37,7 @@ sub add_herb {
 
     my $new_record;
     eval {
-        $new_record = $self->forager_schema->resultset('Herb')->create($herb_data);
+        $new_record = $self->ency_schema->resultset('Ency::Herb')->create($herb_data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "Herb added successfully.");
     } or do {
         my $error = $@ || 'Unknown error';
@@ -60,7 +60,7 @@ sub update_herb {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_herb', "Form data being used for update: " . Dumper($form_data));
 
-    my $herb = $self->forager_schema->resultset('Herb')->find($id);
+    my $herb = $self->ency_schema->resultset('Ency::Herb')->find($id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_herb', "No herb found with ID: $id. Update aborted.");
         return (0, "Herb with ID $id not found.");
@@ -80,13 +80,57 @@ sub update_herb {
 
 sub get_herb_by_id {
     my ($self, $c, $id) = @_;
-    my $herb = $self->forager_schema->resultset('Herb')->find($id);
+    my $herb = $self->ency_schema->resultset('Ency::Herb')->find($id);
     if ($herb) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_herb_by_id', "Herb with ID $id fetched successfully.");
     } else {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_herb_by_id', "No herb found with ID: $id");
     }
     return $herb;
+}
+
+sub get_herbal_data {
+    my ($self, $c) = @_;
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Ency::Herb')->search(
+            { botanical_name => { '!=' => '' } },
+            { order_by => 'botanical_name' }
+        )->all;
+    };
+    return \@results;
+}
+
+sub search_herbs {
+    my ($self, $c, $query) = @_;
+    $query =~ s/^\s+|\s+$//g;
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Ency::Herb')->search(
+            { -or => [
+                botanical_name => { like => "%$query%" },
+                common_names   => { like => "%$query%" },
+                key_name       => { like => "%$query%" },
+            ]},
+            { order_by => 'botanical_name' }
+        )->all;
+    };
+    return \@results;
+}
+
+sub get_bee_forage_plants {
+    my ($self, $c) = @_;
+    my @results;
+    eval {
+        @results = $self->ency_schema->resultset('Ency::Herb')->search(
+            \[ "( apis IS NOT NULL AND apis <> '' AND apis <> '0' )
+                OR ( nectar IS NOT NULL AND nectar > 0 )
+                OR ( pollen IS NOT NULL AND pollen > 0 )" ],
+            { order_by => 'botanical_name',
+              columns  => [qw(record_id botanical_name common_names apis nectar pollen image)] }
+        )->all;
+    };
+    return \@results;
 }
 
 sub get_reference_by_id {
@@ -249,7 +293,7 @@ sub get_animal_related {
         my @animal_herbs = $self->ency_schema->resultset('Ency::AnimalHerb')->search({ animal_id => $id })->all;
         if (@animal_herbs) {
             my @herb_ids = map { $_->herb_id } @animal_herbs;
-            my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
+            my @herbs = $self->ency_schema->resultset('Ency::Herb')->search({ record_id => { -in => \@herb_ids } })->all;
             $related{herbs} = \@herbs;
         } else {
             $related{herbs} = [];
@@ -370,7 +414,7 @@ sub get_insect_related {
         my @insect_herbs = $self->ency_schema->resultset('Ency::InsectHerb')->search({ insect_id => $id })->all;
         if (@insect_herbs) {
             my @herb_ids = map { $_->herb_id } @insect_herbs;
-            my @herbs = $self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all;
+            my @herbs = $self->ency_schema->resultset('Ency::Herb')->search({ record_id => { -in => \@herb_ids } })->all;
             $related{herbs} = \@herbs;
         } else {
             $related{herbs} = [];
@@ -499,7 +543,7 @@ sub get_disease_related {
         my @disease_herbs = $self->ency_schema->resultset('Ency::DiseaseHerb')->search({ disease_id => $id })->all;
         if (@disease_herbs) {
             my @herb_ids = map { $_->herb_id } @disease_herbs;
-            $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
+            $related{herbs} = [$self->ency_schema->resultset('Ency::Herb')->search({ record_id => { -in => \@herb_ids } })->all];
         } else {
             $related{herbs} = [];
         }
@@ -642,7 +686,7 @@ sub get_symptom_related {
         my @herb_symptoms = $self->ency_schema->resultset('Ency::HerbSymptom')->search({ symptom_id => $id })->all;
         if (@herb_symptoms) {
             my @herb_ids = map { $_->herb_id } @herb_symptoms;
-            $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
+            $related{herbs} = [$self->ency_schema->resultset('Ency::Herb')->search({ record_id => { -in => \@herb_ids } })->all];
         } else {
             $related{herbs} = [];
         }
@@ -686,7 +730,7 @@ sub backlink_constituent_to_all_herbs {
     my $linked = 0;
     my $pat    = quotemeta($name);
     eval {
-        my @herbs = $self->forager_schema->resultset('Herb')->search(
+        my @herbs = $self->ency_schema->resultset('Ency::Herb')->search(
             { constituents => { like => "%$name%" } },
             { columns => ['record_id', 'constituents'] }
         )->all;
@@ -800,7 +844,7 @@ sub resolve_names_to_herbs {
         }
 
         my $herb = eval {
-            my $rs = $self->forager_schema->resultset('Herb');
+            my $rs = $self->ency_schema->resultset('Ency::Herb');
             $rs->search({ botanical_name => { like => "%$botanical%" } }, { rows => 1, order_by => 'record_id' })->first
             || ($common && $rs->search({ common_names => { like => "%$common%" } }, { rows => 1, order_by => 'record_id' })->first)
             || $rs->search({ -or => [ botanical_name => { like => "%$name%" }, common_names => { like => "%$name%" } ] }, { rows => 1, order_by => 'record_id' })->first;
@@ -848,7 +892,7 @@ sub auto_link_herb_constituent {
         $name =~ s/^\s+|\s+$//g;
         next unless length($name) > 2;
         eval {
-            my $herb = $self->forager_schema->resultset('Herb')->search(
+            my $herb = $self->ency_schema->resultset('Ency::Herb')->search(
                 { -or => [
                     botanical_name => { like => "%$name%" },
                     common_names   => { like => "%$name%" },
@@ -1220,7 +1264,7 @@ sub get_constituent_related {
         my @herb_constituents = $self->ency_schema->resultset('Ency::HerbConstituent')->search({ constituent_id => $id })->all;
         if (@herb_constituents) {
             my @herb_ids = map { $_->herb_id } @herb_constituents;
-            $related{herbs} = [$self->forager_schema->resultset('Herb')->search({ record_id => { -in => \@herb_ids } })->all];
+            $related{herbs} = [$self->ency_schema->resultset('Ency::Herb')->search({ record_id => { -in => \@herb_ids } })->all];
         } else {
             $related{herbs} = [];
         }
@@ -1764,7 +1808,7 @@ sub find_herb_by_name {
     return undef unless $name && length($name) > 2;
     my $herb;
     eval {
-        $herb = $self->forager_schema->resultset('Herb')->search(
+        $herb = $self->ency_schema->resultset('Ency::Herb')->search(
             { -or => [
                 botanical_name => { like => "%$name%" },
                 common_names   => { like => "%$name%" },
