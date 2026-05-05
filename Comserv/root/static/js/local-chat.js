@@ -3094,6 +3094,27 @@
 
         Object.keys(fields).forEach(function(fieldName) {
             const value = fields[fieldName];
+
+            // Multi-checkbox group: multiple checkboxes sharing this name
+            const allCheckboxes = Array.from(
+                targetDoc.querySelectorAll('input[type="checkbox"][name="' + fieldName + '"]')
+            );
+            if (allCheckboxes.length > 1) {
+                const strVal = Array.isArray(value)
+                    ? value.join('; ')
+                    : (value !== null && typeof value === 'object')
+                        ? Object.values(value).join('; ')
+                        : String(value || '');
+                const selected = strVal.split(/[;,]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                allCheckboxes.forEach(function(cb) {
+                    const cbVal = cb.value.toLowerCase();
+                    cb.checked = selected.some(function(s) { return cbVal === s || cbVal.indexOf(s) !== -1 || s.indexOf(cbVal) !== -1; });
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                filled.push(fieldName);
+                return;
+            }
+
             // Try by name first, then by id
             let el = targetDoc.querySelector('[name="' + fieldName + '"]')
                   || targetDoc.getElementById(fieldName);

@@ -1607,11 +1607,14 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_ht_raw = $p->{host_type};
+        my @_ht_vals = ref($_ht_raw) eq 'ARRAY' ? @$_ht_raw : (defined $_ht_raw ? ($_ht_raw) : ());
+        my $_host_type = join('; ', grep { length($_) } @_ht_vals);
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
             disease_type             => $p->{disease_type}             // '',
-            host_type                => $p->{host_type}                // '',
+            host_type                => $_host_type,
             causative_agent          => $p->{causative_agent}          // '',
             transmission             => $p->{transmission}             // '',
             symptoms_description     => $p->{symptoms_description}     // '',
@@ -1663,7 +1666,7 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
         resolve_field       => $resolve_field,
         resolve_type        => $resolve_type,
         resolve_remaining   => $resolve_remaining,
-        ency_ai_prompt      => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        ency_ai_prompt      => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
         template            => 'ENCY/DiseaseDetail.tt',
     );
 }
@@ -1716,11 +1719,14 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
             return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
             return $u;
         };
+        my $_ht_raw2 = $p->{host_type};
+        my @_ht_vals2 = ref($_ht_raw2) eq 'ARRAY' ? @$_ht_raw2 : (defined $_ht_raw2 ? ($_ht_raw2) : ());
+        my $_host_type2 = join('; ', grep { length($_) } @_ht_vals2);
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
             disease_type             => $p->{disease_type}             // '',
-            host_type                => $p->{host_type}                // '',
+            host_type                => $_host_type2,
             causative_agent          => $p->{causative_agent}          // '',
             transmission             => $p->{transmission}             // '',
             symptoms_description     => $p->{symptoms_description}     // '',
@@ -1765,7 +1771,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     $c->stash(
         disease         => $disease,
         edit_mode       => 1,
-        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
         template        => 'ENCY/DiseaseDetail.tt',
     );
 }

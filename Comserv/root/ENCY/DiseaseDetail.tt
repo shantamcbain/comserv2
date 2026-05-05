@@ -82,13 +82,15 @@
         <td><strong>Host Type</strong></td>
         <td>
             [% IF edit_mode %]
-            <select name="host_type">
-                <option value="">-- Select --</option>
-                <option value="human"[% IF disease.host_type == 'human' %] selected="selected"[% END %]>Human</option>
-                <option value="animal"[% IF disease.host_type == 'animal' %] selected="selected"[% END %]>Animal</option>
-                <option value="plant"[% IF disease.host_type == 'plant' %] selected="selected"[% END %]>Plant</option>
-                <option value="insect"[% IF disease.host_type == 'insect' %] selected="selected"[% END %]>Insect</option>
-            </select>
+            [% SET _ht = disease.host_type || prefill_host_type || '' %]
+            <input type="hidden" name="host_type" value="" />
+            [% FOREACH _opt IN ['human', 'animal', 'plant', 'insect', 'bird', 'fish', 'fungal host', 'bacterial host'] %]
+            <label style="margin-right:1em;white-space:nowrap;">
+                <input type="checkbox" name="host_type" value="[% _opt %]"
+                    [% IF _ht.search('(?i)' _ _opt) %] checked="checked"[% END %] />
+                [% _opt | ucfirst %]
+            </label>
+            [% END %]
             [% ELSE %]
             [% disease.host_type | html %]
             [% END %]
