@@ -1609,6 +1609,8 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
         my $p = $c->request->body_parameters;
         my $_ht_raw = $p->{host_type};
         my @_ht_vals = ref($_ht_raw) eq 'ARRAY' ? @$_ht_raw : (defined $_ht_raw ? ($_ht_raw) : ());
+        my $_ht_other = $p->{host_type_other} // '';
+        push @_ht_vals, $_ht_other if length($_ht_other);
         my $_host_type = join('; ', grep { length($_) } @_ht_vals);
         my $data = {
             common_name              => $p->{common_name}              // '',
@@ -1721,6 +1723,8 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         };
         my $_ht_raw2 = $p->{host_type};
         my @_ht_vals2 = ref($_ht_raw2) eq 'ARRAY' ? @$_ht_raw2 : (defined $_ht_raw2 ? ($_ht_raw2) : ());
+        my $_ht_other2 = $p->{host_type_other} // '';
+        push @_ht_vals2, $_ht_other2 if length($_ht_other2);
         my $_host_type2 = join('; ', grep { length($_) } @_ht_vals2);
         my $data = {
             common_name              => $p->{common_name}              // '',
