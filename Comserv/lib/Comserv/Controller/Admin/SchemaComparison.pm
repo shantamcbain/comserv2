@@ -1408,7 +1408,7 @@ Generate Result file Perl code content
 sub generate_result_file_content {
     my ($self, $table_name, $db_schema) = @_;
     
-    my $class_name = ucfirst($table_name);
+    my $class_name = _table_to_class_name($table_name);
     my $content = "package Comserv::Model::Schema::Ency::Result::$class_name;\n";
     $content .= "use base 'DBIx::Class::Core';\n\n";
     $content .= "__PACKAGE__->table('$table_name');\n";
