@@ -84,26 +84,17 @@
             [% IF edit_mode %]
             [% SET _ht = disease.host_type || prefill_host_type || '' %]
             <input type="hidden" name="host_type" value="" />
-            <div style="display:flex;flex-wrap:wrap;gap:0.4em 1.2em;padding:0.25em 0;">
-            [% FOREACH _hostopt IN [
-                {v => 'human',         l => 'Human'},
-                {v => 'animal',        l => 'Animal'},
-                {v => 'plant',         l => 'Plant'},
-                {v => 'insect',        l => 'Insect'},
-                {v => 'bird',          l => 'Bird'},
-                {v => 'fish',          l => 'Fish'},
-                {v => 'fungal host',   l => 'Fungal host'},
-                {v => 'bacterial host',l => 'Bacterial host'}
-            ] %]
-            <label style="white-space:nowrap;cursor:pointer;">
-                <input type="checkbox" name="host_type" value="[% _hostopt.v %]"
-                    [% IF _ht.search('(?i)\b' _ _hostopt.v.replace(' ','\s') _ '\b') %] checked="checked"[% END %] />
-                [% _hostopt.l %]
-            </label>
-            [% END %]
-            <label style="white-space:nowrap;">
-                Other: <input type="text" name="host_type_other" value="" size="15" placeholder="custom type" />
-            </label>
+            <div style="display:flex;flex-wrap:wrap;gap:0.5em 1.4em;padding:0.3em 0;">
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="human"         [% IF _ht.match('(?i)human')         %] checked="checked"[% END %] /> Human</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="animal"        [% IF _ht.match('(?i)animal')        %] checked="checked"[% END %] /> Animal</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="plant"         [% IF _ht.match('(?i)plant')         %] checked="checked"[% END %] /> Plant</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="insect"        [% IF _ht.match('(?i)insect')        %] checked="checked"[% END %] /> Insect</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="bird"          [% IF _ht.match('(?i)bird')          %] checked="checked"[% END %] /> Bird</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="fish"          [% IF _ht.match('(?i)fish')          %] checked="checked"[% END %] /> Fish</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="reptile"       [% IF _ht.match('(?i)reptile')       %] checked="checked"[% END %] /> Reptile</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="fungal host"   [% IF _ht.match('(?i)fungal')        %] checked="checked"[% END %] /> Fungal host</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="bacterial host"[% IF _ht.match('(?i)bacterial')     %] checked="checked"[% END %] /> Bacterial host</label>
+              <label style="white-space:nowrap;">Other: <input type="text" name="host_type_other" value="" size="15" placeholder="e.g. crustacean" /></label>
             </div>
             [% ELSE %]
             [% disease.host_type | html %]
