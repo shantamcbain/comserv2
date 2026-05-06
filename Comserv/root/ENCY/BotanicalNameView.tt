@@ -148,6 +148,14 @@
         panel.style.display = 'block';
         log.innerHTML = '';
         var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+        var seenIds = {};
+
+        function done(msg) {
+            bar.style.width = '100%';
+            status.textContent = msg;
+            btn.disabled = false;
+            btn.textContent = 'Re-run fix';
+        }
 
         function runBatch() {
             status.textContent = 'Fetching NCBI data… (' + totalDone + ' done)';
@@ -159,29 +167,36 @@
             .then(function(r){ return r.json(); })
             .then(function(d) {
                 if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
-                if (grandTotal === null) grandTotal = d.total || 0;
+                if (grandTotal === null) grandTotal = d.total || (d.remaining + d.processed) || 0;
                 if (d.last_id) lastId = d.last_id;
-                totalUpdated += d.updated;
-                totalErrors  += d.errors;
-                totalDone    += d.processed;
-                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
-                bar.style.width = Math.min(pct, 100) + '%';
+                totalUpdated += d.updated || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+
+                var newSeen = 0;
                 (d.details || []).forEach(function(r) {
+                    var oid = r.organism_id;
+                    if (!seenIds[oid]) { seenIds[oid] = true; newSeen++; }
                     var line = document.createElement('div');
                     line.style.color = r.status === 'updated' ? '#267326' : '#c00';
                     line.textContent = (r.status === 'updated' ? '✓ ' : '✗ ')
-                        + (r.scientific_name || 'organism #' + r.organism_id) + ': ' + r.message;
+                        + (r.scientific_name || 'organism #' + oid) + ': ' + r.message;
                     log.appendChild(line);
                     log.scrollTop = log.scrollHeight;
                 });
-                if (d.processed > 0 && d.remaining > 0) {
-                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Continuing…';
+
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+
+                if (d.processed === 0) {
+                    done('Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                } else if (newSeen === 0) {
+                    done('Complete (all organisms processed). ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                } else if (d.remaining > 0 || (!d.last_id && d.processed > 0)) {
+                    status.textContent = totalDone + ' processed — ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Continuing…';
                     setTimeout(runBatch, 500);
                 } else {
-                    bar.style.width = '100%';
-                    status.textContent = 'Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.';
-                    btn.disabled = false;
-                    btn.textContent = 'Re-run fix';
+                    done('Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
                 }
             })
             .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
