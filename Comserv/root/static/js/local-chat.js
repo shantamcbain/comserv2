@@ -33,15 +33,27 @@
         activeModel: null,
         isGuest: true,
         isAdmin: false,
+        isDevMode: false,           // true only on local development machine
         userModelOverride: false,   // true when user manually picks a model
         modelTiers: {
             small:  null,   // fastest/smallest Ollama model
             medium: null,   // mid-size Ollama model
             large:  null,   // largest Ollama model
             grok:   null    // Grok model (premium users)
-        }
+        },
+        supportMode: false,         // true when user is in live support chat mode
+        supportConvId: null,        // conversation_id for current support chat
+        supportLastMsgId: 0,        // last message id seen in support chat
+        supportPollTimer: null,     // setInterval handle for support chat polling
+        siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
+    // Per-tab nonce: generated fresh each time the script runs in a new JS context.
+    // sessionStorage is tab-isolated, but tab duplication copies it.  We detect
+    // duplication by writing this nonce into sessionStorage on first use; if the
+    // stored nonce differs from ours the tab was duplicated and should start fresh.
+    const _TAB_NONCE = Math.random().toString(36).slice(2);
+
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
     // when the widget was opened as a popup/detached window)
     function loadPersistedState() {
@@ -52,6 +64,19 @@
                 console.debug('Restored conversation ID from popup param:', state.currentConversationId);
                 return;
             }
+
+            // Detect duplicated tabs: if the stored nonce doesn't match ours, the
+            // sessionStorage was inherited from another tab → start fresh.
+            const storedNonce = sessionStorage.getItem('ai_tab_nonce');
+            if (storedNonce && storedNonce !== _TAB_NONCE) {
+                console.debug('[AI] Duplicated tab detected — starting fresh conversation');
+                sessionStorage.removeItem('currentConversationId');
+                sessionStorage.removeItem('chatMessages');
+                sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+                return;
+            }
+            sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+
             const savedConvId = sessionStorage.getItem('currentConversationId');
             if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
                 state.currentConversationId = parseInt(savedConvId);
@@ -188,6 +213,187 @@
             });
     }
     
+    // Populate the agent picker dropdown from agentsConfig, respecting local_only + isDevMode
+    function populateAgentPicker() {
+        var sel = document.getElementById('ai-agent-select');
+        if (!sel || !state.agentsConfig || !state.agentsConfig.agents) return;
+        var agents = state.agentsConfig.agents;
+        // Keep the Auto option, then add one per eligible agent
+        sel.innerHTML = '<option value="auto">⚡ Auto</option>';
+        Object.entries(agents).forEach(function([key, agent]) {
+            if (agent.local_only  && !state.isDevMode) return;
+            if (agent.admin_only  && !state.isAdmin)   return;
+            var opt = document.createElement('option');
+            opt.value = key;
+            opt.textContent = (agent.icon || '') + ' ' + (agent.display_name || key);
+            sel.appendChild(opt);
+        });
+        // Site-name → default agent map (when no saved preference)
+        var siteAgentMap = {
+            'BMaster':    'bmaster',
+            'ENCY':       'ency',
+            'CSC':        'csc',
+            'HelpDesk':   'helpdesk',
+        };
+
+        // Restore previously saved agent selection, or auto-select by site.
+        // URL-based match always wins over saved preference (so navigating to /ENCY
+        // always gets the ency agent even if the user last selected "coding").
+        var saved = localStorage.getItem('ai_widget_agent');
+        var urlAgent = selectAgentForPage();
+        if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
+            sel.value = urlAgent.id;
+            _applyAgentOverride(urlAgent.id);
+        } else if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+            sel.value = saved;
+            if (saved !== 'auto') _applyAgentOverride(saved);
+        } else if (state.siteName && siteAgentMap[state.siteName]) {
+            var siteAgent = siteAgentMap[state.siteName];
+            if (sel.querySelector('option[value="' + siteAgent + '"]')) {
+                sel.value = siteAgent;
+                _applyAgentOverride(siteAgent);
+            }
+        }
+        sel.addEventListener('change', function() {
+            var chosen = sel.value;
+            localStorage.setItem('ai_widget_agent', chosen);
+            if (chosen === 'auto') {
+                state.agentOverride = null;
+                state.pageContext = detectPageContext();
+                _updateAgentBanner('auto');
+            } else {
+                _applyAgentOverride(chosen);
+            }
+        });
+        sel.dataset.populated = '1';
+    }
+
+    function _applyAgentOverride(agentKey) {
+        if (!state.agentsConfig || !state.agentsConfig.agents) return;
+        var agent = state.agentsConfig.agents[agentKey];
+        if (!agent) return;
+        state.agentOverride = agentKey;
+        state.currentAgent = agent;
+        var ctx = detectPageContext() || {};
+        ctx.agent_id   = agent.id;
+        ctx.agent_name = agent.display_name;
+        if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
+        state.pageContext = ctx;
+        _updateAgentBanner(agentKey);
+        updatePageLabel();
+    }
+
+    function _updateAgentBanner(agentKey) {
+        var banner = document.getElementById('chat-agent-banner');
+        if (!banner) return;
+        if (agentKey === 'template_editor') {
+            banner.innerHTML = '✏️ <strong>Template Editor</strong> — Use the dedicated form to load, edit, and apply template changes: ' +
+                '<a href="/ai/template_editor" target="_blank" style="color:#1a73e8;font-weight:bold;">Open Template Editor →</a>';
+            banner.style.display = 'block';
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+    // ── _collectPageErrors ────────────────────────────────────────────────────
+    // Scans the current page DOM for visible error messages and returns a
+    // formatted string to prepend to coding-agent prompts.
+    function _collectPageErrors() {
+        var errors = [];
+        var seen = {};
+
+        var selectors = [
+            '.error-message', '.alert-danger', '.alert-error',
+            '#error-message', '.flash-error', '.catalyst-error',
+            '.exception-title', '.exception-message',
+            '[class*="error"]', '[id*="error"]'
+        ];
+
+        selectors.forEach(function(sel) {
+            try {
+                document.querySelectorAll(sel).forEach(function(el) {
+                    var txt = (el.innerText || '').trim();
+                    if (txt && txt.length > 5 && txt.length < 2000 && !seen[txt]) {
+                        seen[txt] = 1;
+                        errors.push(txt);
+                    }
+                });
+            } catch(e) {}
+        });
+
+        // Also check page title for Catalyst error pages
+        if (document.title && /error|exception|500|404/i.test(document.title)) {
+            var bodySnippet = (document.body && document.body.innerText || '').substring(0, 800).trim();
+            if (bodySnippet && !seen[bodySnippet.substring(0, 50)]) {
+                errors.push('Page title: ' + document.title + '\n' + bodySnippet);
+            }
+        }
+
+        if (!errors.length) return '';
+
+        return '[PAGE ERROR DETECTED]\n' + errors.slice(0, 3).join('\n---\n') + '\n[/PAGE ERROR]';
+    }
+
+    // ── _getTemplatePathForPage ────────────────────────────────────────────────
+    // Maps the current page URL to its TT2 template file path (relative to project root).
+    function _getTemplatePathForPage(pathname) {
+        var map = {
+            '/':              'root/CSC/CSC.tt',
+            '/CSC':           'root/CSC/CSC.tt',
+            '/hosting':       'root/CSC/proxy_manager.tt',
+            '/BMaster':       'root/BMaster/index.tt',
+            '/ENCY':          'root/ENCY/index.tt',
+            '/workshop':      'root/Workshops/index.tt',
+            '/HelpDesk':      'root/HelpDesk/index.tt',
+            '/membership':    'root/membership/index.tt',
+            '/marketplace':   'root/marketplace/index.tt',
+            '/shop':          'root/shop/index.tt',
+            '/Documentation': 'root/Documentation/index.tt',
+            '/ai':            'root/ai/index.tt',
+            '/admin':         'root/admin/index.tt',
+        };
+        var clean = pathname.replace(/\/$/, '') || '/';
+        if (map[clean]) return map[clean];
+        for (var key in map) {
+            if (clean.startsWith(key + '/')) return map[key];
+        }
+        var parts = clean.replace(/^\//, '').split('/');
+        if (parts.length >= 2) {
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/' + parts[1].toLowerCase() + '.tt';
+        } else if (parts[0]) {
+            // Convention: site homepages use {Ctrl}/{Ctrl}.tt (e.g. Shanta/Shanta.tt, CSC/CSC.tt)
+            // Fall back to {Ctrl}/index.tt when the controller-name variant is not in the static map
+            var ctrl = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
+            return 'root/' + ctrl + '/' + ctrl + '.tt';
+        }
+        return null;
+    }
+
+    // ── _handleReadFileRequest ─────────────────────────────────────────────────
+    // Called when the AI response contains [READ_FILE: path] tokens.
+    // Fetches the file content and sends it back as a follow-up context message.
+    function _handleReadFileRequest(path) {
+        var url = '/ai/read_file?path=' + encodeURIComponent(path) + '&limit=300';
+        fetch(url, { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var ctx = '[FILE: ' + data.path + ' (lines ' + (data.offset + 1)
+                            + '-' + (data.offset + data.lines) + ' of ' + data.total + ')]\n'
+                            + '```\n' + data.content + '\n```\n[/FILE]';
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) {
+                        msgInput.value = ctx + '\n\n(File loaded. Please continue your analysis.)';
+                    }
+                } else {
+                    var msgInput = document.getElementById('message-input');
+                    if (msgInput) msgInput.value = '[Could not read file: ' + data.error + ']';
+                }
+            })
+            .catch(function(e) { console.error('read_file error', e); });
+    }
+
     // Match page URL against agent patterns and select appropriate agent
     function selectAgentForPage() {
         const pathname = window.location.pathname;
@@ -198,10 +404,54 @@
         }
         
         const agents = state.agentsConfig.agents;
+
+        // On todo/project detail pages, pick the agent based on the todo subject text
+        // rather than the URL — the subject tells us which domain the work belongs to.
+        const isTodoDetail    = pathname.startsWith('/todo/details') || pathname.startsWith('/todo/view');
+        const isProjectDetail = pathname.startsWith('/project/details');
+        if (isTodoDetail || isProjectDetail) {
+            // Gather candidate text: page <h1>, <h2>, <title>, and the first .subject / .todo-subject element
+            const candidateEls = [
+                document.querySelector('h1'),
+                document.querySelector('h2'),
+                document.querySelector('.todo-subject'),
+                document.querySelector('.subject'),
+                document.querySelector('.todo-title'),
+                document.querySelector('[data-todo-subject]'),
+            ];
+            const candidateText = candidateEls
+                .filter(Boolean)
+                .map(function(el) { return el.textContent || el.getAttribute('data-todo-subject') || ''; })
+                .join(' ')
+                .toUpperCase();
+
+            if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                console.debug('Agent selected from todo content: ency');
+                return agents.ency;
+            }
+            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
+                console.debug('Agent selected from todo content: bmaster');
+                return agents.bmaster;
+            }
+            if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                console.debug('Agent selected from todo content: inventory');
+                return agents.inventory;
+            }
+            if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                console.debug('Agent selected from todo content: helpdesk');
+                return agents.helpdesk;
+            }
+            // Todo/project detail with no domain match → use planning agent
+            if (agents.planning) {
+                console.debug('Agent selected for todo/project detail: planning');
+                return agents.planning;
+            }
+        }
         
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
             if (!agent.url_patterns) continue;
+            if (agent.local_only && !state.isDevMode) continue;
             
             // Check if any URL pattern matches the current pathname (case-insensitive)
             const pathLower = pathname.toLowerCase();
@@ -338,7 +588,7 @@
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname,
+            page_path: pathname + (window.location.search || ''),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -442,7 +692,11 @@
         const providerSelector = document.createElement('div');
         providerSelector.className = 'provider-selector';
         providerSelector.innerHTML =
-            '<label for="ai-provider">AI Model:</label>' +
+            '<label for="ai-agent-select" style="font-size:0.82em;color:#555;">Agent:</label>' +
+            '<select id="ai-agent-select" title="Select AI agent / assistant" style="font-size:0.82em;max-width:110px;">' +
+              '<option value="auto">⚡ Auto</option>' +
+            '</select>' +
+            '<label for="ai-provider">Model:</label>' +
             '<select id="ai-provider"><option value="ollama">Ollama (Local)</option></select>' +
             '<span id="web-search-toggle" style="display:none;margin-left:6px;" title="Enable Grok web search (uses API credits)">' +
               '<label style="cursor:pointer;font-size:0.85em;user-select:none;">' +
@@ -450,6 +704,12 @@
               '</label>' +
             '</span>' +
             '<a href="/ai/manage_api_keys" target="_blank" class="manage-keys-link" title="Manage API keys">⚙️</a>';
+
+        // Agent-specific banner (shown when a special agent needs a dedicated page)
+        const agentBanner = document.createElement('div');
+        agentBanner.id = 'chat-agent-banner';
+        agentBanner.style.cssText = 'display:none;padding:6px 10px;background:#fffbe6;border-top:1px solid #f0c000;' +
+            'border-bottom:1px solid #f0c000;font-size:0.82em;color:#555;';
 
         // Status indicator
         const statusIndicator = document.createElement('div');
@@ -461,8 +721,16 @@
         const chatInput = document.createElement('div');
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
-            '<textarea id="message-input" placeholder="Type your message…"></textarea>' +
-            '<button id="send-message">Send</button>';
+            '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
+            '<div style="display:flex;gap:3px;align-items:stretch;">' +
+            '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
+            '<div style="display:flex;flex-direction:column;gap:3px;">' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
+            '<button id="send-message" style="flex:1;">Send</button>' +
+            '</div></div>';
 
         // Resize handle (bottom-right corner)
         const resizeHandle = document.createElement('div');
@@ -475,6 +743,7 @@
         chatPanel.appendChild(historyDrawer);
         chatPanel.appendChild(chatMessages);
         chatPanel.appendChild(providerSelector);
+        chatPanel.appendChild(agentBanner);
         chatPanel.appendChild(statusIndicator);
         chatPanel.appendChild(chatInput);
         chatPanel.appendChild(resizeHandle);
@@ -484,9 +753,10 @@
             .then(r => r.json())
             .then(function(data) {
                 if (data.success) {
-                    if (data.username)  state.username = data.username;
-                    if (data.is_admin)  state.isAdmin  = !!data.is_admin;
-                    if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+                    if (data.username)  state.username   = data.username;
+                    if (data.is_admin)  state.isAdmin    = !!data.is_admin;
+                    if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+                    if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
                 }
                 if (data.success && data.providers && data.providers.length > 0) {
                     const sel = document.getElementById('ai-provider');
@@ -503,11 +773,10 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3' },
-                                    { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                                    { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
+                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
+                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
+                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -517,7 +786,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-3-mini';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -579,6 +848,19 @@
                 _firePreload();
                 // Re-fire every 110 minutes to keep model warm (keep_alive is 2h)
                 state._preloadTimer = setInterval(_firePreload, 110 * 60 * 1000);
+
+                // Populate agent picker now that is_dev is known
+                if (state.agentsConfig) {
+                    populateAgentPicker();
+                } else {
+                    loadAgentsConfig().then(function() { populateAgentPicker(); });
+                }
+
+                // Show/hide image attach based on admin role
+                var attachBtn = document.getElementById('attach-image-btn');
+                if (attachBtn) {
+                    attachBtn.style.display = state.isAdmin ? '' : 'none';
+                }
             })
             .catch(function() {});
 
@@ -674,9 +956,9 @@
         (function initTextareaGrow() {
             const ta = document.getElementById('message-input');
             if (!ta) return;
+            const max = 200;
             ta.addEventListener('input', function() {
                 this.style.height = 'auto';
-                const max = 140;
                 this.style.height = Math.min(this.scrollHeight, max) + 'px';
                 this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
             });
@@ -697,15 +979,131 @@
             document.getElementById('widget-history-drawer').style.display = 'none';
         });
 
+        // ── Image attachment helpers ──────────────────────────────────────────
+        function _setPendingImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(ev) {
+                const dataUrl = ev.target.result;
+                const mime = file.type || 'image/jpeg';
+                const b64  = dataUrl.split(',')[1];
+                state.pendingImage = { data: b64, mime: mime, dataUrl: dataUrl };
+                const prev = document.getElementById('chat-img-preview');
+                if (prev) {
+                    prev.style.display = 'block';
+                    prev.innerHTML = '<img src="' + dataUrl + '" style="max-height:80px;max-width:120px;border-radius:4px;border:1px solid #ccc;vertical-align:middle;">' +
+                        ' <button type="button" title="Remove image" onclick="_clearPendingImage()" style="font-size:1em;border:none;background:none;cursor:pointer;color:#c00;">✕</button>' +
+                        ' <small style="color:#666;">' + (file.name || 'image') + '</small>';
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+        window._clearPendingImage = function() {
+            state.pendingImage = null;
+            const prev = document.getElementById('chat-img-preview');
+            if (prev) { prev.style.display = 'none'; prev.innerHTML = ''; }
+            const fi = document.getElementById('image-file-input');
+            if (fi) fi.value = '';
+        };
+        window._handleReadFileRequest = _handleReadFileRequest;
+
         // ── Other events ──────────────────────────────────────────────────────
-        chatButton.addEventListener('click', function() { openChat(); });
+        // Chat bubble click:
+        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
+        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
+        //   Falls back to the inline panel if the browser blocks popups.
+        chatButton.addEventListener('click', function() {
+            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+        });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        document.getElementById('detach-chat').addEventListener('click', function() { detachToPopup(); });
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden
+        document.getElementById('detach-chat').addEventListener('click', function() {
+            if (state._popupWindow && !state._popupWindow.closed) {
+                state._popupWindow.focus();
+            } else {
+                detachToPopup();
+            }
+        });
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
         });
+        document.getElementById('message-input').addEventListener('paste', function(e) {
+            if (!state.isAdmin) return;
+            const items = (e.clipboardData || window.clipboardData).items;
+            for (var i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') !== -1) {
+                    e.preventDefault();
+                    _setPendingImage(items[i].getAsFile());
+                    break;
+                }
+            }
+        });
+        document.getElementById('image-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _setPendingImage(e.target.files[0]);
+            }
+        });
+
+        document.getElementById('audio-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _transcribeAudioFile(e.target.files[0]);
+                e.target.value = '';
+            }
+        });
+
+        (function _initMicRecorder() {
+            var micBtn = document.getElementById('mic-record-btn');
+            if (!micBtn) return;
+            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
+            micBtn.style.display = '';
+
+            var _mediaRec = null;
+            var _chunks   = [];
+            var _stream   = null;
+
+            micBtn.addEventListener('click', function() {
+                if (_mediaRec && _mediaRec.state === 'recording') {
+                    _mediaRec.stop();
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    _stream  = stream;
+                    _chunks  = [];
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _mediaRec = new MediaRecorder(stream, { mimeType: mimeType });
+
+                    _mediaRec.ondataavailable = function(ev) {
+                        if (ev.data && ev.data.size > 0) _chunks.push(ev.data);
+                    };
+
+                    _mediaRec.onstop = function() {
+                        stream.getTracks().forEach(function(t) { t.stop(); });
+                        var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
+                        var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                        var file = new File([blob], 'recording.' + ext, { type: blob.type });
+                        _transcribeAudioFile(file);
+                        micBtn.textContent = '⏺';
+                        micBtn.title = 'Record voice inspection';
+                        micBtn.style.background = '';
+                    };
+
+                    _mediaRec.start(1000);
+                    micBtn.textContent = '⏹';
+                    micBtn.title = 'Stop recording';
+                    micBtn.style.background = '#ffd0d0';
+
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '🔴 Recording… click ⏹ to stop'; _statusEl.style.display = ''; }
+                }).catch(function(err) {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
+                });
+            });
+        })();
+
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
             const parts = selectedVal.split('|');
@@ -925,9 +1323,10 @@
         .then(data => {
             if (!data.success) return;
 
-            if (data.username)              state.username = data.username;
-            if (data.is_admin !== undefined) state.isAdmin = !!data.is_admin;
-            if (data.is_guest !== undefined) state.isGuest = !!data.is_guest;
+            if (data.username)              state.username   = data.username;
+            if (data.is_admin !== undefined) state.isAdmin   = !!data.is_admin;
+            if (data.is_guest !== undefined) state.isGuest   = !!data.is_guest;
+            if (data.is_dev   !== undefined) state.isDevMode = !!data.is_dev;
 
             // Hide provider selector and history button for guests / non-admins
             if (data.is_guest || !data.can_access_history) {
@@ -1013,8 +1412,6 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (fast)' },
-                            { val: 'grok|grok-3',                    label: 'Grok 3' },
                             { val: 'grok|grok-4-0709',               label: 'Grok 4' },
                             { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
                             { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
@@ -1066,28 +1463,50 @@
         });
     }
     
-    // Open chat in a separate browser window — user can drag it to another monitor.
-    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
-    // footer) so the popup always stays clean regardless of link clicks or refreshes.
+    // Open chat in a separate browser popup window — the user can drag it anywhere on
+    // the screen or to a second monitor.  Uses /ai/widget (no site nav/header/footer).
+    // Falls back to the inline panel if the browser blocks popups.
     function detachToPopup() {
+        // If a popup is already open, bring it to front and return
+        if (state._popupWindow && !state._popupWindow.closed) {
+            state._popupWindow.focus();
+            return;
+        }
+
         const convId = state.currentConversationId;
         const params = [];
         if (convId) params.push('resume=' + encodeURIComponent(convId));
         params.push('from_path='  + encodeURIComponent(window.location.pathname));
         params.push('from_title=' + encodeURIComponent(document.title || ''));
         const url = '/ai/widget' + (params.length ? '?' + params.join('&') : '');
+
+        // Position popup at bottom-right of the current screen, near where the widget sits
+        const popW = 430, popH = 700;
+        const screenRight  = window.screenX + window.outerWidth;
+        const screenBottom = window.screenY + window.outerHeight;
+        const popLeft = Math.max(window.screenX, screenRight  - popW - 24);
+        const popTop  = Math.max(window.screenY, screenBottom - popH - 60);
+
         const popup = window.open(url, 'ai-chat-popup',
-            'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+            'width=' + popW + ',height=' + popH + ',left=' + popLeft + ',top=' + popTop +
+            ',resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+
         if (popup) {
-            closeChat();
-            // Hide the entire widget on the parent page while chat is in the popup
-            const widgetEl = document.querySelector('.local-chat-widget');
-            if (widgetEl) widgetEl.style.display = 'none';
+            state._popupWindow = popup;
+            // Mark the chat button as "popup active" so the user knows where the chat is
+            const chatButton = document.getElementById('chat-button');
+            if (chatButton) {
+                chatButton.classList.add('popup-active');
+                chatButton.title = 'AI chat is open in a separate window — click to bring to front';
+            }
             const _pollPopup = setInterval(function() {
                 if (popup.closed) {
                     clearInterval(_pollPopup);
-                    // Restore the widget on the parent page
-                    if (widgetEl) widgetEl.style.display = '';
+                    state._popupWindow = null;
+                    if (chatButton) {
+                        chatButton.classList.remove('popup-active');
+                        chatButton.title = 'Open AI assistant';
+                    }
                     // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
@@ -1101,25 +1520,139 @@
                 }
             }, 1000);
         } else {
+            // Popup blocked — fall back to inline panel
             const _siD = document.getElementById('chat-status');
-            if (_siD) _siD.textContent = 'Please allow popups for this site to open chat in a separate window';
+            if (_siD) _siD.textContent = 'Popups blocked — enable popups for this site to allow the moveable chat window.';
+            openChat();
         }
     }
 
-    // Update the page label in the widget header to show what page is being assisted
+    // Update the page label in the widget header to show what page is being assisted.
+    // Shows: [Site] · Page Title · agent badge  — all in one readable line.
     function updatePageLabel() {
         const labelEl = document.getElementById('chat-page-label');
         if (!labelEl) return;
+
         const ctx = state.pageContext;
         let pagePath = (ctx && ctx.page_path) || window.location.pathname;
-        // In popup mode use the originating page path
         if (window.AI_WIDGET_POPUP) {
             pagePath = window.AI_DETACHED_FROM_PATH || pagePath;
         }
-        // Show only last two segments for brevity: /Foo/Bar → Foo/Bar
-        const label = pagePath.replace(/^\//, '').replace(/\/$/, '') || '/';
-        labelEl.textContent = label;
-        labelEl.title = 'Assisting page: ' + pagePath;
+
+        // Human-readable page title: prefer document.title, fall back to last path segment
+        let pageTitle = '';
+        try {
+            pageTitle = (window.AI_WIDGET_POPUP ? (window.AI_DETACHED_FROM_TITLE || '') : document.title) || '';
+            pageTitle = pageTitle.replace(/\s*[|\-–—]\s*.*$/, '').trim(); // strip site suffix
+        } catch(e) {}
+        if (!pageTitle) {
+            pageTitle = pagePath.split('/').filter(Boolean).pop() || '/';
+        }
+        // Truncate long titles
+        if (pageTitle.length > 32) pageTitle = pageTitle.slice(0, 30) + '…';
+
+        // Site name badge
+        const site = state.siteName || '';
+
+        // Active agent label
+        const agentLabel = (state.currentAgent && (state.currentAgent.display_name || state.currentAgent.id)) || '';
+
+        // Build label HTML
+        let html = '';
+        if (site) html += '<span class="chat-ctx-badge chat-ctx-site" title="Site">' + _escH(site) + '</span> ';
+        html += '<span class="chat-ctx-page" title="' + _escH('Page: ' + pagePath) + '">' + _escH(pageTitle) + '</span>';
+        if (agentLabel) html += ' <span class="chat-ctx-badge chat-ctx-agent" title="Agent">' + _escH(agentLabel) + '</span>';
+
+        labelEl.innerHTML = html;
+    }
+
+    function _escH(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    // ── Form Fill Button ─────────────────────────────────────────────────────
+    // When the page has fillable form fields, adds a "🪄 Fill Form" button
+    // next to the Send button. User types description in the normal message
+    // input, then clicks Fill Form — AI fills the form fields directly.
+    function injectFormFillStrip() {
+        if (document.getElementById('lc-ff-btn')) return;
+        if (typeof window._getPageFormFields !== 'function') return;
+        const fields = window._getPageFormFields();
+        if (!fields || fields.length === 0) return;
+
+        const sendBtn = document.getElementById('send-message');
+        if (!sendBtn) return;
+
+        // Build field description for the AI system prompt
+        const fieldDesc = fields.map(function(f) {
+            if (f.type === 'radio' && f.options) return f.name + ' (one of: ' + f.options.join(', ') + ')';
+            if (f.tagName === 'select') return f.name + ' (' + (f.label || 'select') + ')';
+            return f.name + (f.label && f.label !== f.name ? ' (' + f.label + ')' : '');
+        }).join(', ');
+
+        const ffBtn = document.createElement('button');
+        ffBtn.id = 'lc-ff-btn';
+        ffBtn.textContent = '🪄 Fill Form';
+        ffBtn.title = 'Describe what to fill in the message box, then click here to fill the form with AI';
+        ffBtn.style.cssText = 'padding:4px 8px;background:#f0c000;color:#333;border:none;border-radius:4px;' +
+            'cursor:pointer;font-size:.8em;font-weight:bold;white-space:nowrap;flex-shrink:0;';
+
+        // Insert after Send button
+        sendBtn.parentNode.insertBefore(ffBtn, sendBtn.nextSibling);
+
+        ffBtn.addEventListener('click', function() {
+            const msgInput = document.getElementById('message-input');
+            const desc = (msgInput ? msgInput.value : '').trim();
+            if (!desc) {
+                alert('Type a description of what to fill in the message box first, then click Fill Form.');
+                if (msgInput) msgInput.focus();
+                return;
+            }
+            ffBtn.disabled = true; ffBtn.textContent = '⏳';
+
+            // Detect if form has contact/company fields — if so, enable web search
+            // so the AI can look up real-world information (address, phone, email, etc.)
+            var contactFieldRE = /phone|email|address|contact|url|website|city|postal|zip/i;
+            var hasContactFields = fields.some(function(f) {
+                return contactFieldRE.test(f.name) || contactFieldRE.test(f.label || '');
+            });
+            var useSearch = hasContactFields ? 1 : 0;
+
+            const SYSTEM = 'You fill in a web form. The page is "' + document.title + '". ' +
+                (useSearch ? 'If web search results are provided above, use them to find accurate real-world information (address, phone, email, etc.) for the entity described. ' : '') +
+                'Return ONLY a raw JSON object. Keys must exactly match the HTML field name attributes: ' + fieldDesc + '. ' +
+                'Values must be plain strings or numbers. No markdown, no code fences, no explanation — only the JSON object.';
+
+            const selProvider = document.getElementById('ai-provider');
+            const provider = (selProvider && selProvider.value) || 'ollama';
+
+            fetch('/ai/generate', {
+                method: 'POST', credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true, use_search: useSearch })
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form';
+                if (!data.success) { alert('AI error: ' + (data.error || 'unknown')); return; }
+                const raw = (data.response || '').trim();
+                const js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { alert('AI returned no JSON. Try rephrasing your description.'); return; }
+                let parsed;
+                try { parsed = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { alert('JSON parse error: ' + e.message + '\n\nAI said:\n' + raw.substring(0, 300)); return; }
+                let filled = 0;
+                Object.keys(parsed).forEach(function(k) {
+                    if (window._applyFieldValue && window._applyFieldValue(k, parsed[k])) filled++;
+                });
+                // Show brief success in status bar
+                const si = document.getElementById('chat-status');
+                if (si) { si.textContent = '✅ Filled ' + filled + ' form field(s) — review and save.'; }
+                // Clear message input
+                if (msgInput) msgInput.value = '';
+            })
+            .catch(function(e) { ffBtn.disabled = false; ffBtn.textContent = '🪄 Fill Form'; alert('Request failed: ' + e); });
+        });
     }
 
     // Open chat panel
@@ -1166,6 +1699,8 @@
         const messageInput = document.getElementById('message-input');
         messageInput.focus();
 
+        // Inject form-fill strip if the page has fillable form fields
+        injectFormFillStrip();
     }
     
     // Reset conversation - clear session and UI
@@ -1214,7 +1749,7 @@
     }
     
     // Function to query AI and get response
-    function queryAI(prompt) {
+    function queryAI(prompt, imageData) {
         const _siQ = document.getElementById('chat-status');
         const statusIndicator = _siQ || { textContent: '', className: '' };
         statusIndicator.textContent = 'AI is thinking...';
@@ -1253,20 +1788,52 @@
                 });
 
             docPromise.then(function() {
-                sendAIRequest(prompt, statusIndicator, loadingMessage);
+                var effectivePrompt = prompt;
+
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var pageErrors = _collectPageErrors();
+                    if (pageErrors && !prompt.toLowerCase().includes('[page error')) {
+                        effectivePrompt = pageErrors + '\n\n' + prompt;
+                    }
+                }
+
+                if (state.pageContext && state.pageContext.agent_id === 'template_editor'
+                        && !prompt.includes('[FILE:')) {
+                    var tplPath = _getTemplatePathForPage(window.location.pathname);
+                    if (tplPath) {
+                        fetch('/ai/read_file?path=' + encodeURIComponent(tplPath) + '&limit=500',
+                              { credentials: 'include' })
+                            .then(function(r) { return r.json(); })
+                            .then(function(data) {
+                                if (data.success) {
+                                    var fileBlock = '[FILE: ' + data.path + ']\n```\n'
+                                                  + data.content + '\n```\n[/FILE]\n\n';
+                                    sendAIRequest(fileBlock + effectivePrompt,
+                                                  statusIndicator, loadingMessage, imageData);
+                                } else {
+                                    sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                                }
+                            })
+                            .catch(function() {
+                                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
+                            });
+                        return;
+                    }
+                }
+
+                sendAIRequest(effectivePrompt, statusIndicator, loadingMessage, imageData);
             });
         }).catch(function(error) {
             console.error('Failed to load agents config:', error);
-            // Fallback: still send request with default context
             if (!state.pageContext) {
                 state.pageContext = detectPageContext();
             }
-            sendAIRequest(prompt, statusIndicator, loadingMessage);
+            sendAIRequest(prompt, statusIndicator, loadingMessage, imageData);
         });
     }
     
     // Helper function to send AI request after context is ready
-    function sendAIRequest(prompt, statusIndicator, loadingMessage) {
+    function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -1283,7 +1850,7 @@
             }
         }
 
-        // Parse provider|model format (e.g. "grok|grok-3-mini" or "ollama|llama3.1:latest")
+        // Parse provider|model format (e.g. "grok|grok-mini" or "ollama|llama3.1:latest")
         const providerParts = effectiveProvider.split('|');
         const providerName = providerParts[0];
         // Only pass a model name for Grok (client-chosen) or explicit user overrides.
@@ -1299,6 +1866,121 @@
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
+
+        // When accounting agent is active AND the prompt looks like a pasted bill,
+        // inject the navigate_and_fill instruction so Grok emits the ACTION block.
+        const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
+            && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
+        const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
+        if (state.pageContext.agent_id === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
+            state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        }
+
+        // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
+        // Parses bill text from chat history and fires navigate_and_fill directly.
+        if (state.pageContext.agent_id === 'accounting') {
+            const _pu2 = prompt.toUpperCase();
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            if (_enterIntent) {
+                const _chatMsgs = document.getElementById('chat-messages');
+                let _billText = prompt;
+                if (_chatMsgs) {
+                    _chatMsgs.querySelectorAll('.message').forEach(function(el) {
+                        _billText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _nfFields = {};
+                const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
+                if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (_dateM) {
+                    _nfFields.invoice_date = _dateM[0].includes('-')
+                        ? _dateM[0]
+                        : (_dateM[3] + '-' + _dateM[1] + '-' + _dateM[2]);
+                }
+                const _invNumM = _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
+                    || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
+                if (_invNumM) _nfFields.invoice_number = _invNumM[1];
+                if (/Auto\s*Pay/i.test(_billText)) {
+                    const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
+                    _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
+                }
+                const _supplierM = _billText.match(/Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio/i);
+                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                _nfFields.description_0 = 'Service charge';
+                _nfFields.quantity_0 = '1';
+                _nfFields.notes = _supplierName + ' invoice'
+                    + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                    + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
+                if (_nfFields.unit_cost_0) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening invoice form\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    const _wAcc = document.createElement('div');
+                    _wAcc.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lblAcc = document.createElement('div');
+                    _lblAcc.className = 'msg-label';
+                    _lblAcc.textContent = 'Accounting Agent';
+                    const _elAcc = document.createElement('div');
+                    _elAcc.className = 'message ai-message';
+                    _elAcc.innerHTML = 'Opening invoice form pre-filled with the detected bill details.';
+                    _wAcc.appendChild(_lblAcc);
+                    _wAcc.appendChild(_elAcc);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY fast path: navigate to constituent#N page or add form directly.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
@@ -1311,6 +1993,12 @@
             agent_name: state.pageContext.agent_name,
             page_content: extractPageContent()
         };
+
+        // Include image data if present (for Grok vision models)
+        if (imageData && imageData.data) {
+            requestPayload.image_data = imageData.data;
+            requestPayload.image_mime = imageData.mime || 'image/jpeg';
+        }
         
         // Include selected model for Grok
         if (modelName) {
@@ -1585,7 +2273,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-3-mini';
+                                          : 'grok|grok-4-0709';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
@@ -1662,11 +2350,25 @@
                     chatMessages.scrollTop = chatMessages.scrollHeight;
                 }
 
-                // Add AI response — strip any embedded [ACTION: ...] blocks before display
-                const { cleanText, actions } = extractActions(data.response || '');
+                // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
+                const { cleanText: _rawClean, actions } = extractActions(data.response || '');
+                const _needsSupport = _detectSupportNeeded(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean);
                 addMessage(cleanText, 'ai-message');
 
+                if (_needsSupport && !state.supportMode) {
+                    _showEscalationButtons();
+                }
+
                 persistMessages();
+
+                // Coding agent: intercept [READ_FILE: path] requests automatically
+                if (state.pageContext && state.pageContext.agent_id === 'coding') {
+                    var rfMatch = cleanText.match(/\[READ_FILE:\s*([^\]]+)\]/i);
+                    if (rfMatch) {
+                        _handleReadFileRequest(rfMatch[1].trim());
+                    }
+                }
 
                 // Execute any in-app actions the AI embedded
                 if (actions.length > 0) {
@@ -1852,9 +2554,9 @@
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
         const s = id.toLowerCase();
-        // Exclude embedding/reranker/vision-only/cloud-routed models
+        // Exclude embedding/reranker/vision-only models
         if (/embed|rerank|bge|nomic|clip|whisper|tts|vision(?!.*instruct)/.test(s)) return false;
-        if (/:cloud$/.test(s)) return false;  // Ollama cloud-routed models need external API keys
+        // :cloud models (Ollama-routed cloud) are chat-capable — include them
         return true;
     }
 
@@ -1866,6 +2568,7 @@
         if (/7b|8b|mistral(?!.*\d{2})/.test(s))               return 3;
         if (/13b|14b|llama3\.1(?!.*\d{2})/.test(s))           return 4;
         if (/30b|34b|70b|405b|mixtral/.test(s))               return 5;
+        if (/kimi-k2|kimi/.test(s))                            return 6;
         return 3;
     }
 
@@ -1928,7 +2631,7 @@
         { label: 'todo list',                  url: '/todo' },
         { label: 'todos',                      url: '/todo' },
         { label: 'projects',                   url: '/project' },
-        { label: 'daily plan',                 url: '/Documentation/DailyPlan' },
+        { label: 'daily plan',                 url: '/planning/daily' },
         { label: 'documentation',              url: '/Documentation' },
         { label: 'encyclopedia',               url: '/ENCY' },
         { label: 'ency',                       url: '/ENCY' },
@@ -1948,6 +2651,11 @@
         { label: 'docker containers',          url: '/admin/docker-containers' },
         { label: 'docker',                     url: '/admin/docker-containers' },
         { label: 'security scan',              url: '/admin/security-scan' },
+        { label: 'link crawler',               url: '/admin/security-scan' },
+        { label: 'crawler',                    url: '/admin/security-scan' },
+        { label: 'link checker',               url: '/admin/security-scan' },
+        { label: 'check links',                url: '/admin/security-scan' },
+        { label: 'broken links',               url: '/admin/security-scan' },
         { label: 'git pull',                   url: '/admin/git_pull' },
         { label: 'planning admin',             url: '/admin/planning' },
         { label: 'workshops',                  url: '/workshop' },
@@ -1986,10 +2694,40 @@
         return map;
     }
 
+    // Levenshtein edit distance for typo tolerance
+    function _editDist(a, b) {
+        if (a === b) return 0;
+        if (!a.length) return b.length;
+        if (!b.length) return a.length;
+        var prev = Array.from({ length: b.length + 1 }, function(_, i) { return i; });
+        for (var i = 0; i < a.length; i++) {
+            var curr = [i + 1];
+            for (var j = 0; j < b.length; j++) {
+                curr.push(Math.min(
+                    curr[j] + 1,
+                    prev[j + 1] + 1,
+                    prev[j] + (a[i] === b[j] ? 0 : 1)
+                ));
+            }
+            prev = curr;
+        }
+        return prev[b.length];
+    }
+
+    // Returns true if word `w` fuzzy-matches any word in `labelWords`
+    // Threshold: 1 edit for words 4-5 chars, 2 edits for 6+ chars
+    function _fuzzyWordMatch(w, labelWords) {
+        if (w.length < 3) return false;
+        var maxDist = w.length >= 6 ? 2 : 1;
+        return labelWords.some(function(lw) {
+            return lw.length >= 3 && _editDist(w, lw) <= maxDist;
+        });
+    }
+
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -2006,7 +2744,14 @@
             return words.every(function(w) { return item.label.includes(w); })
                 || item.label.split(/\s+/).some(function(w) { return words.includes(w) && w.length > 3; });
         });
-        return partial.length ? partial : null;
+        if (partial.length) return partial;
+        // Typo-tolerant fallback: fuzzy match each query word against label words
+        const fuzzy = map.filter(function(item) {
+            const labelWords = item.label.split(/\s+/);
+            return words.filter(function(w) { return w.length >= 3; })
+                .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
+        });
+        return fuzzy.length ? fuzzy : null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
@@ -2032,11 +2777,181 @@
         return true;
     }
 
+    // ── Support Chat ──────────────────────────────────────────────────────────
+
+    function _showEscalationButtons(afterEl) {
+        var strip = document.createElement('div');
+        strip.className = 'support-escalation-strip';
+        strip.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;padding:6px 10px 4px;border-top:1px solid #e0e0e0;margin-top:4px;';
+        strip.innerHTML =
+            '<span style="font-size:.82em;color:#666;align-self:center;">Need more help?</span>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.ticket();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#eee;border:1px solid #ccc;border-radius:4px;cursor:pointer;">📋 Create Ticket</button>'
+          + '<button class="chat-action-btn" onclick="(function(){'
+          + '  var _s=window.__aiChatSupportFns;if(_s)_s.startChat();'
+          + '})();" style="font-size:.8em;padding:4px 10px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;">💬 Chat with Support</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(strip); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _detectSupportNeeded(text) {
+        if (/\[SUPPORT_NEEDED\]/i.test(text)) return true;
+        var phrases = [
+            /i\s+(don'?t|do not|cannot|can'?t)\s+(have|access|provide|help|answer|assist)/i,
+            /outside\s+(my|the AI'?s?)\s+(capabilities|knowledge|scope|ability)/i,
+            /please\s+contact\s+support/i,
+            /you\s+('?ll?\s+)?need\s+to\s+contact/i,
+            /i\s+am\s+unable\s+to\s+assist/i,
+        ];
+        return phrases.some(function(re) { return re.test(text); });
+    }
+
+    function _stripSupportTag(text) {
+        return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
+    }
+
+    function _enterSupportMode(convId, lastMsgId) {
+        state.supportMode   = true;
+        state.supportConvId = convId;
+        state.supportLastMsgId = lastMsgId || 0;
+        var header = document.getElementById('chat-header');
+        if (header) {
+            header.style.background = '#1a6bb5';
+            header.textContent = '💬 Support Chat (live)';
+        }
+        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message to support…';
+        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        _startSupportPolling();
+    }
+
+    function _exitSupportMode() {
+        if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        state.supportMode   = false;
+        state.supportConvId = null;
+        state.supportLastMsgId = 0;
+        var header = document.getElementById('chat-header');
+        if (header) { header.style.background = ''; header.textContent = state.currentAgent ? (state.currentAgent.display_name || 'AI Assistant') : 'AI Assistant'; }
+        var placeholder = document.getElementById('message-input');
+        if (placeholder) placeholder.placeholder = 'Type a message…';
+    }
+
+    function _addSupportSystemMsg(text) {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
+        el.textContent = text;
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
+    function _startSupportPolling() {
+        if (state.supportPollTimer) clearInterval(state.supportPollTimer);
+        state.supportPollTimer = setInterval(function() {
+            if (!state.supportMode || !state.supportConvId) { clearInterval(state.supportPollTimer); return; }
+            fetch('/chat/get_messages?conversation_id=' + state.supportConvId + '&last_id=' + state.supportLastMsgId, {
+                credentials: 'include'
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (!d.success || !d.messages) return;
+                d.messages.forEach(function(msg) {
+                    if (msg.id > state.supportLastMsgId) {
+                        state.supportLastMsgId = msg.id;
+                        if (msg.role === 'assistant') {
+                            addMessage(msg.content, 'ai-message');
+                        }
+                    }
+                });
+            })
+            .catch(function() {});
+        }, 5000);
+    }
+
+    function _initSupportChat(contextMsg) {
+        _addSupportSystemMsg('⏳ Connecting to support…');
+        var body = new URLSearchParams({
+            message: contextMsg || 'User requested live support',
+            agent_type: 'support',
+            title: 'Support Chat - ' + (document.title || window.location.pathname)
+        });
+        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success && d.conversation_id) {
+                state.supportLastMsgId = d.message_id || 0;
+                _enterSupportMode(d.conversation_id, d.message_id);
+            } else {
+                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+            }
+        })
+        .catch(function() {
+            _addSupportSystemMsg('❌ Network error. Please try again.');
+        });
+    }
+
+    function _createTicketFromSupport() {
+        var lastAiMsg = '';
+        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
+        var body = new URLSearchParams({
+            action: 'create_helpdesk_ticket',
+            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
+            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
+            category: 'General',
+            priority: 'normal'
+        });
+        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) {
+                var url = d.ticket_url || '/HelpDesk';
+                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
+            } else {
+                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
+            }
+        })
+        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+    }
+
+    window.__aiChatSupportFns = {
+        ticket:    _createTicketFromSupport,
+        startChat: function() {
+            var lastUserMsg = '';
+            document.querySelectorAll('#chat-messages .user-message').forEach(function(el) { lastUserMsg = el.textContent; });
+            _initSupportChat(lastUserMsg.slice(-200) || 'User requested live support');
+        },
+        exit:      _exitSupportMode
+    };
+
+    // ─────────────────────────────────────────────────────────────────────────
+
     // Function to send a message
     function sendMessage() {
         const messageInput = document.getElementById('message-input');
         const message = messageInput.value.trim();
-        if (!message) return;
+        if (!message && !state.pendingImage) return;
+
+        // Support chat mode: route message to Chat controller, not AI
+        if (state.supportMode && state.supportConvId) {
+            messageInput.value = '';
+            addMessage(message, 'user-message');
+            var _spBody = new URLSearchParams({
+                message: message,
+                conversation_id: state.supportConvId,
+                agent_type: 'support'
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: _spBody })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.message_id > state.supportLastMsgId) {
+                    state.supportLastMsgId = d.message_id;
+                }
+            })
+            .catch(function() {});
+            return;
+        }
 
         // Ensure page context is ready so navigation map is populated
         if (!state.pageContext) {
@@ -2050,9 +2965,56 @@
             return;
         }
 
-        // Client-side navigation interception — no AI round-trip needed
+        // Early keyword interceptor: daily log actions bypass all AI routing
+        {
+            const _lcMsg = message.toLowerCase().trim().replace(/[!.]+$/, '').replace(/\s+/g, ' ');
+            const _isMorning = /^(good morning|start day|begin day|start of day)$/.test(_lcMsg);
+            const _isNight   = /^(good night|end day|finish day|end of day)$/.test(_lcMsg);
+            if (_isMorning || _isNight) {
+                const _action = _isMorning ? 'start' : 'end';
+                messageInput.value = '';
+                addMessage(message, 'user-message');
+                const _chatMsgs = document.getElementById('chat-messages');
+                const _loadEl = document.createElement('div');
+                _loadEl.className = 'message ai-message';
+                _loadEl.textContent = '⏳ ' + (_isMorning ? 'Starting your day…' : 'Closing your day…');
+                if (_chatMsgs) { _chatMsgs.appendChild(_loadEl); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                fetch('/ai/daily_log', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: 'action=' + encodeURIComponent(_action)
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(d) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    var resp = d.response || d.error || (_isMorning ? 'Day started.' : 'Day closed.');
+                    addMessage(resp, 'ai-message');
+                    if (d.success && window.location.pathname.includes('/planning/daily')) {
+                        setTimeout(function() { window.location.reload(); }, 800);
+                    }
+                })
+                .catch(function(e) {
+                    if (_loadEl && _loadEl.parentNode) _loadEl.parentNode.removeChild(_loadEl);
+                    addMessage('❌ Request failed: ' + e, 'ai-message');
+                });
+                return;
+            }
+        }
+
+        // Template editor agent: open the dedicated form page with the file + request pre-loaded
+        if (state.pageContext && state.pageContext.agent_id === 'template_editor' && message) {
+            var tplPath = _getTemplatePathForPage(window.location.pathname);
+            var params = new URLSearchParams();
+            if (tplPath) params.set('file', tplPath);
+            params.set('request', message);
+            messageInput.value = '';
+            window.open('/ai/template_editor?' + params.toString(), '_blank');
+            return;
+        }
+
+        // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message.match(NAV_RE);
+        const navMatch = message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -2065,8 +3027,8 @@
         // 2. Bare page-name navigation (voice-control ready): short message (≤5 words)
         //    that resolves to EXACTLY ONE navigation entry with high confidence.
         //    Prevents accidental interception of regular questions.
-        const wordCount = message.trim().split(/\s+/).length;
-        if (wordCount <= 5) {
+        const wordCount = message ? message.trim().split(/\s+/).length : 0;
+        if (message && wordCount <= 5) {
             const bareMatches = resolveNavIntent(message);
             if (bareMatches && bareMatches.length === 1) {
                 // Only auto-navigate on an exact or strong label match — not a loose partial
@@ -2079,10 +3041,22 @@
             }
         }
 
-        addMessage(message, 'user-message');
+        // Build display message (text + optional thumbnail)
+        let displayHtml = message ? _escapeHtml(message) : '';
+        if (state.pendingImage) {
+            displayHtml += (displayHtml ? '<br>' : '') +
+                '<img src="' + state.pendingImage.dataUrl + '" style="max-height:120px;max-width:160px;border-radius:4px;margin-top:4px;display:block;">';
+        }
+        addMessage(displayHtml, 'user-message', true);
         messageInput.value = '';
+        const imgForRequest = state.pendingImage || null;
+        window._clearPendingImage();
         persistMessages();
-        queryAI(message);
+        queryAI(message || '(image attached)', imgForRequest);
+    }
+
+    function _escapeHtml(s) {
+        return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
     
     // Function to add a message to the chat with sender label
@@ -2102,9 +3076,642 @@
         return { cleanText, actions };
     }
 
+    // Fill form fields in the current page (or window.opener if popup).
+    // actionObj.fields is a plain object: { fieldName: value, ... }
+    // For checkboxes pass boolean/0/1; selects and inputs accept string values.
+    function _executeFillForm(actionObj) {
+        const chatMessages = document.getElementById('chat-messages');
+        const fields = actionObj.fields || {};
+
+        // When the chat is running in a detached popup window the form lives in the
+        // opener page — try that first, fall back to the current document.
+        const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+            ? window.opener.document
+            : document;
+
+        const filled = [];
+        const missed = [];
+
+        Object.keys(fields).forEach(function(fieldName) {
+            const value = fields[fieldName];
+
+            // Multi-checkbox group: multiple checkboxes sharing this name
+            const allCheckboxes = Array.from(
+                targetDoc.querySelectorAll('input[type="checkbox"][name="' + fieldName + '"]')
+            );
+            if (allCheckboxes.length > 1) {
+                const strVal = Array.isArray(value)
+                    ? value.join('; ')
+                    : (value !== null && typeof value === 'object')
+                        ? Object.values(value).join('; ')
+                        : String(value || '');
+                const selected = strVal.split(/[;,]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                allCheckboxes.forEach(function(cb) {
+                    const cbVal = cb.value.toLowerCase();
+                    cb.checked = selected.some(function(s) { return cbVal === s || cbVal.indexOf(s) !== -1 || s.indexOf(cbVal) !== -1; });
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                filled.push(fieldName);
+                return;
+            }
+
+            // Try by name first, then by id
+            let el = targetDoc.querySelector('[name="' + fieldName + '"]')
+                  || targetDoc.getElementById(fieldName);
+
+            if (!el) {
+                missed.push(fieldName);
+                return;
+            }
+
+            const tag  = el.tagName.toLowerCase();
+            const type = (el.getAttribute('type') || '').toLowerCase();
+
+            if (type === 'checkbox') {
+                el.checked = !!(value === true || value === 1 || value === '1' || value === 'true');
+            } else if (tag === 'select') {
+                el.value = String(value);
+                // Fallback: try case-insensitive match on option text
+                if (!el.value || el.value !== String(value)) {
+                    Array.from(el.options).forEach(function(opt) {
+                        if (opt.text.toLowerCase() === String(value).toLowerCase()) {
+                            el.value = opt.value;
+                        }
+                    });
+                }
+            } else {
+                var strVal;
+                if (Array.isArray(value)) {
+                    strVal = value.join('; ');
+                } else if (value !== null && typeof value === 'object') {
+                    strVal = Object.values(value).join('; ');
+                } else {
+                    strVal = value !== null && value !== undefined ? String(value) : '';
+                }
+                el.value = strVal;
+            }
+
+            // Fire change/input events so any JS listeners react
+            el.dispatchEvent(new Event('input',  { bubbles: true }));
+            el.dispatchEvent(new Event('change', { bubbles: true }));
+            filled.push(fieldName);
+        });
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'System';
+        const el2 = document.createElement('div');
+        el2.className = 'message system-message';
+        let msg = '';
+        if (filled.length)  msg += '✅ Filled: ' + filled.join(', ') + '.';
+        if (missed.length)  msg += '\n⚠️ Not found: ' + missed.join(', ') + '.';
+        if (!filled.length && !missed.length) msg = '⚠️ No fields specified.';
+        el2.textContent = msg.trim();
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(el2);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // ── _transcribeAudioFile ───────────────────────────────────────────────────
+    // Upload an audio File object to /ai/transcribe, show progress, and on success
+    // populate the chat input with the transcript so the user can review + send.
+    function _transcribeAudioFile(file) {
+        var statusEl  = document.getElementById('audio-transcribe-status');
+        var inputEl   = document.getElementById('message-input');
+        var sendBtn   = document.getElementById('send-message');
+
+        if (!file) return;
+
+        var sizeMB = (file.size / 1048576).toFixed(1);
+        if (statusEl) { statusEl.textContent = '⏳ Uploading ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
+        if (sendBtn) sendBtn.disabled = true;
+
+        var formData = new FormData();
+        formData.append('audio', file, file.name || 'recording.webm');
+        formData.append('diarize', '1');
+        formData.append('num_speakers', '2');
+
+        function _handleTranscriptResult(data) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (!data.success) {
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            var transcript = (data.transcript || '').trim();
+            if (!transcript) {
+                if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
+                return;
+            }
+            if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
+            if (data.transcript_file_id) { state.lastTranscriptFileId = data.transcript_file_id; }
+            if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
+
+            var displayText = transcript;
+            if (data.diarized && data.segments && data.segments.length) {
+                var lines = [];
+                var lastSpeaker = null;
+                data.segments.forEach(function(seg) {
+                    var spk = seg.speaker || 'SPEAKER_0';
+                    var label = spk === 'SPEAKER_0' ? 'Instructor' : spk === 'SPEAKER_1' ? 'Student' : spk;
+                    var mins = Math.floor((seg.start || 0) / 60);
+                    var secs = Math.round((seg.start || 0) % 60);
+                    var ts = '[' + mins + ':' + (secs < 10 ? '0' : '') + secs + ']';
+                    if (spk !== lastSpeaker) {
+                        lines.push('\n' + label + ' ' + ts + ': ' + (seg.text || '').trim());
+                        lastSpeaker = spk;
+                    } else {
+                        lines.push((seg.text || '').trim());
+                    }
+                });
+                displayText = lines.join(' ').trim();
+            }
+
+            if (inputEl) {
+                inputEl.value = displayText;
+                inputEl.style.height = 'auto';
+                inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
+                inputEl.style.overflowY = inputEl.scrollHeight > 200 ? 'auto' : 'hidden';
+                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                inputEl.focus();
+            }
+            var diarizedNote = data.diarized ? ' (speakers separated)' : '';
+            if (statusEl) {
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
+            }
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+        }
+
+        function _pollTranscribeStatus(jobId, attempt) {
+            attempt = attempt || 0;
+            if (attempt > 120) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
+                return;
+            }
+            var elapsed = Math.round(attempt * 5);
+            if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
+            setTimeout(function() {
+                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'processing') {
+                        _pollTranscribeStatus(jobId, attempt + 1);
+                    } else {
+                        _handleTranscriptResult(data);
+                    }
+                })
+                .catch(function() {
+                    _pollTranscribeStatus(jobId, attempt + 1);
+                });
+            }, 5000);
+        }
+
+        fetch('/ai/transcribe', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        })
+        .then(function(r) {
+            if (!r.ok && r.status === 403) throw new Error('Login required — please sign in to use voice transcription.');
+            if (!r.ok && r.status === 503) throw new Error('Whisper not installed on server. Run: pip install openai-whisper in Comserv/whisper_venv');
+            return r.text().then(function(txt) {
+                try { return JSON.parse(txt); }
+                catch(e) { throw new Error('Server returned unexpected response (HTTP ' + r.status + '). The server may be restarting — please try again in a moment.'); }
+            });
+        })
+        .then(function(data) {
+            if (!data.success) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            if (data.job_id) {
+                if (statusEl) { statusEl.textContent = '⏳ Transcription started (job ' + data.job_id + ') — checking progress…'; }
+                _pollTranscribeStatus(data.job_id, 1);
+            } else {
+                _handleTranscriptResult(data);
+            }
+        })
+        .catch(function(err) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
+        });
+    }
+
+    function _makeWizardForm(fields, onConfirm) {
+        var form = document.createElement('form');
+        form.onsubmit = function(e) { e.preventDefault(); onConfirm(form); };
+        fields.forEach(function(f) {
+            var row = document.createElement('div');
+            row.style.cssText = 'margin:4px 0;display:flex;gap:6px;align-items:center;';
+            var label = document.createElement('label');
+            label.textContent = f.label;
+            label.style.cssText = 'width:160px;font-size:12px;color:var(--text-color,#555);flex-shrink:0;';
+            var input = document.createElement('input');
+            input.name = f.name;
+            input.value = f.value !== undefined ? f.value : '';
+            input.type = f.type || 'text';
+            input.style.cssText = 'flex:1;padding:4px 6px;border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:13px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+            if (f.required) input.required = true;
+            row.appendChild(label);
+            row.appendChild(input);
+            form.appendChild(row);
+        });
+        return form;
+    }
+
+    function _postWizardAction(actionName, params, msgEl) {
+        msgEl.textContent = '⏳ Saving…';
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionName, params: params })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
+                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:#0077cc;font-weight:bold;">View →</a>' : '');
+            } else {
+                msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
+            }
+        })
+        .catch(function(e) { msgEl.textContent = '⚠️ Request failed: ' + e.message; });
+    }
+
+    function _openSimpleWizard(title, fields, actionName, extraParams) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        var id = 'ai-' + actionName + '-wizard';
+        var existing = document.getElementById(id);
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.id = id;
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.style.cssText = 'margin:8px 0;';
+
+        var card = document.createElement('div');
+        card.className = 'message system-message';
+        card.style.cssText = 'background:var(--table-header-bg,#f9f9f9);border:1px solid var(--border-color,#ddd);border-radius:8px;padding:12px;max-width:520px;color:var(--text-color,#222);';
+
+        var heading = document.createElement('div');
+        heading.textContent = title;
+        heading.style.cssText = 'font-weight:bold;font-size:14px;margin-bottom:8px;';
+        card.appendChild(heading);
+
+        var msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+
+        var form = _makeWizardForm(fields, function(f) {
+            var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
+            fields.forEach(function(fd) {
+                var inp = f.elements[fd.name];
+                if (inp) params[fd.name] = inp.value;
+            });
+            _postWizardAction(actionName, params, msgEl);
+        });
+        card.appendChild(form);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;';
+        var saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.type = 'submit';
+        saveBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
+        saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
+        cancelBtn.onclick = function() { wrapper.remove(); };
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(cancelBtn);
+        card.appendChild(btnRow);
+        card.appendChild(msgEl);
+        wrapper.appendChild(card);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function openYardWizard(prefill) {
+        _openSimpleWizard('🏡 Create Yard', [
+            { name: 'yard_name',       label: 'Yard Name *',      value: prefill.yard_name  || '', required: true },
+            { name: 'yard_code',       label: 'Yard Code *',      value: prefill.yard_code  || '', required: true },
+            { name: 'yard_size',       label: 'Capacity (hives)', value: prefill.yard_size  || 10, type: 'number' },
+            { name: 'total_yard_size', label: 'Total Size (hives)',value: prefill.total_yard_size || 10, type: 'number' },
+            { name: 'notes',           label: 'Notes',            value: prefill.notes      || '' },
+        ], 'create_yard', {});
+    }
+
+    function openHiveWizard(prefill) {
+        _openSimpleWizard('🐝 Register Hive', [
+            { name: 'hive_number', label: 'Hive Number *', value: prefill.hive_number || '', required: true },
+            { name: 'yard_id',     label: 'Yard ID *',     value: prefill.yard_id    || '', required: true, type: 'number' },
+            { name: 'queen_code',  label: 'Queen Code',    value: prefill.queen_code || '' },
+            { name: 'notes',       label: 'Notes',         value: prefill.notes      || '' },
+        ], 'create_hive', {});
+    }
+
+    function openQueenWizard(prefill) {
+        _openSimpleWizard('👑 Record Queen', [
+            { name: 'tag_number',    label: 'Tag / Number',   value: prefill.tag_number    || '' },
+            { name: 'color_marking', label: 'Colour Marking', value: prefill.color_marking || '' },
+            { name: 'birth_date',    label: 'Birth Date',     value: prefill.birth_date    || '', type: 'date' },
+            { name: 'breed',         label: 'Breed',          value: prefill.breed         || 'unknown' },
+            { name: 'mating_status', label: 'Mating Status',  value: prefill.mating_status || 'mated' },
+            { name: 'health_status', label: 'Health Status',  value: prefill.health_status || 'healthy' },
+            { name: 'notes',         label: 'Notes',          value: prefill.notes         || '' },
+        ], 'create_queen', { hive_id: prefill.hive_id || undefined });
+    }
+
+    // ── openInspectionWizard ───────────────────────────────────────────────────
+    // Renders an inline inspection review form pre-filled with AI-extracted data.
+    // User can edit all fields before confirming; on confirm sends create_inspection.
+    function openInspectionWizard(prefill) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        var existing = document.getElementById('ai-inspection-wizard');
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.id = 'ai-inspection-wizard';
+
+        var lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'Hive Inspection Review';
+
+        var box = document.createElement('div');
+        box.className = 'message system-message';
+        box.style.cssText = 'padding:12px;max-width:520px;font-size:0.88em;';
+
+        var p = prefill || {};
+        var qs_yes = p.queen_seen        ? 'checked' : '';
+        var qm_yes = p.queen_marked      ? 'checked' : '';
+        var eg_yes = p.eggs_seen         ? 'checked' : '';
+        var lv_yes = p.larvae_seen       ? 'checked' : '';
+        var cb_yes = p.capped_brood_seen ? 'checked' : '';
+        var fd_yes = p.feeding_done      ? 'checked' : '';
+        var today  = new Date().toISOString().slice(0, 10);
+
+        var popOpts = ['', 'very_strong', 'strong', 'moderate', 'weak', 'very_weak'].map(function(v) {
+            var sel = (p.population_estimate || '') === v ? ' selected' : '';
+            var lbl2 = v ? v.replace(/_/g, ' ') : '— select —';
+            return '<option value="' + v + '"' + sel + '>' + lbl2 + '</option>';
+        }).join('');
+        var tempOpts = ['calm', 'moderate', 'aggressive', 'very_aggressive'].map(function(v) {
+            var sel = (p.temperament || 'calm') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v.replace(/_/g, ' ') + '</option>';
+        }).join('');
+        var statusOpts = ['excellent', 'good', 'fair', 'poor', 'critical'].map(function(v) {
+            var sel = (p.overall_status || 'good') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v + '</option>';
+        }).join('');
+
+        var inpStyle = 'width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var selStyle = 'width:100%;padding:3px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var lblStyle = 'font-weight:600;display:block;font-size:0.85em;color:var(--text-color,#333);';
+
+        box.innerHTML =
+            '<strong style="font-size:1.05em;color:var(--text-color,#222)">🐝 Review Hive Inspection</strong>' +
+            '<p style="margin:4px 0 8px;color:var(--text-color,#555);font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
+            '<form id="ai-insp-form" style="display:flex;flex-direction:column;gap:5px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">' +
+                    '<div><label style="' + lblStyle + '">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Population</label><select name="population_estimate" style="' + selStyle + '">' + popOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Temperament</label><select name="temperament" style="' + selStyle + '">' + tempOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Overall Status</label><select name="overall_status" style="' + selStyle + '">' + statusOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="' + inpStyle + '"></div>' +
+                '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;color:var(--text-color,#333);">' +
+                    '<label><input type="checkbox" name="queen_seen" ' + qs_yes + '> Queen seen</label>' +
+                    '<label><input type="checkbox" name="queen_marked" ' + qm_yes + '> Queen marked</label>' +
+                    '<label><input type="checkbox" name="eggs_seen" ' + eg_yes + '> Eggs</label>' +
+                    '<label><input type="checkbox" name="larvae_seen" ' + lv_yes + '> Larvae</label>' +
+                    '<label><input type="checkbox" name="capped_brood_seen" ' + cb_yes + '> Capped brood</label>' +
+                    '<label><input type="checkbox" name="feeding_done" ' + fd_yes + '> Feeding done</label>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">' +
+                    '<div><label style="' + lblStyle + '">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                '</div>' +
+                '<div><label style="' + lblStyle + '">General notes</label><textarea name="general_notes" rows="3" style="' + inpStyle + 'resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Action required</label><textarea name="action_required" rows="2" style="' + inpStyle + 'resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="' + inpStyle + '"></div>' +
+                '<div><label style="' + lblStyle + '">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="' + inpStyle + '"></div>' +
+                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:var(--text-color,#555);"></div>' +
+                '<div style="display:flex;gap:8px;margin-top:4px;">' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#0077cc);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
+                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
+                '</div>' +
+            '</form>';
+
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(box);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        document.getElementById('ai-insp-cancel').addEventListener('click', function() {
+            wrapper.remove();
+        });
+
+        document.getElementById('ai-insp-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(e.target);
+            var confirmed = { box_details: p.box_details || [] };
+            fd.forEach(function(val, key) { confirmed[key] = val; });
+            confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
+            confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
+            confirmed.eggs_seen         = e.target.eggs_seen.checked         ? 1 : 0;
+            confirmed.larvae_seen       = e.target.larvae_seen.checked       ? 1 : 0;
+            confirmed.capped_brood_seen = e.target.capped_brood_seen.checked ? 1 : 0;
+            confirmed.feeding_done      = e.target.feeding_done.checked      ? 1 : 0;
+            confirmed.swarm_cells       = parseInt(confirmed.swarm_cells, 10) || 0;
+            confirmed.queen_cells       = parseInt(confirmed.queen_cells, 10) || 0;
+            confirmed.supersedure_cells = parseInt(confirmed.supersedure_cells, 10) || 0;
+
+            var statusDiv = document.getElementById('ai-insp-status');
+            if (statusDiv) { statusDiv.textContent = 'Saving…'; statusDiv.style.display = ''; }
+            e.target.querySelector('[type=submit]').disabled = true;
+
+            executeAIAction({ action: 'create_inspection', params: confirmed });
+
+            setTimeout(function() { wrapper.remove(); }, 1500);
+        });
+    }
+
+    // Project creation wizard — renders an inline form in the chat window.
+    // Submitted data is sent to /ai/action as a create_project ACTION.
+    function openProjectWizard(prefillTitle) {
+        const chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        const existing = document.getElementById('ai-project-wizard');
+        if (existing) existing.remove();
+
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.id = 'ai-project-wizard';
+
+        const lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'Planning Agent';
+
+        const box = document.createElement('div');
+        box.className = 'message system-message';
+        box.style.cssText = 'padding:12px;max-width:480px;';
+
+        const DEPS = [
+            ['inventory',   'Inventory tracking'],
+            ['billing',     'Billing / payments'],
+            ['email',       'Email notifications'],
+            ['calendar',    'Calendar / bookings'],
+            ['helpdesk',    'HelpDesk / support'],
+            ['api',         'External API'],
+            ['schema',      'New DB tables needed'],
+            ['ai',          'AI / Chat integration'],
+        ];
+
+        box.innerHTML =
+            '<strong style="font-size:1.05em">📋 New Project Wizard</strong>' +
+            '<form id="ai-wizard-form" style="margin-top:8px;display:flex;flex-direction:column;gap:6px;">' +
+                '<label style="font-size:.85em;font-weight:600">Project name</label>' +
+                '<input id="wiz-name" type="text" required style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;" value="' + (prefillTitle || '').replace(/"/g, '&quot;') + '">' +
+                '<label style="font-size:.85em;font-weight:600">Description</label>' +
+                '<textarea id="wiz-desc" rows="2" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;resize:vertical;"></textarea>' +
+                '<label style="font-size:.85em;font-weight:600">Due date</label>' +
+                '<input id="wiz-due" type="date" style="padding:4px 6px;border:1px solid #ccc;border-radius:4px;">' +
+                '<label style="font-size:.85em;font-weight:600">Dependencies needed (check all that apply)</label>' +
+                '<div id="wiz-deps" style="display:flex;flex-wrap:wrap;gap:4px 12px;">' +
+                    DEPS.map(function(d) {
+                        return '<label style="font-size:.82em"><input type="checkbox" name="dep" value="' + d[0] + '" style="margin-right:3px">' + d[1] + '</label>';
+                    }).join('') +
+                '</div>' +
+                '<div style="display:flex;gap:8px;margin-top:4px;">' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
+                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
+                '</div>' +
+            '</form>';
+
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(box);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        document.getElementById('wiz-cancel').addEventListener('click', function() {
+            wrapper.remove();
+        });
+
+        document.getElementById('ai-wizard-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var name = document.getElementById('wiz-name').value.trim();
+            var desc = document.getElementById('wiz-desc').value.trim();
+            var due  = document.getElementById('wiz-due').value;
+            var deps = Array.from(document.querySelectorAll('#wiz-deps input:checked')).map(function(cb) { return cb.value; });
+
+            if (!name) { alert('Project name is required.'); return; }
+
+            var depNote = deps.length ? '\n\nDependencies: ' + deps.join(', ') : '';
+            wrapper.remove();
+
+            executeAIAction({
+                action: 'create_project',
+                params: {
+                    name:        name,
+                    description: desc + depNote,
+                    due_date:    due || undefined,
+                }
+            });
+
+            if (deps.length) {
+                var depMsg = 'Project "' + name + '" was created. Dependencies noted: ' + deps.join(', ') + '. Please create the relevant sub-project todos and blocking dependencies.';
+                var chatInput = document.getElementById('chat-input') || document.getElementById('chat-message');
+                if (chatInput) {
+                    chatInput.value = depMsg;
+                    var sendBtn = document.getElementById('send-button') || document.querySelector('[data-action="send"]');
+                    if (sendBtn) sendBtn.click();
+                }
+            }
+        });
+    }
+
     // POST an action object to /ai/action and show a confirmation bubble.
     function executeAIAction(actionObj) {
         const chatMessages = document.getElementById('chat-messages');
+
+        // fill_form is handled entirely client-side — no server round-trip needed.
+        if (actionObj.action === 'fill_form') {
+            _executeFillForm(actionObj);
+            return;
+        }
+
+        // navigate: open a URL in a new tab without any pre-fill
+        if (actionObj.action === 'navigate') {
+            const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
+            if (navUrl) {
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
+        // navigate_and_fill: store field values in localStorage then open the target page.
+        // The widget init on the target page checks for a pending fill and applies it.
+        if (actionObj.action === 'navigate_and_fill') {
+            const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
+            const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
+            if (nfUrl) {
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
+                try {
+                    localStorage.setItem('ai_pending_fill', JSON.stringify({
+                        url:     nfUrl,
+                        fields:  nfFields,
+                        ts:      Date.now()
+                    }));
+                } catch(e) { console.warn('localStorage write failed', e); }
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                const fieldCount = Object.keys(nfFields).length;
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                    + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
 
         fetch('/ai/action', {
             method: 'POST',
@@ -2114,6 +3721,29 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (result.success && result.action === 'open_project_wizard') {
+                openProjectWizard(result.wizard_title || '');
+                return;
+            }
+            if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
+                var prefill = result.wizard_prefill || actionObj.params || {};
+                if (state.lastAudioFileId)      { prefill.audio_file_id      = state.lastAudioFileId; }
+                if (state.lastTranscriptFileId) { prefill.transcript_file_id = state.lastTranscriptFileId; }
+                openInspectionWizard(prefill);
+                return;
+            }
+            if (result.action === 'open_yard_wizard') {
+                openYardWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_hive_wizard') {
+                openHiveWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_queen_wizard') {
+                openQueenWizard(result.wizard_prefill || {});
+                return;
+            }
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
             const lbl = document.createElement('div');
@@ -2121,9 +3751,14 @@
             lbl.textContent = 'System';
             const el = document.createElement('div');
             el.className = 'message system-message';
-            el.textContent = result.success
-                ? '✅ ' + (result.message || 'Action completed')
-                : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            if (result.success && result.inspection_id) {
+                el.innerHTML = '✅ ' + (result.message || 'Inspection saved') +
+                    ' <a href="' + (result.url || '/BMaster') + '" target="_blank" style="color:#0077cc;font-weight:bold;">View inspection →</a>';
+            } else {
+                el.textContent = result.success
+                    ? '✅ ' + (result.message || 'Action completed')
+                    : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            }
             wrapper.appendChild(lbl);
             wrapper.appendChild(el);
             chatMessages.appendChild(wrapper);
@@ -2146,7 +3781,7 @@
         });
     }
 
-    function addMessage(text, className) {
+    function addMessage(text, className, isHtml) {
         const chatMessages = document.getElementById('chat-messages');
         const wrapper = document.createElement('div');
         wrapper.className = 'msg-wrapper ' + (className === 'user-message' ? 'msg-wrapper-user' : 'msg-wrapper-ai');
@@ -2165,7 +3800,9 @@
 
         const messageElement = document.createElement('div');
         messageElement.className = 'message ' + className;
-        if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
+        if (isHtml) {
+            messageElement.innerHTML = text;
+        } else if (className === 'ai-message' && window.AIUtils && AIUtils.formatMessageContent) {
             messageElement.innerHTML = AIUtils.formatMessageContent(text);
         } else {
             messageElement.textContent = text;
@@ -2212,6 +3849,7 @@
             if (cfg.username) state.username = cfg.username;
             if (cfg.isGuest  !== undefined) state.isGuest  = !!cfg.isGuest;
             if (cfg.isAdmin  !== undefined) state.isAdmin  = !!cfg.isAdmin;
+            if (cfg.siteName) state.siteName = cfg.siteName;
         }
 
         // If this /ai page was opened by detaching the widget, honour the original
@@ -2227,6 +3865,16 @@
             }
         } catch(e) {}
 
+        // When opened via task_id=N, store the todo details so every chat request
+        // sends page_path=/todo/details?record_id=N which triggers single-todo context injection.
+        if (window.AI_TASK_CONTEXT && window.AI_TASK_CONTEXT.record_id) {
+            var tc = window.AI_TASK_CONTEXT;
+            state.taskContext = tc;
+            // Override page path so server-side _get_module_data uses single-todo fast-path
+            state.taskPagePath = '/todo/details?record_id=' + tc.record_id;
+            console.debug('[AI] Task context loaded: todo #' + tc.record_id, tc.subject);
+        }
+
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
         loadPersistedState();
@@ -2234,8 +3882,30 @@
         // Initialize agent context and user providers
         loadAgentsConfig().then(function() {
             state.pageContext = detectPageContext();
+            // Override page_path so single-todo context injection triggers for task_id links
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
+            // Auto-select agent based on task subject keywords (same logic as todo/details pages)
+            if (window.AI_TASK_CONTEXT && state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (window.AI_TASK_CONTEXT.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    console.debug('[AI] Task-context agent selected:', picked.id);
+                }
+            }
         }).catch(function() {
             state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
         });
         loadUserProviders().catch(function() {});
 
@@ -2252,7 +3922,10 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
-            if (!state.pageContext) state.pageContext = detectPageContext();
+            if (!state.pageContext) {
+                state.pageContext = detectPageContext();
+                if (state.taskPagePath) state.pageContext.page_path = state.taskPagePath;
+            }
 
             // Client-side navigation interception
             const navMatch = prompt.match(NAV_RE);
@@ -2411,6 +4084,17 @@
                 margin-right: 8px;
                 font-size: 1.2em;
             }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+            }
             
             .chat-panel {
                 position: fixed;
@@ -2431,7 +4115,42 @@
                 z-index: 10001;
                 overflow: hidden;
             }
-            
+
+            /* In a detached popup window: fill the entire window so resize works naturally */
+            body.ai-widget-popup .chat-panel {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                border-radius: 0;
+                box-shadow: none;
+                margin: 0;
+            }
+            body.ai-widget-popup .chat-input {
+                flex-shrink: 0;
+            }
+            body.ai-widget-popup #message-input {
+                height: auto;
+                min-height: 40px;
+                max-height: 160px;
+                resize: vertical;
+            }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+            }
+
             .chat-header {
                 background-color: var(--accent-color, #FF9900);
                 color: #fff;
@@ -2452,10 +4171,32 @@
             .chat-header-drag:active { cursor: grabbing; }
 
             .chat-header h3 {
-                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis;
+                margin: 0; font-size: 14px; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
             }
-            
+
+            .chat-header-title-group {
+                display: flex; align-items: baseline; gap: 5px;
+                flex: 1; min-width: 0; overflow: hidden;
+            }
+
+            .chat-page-label {
+                font-size: 11px; opacity: 0.88; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+                display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
+            }
+            .chat-ctx-page {
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                flex-shrink: 1; min-width: 0;
+            }
+            .chat-ctx-badge {
+                display: inline-block; border-radius: 3px; padding: 0 4px;
+                font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+                white-space: nowrap; flex-shrink: 0; line-height: 1.5;
+            }
+            .chat-ctx-site  { background: rgba(255,255,255,0.28); }
+            .chat-ctx-agent { background: rgba(0,0,0,0.22); }
+
             .chat-header-buttons {
                 display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
@@ -2488,8 +4229,8 @@
                 border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
                 color: var(--text-color); transition: background 0.15s;
             }
-            .wh-item:hover { background: var(--secondary-color); }
-            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-item:hover { background: var(--table-header-bg); }
+            .wh-item.active { background: var(--table-header-bg); border-left: 3px solid var(--link-color); }
             .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
             .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
@@ -2743,6 +4484,12 @@
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
+        // When running inside the detached popup window, mark <body> so CSS can
+        // override the chat panel to fill 100% of the window.
+        if (window.AI_WIDGET_POPUP) {
+            document.body.classList.add('ai-widget-popup');
+        }
+
         if (PAGE_MODE) {
             // /ai full-page mode: bind to existing DOM, no floating widget
             initPageMode();
@@ -2760,7 +4507,57 @@
                     }
                 }
             });
+
+            // In popup window mode: auto-open the chat panel immediately so the
+            // user sees the chat right away without having to click the bubble.
+            if (window.AI_WIDGET_POPUP) {
+                openChat();
+            }
         }
+
+        // Check for a pending navigate_and_fill stored by another tab.
+        // If the current URL matches the stored target, apply the field values and clear.
+        (function() {
+            try {
+                var pending = localStorage.getItem('ai_pending_fill');
+                if (!pending) return;
+                var pdata = JSON.parse(pending);
+                if (!pdata || !pdata.url || !pdata.fields) return;
+                // Expire after 2 minutes
+                if (Date.now() - (pdata.ts || 0) > 120000) {
+                    localStorage.removeItem('ai_pending_fill');
+                    return;
+                }
+                // Normalize both URLs to just pathname+search for comparison
+                var targetPath = pdata.url.replace(/^https?:\/\/[^\/]+/, '');
+                var currentPath = window.location.pathname + window.location.search;
+                if (targetPath !== currentPath) return;
+                // Clear immediately to avoid re-applying on refresh
+                localStorage.removeItem('ai_pending_fill');
+                // Short delay so the page form has rendered
+                setTimeout(function() {
+                    _executeFillForm({ fields: pdata.fields });
+                    // Show notification in widget if it exists
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'System';
+                        var el = document.createElement('div');
+                        el.className = 'message system-message';
+                        el.textContent = '🪄 AI pre-filled form fields. Please review before saving.';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(el);
+                        chatMessages.appendChild(wrapper);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 600);
+            } catch(e) {
+                console.warn('ai_pending_fill check failed:', e);
+            }
+        })();
 
         // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
         if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {
@@ -2801,4 +4598,37 @@
             window.openHelpDeskChat = _hdOpenAndGreet;
         }
     });
+
+    // Global API: open the chat widget pre-loaded with a task context.
+    // Called from todo/details.tt "Chat about this task" button.
+    // taskContext: { record_id, subject, description, status, due_date, project }
+    window.openAIChatWithTask = function(taskContext) {
+        if (!taskContext || !taskContext.record_id) { openChat(); return; }
+        state.taskContext = taskContext;
+        state.taskPagePath = '/todo/details?record_id=' + taskContext.record_id;
+        if (!state.pageContext) state.pageContext = detectPageContext();
+        state.pageContext.page_path = state.taskPagePath;
+        // Auto-select agent based on task subject
+        loadAgentsConfig().then(function() {
+            if (state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (taskContext.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    state.pageContext.agent_id   = picked.id;
+                    state.pageContext.agent_name = picked.display_name;
+                    if (picked.system_prompt) state.pageContext.system_prompt = picked.system_prompt;
+                    populateAgentPicker();
+                }
+            }
+            openChat();
+        }).catch(function() { openChat(); });
+    };
 })();

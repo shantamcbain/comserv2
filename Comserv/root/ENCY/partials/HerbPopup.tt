@@ -1,0 +1,10 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3>[% herb.common_names | html %]</h3>
+  [% IF herb.botanical_name %]<p><em>[% herb.botanical_name | html %]</em></p>[% END %]
+  [% IF herb.therapeutic_action %]<p><strong>Therapeutic Action:</strong> [% herb.therapeutic_action | html %]</p>[% END %]
+  [% IF herb.parts_used %]<p><strong>Parts Used:</strong> [% herb.parts_used | html %]</p>[% END %]
+  [% IF herb.constituents %]<p><strong>Key Constituents:</strong> [% herb.constituents | html %]</p>[% END %]
+  [% IF herb.contra_indications %]<p><strong>Contraindications:</strong> [% herb.contra_indications | html %]</p>[% END %]
+  <p><a href="/ENCY/herb_detail/[% herb.record_id %]">View full herb details &rarr;</a></p>
+</div>

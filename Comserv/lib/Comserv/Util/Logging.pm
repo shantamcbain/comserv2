@@ -15,6 +15,7 @@ use strict;
 use warnings;
 use namespace::autoclean;
 use File::Copy;
+use Scalar::Util qw(blessed);
 use FindBin;
 use File::Path qw(make_path);
 use File::Spec;
@@ -67,6 +68,7 @@ my @BOT_PATTERNS = (
 # Circuit breaker: if DB write fails, stop trying for 30s to prevent blocking Starman workers.
 my $_db_log_failed_at  = 0;  # epoch time of last DB write failure
 my $_db_log_backoff_s  = 30; # seconds to pause DB writes after a failure
+my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
@@ -92,10 +94,18 @@ our $EMAIL_NOTIFY_THRESHOLD = 'ERROR';
 # This prevents millions of low-value rows from filling the table.
 our $DB_LOG_MIN_LEVEL = $ENV{DB_LOG_MIN_LEVEL} || 'WARN';
 
+# Minimum level to emit to STDERR (captured by Docker as container logs).
+# Set COMSERV_LOG_MIN_LEVEL=WARN in production to suppress DEBUG/INFO noise.
+# Default: DEBUG (emit everything) to preserve existing dev behaviour.
+our $STDERR_LOG_MIN_LEVEL = $ENV{COMSERV_LOG_MIN_LEVEL} || 'DEBUG';
+
 # Internal subroutine to print log messages to STDERR and the log file
 sub _print_log {
-    my ($msg) = @_;
-    print STDERR "$msg\n";
+    my ($msg, $level) = @_;
+    $level //= 'DEBUG';
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    print STDERR "$msg\n" if $msg_prio >= $min_prio;
     if (defined $LOG_FH && fileno($LOG_FH)) {
         flock($LOG_FH, LOCK_EX);
         print $LOG_FH "$msg\n";
@@ -369,22 +379,23 @@ sub log_with_details {
     }
     my $log_message = sprintf("[%s] [%s] [%s:%d] %s - %s%s", $timestamp, $system_id, $file, $line, ($subroutine // 'unknown'), $message, $_req_suffix);
 
-    # Add to debug_errors in stash if Catalyst context is available
-    # But avoid calling $c->log methods to prevent recursion
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+    # Add to debug_errors in stash only when debug_mode is active
+    if ($c && blessed($c) && ref($c->stash) eq 'HASH'
+        && $c->can('session') && $c->session
+        && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
 
-    # Restore standard behavior: also write to application log file and STDERR
+    # Write to application log file and STDERR (filtered by COMSERV_LOG_MIN_LEVEL).
     log_to_file($log_message, undef, $level);
-    _print_log($log_message);
+    _print_log($log_message, $level);
 
     # Log to database — only WARN and above to keep the table manageable.
     # DEBUG/INFO messages go to file log only.
     my $level_prio    = $LEVEL_PRIORITY{ uc($level) }           // 0;
     my $db_min_prio   = $LEVEL_PRIORITY{ uc($DB_LOG_MIN_LEVEL) } // 3;
-    if ($c && ref($c) && $c->can('model') && $level_prio >= $db_min_prio) {
+    if ($c && blessed($c) && $c->can('model') && $level_prio >= $db_min_prio) {
         my $now = time();
         if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
             _print_log("[DB-LOG-SKIP] circuit breaker open, skipping DB write for $level $subroutine");
@@ -431,6 +442,101 @@ sub log_with_details {
         # Don't log the error of sending the error notification to avoid infinite loop
     }
 
+    # Auto-create a Todo in the audit panel for every EMAIL-threshold+ error.
+    # This ensures errors show up immediately without waiting for Start Day.
+    if ($current_prio >= $notify_prio
+        && $c && blessed($c) && $c->can('model')
+        && !$_in_todo_create) {
+        $_in_todo_create = 1;
+        eval {
+            my $now_date = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $sub_name = $subroutine // 'unknown';
+            $sub_name =~ s/^Comserv:://;
+            my $sub_short    = substr($sub_name, 0, 80);
+            my $todo_subject = "[Error] $sub_short ($now_date)";
+            my $sitename     = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
+            my $username     = ($c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
+            my $uid          = ($c->can('session') && $c->session) ? ($c->session->{user_id}  || undef)    : undef;
+            my $top_level    = uc($level);
+            my $todo_priority = ($top_level eq 'CRITICAL') ? 1 : ($top_level eq 'ERROR') ? 2 : 3;
+
+            my $existing = $c->model('DBEncy')->resultset('Todo')->search(
+                { subject    => { -like => "[Error] $sub_short%" },
+                  start_date => $now_date,
+                  status     => { -not_in => [3, 'done', 'Done', 'DONE', 'completed', 'Completed'] } },
+                { rows => 1 }
+            )->first;
+
+            unless ($existing) {
+                # Try to match the error's file/subroutine to a project.
+                # The file path (e.g. "Comserv/Controller/Todo.pm") and
+                # subroutine (e.g. "Comserv::Controller::Todo::modify_todo")
+                # both carry the controller/module name which we can match
+                # against project_name or project_code in the Project table.
+                my $fallback_project_id   = 1;
+                my $matched_project_id    = undef;
+                my $matched_project_code  = 'PLANNING';
+                eval {
+                    my $sp = $c->model('DBEncy')->resultset('Project')->search(
+                        { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+                        { order_by => { -asc => 'id' }, rows => 1 }
+                    )->first;
+                    $fallback_project_id = $sp->id if $sp;
+                };
+                eval {
+                    my $search_term;
+                    if ($sub_name =~ /Controller::(\w+)/) {
+                        $search_term = $1;
+                    } elsif ($file && $file =~ m{/(\w+)\.pm$}i) {
+                        $search_term = $1;
+                    }
+                    if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
+                        my $proj = $c->model('DBEncy')->resultset('Project')->search(
+                            { -or => [
+                                { name         => { -like => "%$search_term%" } },
+                                { project_code => { -like => "%$search_term%" } },
+                            ]},
+                            { rows => 1 }
+                        )->first;
+                        if ($proj) {
+                            $matched_project_id   = $proj->id;
+                            $matched_project_code = $proj->project_code || 'PLANNING';
+                        }
+                    }
+                };
+                $matched_project_id //= $fallback_project_id;
+
+                my $effective_uid = defined($uid) ? $uid : 178;
+
+                my %create_args = (
+                    subject             => $todo_subject,
+                    description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
+                    status              => 1,
+                    priority            => $todo_priority,
+                    is_blocking         => 0,
+                    sitename            => $sitename,
+                    developer           => $username,
+                    username_of_poster  => $username,
+                    user_id             => $effective_uid,
+                    project_id          => $matched_project_id,
+                    last_mod_by         => $username,
+                    last_mod_date       => $now_date,
+                    date_time_posted    => $now_date . ' 00:00:00',
+                    start_date          => $now_date,
+                    due_date            => $now_date,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => $matched_project_code,
+                    share               => 0,
+                );
+                $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
+            }
+        };
+        $_in_todo_create = 0;
+    }
+
     return $log_message;
 }
 
@@ -447,9 +553,10 @@ sub log_error {
     # Pass 'ERROR' level explicitly
     log_to_file($log_message, undef, 'ERROR');
 
-    # Add to debug_errors in stash if Catalyst context is available
-    # But avoid calling $c->log methods to prevent recursion
-    if ($c && ref($c) && ref($c->stash) eq 'HASH') {
+    # Add to debug_errors in stash only when debug_mode is active
+    if ($c && blessed($c) && ref($c->stash) eq 'HASH'
+        && $c->can('session') && $c->session
+        && ($c->session->{debug_mode} // 0) == 1) {
         my $debug_errors = $c->stash->{debug_errors} ||= [];
         push @$debug_errors, $log_message;
     }
@@ -491,7 +598,7 @@ sub send_error_notification {
     my $site_admin_email;
     my $sitename = 'CSC';
 
-    if ($c && ref($c) && $c->can('model')) {
+    if ($c && blessed($c) && $c->can('model')) {
         eval { # Use eval instead of try if Try::Tiny is not explicitly imported or available
             $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
             my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
@@ -739,7 +846,7 @@ sub get_log_file_size {
 # Refresh settings from database
 sub refresh_settings {
     my ($self, $c) = @_;
-    return unless $c && ref($c) && $c->can('model');
+    return unless $c && blessed($c) && $c->can('model');
     
     eval {
         my $sitename = ($c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'CSC') : 'CSC';
@@ -773,7 +880,7 @@ sub refresh_settings {
 
 sub log_access {
     my ($self, $c, $status_code) = @_;
-    return unless $c && ref($c) && $c->can('model');
+    return unless $c && blessed($c) && $c->can('model');
 
     my $now = time();
     if ($now - $_db_log_failed_at < $_db_log_backoff_s) {
@@ -824,7 +931,7 @@ sub _classify_request {
 sub extract_request_info {
     my ($c) = @_;
     my %info;
-    return %info unless $c && ref($c) && $c->can('req');
+    return %info unless $c && blessed($c) && $c->can('req');
     eval {
         $info{ip_address}     = $c->req->address // '';
         $info{user_agent}     = substr($c->req->user_agent // '', 0, 512);

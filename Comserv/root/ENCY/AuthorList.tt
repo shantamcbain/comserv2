@@ -1,0 +1,67 @@
+[% META
+   title = "Authors - ENCY Encyclopedia"
+   description = "Authors and contributors cited in the ENCY reference library"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-08"
+%]
+[% PageVersion = 'ENCY/AuthorList.tt,v 0.01 2026/04/08' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+
+
+<h1>Authors &amp; Contributors</h1>
+
+<p class="ency-admin-breadcrumb">
+  <a href="[% c.uri_for('/ENCY') %]">&larr; ENCY Home</a>
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/Reference') %]">Reference Library</a>
+  [% IF is_admin %]
+  &nbsp;|&nbsp; <a href="[% c.uri_for('/ENCY/admin') %]">Admin Dashboard</a>
+  [% END %]
+</p>
+
+[% IF authors && authors.size %]
+<p class="ency-admin-note">[% authors.size %] author(s). Click a name to view bio and works.</p>
+
+<table class="ency-admin-table" style="width:100%;">
+  <thead>
+  <tr>
+    <th>#</th>
+    <th>Name</th>
+    <th>Credentials</th>
+    <th>Specialty</th>
+    <th>Affiliation</th>
+    <th>Nationality</th>
+    <th style="width:7em;">Actions</th>
+  </tr>
+  </thead>
+  <tbody>
+  [% FOR author IN authors %]
+  <tr>
+    <td>[% author.author_id %]</td>
+    <td><a href="[% c.uri_for('/ENCY/Author', author.author_id) %]"><strong>[% author.full_name | html %]</strong></a></td>
+    <td>[% author.credentials | html %]</td>
+    <td>[% author.specialty | html %]</td>
+    <td>[% author.affiliation | html %]</td>
+    <td>[% author.nationality | html %]</td>
+    <td class="nowrap">
+      <a href="[% c.uri_for('/ENCY/Author', author.author_id) %]">Detail</a>
+      [% IF is_editor %]
+      &nbsp;<a href="[% c.uri_for('/ENCY/Author', author.author_id, { edit => 1 }) %]">Edit</a>
+      [% END %]
+    </td>
+  </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p class="ency-admin-note">No authors found.</p>
+[% END %]

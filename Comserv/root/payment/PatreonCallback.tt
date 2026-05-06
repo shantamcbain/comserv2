@@ -1,0 +1,69 @@
+[% META
+   title = "Patreon Connection"
+   description = "Patreon OAuth2 callback and account linking"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Payment"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Patreon Account Linking</h1>
+  </div>
+  <div class="content-container">
+    <div class="content-primary">
+      <div class="content-section">
+
+        [% IF patreon_error %]
+        <div class="error-box" style="padding:1.5em;border:1px solid #d9534f;border-radius:6px;background:#fdf2f2">
+          <h2>Patreon Connection Failed</h2>
+          [% IF patreon_error == 'not_configured' %]
+          <p>Patreon integration has not yet been configured for this site. Please use another payment method or contact the site administrator.</p>
+          [% ELSIF patreon_error == 'api_error' %]
+          <p>[% error_desc | html %]</p>
+          <p>Please try connecting your Patreon account again. If the problem persists, contact support.</p>
+          [% ELSIF patreon_error == 'link_failed' %]
+          <p>[% error_desc | html %]</p>
+          [% IF patron_id %]<p>Your Patreon patron ID is: <code>[% patron_id | html %]</code>. Please provide this to support.</p>[% END %]
+          [% ELSE %]
+          <p>[% error_desc || 'An unknown error occurred.' | html %]</p>
+          [% END %]
+          <div class="form-actions">
+            <a href="[% c.uri_for('/membership') %]" class="btn btn-primary">← Back to Plans</a>
+            [% IF plan_id %]
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan_id }) %]"
+               class="btn btn-secondary">Try Another Payment Method</a>
+            [% END %]
+          </div>
+        </div>
+
+        [% ELSIF patron_id %]
+        <div class="success-box" style="padding:1.5em;border:1px solid #5cb85c;border-radius:6px;background:#f2fdf2">
+          <h2>Patreon Account Verified</h2>
+          <p>Your Patreon account has been verified (patron ID: <code>[% patron_id | html %]</code>).</p>
+          [% IF patron_email %]
+          <p>Patreon email: <strong>[% patron_email | html %]</strong></p>
+          [% END %]
+          [% IF plan_id %]
+          <p>Your membership is being activated. Please visit your account to confirm.</p>
+          [% ELSE %]
+          <p>Your Patreon account is linked. To activate a membership plan, please select a plan below.</p>
+          [% END %]
+          <div class="form-actions">
+            <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">View My Account</a>
+            <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">Browse Plans</a>
+          </div>
+        </div>
+
+        [% ELSE %]
+        <p>Processing your Patreon connection&hellip;</p>
+        [% END %]
+
+      </div>
+    </div>
+  </div>
+</div>

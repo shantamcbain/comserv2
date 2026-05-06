@@ -18,12 +18,7 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
 <h1>Editing Symptom: [% symptom.name | html %]</h1>
@@ -32,16 +27,23 @@
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Symptom') %]">&larr; Back to Symptoms</a>
-[% IF is_admin && !edit_mode && symptom.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Symptom/edit') %]" onclick="document.cookie='record_id=[% symptom.record_id %]'">Edit</a>
+[% IF is_editor && !edit_mode && symptom.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Symptom/edit', { record_id => symptom.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 <form action="[% IF symptom.record_id %][% c.uri_for('/ENCY/Symptom/edit') %][% ELSE %][% c.uri_for('/ENCY/Symptom/add') %][% END %]" method="post">
 [% IF symptom.record_id %]
 <input type="hidden" name="record_id" value="[% symptom.record_id %]" />
 [% END %]
+[% IF return_to %]
+<input type="hidden" name="return_to"     value="[% return_to    | html %]" />
+<input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
+<input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
+[% END %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <h2>Clinical Info</h2>
@@ -50,7 +52,7 @@
         <td><strong>Name</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="name" value="[% symptom.name | html %]" size="50" />
+            <input type="text" name="name" value="[% prefill_name || symptom.name | html %]" size="50" />
             [% ELSE %]
             [% symptom.name | html %]
             [% END %]
@@ -200,6 +202,9 @@
     [% END %]
 </table>
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>

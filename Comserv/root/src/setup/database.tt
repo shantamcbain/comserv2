@@ -1,5 +1,5 @@
 <div class="container" style="max-width: 600px; margin: 50px auto;">
-    <div style="background: var(--light-color); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color);">
+    <div style="background: rgba(255,255,255,0.15); padding: 30px; border-radius: 8px; border: 1px solid var(--border-color);">
         <h1 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Database Configuration Setup</h1>
         
         <p style="color: var(--text-color); font-family: var(--body-font); margin-bottom: 20px;">

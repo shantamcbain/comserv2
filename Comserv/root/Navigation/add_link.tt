@@ -92,6 +92,11 @@
             <a href="/navigation/manage_links" class="btn btn-secondary">Cancel</a>
         </div>
     </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'navigation link'
+   ai_form_context      = 'site navigation menu link management'
+   ai_form_fields       = 'link_text, url, description, category'
+%]
 </div>
 
 <script>

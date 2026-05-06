@@ -1,0 +1,73 @@
+[% META
+   title = "Transfer Coins"
+   description = "Send coins to another member"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Currency"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Transfer Coins</h1>
+    <div class="header-actions">
+      <a href="[% c.uri_for('/currency/balance') %]" class="btn btn-secondary">My Balance</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <p>
+          Available balance: <strong style="color:var(--success-color,#27ae60)">[% balance | format('%.4f') %] coins</strong>
+        </p>
+
+        <form method="post" action="[% c.uri_for('/currency/transfer') %]" style="max-width:480px">
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <label for="recipient_username"><strong>Recipient Username</strong></label>
+            <input type="text" id="recipient_username" name="recipient_username"
+                   value="[% recipient | html %]"
+                   required
+                   placeholder="Enter username"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-group" style="margin-bottom:1rem">
+            <label for="amount"><strong>Amount (coins)</strong></label>
+            <input type="number" id="amount" name="amount"
+                   value="[% amount | html %]"
+                   required min="0.0001" step="0.0001"
+                   placeholder="0.0000"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-group" style="margin-bottom:1.2rem">
+            <label for="note"><strong>Note</strong> <span style="font-weight:normal;color:#888">(optional)</span></label>
+            <input type="text" id="note" name="note"
+                   value="[% note | html %]"
+                   maxlength="200"
+                   placeholder="What is this transfer for?"
+                   style="width:100%;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;margin-top:0.3rem">
+          </div>
+
+          <div class="form-actions">
+            <button type="submit" class="btn btn-primary">Send Coins</button>
+            <a href="[% c.uri_for('/currency/balance') %]" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+
+        <p style="margin-top:1.5rem;font-size:0.82em;color:#888">
+          Transfers are instant and irreversible. Please double-check the recipient's username
+          before confirming. The minimum transfer amount is 0.0001 coins.
+        </p>
+      </div>
+
+    </div>
+  </div>
+</div>

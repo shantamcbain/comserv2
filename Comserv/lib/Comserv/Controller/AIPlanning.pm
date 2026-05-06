@@ -14,6 +14,60 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance },
 );
 
+sub auto :Private {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'auto',
+        "AIPlanning controller auto method called");
+
+    my $user_id = $c->session->{user_id};
+    my $site_id = $c->session->{SiteID};
+
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({
+            success     => 0,
+            error       => 'Authentication required to access planning features',
+            upgrade_url => '/membership/plans',
+        }));
+        $c->detach;
+        return 0;
+    }
+
+    my $roles = $c->session->{roles};
+    my $is_admin = 0;
+    if (ref $roles eq 'ARRAY') {
+        $is_admin = 1 if grep { lc($_) eq 'admin' || lc($_) eq 'site_admin' } @$roles;
+    } elsif ($roles) {
+        $is_admin = 1 if lc($roles) eq 'admin' || lc($roles) eq 'site_admin';
+    }
+    return 1 if $is_admin;
+
+    my $has_access = 0;
+    eval {
+        $has_access = $c->model('Membership')->check_access($c, $user_id, 'planning', $site_id);
+    };
+    if (my $err = $@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
+            "Error checking membership access for planning: $err");
+        $has_access = 0;
+    }
+
+    unless ($has_access) {
+        $c->response->status(403);
+        $c->response->content_type('application/json');
+        $c->response->body(encode_json({
+            success     => 0,
+            error       => 'Planning features require a membership plan with planning access',
+            upgrade_url => '/membership/plans',
+        }));
+        $c->detach;
+        return 0;
+    }
+
+    return 1;
+}
+
 sub attach_to_plan :Path('/ai/planning/attach') :Args(0) {
     my ($self, $c) = @_;
     

@@ -25,17 +25,17 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access Control</a>
-                <a href="#related-files" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Related Files</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Access Control</a>
+                <a href="#related-files" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Related Files</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -57,7 +57,7 @@
                     <li><strong>Infrastructure monitoring</strong> - server health checks, application start tracking</li>
                 </ul>
             </p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <strong>Recent Changes (v0.03 - 2026-01-11)</strong>: Version consolidation update. Aligned documentation with latest code commits from HEAD. All method signatures verified current; no breaking changes detected.
                 <br/><br/>
                 <strong>v0.02 Changes</strong>: Expanded documentation of all 20+ subroutines. Added comprehensive method signatures and parameters. Documented session variables, role checking logic, and site configuration workflow.
@@ -83,7 +83,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Advanced Features</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
                 <li><strong>Application Lifecycle Hooks</strong>: BEGIN (startup), auto (pre-action), end (post-action) with comprehensive logging</li>
-                <li><strong>Health Monitoring</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/health</code> endpoint for infrastructure health checks</li>
+                <li><strong>Health Monitoring</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/health</code> endpoint for infrastructure health checks</li>
                 <li><strong>Structured Logging</strong>: Integrates with Comserv::Util::Logging for file/context-based logging of all operations</li>
                 <li><strong>Debug Mode</strong>: Optional debug tracing for development with debug_mode session flag</li>
                 <li><strong>Email Integration</strong>: Built-in send_email() method for transactional emails</li>
@@ -100,48 +100,48 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Catalyst Lifecycle Hooks</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>BEGIN</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:163]</code>: Extends Catalyst::Controller. Sets namespace to '' for global routing.</li>
-                <li><strong>begin</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1724]</code>: Runs at start of request cycle. Initializes application state and setup variables.</li>
-                <li><strong>auto</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:186]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">PRIVATE</span>: Runs before every action. Core initialization logic including user_exists() check, role validation, session setup, site_setup() call, theme management.</li>
-                <li><strong>end</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1758]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">RenderView</span>: Final action after all processing. Renders response and handles cleanup.</li>
+                <li><strong>BEGIN</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:163]</code>: Extends Catalyst::Controller. Sets namespace to '' for global routing.</li>
+                <li><strong>begin</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1724]</code>: Runs at start of request cycle. Initializes application state and setup variables.</li>
+                <li><strong>auto</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:186]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">PRIVATE</span>: Runs before every action. Core initialization logic including user_exists() check, role validation, session setup, site_setup() call, theme management.</li>
+                <li><strong>end</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1758]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">RenderView</span>: Final action after all processing. Renders response and handles cleanup.</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Public Routes (:Path)</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>health</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/health [:725]</code>: Health check endpoint. Returns 200 OK for infrastructure monitoring.</li>
-                <li><strong>index</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/ [:735]</code>: Default homepage. Main application entry point.</li>
-                <li><strong>debug</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/debug [:1629]</code>: Debug information display (if debug_mode enabled).</li>
-                <li><strong>accounts</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/accounts [:1637]</code>: Displays user accounts or redirects to Auth page.</li>
-                <li><strong>proxmox_servers</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/proxmox_servers [:1656]</code>: Lists available Proxmox servers.</li>
-                <li><strong>proxmox</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/proxmox [:1662]</code>: Routes to Proxmox controller.</li>
-                <li><strong>proxymanager</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/proxymanager [:1669]</code>: Routes to ProxyManager controller.</li>
-                <li><strong>ProxyManager</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/ProxyManager [:1676]</code>: Alternative route to ProxyManager (case variation).</li>
-                <li><strong>hosting</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/hosting [:1683]</code>: Routes to HostingSignup controller.</li>
-                <li><strong>Hosting</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/Hosting [:1690]</code>: Alternative route to HostingSignup (case variation).</li>
-                <li><strong>reset_session</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">:Global [:1698]</code>: Clears session data and logs out user.</li>
-                <li><strong>default</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">:Path [:1796]</code>: Catches unmapped requests. Returns 404 error.</li>
+                <li><strong>health</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/health [:725]</code>: Health check endpoint. Returns 200 OK for infrastructure monitoring.</li>
+                <li><strong>index</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/ [:735]</code>: Default homepage. Main application entry point.</li>
+                <li><strong>debug</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/debug [:1629]</code>: Debug information display (if debug_mode enabled).</li>
+                <li><strong>accounts</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/accounts [:1637]</code>: Displays user accounts or redirects to Auth page.</li>
+                <li><strong>proxmox_servers</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/proxmox_servers [:1656]</code>: Lists available Proxmox servers.</li>
+                <li><strong>proxmox</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/proxmox [:1662]</code>: Routes to Proxmox controller.</li>
+                <li><strong>proxymanager</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/proxymanager [:1669]</code>: Routes to ProxyManager controller.</li>
+                <li><strong>ProxyManager</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/ProxyManager [:1676]</code>: Alternative route to ProxyManager (case variation).</li>
+                <li><strong>hosting</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/hosting [:1683]</code>: Routes to HostingSignup controller.</li>
+                <li><strong>Hosting</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/Hosting [:1690]</code>: Alternative route to HostingSignup (case variation).</li>
+                <li><strong>reset_session</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">:Global [:1698]</code>: Clears session data and logs out user.</li>
+                <li><strong>default</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">:Path [:1796]</code>: Catches unmapped requests. Returns 404 error.</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Session &amp; Authentication Methods</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>user_exists</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:27]</code>: Checks if user session exists (username + user_id). Returns boolean.</li>
-                <li><strong>check_user_roles</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:33]</code>: Validates user role against a specified role. Checks: is_admin flag, roles array, roles string, user_groups array. Comprehensive logging for debugging.</li>
+                <li><strong>user_exists</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:27]</code>: Checks if user session exists (username + user_id). Returns boolean.</li>
+                <li><strong>check_user_roles</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:33]</code>: Validates user role against a specified role. Checks: is_admin flag, roles array, roles string, user_groups array. Comprehensive logging for debugging.</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Configuration &amp; Setup Methods</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>setup_site</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1271]</code>: Multi-site configuration loader. Queries database for Site by domain/subdomain. Sets SiteName, ControllerName in stash/session. Handles domain errors with fallback to 'CSC' default. Calls site_setup() for additional initialization.</li>
-                <li><strong>site_setup</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1481]</code>: Site-specific initialization. Loads configuration, user groups, admin email based on site name.</li>
-                <li><strong>set_theme</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:817]</code>: Loads theme from theme_definitions.json. Applies CSS variables to stash for template rendering.</li>
-                <li><strong>fetch_and_set</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:850]</code>: Helper for theme loading. Retrieves theme config and validates structure.</li>
-                <li><strong>setup_debug_mode</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1137]</code>: Initializes debug mode based on environment or session flag.</li>
+                <li><strong>setup_site</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1271]</code>: Multi-site configuration loader. Queries database for Site by domain/subdomain. Sets SiteName, ControllerName in stash/session. Handles domain errors with fallback to 'CSC' default. Calls site_setup() for additional initialization.</li>
+                <li><strong>site_setup</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1481]</code>: Site-specific initialization. Loads configuration, user groups, admin email based on site name.</li>
+                <li><strong>set_theme</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:817]</code>: Loads theme from theme_definitions.json. Applies CSS variables to stash for template rendering.</li>
+                <li><strong>fetch_and_set</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:850]</code>: Helper for theme loading. Retrieves theme config and validates structure.</li>
+                <li><strong>setup_debug_mode</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1137]</code>: Initializes debug mode based on environment or session flag.</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">System &amp; Utility Methods</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>get_server_ip</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:167]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">PRIVATE</span>: Detects server IP address for infrastructure monitoring.</li>
-                <li><strong>track_application_start</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:918]</code>: Records application startup time and initializes request tracking.</li>
-                <li><strong>send_email</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">[:1146]</code>: Sends transactional emails. Integrates with Email::Simple and Email::Sender::Simple.</li>
+                <li><strong>get_server_ip</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:167]</code> <span style="background-color: var(--success-color); padding: 2px 4px; color: white; border-radius: 3px; font-size: 0.9em;">PRIVATE</span>: Detects server IP address for infrastructure monitoring.</li>
+                <li><strong>track_application_start</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:918]</code>: Records application startup time and initializes request tracking.</li>
+                <li><strong>send_email</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">[:1146]</code>: Sends transactional emails. Integrates with Email::Simple and Email::Sender::Simple.</li>
             </ul>
             
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -157,8 +157,8 @@
             <p style="color: var(--text-color); font-family: var(--body-font);">
                 The following routes are accessible without authentication:
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
-                    <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/ (index)</code> - Homepage</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">/health</code> - Infrastructure health check</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/ (index)</code> - Homepage</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">/health</code> - Infrastructure health check</li>
                 </ul>
             </p>
 
@@ -172,7 +172,7 @@
                 <li><strong>Roles string</strong>: Regex match against comma-separated roles string</li>
                 <li><strong>User groups array</strong>: Check user's groups (e.g., admin group membership)</li>
             </ol>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
                 <strong>⚠️ Admin Role Requirements</strong>: Admin access requires at least ONE of: (1) is_admin=1, (2) 'admin' in roles array, (3) 'admin' in roles string, or (4) 'admin' in user_groups array. Each check is logged with debug details for troubleshooting.
             </div>
 
@@ -181,14 +181,14 @@
                 The controller maintains and validates these session variables:
             </p>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{username}</code> - Authenticated user's login name</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{user_id}</code> - User's database ID</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{roles}</code> - User roles (array or string)</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{is_admin}</code> - Admin flag (boolean)</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{user_groups}</code> - User's groups array (for group-based auth)</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{SiteName}</code> - Current site context</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{ControllerName}</code> - Home controller for site</li>
-                <li><code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">$c->session->{debug_mode}</code> - Debug tracing flag (0/1)</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{username}</code> - Authenticated user's login name</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{user_id}</code> - User's database ID</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{roles}</code> - User roles (array or string)</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{is_admin}</code> - Admin flag (boolean)</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{user_groups}</code> - User's groups array (for group-based auth)</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{SiteName}</code> - Current site context</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{ControllerName}</code> - Home controller for site</li>
+                <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">$c->session->{debug_mode}</code> - Debug tracing flag (0/1)</li>
             </ul>
 
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -202,22 +202,22 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Core Code</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Root.pm</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">lib/Comserv/Controller/Root.pm</code> (1,831 lines) - Main implementation</li>
-                <li><strong>Root.tt</strong> <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">root/Documentation/controllers/Root.tt</code> - This documentation</li>
+                <li><strong>Root.pm</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">lib/Comserv/Controller/Root.pm</code> (1,831 lines) - Main implementation</li>
+                <li><strong>Root.tt</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">root/Documentation/controllers/Root.tt</code> - This documentation</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Configuration Files</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Theme Configuration</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">root/static/config/theme_definitions.json</code> - CSS theme variables loaded by set_theme()</li>
-                <li><strong>Application Config</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">config/comserv.conf</code> - Main app configuration (YAML)</li>
-                <li><strong>Database Config</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">db_config.json</code> - Database connection details</li>
+                <li><strong>Theme Configuration</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">root/static/config/theme_definitions.json</code> - CSS theme variables loaded by set_theme()</li>
+                <li><strong>Application Config</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">config/comserv.conf</code> - Main app configuration (YAML)</li>
+                <li><strong>Database Config</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">db_config.json</code> - Database connection details</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Dependency Modules</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Logging</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">Comserv::Util::Logging</code> - Structured logging for debug output</li>
-                <li><strong>System Info</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">Comserv::Util::SystemInfo</code> - Server information utilities</li>
-                <li><strong>Email</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">Email::Simple, Email::Sender::Simple</code> - Email sending (CPAN)</li>
+                <li><strong>Logging</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">Comserv::Util::Logging</code> - Structured logging for debug output</li>
+                <li><strong>System Info</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">Comserv::Util::SystemInfo</code> - Server information utilities</li>
+                <li><strong>Email</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">Email::Simple, Email::Sender::Simple</code> - Email sending (CPAN)</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Database Models</h3>
@@ -229,9 +229,9 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Template Files</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
-                <li><strong>Master Layout</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">root/lib/Comserv/View/TT/wrapper.tt</code> - Global page wrapper</li>
-                <li><strong>Page Top</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">root/lib/Comserv/View/TT/pagetop.tt</code> - Navigation/header</li>
-                <li><strong>Homepage</strong>: <code style="background-color: var(--light-color); padding: 2px 4px; border-radius: 3px;">root/src/index.tt</code> - Default index template</li>
+                <li><strong>Master Layout</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">root/lib/Comserv/View/TT/wrapper.tt</code> - Global page wrapper</li>
+                <li><strong>Page Top</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">root/lib/Comserv/View/TT/pagetop.tt</code> - Navigation/header</li>
+                <li><strong>Homepage</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; border-radius: 3px;">root/src/index.tt</code> - Default index template</li>
             </ul>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em; margin-top: var(--spacing-medium);">Related Controllers</h3>
@@ -252,7 +252,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">6. See Also &amp; Related Documentation</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/controllers/index" style="color: var(--link-color);">Controller Documentation Index</a> - Complete list of all Comserv controllers</li>

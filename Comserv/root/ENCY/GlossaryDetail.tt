@@ -17,30 +17,38 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
-[% roles = c.session.roles;
-   is_admin = 0;
-   FOREACH r IN roles;
-     IF r == 'admin'; is_admin = 1; END;
-   END;
-%]
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
-<h1>Editing Glossary Term: [% entry.term | html %]</h1>
+<h1>[% IF entry.record_id %]Editing Glossary Term: [% entry.term | html %][% ELSIF prefill_term %]Add New Glossary Term: [% prefill_term | html %][% ELSE %]Add New Glossary Term[% END %]</h1>
 [% ELSE %]
 <h1>[% entry.term | html %]</h1>
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Glossary') %]">&larr; Back to Glossary</a>
-[% IF is_admin && !edit_mode && entry.record_id %]
-  | <a href="[% c.uri_for('/ENCY/Glossary/edit') %]" onclick="document.cookie='record_id=[% entry.record_id %]'">Edit</a>
+[% IF is_editor && !edit_mode && entry.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Glossary/edit', { record_id => entry.record_id }) %]">Edit</a>
 [% END %]
 </p>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
+[% IF return_to && !(resolve_field || resolve_type) %]
+<div class="alert alert-info" style="margin-bottom:0.75em;">
+  Adding this glossary term so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
+  &mdash; you will be returned there automatically after saving.
+</div>
+[% END %]
 <form action="[% IF entry.record_id %][% c.uri_for('/ENCY/Glossary/edit') %][% ELSE %][% c.uri_for('/ENCY/Glossary/add') %][% END %]" method="post">
 [% IF entry.record_id %]
 <input type="hidden" name="record_id" value="[% entry.record_id %]" />
 [% END %]
+[% IF return_to %]
+<input type="hidden" name="return_to"     value="[% return_to    | html %]" />
+<input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
+<input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
+[% END %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
 
 <table border="1" cellpadding="4" cellspacing="0">
@@ -48,7 +56,7 @@
         <td><strong>Term</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="term" value="[% entry.term | html %]" size="60" />
+            <input type="text" name="term" value="[% prefill_term || entry.term | html %]" size="60" />
             [% ELSE %]
             [% entry.term | html %]
             [% END %]
@@ -58,9 +66,10 @@
         <td><strong>Alternate Terms</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <input type="text" name="alternate_terms" value="[% entry.alternate_terms | html %]" size="60" />
             [% ELSE %]
-            [% entry.alternate_terms | html %]
+            [% entry.alternate_terms | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -70,7 +79,7 @@
             [% IF edit_mode %]
             <textarea name="definition" rows="6" cols="60">[% entry.definition | html %]</textarea>
             [% ELSE %]
-            [% entry.definition | html %]
+            [% entry.definition | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -90,7 +99,7 @@
             [% IF edit_mode %]
             <textarea name="context" rows="3" cols="60">[% entry.context | html %]</textarea>
             [% ELSE %]
-            [% entry.context | html %]
+            [% entry.context | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -100,7 +109,7 @@
             [% IF edit_mode %]
             <textarea name="etymology" rows="3" cols="60">[% entry.etymology | html %]</textarea>
             [% ELSE %]
-            [% entry.etymology | html %]
+            [% entry.etymology | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -108,9 +117,10 @@
         <td><strong>Examples</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <textarea name="examples" rows="3" cols="60">[% entry.examples | html %]</textarea>
             [% ELSE %]
-            [% entry.examples | html %]
+            [% entry.examples | ref_links %]
             [% END %]
         </td>
     </tr>
@@ -118,12 +128,13 @@
         <td><strong>Related Terms</strong></td>
         <td>
             [% IF edit_mode %]
+            [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
             <input type="text" name="related_terms" value="[% entry.related_terms | html %]" size="60" />
             [% ELSE %]
             [% IF entry.related_terms %]
-            [% FOREACH rt IN entry.related_terms.split(',') %]
+            [% FOREACH rt IN entry.related_terms.split(';') %]
               [% rt_trimmed = rt.replace('^\s+|\s+$', '') %]
-              <a href="[% c.uri_for('/ENCY/Glossary') %]?term=[% rt_trimmed | uri %]">[% rt_trimmed | html %]</a>[% UNLESS loop.last %],[% END %]
+              [% IF rt_trimmed %]<a href="[% c.uri_for('/ENCY/Glossary') %]?term=[% rt_trimmed | uri %]">[% rt_trimmed | html %]</a>[% UNLESS loop.last %]; [% END %][% END %]
             [% END %]
             [% END %]
             [% END %]
@@ -141,8 +152,10 @@
     </tr>
 </table>
 
+[% IF !edit_mode %]
+[% PROCESS 'ENCY/partials/FormalRefs.tt' %]
+[% END %]
 [% IF edit_mode %]
-[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 <br/>
 <input type="submit" value="[% IF entry.record_id %]Update Term[% ELSE %]Add Term[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Glossary') %]" class="btn btn-default">Cancel</a>

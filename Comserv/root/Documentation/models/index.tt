@@ -55,7 +55,7 @@
     .model-list h2 {
         color: #0056b3;
         margin: 20px 0 10px 0;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
         padding-bottom: 5px;
     }
     .model-list ul {

@@ -1,0 +1,21 @@
+[Unit]
+Description=Comserv Docker Compose Services (waits for NFS, mounts on host)
+Documentation=https://github.com/shantamcsbain/comserv2
+After=docker.service network-online.target
+Requires=docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=root
+WorkingDirectory=/home/shanta/PycharmProjects/comserv2
+ExecStart=/home/shanta/PycharmProjects/comserv2/Comserv/script/comserv-docker-start.sh
+ExecStop=/bin/bash -c 'umount -l /home/shanta/comserv-workshop 2>/dev/null || true; /usr/local/bin/docker compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml down'
+StandardOutput=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/docker-boot.log
+StandardError=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/docker-boot.log
+TimeoutStartSec=180
+TimeoutStopSec=60
+
+[Install]
+WantedBy=multi-user.target

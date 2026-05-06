@@ -29,7 +29,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font);">This guide walks you through setting up the complete Kubernetes-ready CI/CD pipeline for Comserv with automated testing, building, and deployment to three environments (Development, Staging, Production).</p>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Pipeline Architecture</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0; white-space: pre-wrap;"><code>
 ┌─────────────┐
 │  Push Code  │
@@ -88,7 +88,7 @@
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Installation Instructions</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Install Docker & Docker Compose</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 curl -fsSL https://get.docker.com -o get-docker.sh
 sudo sh get-docker.sh
@@ -98,7 +98,7 @@ sudo chmod +x /usr/local/bin/docker-compose
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Create Deployment User</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 sudo useradd -m -s /bin/bash deploy
 sudo usermod -aG docker deploy
@@ -108,7 +108,7 @@ sudo chmod 700 /home/deploy/.ssh
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Create Directory Structure</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 sudo mkdir -p /opt/comserv2
 sudo chown deploy:deploy /opt/comserv2
@@ -118,7 +118,7 @@ git clone https://github.com/YOUR-ORG/comserv2.git .
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Create Backup Directory</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 mkdir -p ~/backups
 chmod 700 ~/backups
@@ -143,7 +143,7 @@ chmod 700 ~/backups
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Navigate to:</strong> Settings → Secrets and variables → Actions</p>
             
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Development Server Secrets</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 DEV_SERVER_HOST: your-dev-server.com
 DEV_SERVER_USER: deploy
@@ -153,7 +153,7 @@ DEV_DATABASE_PASS: &lt;secure password&gt;
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Staging Server Secrets</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 STAGING_SERVER_HOST: your-staging-server.com
 STAGING_SERVER_USER: deploy
@@ -164,7 +164,7 @@ STAGING_ALERT_EMAIL: devops@example.com
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Production Server Secrets</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 PROD_SERVER_HOST: your-prod-server.com
 PROD_SERVER_USER: deploy
@@ -203,7 +203,7 @@ IMAGE_REGISTRY: yourusername/comserv
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Development Server Setup</h3>
             
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Create Deployment Key Pair</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 ssh-keygen -t ed25519 -f ~/.ssh/comserv-dev-deploy -C "comserv-dev-deploy"
 # Don't set passphrase for CI/CD
@@ -211,7 +211,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/comserv-dev-deploy -C "comserv-dev-deploy"
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Add Public Key to Server</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 mkdir -p ~/.ssh
 echo "$(cat ~/.ssh/comserv-dev-deploy.pub)" >> ~/.ssh/authorized_keys
@@ -220,7 +220,7 @@ chmod 600 ~/.ssh/authorized_keys
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Clone Repository to Server</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 cd ~/
 git clone https://github.com/YOUR-ORG/comserv2.git
@@ -229,7 +229,7 @@ cd comserv2
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Create .env File</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 cd Comserv
 cp .env.development .env
@@ -239,7 +239,7 @@ nano .env
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Verify Docker Setup</h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 docker run hello-world
 docker-compose --version
@@ -352,7 +352,7 @@ docker-compose --version
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
             
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Docker Build Fails</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -361,7 +361,7 @@ docker-compose --version
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Deployment SSH Fails</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -370,7 +370,7 @@ docker-compose --version
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: var(--warning-color); font-family: var(--header-font);">Database Migration Fails</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong></p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -408,7 +408,7 @@ docker-compose --version
 
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font);">See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/deployment/cicd_setup_instructions" style="color: var(--link-color);">CI/CD Setup Instructions</a></li>

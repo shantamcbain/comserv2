@@ -90,7 +90,7 @@
                         <td>auto_increment</td>
                         <td>Primary key - auto-generated index ID</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>file_path</td>
                         <td>VARCHAR(512)</td>
                         <td>NO</td>
@@ -104,7 +104,7 @@
                         <td>REQUIRED</td>
                         <td>File type: 'tt' (Template Toolkit), 'md' (Markdown)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>title</td>
                         <td>VARCHAR(512)</td>
                         <td>NO</td>
@@ -118,7 +118,7 @@
                         <td>NULL</td>
                         <td>Short excerpt for search results display (optional, unlimited length)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>searchable_text</td>
                         <td>LONGTEXT</td>
                         <td>NO</td>
@@ -132,7 +132,7 @@
                         <td>REQUIRED</td>
                         <td>SHA256 hash of file content (for staleness detection)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>role_access</td>
                         <td>JSON</td>
                         <td>YES</td>
@@ -146,7 +146,7 @@
                         <td>CURRENT_TIMESTAMP</td>
                         <td>Timestamp when index was created (auto-set)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>last_file_modified</td>
                         <td>TIMESTAMP</td>
                         <td>YES</td>
@@ -180,7 +180,7 @@
                         <td>Template Toolkit documents (primary documentation format)</td>
                         <td>&#91;% META ... %&#93; block at top of file</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td><strong>'md'</strong></td>
                         <td>.md</td>
                         <td>Markdown documents (legacy or draft format)</td>
@@ -189,7 +189,7 @@
                 </table>
 
                 <h3>File Type Indexing Examples</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use Digest::SHA;
 
 # Index a Template Toolkit file
@@ -220,7 +220,7 @@ my $index = $schema->resultset('DocumentationMetadataIndex')->create({
 
                 <h3>Markdown Metadata</h3>
                 <p>For .md files, metadata can come from YAML frontmatter:</p>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>---
 title: Installation Guide
 excerpt: Steps to install and configure Comserv
@@ -257,7 +257,7 @@ roles: [admin, developer]
                 </ul>
 
                 <h3>Accessing Citations</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $doc_index = $schema->resultset('DocumentationMetadataIndex')->find($id);
 
 # Get all AI messages that cited this document
@@ -271,7 +271,7 @@ foreach my $message (@citations) {
                 </div>
 
                 <h3>Citation Analytics</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code># Count how many times a document was cited
 my $doc_index = $schema->resultset('DocumentationMetadataIndex')->find($id);
 my $citation_count = $doc_index->ai_citations->count;
@@ -291,7 +291,7 @@ print "This document was cited $citation_count times\n";</code></pre>
                 </ul>
 
                 <h3>Detecting Stale Content</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>is_content_stale():</strong> Check if documentation needs refresh</p>
                     <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
 
@@ -304,7 +304,7 @@ if ($index->is_content_stale) {
                 </div>
 
                 <h3>Refreshing Stale Documentation</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use DateTime;
 use Digest::SHA;
 
@@ -340,7 +340,7 @@ foreach my $index (@stale) {
                 </ul>
 
                 <h3>Checking User Access</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>can_user_access($user_roles):</strong> Check if user can view document</p>
                     <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
 my $user_roles = ['developer', 'editor'];
@@ -353,7 +353,7 @@ if ($index->can_user_access($user_roles)) {
                 </div>
 
                 <h3>Accessible Roles Retrieval</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_accessible_by_roles():</strong> Get roles with access</p>
                     <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find($id);
 my @accessible = @{ $index->get_accessible_by_roles() };
@@ -366,7 +366,7 @@ print "Accessible by roles: " . join(', ', @accessible) . "\n";</code></pre>
                 <h2>API Methods & Helpers</h2>
                 
                 <h3>Standard DBIx::Class Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Creating Index Entries:</strong></p>
                     <pre><code>use Digest::SHA;
 use JSON::MaybeXS;
@@ -384,7 +384,7 @@ my $index = $schema->resultset('DocumentationMetadataIndex')->create({
 });</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Retrieving Indexes:</strong></p>
                     <pre><code>my $index = $schema->resultset('DocumentationMetadataIndex')->find(1);
 
@@ -398,20 +398,20 @@ my @by_title = $schema->resultset('DocumentationMetadataIndex')->search({
                 </div>
 
                 <h3>Helper Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>get_accessible_by_roles():</strong> Get array of accessible roles</p>
                     <pre><code>my @roles = @{ $index->get_accessible_by_roles() };
 # Returns: ['admin', 'developer'] or ['*'] for public</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>can_user_access($user_roles):</strong> Check user access (array ref)</p>
                     <pre><code>if ($index->can_user_access(['developer', 'admin'])) {
     # User has access
 }</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>is_content_stale():</strong> Check if >24 hours old</p>
                     <pre><code>if ($index->is_content_stale) {
     # Schedule re-indexing
@@ -423,7 +423,7 @@ my @by_title = $schema->resultset('DocumentationMetadataIndex')->search({
                 <h2>Usage Examples</h2>
                 
                 <h3>Example 1: Index New Template Toolkit Document</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use File::Slurp;
 use Digest::SHA;
 use JSON::MaybeXS;
@@ -447,7 +447,7 @@ print "Indexed: " . $index->file_path . "\n";</code></pre>
                 </div>
 
                 <h3>Example 2: Search Documents by Title</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my @results = $schema->resultset('DocumentationMetadataIndex')->search({
     title => { like => '%Model%' }
 })->all;
@@ -460,7 +460,7 @@ foreach my $doc (@results) {
                 </div>
 
                 <h3>Example 3: Filter Documents by Role Access</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $user_roles = ['developer'];
 my @docs = $schema->resultset('DocumentationMetadataIndex')->search({
     file_type => 'tt'
@@ -474,7 +474,7 @@ print "Found " . scalar(@accessible) . " accessible docs for developer\n";</code
                 </div>
 
                 <h3>Example 4: Find and Refresh Stale Documentation</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my @all_docs = $schema->resultset('DocumentationMetadataIndex')->all;
 my @stale = grep { $_->is_content_stale } @all_docs;
 
@@ -492,7 +492,7 @@ foreach my $doc (@stale) {
                 </div>
 
                 <h3>Example 5: Track Document Citations</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $doc = $schema->resultset('DocumentationMetadataIndex')->find(50);
 
 my @citations = $doc->ai_citations->search(

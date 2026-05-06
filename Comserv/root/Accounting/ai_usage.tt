@@ -1,0 +1,178 @@
+<h1>AI Usage Cost Allocation</h1>
+<p><a href="/Accounting">← Accounting</a></p>
+
+<form method="GET" action="/Accounting/ai_usage" style="margin-bottom:1.2em;padding:0.8em;background:#f7f7f7;border:1px solid #ccc;border-radius:5px;display:flex;flex-wrap:wrap;gap:0.7em;align-items:flex-end;">
+  <div>
+    <label style="font-size:0.85em;display:block;">From</label>
+    <input type="date" name="period_from" value="[% period_from %]" required>
+  </div>
+  <div>
+    <label style="font-size:0.85em;display:block;">To</label>
+    <input type="date" name="period_to" value="[% period_to %]" required>
+  </div>
+  <div>
+    <label style="font-size:0.85em;display:block;">Provider</label>
+    <select name="provider">
+      <option value="grok"[% IF provider == 'grok' %] selected[% END %]>Grok / xAI (external cost)</option>
+      <option value="all"[% IF provider == 'all' %] selected[% END %]>All providers</option>
+      <option value="ollama"[% IF provider == 'ollama' %] selected[% END %]>Ollama (local — no API cost)</option>
+    </select>
+  </div>
+  <div>
+    <label style="font-size:0.85em;display:block;">Agent / System</label>
+    <select name="agent_filter">
+      <option value="all"[% IF agent_filter == 'all' %] selected[% END %]>All agents</option>
+      [% FOREACH a IN agent_list %]
+      <option value="[% a | html %]"[% IF agent_filter == a %] selected[% END %]>[% a | html %]</option>
+      [% END %]
+    </select>
+  </div>
+  <div>
+    <label style="font-size:0.85em;display:block;">Invoice amount ($)</label>
+    <input type="number" name="invoice_amount" value="[% invoice_amt %]" step="0.01" min="0" style="width:100px;"
+           placeholder="e.g. 1.11">
+  </div>
+  <div>
+    <label style="font-size:0.85em;display:block;">Invoice ID (optional)</label>
+    <input type="text" name="invoice_id" value="[% invoice_id %]" style="width:80px;" placeholder="DB id">
+  </div>
+  <div>
+    <button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+      Generate Report
+    </button>
+  </div>
+</form>
+
+<h2>Period: [% period_from %] → [% period_to %]
+  <small style="font-size:0.7em;color: var(--text-muted-color, #555);">
+    ([% provider == 'grok' ? 'Grok/xAI only' : provider %]
+    [% IF agent_filter != 'all' %] · agent: [% agent_filter | html %][% END %])
+  </small>
+</h2>
+
+[% IF agents.size %]
+<h3>Usage by Agent / System</h3>
+<p style="font-size:0.85em;color: var(--text-muted-color, #555);">Use this to see how much of the cost was driven by each part of the system (e.g. Inventory accounting AI vs general chat).</p>
+<table border="1" cellpadding="4" style="border-collapse:collapse;margin-bottom:1.2em;font-size:0.9em;">
+  <tr style="background:#dde;">
+    <th>Agent</th>
+    <th>API Calls</th>
+    <th>Tokens</th>
+    [% IF invoice_amt > 0 %]<th>Allocated $</th>[% END %]
+  </tr>
+  [% SET agent_total_calls = 0 %]
+  [% FOREACH a IN agents %]
+    [% agent_total_calls = agent_total_calls + a.calls %]
+  [% END %]
+  [% FOREACH a IN agents %]
+  <tr>
+    <td><strong>[% a.agent_type | html %]</strong></td>
+    <td style="text-align:right;">[% a.calls %]</td>
+    <td style="text-align:right;">[% a.tokens || '—' %]</td>
+    [% IF invoice_amt > 0 %]
+    <td style="text-align:right;">$[% agent_total_calls > 0 ? sprintf('%.2f', invoice_amt * a.calls / agent_total_calls) : '0.00' %]</td>
+    [% END %]
+  </tr>
+  [% END %]
+</table>
+[% END %]
+
+[% IF models.size %]
+<h3>Models Used</h3>
+<table border="1" cellpadding="4" style="border-collapse:collapse;margin-bottom:1em;font-size:0.9em;">
+  <tr style="background:#eee;"><th>Model</th><th>API Calls</th><th>Tokens</th></tr>
+  [% FOREACH m IN models %]
+  <tr>
+    <td>[% m.model_used | html %]</td>
+    <td style="text-align:right;">[% m.calls %]</td>
+    <td style="text-align:right;">[% m.tokens || '—' %]</td>
+  </tr>
+  [% END %]
+</table>
+[% END %]
+
+[% IF usage.size %]
+<h3>Usage by User</h3>
+[% IF invoice_amt > 0 %]
+<p>
+  Invoice amount: <strong>$[% invoice_amt %]</strong> —
+  allocation based on [% grand_tokens > 0 ? 'token count' : 'API call count (no tokens recorded yet)' %].
+  [% IF grand_tokens == 0 %]
+  <em style="color:#888;">Token counts will be captured for future periods.</em>
+  [% END %]
+</p>
+[% END %]
+
+<table border="1" cellpadding="5" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr style="background:#dde;">
+      <th>User</th>
+      <th>Email</th>
+      <th>API Calls</th>
+      <th>% of Calls</th>
+      [% IF grand_tokens > 0 %]<th>Tokens</th><th>% Tokens</th>[% END %]
+      [% IF invoice_amt > 0 %]<th>Allocated $</th>[% END %]
+    </tr>
+  </thead>
+  <tbody>
+    [% FOREACH u IN usage %]
+    <tr>
+      <td>[% u.username | html %]</td>
+      <td style="font-size:0.85em;">[% u.email | html %]</td>
+      <td style="text-align:right;">[% u.api_calls %]</td>
+      <td style="text-align:right;">[% u.call_pct %]%</td>
+      [% IF grand_tokens > 0 %]
+      <td style="text-align:right;">[% u.total_tokens %]</td>
+      <td style="text-align:right;">[% u.token_pct %]%</td>
+      [% END %]
+      [% IF invoice_amt > 0 %]
+      <td style="text-align:right;font-weight:bold;">$[% u.allocated %]</td>
+      [% END %]
+    </tr>
+    [% END %]
+  </tbody>
+  <tfoot>
+    <tr style="background:#eee;font-weight:bold;">
+      <td colspan="2">TOTAL</td>
+      <td style="text-align:right;">[% grand_calls %]</td>
+      <td style="text-align:right;">100%</td>
+      [% IF grand_tokens > 0 %]
+      <td style="text-align:right;">[% grand_tokens %]</td>
+      <td style="text-align:right;">100%</td>
+      [% END %]
+      [% IF invoice_amt > 0 %]
+      <td style="text-align:right;">$[% invoice_amt %]</td>
+      [% END %]
+    </tr>
+  </tfoot>
+</table>
+
+[% IF invoice_amt > 0 %]
+<div style="margin-top:1.2em;padding:0.8em;background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);border-radius:5px;">
+  <strong>Workflow — How to Record This:</strong>
+  <ol style="margin:0.5em 0 0 1.2em;">
+    <li>Enter the xAI invoice at <a href="/Inventory/invoice/new">/Inventory/invoice/new</a>
+        (supplier: xAI, amount: $[% invoice_amt %], expense acct: 6510 AI API Services)</li>
+    <li>Mark it <strong>Paid by Shanta</strong> — credit Shanta's point account the equivalent in points</li>
+    <li>For each user above with &gt;0% share: post a point ledger charge for their allocated amount,
+        or note it as a future membership fee adjustment</li>
+    <li>For historical invoices (pre-point-system): enter with actual date, mark paid, note
+        "Pre-point-system — Shanta credited at system start". No additional GL/point entries needed.</li>
+  </ol>
+</div>
+[% END %]
+
+[% ELSE %]
+<p style="color:#888;">No [% provider %] API activity found for this period[% IF agent_filter != 'all' %] for agent "[% agent_filter | html %]"[% END %].</p>
+[% END %]
+
+<hr style="margin-top:2em;">
+<h3>Notes on This System</h3>
+<ul style="font-size:0.9em;">
+  <li><strong>xAI / Grok</strong> — external paid API. Costs are charged to CSC and borne by Shanta personally; Shanta is compensated via Points.</li>
+  <li><strong>Ollama (local)</strong> — runs on CSC hardware; no per-call cost; electricity/hardware is covered by Shanta's infrastructure points credit.</li>
+  <li><strong>Token tracking</strong> — started capturing Grok token counts going forward. Historical data uses API call count as proxy.</li>
+  <li><strong>Point rate</strong> — 1 point = $0.01 CAD (set in point system config). Adjust allocation accordingly.</li>
+  <li><strong>Agent filter</strong> — use "accounting" to see only Inventory/accounting AI usage; "general" for regular chat; "planning" for project management AI.</li>
+  <li><strong>Web search provider</strong> — stored in the conversation trace (metadata). View at <a href="/ai/conversations">/ai/conversations</a> → expand the thinking trace.</li>
+</ul>

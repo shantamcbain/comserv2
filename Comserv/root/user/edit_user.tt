@@ -152,6 +152,43 @@
                 </form>
             </div>
 
+            <div class="admin-actions-panel">
+                <h3>Admin Actions</h3>
+                <p class="user-status-line">
+                    Account status: <strong>[% user.status || 'active' | html %]</strong>
+                    &nbsp;·&nbsp; Email: <strong>[% user.email | html %]</strong>
+                </p>
+
+                [% SET cur_uid = user.id %]
+                [% SET return_here = c.uri_for('/user/edit_user', cur_uid) %]
+
+                [% IF user.status == 'pending_verification' OR user.status == 'pending_setup' %]
+                <div class="admin-action-row">
+                    <div>
+                        <strong>Resend Verification Code</strong>
+                        <p>Send a fresh 6-digit verification code to the user's email address.</p>
+                    </div>
+                    <a href="[% c.uri_for('/user/admin_resend_verification', { user_id = cur_uid, return_to = return_here }) %]"
+                       class="btn btn-warning"
+                       onclick="return confirm('Send a new verification code to [% user.email | html %]?')">
+                        Send Verification Code
+                    </a>
+                </div>
+                [% END %]
+
+                <div class="admin-action-row">
+                    <div>
+                        <strong>Send Password Reset Email</strong>
+                        <p>Send a secure password-reset link to the user's email address.</p>
+                    </div>
+                    <a href="[% c.uri_for('/user/admin_send_password_reset', { user_id = cur_uid, return_to = return_here }) %]"
+                       class="btn btn-secondary"
+                       onclick="return confirm('Send a password reset email to [% user.email | html %]?')">
+                        Send Reset Email
+                    </a>
+                </div>
+            </div>
+
         </div>
 
     </div>
@@ -159,6 +196,47 @@
 </div>
 
 <style>
+.admin-actions-panel {
+    margin-top: 2rem;
+    padding: 1.25rem;
+    background: #f0f4ff;
+    border: 1px solid #b0c4de;
+    border-radius: 6px;
+}
+.admin-actions-panel h3 {
+    margin: 0 0 0.5rem 0;
+    font-size: 1.05rem;
+}
+.user-status-line {
+    margin: 0 0 1rem 0;
+    font-size: 0.95rem;
+    color: #444;
+}
+.admin-action-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.75rem 0;
+    border-top: 1px solid #c8d8f0;
+}
+.admin-action-row > div p {
+    margin: 2px 0 0 0;
+    font-size: 0.88rem;
+    color: #555;
+}
+.btn-warning {
+    background: #f0a020;
+    color: white;
+    border: none;
+    padding: 8px 14px;
+    border-radius: 4px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    font-size: 0.9rem;
+}
+.btn-warning:hover { background: #d08800; color: white; }
 .check-pill-group {
     display: flex;
     flex-wrap: wrap;

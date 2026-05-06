@@ -1,195 +1,204 @@
-[% META title = 'Chat Admin' %]
+[% META title = 'Support Chat Admin' %]
 
-<div class="container">
-    <h1>Chat Admin Interface</h1>
-    
-    <div class="row">
-        <div class="col-md-8">
-            <div class="card">
-                <div class="card-header">
-                    <h2>Chat Messages</h2>
-                </div>
-                <div class="card-body">
-                    <div id="chat-admin-messages">
-                        [% IF messages.size > 0 %]
-                            <table class="table table-striped">
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>User</th>
-                                        <th>Domain</th>
-                                        <th>Site</th>
-                                        <th>Message</th>
-                                        <th>Time</th>
-                                        <th>Status</th>
-                                        <th>Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    [% FOREACH msg IN messages %]
-                                    <tr class="[% IF !msg.is_read %]table-warning[% END %]">
-                                        <td>[% msg.id %]</td>
-                                        <td>[% msg.username %]</td>
-                                        <td>[% msg.domain || 'Unknown' %]</td>
-                                        <td>[% msg.site_name || 'Unknown' %]</td>
-                                        <td>[% msg.message %]</td>
-                                        <td>[% msg.timestamp %]</td>
-                                        <td>
-                                            [% IF msg.is_read %]
-                                                <span class="badge bg-success">Read</span>
-                                            [% ELSE %]
-                                                <span class="badge bg-warning">Unread</span>
-                                            [% END %]
-                                        </td>
-                                        <td>
-                                            [% UNLESS msg.is_system_message %]
-                                            <button class="btn btn-sm btn-primary respond-btn" 
-                                                    data-username="[% msg.username %]"
-                                                    data-message="[% msg.message %]"
-                                                    data-domain="[% msg.domain %]"
-                                                    data-site="[% msg.site_name %]">
-                                                Respond
-                                            </button>
-                                            [% END %]
-                                        </td>
-                                    </tr>
-                                    [% END %]
-                                </tbody>
-                            </table>
-                        [% ELSE %]
-                            <div class="alert alert-info">No chat messages yet.</div>
-                        [% END %]
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="col-md-4">
-            <div class="card">
-                <div class="card-header">
-                    <h3>Respond to User</h3>
-                </div>
-                <div class="card-body">
-                    <form id="response-form">
-                        <div class="mb-3">
-                            <label for="to-username" class="form-label">To User</label>
-                            <input type="text" class="form-control" id="to-username" readonly>
-                        </div>
-                        <div class="mb-3 row">
-                            <div class="col-md-6">
-                                <label for="user-domain" class="form-label">Domain</label>
-                                <input type="text" class="form-control" id="user-domain" readonly>
-                            </div>
-                            <div class="col-md-6">
-                                <label for="user-site" class="form-label">Site</label>
-                                <input type="text" class="form-control" id="user-site" readonly>
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="original-message" class="form-label">Original Message</label>
-                            <textarea class="form-control" id="original-message" rows="2" readonly></textarea>
-                        </div>
-                        <div class="mb-3">
-                            <label for="response-message" class="form-label">Your Response</label>
-                            <textarea class="form-control" id="response-message" rows="4" required></textarea>
-                        </div>
-                        <button type="submit" class="btn btn-primary">Send Response</button>
-                    </form>
-                </div>
-            </div>
-            
-            <div class="card mt-4">
-                <div class="card-header">
-                    <h3>Quick Responses</h3>
-                </div>
-                <div class="card-body">
-                    <div class="list-group">
-                        <button class="list-group-item list-group-item-action quick-response">
-                            Thank you for your message. I'll look into this and get back to you shortly.
-                        </button>
-                        <button class="list-group-item list-group-item-action quick-response">
-                            Could you please provide more details about the issue you're experiencing?
-                        </button>
-                        <button class="list-group-item list-group-item-action quick-response">
-                            I've resolved your issue. Please let me know if you need anything else.
-                        </button>
-                        <button class="list-group-item list-group-item-action quick-response">
-                            This issue requires further investigation. We'll contact you within 24 hours.
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </div>
+<style>
+#sa-layout { display:flex; gap:0; height:calc(100vh - 120px); }
+#sa-sidebar { width:280px; min-width:200px; border-right:1px solid #ddd; overflow-y:auto; background:#f8f9fa; }
+#sa-main   { flex:1; display:flex; flex-direction:column; overflow:hidden; }
+#sa-conv-list { list-style:none; margin:0; padding:0; }
+#sa-conv-list li { padding:10px 12px; border-bottom:1px solid #e0e0e0; cursor:pointer; font-size:.9em; }
+#sa-conv-list li:hover, #sa-conv-list li.active { background:#dce8f7; }
+#sa-conv-list li.awaiting { border-left:4px solid #e55; }
+#sa-conv-list li.responded { border-left:4px solid #5a5; }
+#sa-conv-list .conv-title { font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+#sa-conv-list .conv-meta  { color:#666; font-size:.78em; margin-top:2px; }
+#sa-chat-header { padding:10px 16px; background:#1a6bb5; color:#fff; font-weight:600; flex-shrink:0; display:flex; align-items:center; justify-content:space-between; }
+#sa-messages { flex:1; overflow-y:auto; padding:12px; display:flex; flex-direction:column; gap:8px; background:#fff; }
+#sa-msg-none { color:#888; font-size:.9em; align-self:center; margin-top:40px; }
+#sa-reply-area { border-top:1px solid #ddd; padding:10px 12px; background:#f8f9fa; display:flex; gap:8px; flex-shrink:0; }
+#sa-reply-area textarea { flex:1; resize:none; border:1px solid #ccc; border-radius:6px; padding:8px; font-size:.9em; }
+#sa-reply-area button { align-self:flex-end; padding:8px 18px; background:#1a6bb5; color:#fff; border:none; border-radius:6px; cursor:pointer; font-size:.9em; }
+#sa-reply-area button:hover { background:#155a9a; }
+.sa-msg { max-width:80%; border-radius:10px; padding:8px 12px; font-size:.9em; line-height:1.4; }
+.sa-msg-user  { background:#eef2ff; align-self:flex-start; border-bottom-left-radius:2px; }
+.sa-msg-admin { background:#dcfce7; align-self:flex-end; border-bottom-right-radius:2px; }
+.sa-msg-meta  { font-size:.72em; color:#888; margin-top:2px; }
+.sa-badge { display:inline-block; background:#e55; color:#fff; border-radius:10px; padding:1px 7px; font-size:.75em; margin-left:6px; }
+#sa-sidebar-header { padding:10px 12px; font-weight:bold; font-size:.95em; border-bottom:1px solid #ddd; background:#e9ecef; display:flex; justify-content:space-between; align-items:center; }
+</style>
+
+<div id="sa-layout">
+  <div id="sa-sidebar">
+    <div id="sa-sidebar-header">
+      Support Chats
+      <span id="sa-pending-badge" class="sa-badge" style="display:none"></span>
     </div>
+    <ul id="sa-conv-list"><li style="padding:20px;color:#888;font-size:.85em;">Loading…</li></ul>
+  </div>
+  <div id="sa-main">
+    <div id="sa-chat-header">
+      <span id="sa-chat-title">Select a conversation</span>
+      <span id="sa-chat-user" style="font-size:.8em;font-weight:normal;opacity:.85;"></span>
+    </div>
+    <div id="sa-messages"><div id="sa-msg-none">Select a support chat from the left panel</div></div>
+    <div id="sa-reply-area">
+      <textarea id="sa-reply-text" rows="2" placeholder="Type your reply…"></textarea>
+      <div style="display:flex;flex-direction:column;gap:6px;">
+        <button onclick="saSend()">Send ↵</button>
+        <button onclick="saQuick()" style="background:#555;font-size:.78em;padding:5px 10px;">Quick…</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    // Handle respond button clicks
-    document.querySelectorAll('.respond-btn').forEach(button => {
-        button.addEventListener('click', function() {
-            const username = this.getAttribute('data-username');
-            const message = this.getAttribute('data-message');
-            const domain = this.getAttribute('data-domain') || 'Unknown';
-            const site = this.getAttribute('data-site') || 'Unknown';
-            
-            document.getElementById('to-username').value = username;
-            document.getElementById('original-message').value = message;
-            document.getElementById('user-domain').value = domain;
-            document.getElementById('user-site').value = site;
-            document.getElementById('response-message').focus();
-        });
+(function() {
+var _activeConvId = null;
+var _lastMsgId = 0;
+var _pollTimer = null;
+var _convCache = {};
+
+var QUICK = [
+  "Thank you for reaching out. I'm looking into this now.",
+  "Could you please provide more details about the issue?",
+  "I've resolved your issue. Let me know if you need anything else.",
+  "This requires further investigation. We'll follow up within 24 hours.",
+  "Please try refreshing the page and let me know if the issue persists."
+];
+
+function _ts(iso) {
+  if (!iso) return '';
+  var d = new Date(iso);
+  return d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) + ' ' + d.toLocaleDateString();
+}
+
+function _renderMsg(msg) {
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:' + (msg.role === 'assistant' ? 'flex-end' : 'flex-start') + ';';
+  var bubble = document.createElement('div');
+  bubble.className = 'sa-msg ' + (msg.role === 'assistant' ? 'sa-msg-admin' : 'sa-msg-user');
+  bubble.textContent = msg.content;
+  var meta = document.createElement('div');
+  meta.className = 'sa-msg-meta';
+  meta.textContent = (msg.role === 'assistant' ? '👤 Support' : '🙋 User') + ' · ' + _ts(msg.created_at || msg.timestamp || '');
+  wrap.appendChild(bubble);
+  wrap.appendChild(meta);
+  return wrap;
+}
+
+function _loadConvList() {
+  fetch('/chat/support_conversations', { credentials: 'include' })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    var ul = document.getElementById('sa-conv-list');
+    var badge = document.getElementById('sa-pending-badge');
+    if (!d.success || !d.conversations || !d.conversations.length) {
+      ul.innerHTML = '<li style="padding:20px;color:#888;font-size:.85em;">No support chats yet.</li>';
+      badge.style.display = 'none';
+      return;
+    }
+    var pending = 0;
+    ul.innerHTML = '';
+    d.conversations.forEach(function(conv) {
+      _convCache[conv.conversation_id] = conv;
+      var li = document.createElement('li');
+      li.dataset.id = conv.conversation_id;
+      var awaiting = conv.last_role === 'user';
+      if (awaiting) pending++;
+      li.className = awaiting ? 'awaiting' : 'responded';
+      if (_activeConvId && conv.conversation_id == _activeConvId) li.className += ' active';
+      li.innerHTML = '<div class="conv-title">' + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
+        + '<div class="conv-meta">'
+        + (awaiting ? '<strong style="color:#c00">⏳ Awaiting reply</strong>' : '✅ Replied')
+        + ' · ' + conv.message_count + ' msg(s)'
+        + '</div>';
+      li.onclick = function() { _openConv(conv.conversation_id); };
+      ul.appendChild(li);
     });
-    
-    // Handle quick responses
-    document.querySelectorAll('.quick-response').forEach(button => {
-        button.addEventListener('click', function() {
-            document.getElementById('response-message').value = this.textContent.trim();
-        });
+    if (pending > 0) { badge.textContent = pending; badge.style.display = ''; }
+    else { badge.style.display = 'none'; }
+  })
+  .catch(function() {});
+}
+
+function _openConv(convId) {
+  _activeConvId = convId;
+  _lastMsgId = 0;
+  document.querySelectorAll('#sa-conv-list li').forEach(function(el) {
+    el.classList.toggle('active', el.dataset.id == convId);
+  });
+  var conv = _convCache[convId];
+  document.getElementById('sa-chat-title').textContent = conv ? (conv.title || 'Chat #' + convId) : 'Chat #' + convId;
+  document.getElementById('sa-chat-user').textContent = conv ? 'User #' + conv.user_id : '';
+  var msgsEl = document.getElementById('sa-messages');
+  msgsEl.innerHTML = '';
+  if (conv && conv.messages) {
+    conv.messages.forEach(function(msg) {
+      msgsEl.appendChild(_renderMsg(msg));
+      if (msg.id > _lastMsgId) _lastMsgId = msg.id;
     });
-    
-    // Handle form submission
-    document.getElementById('response-form').addEventListener('submit', function(e) {
-        e.preventDefault();
-        
-        const toUsername = document.getElementById('to-username').value;
-        const responseMessage = document.getElementById('response-message').value;
-        
-        if (!toUsername || !responseMessage) {
-            alert('Please select a user and enter a response message.');
-            return;
+    msgsEl.scrollTop = msgsEl.scrollHeight;
+  }
+  _startConvPoll();
+}
+
+function _startConvPoll() {
+  if (_pollTimer) clearInterval(_pollTimer);
+  _pollTimer = setInterval(function() {
+    if (!_activeConvId) return;
+    fetch('/chat/get_messages?conversation_id=' + _activeConvId + '&last_id=' + _lastMsgId, { credentials: 'include' })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (!d.success || !d.messages) return;
+      var msgsEl = document.getElementById('sa-messages');
+      d.messages.forEach(function(msg) {
+        if (msg.id > _lastMsgId) {
+          _lastMsgId = msg.id;
+          msgsEl.appendChild(_renderMsg(msg));
         }
-        
-        // Create form data
-        const formData = new FormData();
-        formData.append('to_username', toUsername);
-        formData.append('message', responseMessage);
-        
-        // Send response
-        fetch('/chat/respond', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                alert('Response sent successfully!');
-                document.getElementById('response-message').value = '';
-                // Reload the page to show the updated message list
-                window.location.reload();
-            } else {
-                alert('Error sending response: ' + data.error);
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('An error occurred while sending the response.');
-        });
-    });
-    
-    // Auto-refresh the page every 30 seconds to show new messages
-    setInterval(function() {
-        window.location.reload();
-    }, 30000);
+      });
+      if (d.messages.length) msgsEl.scrollTop = msgsEl.scrollHeight;
+      _loadConvList();
+    })
+    .catch(function() {});
+  }, 4000);
+}
+
+function _esc(s) { var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+
+window.saSend = function() {
+  if (!_activeConvId) { alert('Select a conversation first.'); return; }
+  var ta = document.getElementById('sa-reply-text');
+  var msg = ta.value.trim();
+  if (!msg) return;
+  ta.disabled = true;
+  var body = new URLSearchParams({ message: msg, conversation_id: _activeConvId });
+  fetch('/chat/respond', { method: 'POST', credentials: 'include', body: body })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    ta.disabled = false;
+    if (d.success) {
+      ta.value = '';
+      _loadConvList();
+    } else {
+      alert('Error: ' + (d.error || 'unknown'));
+    }
+  })
+  .catch(function() { ta.disabled = false; alert('Network error.'); });
+};
+
+window.saQuick = function() {
+  var choice = prompt('Choose a quick reply (enter number):\n' + QUICK.map(function(t,i){ return (i+1) + '. ' + t; }).join('\n'));
+  var idx = parseInt(choice, 10);
+  if (idx >= 1 && idx <= QUICK.length) {
+    document.getElementById('sa-reply-text').value = QUICK[idx - 1];
+  }
+};
+
+document.getElementById('sa-reply-text').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saSend(); }
 });
+
+_loadConvList();
+setInterval(_loadConvList, 15000);
+})();
 </script>

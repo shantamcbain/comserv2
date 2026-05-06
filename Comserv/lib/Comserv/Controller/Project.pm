@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use DateTime;
 use Data::Dumper;
+use Try::Tiny;
+use POSIX qw(strftime);
 use JSON ();
 use Comserv::Util::Logging;
 use Comserv::Controller::Site;
@@ -193,10 +195,73 @@ sub  create_project :Local :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_project',
         "Project created with ID: " . $project->id);
 
+    $self->_create_governance_ticket($c, $project);
+
     $c->flash->{success_message} = 'Project added successfully';
     $c->res->redirect($c->uri_for($self->action_for('project')));
 }
 
+
+sub _create_governance_ticket {
+    my ($self, $c, $project) = @_;
+
+    my $site_name    = $project->sitename || 'unknown';
+    my $project_name = $project->name     || '(unnamed)';
+    my $project_id   = $project->id;
+    my $project_code = $project->project_code || '';
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+        "Creating governance HelpDesk ticket for project id=$project_id on site=$site_name");
+
+    try {
+        my $schema  = $c->model('DBEncy')->schema;
+        my $ticket_rs = $schema->resultset('SupportTicket');
+
+        my $ticket_number = 'CSC-GOV-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', $project_id);
+
+        my $existing = $ticket_rs->search(
+            { -or => [
+                { ticket_number => $ticket_number },
+                { ticket_number => { like => 'CSC-GOV-%-' . sprintf('%04d', $project_id) } },
+            ]},
+            { rows => 1 }
+        )->first;
+
+        if ($existing) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+                "Governance ticket already exists for project id=$project_id (ticket: " . $existing->ticket_number . "), skipping duplicate");
+            return;
+        }
+
+        $ticket_rs->create({
+            ticket_number => $ticket_number,
+            site_name     => 'CSC',
+            user_id       => undef,
+            username      => $c->session->{username} || 'system',
+            email         => '',
+            subject       => "New project created: $project_name (site: $site_name)",
+            description   => "A new project has been created and requires CSC awareness.\n\n"
+                           . "Project ID    : $project_id\n"
+                           . "Project Name  : $project_name\n"
+                           . "Project Code  : $project_code\n"
+                           . "Site          : $site_name\n"
+                           . "Created by    : " . ($c->session->{username} || 'system') . "\n"
+                           . "Created at    : " . strftime('%Y-%m-%d %H:%M:%S', localtime) . "\n\n"
+                           . "Please review and ensure proper governance procedures are followed.",
+            category      => 'project_governance',
+            priority      => 'medium',
+            status        => 'open',
+            created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+            "Governance ticket $ticket_number created for project id=$project_id");
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_create_governance_ticket',
+            "Could not create governance ticket for project id=$project_id: $_"
+            . " (run schema_compare to create support_tickets table if missing)");
+    };
+}
 
 sub project :Path('project') :Args(0) {
     my ( $self, $c ) = @_;
@@ -338,11 +403,33 @@ sub details :Path('details') :Args(0) {
             "Project tree is undefined or empty after build_project_tree call");
     }
 
+    # Fetch recent AI conversations linked to this project
+    my @ai_conversations;
+    my $schema = $c->model('DBEncy');
+    eval {
+        @ai_conversations = $schema->resultset('AiConversation')->search(
+            { project_id => $project_id },
+            { order_by => { -desc => 'updated_at' }, rows => 10 }
+        );
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
+            "Failed to fetch AI conversations for project $project_id: $@");
+    }
+
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [split(/\s*,\s*/, $user_roles)] if !ref($user_roles) && $user_roles;
+    my $can_see_ai = ref($user_roles) eq 'ARRAY'
+        ? (grep { $_ =~ /^(admin|developer|editor)$/i } @$user_roles) ? 1 : 0
+        : 0;
+
     # Add the project tree (including sub-projects and todos) to the stash
     $c->stash(
-        project => $project_tree,
-        todos => \@todos,
-        template => 'todo/projectdetails.tt'
+        project          => $project_tree,
+        todos            => \@todos,
+        ai_conversations => \@ai_conversations,
+        can_see_ai       => $can_see_ai,
+        template         => 'todo/projectdetails.tt'
     );
 
     # Logging: End of details action
@@ -382,6 +469,7 @@ sub fetch_projects_with_subprojects :Private {
 
     # Fetch top-level projects (those without a parent)
     # CSC admins see all sites; all others see only their own SiteName
+    # Sub-projects are fetched by parent_id (no sitename filter) so they appear regardless of sitename
     my @top_projects;
     eval {
         my %search_cond = (parent_id => undef);
@@ -435,12 +523,29 @@ sub fetch_projects_with_subprojects :Private {
             };
             
             foreach my $subproject1 (@level1_subprojects) {
+                my @level2_subprojects;
+                eval {
+                    @level2_subprojects = $schema->resultset('Project')->search(
+                        { parent_id => $subproject1->id },
+                        { order_by => { -asc => 'name' } }
+                    )->all;
+                };
+                my @level2_hashes;
+                foreach my $subproject2 (@level2_subprojects) {
+                    push @level2_hashes, {
+                        id           => $subproject2->id,
+                        name         => $subproject2->name,
+                        parent_id    => $subproject2->parent_id,
+                        status       => $subproject2->status || 1,
+                        sub_projects => []
+                    };
+                }
                 push @{$project_hash->{sub_projects}}, {
-                    id => $subproject1->id,
-                    name => $subproject1->name,
-                    parent_id => $subproject1->parent_id,
-                    status => $subproject1->status || 1,
-                    sub_projects => []
+                    id           => $subproject1->id,
+                    name         => $subproject1->name,
+                    parent_id    => $subproject1->parent_id,
+                    status       => $subproject1->status || 1,
+                    sub_projects => \@level2_hashes
                 };
             }
         }
@@ -631,10 +736,18 @@ sub build_project_tree :Private {
     # Create an array of todo hashrefs with only the needed attributes
     my @todo_hashrefs = ();
     foreach my $todo (@todos) {
-        # Safely get accumulated_time (may not exist in all schemas)
         my $accumulated_time = 0;
-        eval { $accumulated_time = $todo->accumulated_time || 0; };
-        
+        eval {
+            my $t = $todo->accumulative_time;
+            if ($t) {
+                if ($t =~ /^(\d+):(\d+):(\d+)$/) {
+                    $accumulated_time = $1 * 3600 + $2 * 60 + $3;
+                } elsif ($t =~ /^\d+$/) {
+                    $accumulated_time = $t + 0;
+                }
+            }
+        };
+
         push @todo_hashrefs, {
             id => $todo->id,
             record_id => $todo->record_id,

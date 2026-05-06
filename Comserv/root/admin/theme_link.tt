@@ -12,7 +12,7 @@
 
 <h2>Debug Information</h2>
 
-<div style="background-color: #f8f9fa; padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
+<div style="background-color: var(--bg-secondary, #f8f9fa); padding: 15px; margin-bottom: 20px; border: 1px solid #ddd;">
     <p><strong>User Exists:</strong> [% c.user_exists ? 'Yes' : 'No' %]</p>
     <p><strong>Session ID:</strong> [% c.sessionid %]</p>
     

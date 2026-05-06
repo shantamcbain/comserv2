@@ -92,6 +92,11 @@
                     </div>
 
                 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'apiary yard'
+   ai_form_context      = 'beekeeping apiary yard management'
+   ai_form_fields       = 'name, location, description, notes'
+%]
             </div>
 
         </div>

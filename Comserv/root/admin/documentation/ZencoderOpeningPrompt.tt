@@ -37,7 +37,7 @@
         <p style="color: var(--danger-color);"><strong>PHASE 0 and PHASE 1 are NON-NEGOTIABLE.</strong> Agents MUST execute <code>validation_step0.pl</code> and <code>updateprompt.pl --phase before</code> as their absolute first actions. <strong>Bilateral logging REQUIREMENT:</strong> The <code>--description</code> field MUST contain the <code>USER PROMPT: [verbatim text]</code>. Cleanup Agents MUST execute Phase 2 (After Work) and Phase 3 (After Question) for EVERY incremental change.</p>
     </div>
     
-    <div style="background: var(--light-color); border: 2px solid var(--success-color); border-radius: 4px; padding: 15px; margin: 15px 0;">
+    <div style="background: rgba(255,255,255,0.15); border: 2px solid var(--success-color); border-radius: 4px; padding: 15px; margin: 15px 0;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
             <h3 style="margin: 0; color: var(--success-color);">🚀 V3 LITERAL EXECUTION OPENING PROMPT</h3>
             <button class="copy-btn" data-target="unifiedPromptCodeBlock" style="background: var(--success-color); color: white; border: none; padding: 5px 15px; border-radius: 4px; cursor: pointer; font-size: 12px;">📋 Copy V3 Prompt</button>

@@ -24,19 +24,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#routes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API Routes</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Logging</a>
-                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Key Features</a>
+                <a href="#routes" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">API Routes</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#logging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Logging</a>
+                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Troubleshooting</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -52,7 +52,7 @@
     </div>
 
     <!-- RECENT CHANGES SECTION -->
-    <div class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
+    <div class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
         <div class="col-100">
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Recent Changes (v0.02 - Jan 11, 2026)</h3>
             <ul style="margin: 5px 0 0 20px; font-size: 0.9em; color: var(--text-color);">
@@ -104,7 +104,7 @@
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters:</strong> None (uses session data)</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response:</strong> Renders chat/index.tt template with user_id and username</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Example Request:</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>GET http://localhost:3000/chat/</code></pre>
             </div>
 
@@ -116,7 +116,7 @@
                 <li><code>conversation_id</code> (integer, optional): Existing conversation; auto-created if omitted</li>
             </ul>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "success": 1,
   "message_id": 42,
@@ -125,7 +125,7 @@
 }</code></pre>
             </div>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error Response (400 - empty message):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "success": 0,
   "error": "Message cannot be empty"
@@ -141,7 +141,7 @@
             </ul>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control:</strong> Admins see all messages; users see only their own</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "success": 1,
   "messages": [
@@ -175,7 +175,7 @@
             </ul>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control:</strong> Admin role required (403 if not admin)</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Response (JSON):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "success": 1,
   "message_id": 43,
@@ -184,7 +184,7 @@
 }</code></pre>
             </div>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error: Missing parameters (400):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>{
   "success": 0,
   "error": "Message and conversation_id are required"
@@ -213,7 +213,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Display chat home page</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Public</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>send_message</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">POST /chat/send_message</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Store user message</td>
@@ -225,7 +225,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Retrieve messages (paginated)</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Public/Role-Based</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><code>admin</code></td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">GET /chat/admin</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin chat dashboard</td>
@@ -262,7 +262,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, username</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Message sent</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG / INFO / WARN</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, domain, conversation_id (if created)</td>
@@ -272,7 +272,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">WARN</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, reason</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Conversation created</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">conversation_id, user_id, domain, site_name</td>
@@ -282,7 +282,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">DEBUG / INFO</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, is_admin, count, conversation_id</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Admin access attempt</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO / WARN</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">user_id, is_admin flag</td>
@@ -292,7 +292,7 @@
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">INFO</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">message_id, conversation_id, admin_id</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Any error</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">ERROR</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Exception message, context</td>
@@ -300,7 +300,7 @@
             </table>
 
             <h3 id="logging-example" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.2 Example Log Entry</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>[INFO] Chat.pm:104 send_message - Created new conversation_id=15 for user_id=199</code></pre>
             </div>
 
@@ -313,7 +313,7 @@
         <div class="col-100">
             <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">7. Troubleshooting</h2>
             
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-empty-message" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Message Cannot Be Empty Error (400)</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> send_message returns HTTP 400 with "Message cannot be empty" error</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> User submitted empty or whitespace-only message</p>
@@ -325,7 +325,7 @@
                 </ol>
             </div>
 
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-conv-not-found" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Conversation Not Found (404)</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Admin respond endpoint returns "Conversation not found"</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Invalid conversation_id or conversation was deleted</p>
@@ -337,7 +337,7 @@
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-auth-fail" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Unauthorized / Access Denied (403)</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Admin endpoints (admin, respond) return 403 Unauthorized</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> User lacks 'admin' role or session not authenticated</p>
@@ -350,7 +350,7 @@
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-db-error" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Database Errors / 500 Server Error</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Any endpoint returns 500 with "Failed to..." error</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Database connectivity, schema issues, or missing tables</p>
@@ -364,7 +364,7 @@
                 </ol>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="ts-logging-missing" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: No Log Entries / Logging Not Working</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Expected log entries do not appear in comserv.log</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Cause:</strong> Logging not initialized, file permissions, or log level too high</p>
@@ -384,7 +384,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/controllers/AI" style="color: var(--link-color);">AI Controller</a> - AI conversation and integration</li>

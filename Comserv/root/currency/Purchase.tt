@@ -1,0 +1,87 @@
+[% META
+   title = "Buy Coins"
+   description = "Purchase internal coins to spend on memberships and services"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Currency"
+   page_version = "0.01"
+   last_updated = "2026-04-03"
+%]
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Buy Coins</h1>
+    <div class="header-actions">
+      <a href="[% c.uri_for('/currency/balance') %]" class="btn btn-secondary">My Balance</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <div class="content-section">
+        <p>
+          Current balance: <strong style="color:var(--success-color,#27ae60)">[% balance | format('%.4f') %] coins</strong>
+        </p>
+        <p style="font-size:0.9em;color:#666">
+          Coins are the internal currency of the platform. Use them to pay for memberships,
+          workshops, hosting renewals, and other services — all without leaving the site.
+          1 coin = 1 CAD (exchange rate applies for other currencies).
+        </p>
+      </div>
+
+      [% IF packages.size %]
+      <div class="content-section">
+        <h2>Available Packages</h2>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1rem">
+          [% FOREACH pkg IN packages %]
+          <div style="border:1px solid var(--border-color,#ddd);border-radius:8px;padding:1.2rem;text-align:center">
+            <h3 style="margin:0 0 0.5rem">[% pkg.name | html %]</h3>
+            <p style="font-size:1.6em;font-weight:bold;color:var(--primary-color,#3498db);margin:0.3rem 0">
+              [% pkg.coins %] coins
+            </p>
+            <p style="font-size:1.1em;color:#444;margin:0.3rem 0">
+              [% pkg.price_currency | html %] [% pkg.price | format('%.2f') %]
+            </p>
+            [% IF pkg.bonus_coins %]
+            <p style="font-size:0.85em;color:#27ae60;margin:0.3rem 0">
+              + [% pkg.bonus_coins %] bonus coins!
+            </p>
+            [% END %]
+            [% IF pkg.description %]
+            <p style="font-size:0.82em;color:#888;margin:0.5rem 0">[% pkg.description | html %]</p>
+            [% END %]
+            <form method="post" action="[% c.uri_for('/payment/buy/coins') %]" style="margin-top:0.8rem">
+              <input type="hidden" name="package_id" value="[% pkg.id %]">
+              <button type="submit" class="btn btn-primary" style="width:100%">Buy Now</button>
+            </form>
+          </div>
+          [% END %]
+        </div>
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <p class="empty-state">No coin packages are available at this time.</p>
+        <p style="font-size:0.9em;color:#666">
+          You can still earn coins through membership bonuses, contributing to services,
+          or receiving transfers from other members.
+        </p>
+      </div>
+      [% END %]
+
+      <div class="content-section" style="font-size:0.85em;color:#888">
+        <h3 style="font-size:1em;color:#555">Other ways to earn coins</h3>
+        <ul>
+          <li><strong>Membership bonus</strong> — some plans include a sign-up coin bonus</li>
+          <li><strong>Joining bonus</strong> — new accounts receive a welcome bonus</li>
+          <li><strong>Transfers</strong> — receive coins from other members</li>
+          <li><strong>Admin grants</strong> — site administrators can grant coins for contributions</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</div>

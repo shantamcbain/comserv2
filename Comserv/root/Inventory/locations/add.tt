@@ -54,3 +54,8 @@
     </tr>
   </table>
 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'inventory location'
+   ai_form_context      = 'inventory storage location management'
+   ai_form_fields       = 'name, location_type, address, description, status, notes'
+%]
