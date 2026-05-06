@@ -3513,10 +3513,18 @@ sub organism_detail : Path('/ENCY/Organism') : Args(1) {
         $c->stash(error_message => "Organism #$id not found.", template => 'error.tt');
         return;
     }
+    my @org_images;
+    eval {
+        @org_images = $c->model('ENCYModel')->ency_schema
+            ->resultset('Ency::OrganismImage')
+            ->search({ organism_id => $id }, { order_by => 'sort_order' })
+            ->all;
+    };
     $c->stash(
-        organism  => $organism,
-        edit_mode => 0,
-        template  => 'ENCY/OrganismDetail.tt',
+        organism    => $organism,
+        org_images  => \@org_images,
+        edit_mode   => 0,
+        template    => 'ENCY/OrganismDetail.tt',
     );
 }
 
