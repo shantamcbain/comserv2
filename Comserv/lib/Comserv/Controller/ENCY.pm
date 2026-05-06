@@ -226,6 +226,16 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
 
+    my @cn_list_edit;
+    eval {
+        if ($herb->organism_id) {
+            @cn_list_edit = $c->model('ENCYModel')->ency_schema
+                ->resultset('Ency::CommonName')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'record_id' })
+                ->all;
+        }
+    };
+
     my $entities_edit = _fetch_linkable_entities($c);
     my %field_html_edit;
     for my $f (qw(
@@ -245,6 +255,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     $c->stash(
         herb            => $herb,
+        cn_list         => \@cn_list_edit,
         field_html      => \%field_html_edit,
         edit_mode       => 1,
         is_admin        => $is_admin,
@@ -291,11 +302,17 @@ sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
         my $org          = eval { $herb->organism_id ? $herb->organism : undef };
         my $display_name = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
         my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
         push @herbal_data, {
             record_id       => $herb->record_id,
             display_name    => $display_name,
             display_image   => $display_image,
-            common_names    => $herb->common_names    // '',
+            common_names    => $cn_text,
             ident_character => $herb->ident_character // '',
             distribution    => $herb->distribution    // '',
             medical_uses    => $herb->medical_uses    // '',
@@ -359,11 +376,15 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     }
 
     my @org_images;
+    my @cn_list;
     eval {
         if ($herb->organism_id) {
-            @org_images = $c->model('ENCYModel')->ency_schema
-                ->resultset('Ency::OrganismImage')
+            my $schema = $c->model('ENCYModel')->ency_schema;
+            @org_images = $schema->resultset('Ency::OrganismImage')
                 ->search({ organism_id => $herb->organism_id }, { order_by => 'sort_order' })
+                ->all;
+            @cn_list = $schema->resultset('Ency::CommonName')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'record_id' })
                 ->all;
         }
     };
@@ -372,6 +393,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     $c->stash(
         herb                    => $herb,
         org_images              => \@org_images,
+        cn_list                 => \@cn_list,
         constituents_html       => $constituents_html,
         parts_used_html         => $parts_used_html,
         sister_plants_html      => $sister_plants_html,
@@ -2666,11 +2688,17 @@ sub herb_list : Path('/ENCY/Herb') : Args(0) {
         my $org           = eval { $herb->organism_id ? $herb->organism : undef };
         my $display_name  = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
         my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
         push @herbal_data, {
             record_id       => $herb->record_id,
             display_name    => $display_name,
             display_image   => $display_image,
-            common_names    => $herb->common_names    // '',
+            common_names    => $cn_text,
             ident_character => $herb->ident_character // '',
             distribution    => $herb->distribution    // '',
             medical_uses    => $herb->medical_uses    // '',
@@ -3948,6 +3976,105 @@ sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
 
     my ($ok, $msg) = $c->model('ENCYModel')->enrich_organism_from_external($c, $record_id);
     $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub common_name_add : Path('/ENCY/common_name_add') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $organism_id = $c->request->body_parameters->{organism_id} // '';
+    my $name        = $c->request->body_parameters->{name}        // '';
+    my $language    = $c->request->body_parameters->{language}    || 'en';
+
+    unless ($organism_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid organism_id' }));
+        return;
+    }
+    $name =~ s/^\s+|\s+$//g;
+    unless (length($name) > 0) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Name is required' }));
+        return;
+    }
+
+    my $cn_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName');
+    my $existing = eval {
+        $cn_rs->search({ organism_id => $organism_id, name => $name, language => $language, region => undef })->first
+    };
+    if ($existing) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Name already exists', record_id => $existing->record_id }));
+        return;
+    }
+
+    my $new_cn = eval {
+        $cn_rs->create({
+            organism_id        => $organism_id,
+            name               => $name,
+            language           => $language,
+            is_preferred       => 0,
+            is_historical      => 0,
+            source             => 'manual',
+            date_time_posted   => \'NOW()',
+            username_of_poster => $c->session->{username} || 'editor',
+        });
+    };
+    if ($@ || !$new_cn) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "DB error: $@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1, record_id => $new_cn->record_id, name => $name }));
+}
+
+sub common_name_delete : Path('/ENCY/common_name_delete') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $record_id = $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid record_id' }));
+        return;
+    }
+
+    my $cn = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName')->find($record_id) };
+    unless ($cn) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Record not found' }));
+        return;
+    }
+    eval { $cn->delete };
+    if ($@) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "Delete failed: $@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1 }));
 }
 
 sub herb_import_common_names : Path('/ENCY/herb_import_common_names') : Args(0) {
