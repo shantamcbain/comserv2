@@ -56,11 +56,16 @@
 }
 
 /* Base styles using variables */
+html {
+  overflow-x: hidden;
+}
+
 body {
   font-family: var(--body-font);
   font-size: var(--font-size-base);
   color: var(--text-color);
   background-color: var(--background-color);
+  overflow-x: hidden;
 }
 
 a {
