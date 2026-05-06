@@ -249,6 +249,28 @@
                         blocked.push(key);
                         return;
                     }
+
+                    // Special handling: common_names via junction table chip UI
+                    if (key === 'common_names' || key === 'common_name') {
+                        var cnMgr = document.getElementById('cn-manager');
+                        if (cnMgr && typeof cnAddBatch === 'function') {
+                            var orgId = cnMgr.getAttribute('data-organism-id');
+                            var rawCn = fields[key];
+                            if (!rawCn) return;
+                            var cnStr = Array.isArray(rawCn) ? rawCn.join('; ') : String(rawCn);
+                            var cnNames = cnStr.split(/[;,\n]+/).map(function(s){ return s.trim(); }).filter(function(s){ return s.length > 1; });
+                            var existingTags = [];
+                            document.querySelectorAll('#cn-tag-list .cn-tag').forEach(function(t){ existingTags.push(t.textContent.trim().replace(/\s*✕\s*$/, '').trim().toLowerCase()); });
+                            cnNames.forEach(function(name) {
+                                if (existingTags.indexOf(name.toLowerCase()) === -1) {
+                                    cnAddBatch(orgId, name, null);
+                                    filled++;
+                                }
+                            });
+                            return;
+                        }
+                    }
+
                     var el = document.querySelector('[name="' + key + '"]');
                     if (!el) return;
                     var aiValue = fields[key];

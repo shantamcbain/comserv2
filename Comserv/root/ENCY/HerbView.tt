@@ -74,7 +74,7 @@ Record ID:[% herb.record_id %]
                 [% END %]
             [% ELSE %]
                 [% IF herb.organism_id %]
-                <div id="cn-manager" style="margin-bottom:0.5em;">
+                <div id="cn-manager" data-organism-id="[% herb.organism_id %]" style="margin-bottom:0.5em;">
                     <div id="cn-tag-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
                     [% FOREACH cn IN cn_list %]
                     <span class="cn-tag" data-id="[% cn.record_id %]"
@@ -113,6 +113,12 @@ Record ID:[% herb.record_id %]
                     var name = inp.value.trim();
                     if (!name) return;
                     msg.textContent = 'Adding…';
+                    cnAddBatch(orgId, name, function(d) {
+                        if (d.ok) { inp.value = ''; msg.textContent = 'Added.'; setTimeout(function(){ msg.textContent=''; }, 2000); }
+                        else { msg.textContent = d.error || 'Error'; }
+                    });
+                }
+                function cnAddBatch(orgId, name, callback) {
                     fetch('/ENCY/common_name_add', {
                         method: 'POST',
                         headers: {'Content-Type':'application/x-www-form-urlencoded'},
@@ -127,13 +133,9 @@ Record ID:[% herb.record_id %]
                             span.innerHTML = d.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
                                 + ' <button type="button" title="Remove" onclick="cnDelete(' + d.record_id + ', this)" style="background:none;border:none;color:#c00;cursor:pointer;font-size:1em;line-height:1;padding:0 2px;">&#x2715;</button>';
                             list.appendChild(span);
-                            inp.value = '';
-                            msg.textContent = 'Added.';
-                            setTimeout(function(){ msg.textContent=''; }, 2000);
-                        } else {
-                            msg.textContent = d.error || 'Error';
                         }
-                    }).catch(function(){ msg.textContent = 'Network error'; });
+                        if (callback) callback(d);
+                    }).catch(function(){ if (callback) callback({ok:false, error:'Network error'}); });
                 }
                 </script>
                 [% ELSE %]
