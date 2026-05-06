@@ -2581,7 +2581,6 @@ sub enrich_organism_from_external {
     if ($gbif && $gbif->{gbif_id}) {
         $updates{gbif_id} = $gbif->{gbif_id} unless $org->gbif_id;
         push @messages, "GBIF:$gbif->{gbif_id}";
-        push @image_records, @{ $gbif->{images} // [] };
     }
     select(undef, undef, undef, 0.3);
 
@@ -2593,16 +2592,20 @@ sub enrich_organism_from_external {
             if $wiki->{habitat} && !($org->habitat // '');
         push @messages, "Wiki:ok";
 
-        if ($wiki->{image_url} && !@image_records) {
+        if ($wiki->{image_url}) {
             push @image_records, {
                 url           => $wiki->{image_url},
                 thumbnail_url => $wiki->{image_url},
                 caption       => $wiki->{wiki_title},
                 source        => 'Wikipedia',
-                license       => '',
+                license       => 'Wikimedia',
                 rights_holder => '',
             };
         }
+    }
+
+    if ($gbif && $gbif->{images}) {
+        push @image_records, @{ $gbif->{images} };
     }
 
     eval { $org->update(\%updates) } if %updates;
