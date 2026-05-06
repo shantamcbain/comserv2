@@ -81,6 +81,19 @@
             style="background:#c0392b;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
         Clean bad images (graphs/papers)
     </button>
+    &nbsp;
+    <button type="button" id="import-cn-btn" onclick="importCommonNames()"
+            style="background:#7a5c2a;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Import common names from herbs
+    </button>
+    <div id="import-cn-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#fffbf0;border:1px solid #d8c890;border-radius:4px;max-width:700px;">
+        <strong>Import Common Names</strong>
+        <div id="import-cn-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="import-cn-bar" style="background:#7a5c2a;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="import-cn-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
     <div id="enrich-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5fff9;border:1px solid #b0d8c0;border-radius:4px;max-width:700px;">
         <strong>Bulk Enrich from GBIF &amp; Wikipedia</strong>
         <div id="enrich-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
@@ -266,6 +279,59 @@
                     setTimeout(runBatch, 500);
                 } else {
                     done('Complete. ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Reload to see changes.');
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
+    function importCommonNames() {
+        var btn    = document.getElementById('import-cn-btn');
+        var panel  = document.getElementById('import-cn-panel');
+        var bar    = document.getElementById('import-cn-bar');
+        var status = document.getElementById('import-cn-status');
+        var log    = document.getElementById('import-cn-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        log.innerHTML = '';
+        var totalAdded = 0, totalSkipped = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+
+        function runBatch() {
+            status.textContent = 'Importing common names… (' + totalDone + ' herbs done)';
+            fetch('/ENCY/herb_import_common_names', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=20&last_herb_id=' + lastId
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total || 0;
+                if (d.last_id) lastId = d.last_id;
+                totalAdded   += d.added   || 0;
+                totalSkipped += d.skipped || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    line.style.color = r.added > 0 ? '#267326' : '#888';
+                    line.textContent = (r.added > 0 ? '✓' : '—') + ' '
+                        + (r.botanical_name || 'herb #' + r.herb_id)
+                        + ': parsed=' + r.parsed + ' added=' + r.added + ' skipped=' + r.skipped
+                        + (r.error ? ' ERROR: ' + r.error : '');
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.processed === 0 || d.remaining <= 0) {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalAdded + ' names added, ' + totalSkipped + ' already existed, ' + totalErrors + ' errors.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run import';
+                } else {
+                    setTimeout(runBatch, 300);
                 }
             })
             .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });

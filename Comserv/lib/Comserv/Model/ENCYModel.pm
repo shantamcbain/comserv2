@@ -2729,5 +2729,127 @@ sub resync_organisms_from_ncbi {
     };
 }
 
+sub _parse_common_name_string {
+    my ($self, $raw) = @_;
+    return () unless defined $raw && length $raw;
+
+    my $str = $raw;
+
+    $str =~ s/\x{2019}/'/g;
+    $str =~ s/\x{2018}/'/g;
+    $str =~ s/\x{201C}|\x{201D}/"/g;
+    $str =~ s/\?{2,}/'/g;
+
+    $str =~ s/\s*\(\s*(?:\d+(?:\s*,\s*\d+)*)\s*\)//g;
+
+    $str =~ s/[;,\/]+/;/g;
+
+    my @names;
+    for my $part (split /;/, $str) {
+        $part =~ s/^\s+|\s+$//g;
+        $part =~ s/\s+/ /g;
+        next unless length($part) > 1;
+        next if $part =~ /^\d+$/;
+        next if $part =~ /^(?:numbers?\s+are|see\s+also|ref(?:erence)?s?|note)/i;
+        next if length($part) > 120;
+        push @names, $part;
+    }
+    return @names;
+}
+
+sub import_herb_common_names {
+    my ($self, $c, $batch_size, $last_herb_id) = @_;
+    $batch_size   //= 20;
+    $last_herb_id //= 0;
+
+    my $herb_rs = $self->ency_schema->resultset('Ency::Herb');
+    my $total   = $herb_rs->search({ 'me.record_id' => { '>' => 0 } })->count;
+
+    my @herbs = $herb_rs->search(
+        {
+            'me.record_id'    => { '>' => $last_herb_id },
+            'me.common_names' => { '!=' => undef },
+            'me.organism_id'  => { '!=' => undef },
+        },
+        { order_by => 'me.record_id', rows => $batch_size }
+    )->all;
+
+    my $cn_rs    = $self->ency_schema->resultset('Ency::CommonName');
+    my @results;
+    my ($added, $skipped, $errors) = (0, 0, 0);
+    my $max_id = $last_herb_id;
+
+    for my $herb (@herbs) {
+        $max_id = $herb->record_id if $herb->record_id > $max_id;
+        my $org_id   = $herb->organism_id;
+        my $raw      = $herb->common_names // '';
+        my @names    = $self->_parse_common_name_string($raw);
+        my $r = {
+            herb_id         => $herb->record_id,
+            botanical_name  => $herb->botanical_name // '',
+            parsed          => scalar @names,
+            added           => 0,
+            skipped         => 0,
+        };
+
+        for my $name (@names) {
+            my $existing = eval {
+                $cn_rs->search({
+                    organism_id => $org_id,
+                    name        => $name,
+                    language    => 'en',
+                    region      => undef,
+                })->first
+            };
+            if ($existing) {
+                $r->{skipped}++;
+                $skipped++;
+                next;
+            }
+            eval {
+                $cn_rs->create({
+                    organism_id        => $org_id,
+                    name               => $name,
+                    language           => 'en',
+                    is_preferred       => 0,
+                    is_historical      => 0,
+                    source             => 'herb_import',
+                    date_time_posted   => \'NOW()',
+                    username_of_poster => ($c && $c->session->{username}) || 'system',
+                });
+                $r->{added}++;
+                $added++;
+            };
+            if ($@) {
+                if ("$@" =~ /Duplicate entry/i) {
+                    $r->{skipped}++;
+                    $skipped++;
+                } else {
+                    $r->{error} = "$@";
+                    $errors++;
+                }
+            }
+        }
+        push @results, $r;
+    }
+
+    my $remaining = $herb_rs->search({
+        'me.record_id'    => { '>' => $max_id },
+        'me.common_names' => { '!=' => undef },
+        'me.organism_id'  => { '!=' => undef },
+    })->count;
+
+    return {
+        processed => scalar @herbs,
+        added     => $added,
+        skipped   => $skipped,
+        errors    => $errors,
+        remaining => $remaining,
+        total     => $total,
+        last_id   => $max_id,
+        details   => \@results,
+    };
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
