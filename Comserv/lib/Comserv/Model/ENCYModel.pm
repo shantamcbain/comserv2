@@ -2524,8 +2524,10 @@ sub bulk_link_herbs_to_ncbi {
             $result->{status}      = 'linked';
             $result->{organism_id} = $organism->record_id;
             $result->{ncbi_tax_id} = $ncbi_data->{ncbi_tax_id};
+            my $matched_as = $ncbi_data->{searched_as} ? " via '$ncbi_data->{searched_as}'" : '';
             $result->{message}     = "Linked to organism #" . $organism->record_id
-                                   . " (NCBI:" . $ncbi_data->{ncbi_tax_id} . ")";
+                                   . " (NCBI:" . $ncbi_data->{ncbi_tax_id} . ")"
+                                   . $matched_as;
         } else {
             $result->{status}  = 'error';
             $result->{message} = $msg;

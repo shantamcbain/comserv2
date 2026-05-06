@@ -52,22 +52,68 @@ sub ncbi_search_taxonomy {
     my ($self, $c, $scientific_name) = @_;
     return undef unless $scientific_name;
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ncbi_search_taxonomy',
-        "Searching NCBI taxonomy for: $scientific_name");
+    my @candidates = $self->_clean_botanical_name($scientific_name);
 
-    my $name_enc = $scientific_name;
-    $name_enc =~ s/ /+/g;
-    my $search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-                   . "?db=taxonomy&term=${name_enc}[SCINAME]&retmode=json&retmax=5";
+    for my $name (@candidates) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'ncbi_search_taxonomy',
+            "Searching NCBI taxonomy for: $name");
 
-    my $search = $self->_get_json($c, $search_url);
-    return undef unless $search && ref $search->{esearchresult}{idlist} eq 'ARRAY';
+        my $name_enc = $name;
+        $name_enc =~ s/ /+/g;
+        my $search_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
+                       . "?db=taxonomy&term=${name_enc}[SCINAME]&retmode=json&retmax=5";
 
-    my @ids = @{ $search->{esearchresult}{idlist} };
-    return undef unless @ids;
+        my $search = $self->_get_json($c, $search_url);
+        next unless $search && ref $search->{esearchresult}{idlist} eq 'ARRAY';
 
-    my $tax_id = $ids[0];
-    return $self->ncbi_fetch_by_tax_id($c, $tax_id);
+        my @ids = @{ $search->{esearchresult}{idlist} };
+        next unless @ids;
+
+        my $result = $self->ncbi_fetch_by_tax_id($c, $ids[0]);
+        if ($result) {
+            $result->{searched_as} = $name if $name ne $scientific_name;
+            return $result;
+        }
+        select(undef, undef, undef, 0.35);
+    }
+
+    return undef;
+}
+
+sub _clean_botanical_name {
+    my ($self, $name) = @_;
+    $name =~ s/^\s+|\s+$//g;
+
+    my @candidates;
+    push @candidates, $name;
+
+    my $clean = $name;
+
+    $clean =~ s/,\s*\(.*\)//g;
+    $clean =~ s/\s*,.*$//;
+
+    $clean =~ s/\s+var\b.*$//i;
+    $clean =~ s/\s+subsp\b.*$//i;
+    $clean =~ s/\s+ssp\b.*$//i;
+    $clean =~ s/\s+f\.\s+\S+.*$//i;
+
+    $clean =~ s/\s*\([^)]*\)\s*/ /g;
+    $clean =~ s/\s+[A-Z][a-z]+\.\s+.*$//;
+    $clean =~ s/\s+[A-Z]\.\s+.*$//;
+    $clean =~ s/\s+L\.\s*$//i;
+    $clean =~ s/\s+Mill\.\s*$//i;
+    $clean =~ s/\s{2,}/ /g;
+    $clean =~ s/^\s+|\s+$//g;
+
+    push @candidates, $clean if $clean ne $name;
+
+    if ($clean =~ /^(\S+\s+\S+)/) {
+        my $two_words = $1;
+        push @candidates, $two_words if $two_words ne $clean && $two_words ne $name;
+    }
+
+    my %seen;
+    return grep { !$seen{$_}++ && /\S/ } @candidates;
 }
 
 sub ncbi_fetch_by_tax_id {
