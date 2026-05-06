@@ -6336,6 +6336,24 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         }
         print "\n✅ Build complete\n\n";
 
+        print "--- Step 1b: Stale-build check ---\n";
+        my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
+        chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
+        chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
+        my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
+        if ($new_commits > 0) {
+            print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
+            print "   Build captured: $git_commit\n";
+            print "   main is now at: $post_build_commit\n";
+            print "   The pushed image will NOT contain these commits:\n";
+            my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
+            print "$new_log\n";
+            print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
+            print "   Continuing push anyway (image is still valid, just not latest).\n\n";
+        } else {
+            print "✅ main has not advanced — build is current ($git_commit)\n\n";
+        }
+
         print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
         my $push_exit = system('docker', 'compose',
             '-f', "$comserv_dir/$prod_compose",
