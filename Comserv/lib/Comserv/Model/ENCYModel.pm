@@ -2390,7 +2390,7 @@ sub find_or_create_organism_from_ncbi {
     eval {
         $new_org = $self->ency_schema->resultset('Ency::Organism')->create({
             scientific_name     => $ncbi_data->{scientific_name},
-            organism_type       => $ncbi_data->{organism_type} || 'plant',
+            organism_type       => $ncbi_data->{organism_type} || 'unknown',
             kingdom             => $ncbi_data->{kingdom}       || '',
             phylum              => $ncbi_data->{phylum}        || '',
             class_name          => $ncbi_data->{class_name}    || '',
@@ -2560,6 +2560,75 @@ sub bulk_link_herbs_to_ncbi {
         remaining      => $remaining > 0 ? $remaining : 0,
         total_pending  => $total_pending,
         details        => \@results,
+    };
+}
+
+sub resync_organisms_from_ncbi {
+    my ($self, $c, $batch_size) = @_;
+    $batch_size //= 10;
+
+    my $needs_resync_where = {
+        ncbi_tax_id => { '!=' => undef },
+        -or => [
+            { organism_type => 'animal' },
+            { kingdom       => undef    },
+            { kingdom       => ''       },
+        ],
+    };
+
+    my @organisms = $self->ency_schema->resultset('Ency::Organism')->search(
+        $needs_resync_where,
+        { order_by => 'record_id', rows => $batch_size }
+    )->all;
+
+    my @results;
+    my $ext_model = $c->model('ExternalDB');
+
+    my $remaining = $self->ency_schema->resultset('Ency::Organism')->search(
+        $needs_resync_where
+    )->count;
+
+    for my $org (@organisms) {
+        my $tax_id = $org->ncbi_tax_id;
+        my $r = { organism_id => $org->record_id, ncbi_tax_id => $tax_id,
+                  scientific_name => $org->scientific_name };
+
+        my $ncbi = eval { $ext_model->ncbi_fetch_by_tax_id($c, $tax_id) };
+        if ($@ || !$ncbi) {
+            $r->{status}  = 'error';
+            $r->{message} = "NCBI fetch failed for tax_id $tax_id";
+            push @results, $r;
+            select(undef, undef, undef, 0.35);
+            next;
+        }
+
+        my %updates;
+        $updates{organism_type} = $ncbi->{organism_type} if $ncbi->{organism_type};
+        $updates{kingdom}       = $ncbi->{kingdom}       if $ncbi->{kingdom};
+        $updates{phylum}        = $ncbi->{phylum}        if $ncbi->{phylum};
+        $updates{class_name}    = $ncbi->{class_name}    if $ncbi->{class_name};
+        $updates{order_name}    = $ncbi->{order_name}    if $ncbi->{order_name};
+        $updates{family_name}   = $ncbi->{family_name}   if $ncbi->{family_name};
+        $updates{genus}         = $ncbi->{genus}         if $ncbi->{genus};
+        $updates{species}       = $ncbi->{species}       if $ncbi->{species};
+
+        eval { $org->update(\%updates) } if %updates;
+        $r->{status}  = 'updated';
+        $r->{message} = "type=" . ($ncbi->{organism_type} // '?')
+                      . " kingdom=" . ($ncbi->{kingdom} // '?');
+        push @results, $r;
+        select(undef, undef, undef, 0.35);
+    }
+
+    my $updated = scalar grep { $_->{status} eq 'updated' } @results;
+    my $errors  = scalar grep { $_->{status} eq 'error'   } @results;
+
+    return {
+        processed => scalar @results,
+        updated   => $updated,
+        errors    => $errors,
+        remaining => ($remaining - scalar @organisms) > 0 ? ($remaining - scalar @organisms) : 0,
+        details   => \@results,
     };
 }
 

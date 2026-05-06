@@ -132,23 +132,36 @@ sub ncbi_fetch_by_tax_id {
     my $rec = $data->{result}{$tax_id} // {};
     return undef unless $rec->{scientificname};
 
+    my %lineage_rank;
+    if (ref $rec->{lineageex} eq 'ARRAY') {
+        for my $entry (@{ $rec->{lineageex} }) {
+            my $rank = lc($entry->{rank} // '');
+            my $sname = $entry->{scientificname} // '';
+            next unless $rank && $sname;
+            $lineage_rank{$rank} = $sname;
+        }
+    }
+
     my $result = {
         ncbi_tax_id     => $tax_id,
         scientific_name => $rec->{scientificname} // '',
         common_name     => $rec->{commonname}     // '',
-        kingdom         => $rec->{kingdom}         // '',
-        phylum          => $rec->{phylum}          // '',
-        class_name      => $rec->{class}           // '',
-        order_name      => $rec->{order}           // '',
-        family_name     => $rec->{family}          // '',
+        kingdom         => $lineage_rank{kingdom}     // $lineage_rank{superkingdom} // '',
+        phylum          => $lineage_rank{phylum}      // '',
+        class_name      => $lineage_rank{class}       // '',
+        order_name      => $lineage_rank{order}       // '',
+        family_name     => $lineage_rank{family}      // '',
+        genus           => $lineage_rank{genus}       // '',
         organism_type   => _infer_type($rec),
         source_url      => "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$tax_id",
         db_name         => 'NCBI',
     };
 
-    if ($result->{scientific_name} =~ /^(\S+)\s+(.+)$/) {
+    if (!$result->{genus} && $result->{scientific_name} =~ /^(\S+)\s+(.+)$/) {
         $result->{genus}   = $1;
         $result->{species} = $2;
+    } elsif ($result->{genus} && $result->{scientific_name} =~ /^\S+\s+(.+)$/) {
+        $result->{species} = $1;
     }
 
     return $result;
@@ -270,8 +283,21 @@ sub get_external_ids {
 
 sub _infer_type {
     my ($rec) = @_;
-    my $lineage = lc($rec->{lineage} // '');
-    return 'plant'     if $lineage =~ /viridiplantae|embryophyta|plantae/;
+    my $division = lc($rec->{division}         // '');
+    my $gendiv   = lc($rec->{genbankdivision}  // '');
+    my $lineage  = lc($rec->{lineage}          // '');
+
+    return 'plant'     if $division =~ /plant/      || $gendiv eq 'pln';
+    return 'fungus'    if $division =~ /fung/       || $gendiv eq 'fun';
+    return 'bacterium' if $division =~ /bacter/     || $gendiv eq 'bct';
+    return 'virus'     if $division =~ /virus/      || $gendiv eq 'vrl';
+    return 'insect'    if $division =~ /insect/;
+    return 'bird'      if $division =~ /bird/;
+    return 'mammal'    if $division =~ /mammal/;
+    return 'human'     if ($rec->{taxid} // 0) == 9606;
+    return 'fish'      if $division =~ /fish/;
+
+    return 'plant'     if $lineage =~ /viridiplantae|embryophyta/;
     return 'fungus'    if $lineage =~ /fungi/;
     return 'bacterium' if $lineage =~ /bacteria/;
     return 'virus'     if $lineage =~ /viruses/;
@@ -280,7 +306,6 @@ sub _infer_type {
     return 'fish'      if $lineage =~ /actinopterygii/;
     return 'amphibian' if $lineage =~ /amphibia/;
     return 'reptile'   if $lineage =~ /reptilia/;
-    return 'human'     if ($rec->{taxid} // 0) == 9606;
     return 'mammal'    if $lineage =~ /mammalia/;
     return 'animal';
 }

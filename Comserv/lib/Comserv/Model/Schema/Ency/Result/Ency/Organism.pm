@@ -21,7 +21,7 @@ __PACKAGE__->add_columns(
         data_type     => 'varchar',
         size          => 50,
         is_nullable   => 0,
-        default_value => 'animal',
+        default_value => 'unknown',
     },
     kingdom => {
         data_type   => 'varchar',
