@@ -226,9 +226,56 @@
     [% END %]
 </table>
 
-[% IF !edit_mode && organism.image %]
-<h2>Image</h2>
+[% SET _org_images = organism.images.all %]
+[% IF _org_images || organism.image %]
+<h2>Images</h2>
+[% IF _org_images %]
+<div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+[% FOREACH img IN _org_images %]
+<div style="border:1px solid #ccc;padding:6px;border-radius:4px;max-width:220px;text-align:center;background:#fafafa;">
+  <a href="[% img.url | html %]" target="_blank">
+    <img src="[% img.thumbnail_url || img.url | html %]" alt="[% img.caption || organism.scientific_name | html %]" style="max-width:200px;max-height:160px;object-fit:contain;" />
+  </a>
+  [% IF img.caption %]<div style="font-size:0.8em;margin-top:4px;">[% img.caption | html %]</div>[% END %]
+  [% IF img.source %]<div style="font-size:0.75em;color:#666;">[% img.source | html %][% IF img.license %] &mdash; [% img.license | html %][% END %]</div>[% END %]
+  [% IF img.rights_holder %]<div style="font-size:0.7em;color:#888;">&copy; [% img.rights_holder | html %]</div>[% END %]
+</div>
+[% END %]
+</div>
+[% ELSIF organism.image %]
 [% PROCESS show_image path=organism.image alt=organism.scientific_name %]
+[% END %]
+[% END %]
+
+[% IF !edit_mode && is_editor && organism.record_id %]
+<div id="enrich-section" style="margin:10px 0;">
+  <button id="enrich-btn" class="btn btn-info" onclick="enrichOrganism([% organism.record_id %])">Fetch Images &amp; Description (GBIF / Wikipedia)</button>
+  <span id="enrich-status" style="margin-left:10px;"></span>
+</div>
+<script>
+function enrichOrganism(id) {
+  var btn = document.getElementById('enrich-btn');
+  var status = document.getElementById('enrich-status');
+  btn.disabled = true;
+  status.textContent = 'Fetching…';
+  fetch('[% c.uri_for('/ENCY/Organism/enrich') %]', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+    body: 'record_id=' + id
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    if (d.ok) {
+      status.textContent = 'Done: ' + d.message;
+      setTimeout(function(){ location.reload(); }, 1500);
+    } else {
+      status.textContent = 'Error: ' + (d.error || d.message);
+      btn.disabled = false;
+    }
+  })
+  .catch(function(e){ status.textContent = 'Request failed'; btn.disabled = false; });
+}
+</script>
 [% END %]
 
 [% IF edit_mode %]

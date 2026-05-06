@@ -2564,6 +2564,80 @@ sub bulk_link_herbs_to_ncbi {
     };
 }
 
+sub enrich_organism_from_external {
+    my ($self, $c, $org_id) = @_;
+    my $org = $self->ency_schema->resultset('Ency::Organism')->find($org_id);
+    return (0, "Organism not found") unless $org;
+
+    my $ext      = $c->model('ExternalDB');
+    my $sci_name = $org->scientific_name // '';
+    return (0, "No scientific name") unless $sci_name;
+
+    my %updates;
+    my @image_records;
+    my @messages;
+
+    my $gbif = eval { $ext->gbif_lookup_by_name($c, $sci_name) };
+    if ($gbif && $gbif->{gbif_id}) {
+        $updates{gbif_id} = $gbif->{gbif_id} unless $org->gbif_id;
+        push @messages, "GBIF:$gbif->{gbif_id}";
+        push @image_records, @{ $gbif->{images} // [] };
+    }
+    select(undef, undef, undef, 0.3);
+
+    my $wiki = eval { $ext->wikipedia_summary($c, $sci_name) };
+    if ($wiki) {
+        $updates{description} = $wiki->{description}
+            if $wiki->{description} && !($org->description // '');
+        $updates{habitat} = $wiki->{habitat}
+            if $wiki->{habitat} && !($org->habitat // '');
+        push @messages, "Wiki:ok";
+
+        if ($wiki->{image_url} && !@image_records) {
+            push @image_records, {
+                url           => $wiki->{image_url},
+                thumbnail_url => $wiki->{image_url},
+                caption       => $wiki->{wiki_title},
+                source        => 'Wikipedia',
+                license       => '',
+                rights_holder => '',
+            };
+        }
+    }
+
+    eval { $org->update(\%updates) } if %updates;
+
+    if (@image_records) {
+        my $img_rs = $self->ency_schema->resultset('Ency::OrganismImage');
+        my $existing_count = eval { $img_rs->search({ organism_id => $org_id })->count } // 0;
+        my $sort = $existing_count;
+        for my $img (@image_records) {
+            eval {
+                $img_rs->create({
+                    organism_id        => $org_id,
+                    url                => $img->{url},
+                    thumbnail_url      => $img->{thumbnail_url},
+                    caption            => $img->{caption}       // '',
+                    source             => $img->{source}        // '',
+                    license            => $img->{license}       // '',
+                    rights_holder      => $img->{rights_holder} // '',
+                    is_primary         => ($sort == 0 && !$existing_count) ? 1 : 0,
+                    sort_order         => $sort++,
+                    date_time_posted   => \'NOW()',
+                    username_of_poster => ($c && $c->session->{username}) || 'system',
+                });
+            };
+        }
+        push @messages, scalar(@image_records) . " image(s) added";
+    }
+
+    if (!$org->image && @image_records) {
+        eval { $org->update({ image => $image_records[0]{url} }) };
+    }
+
+    return (1, join('; ', @messages) || 'ok');
+}
+
 sub resync_organisms_from_ncbi {
     my ($self, $c, $batch_size, $after_id) = @_;
     $batch_size //= 10;
