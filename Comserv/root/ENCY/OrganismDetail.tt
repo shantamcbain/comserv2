@@ -1,13 +1,13 @@
-[% META
+[%
    title = "Organism Detail - Encyclopedia of Biological Life"
    description = "View and edit organism details in the ENCY encyclopedia"
    roles = "public"
    TemplateType = "Application"
    category = "ENCY"
-   page_version = "0.01"
-   last_updated = "2026-05-05"
+   page_version = "0.02"
+   last_updated = "2026-05-06"
 %]
-[% PageVersion = 'ENCY/OrganismDetail.tt,v 0.01 2026/05/05' %]
+[% PageVersion = 'ENCY/OrganismDetail.tt,v 0.02 2026/05/06' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 [% PROCESS 'ENCY/ImageHelper.tt' %]
 
@@ -21,9 +21,15 @@
 [% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
 
 [% IF edit_mode %]
-<h1>[% IF organism.record_id %]Editing Organism: [% organism.common_name | html %][% ELSE %]Add New Organism[% END %]</h1>
+<h1>Editing Organism: <em>[% organism.scientific_name | html %]</em></h1>
 [% ELSE %]
-<h1>[% organism.common_name | html %]</h1>
+<h1><em>[% organism.scientific_name | html %][% IF !organism.scientific_name %]Organism #[% organism.record_id %][% END %]</em></h1>
+[% SET _cnames = organism.common_names.all %]
+[% IF _cnames %]
+<p><strong>Common Names:</strong>
+[% FOREACH cn IN _cnames %][% cn.name | html %][% IF cn.language && cn.language != 'en' %] ([% cn.language | html %])[% END %][% UNLESS loop.last %]; [% END %][% END %]
+</p>
+[% END %]
 [% END %]
 
 <p><a href="[% c.uri_for('/ENCY/Organism') %]">&larr; Back to Organisms</a>
@@ -43,16 +49,6 @@
 <h2>Identity</h2>
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
-        <td><strong>Common Name</strong></td>
-        <td>
-            [% IF edit_mode %]
-            <input type="text" name="common_name" value="[% prefill_common_name || organism.common_name | html %]" size="50" />
-            [% ELSE %]
-            [% organism.common_name | html %]
-            [% END %]
-        </td>
-    </tr>
-    <tr>
         <td><strong>Scientific Name</strong></td>
         <td>
             [% IF edit_mode %]
@@ -62,13 +58,27 @@
             [% END %]
         </td>
     </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Add Common Name</strong></td>
+        <td>
+            [% SET _pref = organism.common_names.search({ is_preferred => 1 }).first %]
+            [% SET _all_cnames = organism.common_names.all %]
+            <input type="text" name="common_name" value="[% _pref.name | html %]" size="50"
+                   placeholder="Primary English common name (e.g. Okra)" />
+            [% IF _all_cnames %]
+            <br /><small>Existing: [% FOREACH cn IN _all_cnames %][% cn.name | html %][% UNLESS loop.last %]; [% END %][% END %]</small>
+            [% END %]
+        </td>
+    </tr>
+    [% END %]
     <tr>
         <td><strong>Type</strong></td>
         <td>
             [% IF edit_mode %]
             <select name="organism_type">
-                [% SET _ot = organism.organism_type || 'animal' %]
-                [% FOREACH _t IN ['human','animal','plant','insect','bird','fish','reptile','amphibian','fungus','bacterium','virus','mammal'] %]
+                [% SET _ot = organism.organism_type || 'unknown' %]
+                [% FOREACH _t IN ['human','mammal','animal','plant','insect','bird','fish','reptile','amphibian','fungus','bacterium','virus','unknown'] %]
                 <option value="[% _t %]"[% IF _ot == _t %] selected="selected"[% END %]>[% _t | html %]</option>
                 [% END %]
             </select>
@@ -91,22 +101,22 @@
 
 <h2>Taxonomy</h2>
 <table border="1" cellpadding="4" cellspacing="0">
-    [% FOREACH _row IN [
-          ['Kingdom',    'kingdom'],
-          ['Phylum',     'phylum'],
-          ['Class',      'class_name'],
-          ['Order',      'order_name'],
-          ['Family',     'family_name'],
-          ['Genus',      'genus'],
-          ['Species',    'species'],
+    [% FOREACH taxrow IN [
+          { label => 'Kingdom', key => 'kingdom'    },
+          { label => 'Phylum',  key => 'phylum'     },
+          { label => 'Class',   key => 'class_name' },
+          { label => 'Order',   key => 'order_name' },
+          { label => 'Family',  key => 'family_name'},
+          { label => 'Genus',   key => 'genus'      },
+          { label => 'Species', key => 'species'    },
        ] %]
     <tr>
-        <td><strong>[% _row.0 %]</strong></td>
+        <td><strong>[% taxrow.label %]</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="[% _row.1 %]" value="[% organism.item(_row.1) | html %]" size="40" />
+            <input type="text" name="[% taxrow.key %]" value="[% organism.get_column(taxrow.key) | html %]" size="40" />
             [% ELSE %]
-            [% organism.item(_row.1) | html %]
+            [% organism.get_column(taxrow.key) | html %]
             [% END %]
         </td>
     </tr>
@@ -175,29 +185,14 @@
     </tr>
 </table>
 
-<h2>Medical Uses</h2>
-<table border="1" cellpadding="4" cellspacing="0">
-    <tr>
-        <td><strong>Medicinal Uses</strong></td>
-        <td>
-            [% IF edit_mode %]
-            <textarea name="medicinal_uses" rows="4" cols="60">[% organism.medicinal_uses | html %]</textarea>
-            [% ELSE %]
-            [% organism.medicinal_uses | html %]
-            [% END %]
-        </td>
-    </tr>
-    <tr>
-        <td><strong>Therapeutic Uses</strong></td>
-        <td>
-            [% IF edit_mode %]
-            <textarea name="therapeutic_uses" rows="4" cols="60">[% organism.therapeutic_uses | html %]</textarea>
-            [% ELSE %]
-            [% organism.therapeutic_uses | html %]
-            [% END %]
-        </td>
-    </tr>
-</table>
+[% IF organism.herbs.count %]
+<h2>Linked Herbs</h2>
+<ul>
+[% FOREACH h IN organism.herbs.all %]
+<li><a href="[% c.uri_for('/ENCY/herb_detail', h.record_id) %]"><em>[% h.botanical_name | html %]</em>[% IF h.key_name %] — [% h.key_name | html %][% END %]</a></li>
+[% END %]
+</ul>
+[% END %]
 
 <h2>References</h2>
 <table border="1" cellpadding="4" cellspacing="0">
@@ -233,7 +228,7 @@
 
 [% IF !edit_mode && organism.image %]
 <h2>Image</h2>
-[% PROCESS show_image path=organism.image alt=organism.common_name %]
+[% PROCESS show_image path=organism.image alt=organism.scientific_name %]
 [% END %]
 
 [% IF edit_mode %]
