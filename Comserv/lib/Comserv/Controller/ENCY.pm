@@ -3270,7 +3270,7 @@ sub api_references : Path('/ENCY/api/references') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_references', "Error: $err");
     };
     require JSON;
-    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::encode_json({ results => \@results }));
 }
 
 sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
@@ -3292,7 +3292,7 @@ sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->link_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
@@ -3314,7 +3314,7 @@ sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->unlink_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
@@ -3342,7 +3342,7 @@ sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
         isbn         => $_->isbn         // '',
     } } @refs;
     require JSON;
-    $c->response->body(JSON::JSON::encode_json({ references => \@data }));
+    $c->response->body(JSON::encode_json({ references => \@data }));
 }
 
 sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
@@ -3417,7 +3417,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
     };
     require JSON;
-    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::encode_json({ results => \@results }));
 }
 
 sub _start_resolve_workflow {
