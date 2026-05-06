@@ -3813,6 +3813,75 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     );
 }
 
+sub organism_bulk_enrich : Path('/ENCY/organism_bulk_enrich') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size = $c->request->body_parameters->{batch_size} // 3;
+    $batch_size = 3 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 10;
+    my $after_id = $c->request->body_parameters->{last_id} // 0;
+    $after_id = 0 if $after_id !~ /^\d+$/;
+
+    my $schema = $c->model('ENCYModel')->ency_schema;
+    my @organisms = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef },
+          record_id       => { '>'  => $after_id } },
+        { order_by => 'record_id', rows => $batch_size }
+    )->all;
+
+    my $total = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef } }
+    )->count;
+
+    my $remaining = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef },
+          record_id       => { '>'  => ($organisms[-1] ? $organisms[-1]->record_id : $after_id) } }
+    )->count if @organisms;
+    $remaining //= 0;
+
+    my @details;
+    my ($updated, $errors, $last_id) = (0, 0, $after_id);
+    for my $org (@organisms) {
+        $last_id = $org->record_id;
+        my ($ok, $msg) = eval { $c->model('ENCYModel')->enrich_organism_from_external($c, $org->record_id) };
+        if ($@) { $ok = 0; $msg = $@; }
+        if ($ok) { $updated++ } else { $errors++ }
+        push @details, {
+            organism_id     => $org->record_id,
+            scientific_name => $org->scientific_name,
+            status          => $ok ? 'enriched' : 'error',
+            message         => $msg // '',
+        };
+        select(undef, undef, undef, 0.2);
+    }
+
+    $c->response->body(JSON::encode_json({
+        ok        => 1,
+        processed => scalar @organisms,
+        updated   => $updated,
+        errors    => $errors,
+        remaining => $remaining,
+        total     => $total,
+        last_id   => $last_id,
+        details   => \@details,
+    }));
+}
+
 sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
