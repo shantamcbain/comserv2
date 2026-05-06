@@ -844,8 +844,11 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
 
     try {
         # Load the Result class dynamically
+        # result_name may contain '/' from scan_result_directory_recursive (subdir prefix);
+        # convert to '::' so the eval'd require is valid Perl
         my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
-        my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_name}";
+        (my $result_path = $result_name) =~ s{/}{::}g;
+        my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_path}";
 
         eval "require $class_name";
         if ($@) {

@@ -3270,7 +3270,7 @@ sub api_references : Path('/ENCY/api/references') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_references', "Error: $err");
     };
     require JSON;
-    $c->response->body(JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
 }
 
 sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
@@ -3292,7 +3292,7 @@ sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->link_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
@@ -3314,7 +3314,7 @@ sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->unlink_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
@@ -3342,7 +3342,7 @@ sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
         isbn         => $_->isbn         // '',
     } } @refs;
     require JSON;
-    $c->response->body(JSON::encode_json({ references => \@data }));
+    $c->response->body(JSON::JSON::encode_json({ references => \@data }));
 }
 
 sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
@@ -3417,7 +3417,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
     };
     require JSON;
-    $c->response->body(JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
 }
 
 sub _start_resolve_workflow {
@@ -3587,6 +3587,87 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
         ency_ai_prompt      => 'common_name, scientific_name, organism_type (one of: human, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
         template            => 'ENCY/OrganismDetail.tt',
     );
+}
+
+sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+
+    my $herb_id = $c->request->param('record_id') // '';
+    unless ($herb_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p      = $c->request->body_parameters;
+        my $action = $p->{action} // '';
+
+        if ($action eq 'link') {
+            my $tax_id = $p->{ncbi_tax_id} // '';
+            unless ($tax_id =~ /^\d+$/) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid NCBI Tax ID' }));
+                return;
+            }
+
+            my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $tax_id);
+            unless ($ncbi_data) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => "Could not fetch NCBI ID $tax_id" }));
+                return;
+            }
+
+            my $organism = $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data);
+            unless ($organism) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Failed to create organism record' }));
+                return;
+            }
+
+            my ($ok, $msg) = $c->model('ENCYModel')->link_herb_to_organism($c, $herb_id, $organism->record_id);
+            $c->response->body(JSON::encode_json({
+                ok          => $ok ? 1 : 0,
+                error       => $ok ? undef : $msg,
+                organism_id => $organism->record_id,
+                scientific_name => $ncbi_data->{scientific_name},
+                kingdom     => $ncbi_data->{kingdom},
+                family_name => $ncbi_data->{family_name},
+            }));
+            return;
+        }
+
+        if ($action eq 'accept_fields') {
+            my $ncbi_tax_id = $p->{ncbi_tax_id} // '';
+            my @fields = split /,/, ($p->{fields} // '');
+            unless ($ncbi_tax_id =~ /^\d+$/ && @fields) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Missing parameters' }));
+                return;
+            }
+            my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id);
+            unless ($ncbi_data) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'NCBI fetch failed' }));
+                return;
+            }
+            my ($ok, $result) = $c->model('ENCYModel')->accept_ncbi_fields_to_herb($c, $herb_id, $ncbi_data, \@fields);
+            $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, updated => $result }));
+            return;
+        }
+
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Unknown action' }));
+        return;
+    }
+
+    my ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    unless ($ok) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => $data }));
+        return;
+    }
+
+    $c->response->body(JSON::encode_json({ ok => 1, ncbi => $data }));
 }
 
 sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
