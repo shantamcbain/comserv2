@@ -310,6 +310,28 @@
                         return;
                     }
 
+                    // Checkbox group handling (e.g. host_type with multiple checkboxes)
+                    if (el.type === 'checkbox') {
+                        var allBoxes = document.querySelectorAll('[name="' + key + '"]');
+                        var anyChecked = false;
+                        allBoxes.forEach(function(cb) { if (cb.checked) anyChecked = true; });
+                        if (anyChecked && !overrideAll) { skipped.push(key); return; }
+                        var aiTerms = val.toLowerCase().split(/[;,\/\n]+/).map(function(s){ return s.trim(); }).filter(Boolean);
+                        var matchedBoxes = 0;
+                        allBoxes.forEach(function(cb) {
+                            var cbVal = cb.value.toLowerCase();
+                            var shouldCheck = aiTerms.some(function(t) {
+                                return cbVal === t || t.indexOf(cbVal) !== -1 || cbVal.indexOf(t) !== -1;
+                            });
+                            if (overrideAll) cb.checked = shouldCheck;
+                            else if (shouldCheck) cb.checked = true;
+                            if (cb.checked) matchedBoxes++;
+                        });
+                        if (matchedBoxes > 0) filled++;
+                        else skipped.push(key + '=' + val);
+                        return;
+                    }
+
                     if (el.tagName === 'SELECT') {
                         // Only set if empty (no selection) or override enabled
                         var hasSelection = (el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '');
