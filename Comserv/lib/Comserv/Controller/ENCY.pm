@@ -2660,8 +2660,23 @@ sub legacy : Path('/ENCY/legacy') : Args(1) {
 sub herb_list : Path('/ENCY/Herb') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_list', 'Entered herb_list');
-    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
-    $c->stash(herbal_data => $forager_data, template => 'ENCY/BotanicalNameView.tt');
+    my $rows = $c->model('ENCYModel')->get_herbal_data($c);
+    my @herbal_data;
+    for my $herb (@$rows) {
+        my $org           = eval { $herb->organism_id ? $herb->organism : undef };
+        my $display_name  = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
+        my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        push @herbal_data, {
+            record_id       => $herb->record_id,
+            display_name    => $display_name,
+            display_image   => $display_image,
+            common_names    => $herb->common_names    // '',
+            ident_character => $herb->ident_character // '',
+            distribution    => $herb->distribution    // '',
+            medical_uses    => $herb->medical_uses    // '',
+        };
+    }
+    $c->stash(herbal_data => \@herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 
 sub herb_detail_by_id : Path('/ENCY/Herb') : Args(1) {
