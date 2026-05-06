@@ -33,9 +33,15 @@
 </p>
 
 [% IF edit_mode %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 <form action="[% IF disease.record_id %][% c.uri_for('/ENCY/Disease/edit') %][% ELSE %][% c.uri_for('/ENCY/Disease/add') %][% END %]" method="post">
 [% IF disease.record_id %]
 <input type="hidden" name="record_id" value="[% disease.record_id %]" />
+[% END %]
+[% IF return_to %]
+<input type="hidden" name="return_to"     value="[% return_to    | html %]" />
+<input type="hidden" name="resolve_field" value="[% resolve_field | html %]" />
+<input type="hidden" name="resolve_type"  value="[% resolve_type  | html %]" />
 [% END %]
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
 [% END %]
@@ -46,7 +52,7 @@
         <td><strong>Common Name</strong></td>
         <td>
             [% IF edit_mode %]
-            <input type="text" name="common_name" value="[% disease.common_name | html %]" size="50" />
+            <input type="text" name="common_name" value="[% prefill_common_name || disease.common_name | html %]" size="50" />
             [% ELSE %]
             [% disease.common_name | html %]
             [% END %]
@@ -76,13 +82,20 @@
         <td><strong>Host Type</strong></td>
         <td>
             [% IF edit_mode %]
-            <select name="host_type">
-                <option value="">-- Select --</option>
-                <option value="human"[% IF disease.host_type == 'human' %] selected="selected"[% END %]>Human</option>
-                <option value="animal"[% IF disease.host_type == 'animal' %] selected="selected"[% END %]>Animal</option>
-                <option value="plant"[% IF disease.host_type == 'plant' %] selected="selected"[% END %]>Plant</option>
-                <option value="insect"[% IF disease.host_type == 'insect' %] selected="selected"[% END %]>Insect</option>
-            </select>
+            [% SET _ht = disease.host_type || prefill_host_type || '' %]
+            <input type="hidden" name="host_type" value="" />
+            <div style="display:flex;flex-wrap:wrap;gap:0.5em 1.4em;padding:0.3em 0;">
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="human"         [% IF _ht.match('(?i)human')         %] checked="checked"[% END %] /> Human</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="animal"        [% IF _ht.match('(?i)animal')        %] checked="checked"[% END %] /> Animal</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="plant"         [% IF _ht.match('(?i)plant')         %] checked="checked"[% END %] /> Plant</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="insect"        [% IF _ht.match('(?i)insect')        %] checked="checked"[% END %] /> Insect</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="bird"          [% IF _ht.match('(?i)bird')          %] checked="checked"[% END %] /> Bird</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="fish"          [% IF _ht.match('(?i)fish')          %] checked="checked"[% END %] /> Fish</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="reptile"       [% IF _ht.match('(?i)reptile')       %] checked="checked"[% END %] /> Reptile</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="fungal host"   [% IF _ht.match('(?i)fungal')        %] checked="checked"[% END %] /> Fungal host</label>
+              <label style="white-space:nowrap;cursor:pointer;"><input type="checkbox" name="host_type" value="bacterial host"[% IF _ht.match('(?i)bacterial')     %] checked="checked"[% END %] /> Bacterial host</label>
+              <label style="white-space:nowrap;">Other: <input type="text" name="host_type_other" value="" size="15" placeholder="e.g. crustacean" /></label>
+            </div>
             [% ELSE %]
             [% disease.host_type | html %]
             [% END %]

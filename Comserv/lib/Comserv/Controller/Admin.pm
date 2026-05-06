@@ -204,14 +204,14 @@ sub index :Path :Args(0) {
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
-            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my @pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' },
                 { order_by => { -asc => 'sitename' } }
             )->all;
             $pending_hosting = scalar @pending;
             $pending_hosting_sites = \@pending;
         } else {
-            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @inv = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
                 { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
             )->all;
@@ -498,7 +498,7 @@ sub get_system_notifications {
         }
 
         if ($is_csc_admin) {
-            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my $pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
@@ -514,7 +514,7 @@ sub get_system_notifications {
 
             # Recently paid hosting invoices (last 48h)
             my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
-            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @paid = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => { '!=' => 'CSC' }, status => 'paid',
                   updated_at => { '>=' => $cutoff } },
                 { order_by => { -desc => 'updated_at' } }
@@ -533,7 +533,7 @@ sub get_system_notifications {
         eval {
             my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
             my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+            my $auto_due  = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search({
                 sitename => $site_name,
                 auto_pay => 1,
                 status   => { '!=' => 'paid' },
@@ -2607,8 +2607,15 @@ sub find_result_file {
     my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
     
     if (lc($database) eq 'ency') {
+        # If the input looks like a subdirectory path (e.g., "Ency/ExternalID"),
+        # also try a direct path match before falling back to computed result_name
+        if ($table_name =~ m{/}) {
+            my $direct = "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/${table_name}.pm";
+            return $direct if -f $direct;
+        }
         @search_paths = (
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/Ency/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
         );
@@ -2642,7 +2649,13 @@ sub table_name_to_result_name {
     
     # Handle database-specific table name patterns
     my $clean_name = $table_name;
-    
+
+    # Strip subdirectory prefix (e.g., "Ency/ExternalID" -> "ExternalID")
+    # scan_result_directory_recursive uses "/" to denote subdirectory nesting
+    if ($clean_name =~ m{^[A-Za-z][A-Za-z0-9]*/(.+)$}) {
+        $clean_name = $1;
+    }
+
     # Remove common prefixes
     $clean_name =~ s/^ency_//i;
     $clean_name =~ s/^forager_//i;

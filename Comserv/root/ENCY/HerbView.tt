@@ -18,6 +18,15 @@
 <div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
 [% END %]
 
+<style>
+.field-term-preview{background:#f0f7ff;border-left:3px solid #4a90d9;padding:0.3em 0.6em;margin-bottom:0.35em;font-size:0.88em;border-radius:0 3px 3px 0;}
+.field-term-preview em{color:#555;font-style:normal;font-weight:600;margin-right:0.4em;}
+.field-term-preview a{color:#1a5fa8;text-decoration:underline dotted;}
+</style>
+[% MACRO term_preview(html) BLOCK %]
+[% IF html %]<div class="field-term-preview"><em>Saved:</em> [% html %]</div>[% END %]
+[% END %]
+
 [% IF !edit_mode %]
     <h1>[% herb.botanical_name | html %]</h1>
 [% ELSE %]
@@ -37,6 +46,7 @@ Record ID:[% herb.record_id %]
 <form action="[% c.uri_for('/ENCY/edit_herb') %]" method="post">
 <input type="hidden" name="record_id" value="[% herb.record_id %]" />
 [% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
 [% END %]
 
 <table>
@@ -57,7 +67,7 @@ Record ID:[% herb.record_id %]
         <td>Common Names:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.common_names %]
+                [% field_html.common_names %]
             [% ELSE %]
                 <input type="text" id="common_names" name="common_names" value="[% herb.common_names %]" size="50" />
             [% END %]
@@ -77,8 +87,9 @@ Record ID:[% herb.record_id %]
         <td>Parts Used:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.parts_used %]
+                [% parts_used_html %]
             [% ELSE %]
+                [% term_preview(field_html.parts_used) %]
                 <input type="text" id="parts_used" name="parts_used" value="[% herb.parts_used %]" size="50" />
             [% END %]
         </td>
@@ -87,8 +98,10 @@ Record ID:[% herb.record_id %]
         <td>Sister Plants:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.sister_plants %]
+                [% sister_plants_html %]
             [% ELSE %]
+                [% term_preview(field_html.sister_plants) %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
             [% END %]
         </td>
@@ -97,10 +110,77 @@ Record ID:[% herb.record_id %]
         <td>Comments:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.comments | ref_links %]
+                [% field_html.comments %]
             [% ELSE %]
                 <textarea id="comments" name="comments" rows="4" cols="50">[% herb.comments %]</textarea>
             [% END %]
+        </td>
+    </tr>
+
+    <tr>
+        <th colspan="2"><h2>Taxonomy</h2></th>
+    </tr>
+    <tr>
+        <td colspan="2">
+[% IF herb.organism %]
+[% SET org = herb.organism %]
+<table style="width:100%;border-collapse:collapse;">
+    <tr>
+        <td style="width:140px;font-weight:bold;">Kingdom</td>
+        <td>[% org.kingdom | html %]</td>
+        <td style="width:140px;font-weight:bold;">Phylum</td>
+        <td>[% org.phylum | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Class</td>
+        <td>[% org.class_name | html %]</td>
+        <td style="font-weight:bold;">Order</td>
+        <td>[% org.order_name | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Family</td>
+        <td>[% org.family_name | html %]</td>
+        <td style="font-weight:bold;">Genus</td>
+        <td>[% org.genus | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Species</td>
+        <td>[% org.species | html %]</td>
+        <td style="font-weight:bold;">NCBI Tax ID</td>
+        <td>
+            [% IF org.ncbi_tax_id %]
+            <a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=[% org.ncbi_tax_id | html %]"
+               target="_blank">[% org.ncbi_tax_id | html %]</a>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Organism</td>
+        <td colspan="3">
+            <a href="[% c.uri_for('/ENCY/Organism', org.record_id) %]">[% org.common_name | html %]</a>
+            [% IF is_editor %]
+            &nbsp;<a href="[% c.uri_for('/ENCY/Organism/edit', { record_id => org.record_id }) %]"
+                    style="font-size:0.85em;">[edit organism]</a>
+            [% END %]
+        </td>
+    </tr>
+</table>
+[% ELSE %]
+<p style="color:#888;font-style:italic;">No taxonomy linked yet.
+[% IF is_editor %]
+<button type="button" id="ncbi-lookup-btn"
+        onclick="ncbiLookupHerb([% herb.record_id %])"
+        style="margin-left:1em;">Look up NCBI</button>
+[% END %]
+</p>
+[% END %]
+[% IF is_editor && herb.organism %]
+<p style="margin-top:0.4em;">
+<button type="button"
+        onclick="ncbiAcceptFields([% herb.record_id %], [% herb.organism.ncbi_tax_id || 0 %])"
+        style="font-size:0.85em;">Enrich from NCBI</button>
+</p>
+[% END %]
         </td>
     </tr>
 
@@ -111,7 +191,7 @@ Record ID:[% herb.record_id %]
         <td>Identifying Character:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.ident_character %]
+                [% field_html.ident_character %]
             [% ELSE %]
                 <input type="text" id="ident_character" name="ident_character" value="[% herb.ident_character %]" size="50" />
             [% END %]
@@ -121,8 +201,9 @@ Record ID:[% herb.record_id %]
         <td>Stem:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.stem %]
+                [% field_html.stem %]
             [% ELSE %]
+                [% term_preview(field_html.stem) %]
                 <input type="text" id="stem" name="stem" value="[% herb.stem %]" size="50" />
             [% END %]
         </td>
@@ -131,8 +212,9 @@ Record ID:[% herb.record_id %]
         <td>Leaves:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.leaves %]
+                [% field_html.leaves %]
             [% ELSE %]
+                [% term_preview(field_html.leaves) %]
                 <input type="text" id="leaves" name="leaves" value="[% herb.leaves %]" size="50" />
             [% END %]
         </td>
@@ -141,7 +223,7 @@ Record ID:[% herb.record_id %]
         <td>Flowers:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.flowers %]
+                [% field_html.flowers %]
             [% ELSE %]
                 <input type="text" id="flowers" name="flowers" value="[% herb.flowers %]" size="50" />
             [% END %]
@@ -151,7 +233,7 @@ Record ID:[% herb.record_id %]
         <td>Fruit:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.fruit %]
+                [% field_html.fruit %]
             [% ELSE %]
                 <input type="text" id="fruit" name="fruit" value="[% herb.fruit %]" size="50" />
             [% END %]
@@ -161,8 +243,9 @@ Record ID:[% herb.record_id %]
         <td>Taste:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.taste %]
+                [% field_html.taste %]
             [% ELSE %]
+                [% term_preview(field_html.taste) %]
                 <input type="text" id="taste" name="taste" value="[% herb.taste %]" size="50" />
             [% END %]
         </td>
@@ -171,7 +254,7 @@ Record ID:[% herb.record_id %]
         <td>Odour:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.odour %]
+                [% field_html.odour %]
             [% ELSE %]
                 <input type="text" id="odour" name="odour" value="[% herb.odour %]" size="50" />
             [% END %]
@@ -181,7 +264,7 @@ Record ID:[% herb.record_id %]
         <td>Root:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.root %]
+                [% field_html.root %]
             [% ELSE %]
                 <input type="text" id="root" name="root" value="[% herb.root %]" size="50" />
             [% END %]
@@ -205,7 +288,7 @@ Record ID:[% herb.record_id %]
         <td>Distribution:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.distribution %]
+                [% field_html.distribution %]
             [% ELSE %]
                 <input type="text" id="distribution" name="distribution" value="[% herb.distribution %]" size="50" />
             [% END %]
@@ -215,7 +298,7 @@ Record ID:[% herb.record_id %]
         <td>Cultivation:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.cultivation %]
+                [% field_html.cultivation %]
             [% ELSE %]
                 <input type="text" id="cultivation" name="cultivation" value="[% herb.cultivation %]" size="50" />
             [% END %]
@@ -225,7 +308,7 @@ Record ID:[% herb.record_id %]
         <td>Harvest:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.harvest %]
+                [% field_html.harvest %]
             [% ELSE %]
                 <input type="text" id="harvest" name="harvest" value="[% herb.harvest %]" size="50" />
             [% END %]
@@ -239,8 +322,10 @@ Record ID:[% herb.record_id %]
         <td>Therapeutic Action:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.therapeutic_action | ref_links %]
+                [% therapeutic_action_html %]
             [% ELSE %]
+                [% term_preview(field_html.therapeutic_action) %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="therapeutic_action" name="therapeutic_action" rows="4" cols="50">[% herb.therapeutic_action %]</textarea>
             [% END %]
         </td>
@@ -249,8 +334,10 @@ Record ID:[% herb.record_id %]
         <td>Medical Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.medical_uses | ref_links %]
+                [% medical_uses_html %]
             [% ELSE %]
+                [% term_preview(field_html.medical_uses) %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="medical_uses" name="medical_uses" rows="4" cols="50">[% herb.medical_uses %]</textarea>
             [% END %]
         </td>
@@ -261,6 +348,8 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% constituents_html %]
             [% ELSE %]
+                [% term_preview(constituents_html) %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="constituents" name="constituents" rows="4" cols="50">[% herb.constituents %]</textarea>
             [% END %]
         </td>
@@ -269,7 +358,7 @@ Record ID:[% herb.record_id %]
         <td>Solvents:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.solvents | ref_links %]
+                [% field_html.solvents %]
             [% ELSE %]
                 <input type="text" id="solvents" name="solvents" value="[% herb.solvents %]" size="50" />
             [% END %]
@@ -279,8 +368,9 @@ Record ID:[% herb.record_id %]
         <td>Dosage:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.dosage | ref_links %]
+                [% field_html.dosage %]
             [% ELSE %]
+                [% term_preview(field_html.dosage) %]
                 <input type="text" id="dosage" name="dosage" value="[% herb.dosage %]" size="50" />
             [% END %]
         </td>
@@ -289,8 +379,9 @@ Record ID:[% herb.record_id %]
         <td>Administration:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.administration | ref_links %]
+                [% field_html.administration %]
             [% ELSE %]
+                [% term_preview(field_html.administration) %]
                 <input type="text" id="administration" name="administration" value="[% herb.administration %]" size="50" />
             [% END %]
         </td>
@@ -299,8 +390,9 @@ Record ID:[% herb.record_id %]
         <td>Formulas:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.formulas | ref_links %]
+                [% field_html.formulas %]
             [% ELSE %]
+                [% term_preview(field_html.formulas) %]
                 <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
             [% END %]
         </td>
@@ -309,8 +401,10 @@ Record ID:[% herb.record_id %]
         <td>Contra Indications:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.contra_indications | ref_links %]
+                [% field_html.contra_indications %]
             [% ELSE %]
+                [% term_preview(field_html.contra_indications) %]
+                [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
                 <textarea id="contra_indications" name="contra_indications" rows="4" cols="50">[% herb.contra_indications %]</textarea>
             [% END %]
         </td>
@@ -319,8 +413,9 @@ Record ID:[% herb.record_id %]
         <td>Preparation:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.preparation | ref_links %]
+                [% field_html.preparation %]
             [% ELSE %]
+                [% term_preview(field_html.preparation) %]
                 <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
             [% END %]
         </td>
@@ -329,8 +424,9 @@ Record ID:[% herb.record_id %]
         <td>Chinese:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.chinese | ref_links %]
+                [% field_html.chinese %]
             [% ELSE %]
+                [% term_preview(field_html.chinese) %]
                 <input type="text" id="chinese" name="chinese" value="[% herb.chinese %]" size="50" />
             [% END %]
         </td>
@@ -339,8 +435,9 @@ Record ID:[% herb.record_id %]
         <td>Veterinary:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.vetrinary | ref_links %]
+                [% field_html.vetrinary %]
             [% ELSE %]
+                [% term_preview(field_html.vetrinary) %]
                 <input type="text" id="vetrinary" name="vetrinary" value="[% herb.vetrinary %]" size="50" />
             [% END %]
         </td>
@@ -349,8 +446,9 @@ Record ID:[% herb.record_id %]
         <td>Homeopathic:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.homiopathic | ref_links %]
+                [% field_html.homiopathic %]
             [% ELSE %]
+                [% term_preview(field_html.homiopathic) %]
                 <input type="text" id="homiopathic" name="homiopathic" value="[% herb.homiopathic %]" size="50" />
             [% END %]
         </td>
@@ -376,7 +474,7 @@ Record ID:[% herb.record_id %]
         <td>Pollinator:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.pollinator %]
+                [% field_html.pollinator %]
             [% ELSE %]
                 <input type="text" id="pollinator" name="pollinator" value="[% herb.pollinator %]" size="50" />
             [% END %]
@@ -399,7 +497,7 @@ Record ID:[% herb.record_id %]
         <td>Pollen Notes:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.pollennotes | ref_links %]
+                [% field_html.pollennotes %]
             [% ELSE %]
                 <textarea id="pollennotes" name="pollennotes" rows="4" cols="50">[% herb.pollennotes %]</textarea>
             [% END %]
@@ -423,7 +521,7 @@ Record ID:[% herb.record_id %]
         <td>Nectar Notes:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.nectarnotes | ref_links %]
+                [% field_html.nectarnotes %]
             [% ELSE %]
                 <textarea id="nectarnotes" name="nectarnotes" rows="4" cols="50">[% herb.nectarnotes %]</textarea>
             [% END %]
@@ -437,7 +535,7 @@ Record ID:[% herb.record_id %]
         <td>Non-Medical Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.non_med | ref_links %]
+                [% field_html.non_med %]
             [% ELSE %]
                 <textarea id="non_med" name="non_med" rows="4" cols="50">[% herb.non_med %]</textarea>
             [% END %]
@@ -447,7 +545,7 @@ Record ID:[% herb.record_id %]
         <td>Culinary Uses:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.culinary | ref_links %]
+                [% field_html.culinary %]
             [% ELSE %]
                 <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" required />
             [% END %]
@@ -457,7 +555,7 @@ Record ID:[% herb.record_id %]
         <td>History:</td>
         <td>
             [% IF !edit_mode %]
-                [% herb.history | ref_links %]
+                [% field_html.history %]
             [% ELSE %]
                 <textarea id="history" name="history" rows="4" cols="50">[% herb.history %]</textarea>
             [% END %]
@@ -513,24 +611,159 @@ Record ID:[% herb.record_id %]
   </div>
 </div>
 
+<div id="ency-glossary-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9001;background:rgba(0,0,0,0.45);">
+  <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border-radius:6px;padding:1.5em 2em;max-width:560px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 4px 24px rgba(0,0,0,0.3);">
+    <button onclick="document.getElementById('ency-glossary-modal').style.display='none'" style="float:right;border:none;background:none;font-size:1.4em;cursor:pointer;">&times;</button>
+    <div id="ency-glossary-modal-body">Loading&hellip;</div>
+  </div>
+</div>
+
+<div id="ncbi-panel" style="display:none;border:1px solid #b0c4de;border-radius:5px;padding:1em;margin:0.5em 0;background:#f4f8ff;">
+  <strong>NCBI Taxonomy Result</strong>
+  <div id="ncbi-panel-body" style="margin-top:0.5em;"></div>
+  <div id="ncbi-panel-actions" style="margin-top:0.7em;display:none;">
+    <input type="hidden" id="ncbi-tax-id" value="" />
+    <label><input type="checkbox" name="ncbi_accept" value="common_name" /> Add NCBI common name to Common Names</label><br/>
+    <button type="button" onclick="ncbiApplyFields([% herb.record_id %])">Apply selected</button>
+    &nbsp;
+    <button type="button"
+            onclick="ncbiLinkOrganism([% herb.record_id %], document.getElementById('ncbi-tax-id').value)">
+      Link taxonomy &amp; create organism record
+    </button>
+    &nbsp;
+    <button type="button" onclick="document.getElementById('ncbi-panel').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+function ncbiLookupHerb(herbId) {
+  var panel = document.getElementById('ncbi-panel');
+  var body  = document.getElementById('ncbi-panel-body');
+  var actions = document.getElementById('ncbi-panel-actions');
+  body.innerHTML = 'Searching NCBI\u2026';
+  actions.style.display = 'none';
+  panel.style.display = 'block';
+  fetch('/ENCY/herb_ncbi_lookup?record_id=' + herbId)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) { body.innerHTML = '<span style="color:red;">'+d.error+'</span>'; return; }
+      var n = d.ncbi;
+      document.getElementById('ncbi-tax-id').value = n.ncbi_tax_id || '';
+      var html = '<table style="border-collapse:collapse;">';
+      var rows = [
+        ['Scientific Name', n.scientific_name],
+        ['Common Name',     n.common_name],
+        ['Kingdom',         n.kingdom],
+        ['Phylum',          n.phylum],
+        ['Class',           n.class_name],
+        ['Order',           n.order_name],
+        ['Family',          n.family_name],
+        ['Genus',           n.genus],
+        ['NCBI Tax ID',     n.ncbi_tax_id ? '<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id='+n.ncbi_tax_id+'" target="_blank">'+n.ncbi_tax_id+'</a>' : ''],
+      ];
+      rows.forEach(function(r){
+        if (r[1]) html += '<tr><td style="font-weight:bold;padding:2px 8px 2px 0;">'+r[0]+'</td><td>'+r[1]+'</td></tr>';
+      });
+      html += '</table>';
+      body.innerHTML = html;
+      actions.style.display = 'block';
+    })
+    .catch(function(e){ body.innerHTML = '<span style="color:red;">Lookup failed: '+e+'</span>'; });
+}
+
+function ncbiLinkOrganism(herbId, taxId) {
+  if (!taxId) { alert('No NCBI Tax ID found. Run lookup first.'); return; }
+  if (!confirm('Create organism record from NCBI Tax ID '+taxId+' and link to this herb?')) return;
+  var fd = new FormData();
+  fd.append('action', 'link');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        alert('Linked! Organism #'+d.organism_id+' ('+d.scientific_name+'). Reloading page.');
+        location.reload();
+      } else {
+        alert('Error: ' + d.error);
+      }
+    });
+}
+
+function ncbiApplyFields(herbId) {
+  var taxId = document.getElementById('ncbi-tax-id').value;
+  if (!taxId) { alert('No NCBI Tax ID. Run lookup first.'); return; }
+  var checked = Array.from(document.querySelectorAll('input[name="ncbi_accept"]:checked'))
+                     .map(function(el){ return el.value; });
+  if (!checked.length) { alert('Select at least one field to apply.'); return; }
+  var fd = new FormData();
+  fd.append('action', 'accept_fields');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fd.append('fields', checked.join(','));
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var updated = d.updated ? Object.keys(d.updated).join(', ') : 'none';
+        alert('Applied fields: '+updated+'. Reloading.');
+        location.reload();
+      } else {
+        alert('Error: '+d.error);
+      }
+    });
+}
+
+function ncbiAcceptFields(herbId, taxId) {
+  if (!taxId) { alert('No NCBI Tax ID linked to this organism.'); return; }
+  if (!confirm('Enrich common_names from NCBI for this herb?')) return;
+  var fd = new FormData();
+  fd.append('action', 'accept_fields');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fd.append('fields', 'common_name');
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      alert(d.ok ? 'Done. Reloading.' : 'Error: '+d.error);
+      if (d.ok) location.reload();
+    });
+}
+</script>
+
 <script>
 (function(){
-  document.addEventListener('click', function(e){
-    var a = e.target.closest('a.ency-constituent-link');
-    if (!a) return;
-    e.preventDefault();
-    var cid = a.getAttribute('data-cid');
-    var modal = document.getElementById('ency-constituent-modal');
-    var body  = document.getElementById('ency-constituent-modal-body');
+  function openEncyModal(modalId, bodyId, url, fallback) {
+    var modal = document.getElementById(modalId);
+    var body  = document.getElementById(bodyId);
     body.innerHTML = 'Loading\u2026';
     modal.style.display = 'block';
-    fetch('/ENCY/constituent_popup/' + cid)
+    fetch(url)
       .then(function(r){ return r.text(); })
       .then(function(html){ body.innerHTML = html; })
-      .catch(function(){ body.innerHTML = 'Could not load constituent details.'; });
-  });
-  document.getElementById('ency-constituent-modal').addEventListener('click', function(e){
-    if (e.target === this) this.style.display = 'none';
+      .catch(function(){ body.innerHTML = fallback; });
+    modal.addEventListener('click', function closeOnBg(e){
+      if (e.target === modal) { modal.style.display = 'none'; modal.removeEventListener('click', closeOnBg); }
+    });
+  }
+
+  document.addEventListener('click', function(e){
+    var a = e.target.closest('a.ency-constituent-link');
+    if (a) {
+      e.preventDefault();
+      openEncyModal('ency-constituent-modal', 'ency-constituent-modal-body',
+        '/ENCY/constituent_popup/' + a.getAttribute('data-cid'),
+        'Could not load constituent details.');
+      return;
+    }
+    a = e.target.closest('a.ency-glossary-link');
+    if (a) {
+      e.preventDefault();
+      openEncyModal('ency-glossary-modal', 'ency-glossary-modal-body',
+        '/ENCY/glossary_popup/' + a.getAttribute('data-gid'),
+        'Could not load glossary details.');
+      return;
+    }
   });
 })();
 </script>

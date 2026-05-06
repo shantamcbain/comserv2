@@ -322,7 +322,7 @@ document.addEventListener('DOMContentLoaded', function() {
 [% SET _mem_rs = c.model('DBEncy').resultset('UserMembership') %]
 [% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
 [% IF NOT _active_mem %][% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
-[% SET _coin_acct = c.model('DBEncy').resultset('InternalCurrencyAccount').find({user_id => _uid}) %]
+[% SET _coin_acct = c.model('DBEncy').resultset('Accounting::InternalCurrencyAccount').find({user_id => _uid}) %]
 <div class="membership-status-bar">
     [% IF _active_mem AND _active_mem.plan %]
         <a href="/membership/account" class="membership-tier-badge membership-tier-[% _active_mem.plan.slug | html %]" title="Your membership plan">[% _active_mem.plan.name | html %]</a>

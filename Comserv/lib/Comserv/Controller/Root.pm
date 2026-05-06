@@ -486,7 +486,7 @@ sub auto :Private {
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
             my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
-            my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
+            my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
                 sitename     => $shop_site,
                 status       => 'active',
                 show_in_shop => 1,

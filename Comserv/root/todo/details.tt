@@ -187,14 +187,23 @@
 [% END %]
 
 [% SET task_id = record.get_column('record_id') %]
+[% SET task_subject     = record.get_column('subject')     | html %]
+[% SET task_description = record.get_column('description') | html %]
+[% SET task_status      = record.get_column('status')          %]
+[% SET task_due_date    = record.get_column('due_date')         %]
+[% SET task_project     = record.get_column('project_code') | html %]
 <div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid var(--border-color, #ddd); border-radius:4px; padding:16px; background: var(--bg-secondary, #fafafa);">
     <h3 style="margin-top:0;">AI Chat Activity</h3>
     <div id="ai-task-conversations" data-task-id="[% task_id %]">
         <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>
     </div>
     <div style="margin-top:10px;">
-        <a href="/ai?task_id=[% task_id %]" class="button button-primary" style="font-size:0.9em;">Chat about this task</a>
-        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all task conversations</a>
+        <button type="button" class="button button-primary" style="font-size:0.9em;"
+            onclick="openAIChatWithTask({record_id:[% task_id %],subject:'[% task_subject | js %]',description:'[% task_description | js %]',status:[% task_status %],due_date:'[% task_due_date %]',project:'[% task_project | js %]'})">
+            💬 Chat about this task
+        </button>
+        <a href="/todo/details?edit=1&amp;record_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">✏️ Edit this task</a>
+        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all conversations</a>
     </div>
 </div>
 

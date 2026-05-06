@@ -48,6 +48,12 @@
         siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
+    // Per-tab nonce: generated fresh each time the script runs in a new JS context.
+    // sessionStorage is tab-isolated, but tab duplication copies it.  We detect
+    // duplication by writing this nonce into sessionStorage on first use; if the
+    // stored nonce differs from ours the tab was duplicated and should start fresh.
+    const _TAB_NONCE = Math.random().toString(36).slice(2);
+
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
     // when the widget was opened as a popup/detached window)
     function loadPersistedState() {
@@ -58,6 +64,19 @@
                 console.debug('Restored conversation ID from popup param:', state.currentConversationId);
                 return;
             }
+
+            // Detect duplicated tabs: if the stored nonce doesn't match ours, the
+            // sessionStorage was inherited from another tab → start fresh.
+            const storedNonce = sessionStorage.getItem('ai_tab_nonce');
+            if (storedNonce && storedNonce !== _TAB_NONCE) {
+                console.debug('[AI] Duplicated tab detected — starting fresh conversation');
+                sessionStorage.removeItem('currentConversationId');
+                sessionStorage.removeItem('chatMessages');
+                sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+                return;
+            }
+            sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+
             const savedConvId = sessionStorage.getItem('currentConversationId');
             if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
                 state.currentConversationId = parseInt(savedConvId);
@@ -217,9 +236,15 @@
             'HelpDesk':   'helpdesk',
         };
 
-        // Restore previously saved agent selection, or auto-select by site
+        // Restore previously saved agent selection, or auto-select by site.
+        // URL-based match always wins over saved preference (so navigating to /ENCY
+        // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
-        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+        var urlAgent = selectAgentForPage();
+        if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
+            sel.value = urlAgent.id;
+            _applyAgentOverride(urlAgent.id);
+        } else if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
         } else if (state.siteName && siteAgentMap[state.siteName]) {
@@ -248,12 +273,14 @@
         var agent = state.agentsConfig.agents[agentKey];
         if (!agent) return;
         state.agentOverride = agentKey;
+        state.currentAgent = agent;
         var ctx = detectPageContext() || {};
         ctx.agent_id   = agent.id;
         ctx.agent_name = agent.display_name;
         if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
         state.pageContext = ctx;
         _updateAgentBanner(agentKey);
+        updatePageLabel();
     }
 
     function _updateAgentBanner(agentKey) {
@@ -377,6 +404,49 @@
         }
         
         const agents = state.agentsConfig.agents;
+
+        // On todo/project detail pages, pick the agent based on the todo subject text
+        // rather than the URL — the subject tells us which domain the work belongs to.
+        const isTodoDetail    = pathname.startsWith('/todo/details') || pathname.startsWith('/todo/view');
+        const isProjectDetail = pathname.startsWith('/project/details');
+        if (isTodoDetail || isProjectDetail) {
+            // Gather candidate text: page <h1>, <h2>, <title>, and the first .subject / .todo-subject element
+            const candidateEls = [
+                document.querySelector('h1'),
+                document.querySelector('h2'),
+                document.querySelector('.todo-subject'),
+                document.querySelector('.subject'),
+                document.querySelector('.todo-title'),
+                document.querySelector('[data-todo-subject]'),
+            ];
+            const candidateText = candidateEls
+                .filter(Boolean)
+                .map(function(el) { return el.textContent || el.getAttribute('data-todo-subject') || ''; })
+                .join(' ')
+                .toUpperCase();
+
+            if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                console.debug('Agent selected from todo content: ency');
+                return agents.ency;
+            }
+            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
+                console.debug('Agent selected from todo content: bmaster');
+                return agents.bmaster;
+            }
+            if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                console.debug('Agent selected from todo content: inventory');
+                return agents.inventory;
+            }
+            if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                console.debug('Agent selected from todo content: helpdesk');
+                return agents.helpdesk;
+            }
+            // Todo/project detail with no domain match → use planning agent
+            if (agents.planning) {
+                console.debug('Agent selected for todo/project detail: planning');
+                return agents.planning;
+            }
+        }
         
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
@@ -518,7 +588,7 @@
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname,
+            page_path: pathname + (window.location.search || ''),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -1393,9 +1463,9 @@
         });
     }
     
-    // Open chat in a separate browser window — user can drag it to another monitor.
-    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
-    // footer) so the popup always stays clean regardless of link clicks or refreshes.
+    // Open chat in a separate browser popup window — the user can drag it anywhere on
+    // the screen or to a second monitor.  Uses /ai/widget (no site nav/header/footer).
+    // Falls back to the inline panel if the browser blocks popups.
     function detachToPopup() {
         // If a popup is already open, bring it to front and return
         if (state._popupWindow && !state._popupWindow.closed) {
@@ -1423,6 +1493,7 @@
 
         if (popup) {
             state._popupWindow = popup;
+            // Mark the chat button as "popup active" so the user knows where the chat is
             const chatButton = document.getElementById('chat-button');
             if (chatButton) {
                 chatButton.classList.add('popup-active');
@@ -1436,6 +1507,7 @@
                         chatButton.classList.remove('popup-active');
                         chatButton.title = 'Open AI assistant';
                     }
+                    // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
                         if (popupConvId) {
@@ -1455,20 +1527,47 @@
         }
     }
 
-    // Update the page label in the widget header to show what page is being assisted
+    // Update the page label in the widget header to show what page is being assisted.
+    // Shows: [Site] · Page Title · agent badge  — all in one readable line.
     function updatePageLabel() {
         const labelEl = document.getElementById('chat-page-label');
         if (!labelEl) return;
+
         const ctx = state.pageContext;
         let pagePath = (ctx && ctx.page_path) || window.location.pathname;
-        // In popup mode use the originating page path
         if (window.AI_WIDGET_POPUP) {
             pagePath = window.AI_DETACHED_FROM_PATH || pagePath;
         }
-        // Show only last two segments for brevity: /Foo/Bar → Foo/Bar
-        const label = pagePath.replace(/^\//, '').replace(/\/$/, '') || '/';
-        labelEl.textContent = label;
-        labelEl.title = 'Assisting page: ' + pagePath;
+
+        // Human-readable page title: prefer document.title, fall back to last path segment
+        let pageTitle = '';
+        try {
+            pageTitle = (window.AI_WIDGET_POPUP ? (window.AI_DETACHED_FROM_TITLE || '') : document.title) || '';
+            pageTitle = pageTitle.replace(/\s*[|\-–—]\s*.*$/, '').trim(); // strip site suffix
+        } catch(e) {}
+        if (!pageTitle) {
+            pageTitle = pagePath.split('/').filter(Boolean).pop() || '/';
+        }
+        // Truncate long titles
+        if (pageTitle.length > 32) pageTitle = pageTitle.slice(0, 30) + '…';
+
+        // Site name badge
+        const site = state.siteName || '';
+
+        // Active agent label
+        const agentLabel = (state.currentAgent && (state.currentAgent.display_name || state.currentAgent.id)) || '';
+
+        // Build label HTML
+        let html = '';
+        if (site) html += '<span class="chat-ctx-badge chat-ctx-site" title="Site">' + _escH(site) + '</span> ';
+        html += '<span class="chat-ctx-page" title="' + _escH('Page: ' + pagePath) + '">' + _escH(pageTitle) + '</span>';
+        if (agentLabel) html += ' <span class="chat-ctx-badge chat-ctx-agent" title="Agent">' + _escH(agentLabel) + '</span>';
+
+        labelEl.innerHTML = html;
+    }
+
+    function _escH(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // ── Form Fill Button ─────────────────────────────────────────────────────
@@ -1765,6 +1864,121 @@
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
             const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
+        }
+
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
+
+        // When accounting agent is active AND the prompt looks like a pasted bill,
+        // inject the navigate_and_fill instruction so Grok emits the ACTION block.
+        const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
+            && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
+        const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
+        if (state.pageContext.agent_id === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
+            state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        }
+
+        // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
+        // Parses bill text from chat history and fires navigate_and_fill directly.
+        if (state.pageContext.agent_id === 'accounting') {
+            const _pu2 = prompt.toUpperCase();
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            if (_enterIntent) {
+                const _chatMsgs = document.getElementById('chat-messages');
+                let _billText = prompt;
+                if (_chatMsgs) {
+                    _chatMsgs.querySelectorAll('.message').forEach(function(el) {
+                        _billText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _nfFields = {};
+                const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
+                if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (_dateM) {
+                    _nfFields.invoice_date = _dateM[0].includes('-')
+                        ? _dateM[0]
+                        : (_dateM[3] + '-' + _dateM[1] + '-' + _dateM[2]);
+                }
+                const _invNumM = _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
+                    || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
+                if (_invNumM) _nfFields.invoice_number = _invNumM[1];
+                if (/Auto\s*Pay/i.test(_billText)) {
+                    const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
+                    _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
+                }
+                const _supplierM = _billText.match(/Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio/i);
+                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                _nfFields.description_0 = 'Service charge';
+                _nfFields.quantity_0 = '1';
+                _nfFields.notes = _supplierName + ' invoice'
+                    + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                    + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
+                if (_nfFields.unit_cost_0) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening invoice form\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    const _wAcc = document.createElement('div');
+                    _wAcc.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lblAcc = document.createElement('div');
+                    _lblAcc.className = 'msg-label';
+                    _lblAcc.textContent = 'Accounting Agent';
+                    const _elAcc = document.createElement('div');
+                    _elAcc.className = 'message ai-message';
+                    _elAcc.innerHTML = 'Opening invoice form pre-filled with the detected bill details.';
+                    _wAcc.appendChild(_lblAcc);
+                    _wAcc.appendChild(_elAcc);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY fast path: navigate to constituent#N page or add form directly.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
         }
 
         // Build request payload with page context and agent info
@@ -2880,6 +3094,27 @@
 
         Object.keys(fields).forEach(function(fieldName) {
             const value = fields[fieldName];
+
+            // Multi-checkbox group: multiple checkboxes sharing this name
+            const allCheckboxes = Array.from(
+                targetDoc.querySelectorAll('input[type="checkbox"][name="' + fieldName + '"]')
+            );
+            if (allCheckboxes.length > 1) {
+                const strVal = Array.isArray(value)
+                    ? value.join('; ')
+                    : (value !== null && typeof value === 'object')
+                        ? Object.values(value).join('; ')
+                        : String(value || '');
+                const selected = strVal.split(/[;,]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                allCheckboxes.forEach(function(cb) {
+                    const cbVal = cb.value.toLowerCase();
+                    cb.checked = selected.some(function(s) { return cbVal === s || cbVal.indexOf(s) !== -1 || s.indexOf(cbVal) !== -1; });
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                filled.push(fieldName);
+                return;
+            }
+
             // Try by name first, then by id
             let el = targetDoc.querySelector('[name="' + fieldName + '"]')
                   || targetDoc.getElementById(fieldName);
@@ -2905,7 +3140,15 @@
                     });
                 }
             } else {
-                el.value = value !== null && value !== undefined ? String(value) : '';
+                var strVal;
+                if (Array.isArray(value)) {
+                    strVal = value.join('; ');
+                } else if (value !== null && typeof value === 'object') {
+                    strVal = Object.values(value).join('; ');
+                } else {
+                    strVal = value !== null && value !== undefined ? String(value) : '';
+                }
+                el.value = strVal;
             }
 
             // Fire change/input events so any JS listeners react
@@ -3415,6 +3658,61 @@
             return;
         }
 
+        // navigate: open a URL in a new tab without any pre-fill
+        if (actionObj.action === 'navigate') {
+            const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
+            if (navUrl) {
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
+        // navigate_and_fill: store field values in localStorage then open the target page.
+        // The widget init on the target page checks for a pending fill and applies it.
+        if (actionObj.action === 'navigate_and_fill') {
+            const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
+            const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
+            if (nfUrl) {
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
+                try {
+                    localStorage.setItem('ai_pending_fill', JSON.stringify({
+                        url:     nfUrl,
+                        fields:  nfFields,
+                        ts:      Date.now()
+                    }));
+                } catch(e) { console.warn('localStorage write failed', e); }
+                window.open(abs, '_blank');
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                const fieldCount = Object.keys(nfFields).length;
+                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                    + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
         fetch('/ai/action', {
             method: 'POST',
             credentials: 'include',
@@ -3567,6 +3865,16 @@
             }
         } catch(e) {}
 
+        // When opened via task_id=N, store the todo details so every chat request
+        // sends page_path=/todo/details?record_id=N which triggers single-todo context injection.
+        if (window.AI_TASK_CONTEXT && window.AI_TASK_CONTEXT.record_id) {
+            var tc = window.AI_TASK_CONTEXT;
+            state.taskContext = tc;
+            // Override page path so server-side _get_module_data uses single-todo fast-path
+            state.taskPagePath = '/todo/details?record_id=' + tc.record_id;
+            console.debug('[AI] Task context loaded: todo #' + tc.record_id, tc.subject);
+        }
+
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
         loadPersistedState();
@@ -3574,8 +3882,30 @@
         // Initialize agent context and user providers
         loadAgentsConfig().then(function() {
             state.pageContext = detectPageContext();
+            // Override page_path so single-todo context injection triggers for task_id links
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
+            // Auto-select agent based on task subject keywords (same logic as todo/details pages)
+            if (window.AI_TASK_CONTEXT && state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (window.AI_TASK_CONTEXT.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    console.debug('[AI] Task-context agent selected:', picked.id);
+                }
+            }
         }).catch(function() {
             state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
         });
         loadUserProviders().catch(function() {});
 
@@ -3592,7 +3922,10 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
-            if (!state.pageContext) state.pageContext = detectPageContext();
+            if (!state.pageContext) {
+                state.pageContext = detectPageContext();
+                if (state.taskPagePath) state.pageContext.page_path = state.taskPagePath;
+            }
 
             // Client-side navigation interception
             const navMatch = prompt.match(NAV_RE);
@@ -3751,6 +4084,17 @@
                 margin-right: 8px;
                 font-size: 1.2em;
             }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+            }
             
             .chat-panel {
                 position: fixed;
@@ -3827,10 +4171,32 @@
             .chat-header-drag:active { cursor: grabbing; }
 
             .chat-header h3 {
-                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis;
+                margin: 0; font-size: 14px; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
             }
-            
+
+            .chat-header-title-group {
+                display: flex; align-items: baseline; gap: 5px;
+                flex: 1; min-width: 0; overflow: hidden;
+            }
+
+            .chat-page-label {
+                font-size: 11px; opacity: 0.88; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+                display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
+            }
+            .chat-ctx-page {
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                flex-shrink: 1; min-width: 0;
+            }
+            .chat-ctx-badge {
+                display: inline-block; border-radius: 3px; padding: 0 4px;
+                font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+                white-space: nowrap; flex-shrink: 0; line-height: 1.5;
+            }
+            .chat-ctx-site  { background: rgba(255,255,255,0.28); }
+            .chat-ctx-agent { background: rgba(0,0,0,0.22); }
+
             .chat-header-buttons {
                 display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
@@ -4149,6 +4515,50 @@
             }
         }
 
+        // Check for a pending navigate_and_fill stored by another tab.
+        // If the current URL matches the stored target, apply the field values and clear.
+        (function() {
+            try {
+                var pending = localStorage.getItem('ai_pending_fill');
+                if (!pending) return;
+                var pdata = JSON.parse(pending);
+                if (!pdata || !pdata.url || !pdata.fields) return;
+                // Expire after 2 minutes
+                if (Date.now() - (pdata.ts || 0) > 120000) {
+                    localStorage.removeItem('ai_pending_fill');
+                    return;
+                }
+                // Normalize both URLs to just pathname+search for comparison
+                var targetPath = pdata.url.replace(/^https?:\/\/[^\/]+/, '');
+                var currentPath = window.location.pathname + window.location.search;
+                if (targetPath !== currentPath) return;
+                // Clear immediately to avoid re-applying on refresh
+                localStorage.removeItem('ai_pending_fill');
+                // Short delay so the page form has rendered
+                setTimeout(function() {
+                    _executeFillForm({ fields: pdata.fields });
+                    // Show notification in widget if it exists
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'System';
+                        var el = document.createElement('div');
+                        el.className = 'message system-message';
+                        el.textContent = '🪄 AI pre-filled form fields. Please review before saving.';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(el);
+                        chatMessages.appendChild(wrapper);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 600);
+            } catch(e) {
+                console.warn('ai_pending_fill check failed:', e);
+            }
+        })();
+
         // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
         if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {
             var _hdOpenAndGreet = function() {
@@ -4188,4 +4598,37 @@
             window.openHelpDeskChat = _hdOpenAndGreet;
         }
     });
+
+    // Global API: open the chat widget pre-loaded with a task context.
+    // Called from todo/details.tt "Chat about this task" button.
+    // taskContext: { record_id, subject, description, status, due_date, project }
+    window.openAIChatWithTask = function(taskContext) {
+        if (!taskContext || !taskContext.record_id) { openChat(); return; }
+        state.taskContext = taskContext;
+        state.taskPagePath = '/todo/details?record_id=' + taskContext.record_id;
+        if (!state.pageContext) state.pageContext = detectPageContext();
+        state.pageContext.page_path = state.taskPagePath;
+        // Auto-select agent based on task subject
+        loadAgentsConfig().then(function() {
+            if (state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (taskContext.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
+                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    state.pageContext.agent_id   = picked.id;
+                    state.pageContext.agent_name = picked.display_name;
+                    if (picked.system_prompt) state.pageContext.system_prompt = picked.system_prompt;
+                    populateAgentPicker();
+                }
+            }
+            openChat();
+        }).catch(function() { openChat(); });
+    };
 })();

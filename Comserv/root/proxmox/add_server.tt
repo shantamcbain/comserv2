@@ -83,21 +83,29 @@
                                 </div>
 
                                 <div class="form-group mb-3">
+                                    <label for="full_token_paste">Paste Full Token (optional shortcut):</label>
+                                    <input type="text" id="full_token_paste" class="form-control"
+                                           placeholder="root@pam!mytoken=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx">
+                                    <div class="form-text">Paste the complete token string here and the fields below will fill automatically.</div>
+                                </div>
+
+                                <div class="form-group mb-3">
                                     <label for="token_user">API Token User:</label>
                                     <input type="text" id="token_user" name="token_user" class="form-control" required
                                            value="[% form_data.token_user | html %]" placeholder="e.g., root@pam!mytoken">
-                                    <div class="form-text">The API token user in format: USER@REALM!TOKENID</div>
+                                    <div class="form-text">USER@REALM!TOKENID (everything before the <code>=</code>)</div>
                                     <div class="invalid-feedback">
                                         Please enter the API token user.
                                     </div>
                                 </div>
 
                                 <div class="form-group mb-3">
-                                    <label for="token_value">API Token Value:</label>
-                                    <input type="password" id="token_value" name="token_value" class="form-control" required>
-                                    <div class="form-text">The API token value (UUID). This will be encrypted before storage.</div>
+                                    <label for="token_value">API Token Value (UUID):</label>
+                                    <input type="text" id="token_value" name="token_value" class="form-control" required
+                                           value="[% form_data.token_value | html %]" placeholder="e.g., 11111111-2222-3333-4444-555555555555">
+                                    <div class="form-text">The UUID part (everything after the <code>=</code>). Stored encrypted.</div>
                                     <div class="invalid-feedback">
-                                        Please enter the API token value.
+                                        Please enter the API token value (UUID).
                                     </div>
                                 </div>
                                 
@@ -127,14 +135,29 @@
 </div>
 
 <script>
-// Form validation
 (function() {
     'use strict';
+
     window.addEventListener('load', function() {
-        // Fetch all the forms we want to apply custom Bootstrap validation styles to
+        // Auto-split full token paste shortcut
+        var fullPaste = document.getElementById('full_token_paste');
+        if (fullPaste) {
+            fullPaste.addEventListener('input', function() {
+                var val = fullPaste.value.trim();
+                var m = val.match(/^([^=\s]+)=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\s*$/i);
+                if (m) {
+                    document.getElementById('token_user').value  = m[1];
+                    document.getElementById('token_value').value = m[2];
+                    fullPaste.classList.add('is-valid');
+                } else if (val.length > 5) {
+                    fullPaste.classList.remove('is-valid');
+                }
+            });
+        }
+
+        // Bootstrap validation
         var forms = document.getElementsByClassName('needs-validation');
-        // Loop over them and prevent submission
-        var validation = Array.prototype.filter.call(forms, function(form) {
+        Array.prototype.filter.call(forms, function(form) {
             form.addEventListener('submit', function(event) {
                 if (form.checkValidity() === false) {
                     event.preventDefault();
