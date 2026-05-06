@@ -2634,7 +2634,12 @@ sub enrich_organism_from_external {
         push @messages, scalar(@image_records) . " image(s) added";
     }
 
-    if (!$org->image && @image_records) {
+    my $bad_img_pat = qr{zenodo|pensoft|plos(?:one)?|figshare|researchgate|academia\.edu
+                        |doi\.org|pubmed|ncbi\.nlm|springer|elsevier|wiley
+                        |nature\.com/articles|sciencedirect|bioone|\.pdf
+                        |[/_](?:graph|chart|figure)}xi;
+    my $cur_img = $org->image // '';
+    if (@image_records && (!$cur_img || $cur_img =~ $bad_img_pat)) {
         eval { $org->update({ image => $image_records[0]{url} }) };
     }
 
