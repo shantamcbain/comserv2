@@ -71,6 +71,19 @@
             style="background:#8a6ae2;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
         Fix organism types &amp; taxonomy
     </button>
+    &nbsp;
+    <button type="button" id="enrich-bulk-btn" onclick="bulkEnrich()"
+            style="background:#2a9e5a;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Fetch images &amp; descriptions (GBIF / Wikipedia)
+    </button>
+    <div id="enrich-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5fff9;border:1px solid #b0d8c0;border-radius:4px;max-width:700px;">
+        <strong>Bulk Enrich from GBIF &amp; Wikipedia</strong>
+        <div id="enrich-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="enrich-bulk-bar" style="background:#2a9e5a;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="enrich-bulk-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
     <div id="ncbi-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5f9ff;border:1px solid #c0d8f0;border-radius:4px;max-width:700px;">
         <strong>NCBI Bulk Link</strong>
         <div id="ncbi-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
@@ -88,6 +101,57 @@
         <div id="ncbi-resync-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
     </div>
     <script>
+    function bulkEnrich() {
+        var btn    = document.getElementById('enrich-bulk-btn');
+        var panel  = document.getElementById('enrich-bulk-panel');
+        var bar    = document.getElementById('enrich-bulk-bar');
+        var status = document.getElementById('enrich-bulk-status');
+        var log    = document.getElementById('enrich-bulk-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        log.innerHTML = '';
+        var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
+
+        function runBatch() {
+            status.textContent = 'Fetching GBIF / Wikipedia… (' + totalDone + ' done)';
+            fetch('/ENCY/organism_bulk_enrich', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=3&last_id=' + lastId
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total || 0;
+                if (d.last_id) lastId = d.last_id;
+                totalUpdated += d.updated || 0;
+                totalErrors  += d.errors  || 0;
+                totalDone    += d.processed || 0;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    line.style.color = r.status === 'enriched' ? '#267326' : '#c00';
+                    line.textContent = (r.status === 'enriched' ? '✓ ' : '✗ ')
+                        + (r.scientific_name || 'organism #' + r.organism_id) + ': ' + r.message;
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.processed === 0 || d.remaining <= 0) {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalUpdated + ' enriched, ' + totalErrors + ' errors.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run enrich';
+                } else {
+                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalUpdated + ' enriched, ' + totalErrors + ' errors. Continuing…';
+                    setTimeout(runBatch, 800);
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+
     function ncbiBulkLink() {
         var btn   = document.getElementById('ncbi-bulk-btn');
         var panel = document.getElementById('ncbi-bulk-panel');
