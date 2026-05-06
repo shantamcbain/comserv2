@@ -277,18 +277,20 @@
     </tr>
 
  [% FOREACH link IN herbal_data %]
+ [% SET _org = link.organism %]
+ [% SET _bot_name = (_org && _org.scientific_name) ? _org.scientific_name : link.botanical_name %]
+ [% SET _img_src  = (_org && _org.image) ? _org.image : link.image %]
     <tr>
         <td>
-            <span style="font-size: 30px;"> Botanical Name:</span> [% link.botanical_name %]<br>
-             <span style="font-size: 30px;">Common Name:</span> [% link.common_names %]<br>
-             <span style="font-size: 30px;">Idententifing Character:</span> [% link.ident_character %]<br>
-            <span style="font-size: 30px;"> Distribution:</span> [% link.distribution %]<br>
-            <span style="font-size: 30px;" >Medical Uses:</span> [% link.medical_uses %]<br>
-           <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
-
+            <span style="font-size: 30px;">Botanical Name:</span> [% _bot_name | html %]<br>
+            <span style="font-size: 30px;">Common Name:</span> [% link.common_names | html %]<br>
+            <span style="font-size: 30px;">Identifying Character:</span> [% link.ident_character | html %]<br>
+            <span style="font-size: 30px;">Distribution:</span> [% link.distribution | html %]<br>
+            <span style="font-size: 30px;">Medical Uses:</span> [% link.medical_uses | html %]<br>
+            <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
         </td>
         <td>
-            [% ency_img_tag(link.image, 300, 325) %]
+            [% ency_img_tag(_img_src, 300, 325) %]
         </td>
     </tr>
 [% END %]

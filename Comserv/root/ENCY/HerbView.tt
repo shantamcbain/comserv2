@@ -274,7 +274,26 @@ Record ID:[% herb.record_id %]
         <td>Image:</td>
         <td>
             [% IF !edit_mode %]
+                [% IF org_images && org_images.size %]
+                <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                [% FOREACH img IN org_images %]
+                <div style="text-align:center;">
+                  <a href="[% img.url | html %]" target="_blank">
+                    <img src="[% img.thumbnail_url || img.url | html %]"
+                         style="max-width:300px;max-height:325px;object-fit:contain;"
+                         alt="[% img.caption || herb.botanical_name | html %]"
+                         onerror="this.style.display='none'">
+                  </a>
+                  [% IF img.caption %]<div style="font-size:0.75em;">[% img.caption | html %]</div>[% END %]
+                  [% IF img.source %]<div style="font-size:0.7em;color:#888;">[% img.source | html %][% IF img.license %] &mdash; [% img.license | html %][% END %]</div>[% END %]
+                </div>
+                [% END %]
+                </div>
+                [% ELSIF herb.organism && herb.organism.image %]
+                [% ency_img_tag(herb.organism.image, 300, 325) %]
+                [% ELSIF herb.image %]
                 [% ency_img_tag(herb.image, 300, 325) %]
+                [% END %]
             [% ELSE %]
                 [% ency_img_picker('image', herb.image) %]
             [% END %]
