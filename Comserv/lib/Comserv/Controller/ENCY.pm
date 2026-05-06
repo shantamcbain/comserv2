@@ -3489,10 +3489,7 @@ sub organism_list : Path('/ENCY/Organism') : Args(0) {
     my $where  = {};
     $where->{organism_type} = $type   if $type;
     if ($search) {
-        $where->{-or} = [
-            common_name     => { like => "%$search%" },
-            scientific_name => { like => "%$search%" },
-        ];
+        $where->{scientific_name} = { like => "%$search%" };
     }
     my $organisms = $c->model('ENCYModel')->list_organisms($c, { where => $where });
     $c->stash(
@@ -3540,10 +3537,10 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $common_name_val = $p->{common_name} // '';
         my $data = {
-            common_name         => $p->{common_name}         // '',
             scientific_name     => $p->{scientific_name}     // '',
-            organism_type       => $p->{organism_type}       || 'animal',
+            organism_type       => $p->{organism_type}       || 'unknown',
             kingdom             => $p->{kingdom}             // '',
             phylum              => $p->{phylum}              // '',
             class_name          => $p->{class_name}          // '',
@@ -3551,13 +3548,11 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
             family_name         => $p->{family_name}         // '',
             genus               => $p->{genus}               // '',
             species             => $p->{species}             // '',
-            ncbi_tax_id         => ($p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
-            gbif_id             => ($p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            ncbi_tax_id         => ($p->{ncbi_tax_id} && $p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     && $p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
             iucn_id             => $p->{iucn_id}             // '',
             description         => $p->{description}         // '',
             habitat             => $p->{habitat}             // '',
-            medicinal_uses      => $p->{medicinal_uses}      // '',
-            therapeutic_uses    => $p->{therapeutic_uses}    // '',
             sub_population_note => $p->{sub_population_note} // '',
             image               => $p->{image}               // '',
             url                 => $p->{url}                 // '',
@@ -3568,24 +3563,29 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
             date_time_posted    => \'NOW()',
             share               => 1,
         };
-        unless ($data->{common_name}) {
-            $c->stash(error_msg => "Common name is required.", organism => $data, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        unless ($data->{scientific_name}) {
+            $c->stash(error_msg => "Scientific name is required.", edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
             return;
         }
-        $c->model('ENCYModel')->add_organism($c, $data);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{common_name}");
+        my $new_org = $c->model('ENCYModel')->add_organism($c, $data);
+        if ($new_org && $common_name_val) {
+            eval {
+                $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName')->create(
+                    { organism_id => $new_org->record_id, name => $common_name_val, language => 'en', is_preferred => 1 }
+                );
+            };
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{scientific_name}");
         $c->flash->{success_msg} = 'Organism added successfully.';
         $c->response->redirect($c->uri_for('/ENCY/Organism'));
         return;
     }
 
-    my $prefill_common_name = $c->request->param('common_name') // '';
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode           => 1,
-        prefill_common_name => $prefill_common_name,
-        ency_ai_prompt      => 'common_name, scientific_name, organism_type (one of: human, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
-        template            => 'ENCY/OrganismDetail.tt',
+        edit_mode      => 1,
+        ency_ai_prompt => 'scientific_name, organism_type (one of: human, mammal, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus, unknown), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, sub_population_note, reference, url',
+        template       => 'ENCY/OrganismDetail.tt',
     );
 }
 
@@ -3754,10 +3754,10 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $common_name_val = $p->{common_name} // '';
         my $data = {
-            common_name         => $p->{common_name}         // '',
             scientific_name     => $p->{scientific_name}     // '',
-            organism_type       => $p->{organism_type}       || 'animal',
+            organism_type       => $p->{organism_type}       || 'unknown',
             kingdom             => $p->{kingdom}             // '',
             phylum              => $p->{phylum}              // '',
             class_name          => $p->{class_name}          // '',
@@ -3770,23 +3770,28 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
             iucn_id             => $p->{iucn_id}             // '',
             description         => $p->{description}         // '',
             habitat             => $p->{habitat}             // '',
-            medicinal_uses      => $p->{medicinal_uses}      // '',
-            therapeutic_uses    => $p->{therapeutic_uses}    // '',
             sub_population_note => $p->{sub_population_note} // '',
             image               => $p->{image}               // '',
             url                 => $p->{url}                 // '',
             reference           => $p->{reference}           // '',
         };
-        unless ($data->{common_name}) {
-            $c->stash(error_msg => "Common name is required.", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        unless ($data->{scientific_name}) {
+            $c->stash(error_msg => "Scientific name is required.", organism => $organism, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
             return;
         }
         my ($ok, $msg) = $c->model('ENCYModel')->update_organism($c, $record_id, $data);
         if ($ok) {
+            if ($common_name_val) {
+                my $cn_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName');
+                my $existing = eval { $cn_rs->search({ organism_id => $record_id, name => $common_name_val })->first };
+                unless ($existing) {
+                    eval { $cn_rs->create({ organism_id => $record_id, name => $common_name_val, language => 'en', is_preferred => 1 }) };
+                }
+            }
             $c->flash->{success_msg} = 'Organism updated successfully.';
             $c->response->redirect($c->uri_for('/ENCY/Organism', $record_id));
         } else {
-            $c->stash(error_msg => "Failed to update: $msg", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            $c->stash(error_msg => "Failed to update: $msg", organism => $organism, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
         }
         return;
     }
@@ -3795,7 +3800,7 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     $c->stash(
         organism       => $organism,
         edit_mode      => 1,
-        ency_ai_prompt => 'common_name, scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        ency_ai_prompt => 'scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, sub_population_note, reference, url',
         template       => 'ENCY/OrganismDetail.tt',
     );
 }

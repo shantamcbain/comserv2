@@ -2285,7 +2285,7 @@ sub preprocess_field_markers {
 
 sub add_organism {
     my ($self, $c, $data) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Adding organism: " . ($data->{common_name} || ''));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Adding organism: " . ($data->{scientific_name} || ''));
     my $rec;
     eval {
         $rec = $self->ency_schema->resultset('Ency::Organism')->create($data);
@@ -2323,7 +2323,7 @@ sub list_organisms {
     $opts ||= {};
     my $where = $opts->{where} || {};
     my %attrs;
-    $attrs{order_by} = $opts->{order_by} || 'common_name';
+    $attrs{order_by} = $opts->{order_by} || 'scientific_name';
     $attrs{rows}     = $opts->{rows}     if $opts->{rows};
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
