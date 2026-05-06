@@ -3950,6 +3950,58 @@ sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
     $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
+sub clean_bad_organism_images : Path('/ENCY/clean_bad_organism_images') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $bad_pattern = qr{zenodo|pensoft|plos(?:one)?|figshare|researchgate|academia\.edu
+                        |doi\.org|pubmed|ncbi\.nlm|springer|elsevier|wiley
+                        |nature\.com/articles|sciencedirect|bioone|\.pdf
+                        |[/_](?:graph|chart|figure)}xi;
+
+    my $img_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::OrganismImage');
+    my @bad = eval { $img_rs->search({})->all };
+    my $deleted = 0;
+    for my $img (@bad) {
+        my $url = $img->url // '';
+        next unless $url =~ $bad_pattern;
+        eval { $img->delete };
+        $deleted++ unless $@;
+    }
+
+    my $org_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Organism');
+    my @orgs = eval { $org_rs->search({ image => { '!=' => undef } })->all };
+    my $cleared = 0;
+    for my $org (@orgs) {
+        my $img = $org->image // '';
+        next unless $img =~ $bad_pattern;
+        eval { $org->update({ image => undef }) };
+        $cleared++ unless $@;
+    }
+
+    $c->response->body(JSON::encode_json({
+        ok      => 1,
+        deleted => $deleted,
+        cleared => $cleared,
+        message => "Deleted $deleted bad image record(s); cleared $cleared organism image field(s)"
+    }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

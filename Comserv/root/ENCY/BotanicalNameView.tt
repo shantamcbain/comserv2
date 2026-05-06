@@ -76,6 +76,11 @@
             style="background:#2a9e5a;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
         Fetch images &amp; descriptions (GBIF / Wikipedia)
     </button>
+    &nbsp;
+    <button type="button" id="clean-images-btn" onclick="cleanBadImages()"
+            style="background:#c0392b;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Clean bad images (graphs/papers)
+    </button>
     <div id="enrich-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5fff9;border:1px solid #b0d8c0;border-radius:4px;max-width:700px;">
         <strong>Bulk Enrich from GBIF &amp; Wikipedia</strong>
         <div id="enrich-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
@@ -266,6 +271,33 @@
             .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
         }
         runBatch();
+    }
+
+    function cleanBadImages() {
+        var btn = document.getElementById('clean-images-btn');
+        btn.disabled = true;
+        btn.textContent = 'Cleaning…';
+        fetch('/ENCY/clean_bad_organism_images', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+            body: ''
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d) {
+            btn.disabled = false;
+            if (d.ok) {
+                btn.textContent = 'Done — ' + d.message;
+                btn.style.background = '#267326';
+            } else {
+                btn.textContent = 'Error: ' + (d.error || 'unknown');
+                btn.style.background = '#c0392b';
+            }
+        })
+        .catch(function(e) {
+            btn.disabled = false;
+            btn.textContent = 'Network error';
+            btn.style.background = '#c0392b';
+        });
     }
     </script>
 [% END %]
