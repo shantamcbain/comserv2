@@ -30,12 +30,11 @@ $ua->default_header('Accept' => 'application/json');
 
 my $insert = $dbh->prepare(q{
     INSERT INTO ency_organism_tb
-        (common_name, scientific_name, organism_type, kingdom, phylum,
+        (scientific_name, organism_type, kingdom, phylum,
          class_name, order_name, family_name, genus, species, ncbi_tax_id,
-         description, sitename, username_of_poster, date_time_posted, share)
+         reference, url, sitename, username_of_poster, date_time_posted, share)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW(),1)
     ON DUPLICATE KEY UPDATE
-        common_name     = VALUES(common_name),
         scientific_name = VALUES(scientific_name),
         organism_type   = VALUES(organism_type),
         kingdom         = VALUES(kingdom),
@@ -44,7 +43,15 @@ my $insert = $dbh->prepare(q{
         order_name      = VALUES(order_name),
         family_name     = VALUES(family_name),
         genus           = VALUES(genus),
-        species         = VALUES(species)
+        species         = VALUES(species),
+        reference       = IF(reference IS NULL OR reference = '', VALUES(reference), reference),
+        url             = IF(url IS NULL OR url = '', VALUES(url), url)
+});
+
+my $insert_common_name = $dbh->prepare(q{
+    INSERT IGNORE INTO ency_common_name_tb
+        (organism_id, name, language, is_preferred, source, date_time_posted, username_of_poster)
+    VALUES (?, ?, 'en', 1, 'NCBI', NOW(), 'system')
 });
 
 my @taxa_to_import = (
@@ -103,17 +110,28 @@ for my $taxon (@taxa_to_import) {
     }
 
     if ($dry_run) {
-        print "  DRY: $common_name | $taxon->{type}\n";
+        print "  DRY: $common_name | $scientific_name | $taxon->{type}\n";
     } else {
         eval {
             $insert->execute(
-                $common_name, $scientific_name, $taxon->{type},
+                $scientific_name, $taxon->{type},
                 $kingdom, $phylum, $class_name, $order_name, $family_name,
                 $genus, $species, $taxon->{tax_id},
                 "NCBI Taxonomy ID: $taxon->{tax_id}",
+                "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$taxon->{tax_id}",
                 'ENCY', 'system'
             );
-            print "  OK: inserted/updated record_id via ncbi_tax_id=$taxon->{tax_id}\n";
+            my $org_id = $dbh->{mysql_insertid} || do {
+                my $row = $dbh->selectrow_hashref(
+                    'SELECT record_id FROM ency_organism_tb WHERE ncbi_tax_id = ?',
+                    undef, $taxon->{tax_id}
+                );
+                $row ? $row->{record_id} : undef;
+            };
+            if ($org_id && $common_name) {
+                eval { $insert_common_name->execute($org_id, $common_name) };
+            }
+            print "  OK: organism record_id=$org_id ncbi=$taxon->{tax_id}\n";
         };
         warn "  ERR: $@\n" if $@;
     }
