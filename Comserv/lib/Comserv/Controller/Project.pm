@@ -105,15 +105,14 @@ sub  create_project :Local :Args(0) {
     my $project_rs = $schema->resultset('Project');
     my $date_time_posted = DateTime->now;
 
-    # Get username safely
-    my $username = '';
-    if ($c->user_exists) {
-        $username = $c->user->username;
-    } elsif ($c->session->{username}) {
-        $username = $c->session->{username};
-    } else {
-        $username = 'anonymous';
-    }
+    my $username = $c->session->{username} || '';
+    eval {
+        if ($c->user_exists) {
+            my $cu = $c->user;
+            $username = $cu->username if defined($cu) && $cu->can('username');
+        }
+    };
+    $username ||= 'anonymous';
 
     # Handle parent_id properly
     my $parent_id = $form_data->{parent_id};
