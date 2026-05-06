@@ -362,14 +362,20 @@ sub gbif_lookup_by_name {
     my @images;
     for my $item (@{ $media_data->{results} // [] }) {
         next unless ($item->{type} // '') eq 'StillImage';
-        next unless $item->{identifier};
+        my $url = $item->{identifier} // '';
+        next unless $url;
+        next if $url =~ m{plos|plosone|pensoft|zenodo|researchgate|academia\.edu
+                         |doi\.org|pubmed|ncbi\.nlm|figshare|springer|elsevier
+                         |wiley|nature\.com/articles|sciencedirect|bioone
+                         |\.pdf|graph|chart|figure}xi;
+        next if ($item->{publisher} // '') =~ m{journal|proceedings|society|press}i;
         push @images, {
-            url          => $item->{identifier},
-            thumbnail_url => $item->{identifier},
-            license      => $item->{license}       // '',
-            rights_holder => $item->{rightsHolder} // '',
-            caption      => $item->{title}         // $item->{description} // '',
-            source       => 'GBIF',
+            url           => $url,
+            thumbnail_url => $url,
+            license       => $item->{license}       // '',
+            rights_holder => $item->{rightsHolder}  // '',
+            caption       => $item->{title}         // $item->{description} // '',
+            source        => 'GBIF',
         };
         last if @images >= 3;
     }
