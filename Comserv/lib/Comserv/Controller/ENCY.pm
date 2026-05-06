@@ -125,8 +125,8 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         return; # Do not redirect; just render the view with an error message
     }
 
-    # Retrieve the herb record (use DBForager directly, same as herb_detail)
-    my $herb = $c->model('DBForager')->get_herb_by_id($record_id);
+    # Retrieve the herb record from ENCY database
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $record_id);
     unless ($herb) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
             "Herb record not found in the database for record_id: $record_id.");
@@ -191,26 +191,22 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
             share              => $p->{share}              // 0,
         };
 
-        # Attempt to update the herb record and handle success or failure
+        my ($form_data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', $record_id, $form_data);
+        $form_data = $form_data_clean;
+
         my ($status, $error_message) = $c->model('ENCYModel')->update_herb($c, $record_id, $form_data);
 
         if ($status) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
                 "Herb updated successfully for record_id: $record_id.");
-            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
-            my $updated_herb = $c->model('DBForager')->get_herb_by_id($record_id) || $herb;
+            my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $record_id, $form_data);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked record(s)." : '';
-            my $todo_msg = $unresolved   ? " $unresolved unresolved term(s) logged as todos." : '';
-            my $constituents_html = _build_constituent_html(
-                $c, $record_id, $updated_herb->constituents // ''
-            );
-            $c->stash(
-                success_msg       => "Herb updated successfully.$link_msg$todo_msg",
-                herb              => $updated_herb,
-                constituents_html => $constituents_html,
-                edit_mode         => 0,
-                template          => 'ENCY/HerbView.tt',
-            );
+            my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
+            $c->flash->{success_msg} = "Herb updated successfully.$link_msg$todo_msg";
+            my $return_to = $c->uri_for('/ENCY/herb_detail/' . $record_id);
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
+                $c->res->redirect($return_to);
+            }
             return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
@@ -229,8 +225,27 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     $self->_stash_image_files($c);
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
+
+    my $entities_edit = _fetch_linkable_entities($c);
+    my %field_html_edit;
+    for my $f (qw(
+        common_names comments ident_character stem leaves flowers fruit
+        taste odour root distribution cultivation harvest solvents dosage
+        administration formulas contra_indications preparation chinese
+        vetrinary homiopathic non_med culinary history pollinator
+        pollennotes nectarnotes
+    )) {
+        my $val = eval { $herb->$f } // '';
+        $field_html_edit{$f} = _build_glossary_popup_html($c, $val, $entities_edit) if length($val);
+    }
+    $field_html_edit{parts_used}         = _build_glossary_term_links_html($c, eval { $herb->parts_used }         // '');
+    $field_html_edit{sister_plants}      = _build_sister_plants_html(      $c, eval { $herb->sister_plants }      // '');
+    $field_html_edit{therapeutic_action} = _build_glossary_popup_html(     $c, eval { $herb->therapeutic_action } // '', $entities_edit);
+    $field_html_edit{medical_uses}       = _build_glossary_popup_html(     $c, eval { $herb->medical_uses }       // '', $entities_edit);
+
     $c->stash(
         herb            => $herb,
+        field_html      => \%field_html_edit,
         edit_mode       => 1,
         is_admin        => $is_admin,
         is_editor       => $is_editor,
@@ -244,7 +259,21 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
                          . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
                          . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
                          . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
-                         . 'conventional, herbal, TCM, Ayurvedic, and naturopathic perspectives where known.',
+                         . 'allopathic, herbal, TCM, Ayurvedic, naturopathic, and homeopathic perspectives where known. '
+                         . 'IMPORTANT FORMATTING — read carefully: '
+                         . '(1) SEMICOLONS: all multi-value fields (therapeutic_action, constituents, parts_used, '
+                         . 'sister_plants, medical_uses, solvents, formulas, contra_indications) use SEMICOLONS (;) '
+                         . 'as the only separator — NOT commas. Use noun phrases, not prose sentences. '
+                         . '(2) PRACTITIONER PREFIXES in therapeutic_action, medical_uses, preparation, vetrinary: '
+                         . 'use "Allopathic:" NOT "Conventional:" — do not use "Conventional" as it implies a norm. '
+                         . 'Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. '
+                         . 'Each prefix group is itself separated from the next by a semicolon. '
+                         . 'Within each group, individual terms are also semicolon-separated. '
+                         . 'Example therapeutic_action: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat; Ayurvedic: cooling; Naturopathic: gut soothing" '
+                         . '(3) CONSTITUENTS: flatten all grouped terms into individual semicolon-separated entries — '
+                         . 'expand parenthetical groups so every item stands alone and can be individually linked. '
+                         . 'Example: "Mucilage (polysaccharides), vitamins (A, C, K), minerals (potassium, magnesium)" '
+                         . '→ "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K; potassium; magnesium"',
         template        => 'ENCY/HerbView.tt',
     );
 
@@ -256,10 +285,10 @@ sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 
     # Fetch the herbal data
-    my $forager_data = $c->model('DBForager')->get_herbal_data();
+    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
 
     # Pass the data to the template
-    my $herbal_data = $forager_data;  # Add 'my' here
+    my $herbal_data = $forager_data;
     $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
@@ -272,7 +301,7 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Fetching herb details for ID: $id");
-    my $herb = $c->model('DBForager')->get_herb_by_id($id);
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $id);
 
     unless ($herb) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'herb_detail', "Herb not found for ID: $id");
@@ -287,36 +316,95 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
     $c->session->{record_id} = $id;
 
+    my $entities = _fetch_linkable_entities($c);
+
     my $constituents_html = _build_constituent_html(
         $c, $id, $herb->constituents // ''
     );
+    my $parts_used_html = _build_glossary_term_links_html(
+        $c, $herb->parts_used // ''
+    );
+    my $sister_plants_html = _build_sister_plants_html(
+        $c, $herb->sister_plants // ''
+    );
+    my $therapeutic_action_html = _build_glossary_popup_html(
+        $c, $herb->therapeutic_action // '', $entities
+    );
+    my $medical_uses_html = _build_glossary_popup_html(
+        $c, $herb->medical_uses // '', $entities
+    );
+
+    my %field_html;
+    for my $f (qw(
+        common_names comments ident_character stem leaves flowers fruit
+        taste odour root distribution cultivation harvest solvents dosage
+        administration formulas contra_indications preparation chinese
+        vetrinary homiopathic non_med culinary history pollinator
+        pollennotes nectarnotes
+    )) {
+        $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '', $entities);
+    }
 
     $self->_stash_image_files($c);
     $c->stash(
-        herb              => $herb,
-        constituents_html => $constituents_html,
-        edit_mode         => 0,
-        template          => 'ENCY/HerbView.tt',
+        herb                    => $herb,
+        constituents_html       => $constituents_html,
+        parts_used_html         => $parts_used_html,
+        sister_plants_html      => $sister_plants_html,
+        therapeutic_action_html => $therapeutic_action_html,
+        medical_uses_html       => $medical_uses_html,
+        field_html              => \%field_html,
+        edit_mode               => 0,
+        template                => 'ENCY/HerbView.tt',
     );
 }
 
 sub constituent_popup : Path('/ENCY/constituent_popup') : Args(1) {
     my ($self, $c, $id) = @_;
     unless (defined $id && $id =~ /^\d+$/) {
-        $c->response->status(400);
-        $c->response->body('Invalid ID');
-        return;
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
     }
     my $constituent = $c->model('ENCYModel')->get_constituent_by_id($c, $id);
     unless ($constituent) {
-        $c->response->status(404);
-        $c->response->body('Not found');
-        return;
+        $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(
-        constituent => $constituent,
-        template    => 'ENCY/partials/ConstituentPopup.tt',
-    );
+    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt');
+}
+
+sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $herb = $c->model('ENCYModel')->get_herb_by_id($c, $id);
+    unless ($herb) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt');
+}
+
+sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $drug = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Drug')->find($id) };
+    unless ($drug) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt');
+}
+
+sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400); $c->response->body('Invalid ID'); return;
+    }
+    my $term = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->find($id) };
+    unless ($term) {
+        $c->response->status(404); $c->response->body('Not found'); return;
+    }
+    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt');
 }
 
 sub _build_constituent_html {
@@ -326,7 +414,7 @@ sub _build_constituent_html {
     $html =~ s/</&lt;/g;
     $html =~ s/>/&gt;/g;
     my @hc_rows = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('HerbConstituent')->search(
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::HerbConstituent')->search(
             { herb_id => $herb_id },
             { prefetch => 'constituent' }
         )->all;
@@ -345,6 +433,194 @@ sub _build_constituent_html {
     return $html;
 }
 
+sub _build_herb_popup_html {
+    my ($c, $text, $linked_herbs) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    return $html unless $linked_herbs && @$linked_herbs;
+    my @with_herb = grep { $_->{herb} } @$linked_herbs;
+    my @sorted    = sort { length($b->{name}) <=> length($a->{name}) } @with_herb;
+    for my $lh (@sorted) {
+        my $herb = $lh->{herb};
+        my $hid  = $herb->record_id;
+        my $name = $lh->{name};
+        my $pat  = quotemeta($name);
+        my $tip  = $herb->botanical_name ? $herb->botanical_name : $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="#" class="ency-herb-link" data-hid="$hid" title="$tip">$name</a>};
+        $html =~ s/(?<![>])$pat(?![<])/$link/gi;
+    }
+    return $html;
+}
+
+sub _build_drug_popup_html {
+    my ($c, $text, $linked_drugs) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    return $html unless $linked_drugs && @$linked_drugs;
+    my @with_drug = grep { $_->{drug} } @$linked_drugs;
+    my @sorted    = sort { length($b->{name}) <=> length($a->{name}) } @with_drug;
+    for my $ld (@sorted) {
+        my $drug = $ld->{drug};
+        my $did  = $drug->record_id;
+        my $name = $ld->{name};
+        my $pat  = quotemeta($name);
+        my $tip  = $drug->generic_name ? $drug->generic_name : $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="#" class="ency-drug-link" data-did="$did" title="$tip">$name</a>};
+        $html =~ s/(?<![>])$pat(?![<])/$link/gi;
+    }
+    return $html;
+}
+
+sub _fetch_linkable_entities {
+    my ($c) = @_;
+    my @glossary = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
+            {},
+            { columns => ['record_id', 'term'], order_by => { -desc => \'LENGTH(term)' } }
+        )->all;
+    };
+    my @diseases = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Disease')->search(
+            {},
+            { columns => ['record_id', 'common_name', 'scientific_name'], order_by => { -desc => \'LENGTH(common_name)' } }
+        )->all;
+    };
+    my @symptoms = eval {
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Symptom')->search(
+            {},
+            { columns => ['record_id', 'name'], order_by => { -desc => \'LENGTH(name)' } }
+        )->all;
+    };
+    return { glossary => \@glossary, diseases => \@diseases, symptoms => \@symptoms };
+}
+
+sub _apply_entity_links {
+    my ($html, $entities) = @_;
+    for my $t (@{ $entities->{glossary} || [] }) {
+        my $gid  = $t->record_id;
+        my $term = $t->term;
+        next unless $term && length($term) > 2;
+        my $pat  = quotemeta($term);
+        my $tip  = $term;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$term</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    for my $d (@{ $entities->{diseases} || [] }) {
+        my $did  = $d->record_id;
+        my $name = $d->common_name;
+        next unless $name && length($name) > 2;
+        my $pat  = quotemeta($name);
+        my $tip  = $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Disease/$did" class="ency-disease-link" data-did="$did" title="Disease: $tip">$name</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    for my $s (@{ $entities->{symptoms} || [] }) {
+        my $sid  = $s->record_id;
+        my $name = $s->name;
+        next unless $name && length($name) > 2;
+        my $pat  = quotemeta($name);
+        my $tip  = $name;
+        $tip =~ s/"/&quot;/g;
+        my $link = qq{<a href="/ENCY/Symptom/$sid" class="ency-symptom-link" data-sid="$sid" title="Symptom: $tip">$name</a>};
+        $html =~ s/(?<![>"\/\w])$pat(?![<"\/\w])/$link/gi;
+    }
+    return $html;
+}
+
+sub _build_glossary_popup_html {
+    my ($c, $text, $entities) = @_;
+    return '' unless defined $text && length($text);
+    my $html = $text;
+    $html =~ s/\s*\[(?:ref\?)?\?\]//g;
+    $html =~ s/\s*\[\d+\]//g;
+    $html =~ s/&/&amp;/g;
+    $html =~ s/</&lt;/g;
+    $html =~ s/>/&gt;/g;
+    if ($entities) {
+        $html = _apply_entity_links($html, $entities);
+    } else {
+        my $ents = _fetch_linkable_entities($c);
+        $html = _apply_entity_links($html, $ents);
+    }
+    return $html;
+}
+
+sub _build_sister_plants_html {
+    my ($c, $text) = @_;
+    return '' unless defined $text && length($text);
+    my @parts;
+    for my $raw (split /\s*;\s*/, $text) {
+        $raw =~ s/^\s+|\s+$//g;
+        next unless length($raw);
+        (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        $clean =~ s/\s*\[(?:ref\?)?\?\]//g;
+        my $escaped = $clean;
+        $escaped =~ s/&/&amp;/g;
+        $escaped =~ s/</&lt;/g;
+        $escaped =~ s/>/&gt;/g;
+        my $rec = eval {
+            $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->search(
+                { -or => [
+                    common_names  => { like => "%$clean%" },
+                    botanical_name => { like => "%$clean%" },
+                    key_name       => { like => "%$clean%" },
+                ]},
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        if ($rec) {
+            my $hid = $rec->record_id;
+            my $tip = $rec->botanical_name || $clean;
+            $tip =~ s/"/&quot;/g;
+            push @parts, qq{<a href="/ENCY/herb_detail/$hid" class="ency-herb-link" data-hid="$hid" title="$tip">$escaped</a>};
+        } else {
+            push @parts, $escaped;
+        }
+    }
+    return join('; ', @parts);
+}
+
+sub _build_glossary_term_links_html {
+    my ($c, $text) = @_;
+    return '' unless defined $text && length($text);
+    my @parts;
+    for my $raw (split /\s*;\s*/, $text) {
+        $raw =~ s/^\s+|\s+$//g;
+        next unless length($raw);
+        (my $clean = $raw) =~ s/\s*\[\d+\]//g;
+        $clean =~ s/\s*\[(?:ref\?)?\?\]//g;
+        my $escaped = $clean;
+        $escaped =~ s/&/&amp;/g;
+        $escaped =~ s/</&lt;/g;
+        $escaped =~ s/>/&gt;/g;
+        my $rec = eval {
+            $c->model('ENCYModel')->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$clean%" }, alternate_terms => { like => "%$clean%" } ] },
+                { rows => 1, order_by => { -asc => \'LENGTH(term)' } }
+            )->first;
+        };
+        if ($rec) {
+            my $gid  = $rec->record_id;
+            my $tip  = $rec->term;
+            $tip =~ s/"/&quot;/g;
+            push @parts, qq{<a href="/ENCY/Glossary/$gid" class="ency-glossary-link" data-gid="$gid" title="Glossary: $tip">$escaped</a>};
+        } else {
+            push @parts, $escaped;
+        }
+    }
+    return join('; ', @parts);
+}
+
 sub get_reference_by_id :Local {
     my ( $self, $c, $id ) = @_;
     $c->response->redirect($c->uri_for('/ENCY/Reference', $id));
@@ -359,7 +635,7 @@ sub Reference :Path('/ENCY/Reference') :Args(0) {
 
     my @refs;
     eval {
-        @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+        @refs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->search(
             {},
             { order_by => { -asc => 'reference_id' }, prefetch => 'publisher_record' }
         )->all;
@@ -390,7 +666,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     }
 
     my $ref = eval {
-        $c->model('ENCYModel')->ency_schema->resultset('Reference')->find($id);
+        $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->find($id);
     };
     unless ($ref) {
         $c->stash(error_msg => "Reference #$id not found.", template => 'ENCY/ReferenceList.tt');
@@ -429,7 +705,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     # Load formal entity links (junction rows) for this reference
     my @entity_links;
     eval {
-        my @links = $c->model('ENCYModel')->ency_schema->resultset('EntityReference')->search(
+        my @links = $c->model('ENCYModel')->ency_schema->resultset('Ency::EntityReference')->search(
             { reference_id => $id },
             { order_by => ['entity_type', 'entity_id'] }
         )->all;
@@ -439,31 +715,31 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
             my $url   = '';
             eval {
                 if ($link->entity_type eq 'herb') {
-                    my $e = $c->model('ENCYModel')->forager_schema->resultset('Herb')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->find($link->entity_id);
                     $name = $e ? ($e->common_names || 'Herb #' . $link->entity_id) : '';
                     $url  = '/ENCY/herb_detail/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'disease') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Disease')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Disease')->find($link->entity_id);
                     $name = $e ? ($e->common_name || $e->scientific_name || '') : '';
                     $url  = '/ENCY/Disease/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'constituent') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Constituent')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Constituent')->find($link->entity_id);
                     $name = $e ? ($e->name || '') : '';
                     $url  = '/ENCY/Constituent/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'animal') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Animal')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Animal')->find($link->entity_id);
                     $name = $e ? ($e->common_name || '') : '';
                     $url  = '/ENCY/Animal/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'insect') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Insect')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Insect')->find($link->entity_id);
                     $name = $e ? ($e->common_name || '') : '';
                     $url  = '/ENCY/Insect/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'drug') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Drug')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Drug')->find($link->entity_id);
                     $name = $e ? ($e->drug_name || '') : '';
                     $url  = '/ENCY/Drug/' . $link->entity_id;
                 } elsif ($link->entity_type eq 'formula') {
-                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Formula')->find($link->entity_id);
+                    my $e = $c->model('ENCYModel')->ency_schema->resultset('Ency::Formula')->find($link->entity_id);
                     $name = $e ? ($e->formula_name || '') : '';
                     $url  = '/ENCY/Formula/' . $link->entity_id;
                 }
@@ -480,7 +756,7 @@ sub Reference_id :Path('/ENCY/Reference') :Args(1) {
     # Load linked authors for this reference
     my @ref_authors;
     eval {
-        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('ReferenceAuthor')->search(
+        @ref_authors = $c->model('ENCYModel')->ency_schema->resultset('Ency::ReferenceAuthor')->search(
             { reference_id => $id },
             { order_by => 'author_id' }
         )->all;
@@ -517,7 +793,7 @@ sub Reference_add :Path('/ENCY/Reference/add') :Args(0) {
         my $pd_clean = $pub_date; if ($pd_clean) { if ($pd_clean =~ /^\d{4}$/) { $pd_clean = "${pd_clean}-01-01"; } elsif ($pd_clean !~ /^\d{4}-\d{2}-\d{2}$/ || $pd_clean =~ /^0000/) { $pd_clean = undef; } } $pub_date = $pd_clean;
         my $new_ref;
         eval {
-            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Reference')->create({
+            $new_ref = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->create({
                 title             => $p->{title}             // '',
                 author            => $p->{author}            // '',
                 publisher         => $p->{publisher}         // '',
@@ -565,7 +841,7 @@ sub Author_list :Path('/ENCY/Author') :Args(0) {
 
     my @authors;
     eval {
-        @authors = $c->model('ENCYModel')->ency_schema->resultset('Author')->search(
+        @authors = $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->search(
             {}, { order_by => { -asc => 'full_name' } }
         )->all;
     };
@@ -591,7 +867,7 @@ sub Author_id :Path('/ENCY/Author') :Args(1) {
         return;
     }
 
-    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Author')->find($id) };
+    my $author = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->find($id) };
     unless ($author) {
         $c->stash(error_msg => "Author #$id not found.", template => 'ENCY/AuthorList.tt');
         return;
@@ -653,7 +929,7 @@ sub Author_add :Path('/ENCY/Author/add') :Args(0) {
         my $p = $c->request->body_parameters;
         my $new_author;
         eval {
-            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Author')->create({
+            $new_author = $c->model('ENCYModel')->ency_schema->resultset('Ency::Author')->create({
                 full_name          => $p->{full_name}          || 'Unknown',
                 credentials        => $p->{credentials}        // '',
                 affiliation        => $p->{affiliation}        // '',
@@ -754,36 +1030,48 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             date_time_posted => \'NOW()',
         };
 
-        # Use the existing logging system to log the new herb data
+        my ($new_herb_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'herb', undef, $new_herb);
+        $new_herb = $new_herb_clean;
+
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_herb', "New herb data: " . join(", ", map { "$_: $new_herb->{$_}" } keys %$new_herb));
 
-        # Save the new herb using the ENCYModel
         my ($ok, $result) = $c->model('ENCYModel')->add_herb($c, $new_herb);
 
         if ($ok) {
             my $new_id = $result->record_id;
-            my ($auto_linked, $unresolved) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
+            my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
-            my $todo_msg = $unresolved   ? " $unresolved term(s) logged as todos." : '';
+            my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
             $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
-            $c->res->redirect($c->uri_for($self->action_for('index')));
+            my $caller_return_to = $form_data->{return_to} // '';
+            my $herb_detail      = $c->uri_for('/ENCY/herb_detail/' . $new_id);
+            my $return_to        = ($caller_return_to && $caller_return_to =~ m{^/}) ? $caller_return_to : $herb_detail;
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
+                $c->res->redirect($return_to);
+            }
         } else {
             $c->stash(
                 error_msg      => "Failed to add herb: $result",
                 template       => 'ENCY/add_herb_form.tt',
                 user_role      => $c->session->{roles},
-                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "Mucilage (polysaccharides), vitamins (A, C, K), minerals (potassium, magnesium)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K; potassium; magnesium"',
                 form_data      => $form_data,
             );
             $self->_stash_image_files($c);
         }
     } else {
         # Display the form
+        my $prefill_botanical = $c->request->param('botanical_name') // '';
+        my $prefill_common    = $c->request->param('common_names')   // '';
+        my $return_to         = $c->request->param('return_to')      // '';
         $self->_stash_image_files($c);
         $c->stash(
-            template       => 'ENCY/add_herb_form.tt',
-            user_role      => $c->session->{roles},
-            ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator',
+            template              => 'ENCY/add_herb_form.tt',
+            user_role             => $c->session->{roles},
+            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "Mucilage (polysaccharides), vitamins (A, C, K), minerals (potassium, magnesium)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K; potassium; magnesium"',
+            prefill_botanical     => $prefill_botanical,
+            prefill_common        => $prefill_common,
+            return_to             => $return_to,
         );
     }
 }
@@ -1319,11 +1607,16 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $_ht_raw = $p->{host_type};
+        my @_ht_vals = ref($_ht_raw) eq 'ARRAY' ? @$_ht_raw : (defined $_ht_raw ? ($_ht_raw) : ());
+        my $_ht_other = $p->{host_type_other} // '';
+        push @_ht_vals, $_ht_other if length($_ht_other);
+        my $_host_type = join('; ', grep { length($_) } @_ht_vals);
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
             disease_type             => $p->{disease_type}             // '',
-            host_type                => $p->{host_type}                // '',
+            host_type                => $_host_type,
             causative_agent          => $p->{causative_agent}          // '',
             transmission             => $p->{transmission}             // '',
             symptoms_description     => $p->{symptoms_description}     // '',
@@ -1354,18 +1647,29 @@ sub add_disease : Path('/ENCY/Disease/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_disease($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_disease', "Disease added: $data->{common_name}");
         $c->flash->{success_msg} = 'Disease added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Disease');
         return;
     }
 
+    my $prefill_common_name = $c->request->param('common_name') // '';
+    my $return_to           = $c->request->param('return_to')     // '';
+    my $resolve_field       = $c->request->param('resolve_field') // '';
+    my $resolve_type        = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining   = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
-        template        => 'ENCY/DiseaseDetail.tt',
+        edit_mode           => 1,
+        prefill_common_name => $prefill_common_name,
+        return_to           => $return_to,
+        resolve_field       => $resolve_field,
+        resolve_type        => $resolve_type,
+        resolve_remaining   => $resolve_remaining,
+        ency_ai_prompt      => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
+        template            => 'ENCY/DiseaseDetail.tt',
     );
 }
 
@@ -1417,11 +1721,16 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
             return '' if $u =~ m{workstation\.local|bmast\.local|localhost|127\.0\.0\.1|/ENCY/entry/}i;
             return $u;
         };
+        my $_ht_raw2 = $p->{host_type};
+        my @_ht_vals2 = ref($_ht_raw2) eq 'ARRAY' ? @$_ht_raw2 : (defined $_ht_raw2 ? ($_ht_raw2) : ());
+        my $_ht_other2 = $p->{host_type_other} // '';
+        push @_ht_vals2, $_ht_other2 if length($_ht_other2);
+        my $_host_type2 = join('; ', grep { length($_) } @_ht_vals2);
         my $data = {
             common_name              => $p->{common_name}              // '',
             scientific_name          => $p->{scientific_name}          // '',
             disease_type             => $p->{disease_type}             // '',
-            host_type                => $p->{host_type}                // '',
+            host_type                => $_host_type2,
             causative_agent          => $p->{causative_agent}          // '',
             transmission             => $p->{transmission}             // '',
             symptoms_description     => $p->{symptoms_description}     // '',
@@ -1466,7 +1775,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     $c->stash(
         disease         => $disease,
         edit_mode       => 1,
-        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url',
+        ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
         template        => 'ENCY/DiseaseDetail.tt',
     );
 }
@@ -1575,18 +1884,29 @@ sub add_symptom : Path('/ENCY/Symptom/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_symptom($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_symptom', "Symptom added: $data->{name}");
         $c->flash->{success_msg} = 'Symptom added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Symptom'));
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Symptom');
         return;
     }
 
+    my $prefill_name      = $c->request->param('name')          // '';
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
-        template        => 'ENCY/SymptomDetail.tt',
+        edit_mode         => 1,
+        prefill_name      => $prefill_name,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'name, common_name, description, body_system, severity, acute_chronic, host_type, reference, url',
+        template          => 'ENCY/SymptomDetail.tt',
     );
 }
 
@@ -1725,17 +2045,30 @@ sub constituent_detail : Path('/ENCY/Constituent') : Args(1) {
     }
 
     $c->session->{record_id} = $id;
-    my $related = $c->model('ENCYModel')->get_constituent_related($c, $id);
+    my $related      = $c->model('ENCYModel')->get_constituent_related($c, $id);
     my $linked_herbs = $c->model('ENCYModel')->resolve_names_to_herbs($c, $constituent->found_in_herbs);
     my $linked_drugs = $c->model('ENCYModel')->resolve_names_to_drugs($c, $constituent->found_in_drugs);
+    my $const_ents              = _fetch_linkable_entities($c);
+    my $herbs_html              = _build_herb_popup_html($c, $constituent->found_in_herbs // '', $linked_herbs);
+    my $drugs_html              = _build_drug_popup_html($c, $constituent->found_in_drugs // '', $linked_drugs);
+    my $therapeutic_html        = _build_glossary_popup_html($c, $constituent->therapeutic_action // '',   $const_ents);
+    my $chemical_class_html     = _build_glossary_popup_html($c, $constituent->chemical_class // '',       $const_ents);
+    my $solubility_html         = _build_glossary_popup_html($c, $constituent->solubility // '',           $const_ents);
+    my $pharmacological_html    = _build_glossary_popup_html($c, $constituent->pharmacological_effects // '', $const_ents);
     $c->stash(
-        constituent      => $constituent,
-        related_diseases => $related->{diseases}  // [],
-        related_symptoms => $related->{symptoms}  // [],
-        linked_herbs     => $linked_herbs,
-        linked_drugs     => $linked_drugs,
-        edit_mode        => 0,
-        template         => 'ENCY/ConstituentDetail.tt',
+        constituent             => $constituent,
+        related_diseases        => $related->{diseases}  // [],
+        related_symptoms        => $related->{symptoms}  // [],
+        linked_herbs            => $linked_herbs,
+        linked_drugs            => $linked_drugs,
+        herbs_html              => $herbs_html,
+        drugs_html              => $drugs_html,
+        therapeutic_html        => $therapeutic_html,
+        chemical_class_html     => $chemical_class_html,
+        solubility_html         => $solubility_html,
+        pharmacological_html    => $pharmacological_html,
+        edit_mode               => 0,
+        template                => 'ENCY/ConstituentDetail.tt',
     );
 }
 
@@ -1797,6 +2130,9 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
+        my ($data_clean, $n_markers) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', undef, $data);
+        $data = $data_clean;
         my ($ok, $new_id) = $c->model('ENCYModel')->add_constituent($c, $data);
         if ($ok && $new_id) {
             if ($data->{found_in_herbs}) {
@@ -1806,20 +2142,32 @@ sub add_constituent : Path('/ENCY/Constituent/add') : Args(0) {
             my $resolve = $c->model('ENCYModel')->auto_resolve_text_fields($c, 'constituent', $new_id, $data);
             my $n_linked = scalar @{ $resolve->{linked} || [] };
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
-            $c->flash->{success_msg} = "Constituent added. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
+            $c->flash->{success_msg} = "Constituent '$data->{name}' added. Linked to $back_linked herb(s)."
+                . ($n_linked  ? " Auto-linked $n_linked record(s)." : '')
+                . ($n_unres   ? " $n_unres term(s) need attention." : '');
         } else {
-            $c->flash->{success_msg} = 'Constituent added successfully.';
+            $c->flash->{success_msg} = "Constituent '$data->{name}' added successfully.";
         }
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_constituent', "Constituent added: $data->{name}");
-        $c->response->redirect($c->uri_for('/ENCY/Constituent'));
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Constituent');
         return;
     }
 
+    my $prefill_name      = $c->request->param('name')          // '';
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
-        template        => 'ENCY/ConstituentDetail.tt',
+        edit_mode         => 1,
+        prefill_name      => $prefill_name,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only, no prose sentences. (2) PRACTITIONER PREFIXES in therapeutic_action: use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both the prefix groups and terms within groups are semicolon-separated. (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "vitamins (A, C, K), minerals (potassium, magnesium)" → "vitamin A; vitamin C; vitamin K; potassium; magnesium"',
+        template          => 'ENCY/ConstituentDetail.tt',
     );
 }
 
@@ -1890,6 +2238,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
         ($mw_raw) = ($mw_raw =~ /(\d+(?:\.\d+)?)/);
         $data->{molecular_weight} = defined $mw_raw ? $mw_raw : undef;
 
+        my ($data_clean_ec, $n_markers_ec) = $c->model('ENCYModel')->preprocess_field_markers($c, 'constituent', $record_id, $data);
+        $data = $data_clean_ec;
+
         my ($status, $msg) = $c->model('ENCYModel')->update_constituent($c, $record_id, $data);
 
         if ($status) {
@@ -1902,8 +2253,14 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
             my $n_unres  = scalar @{ $resolve->{unresolved} || [] };
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
                 "Constituent updated successfully for record_id: $record_id");
-            $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s). Auto-linked $n_linked record(s). $n_unres unresolved term(s) logged as todos.";
-            $c->response->redirect($c->uri_for('/ENCY/Constituent', $record_id));
+            my $link_msg = $n_linked ? " Auto-linked $n_linked record(s)." : '';
+            my $todo_msg = $n_unres  ? " $n_unres term(s) need attention."  : '';
+            $c->flash->{success_msg} = "Constituent updated. Linked to $back_linked herb(s).$link_msg$todo_msg";
+            my $return_to    = $c->uri_for('/ENCY/Constituent', $record_id);
+            my $action_items = $c->model('ENCYModel')->action_items_for_unresolved($resolve->{unresolved});
+            unless ($self->_start_resolve_workflow($c, $action_items, $return_to)) {
+                $c->response->redirect($return_to);
+            }
             return;
         } else {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
@@ -1919,10 +2276,25 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     }
 
     $self->_stash_image_files($c);
+
+    my $entities_const = _fetch_linkable_entities($c);
+    my %field_html_const;
+    for my $f (qw(chemical_class toxicity solubility pharmacological_effects therapeutic_action research_notes found_in_foods)) {
+        my $val = eval { $constituent->$f } // '';
+        $field_html_const{$f} = _build_glossary_popup_html($c, $val, $entities_const) if length($val);
+    }
+    {
+        my $lh = $c->model('ENCYModel')->resolve_names_to_herbs($c, eval { $constituent->found_in_herbs } // '');
+        my $ld = $c->model('ENCYModel')->resolve_names_to_drugs($c, eval { $constituent->found_in_drugs } // '');
+        $field_html_const{found_in_herbs} = _build_herb_popup_html($c, eval { $constituent->found_in_herbs } // '', $lh);
+        $field_html_const{found_in_drugs} = _build_drug_popup_html($c, eval { $constituent->found_in_drugs } // '', $ld);
+    }
+
     $c->stash(
         constituent     => $constituent,
+        field_html      => \%field_html_const,
         edit_mode       => 1,
-        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (comma-separated herb names), found_in_foods (comma-separated food names), found_in_drugs (comma-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation)',
+        ency_ai_prompt  => 'name, common_name, chemical_formula, chemical_class, iupac_name, cas_number, molecular_weight, therapeutic_action, toxicity, solubility, found_in_herbs (semicolon-separated herb names), found_in_foods (semicolon-separated food names), found_in_drugs (semicolon-separated drug/medication names), pharmacological_effects, research_notes, image (Wikipedia or PubChem image URL if available), url (PubChem or authoritative source URL), reference (PubChem CID, Wikipedia article, or citation). IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only, no prose sentences. (2) PRACTITIONER PREFIXES in therapeutic_action: use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both the prefix groups and terms within groups are semicolon-separated. (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "vitamins (A, C, K), minerals (potassium, magnesium)" → "vitamin A; vitamin C; vitamin K; potassium; magnesium"',
         template        => 'ENCY/ConstituentDetail.tt',
     );
 }
@@ -1974,7 +2346,7 @@ sub glossary_detail : Path('/ENCY/Glossary') : Args(1) {
 
     $c->session->{record_id} = $id;
     $c->stash(
-        term      => $term,
+        entry     => $term,
         edit_mode => 0,
         template  => 'ENCY/GlossaryDetail.tt',
     );
@@ -2019,7 +2391,7 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         unless ($data->{term}) {
             $c->stash(
                 error_msg => "Term is required.",
-                term      => $data,
+                entry     => $data,
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
@@ -2029,24 +2401,35 @@ sub add_glossary : Path('/ENCY/Glossary/add') : Args(0) {
         unless ($data->{definition}) {
             $c->stash(
                 error_msg => "Definition is required.",
-                term      => $data,
+                entry     => $data,
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
             return;
         }
 
+        my $return_to = $p->{return_to} // '';
         $c->model('ENCYModel')->add_glossary($c, $data);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_glossary', "Glossary term added: $data->{term}");
-        $c->flash->{success_msg} = 'Glossary term added successfully.';
-        $c->response->redirect($c->uri_for('/ENCY/Glossary'));
+        $c->flash->{success_msg} = "Glossary term '$data->{term}' added successfully.";
+        $self->_advance_resolve_queue($c, $return_to || '/ENCY/Glossary');
         return;
     }
 
+    my $prefill_term      = $c->request->param('term')          // '';
+    my $return_to         = $c->request->param('return_to')     // '';
+    my $resolve_field     = $c->request->param('resolve_field') // '';
+    my $resolve_type      = $c->request->param('resolve_type')  // '';
+    my $resolve_remaining = scalar @{ $c->session->{ency_resolve_queue} || [] };
     $c->stash(
-        edit_mode       => 1,
-        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
-        template        => 'ENCY/GlossaryDetail.tt',
+        edit_mode         => 1,
+        prefill_term      => $prefill_term,
+        return_to         => $return_to,
+        resolve_field     => $resolve_field,
+        resolve_type      => $resolve_type,
+        resolve_remaining => $resolve_remaining,
+        ency_ai_prompt    => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. CRITICAL: Return a FLAT JSON object ONLY — every value must be a plain string, NO nested objects, NO arrays. Keep the total response under 800 characters. FORMATTING: (1) alternate_terms and related_terms: semicolon-separated noun phrases. (2) definition: 1-3 sentences of plain prose, no sub-headings. (3) context: 1 sentence. (4) examples: semicolon-separated short noun phrases only. (5) category: single word or short phrase (e.g. pharmacology, botany, TCM).',
+        template          => 'ENCY/GlossaryDetail.tt',
     );
 }
 
@@ -2118,7 +2501,7 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
                 "Failed to update glossary term: $msg");
             $c->stash(
                 error_msg => "Failed to update glossary term: $msg",
-                term      => { %{ $term->get_columns }, %$data },
+                entry     => { %{ $term->get_columns }, %$data },
                 edit_mode => 1,
                 template  => 'ENCY/GlossaryDetail.tt',
             );
@@ -2127,9 +2510,9 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
     }
 
     $c->stash(
-        term            => $term,
+        entry           => $term,
         edit_mode       => 1,
-        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms',
+        ency_ai_prompt  => 'term, alternate_terms, definition, category, context, etymology, examples, related_terms. CRITICAL: Return a FLAT JSON object ONLY — every value must be a plain string, NO nested objects, NO arrays. Keep the total response under 800 characters. FORMATTING: (1) alternate_terms and related_terms: semicolon-separated noun phrases. (2) definition: 1-3 sentences of plain prose, no sub-headings. (3) context: 1 sentence. (4) examples: semicolon-separated short noun phrases only. (5) category: single word or short phrase (e.g. pharmacology, botany, TCM).',
         template        => 'ENCY/GlossaryDetail.tt',
     );
 }
@@ -2149,7 +2532,7 @@ sub search :Path('/ENCY/search') :Args(0) {
 
     my $ency_model = $c->model('ENCYModel');
 
-    my $herbs        = $query ? $c->model('DBForager')->searchHerbs($c, $query) : [];
+    my $herbs        = $query ? $ency_model->search_herbs($c, $query) : [];
     my $animals      = $query ? $ency_model->search_animals($c, $query)      : [];
     my $insects      = $query ? $ency_model->search_insects($c, $query)      : [];
     my $diseases     = $query ? $ency_model->search_diseases($c, $query)     : [];
@@ -2210,11 +2593,11 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
 
     # Fetch bee forage plants data
-    my $bee_plants = $c->model('DBForager')->get_bee_forage_plants();
+    my $bee_plants = $c->model('ENCYModel')->get_bee_forage_plants($c);
 
     # If no specific bee forage plants method exists, use the general herbal data
     if (!$bee_plants || !@$bee_plants) {
-        $bee_plants = $c->model('DBForager')->get_herbal_data();
+        $bee_plants = $c->model('ENCYModel')->get_herbal_data($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
         push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
     }
@@ -2253,7 +2636,7 @@ sub legacy : Path('/ENCY/legacy') : Args(1) {
 sub herb_list : Path('/ENCY/Herb') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_list', 'Entered herb_list');
-    my $forager_data = $c->model('DBForager')->get_herbal_data();
+    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
     $c->stash(herbal_data => $forager_data, template => 'ENCY/BotanicalNameView.tt');
 }
 
@@ -2806,17 +3189,17 @@ sub ency_admin : Path('/ENCY/admin') : Args(0) {
     my $refs_missing_author = 0;
     my $refs_missing_isbn = 0;
     eval {
-        $refs_missing_title  = $ency->resultset('Reference')->count({ -or => [ title  => undef, title  => '' ] });
-        $refs_missing_author = $ency->resultset('Reference')->count({ -or => [ author => undef, author => '' ] });
-        $refs_missing_isbn   = $ency->resultset('Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
+        $refs_missing_title  = $ency->resultset('Ency::Reference')->count({ -or => [ title  => undef, title  => '' ] });
+        $refs_missing_author = $ency->resultset('Ency::Reference')->count({ -or => [ author => undef, author => '' ] });
+        $refs_missing_isbn   = $ency->resultset('Ency::Reference')->count({ -or => [ isbn   => undef, isbn   => '' ] });
     };
 
     # ── Publisher / Author / ReferenceAuthor counts ──────────────────────────
-    eval { $counts{publisher}        = $ency->resultset('Publisher')->count };
+    eval { $counts{publisher}        = $ency->resultset('Ency::Publisher')->count };
     $counts{publisher} //= 0;
-    eval { $counts{author}           = $ency->resultset('Author')->count };
+    eval { $counts{author}           = $ency->resultset('Ency::Author')->count };
     $counts{author} //= 0;
-    eval { $counts{reference_author} = $ency->resultset('ReferenceAuthor')->count };
+    eval { $counts{reference_author} = $ency->resultset('Ency::ReferenceAuthor')->count };
     $counts{reference_author} //= 0;
 
     # ── Unresolved ENCY todos ────────────────────────────────────────────────
@@ -2866,7 +3249,7 @@ sub api_references : Path('/ENCY/api/references') : Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'api_references', "Searching references q=$q");
     my @results;
     eval {
-        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Reference')->search(
+        my @refs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Reference')->search(
             { -or => [
                 title  => { like => "%$q%" },
                 author => { like => "%$q%" },
@@ -2887,7 +3270,7 @@ sub api_references : Path('/ENCY/api/references') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_references', "Error: $err");
     };
     require JSON;
-    $c->response->body(JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
 }
 
 sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
@@ -2909,7 +3292,7 @@ sub api_link_reference : Path('/ENCY/api/link_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->link_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
@@ -2931,7 +3314,7 @@ sub api_unlink_reference : Path('/ENCY/api/unlink_reference') : Args(0) {
     }
     my ($ok, $msg) = $c->model('ENCYModel')->unlink_entity_reference($c, $entity_type, $entity_id, $reference_id);
     require JSON;
-    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+    $c->response->body(JSON::JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
 sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
@@ -2959,7 +3342,7 @@ sub api_entity_references : Path('/ENCY/api/entity_references') : Args(0) {
         isbn         => $_->isbn         // '',
     } } @refs;
     require JSON;
-    $c->response->body(JSON::encode_json({ references => \@data }));
+    $c->response->body(JSON::JSON::encode_json({ references => \@data }));
 }
 
 sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
@@ -2976,21 +3359,21 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
     eval {
         my $model = $c->model('ENCYModel');
         if ($type eq 'herb') {
-            my @rows = $model->forager_schema->resultset('Herb')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Herb')->search(
                 { -or => [
-                    common_name    => { like => "%$query%" },
+                    common_names   => { like => "%$query%" },
                     botanical_name => { like => "%$query%" },
                 ]},
-                { rows => 8, order_by => 'common_name' }
+                { rows => 8, order_by => 'common_names' }
             )->all;
             @results = map { {
                 id         => $_->record_id,
-                name       => $_->common_name // '',
+                name       => $_->common_names // '',
                 secondary  => $_->botanical_name // '',
                 url        => '/ENCY/herb_detail/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'disease') {
-            my @rows = $model->ency_schema->resultset('Disease')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Disease')->search(
                 { common_name => { like => "%$query%" } },
                 { rows => 8, order_by => 'common_name' }
             )->all;
@@ -3001,7 +3384,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url       => '/ENCY/Disease/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'symptom') {
-            my @rows = $model->ency_schema->resultset('Symptom')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Symptom')->search(
                 { -or => [
                     name        => { like => "%$query%" },
                     common_name => { like => "%$query%" },
@@ -3015,7 +3398,7 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url       => '/ENCY/Symptom/' . $_->record_id,
             } } @rows;
         } elsif ($type eq 'constituent') {
-            my @rows = $model->ency_schema->resultset('Constituent')->search(
+            my @rows = $model->ency_schema->resultset('Ency::Constituent')->search(
                 { -or => [
                     name        => { like => "%$query%" },
                     common_name => { like => "%$query%" },
@@ -3034,7 +3417,359 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
     };
     require JSON;
-    $c->response->body(JSON::encode_json({ results => \@results }));
+    $c->response->body(JSON::JSON::encode_json({ results => \@results }));
+}
+
+sub _start_resolve_workflow {
+    my ($self, $c, $action_items, $return_to) = @_;
+    return 0 unless $action_items && @$action_items;
+    my @queue = @$action_items;
+    my $first = shift @queue;
+    $c->session->{ency_resolve_queue}     = \@queue;
+    $c->session->{ency_resolve_return_to} = $return_to;
+    $c->response->redirect($c->uri_for($first->{add_route}, {
+        $first->{name_param} => $first->{term},
+        return_to            => $return_to,
+        resolve_field        => $first->{field},
+        resolve_type         => $first->{type},
+    }));
+    return 1;
+}
+
+sub _advance_resolve_queue {
+    my ($self, $c, $fallback_return_to) = @_;
+    my $queue     = $c->session->{ency_resolve_queue} || [];
+    my $return_to = $c->session->{ency_resolve_return_to} || $fallback_return_to || '/ENCY';
+    if (@$queue) {
+        my @remaining = @$queue;
+        my $next = shift @remaining;
+        $c->session->{ency_resolve_queue} = \@remaining;
+        $c->response->redirect($c->uri_for($next->{add_route}, {
+            $next->{name_param} => $next->{term},
+            return_to           => $return_to,
+            resolve_field       => $next->{field},
+            resolve_type        => $next->{type},
+        }));
+    } else {
+        delete $c->session->{ency_resolve_queue};
+        delete $c->session->{ency_resolve_return_to};
+        $c->response->redirect($return_to =~ /^https?:\/\// ? $return_to : $c->uri_for($return_to));
+    }
+}
+
+sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
+    my ($self, $c) = @_;
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $p             = $c->request->body_parameters;
+    my $create_ticket = $p->{create_ticket} // 0;
+    my $term          = $p->{term}          // '';
+    my $field         = $p->{field}         // '';
+    my $type          = $p->{type}          // '';
+    if ($create_ticket && $term) {
+        my $short = length($term) > 50 ? substr($term, 0, 47) . '...' : $term;
+        $c->model('ENCYModel')->_create_ency_todo($c,
+            "ENCY: Editor review needed - $type: $short",
+            "Field: $field\nType: $type\nTerm: $term\n\n"
+          . "An editor skipped this term during the resolve workflow. "
+          . "Please verify whether it should be added as a new $type entry."
+        );
+    }
+    $self->_advance_resolve_queue($c, $c->session->{ency_resolve_return_to} || '/ENCY');
+}
+
+# ─── Organism routes ────────────────────────────────────────────────────────
+
+sub organism_list : Path('/ENCY/Organism') : Args(0) {
+    my ($self, $c) = @_;
+    my $type   = $c->request->parameters->{organism_type} // '';
+    my $search = $c->request->parameters->{q}             // '';
+    my $where  = {};
+    $where->{organism_type} = $type   if $type;
+    if ($search) {
+        $where->{-or} = [
+            common_name     => { like => "%$search%" },
+            scientific_name => { like => "%$search%" },
+        ];
+    }
+    my $organisms = $c->model('ENCYModel')->list_organisms($c, { where => $where });
+    $c->stash(
+        organisms     => $organisms,
+        organism_type => $type,
+        search        => $search,
+        template      => 'ENCY/OrganismList.tt',
+    );
+}
+
+sub organism_detail : Path('/ENCY/Organism') : Args(1) {
+    my ($self, $c, $id) = @_;
+    unless (defined $id && $id =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('Invalid organism ID');
+        return;
+    }
+    my $organism = $c->model('ENCYModel')->get_organism_by_id($c, $id);
+    unless ($organism) {
+        $c->response->status(404);
+        $c->stash(error_message => "Organism #$id not found.", template => 'error.tt');
+        return;
+    }
+    $c->stash(
+        organism  => $organism,
+        edit_mode => 0,
+        template  => 'ENCY/OrganismDetail.tt',
+    );
+}
+
+sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Organism/add' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->stash(error_msg => "You do not have permission to add organisms.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name         => $p->{common_name}         // '',
+            scientific_name     => $p->{scientific_name}     // '',
+            organism_type       => $p->{organism_type}       || 'animal',
+            kingdom             => $p->{kingdom}             // '',
+            phylum              => $p->{phylum}              // '',
+            class_name          => $p->{class_name}          // '',
+            order_name          => $p->{order_name}          // '',
+            family_name         => $p->{family_name}         // '',
+            genus               => $p->{genus}               // '',
+            species             => $p->{species}             // '',
+            ncbi_tax_id         => ($p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            iucn_id             => $p->{iucn_id}             // '',
+            description         => $p->{description}         // '',
+            habitat             => $p->{habitat}             // '',
+            medicinal_uses      => $p->{medicinal_uses}      // '',
+            therapeutic_uses    => $p->{therapeutic_uses}    // '',
+            sub_population_note => $p->{sub_population_note} // '',
+            image               => $p->{image}               // '',
+            url                 => $p->{url}                 // '',
+            reference           => $p->{reference}           // '',
+            sitename            => $p->{sitename}            // 'ENCY',
+            username_of_poster  => $c->session->{username},
+            group_of_poster     => $c->session->{group},
+            date_time_posted    => \'NOW()',
+            share               => 1,
+        };
+        unless ($data->{common_name}) {
+            $c->stash(error_msg => "Common name is required.", organism => $data, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            return;
+        }
+        $c->model('ENCYModel')->add_organism($c, $data);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{common_name}");
+        $c->flash->{success_msg} = 'Organism added successfully.';
+        $c->response->redirect($c->uri_for('/ENCY/Organism'));
+        return;
+    }
+
+    my $prefill_common_name = $c->request->param('common_name') // '';
+    $self->_stash_image_files($c);
+    $c->stash(
+        edit_mode           => 1,
+        prefill_common_name => $prefill_common_name,
+        ency_ai_prompt      => 'common_name, scientific_name, organism_type (one of: human, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        template            => 'ENCY/OrganismDetail.tt',
+    );
+}
+
+sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+
+    my $herb_id = $c->request->param('record_id') // '';
+    unless ($herb_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p      = $c->request->body_parameters;
+        my $action = $p->{action} // '';
+
+        if ($action eq 'link') {
+            my $tax_id = $p->{ncbi_tax_id} // '';
+            unless ($tax_id =~ /^\d+$/) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid NCBI Tax ID' }));
+                return;
+            }
+
+            my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $tax_id);
+            unless ($ncbi_data) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => "Could not fetch NCBI ID $tax_id" }));
+                return;
+            }
+
+            my $organism = $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data);
+            unless ($organism) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Failed to create organism record' }));
+                return;
+            }
+
+            my ($ok, $msg) = $c->model('ENCYModel')->link_herb_to_organism($c, $herb_id, $organism->record_id);
+            $c->response->body(JSON::encode_json({
+                ok          => $ok ? 1 : 0,
+                error       => $ok ? undef : $msg,
+                organism_id => $organism->record_id,
+                scientific_name => $ncbi_data->{scientific_name},
+                kingdom     => $ncbi_data->{kingdom},
+                family_name => $ncbi_data->{family_name},
+            }));
+            return;
+        }
+
+        if ($action eq 'accept_fields') {
+            my $ncbi_tax_id = $p->{ncbi_tax_id} // '';
+            my @fields = split /,/, ($p->{fields} // '');
+            unless ($ncbi_tax_id =~ /^\d+$/ && @fields) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'Missing parameters' }));
+                return;
+            }
+            my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id);
+            unless ($ncbi_data) {
+                $c->response->body(JSON::encode_json({ ok => 0, error => 'NCBI fetch failed' }));
+                return;
+            }
+            my ($ok, $result) = $c->model('ENCYModel')->accept_ncbi_fields_to_herb($c, $herb_id, $ncbi_data, \@fields);
+            $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, updated => $result }));
+            return;
+        }
+
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Unknown action' }));
+        return;
+    }
+
+    my ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    unless ($ok) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => $data }));
+        return;
+    }
+
+    $c->response->body(JSON::encode_json({ ok => 1, ncbi => $data }));
+}
+
+sub herb_ncbi_bulk_link : Path('/ENCY/herb_ncbi_bulk_link') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size = $c->request->body_parameters->{batch_size} // 10;
+    $batch_size = 10 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 20;
+
+    my $result = $c->model('ENCYModel')->bulk_link_herbs_to_ncbi($c, $batch_size);
+    $c->response->body(JSON::encode_json({ ok => 1, %$result }));
+}
+
+sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => '/ENCY/Organism/edit' }));
+        return;
+    }
+
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->stash(error_msg => "You do not have permission to edit organisms.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    my $record_id = $c->request->param('record_id') // $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->redirect($c->uri_for('/ENCY/Organism'));
+        return;
+    }
+
+    my $organism = $c->model('ENCYModel')->get_organism_by_id($c, $record_id);
+    unless ($organism) {
+        $c->stash(error_msg => "Organism #$record_id not found.", template => 'ENCY/OrganismList.tt');
+        return;
+    }
+
+    if ($c->request->method eq 'POST') {
+        my $p = $c->request->body_parameters;
+        my $data = {
+            common_name         => $p->{common_name}         // '',
+            scientific_name     => $p->{scientific_name}     // '',
+            organism_type       => $p->{organism_type}       || 'animal',
+            kingdom             => $p->{kingdom}             // '',
+            phylum              => $p->{phylum}              // '',
+            class_name          => $p->{class_name}          // '',
+            order_name          => $p->{order_name}          // '',
+            family_name         => $p->{family_name}         // '',
+            genus               => $p->{genus}               // '',
+            species             => $p->{species}             // '',
+            ncbi_tax_id         => ($p->{ncbi_tax_id} && $p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     && $p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            iucn_id             => $p->{iucn_id}             // '',
+            description         => $p->{description}         // '',
+            habitat             => $p->{habitat}             // '',
+            medicinal_uses      => $p->{medicinal_uses}      // '',
+            therapeutic_uses    => $p->{therapeutic_uses}    // '',
+            sub_population_note => $p->{sub_population_note} // '',
+            image               => $p->{image}               // '',
+            url                 => $p->{url}                 // '',
+            reference           => $p->{reference}           // '',
+        };
+        unless ($data->{common_name}) {
+            $c->stash(error_msg => "Common name is required.", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            return;
+        }
+        my ($ok, $msg) = $c->model('ENCYModel')->update_organism($c, $record_id, $data);
+        if ($ok) {
+            $c->flash->{success_msg} = 'Organism updated successfully.';
+            $c->response->redirect($c->uri_for('/ENCY/Organism', $record_id));
+        } else {
+            $c->stash(error_msg => "Failed to update: $msg", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        }
+        return;
+    }
+
+    $self->_stash_image_files($c);
+    $c->stash(
+        organism       => $organism,
+        edit_mode      => 1,
+        ency_ai_prompt => 'common_name, scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        template       => 'ENCY/OrganismDetail.tt',
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

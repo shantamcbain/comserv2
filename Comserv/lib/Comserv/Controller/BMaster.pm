@@ -210,7 +210,7 @@ sub yards :Path('/BMaster/yards') :Args(0) {
     my $sitename = $c->session->{SiteName} || $c->session->{sitename};
     my @yards;
     eval {
-        @yards = $c->model('DBEncy')->resultset('Yard')->search(
+        @yards = $c->model('DBEncy')->resultset('Beekeeping::Yard')->search(
             { sitename => $sitename },
             { order_by => 'yard_name' }
         )->all;
@@ -231,7 +231,7 @@ sub add_yard :Path('/BMaster/add_yard') :Args(0) {
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
         eval {
-            $c->model('DBEncy')->resultset('Yard')->create({
+            $c->model('DBEncy')->resultset('Beekeeping::Yard')->create({
                 yard_code        => $p->{yard_code},
                 yard_name        => $p->{yard_name},
                 sitename         => $c->session->{SiteName} || $p->{sitename},

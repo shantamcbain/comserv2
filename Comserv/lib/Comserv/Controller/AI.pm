@@ -174,6 +174,47 @@ sub index :Path :Args(0) {
     # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -186,6 +227,7 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -638,6 +680,13 @@ sub generate :Local :Args(0) {
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
+        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+        # planning agent gets less room because its own prompt already includes the project list.
+        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+        if (length($module_data_gen) > $inject_cap) {
+            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+        }
         $system .= "\n\n" . $module_data_gen;
     }
     my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
@@ -985,6 +1034,11 @@ sub generate :Local :Args(0) {
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
 
+            # For force_large agents (planning/ency/bmaster) a cold start of phi4/14b
+            # can take 5-10+ minutes and always times out. Auto-fall back to Grok when:
+            #   - force_large is active (not a manual model override)
+            #   - the selected large model is NOT in memory
+            #   - a Grok API key is configured for this user
             if ($force_large && $is_cold_start && !$manual_model) {
                 my $fallback_key = '';
                 eval {
@@ -3945,6 +3999,66 @@ sub _get_module_data {
     my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
+    # Fast-path: when the widget is on /todo/details?record_id=N, inject ONLY that todo
+    # plus any todos that it is blocked by. No need to load all active todos.
+    my $page_path_req = $c->req->param('page_path') || '';
+    # Also check the JSON body path (already parsed into param by Catalyst for form posts;
+    # for JSON bodies we fall back to the stash or request body — safe to do a quick regex check).
+    if (!$page_path_req) {
+        my $raw = eval { $c->req->content } // '';
+        ($page_path_req) = ($raw =~ /"page_path"\s*:\s*"([^"]+)"/) if $raw;
+    }
+    my ($single_todo_id) = ($page_path_req =~ m{/todo/(?:details|view)[?&;](?:.*&)?record_id=(\d+)}i);
+
+    if ($single_todo_id && $want_todos) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+                my $t  = $rs->find($single_todo_id);
+                if ($t) {
+                    my $stat_label = ($t->status // 0) == 1 ? 'NEW'
+                                   : ($t->status // 0) == 2 ? 'IN PROGRESS'
+                                   : ($t->status // 0) == 3 ? 'DONE'
+                                   : 'status=' . ($t->status // '?');
+                    my $block = "CURRENT TODO #$single_todo_id:\n"
+                        . "  Subject:  " . ($t->subject   // 'Untitled') . "\n"
+                        . "  Status:   $stat_label\n"
+                        . "  Priority: P" . ($t->priority // '?') . "\n"
+                        . "  Due:      " . ($t->due_date  // 'none') . "\n"
+                        . "  Project:  " . (do { my $pid = $t->project_id; $pid ? "id=$pid" : 'none' }) . "\n"
+                        . "  Notes:    " . ($t->description // '') . "\n";
+
+                    # Look up any todos this one explicitly blocks or is blocked by
+                    eval {
+                        if ($t->can('blocker_id') && $t->blocker_id) {
+                            my $blocker = $rs->find($t->blocker_id);
+                            if ($blocker) {
+                                $block .= "BLOCKING TODO #" . $t->blocker_id . ":\n"
+                                    . "  Subject: " . ($blocker->subject // '') . "\n"
+                                    . "  Status:  " . (($blocker->status // 0) == 2 ? 'IN PROGRESS' : ($blocker->status // 0) == 3 ? 'DONE' : 'NEW') . "\n";
+                            }
+                        }
+                        # Any other todos that list this one as their blocker
+                        my @blocked_by = $rs->search({ blocker_id => $single_todo_id, status => { '!=' => 3 } })->all;
+                        if (@blocked_by) {
+                            $block .= "TODOS BLOCKED BY THIS (#$single_todo_id):\n";
+                            for my $b (@blocked_by) {
+                                $block .= "  [#" . $b->record_id . "] " . ($b->subject // '') . "\n";
+                            }
+                        }
+                    };
+                    $block .= "Edit at /todo/edit?record_id=$single_todo_id | All todos: /todo";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Single-todo fetch error: $@") if $@;
+        # Skip the bulk todo fetch below since we already have what we need
+        $want_todos = 0;
+    }
+
     if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -3969,9 +4083,11 @@ sub _get_module_data {
                     $site_filter{sitename} = $site_name;
                 }
 
+                # Cap rows: planning agent on CSC admin can otherwise inject hundreds of todos
+                my $todo_row_cap = (lc($agent_id) eq 'planning') ? 20 : 40;
                 my @todos = $rs->search(
                     \%site_filter,
-                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 40 }
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => $todo_row_cap }
                 );
 
                 if (@todos) {
@@ -4118,7 +4234,7 @@ sub _get_module_data {
 
                 if ($const_id) {
                     $search_label = "id=$const_id";
-                    my $rec = $ency_schema->resultset('Constituent')->find($const_id);
+                    my $rec = $ency_schema->resultset('Ency::Constituent')->find($const_id);
                     if ($rec) {
                         # Full detail for the specific record so AI can pre-fill edit form
                         push @sections,
@@ -4146,7 +4262,7 @@ sub _get_module_data {
                     $search_term ||= '';
                     if ($search_term) {
                         $search_label = $search_term;
-                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
                             { -or => [
                                 name        => { like => "%$search_term%" },
                                 common_name => { like => "%$search_term%" },
@@ -4155,7 +4271,7 @@ sub _get_module_data {
                         )->all;
                     }
                     if (!@cons_rows) {
-                        @cons_rows = $ency_schema->resultset('Constituent')->search(
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
                             {}, { rows => 8, order_by => { -asc => 'name' } }
                         )->all;
                     }
@@ -4190,7 +4306,7 @@ sub _get_module_data {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
                 # Fetch yards for this site
-                my @yards = $schema->resultset('Yard')->search(
+                my @yards = $schema->resultset('Beekeeping::Yard')->search(
                     { sitename => $site_name },
                     { order_by => 'yard_name' }
                 )->all;
@@ -4198,7 +4314,7 @@ sub _get_module_data {
                 if (@yards) {
                     my @yard_lines;
                     for my $y (@yards) {
-                        my $hive_count = $schema->resultset('Hive')->search({
+                        my $hive_count = $schema->resultset('Beekeeping::Hive')->search({
                             yard_id => $y->id,
                             status  => 'active',
                         })->count;
@@ -4213,12 +4329,12 @@ sub _get_module_data {
 
                         # Show hives if bmaster agent or hive keywords
                         if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
-                            my @hives = $schema->resultset('Hive')->search(
+                            my @hives = $schema->resultset('Beekeeping::Hive')->search(
                                 { yard_id => $y->id },
                                 { order_by => 'hive_number', rows => 10 }
                             )->all;
                             for my $h (@hives) {
-                                my $last_insp = $schema->resultset('Inspection')->search(
+                                my $last_insp = $schema->resultset('Beekeeping::Inspection')->search(
                                     { hive_id => $h->id },
                                     { order_by => { -desc => 'inspection_date' }, rows => 1 }
                                 )->first;
@@ -7683,7 +7799,7 @@ sub action :Local :Args(0) {
 
         my $existing;
         eval {
-            $existing = $ency_model->ency_schema->resultset('Constituent')->search(
+            $existing = $ency_model->ency_schema->resultset('Ency::Constituent')->search(
                 { -or => [
                     name        => { like => $name },
                     common_name => { like => $name },
@@ -7793,7 +7909,7 @@ sub action :Local :Args(0) {
 
         my $yard_row;
         eval {
-            $yard_row = $schema->resultset('Yard')->create({
+            $yard_row = $schema->resultset('Beekeeping::Yard')->create({
                 %prefill,
                 current          => 0,
                 status           => 'active',
@@ -7825,7 +7941,7 @@ sub action :Local :Args(0) {
 
         my $yard_id = $params->{yard_id};
         unless ($yard_id) {
-            my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+            my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
             unless (@yards) {
                 $c->response->body(encode_json({
                     success => JSON::true,
@@ -7878,7 +7994,7 @@ sub action :Local :Args(0) {
         }
 
         my $hive_row;
-        eval { $hive_row = $schema->resultset('Hive')->create(\%prefill) };
+        eval { $hive_row = $schema->resultset('Beekeeping::Hive')->create(\%prefill) };
         if ($@ || !$hive_row) {
             $c->response->body(encode_json({ success => JSON::false, error => "Failed to create hive: $@" }));
             return;
@@ -7933,7 +8049,7 @@ sub action :Local :Args(0) {
         }
 
         my $queen_row;
-        eval { $queen_row = $schema->resultset('Queen')->create(\%prefill) };
+        eval { $queen_row = $schema->resultset('Beekeeping::Queen')->create(\%prefill) };
         if ($@ || !$queen_row) {
             $c->response->body(encode_json({ success => JSON::false, error => "Failed to create queen: $@" }));
             return;
@@ -7942,7 +8058,7 @@ sub action :Local :Args(0) {
 
         if ($params->{hive_id}) {
             eval {
-                $schema->resultset('QueenHiveAssignment')->create({
+                $schema->resultset('Beekeeping::QueenHiveAssignment')->create({
                     queen_id   => $queen_id,
                     hive_id    => $params->{hive_id} + 0,
                     start_date => $today,
@@ -7971,14 +8087,14 @@ sub action :Local :Args(0) {
         unless ($hive_id) {
             my $hive_number = $params->{hive_number} || '';
             if ($hive_number) {
-                my $hive_row = $schema->resultset('Hive')->search(
+                my $hive_row = $schema->resultset('Beekeeping::Hive')->search(
                     { hive_number => $hive_number, sitename => $sitename },
                     { rows => 1 }
                 )->first;
                 if ($hive_row) {
                     $hive_id = $hive_row->id;
                 } else {
-                    my @yards = $schema->resultset('Yard')->search({ sitename => $sitename, status => 'active' })->all;
+                    my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
                     unless (@yards) {
                         $c->response->body(encode_json({
                             success => JSON::true,
@@ -8089,7 +8205,7 @@ sub action :Local :Args(0) {
         if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
 
         my $inspection_row;
-        eval { $inspection_row = $schema->resultset('Inspection')->create(\%insp) };
+        eval { $inspection_row = $schema->resultset('Beekeeping::Inspection')->create(\%insp) };
         if ($@ || !$inspection_row) {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                 'action', "create_inspection failed: $@");
@@ -8126,7 +8242,7 @@ sub action :Local :Args(0) {
                 $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
 
                 my $dr;
-                eval { $dr = $schema->resultset('InspectionDetail')->create(\%detail) };
+                eval { $dr = $schema->resultset('Beekeeping::InspectionDetail')->create(\%detail) };
                 if ($@) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                         'action', "create_inspection_detail failed: $@");
@@ -8734,17 +8850,25 @@ STEP 2 — LOOKUP from injected data:
   The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
   Check each field — fields showing "(empty)" need to be filled in.
 
-STEP 3 — NAVIGATE: Tell the user which page to open:
-  - Constituent exists (stub) → /ENCY/Constituent/edit?record_id=N
-  - Constituent does not exist → /ENCY/Constituent/add
+STEP 3 — NAVIGATE AND PRE-FILL: Open the correct form and pre-fill it automatically.
+  Using your botanical/chemical knowledge, populate ALL fields you know for the constituent.
+  Emit ONE navigate_and_fill action (on its own line) — the browser will open the form and
+  fill the fields automatically. Replace N with the actual record_id number:
+
+  For an existing stub constituent:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/edit?record_id=N", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS", "iupac_name": "IUPAC", "cas_number": "CAS", "therapeutic_action": "THERAPEUTIC_USES", "pharmacological_effects": "EFFECTS", "found_in_herbs": "HERB1, HERB2", "url": "https://pubchem.ncbi.nlm.nih.gov/compound/CID"}}]
+
+  For a constituent that does not exist yet:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS"}}]
+
+  After the navigate_and_fill line, briefly list the values you suggested so the user can verify them.
 
 STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
   [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
 
-STEP 5 — PRE-FILL: Using your botanical/chemical knowledge, suggest values for each (empty) field.
-  For common plant constituents, provide: chemical_formula, chemical_class, therapeutic_action,
-  pharmacological_effects, found_in_herbs, and a PubChem or Wikipedia url.
-  Present these as a clear list so the user can copy-paste into the edit form.
+STEP 5 — CONFIRM: Tell the user the form has been opened and pre-filled, and ask them to review
+  and save. Example: "I've opened the edit form for constituent #N and pre-filled the fields with
+  the information above. Please review and click Save."
 
 STEP 6 — REMIND when the user says they are done:
   "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
@@ -8838,6 +8962,21 @@ GUIDELINES:
 - For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
 - When the user mentions a constituent name and asks you to check if it exists, look at the
   LIVE ENCY CONSTITUENT DATA. If it's there, give the link. If not, offer to create it.
+
+ACTIONS YOU CAN PERFORM:
+When the user asks to add a constituent or fix an unresolved constituent term, read the injected
+todo/DB data to find the term name, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME", "found_in_herbs": "HERB_NAME_IF_KNOWN", "therapeutic_action": "IF_KNOWN"}}]
+
+Rules:
+- Extract the term name from the injected todo description or DB data — do NOT ask the user for it.
+- Only include fields you can actually determine from the available data.
+- After the ACTION line, confirm the term name and which herb it came from.
+- If the todo says "Unresolved term in constituent#N", look in the injected data for the actual term string.
+
+When the user asks to add a glossary term, use:
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Glossary/add", "fields": {"term": "TERM_NAME", "definition": "IF_KNOWN"}}]
 END_PROMPT
 }
 
@@ -8962,6 +9101,13 @@ sub _build_planning_system_prompt {
 
     return <<END_PROMPT;
 You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## AGENT ROUTING — check first before answering:
+If the user's prompt clearly belongs to a specialist agent, say so BEFORE answering:
+- Contains "ENCY", "herb", "constituent", "botanical", "Quercetin", or similar → "💡 Tip: Switch the agent to **Encyclopedia (ENCY)** for a better answer on this topic."
+- Contains "BMaster", "hive", "apiary", "inspection", "varroa", "queen" → "💡 Tip: Switch the agent to **BMaster** for beekeeping-specific help."
+- Contains "inventory", "stock", "SKU", "BOM" → "💡 Tip: Switch to **Inventory** agent."
+Give the hint on its own line, then continue with whatever partial help you can offer.
 
 ## DAILY LOG ENTRIES — handle immediately with NO extra questions:
 When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
@@ -9398,11 +9544,31 @@ AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
 GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
 PST paid → 2320 PST Payable
 
-## ACTIONS YOU CAN PERFORM
-When the user asks you to create or update data, respond with a JSON action block:
+## YOUR ROLE
+You are an accounting advisor and form-fill assistant. You explain accounting concepts, advise on
+journal entries, and pre-fill data-entry forms. You do NOT post actual GL entries, modify ledger
+records, or execute any accounting transaction directly — all financial records must be created by
+a human through the appropriate form.
 
-To post a manual GL entry:
-{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+Do NOT emit create_gl_entry or any action that writes directly to accounting tables. Instead,
+explain the correct journal entry (DR/CR accounts, amounts, reference) and direct the user to
+/Accounting/gl/new to enter it manually.
+
+## PRE-FILL FORM ACTIONS
+You may open and pre-fill data-entry forms so the user can review and submit them:
+
+To open the supplier invoice form and pre-fill it from a bill the user has pasted:
+Parse the bill text, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. Freedom Mobile autopay Apr 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+
+Rules for navigate_and_fill invoice entry:
+- supplier_id is a dropdown — tell the user the supplier name and ask them to select it after the form opens.
+- If the supplier does not exist, suggest they go to /Inventory/supplier/add first.
+- Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
+- If the bill shows "$22.40 total, tax included" with no breakdown, set tax_amount to 0 and unit_cost_0 to the full amount.
+- auto_pay_method and auto_pay: fill both only if the bill shows "Auto Pay" or similar (e.g. "Visa Auto Pay"); omit both if not autopay.
+- After the action line, briefly list the values you used so the user can verify before saving.
 
 Only use actions when the user explicitly requests a data change.  Always confirm
 the details before executing.

@@ -87,7 +87,7 @@ sub get_hives_for_yard {
         my $schema = $self->schema;
 
         # Get a DBIx::Class::ResultSet object for the 'Hive' table
-        my $rs = $schema->resultset('Hive');
+        my $rs = $schema->resultset('Beekeeping::Hive');
 
         # Fetch all hives for the given yard
         @hives = $rs->search({ yard_id => $yard_id });
@@ -113,7 +113,7 @@ sub get_queens_for_hive {
     my @queens;
     eval {
         my $schema = $self->schema;
-        my $rs = $schema->resultset('QueenHiveAssignment');
+        my $rs = $schema->resultset('Beekeeping::QueenHiveAssignment');
         my @assignments = $rs->search(
             { hive_id => $hive_id },
             { prefetch => 'queen', order_by => { -desc => 'assigned_date' } }
@@ -134,7 +134,7 @@ sub get_current_queen_for_hive {
     my $queen;
     eval {
         my $schema = $self->schema;
-        my $assignment = $schema->resultset('QueenHiveAssignment')->search(
+        my $assignment = $schema->resultset('Beekeeping::QueenHiveAssignment')->search(
             { hive_id => $hive_id, removed_date => undef },
             { prefetch => 'queen', order_by => { -desc => 'assigned_date' }, rows => 1 }
         )->first;

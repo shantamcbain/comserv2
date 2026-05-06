@@ -306,13 +306,9 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/admin/schema_manager') %]" class="admin-link">
-                        <i class="fas fa-table"></i>
-                        <span>Schema Manager</span>
-                    </a>
                     <a href="[% c.uri_for('/admin/compare_schema') %]" class="admin-link">
-                        <i class="fas fa-balance-scale"></i>
-                        <span>Compare Schema</span>
+                        <i class="fas fa-database"></i>
+                        <span>Schema Manager</span>
                     </a>
                     <a href="[% c.uri_for('/admin/migrate_schema') %]" class="admin-link">
                         <i class="fas fa-exchange-alt"></i>

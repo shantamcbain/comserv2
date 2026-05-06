@@ -844,8 +844,11 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
 
     try {
         # Load the Result class dynamically
+        # result_name may contain '/' from scan_result_directory_recursive (subdir prefix);
+        # convert to '::' so the eval'd require is valid Perl
         my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
-        my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_name}";
+        (my $result_path = $result_name) =~ s{/}{::}g;
+        my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_path}";
 
         eval "require $class_name";
         if ($@) {
@@ -893,9 +896,9 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         if (!$table_exists) {
             # Create the table using deployment_statements
             try {
-                my $source = $schema->source($result_name);
+                my $source = $schema->source($result_path);
                 unless ($source) {
-                    die "Could not find source '$result_name' in schema";
+                    die "Could not find source '$result_path' in schema";
                 }
 
                 my @statements = $schema->deployment_statements('MySQL');
@@ -1408,7 +1411,7 @@ Generate Result file Perl code content
 sub generate_result_file_content {
     my ($self, $table_name, $db_schema) = @_;
     
-    my $class_name = ucfirst($table_name);
+    my $class_name = _table_to_class_name($table_name);
     my $content = "package Comserv::Model::Schema::Ency::Result::$class_name;\n";
     $content .= "use base 'DBIx::Class::Core';\n\n";
     $content .= "__PACKAGE__->table('$table_name');\n";

@@ -1,6 +1,7 @@
 package Comserv::View::TT;
 use Moose;
 use namespace::autoclean;
+use JSON::MaybeXS ();
 extends 'Catalyst::View::TT';
 
 __PACKAGE__->config(
@@ -11,6 +12,10 @@ __PACKAGE__->config(
     PLUGINS     => { DateTime => {} },
     ENCODING => 'UTF-8',
     FILTERS => {
+        json => sub {
+            my $val = shift;
+            return JSON::MaybeXS->new(utf8 => 0, allow_nonref => 1)->encode($val);
+        },
         js => sub {
             my $text = shift;
             $text =~ s/\\/\\\\/g;
@@ -22,10 +27,11 @@ __PACKAGE__->config(
         },
         ref_links => sub {
             my $text = shift;
+            $text =~ s/\s*\[(?:ref\?)?\?\]\s*//g;
+            $text =~ s/\s*\[\d+\]\s*//g;
             $text =~ s{&}{&amp;}g;
             $text =~ s{<}{&lt;}g;
             $text =~ s{>}{&gt;}g;
-            $text =~ s{\b(\d+)\b}{<a href="/ENCY/Reference/$1" title="Reference #$1" class="ency-ref-link">[$1]</a>}g;
             return $text;
         },
     },

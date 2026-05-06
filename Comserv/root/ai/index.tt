@@ -85,11 +85,28 @@
         <!-- Main chat column -->
         <div class="ai-main">
             <div class="chat-messages" id="chat-messages">
+                [% IF task_todo %]
+                <div class="welcome-message task-context-banner">
+                    <div class="welcome-icon">📋</div>
+                    <h2>[% task_todo.subject | html %]</h2>
+                    <div class="task-meta">
+                        [% IF task_todo.priority %]<span class="task-badge priority-badge">P[% task_todo.priority %]</span>[% END %]
+                        <span class="task-badge status-badge">[% task_todo.status | html %]</span>
+                        [% IF task_todo.project %]<span class="task-badge project-badge">📁 [% task_todo.project | html %]</span>[% END %]
+                        [% IF task_todo.due_date %]<span class="task-badge due-badge">📅 [% task_todo.due_date | html %]</span>[% END %]
+                    </div>
+                    [% IF task_todo.description %]
+                    <p class="task-desc">[% task_todo.description | html %]</p>
+                    [% END %]
+                    <p class="task-hint">Ask me about this task — how to proceed, what it involves, or what's blocking it. <a href="[% task_todo.edit_url | html %]">Edit todo ✏️</a></p>
+                </div>
+                [% ELSE %]
                 <div class="welcome-message">
                     <div class="welcome-icon">🤖</div>
                     <h2>How can I help you today?</h2>
                     <p>Ask me anything. [% IF can_select_model %]Select a model above to use Ollama (local) or an external AI like Grok.[% END %]</p>
                 </div>
+                [% END %]
             </div>
 
             <div class="ai-input-bar">
@@ -250,6 +267,16 @@
 .welcome-icon { font-size: 48px; margin-bottom: 16px; }
 .welcome-message h2 { margin: 0 0 8px; font-size: 1.4rem; color: var(--text-color); }
 .welcome-message p { margin: 0; font-size: 14px; }
+.task-context-banner h2 { font-size: 1.2rem; word-break: break-word; }
+.task-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 10px; justify-content: center; }
+.task-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; }
+.priority-badge { background: #e74c3c; color: #fff; }
+.status-badge   { background: #3498db; color: #fff; }
+.project-badge  { background: #8e44ad; color: #fff; }
+.due-badge      { background: #e67e22; color: #fff; }
+.task-desc { font-size: 13px; color: var(--text-color); opacity: 0.85; max-width: 480px; margin: 0 auto 8px; white-space: pre-wrap; word-break: break-word; }
+.task-hint { font-size: 13px; margin-top: 8px; }
+.task-hint a { color: var(--link-color); }
 
 /* Chat messages */
 .chat-message {
@@ -520,6 +547,18 @@ window.AI_CHAT_USER_CONFIG = {
     isGuest:  [% (username && !username.match('^Guest-')) ? 'false' : 'true' %],
     isAdmin:  [% can_select_model ? 'true' : 'false' %]
 };
+[% IF task_todo %]
+window.AI_TASK_CONTEXT = {
+    record_id:   [% task_todo.record_id %],
+    subject:     [% task_todo.subject | json %],
+    description: [% task_todo.description | json %],
+    status:      [% task_todo.status | json %],
+    priority:    [% task_todo.priority || 'null' %],
+    due_date:    [% task_todo.due_date | json %],
+    project:     [% task_todo.project | json %],
+    edit_url:    [% task_todo.edit_url | json %]
+};
+[% END %]
 </script>
 <script src="/static/js/ai-common.js"></script>
 <script>

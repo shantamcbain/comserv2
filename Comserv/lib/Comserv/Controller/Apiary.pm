@@ -239,7 +239,7 @@ sub inspections :Path('/Apiary/inspections') :Args(0) {
 
     my (@recent, %stats);
     eval {
-        my $rs = $schema->resultset('Inspection')->search(
+        my $rs = $schema->resultset('Beekeeping::Inspection')->search(
             \%filter,
             {
                 join     => { hive => 'yard' },
@@ -253,14 +253,14 @@ sub inspections :Path('/Apiary/inspections') :Args(0) {
         my $today       = strftime('%Y-%m-%d', localtime);
         my $month_start = strftime('%Y-%m-01', localtime);
 
-        $stats{total_inspections} = $schema->resultset('Inspection')->count(\%filter);
-        $stats{this_month}        = $schema->resultset('Inspection')->count({
+        $stats{total_inspections} = $schema->resultset('Beekeeping::Inspection')->count(\%filter);
+        $stats{this_month}        = $schema->resultset('Beekeeping::Inspection')->count({
             %filter, inspection_date => { '>=' => $month_start }
         });
-        $stats{pending_actions}   = $schema->resultset('Inspection')->count({
+        $stats{pending_actions}   = $schema->resultset('Beekeeping::Inspection')->count({
             %filter, action_required => { '!=' => undef }
         });
-        $stats{overdue}           = $schema->resultset('Inspection')->count({
+        $stats{overdue}           = $schema->resultset('Beekeeping::Inspection')->count({
             %filter,
             next_inspection_date => { '<' => $today },
         });
@@ -290,7 +290,7 @@ sub inspections_new :Path('/Apiary/inspections/new') :Args(0) {
 
     my @hives;
     eval {
-        @hives = $schema->resultset('Hive')->search(
+        @hives = $schema->resultset('Beekeeping::Hive')->search(
             { 'yard.sitename' => $sitename, 'me.status' => 'active' },
             { join => 'yard', order_by => 'me.hive_number', prefetch => 'yard' }
         );
@@ -326,7 +326,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
     my $inspection;
     eval {
         $schema->txn_do(sub {
-            $inspection = $schema->resultset('Inspection')->create({
+            $inspection = $schema->resultset('Beekeeping::Inspection')->create({
                 hive_id             => $p->{hive_id},
                 inspection_date     => $p->{inspection_date},
                 start_time          => $p->{start_time}          || undef,
@@ -360,7 +360,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
             my @box_ids = ref $p->{box_id} ? @{$p->{box_id}} : ($p->{box_id} // ());
             for my $box_id (@box_ids) {
                 next unless $box_id;
-                $schema->resultset('InspectionDetail')->create({
+                $schema->resultset('Beekeeping::InspectionDetail')->create({
                     inspection_id       => $inspection->id,
                     box_id              => $box_id,
                     detail_type         => 'box_summary',
@@ -378,7 +378,7 @@ sub inspections_create :Path('/Apiary/inspections/create') :Args(0) {
 
             # Save feeding records if feeding was done
             if ($p->{feeding_done} && $p->{feed_inventory_item_id}) {
-                $schema->resultset('InspectionFeeding')->create({
+                $schema->resultset('Beekeeping::InspectionFeeding')->create({
                     inspection_id            => $inspection->id,
                     inventory_item_id        => $p->{feed_inventory_item_id},
                     feed_amount              => $p->{feed_amount}              || undef,
@@ -411,7 +411,7 @@ sub inspections_view :Path('/Apiary/inspections/view') :Args(1) {
     my $inspection;
 
     eval {
-        $inspection = $schema->resultset('Inspection')->find(
+        $inspection = $schema->resultset('Beekeeping::Inspection')->find(
             $id,
             {
                 prefetch => [
@@ -458,7 +458,7 @@ sub inspections_edit :Path('/Apiary/inspections/edit') :Args(1) {
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
 
     my $schema     = $c->model('DBEncy');
-    my $inspection = $schema->resultset('Inspection')->find(
+    my $inspection = $schema->resultset('Beekeeping::Inspection')->find(
         $id, { prefetch => ['inspection_details', 'inspection_feedings'] }
     );
 
@@ -472,7 +472,7 @@ sub inspections_edit :Path('/Apiary/inspections/edit') :Args(1) {
     my $sitename = $c->session->{SiteName} || $c->session->{sitename};
     my @hives;
     eval {
-        @hives = $schema->resultset('Hive')->search(
+        @hives = $schema->resultset('Beekeeping::Hive')->search(
             { 'yard.sitename' => $sitename, 'me.status' => 'active' },
             { join => 'yard', order_by => 'me.hive_number' }
         );
@@ -497,7 +497,7 @@ sub inspections_update :Path('/Apiary/inspections/update') :Args(1) {
 
     my $schema     = $c->model('DBEncy');
     my $p          = $c->req->params;
-    my $inspection = $schema->resultset('Inspection')->find($id);
+    my $inspection = $schema->resultset('Beekeeping::Inspection')->find($id);
 
     unless ($inspection) {
         $c->flash->{error_msg} = "Inspection #$id not found.";
@@ -561,7 +561,7 @@ sub inspections_reports :Path('/Apiary/inspections/reports') :Args(0) {
 
     my (%by_type, %by_status, %by_month, @action_items);
     eval {
-        my $rs = $schema->resultset('Inspection')->search(
+        my $rs = $schema->resultset('Beekeeping::Inspection')->search(
             {
                 'hive.yard.sitename' => $sitename,
                 inspection_date => {
@@ -603,7 +603,7 @@ sub inspections_calendar :Path('/Apiary/inspections/calendar') :Args(0) {
     eval {
         my $base = { 'hive.yard.sitename' => $sitename };
 
-        @upcoming = $schema->resultset('Inspection')->search(
+        @upcoming = $schema->resultset('Beekeeping::Inspection')->search(
             { %$base, next_inspection_date => { '>=' => $today } },
             {
                 join     => { hive => 'yard' },
@@ -613,7 +613,7 @@ sub inspections_calendar :Path('/Apiary/inspections/calendar') :Args(0) {
             }
         )->all;
 
-        @past_30 = $schema->resultset('Inspection')->search(
+        @past_30 = $schema->resultset('Beekeeping::Inspection')->search(
             {
                 %$base,
                 inspection_date => {
@@ -652,7 +652,7 @@ sub api_queen_search :Path('/Apiary/api/queen_search') :Args(0) {
     if (length($q) >= 2) {
         eval {
             my $schema = $c->model('DBEncy');
-            my @queens = $schema->resultset('Queen')->search(
+            my @queens = $schema->resultset('Beekeeping::Queen')->search(
                 {
                     sitename => $sitename,
                     -or => [
@@ -701,7 +701,7 @@ sub api_hive_frame_layout :Path('/Apiary/api/hive_frame_layout') :Args(1) {
     my @boxes;
     eval {
         my $schema = $c->model('DBEncy');
-        my @box_rs = $schema->resultset('Box')->search(
+        my @box_rs = $schema->resultset('Beekeeping::Box')->search(
             { hive_id => $hive_id, status => 'active' },
             { order_by => 'box_position', prefetch => 'hive_frames' }
         );

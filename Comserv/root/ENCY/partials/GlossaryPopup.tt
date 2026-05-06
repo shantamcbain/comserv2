@@ -1,0 +1,9 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3>[% glossary_term.term | html %]</h3>
+  [% IF glossary_term.definition %]<p>[% glossary_term.definition | html %]</p>[% END %]
+  [% IF glossary_term.category %]<p><strong>Category:</strong> [% glossary_term.category | html %]</p>[% END %]
+  [% IF glossary_term.alternate_terms %]<p><strong>Also known as:</strong> [% glossary_term.alternate_terms | html %]</p>[% END %]
+  [% IF glossary_term.reference %]<p><strong>Reference:</strong> [% glossary_term.reference | html %]</p>[% END %]
+  <p><a href="/ENCY/Glossary/[% glossary_term.record_id %]">View full glossary entry &rarr;</a></p>
+</div>
