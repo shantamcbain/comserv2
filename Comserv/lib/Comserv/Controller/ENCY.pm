@@ -284,12 +284,25 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Fetch the herbal data
-    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
+    my $rows = $c->model('ENCYModel')->get_herbal_data($c);
 
-    # Pass the data to the template
-    my $herbal_data = $forager_data;
-    $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
+    my @herbal_data;
+    for my $herb (@$rows) {
+        my $org          = eval { $herb->organism_id ? $herb->organism : undef };
+        my $display_name = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
+        my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        push @herbal_data, {
+            record_id       => $herb->record_id,
+            display_name    => $display_name,
+            display_image   => $display_image,
+            common_names    => $herb->common_names    // '',
+            ident_character => $herb->ident_character // '',
+            distribution    => $herb->distribution    // '',
+            medical_uses    => $herb->medical_uses    // '',
+        };
+    }
+
+    $c->stash(herbal_data => \@herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my ( $self, $c, $id ) = @_;

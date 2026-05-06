@@ -277,11 +277,9 @@
     </tr>
 
  [% FOREACH link IN herbal_data %]
- [% SET bot_name = link.botanical_name %]
- [% SET img_src  = link.image %]
     <tr>
         <td>
-            <span style="font-size: 30px;">Botanical Name:</span> [% bot_name | html %]<br>
+            <span style="font-size: 30px;">Botanical Name:</span> [% link.display_name | html %]<br>
             <span style="font-size: 30px;">Common Name:</span> [% link.common_names | html %]<br>
             <span style="font-size: 30px;">Identifying Character:</span> [% link.ident_character | html %]<br>
             <span style="font-size: 30px;">Distribution:</span> [% link.distribution | html %]<br>
@@ -289,7 +287,7 @@
             <a href="/ENCY/herb_detail/[% link.record_id %]" title="details">Details</a>
         </td>
         <td>
-            [% ency_img_tag(img_src, 300, 325) %]
+            [% ency_img_tag(link.display_image, 300, 325) %]
         </td>
     </tr>
 [% END %]
