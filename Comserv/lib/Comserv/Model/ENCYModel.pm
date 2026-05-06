@@ -2399,7 +2399,8 @@ sub find_or_create_organism_from_ncbi {
             genus               => $ncbi_data->{genus}         || '',
             species             => $ncbi_data->{species}       || '',
             ncbi_tax_id         => $ncbi_data->{ncbi_tax_id},
-            description         => "Imported from NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
+            reference           => "NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
+            url                 => $ncbi_data->{source_url} || "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$ncbi_data->{ncbi_tax_id}",
             sitename            => 'ENCY',
             username_of_poster  => ($c && $c->session->{username}) || 'system',
             group_of_poster     => ($c && $c->session->{group})    || 'system',
@@ -2606,6 +2607,19 @@ sub resync_organisms_from_ncbi {
         $updates{family_name}   = $ncbi->{family_name}   if $ncbi->{family_name};
         $updates{genus}         = $ncbi->{genus}         if $ncbi->{genus};
         $updates{species}       = $ncbi->{species}       if $ncbi->{species};
+
+        my $cur_desc = $org->description // '';
+        if ($cur_desc =~ /^(?:Imported from )?NCBI Taxonomy ID:/i) {
+            $updates{description} = '';
+        }
+        my $cur_ref = $org->reference // '';
+        if (!$cur_ref) {
+            $updates{reference} = "NCBI Taxonomy ID: $tax_id";
+        }
+        my $cur_url = $org->url // '';
+        if (!$cur_url || $cur_url !~ m{^https?://}) {
+            $updates{url} = $ncbi->{source_url} || "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$tax_id";
+        }
 
         eval { $org->update(\%updates) } if %updates;
         $r->{status}  = 'updated';
