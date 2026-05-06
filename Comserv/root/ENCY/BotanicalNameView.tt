@@ -95,7 +95,7 @@
             .then(function(r){ return r.json(); })
             .then(function(d) {
                 if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
-                if (grandTotal === null) grandTotal = d.total_unlinked;
+                if (grandTotal === null) grandTotal = d.total_pending;
                 totalLinked    += d.linked;
                 totalNotFound  += d.not_found;
                 totalErrors    += d.errors;
