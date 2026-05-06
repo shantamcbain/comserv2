@@ -130,7 +130,7 @@ sub index :Path :Args(0) {
             
         # Get user email for API calls
         my $user_email;
-        if ($c->user_exists) {
+        if ($c->user_exists && $c->user) {
             $user_email = $c->user->email;
         } elsif ($c->session->{email}) {
             $user_email = $c->session->{email};
@@ -1031,7 +1031,7 @@ sub _get_cloudflare_domains {
     
     # Get user email - from Catalyst user object or session
     my $user_email;
-    if ($c->user_exists) {
+    if ($c->user_exists && $c->user) {
         $user_email = $c->user->email;
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};

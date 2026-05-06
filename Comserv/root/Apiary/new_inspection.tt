@@ -1,10 +1,8 @@
 [% META title = 'New Hive Inspection' %]
-<head>
-    [% PageVersion = 'new_inspection.tt,v 0.01 2025/06/19 shanta Exp shanta ' %]
-    <meta charset="utf-8">
-    [% IF c.session.debug_mode == 1 %]
-        [% PageVersion %]
-    [% END %]
+[% PageVersion = 'Apiary/new_inspection.tt,v 0.02 2026/04/21 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
 <div class="apiary-container">
     <!-- Header Section -->
     <header class="apiary-header">

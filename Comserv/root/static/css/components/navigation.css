@@ -618,6 +618,25 @@ a.submenu-header {
 .icon-member:before { content: "👥"; }
 .icon-user-help:before { content: "👤🆘"; }
 
+/* Beekeeping & Apiary Icons */
+.icon-hive:before        { content: "🍯"; }
+.icon-apiary:before      { content: "🐝"; }
+.icon-honey:before       { content: "🍯"; }
+.icon-inspect:before     { content: "🔍"; }
+.icon-insect:before      { content: "🐝"; }
+.icon-pollinator:before  { content: "🌸"; }
+.icon-plant:before       { content: "🌿"; }
+.icon-ecology:before     { content: "🌱"; }
+.icon-medical:before     { content: "💊"; }
+.icon-disease:before     { content: "🦠"; }
+.icon-report:before      { content: "📊"; }
+.icon-calendar:before    { content: "📅"; }
+.icon-history:before     { content: "🕐"; }
+.icon-list:before        { content: "📋"; }
+.icon-search:before      { content: "🔍"; }
+.icon-workshop:before    { content: "🎓"; }
+.icon-documentation:before { content: "📄"; }
+
 /* =============================================================================
    MOBILE RESPONSIVE NAVIGATION
    ============================================================================= */

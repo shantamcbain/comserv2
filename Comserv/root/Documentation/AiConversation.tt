@@ -26,7 +26,7 @@
 
     <h2 id="overview" style="color: var(--text-color); font-family: var(--header-font);">Overview</h2>
     
-    <p style="color: var(--text-color); font-family: var(--body-font);">The <code style="background-color: var(--light-color); padding: 2px 4px;">AiConversation</code> model represents a single multi-turn conversation session between a user and an AI system. It serves as the parent record for storing conversation metadata, user associations, and status information, with child records stored in the <code style="background-color: var(--light-color); padding: 2px 4px;">AiMessage</code> model.</p>
+    <p style="color: var(--text-color); font-family: var(--body-font);">The <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">AiConversation</code> model represents a single multi-turn conversation session between a user and an AI system. It serves as the parent record for storing conversation metadata, user associations, and status information, with child records stored in the <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px;">AiMessage</code> model.</p>
     
     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>File:</strong> <code>lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm</code></p>
     <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Table:</strong> <code>ai_conversations</code></p>
@@ -37,7 +37,7 @@
     <h3 style="color: var(--text-color); font-family: var(--header-font);">Columns</h3>
     
     <table style="width: 100%; border-collapse: collapse; color: var(--text-color); font-family: var(--body-font);">
-        <thead style="background-color: var(--light-color);">
+        <thead style="background-color: rgba(255,255,255,0.15);">
             <tr>
                 <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Column Name</th>
                 <th style="border: 1px solid var(--border-color); padding: var(--spacing-small); text-align: left;">Data Type</th>
@@ -52,7 +52,7 @@
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Primary Key, Auto-increment)</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Unique conversation identifier</td>
             </tr>
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>user_id</code></td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">INTEGER</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Foreign Key)</td>
@@ -64,7 +64,7 @@
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">YES</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">User-defined conversation title (e.g., "Project Planning Discussion")</td>
             </tr>
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>created_at</code></td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">TIMESTAMP</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: CURRENT_TIMESTAMP)</td>
@@ -76,7 +76,7 @@
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: CURRENT_TIMESTAMP ON UPDATE)</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">Last modification timestamp (auto-updated on row change)</td>
             </tr>
-            <tr style="background-color: var(--light-color);">
+            <tr style="background-color: rgba(255,255,255,0.15);">
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);"><code>status</code></td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">ENUM('active', 'archived')</td>
                 <td style="border: 1px solid var(--border-color); padding: var(--spacing-small);">NO (Default: 'active')</td>
@@ -129,7 +129,7 @@
     <h2 id="usage-examples" style="color: var(--text-color); font-family: var(--header-font);">Usage Examples</h2>
     
     <h3 style="color: var(--text-color); font-family: var(--header-font);">Creating a New Conversation</h3>
-    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my $schema = $c->model('Ency');
+    <pre style="background-color: rgba(255,255,255,0.12); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my $schema = $c->model('Ency');
 my $conversation = $schema->resultset('AiConversation')->create({
     user_id => $user_id,
     title => 'My Project Discussion',
@@ -139,7 +139,7 @@ my $conversation = $schema->resultset('AiConversation')->create({
 </code></pre>
 
     <h3 style="color: var(--text-color); font-family: var(--header-font);">Fetching User's Conversations</h3>
-    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my @conversations = $schema->resultset('AiConversation')
+    <pre style="background-color: rgba(255,255,255,0.12); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>my @conversations = $schema->resultset('AiConversation')
     ->search({ user_id => $user_id, status => 'active' })
     ->all();
 
@@ -150,7 +150,7 @@ foreach my $conv (@conversations) {
 </code></pre>
 
     <h3 style="color: var(--text-color); font-family: var(--header-font);">Archiving a Conversation</h3>
-    <pre style="background-color: var(--secondary-color); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>$conversation->update({ status => 'archived' });
+    <pre style="background-color: rgba(255,255,255,0.12); color: var(--text-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto; border: 1px solid var(--border-color);"><code>$conversation->update({ status => 'archived' });
 </code></pre>
 
     <h2 id="integration-points" style="color: var(--text-color); font-family: var(--header-font);">Integration Points</h2>
@@ -164,7 +164,7 @@ foreach my $conv (@conversations) {
 
     <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting</h2>
     
-    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--warning-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--warning-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
         <strong>⚠️ Common Issues</strong>
         <ul style="color: var(--text-color); font-family: var(--body-font); margin: var(--spacing-small) 0 0 20px;">
             <li><strong>Conversation not found:</strong> Verify <code>user_id</code> exists in User table (foreign key constraint)</li>
@@ -175,7 +175,7 @@ foreach my $conv (@conversations) {
 
     <h2 id="see-also" style="color: var(--text-color); font-family: var(--header-font);">See Also</h2>
     
-    <div style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
+    <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-medium) 0;">
         <ul style="color: var(--text-color); font-family: var(--body-font); list-style: none; padding-left: 0; margin: 0;">
             <li style="margin: var(--spacing-small) 0;"><a href="/Documentation/models/AiMessage.tt" style="color: var(--link-color);">AiMessage Model</a> - Individual messages within conversations</li>
             <li style="margin: var(--spacing-small) 0;"><a href="/Documentation/controllers/AI.tt" style="color: var(--link-color);">AI Controller</a> - Web interface and API endpoints for conversations</li>

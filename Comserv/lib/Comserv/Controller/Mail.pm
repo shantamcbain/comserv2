@@ -1095,12 +1095,23 @@ sub mass_email :Local :Args(0) {
     my $all_count  = _count_site_users($c, $site_id, 'all');
     my $paid_count = _count_site_users($c, $site_id, 'paid');
 
+    # Sync auto-generated lists (all members, role lists, workshop attendees) before displaying
+    $self->_sync_default_lists($c, $site_id) if $site_id;
+
     my @lists;
     eval {
         my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
             { site_id => $site_id, is_active => 1 }, { order_by => 'name' }
         );
-        push @lists, { id => $_->id, name => $_->name } while $_ = $rs->next;
+        while (my $list = $rs->next) {
+            my $sub_count = 0;
+            eval {
+                $sub_count = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
+                    { mailing_list_id => $list->id, is_active => 1 }
+                )->count;
+            };
+            push @lists, { id => $list->id, name => $list->name, count => $sub_count };
+        }
     };
 
     $c->stash(
@@ -1128,6 +1139,7 @@ sub send_mass_email :Local :Args(0) {
     my $body_tmpl = $c->req->param('body')    || '';
     my $group     = $c->req->param('group')   || 'all';
     my $custom_addresses = $c->req->param('custom_addresses') || '';
+    my @list_ids  = $c->req->param('list_ids');
 
     unless ($subject && $body_tmpl) {
         $c->flash->{error_msg} = 'Subject and message body are required.';
@@ -1136,13 +1148,22 @@ sub send_mass_email :Local :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email',
-        "Mailout started: site_id=$site_id group=$group subject='$subject'");
+        "Mailout started: site_id=$site_id group=$group list_ids=[" . join(',', @list_ids) . "] subject='$subject'");
 
-    # Build recipient list
+    # Build recipient list — track seen emails to avoid duplicates
     my @recipients;
+    my %seen_email;
+
+    my $_add_recip = sub {
+        my ($rec) = @_;
+        my $email = lc($rec->{email} // '');
+        return unless $email && $email =~ /\@/;
+        return if $seen_email{$email}++;
+        push @recipients, $rec;
+    };
 
     if ($group eq 'custom') {
-        # Custom addresses from mailing list checkboxes — look up names from DB
+        # Custom addresses only — look up names from DB
         for my $addr (split /[\s,;]+/, $custom_addresses) {
             $addr =~ s/^\s+|\s+$//g;
             next unless $addr =~ /\@/;
@@ -1167,19 +1188,25 @@ sub send_mass_email :Local :Args(0) {
                     }
                 }
             };
-            push @recipients, $rec;
+            $_add_recip->($rec);
         }
     } else {
         # DB users (all or paid members)
         my @users = _get_site_users($c, $site_id, $group);
-        push @recipients, @users;
+        $_add_recip->($_) for @users;
 
         # Also add any custom addresses provided
         for my $addr (split /[\s,;]+/, $custom_addresses) {
             $addr =~ s/^\s+|\s+$//g;
-            push @recipients, { email => $addr, first_name => '', last_name => '', username => $addr }
+            $_add_recip->({ email => $addr, first_name => '', last_name => '', username => $addr })
                 if $addr =~ /\@/;
         }
+    }
+
+    # Add recipients from any checked named mailing lists (deduped via %seen_email)
+    for my $list_id (@list_ids) {
+        next unless $list_id && $list_id =~ /^\d+$/;
+        $_add_recip->($_) for _get_list_recipients($c, $list_id);
     }
 
     unless (@recipients) {
@@ -1197,7 +1224,13 @@ sub send_mass_email :Local :Args(0) {
     for my $r (@recipients) {
         next unless $r->{email};
 
-        # Personalise body
+        # Personalise subject and body per recipient
+        my $per_subject = $subject;
+        $per_subject =~ s/\[FIRST_NAME\]/$r->{first_name} || ''/ge;
+        $per_subject =~ s/\[LAST_NAME\]/$r->{last_name}   || ''/ge;
+        $per_subject =~ s/\[EMAIL\]/$r->{email}/g;
+        $per_subject =~ s/\[USERNAME\]/$r->{username}     || ''/ge;
+
         my $body = $body_tmpl;
         $body =~ s/\[FIRST_NAME\]/$r->{first_name} || ''/ge;
         $body =~ s/\[LAST_NAME\]/$r->{last_name}   || ''/ge;
@@ -1205,7 +1238,7 @@ sub send_mass_email :Local :Args(0) {
         $body =~ s/\[USERNAME\]/$r->{username}     || ''/ge;
 
         my $result = eval {
-            $c->model('Mail')->send_email($c, $r->{email}, $subject, $body, $site_id);
+            $c->model('Mail')->send_email($c, $r->{email}, $per_subject, $body, $site_id, { html => 1 });
         };
         if ($@ || !$result) {
             $failed++;
@@ -1230,6 +1263,77 @@ sub send_mass_email :Local :Args(0) {
     }
 
     $c->res->redirect($c->uri_for('/mail/mass_email'));
+}
+
+sub send_mailout_test :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    unless (grep { $_ eq 'admin' } @$roles) {
+        $c->res->body('Forbidden'); $c->res->status(403); return;
+    }
+
+    my $site_id   = $self->_get_site_id($c);
+    my $subject   = $c->req->param('subject') || '(no subject)';
+    my $body_tmpl = $c->req->param('body')    || '';
+
+    unless ($body_tmpl) {
+        $c->flash->{error_msg} = 'Message body is required for test send.';
+        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        return;
+    }
+
+    # Get admin's own details to use as the sample recipient
+    my $admin_email = $c->session->{email} || '';
+    my $admin_first = $c->session->{first_name} || $c->session->{username} || 'Admin';
+    my $admin_last  = $c->session->{last_name}  || '';
+    my $admin_user  = $c->session->{username}   || '';
+
+    # Try to load from DB if session is sparse
+    unless ($admin_email) {
+        eval {
+            my $u = $c->model('DBEncy')->resultset('User')->find($c->session->{user_id});
+            if ($u) {
+                $admin_email = $u->email      || '';
+                $admin_first = $u->first_name || $admin_first;
+                $admin_last  = $u->last_name  || '';
+                $admin_user  = $u->username   || $admin_user;
+            }
+        };
+    }
+
+    unless ($admin_email) {
+        $c->flash->{error_msg} = 'Could not determine your email address for the test send.';
+        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        return;
+    }
+
+    # Personalise with admin's own details so the preview is realistic
+    my $body = $body_tmpl;
+    $body =~ s/\[FIRST_NAME\]/$admin_first/g;
+    $body =~ s/\[LAST_NAME\]/$admin_last/g;
+    $body =~ s/\[EMAIL\]/$admin_email/g;
+    $body =~ s/\[USERNAME\]/$admin_user/g;
+
+    my $test_subject = "[TEST PREVIEW] $subject";
+
+    my $result = eval {
+        $c->model('Mail')->send_email($c, $admin_email, $test_subject, $body, $site_id, { html => 1 });
+    };
+
+    $c->res->content_type('application/json; charset=utf-8');
+    if ($@ || !$result) {
+        my $err = $@ || $c->stash->{debug_msg} || 'unknown error';
+        $err =~ s/"/\\"/g;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mailout_test',
+            "Test send failed to $admin_email: $err");
+        $c->res->body('{"ok":0,"msg":"Test send failed: ' . $err . '"}');
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mailout_test',
+            "Test preview sent to $admin_email");
+        $c->res->body('{"ok":1,"msg":"Test preview sent to ' . $admin_email . ' — check your inbox."}');
+    }
 }
 
 # ─── helpers ──────────────────────────────────────────────────
@@ -1289,6 +1393,33 @@ sub _get_site_users {
         }
     };
     return @users;
+}
+
+sub _get_list_recipients {
+    my ($c, $list_id) = @_;
+    my @recipients;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare(
+            "SELECT s.user_id, s.email AS sub_email, s.first_name AS sub_first, s.last_name AS sub_last,
+                    u.email AS user_email, u.first_name, u.last_name, u.username
+             FROM mailing_list_subscriptions s
+             LEFT JOIN users u ON u.id = s.user_id
+             WHERE s.mailing_list_id = ? AND s.is_active = 1"
+        );
+        $sth->execute($list_id);
+        while (my $row = $sth->fetchrow_hashref) {
+            my $email = $row->{user_email} || $row->{sub_email};
+            next unless $email;
+            push @recipients, {
+                email      => $email,
+                first_name => $row->{first_name} || $row->{sub_first} || '',
+                last_name  => $row->{last_name}  || $row->{sub_last}  || '',
+                username   => $row->{username}   || '',
+            };
+        }
+    };
+    return @recipients;
 }
 
 

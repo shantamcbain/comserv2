@@ -1,0 +1,4 @@
+[% META title = 'Log Prune' %]
+<meta http-equiv="refresh" content="0;url=/admin/logging/audit">
+<script>window.location.replace('/admin/logging/audit');</script>
+<p>Redirecting to <a href="/admin/logging/audit">Log Audit</a>...</p>

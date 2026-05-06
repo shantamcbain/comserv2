@@ -24,7 +24,7 @@
         Note: Consolidated from admin/server_update_procedure
     </div>
 
-    <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+    <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
         <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Important:</strong> This procedure should be followed carefully to ensure safe deployment of software updates to the production server. Always test changes thoroughly before deploying to production.</p>
     </div>
 
@@ -53,14 +53,14 @@
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Step-by-Step Update Procedure</h2>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Login to the Starman Server</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Actions:</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Connect to the production server via SSH</li>
-                    <li>Navigate to the application directory: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">cd /opt/comserv</code></li>
-                    <li>Verify current application status: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo systemctl status comserv-starman</code></li>
-                    <li>Check current git branch: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">git branch</code></li>
-                    <li>Note the current commit hash: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">git log --oneline -1</code></li>
+                    <li>Navigate to the application directory: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">cd /opt/comserv</code></li>
+                    <li>Verify current application status: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo systemctl status comserv-starman</code></li>
+                    <li>Check current git branch: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">git branch</code></li>
+                    <li>Note the current commit hash: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">git log --oneline -1</code></li>
                 </ol>
                 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Expected Results:</h4>
@@ -72,18 +72,18 @@
                 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting:</h4>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
-                    <li>If Starman is not running: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo systemctl start comserv-starman</code></li>
+                    <li>If Starman is not running: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo systemctl start comserv-starman</code></li>
                     <li>If git status shows uncommitted changes: Contact development team</li>
                 </ul>
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Start the Development Server</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Actions:</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
-                    <li>Navigate to the Comserv directory: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">cd /opt/comserv/Comserv</code></li>
-                    <li>Start development server on port 3001: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r &</code></li>
-                    <li>Verify development server is running: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">curl -I http://localhost:3001</code></li>
+                    <li>Navigate to the Comserv directory: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">cd /opt/comserv/Comserv</code></li>
+                    <li>Start development server on port 3001: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r &</code></li>
+                    <li>Verify development server is running: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">curl -I http://localhost:3001</code></li>
                     <li>Note the process ID for later termination</li>
                 </ol>
                 
@@ -96,9 +96,9 @@
                 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Troubleshooting:</h4>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
-                    <li>If port 3001 is in use: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo lsof -i :3001</code> and kill existing process</li>
-                    <li>If dependencies missing: Run <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">cpanm --installdeps .</code></li>
-                    <li>If database connection fails: Check <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">db_config.json</code> settings</li>
+                    <li>If port 3001 is in use: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo lsof -i :3001</code> and kill existing process</li>
+                    <li>If dependencies missing: Run <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">cpanm --installdeps .</code></li>
+                    <li>If database connection fails: Check <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">db_config.json</code> settings</li>
                 </ul>
             </div>
 
@@ -273,30 +273,30 @@
 </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 9: Docker Deployment Process (Authoritative Guide)</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 1: Pre-Deployment (Workstation)</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
-                    <li>Build latest image: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">docker compose build web-prod</code></li>
-                    <li>Set deployment credentials: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">export SSHPASS='your_password'</code></li>
+                    <li>Build latest image: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">docker compose build web-prod</code></li>
+                    <li>Set deployment credentials: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">export SSHPASS='your_password'</code></li>
                 </ol>
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 2: Production Preparation (Remote)</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
-                    <li><strong>Check Disk Space:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">df -h /</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker system df -v</code></li>
-                    <li><strong>Cleanup Old State:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker rm comserv2-web-prod-old 2>/dev/null</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker image prune -f</code></li>
+                    <li><strong>Check Disk Space:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">df -h /</code> and <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker system df -v</code></li>
+                    <li><strong>Cleanup Old State:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker rm comserv2-web-prod-old 2>/dev/null</code> and <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker image prune -f</code></li>
                 </ol>
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 3: Image Transfer & Backup</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font); font-style: italic; margin-bottom: var(--spacing-small);"><strong>Note:</strong> Image transfer via <code>docker save | docker load</code> only moves the <strong>image blueprint</strong>. It does <strong>not</strong> transfer running container instances, local volume data, or network configurations. These must be recreated or moved separately.</p>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
-                    <li><strong>Transfer via SSH Pipe:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"</code></li>
-                    <li><strong>Backup Current Container:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)</code></li>
-                    <li><strong>Prepare for Switch:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker rename comserv2-web-prod comserv2-web-prod-old</code> and <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker stop comserv2-web-prod-old</code></li>
+                    <li><strong>Transfer via SSH Pipe:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">docker save comserv2-web-prod | ssh ubuntu@192.168.1.126 "docker load"</code></li>
+                    <li><strong>Backup Current Container:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker commit comserv2-web-prod comserv2-web-prod:backup-$(date +%s)</code></li>
+                    <li><strong>Prepare for Switch:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker rename comserv2-web-prod comserv2-web-prod-old</code> and <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker stop comserv2-web-prod-old</code></li>
                 </ol>
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 4: Execution (NFS vs Local Bind)</h4>
-                <p>Test NFS reachability: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">showmount -e 192.168.1.175</code></p>
-                <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: 10px; margin: 10px 0;">
+                <p>Test NFS reachability: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">showmount -e 192.168.1.175</code></p>
+                <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: 10px; margin: 10px 0;">
                     <strong>Critical:</strong> Ensure stale volumes are removed to avoid conflicts.
                     <code style="display: block; margin-top: 5px;">sudo docker volume rm comserv2_comserv-workshop</code>
                 </div>
@@ -311,8 +311,8 @@
 
                 <h4 style="color: var(--text-color); font-family: var(--header-font);">Phase 5: Verification & Cleanup</h4>
                 <ol style="color: var(--text-color); font-family: var(--body-font);">
-                    <li><strong>Health Check:</strong> <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod</code></li>
-                    <li><strong>Final Cleanup:</strong> Remove <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">comserv2-web-prod-old</code> and prune dangling images.</li>
+                    <li><strong>Health Check:</strong> <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod</code></li>
+                    <li><strong>Final Cleanup:</strong> Remove <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">comserv2-web-prod-old</code> and prune dangling images.</li>
                 </ol>
             </div>
 
@@ -378,16 +378,16 @@
     <div class="row">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Rollback Procedure</h2>
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--danger-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--danger-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Emergency Rollback:</strong> If critical issues are discovered after deployment, follow this immediate rollback procedure.</p>
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Quick Rollback Steps:</h3>
             <ol style="color: var(--text-color); font-family: var(--body-font);">
-                <li>Stop Starman: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo systemctl stop comserv-starman</code></li>
-                <li>Restore from backup: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">rsync -av /opt/backups/comserv-[timestamp]/ /opt/comserv/</code></li>
-                <li>Reset git to backup tag: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">git checkout backup-[timestamp]</code></li>
-                <li>Restart Starman: <code style="background-color: var(--light-color); padding: 2px 4px; font-family: monospace;">sudo systemctl start comserv-starman</code></li>
+                <li>Stop Starman: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo systemctl stop comserv-starman</code></li>
+                <li>Restore from backup: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">rsync -av /opt/backups/comserv-[timestamp]/ /opt/comserv/</code></li>
+                <li>Reset git to backup tag: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">git checkout backup-[timestamp]</code></li>
+                <li>Restart Starman: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 4px; font-family: monospace;">sudo systemctl start comserv-starman</code></li>
                 <li>Verify rollback successful</li>
                 <li>Document issues for development team</li>
             </ol>
@@ -467,7 +467,7 @@
 
     <div class="row">
         <div class="col-100">
-            <div class="info" style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="info" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Note:</strong> This procedure should be reviewed and updated regularly to reflect changes in the system architecture, deployment tools, and operational requirements.</p>
             </div>
         </div>

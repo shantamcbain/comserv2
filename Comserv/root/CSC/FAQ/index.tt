@@ -187,12 +187,12 @@
     
     .category-item {
         flex: 1 1 200px;
-        background-color: #f8f9fa;
+        background-color: rgba(255,255,255,0.12);
         border-radius: 5px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
         text-decoration: none;
-        color: #333;
+        color: var(--text-color, #333);
         text-align: center;
         transition: transform 0.2s;
     }
@@ -205,7 +205,7 @@
     .category-icon {
         font-size: 2rem;
         margin-bottom: 10px;
-        color: #007bff;
+        color: var(--link-color, #007bff);
     }
     
     .category-name {
@@ -222,13 +222,13 @@
     
     .faq-item {
         margin-bottom: 10px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 5px;
         overflow: hidden;
     }
     
     .faq-question {
-        background-color: #f8f9fa;
+        background-color: rgba(255,255,255,0.12);
         padding: 15px;
         cursor: pointer;
         display: flex;
@@ -249,13 +249,13 @@
     .faq-answer {
         padding: 15px;
         display: none;
-        border-top: 1px solid #ddd;
+        border-top: 1px solid var(--border-color, #ddd);
     }
     
     .faq-contact {
         text-align: center;
         padding: 30px;
-        background-color: #f8f9fa;
+        background-color: rgba(255,255,255,0.12);
         border-radius: 5px;
     }
     
@@ -268,7 +268,7 @@
     }
     
     .btn-primary {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
     }
     

@@ -42,7 +42,7 @@
                     <li><strong>Documentation Sync:</strong> Updated version to 1.11 to reflect latest code state</li>
                     <li><strong>Audit Trail:</strong> Documentation now synced via automated audit workflow</li>
                 </ul>
-                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: #666;">For complete change history, see git commit history of <code>lib/Comserv/Controller/AI.pm</code></p>
+                <p style="margin: 10px 0 0 0; font-size: 0.9em; color: var(--text-muted-color, #666);">For complete change history, see git commit history of <code>lib/Comserv/Controller/AI.pm</code></p>
             </div>
             
             <section id="overview">
@@ -482,7 +482,7 @@
                 </p>
                 
                 <h3 id="database-blocker">Database Recording Blocker (Known Issue)</h3>
-                <div style="background-color: #fff3cd; border-left: 4px solid #ff6b6b; padding: 15px; margin: 15px 0; border-radius: 4px;">
+                <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid #ff6b6b; padding: 15px; margin: 15px 0; border-radius: 4px;">
                     <strong>🔴 CRITICAL:</strong> Conversation and message database records not persisting despite code execution.
                     
                     <p><strong>Symptoms:</strong></p>

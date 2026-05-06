@@ -51,7 +51,7 @@ Added server information display to the pagetop.tt template to help administrato
 Added a new div with server information that only appears for administrators:
 
 ```html
-<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid #dee2e6; padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
+<div class="server-info" style="background-color: #e9ecef; border-bottom: 1px solid var(--border-color, #dee2e6); padding: 5px 10px; font-size: 12px; text-align: right; color: #495057;">
     Server: <strong>[% c.req.uri.host %]</strong> | 
     IP: <strong>[% c.req.address %]</strong>
     [% IF c.session.debug_mode == 1 %] | [% PageVersion %][% END %]

@@ -25,7 +25,7 @@
             
             <div class="content-section">
                 <p class="info-text">Showing last 500 lines of the log file.</p>
-                <div class="code-block" style="background: #f8f9fa; padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; max-height: 600px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
+                <div class="code-block" style="background: var(--bg-secondary, #f8f9fa); padding: 15px; border: 1px solid #dee2e6; border-radius: 4px; max-height: 600px; overflow-y: auto; font-family: monospace; white-space: pre-wrap;">
                     [% content | html %]
                 </div>
             </div>

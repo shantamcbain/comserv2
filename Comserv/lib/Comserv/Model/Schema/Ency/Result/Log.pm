@@ -20,7 +20,18 @@ __PACKAGE__->add_columns(
     last_mod_by => { data_type => 'varchar', size => 255 },
     last_mod_date => { data_type => 'date' },
     group_of_poster => { data_type => 'varchar', size => 255 },  # Add the group_of_poster column
-    comments => { data_type => 'text' },
+    comments         => { data_type => 'text' },
+    points_processed => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    point_rate => {
+        data_type   => 'decimal',
+        size        => [10, 4],
+        is_nullable => 1,
+    },
 );
 
 # Ensure proper relationship definition

@@ -14,8 +14,8 @@ has 'logging' => (
 sub check :Path('/admin/health/check') :Args(0) {
     my ($self, $c) = @_;
 
-    # Restrict to admins
-    unless ($c->stash->{is_admin}) {
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    unless ($c->stash->{is_admin} && $sitename eq 'CSC') {
         $c->response->status(403);
         $c->response->body(encode_json({ error => 'Unauthorized access' }));
         return;

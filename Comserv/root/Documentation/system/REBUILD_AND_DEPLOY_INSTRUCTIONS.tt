@@ -407,8 +407,8 @@ curl http://localhost:3000/health</code></pre>
     </div>
 </div>
 
-<div style="margin-top: 40px; padding: 20px; background-color: #f5f5f5; border-radius: 4px;">
-    <p style="font-size: 12px; color: #666;">
+<div style="margin-top: 40px; padding: 20px; background-color: var(--bg-secondary, #f5f5f5); border-radius: 4px;">
+    <p style="font-size: 12px; color: var(--text-muted-color, #666);">
         <strong>Document Version:</strong> 1.0<br>
         <strong>Created:</strong> 2025-12-19<br>
         <strong>Last Updated:</strong> 2025-12-19<br>

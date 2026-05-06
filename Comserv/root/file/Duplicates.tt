@@ -26,10 +26,10 @@
 .badge-missing { background:#c0392b; color:#fff; }
 .badge-present { background:#27ae60; color:#fff; }
 .dup-field { display:flex; gap:6px; margin-bottom:5px; font-size:0.875rem; }
-.dup-field label { font-weight:600; min-width:90px; flex-shrink:0; color:#555; }
+.dup-field label { font-weight:600; min-width:90px; flex-shrink:0; color: var(--text-muted-color, #555); }
 .dup-field span { word-break:break-all; }
-.dup-diff { background:#fff3cd; }
-.dup-actions { grid-column:1/-1; background:#f5f5f5; border-top:1px solid #ccc; padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dup-diff { background: var(--caution-bg, #fff3cd); }
+.dup-actions { grid-column:1/-1; background: var(--bg-secondary, #f5f5f5); border-top:1px solid #ccc; padding:10px 16px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
 .dup-actions .dup-links { margin-left:auto; display:flex; gap:8px; }
 .warning-same-path { color:#c0392b; font-size:0.8rem; font-weight:bold; }
 </style>
@@ -126,7 +126,7 @@
                      page_size => filters.page_size_param} %]
 
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px;flex-wrap:wrap">
-          <p style="margin:0;color:#555;flex:1">
+          <p style="margin:0;color: var(--text-muted-color, #555);flex:1">
             <strong>[% total_count %]</strong> total duplicate
             [% total_count == 1 ? 'file' : 'files' %].
             Page <strong>[% page %]</strong> of <strong>[% total_pages %]</strong>
@@ -172,7 +172,7 @@
                   title="Select all DUPLICATE (right / amber) files">&#9745; Duplicates</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',false)">&#9744; Clear</button>
           <span style="color:#888">|</span>
-          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
+          <span class="dup-sel-count-display" style="color: var(--text-muted-color, #555);white-space:nowrap">0 selected</span>
           <span style="color:#888">|</span>
           <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
                   onclick="dupBatchAction('delete_db')"
@@ -196,7 +196,7 @@
           <div id="dup-batch-ids"></div>
         </form>
 
-        <p style="margin-bottom:12px;font-size:.85rem;color:#666">
+        <p style="margin-bottom:12px;font-size:.85rem;color: var(--text-muted-color, #666)">
           Each card compares the <strong>original</strong> (left, green) against its <strong>duplicate</strong> (right, amber).
           Fields highlighted in amber differ between the two.
         </p>
@@ -398,7 +398,7 @@
                   title="Select all DUPLICATE (right / amber) files">&#9745; Duplicates</button>
           <button type="button" class="btn btn-sm btn-secondary" onclick="dupSelectRole('all',false)">&#9744; Clear</button>
           <span style="color:#888">|</span>
-          <span class="dup-sel-count-display" style="color:#555;white-space:nowrap">0 selected</span>
+          <span class="dup-sel-count-display" style="color: var(--text-muted-color, #555);white-space:nowrap">0 selected</span>
           <span style="color:#888">|</span>
           <button type="button" class="btn btn-sm" style="background:#c0720a;color:#fff"
                   onclick="dupBatchAction('delete_db')"

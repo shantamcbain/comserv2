@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
 use Try::Tiny;
@@ -197,21 +198,116 @@ sub index :Path :Args(0) {
         push @{$c->stash->{debug_msg}}, "Admin controller index view - Template: admin/index.tt";
     }
     
-    # Pass data to the template
+    my $pending_hosting = 0;
+    my $pending_hosting_sites = [];
+    my $outstanding_invoices = [];
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        if (lc($site_name) eq 'csc') {
+            my @pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+                { status => 'pending' },
+                { order_by => { -asc => 'sitename' } }
+            )->all;
+            $pending_hosting = scalar @pending;
+            $pending_hosting_sites = \@pending;
+        } else {
+            my @inv = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
+                { sitename => $site_name, status => 'outstanding' },
+                { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
+            )->all;
+            $outstanding_invoices = \@inv;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "Outstanding invoices query error: $@");
+    }
+
+    my $helpdesk_open_tickets = [];
+    my $helpdesk_open_count   = 0;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        my $is_csc    = lc($site_name) eq 'csc';
+        my %hd_where  = (status => [qw(open in_progress)]);
+        $hd_where{site_name} = $site_name unless $is_csc;
+        my @hd_tickets = $c->model('DBEncy')->resultset('SupportTicket')->search(
+            \%hd_where,
+            { order_by => [{ -desc => 'me.created_at' }], rows => 10 }
+        )->all;
+        $helpdesk_open_count   = $is_csc
+            ? $c->model('DBEncy')->resultset('SupportTicket')->search({ status => [qw(open in_progress)] })->count
+            : scalar @hd_tickets;
+        $helpdesk_open_tickets = \@hd_tickets;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "HelpDesk ticket query error: $@");
+    }
+
+    my $software_status = $self->_get_software_status($c);
+
     $c->stash(
-        template => 'admin/index.tt',
-        stats => $stats,
-        recent_activity => $recent_activity,
-        notifications => $notifications
+        template              => 'admin/index.tt',
+        stats                 => $stats,
+        recent_activity       => $recent_activity,
+        notifications         => $notifications,
+        pending_hosting        => $pending_hosting,
+        pending_hosting_sites  => $pending_hosting_sites,
+        outstanding_invoices   => $outstanding_invoices,
+        helpdesk_open_tickets  => $helpdesk_open_tickets,
+        helpdesk_open_count    => $helpdesk_open_count,
+        software_status        => $software_status,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Completed Admin index action");
 }
 
-sub docker_containers :Local :Args(0) {
+sub _get_software_status {
     my ($self, $c) = @_;
-    $c->res->redirect($c->uri_for('/admin/infrastructure'));
+
+    my $repo_dir = $c->path_to('..')->stringify;
+
+    my $current_branch  = '';
+    my $last_commit     = '';
+    my $commits_behind  = 0;
+    my $has_uncommitted = 0;
+    my $has_untracked   = 0;
+    my @recommendations;
+
+    eval {
+        chomp($current_branch = `git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null`);
+        chomp($last_commit    = `git -C "$repo_dir" log -1 --format="%h %s" 2>/dev/null`);
+
+        my $fetch_out = `git -C "$repo_dir" fetch origin 2>&1`;
+        chomp(my $behind_raw = `git -C "$repo_dir" rev-list --count HEAD..origin/main 2>/dev/null`);
+        $commits_behind = ($behind_raw =~ /^\d+$/) ? $behind_raw + 0 : 0;
+
+        my $status_out = `git -C "$repo_dir" status --porcelain 2>/dev/null`;
+        $has_uncommitted = ($status_out =~ /^[MADRCU]/m) ? 1 : 0;
+        $has_untracked   = ($status_out =~ /^\?\?/m)     ? 1 : 0;
+
+        if ($commits_behind > 0) {
+            push @recommendations, {
+                type    => 'warning',
+                icon    => 'fas fa-exclamation-triangle',
+                message => "Your branch is $commits_behind commit(s) behind origin/main.",
+                action  => 'Run Git Pull to update.',
+                link    => '/admin/git_pull',
+            };
+        }
+    };
+
+    return {
+        git_status => {
+            current_branch          => $current_branch  || 'Unknown',
+            last_commit             => $last_commit      || 'No commits',
+            commits_behind          => $commits_behind,
+            has_uncommitted_changes => $has_uncommitted,
+            has_untracked_files     => $has_untracked,
+        },
+        recommendations => \@recommendations,
+    };
 }
 
 # Get system statistics for the admin dashboard
@@ -219,51 +315,66 @@ sub get_system_stats {
     my ($self, $c) = @_;
     
     my $stats = {
-        user_count => 0,
-        content_count => 0,
-        comment_count => 0,
-        disk_usage => '0 MB',
-        db_size => '0 MB',
-        uptime => '0 days',
+        user_count        => 0,
+        active_user_count => 0,
+        file_count        => 0,
+        disk_usage        => 'Unknown',
+        disk_pct          => 0,
+        disk_used         => '',
+        disk_total        => '',
+        disk_level        => 'ok',
+        nfs_pct           => 0,
+        nfs_used          => '',
+        nfs_total         => '',
+        nfs_level         => 'ok',
+        uptime            => 'Unknown',
     };
-    
-    # Try to get user count
+
     eval {
-        $stats->{user_count} = $c->model('DBEncy::User')->count();
+        my $schema = $c->model('DBEncy');
+        $stats->{user_count}        = $schema->resultset('User')->count;
+        $stats->{active_user_count} = $schema->resultset('User')->search({ status => 'active' })->count;
     };
-    
-    # Try to get content count (pages, posts, etc.)
+
     eval {
-        $stats->{content_count} = $c->model('DBEncy::Content')->count();
+        $stats->{file_count} = $c->model('DBEncy')->resultset('File')->search({ file_status => 'active' })->count;
     };
-    
-    # Try to get comment count
+
     eval {
-        $stats->{comment_count} = $c->model('DBEncy::Comment')->count();
-    };
-    
-    # Get disk usage (this is a simplified example)
-    eval {
-        my $df_output = `df -h . | tail -1`;
-        if ($df_output =~ /(\d+)%/) {
-            $stats->{disk_usage} = "$1%";
+        my $df = `df -P -BM . 2>/dev/null | tail -1`;
+        if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+            my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+            $stats->{disk_pct}   = $pct;
+            $stats->{disk_used}  = $used >= 1024 ? sprintf('%.1f GB', $used/1024) : "${used} MB";
+            $stats->{disk_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+            $stats->{disk_usage} = "$pct%";
+            $stats->{disk_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
         }
     };
-    
-    # Get database size (this would need to be customized for your DB)
+
     eval {
-        # This is just a placeholder - you'd need to implement actual DB size checking
-        $stats->{db_size} = "Unknown";
+        my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
+        if (-d $nfs_root) {
+            my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
+            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+                my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+                $stats->{nfs_pct}   = $pct;
+                $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
+                $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+                $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            }
+        }
     };
-    
-    # Get system uptime
+
     eval {
-        my $uptime_output = `uptime`;
-        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+users/) {
+        my $uptime_output = `uptime 2>/dev/null`;
+        if ($uptime_output =~ /up\s+(.*?),\s+\d+\s+user/) {
             $stats->{uptime} = $1;
+        } elsif ($uptime_output =~ /up\s+(.+)/) {
+            ($stats->{uptime} = $1) =~ s/,\s*\d+\s*user.*//;
         }
     };
-    
+
     return $stats;
 }
 
@@ -373,6 +484,71 @@ sub get_system_notifications {
         }
     };
     
+    # Check for pending CSC hosting registrations — only for CSC-level admin/accounting users
+    eval {
+        my $user_id = $c->session->{user_id};
+        my $is_csc_admin = 0;
+        if ($user_id) {
+            my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id,
+                { columns => ['roles'] });
+            if ($user_obj) {
+                my $global_roles = $user_obj->roles || '';
+                $is_csc_admin = ($global_roles =~ /admin|accounting/i) ? 1 : 0;
+            }
+        }
+
+        if ($is_csc_admin) {
+            my $pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+                { status => 'pending' }
+            )->count;
+            if ($pending > 0) {
+                my $msg = "$pending pending CSC hosting registration(s) require approval."
+                    . " Note: new accounts without prior setup must be added manually to the"
+                    . " system after payment is confirmed.";
+                push @notifications, {
+                    type    => 'warning',
+                    message => $msg,
+                    link    => 'https://computersystemconsulting.ca/membership/admin/hosting_accounts',
+                };
+            }
+
+            # Recently paid hosting invoices (last 48h)
+            my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
+            my @paid = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
+                { sitename => { '!=' => 'CSC' }, status => 'paid',
+                  updated_at => { '>=' => $cutoff } },
+                { order_by => { -desc => 'updated_at' } }
+            )->all;
+            for my $inv (@paid) {
+                push @notifications, {
+                    type    => 'success',
+                    message => 'Payment received: ' . $inv->sitename . ' — ' . $inv->invoice_number
+                               . ' (CAD ' . $inv->total_amount . ')',
+                    link    => 'https://computersystemconsulting.ca/Inventory/sales',
+                };
+            }
+        }
+
+        # Auto-pay overdue alert — shown to any site admin for their own invoices
+        eval {
+            my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+            my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+            my $auto_due  = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search({
+                sitename => $site_name,
+                auto_pay => 1,
+                status   => { '!=' => 'paid' },
+                due_date => { '<=' => $today_str },
+            })->count;
+            if ($auto_due > 0) {
+                push @notifications, {
+                    type    => 'warning',
+                    message => "$auto_due auto-pay invoice(s) past due — confirm the charge has posted.",
+                    link    => '/Inventory/invoice/process_auto_pay',
+                };
+            }
+        };
+    };
+
     return \@notifications;
 }
 
@@ -662,7 +838,7 @@ sub create_user :Path('/admin/create_user') :Args(0) {
         @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
     }
 
-    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'helpdesk', 'admin');
 
     $c->stash(
         available_sites => \@available_sites,
@@ -953,9 +1129,30 @@ sub planning :Path('/admin/planning') :Args(0) {
         return;
     }
 
-    $c->stash(template => 'admin/documentation/Planning.tt');
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_csc   = (uc($sitename) eq 'CSC') ? 1 : 0;
+
+    my @all_db_projects;
+    eval {
+        my %cond = ();
+        $cond{sitename} = $sitename unless $is_csc;
+        @all_db_projects = $c->model('DBEncy')->resultset('Project')->search(
+            \%cond, { order_by => 'id' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'planning',
+            "Could not fetch projects for planning: $@");
+    }
+
+    $c->stash(
+        template          => 'admin/documentation/Planning.tt',
+        planning_is_csc   => $is_csc,
+        planning_sitename => $sitename,
+        all_db_projects   => \@all_db_projects,
+    );
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'planning',
-        "Rendering admin/documentation/Planning.tt");
+        "Rendering admin/documentation/Planning.tt (is_csc=$is_csc sitename=$sitename projects=" . scalar(@all_db_projects) . ")");
     $c->forward($c->view('TT'));
 }
 
@@ -2003,14 +2200,13 @@ sub schema_compare :Path('/admin/schema_compare') :Args(0) {
     my $site_name = $c->session->{site_name} || $c->stash->{site_name} || 'default';
     my $theme_name = $c->model('ThemeConfig')->get_site_theme($c, $site_name);
     
-    # Debug: Log the structure of database_comparison
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
-        "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
         "Set theme_name in stash: $theme_name for site: $site_name");
     
     # Use the standard debug message system
     if ($c->session->{debug_mode}) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'schema_compare', 
+            "Database comparison structure: " . Data::Dumper::Dumper($database_comparison));
         $c->stash->{debug_msg} = [] unless ref($c->stash->{debug_msg}) eq 'ARRAY';
         push @{$c->stash->{debug_msg}}, "Admin controller schema_compare view - Template: admin/schema_compare.tt";
         push @{$c->stash->{debug_msg}}, "Site: $site_name, Theme: $theme_name";
@@ -2073,7 +2269,9 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     
     my $table_name = $c->req->param('table_name');
     my $database = $c->req->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => { success => 0, error => 'Missing required parameters' });
@@ -2119,7 +2317,9 @@ sub get_field_comparison :Path('/admin/get_field_comparison') :Args(0) {
     
     my $table_name = $c->request->param('table_name');
     my $database = $c->request->param('database');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+    $database   =~ s/[^a-zA-Z0-9_]//g if $database;
+
     unless ($table_name && $database) {
         $c->response->status(400);
         $c->stash(json => {
@@ -2333,8 +2533,10 @@ sub get_database_comparison {
 sub compare_table_with_result_file {
     my ($self, $c, $table_name, $database) = @_;
     
+    my $result_name = $self->table_name_to_result_name($table_name);
     my $comparison = {
         table_name => $table_name,
+        result_name => $result_name,
         database => $database,
         has_result_file => 0,
         result_file_path => undef,
@@ -2405,8 +2607,15 @@ sub find_result_file {
     my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
     
     if (lc($database) eq 'ency') {
+        # If the input looks like a subdirectory path (e.g., "Ency/ExternalID"),
+        # also try a direct path match before falling back to computed result_name
+        if ($table_name =~ m{/}) {
+            my $direct = "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/${table_name}.pm";
+            return $direct if -f $direct;
+        }
         @search_paths = (
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/Ency/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
         );
@@ -2440,7 +2649,13 @@ sub table_name_to_result_name {
     
     # Handle database-specific table name patterns
     my $clean_name = $table_name;
-    
+
+    # Strip subdirectory prefix (e.g., "Ency/ExternalID" -> "ExternalID")
+    # scan_result_directory_recursive uses "/" to denote subdirectory nesting
+    if ($clean_name =~ m{^[A-Za-z][A-Za-z0-9]*/(.+)$}) {
+        $clean_name = $1;
+    }
+
     # Remove common prefixes
     $clean_name =~ s/^ency_//i;
     $clean_name =~ s/^forager_//i;
@@ -3994,7 +4209,8 @@ sub generate_result_file {
     my ($self, $c) = @_;
     
     my $table_name = $c->req->param('table_name');
-    
+    $table_name =~ s/[^a-zA-Z0-9_]//g if $table_name;
+
     if (!$table_name) {
         $c->flash->{error_msg} = "No table name specified for Result file generation.";
         return;
@@ -4002,7 +4218,7 @@ sub generate_result_file {
     
     try {
         my $db_schema = $self->get_database_table_schema($c, $table_name);
-        my $result_file_content = $self->generate_result_file_content($table_name, $db_schema);
+        my $result_file_content = $self->_generate_result_file_content_basic($table_name, $db_schema);
         
         # Save the Result file
         my $result_file_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', 'Ency', 'Result', ucfirst($table_name) . '.pm');
@@ -4017,8 +4233,8 @@ sub generate_result_file {
     };
 }
 
-# Generate Result file content from database schema
-sub generate_result_file_content {
+# Generate Result file content from database schema (basic/legacy version)
+sub _generate_result_file_content_basic {
     my ($self, $table_name, $db_schema) = @_;
     
     my $class_name = ucfirst($table_name);
@@ -4544,53 +4760,48 @@ sub get_result_field_info {
         my $columns_section = $1;
         
         my $field_info = {};
-        
+
+        # Helper: parse attributes from a field definition block.
+        # Handles one level of nested braces (e.g. extra => { list => [...] } for ENUM).
+        my $parse_field_def = sub {
+            my ($field_def) = @_;
+            my %info;
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $info{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $info{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $info{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $info{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $info{default_value} = $1;
+            }
+            # Extract ENUM list from: extra => { list => [qw/val1 val2 .../] }
+            if ($field_def =~ /extra\s*=>\s*\{[^}]*list\s*=>\s*\[qw.([^\]\/!|]+)[\/!|>)]\]/s) {
+                $info{enum_list} = [ split /\s+/, $1 ];
+            }
+            return \%info;
+        };
+
+        # Regex that matches a brace-delimited block allowing one level of nesting.
+        # Handles: extra => { list => [...] }  inside the field definition.
+        my $block_re = qr/\{((?:[^{}]|\{[^{}]*\})*)\}/s;
+
         # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from hash format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>?\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
-        
+
         # Try array format: "field_name", { ... }
-        if ($columns_section =~ /["']$field_name["']\s*,\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from array format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /["']$field_name["']\s*,\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
     }
     
@@ -4804,6 +5015,13 @@ sub update_table_field_from_result {
         $col_def .= 'DATE';
     } elsif ($data_type eq 'BOOLEAN') {
         $col_def .= 'TINYINT(1)';
+    } elsif ($data_type eq 'ENUM') {
+        my $enum_list = $result_field_info->{enum_list};
+        unless ($enum_list && ref($enum_list) eq 'ARRAY' && @$enum_list) {
+            die "ENUM field '$field_name' has no list values in Result class (extra => { list => [...] } missing)";
+        }
+        my $values = join(',', map { "'$_'" } @$enum_list);
+        $col_def .= "ENUM($values)";
     } else {
         $col_def .= $data_type;
         $col_def .= "($size)" if $size;
@@ -5265,25 +5483,30 @@ sub generate_result_file_content {
 
 =cut
 
+sub _docker_env {
+    my $home = $ENV{HOME} || '/home/shanta';
+    my @candidates = (
+        '/var/run/docker.sock',
+        "$home/.docker/desktop/docker.sock",
+        '/run/user/1000/docker.sock',
+    );
+    for my $sock (@candidates) {
+        return "DOCKER_HOST=unix://$sock" if -S $sock;
+    }
+    return '';
+}
+
+sub _docker_bin {
+    return '/usr/local/bin/docker' if -x '/usr/local/bin/docker';
+    return '/usr/bin/docker'       if -x '/usr/bin/docker';
+    return 'docker';
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-
-    # Port restriction: only accessible from port 3001 (host dev server)
-    my $port = $c->req->uri->port || 0;
-    if ($port == 5000) {
-        $c->response->body('');
-        $c->response->status(403);
-        return;
-    }
-    if ($port && $port != 3001) {
-        my $redirect_uri = $c->req->uri->clone;
-        $redirect_uri->port(3001);
-        $c->response->redirect($redirect_uri);
-        return;
-    }
 
     # CSC admin only - use AdminAuth (same pattern as all other admin actions)
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -5329,29 +5552,44 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    # Run docker compose ps to get container status
-    my $output = `cd ~/PycharmProjects/comserv2 && docker compose ps --format json 2>&1`;
+    my $denv  = _docker_env();
+    my $docker = _docker_bin();
+
+    my $output = `$denv $docker ps --all --format json 2>&1`;
     my $exit_code = $? >> 8;
     
     if ($exit_code != 0) {
-        $c->response->body(qq({"success": false, "error": "Failed to execute docker compose ps"}));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
         $c->response->content_type('application/json');
         return;
     }
     
-    # Parse JSON output (one JSON object per line)
+    # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
         next unless $line =~ /^\{/;
         eval {
             my $container = decode_json($line);
+            my $name = $container->{Names} || $container->{Name} || '';
+            $name =~ s{^/}{};
+            # Extract service name from compose label if present
+            my $service = '';
+            if (my $labels = $container->{Labels}) {
+                ($service) = $labels =~ /com\.docker\.compose\.service=([^,]+)/;
+            }
+            $service ||= $name;
+            # Parse ports string "0.0.0.0:3000->3000/tcp, ..." into array
+            my @ports;
+            if (my $ports_str = $container->{Ports}) {
+                @ports = grep { /\d+:\d+/ } split(/,\s*/, $ports_str);
+            }
             push @containers, {
-                name => $container->{Name} || '',
-                service => $container->{Service} || '',
-                state => $container->{State} || 'unknown',
-                status => $container->{Status} || '',
-                ports => $container->{Publishers} ? [map { "$_->{PublishedPort}:$_->{TargetPort}" } @{$container->{Publishers}}] : [],
-                image => $container->{Image} || ''
+                name    => $name,
+                service => $service,
+                state   => $container->{State} || 'unknown',
+                status  => $container->{Status} || '',
+                ports   => \@ports,
+                image   => $container->{Image} || ''
             };
         };
     }
@@ -5380,7 +5618,10 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $names_out = `docker volume ls -q 2>&1`;
+    my $denv_v  = _docker_env();
+    my $docker_v = _docker_bin();
+
+    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
     my $names_exit = $? >> 8;
 
     if ($names_exit != 0) {
@@ -5398,7 +5639,7 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `docker volume inspect $names_str 2>&1`;
+    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
     my $inspect_exit = $? >> 8;
 
     my @volumes;
@@ -5452,20 +5693,24 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
 
+    my $denv_r   = _docker_env();
+    my $docker_r = _docker_bin();
+    my $home_r   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
+
     my ($output, $exit_code);
     if ($service eq 'all') {
-        my $home = $ENV{HOME} || '/home/shanta';
-        my $compose_dir = "$home/PycharmProjects/comserv2";
-        $output = `cd '$compose_dir' && docker compose restart 2>&1`;
+        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
         $exit_code = $? >> 8;
     } else {
-        $output = `docker restart '$service' 2>&1`;
+        $output = `$denv_r $docker_r restart '$service' 2>&1`;
         $exit_code = $? >> 8;
         if ($exit_code != 0) {
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
                 "docker restart $service failed (exit $exit_code): $output");
         }
     }
+    $output //= "(no output captured — docker socket not found)";
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5497,13 +5742,16 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_s   = _docker_env();
+    my $docker_s = _docker_bin();
+    my $home_s   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && docker compose start 2>&1"
-        : "docker start '$service' 2>&1";
+        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
+        : "$denv_s $docker_s start '$service' 2>&1";
 
     my $output    = `$cmd`;
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -5536,13 +5784,16 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $home = $ENV{HOME} || '/home/shanta';
-    my $compose_dir = "$home/PycharmProjects/comserv2";
+    my $denv_st   = _docker_env();
+    my $docker_st = _docker_bin();
+    my $home_st   = $ENV{HOME} || '/home/shanta';
+    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
     my $cmd = $service eq 'all'
-        ? "cd '$compose_dir' && docker compose stop 2>&1"
-        : "docker stop '$service' 2>&1";
+        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
+        : "$denv_st $docker_st stop '$service' 2>&1";
 
     my $output    = `$cmd`;
+    $output //= "(no output captured — docker socket not found)";
     my $exit_code = $? >> 8;
 
     $c->response->body(encode_json({
@@ -6447,6 +6698,11 @@ sub end : Private {
         return;
     }
     
+    # Skip rendering for redirects and no-content responses
+    my $status = $c->response->status || 0;
+    return if $status >= 300 && $status < 400;
+    return if $status == 204;
+
     # Normal template rendering for other requests
     $c->forward($c->view('TT')) unless $c->response->body;
 }

@@ -1,0 +1,13 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3>[% constituent.name | html %][% IF constituent.common_name %] <small>([% constituent.common_name | html %])</small>[% END %]</h3>
+  [% IF constituent.chemical_formula %]<p><strong>Formula:</strong> [% constituent.chemical_formula | html %]</p>[% END %]
+  [% IF constituent.chemical_class %]<p><strong>Class:</strong> [% constituent.chemical_class | html %]</p>[% END %]
+  [% IF constituent.therapeutic_action %]<p><strong>Therapeutic Action:</strong> [% constituent.therapeutic_action | html %]</p>[% END %]
+  [% IF constituent.pharmacological_effects %]<p><strong>Pharmacological Effects:</strong> [% constituent.pharmacological_effects | html %]</p>[% END %]
+  [% IF constituent.toxicity %]<p><strong>Toxicity:</strong> [% constituent.toxicity | html %]</p>[% END %]
+  [% IF constituent.solubility %]<p><strong>Solubility:</strong> [% constituent.solubility | html %]</p>[% END %]
+  [% IF constituent.found_in_herbs %]<p><strong>Found In Herbs:</strong> [% constituent.found_in_herbs | html %]</p>[% END %]
+  [% IF constituent.reference %]<p><strong>Reference:</strong> [% constituent.reference | html %]</p>[% END %]
+  <p><a href="/ENCY/Constituent/[% constituent.record_id %]">View full details &rarr;</a></p>
+</div>

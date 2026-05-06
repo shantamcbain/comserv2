@@ -60,7 +60,7 @@
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Option A: Automated Setup</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">The fastest way to get Node.js running on your system:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 bash /home/shanta/PycharmProjects/comserv2/scripts/setup-nodejs.sh
                 </code></pre>
@@ -87,7 +87,7 @@ bash /home/shanta/PycharmProjects/comserv2/scripts/setup-nodejs.sh
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 1: Install Node.js via NodeSource</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">This is the recommended approach for team consistency:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Install NodeSource repository
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -104,7 +104,7 @@ npm --version     # Should show 10.x.x
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Install Project Dependencies</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Install npm packages for the Comserv project:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 cd /home/shanta/PycharmProjects/comserv2
 npm install
@@ -127,7 +127,7 @@ npm install
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 4: Verify Setup</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Test that everything is working:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # From PyCharm Terminal, test Node.js
 node --version
@@ -150,7 +150,7 @@ npm list
             <p style="color: var(--text-color); font-family: var(--body-font);">Edit <strong>/home/shanta/PycharmProjects/comserv2/Comserv/Dockerfile</strong>:</p>
             
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>After line 22 (builder stage):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Install Node.js LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -161,7 +161,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
             </div>
 
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>After line 49 (runtime stage):</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Install Node.js LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -174,7 +174,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 2: Rebuild Docker Images</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">After updating the Dockerfile, rebuild the containers:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 docker-compose build --no-cache
                 </code></pre>
@@ -183,7 +183,7 @@ docker-compose build --no-cache
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Step 3: Verify Docker Node.js</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Test that Node.js is available in the container:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 docker-compose exec web-dev node --version
 docker-compose exec web-dev npm --version
@@ -199,7 +199,7 @@ docker-compose exec web-dev npm --version
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Create package.json</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If not already present, create a package.json in the project root:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 {
   "name": "comserv-zencoder-agents",
@@ -230,7 +230,7 @@ docker-compose exec web-dev npm --version
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Create .env.agents File</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Create environment configuration for agent execution:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 NODE_ENV=development
 AGENT_DEBUG=1
@@ -248,7 +248,7 @@ AGENT_TIMEOUT=30000
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Node.js Not Found in PyCharm</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If PyCharm doesn't recognize Node.js:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Clear PyCharm cache
 rm -rf ~/.cache/JetBrains/PyCharm2025.2
@@ -260,7 +260,7 @@ rm -rf ~/.cache/JetBrains/PyCharm2025.2
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">npm Permissions Error</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If you encounter permission issues with npm:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 mkdir ~/.npm-global
 npm config set prefix '~/.npm-global'
@@ -270,7 +270,7 @@ export PATH=~/.npm-global/bin:$PATH
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Build Fails</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">If Docker build encounters issues:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 docker system prune -a
 docker-compose build --no-cache

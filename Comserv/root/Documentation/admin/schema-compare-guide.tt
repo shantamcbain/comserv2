@@ -699,11 +699,11 @@ Field Details:
 }
 
 .doc-toc {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 25px;
     border-radius: 8px;
     margin-bottom: 30px;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--primary-color, #007bff);
 }
 
 .doc-toc h2 {
@@ -724,7 +724,7 @@ Field Details:
 }
 
 .doc-toc a {
-    color: #007bff;
+    color: var(--link-color, #007bff);
     text-decoration: none;
     padding: 5px 0;
     display: block;
@@ -738,7 +738,7 @@ Field Details:
 .doc-section {
     margin-bottom: 50px;
     padding-bottom: 30px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
 }
 
 .doc-section h2 {
@@ -746,7 +746,7 @@ Field Details:
     font-size: 2em;
     margin-bottom: 25px;
     padding-bottom: 10px;
-    border-bottom: 2px solid #007bff;
+    border-bottom: 2px solid var(--primary-color, #007bff);
 }
 
 .overview-card {
@@ -765,15 +765,15 @@ Field Details:
 }
 
 .feature-card {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .feature-card h3 {
-    color: #007bff;
+    color: var(--link-color, #007bff);
     margin-top: 0;
 }
 
@@ -787,15 +787,15 @@ Field Details:
     display: flex;
     align-items: flex-start;
     gap: 20px;
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .step-number {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
     width: 40px;
     height: 40px;
@@ -834,10 +834,10 @@ Field Details:
 }
 
 .stat-item {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 15px;
     border-radius: 6px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .section-types {
@@ -848,10 +848,10 @@ Field Details:
 }
 
 .section-type {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .section-type h4 {
@@ -881,7 +881,7 @@ Field Details:
 }
 
 .indicator.needs-sync {
-    background: #fff3cd;
+    background: var(--caution-bg, #fff3cd);
     color: #856404;
 }
 
@@ -896,11 +896,11 @@ Field Details:
 .example-table td {
     padding: 12px;
     text-align: left;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .example-table th {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     font-weight: 600;
 }
 
@@ -915,7 +915,7 @@ Field Details:
 .legend {
     margin-top: 20px;
     padding: 20px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     border-radius: 8px;
 }
 
@@ -939,10 +939,10 @@ Field Details:
     border: 1px solid #ccc;
 }
 
-.table-color { background: #007bff; }
+.table-color { background: var(--primary-color, #007bff); }
 .result-color { background: #6f42c1; }
 .different-color { background: #ffecb3; }
-.missing-color { background: #fff3cd; }
+.missing-color { background: var(--caution-bg, #fff3cd); }
 
 .normalization-features {
     display: flex;
@@ -952,15 +952,15 @@ Field Details:
 }
 
 .feature-detail {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .feature-detail h3 {
-    color: #007bff;
+    color: var(--link-color, #007bff);
     margin-top: 0;
 }
 
@@ -988,10 +988,10 @@ Field Details:
 }
 
 .type-category {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .type-category h4 {
@@ -1018,10 +1018,10 @@ Field Details:
 }
 
 .debug-section {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .debug-output {
@@ -1045,16 +1045,16 @@ Field Details:
 }
 
 .issue-item {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     margin-bottom: 20px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .issue-item h4 {
-    color: #dc3545;
+    color: var(--danger-color, #dc3545);
     margin-top: 0;
 }
 
@@ -1074,15 +1074,15 @@ Field Details:
 }
 
 .tool-item {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .tool-item h4 {
     margin-top: 0;
-    color: #007bff;
+    color: var(--link-color, #007bff);
 }
 
 .best-practices-grid {
@@ -1093,15 +1093,15 @@ Field Details:
 }
 
 .practice-card {
-    background: white;
+    background: rgba(255,255,255,0.88);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .practice-card h3 {
-    color: #28a745;
+    color: var(--success-color, #28a745);
     margin-top: 0;
 }
 
@@ -1121,22 +1121,22 @@ Field Details:
 }
 
 .component {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .component h4 {
     margin-top: 0;
-    color: #007bff;
+    color: var(--link-color, #007bff);
 }
 
 .flow-diagram {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 25px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     margin-top: 20px;
 }
 
@@ -1153,7 +1153,7 @@ Field Details:
 .doc-footer {
     margin-top: 50px;
     padding-top: 30px;
-    border-top: 2px solid #dee2e6;
+    border-top: 2px solid var(--border-color, #dee2e6);
     text-align: center;
 }
 
@@ -1176,21 +1176,21 @@ Field Details:
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
-    border: 2px solid #007bff;
+    border: 2px solid var(--primary-color, #007bff);
 }
 
 .btn-secondary {
     background: #6c757d;
     color: white;
-    border: 2px solid #6c757d;
+    border: 2px solid var(--text-muted-color, #6c757d);
 }
 
 .btn-outline {
     background: transparent;
-    color: #007bff;
-    border: 2px solid #007bff;
+    color: var(--link-color, #007bff);
+    border: 2px solid var(--primary-color, #007bff);
 }
 
 .btn:hover {
@@ -1212,11 +1212,11 @@ Field Details:
 }
 
 .btn-outline:hover {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
-.text-success { color: #28a745; }
+.text-success { color: var(--success-color, #28a745); }
 .text-warning { color: #ffc107; }
 .text-info { color: #17a2b8; }
 

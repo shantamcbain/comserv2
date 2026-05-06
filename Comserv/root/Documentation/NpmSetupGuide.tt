@@ -25,15 +25,15 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-large) 0;">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px; margin: var(--spacing-large) 0;">
         <h2 style="color: var(--text-color); margin-top: 0;">Quick Navigation</h2>
         <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-            <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-            <a href="#automated-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Automated Setup</a>
-            <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-            <a href="#manual-installation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Manual Installation</a>
-            <a href="#configuration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Configuration</a>
-            <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
+            <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+            <a href="#automated-setup" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Automated Setup</a>
+            <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Prerequisites</a>
+            <a href="#manual-installation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Manual Installation</a>
+            <a href="#configuration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Configuration</a>
+            <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Troubleshooting</a>
         </div>
     </div>
 
@@ -75,7 +75,7 @@
     
     <p style="color: var(--text-color);">Execute the following commands to install Docker:</p>
     
-    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+    <pre style="background-color: var(--dark-color); color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
 # Update package index
 sudo apt update
 
@@ -103,7 +103,7 @@ newgrp docker
 
     <h3 style="color: var(--text-color);">Step 2: Install Docker Compose</h3>
     
-    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+    <pre style="background-color: var(--dark-color); color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
 # Download Docker Compose
 sudo curl -L "https://github.com/docker/compose/releases/download/v2.18.1/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
 
@@ -118,7 +118,7 @@ docker-compose --version
     
     <p style="color: var(--text-color);">Create a file named <code>docker-compose.yml</code> in a directory of your choice (e.g., <code>/home/shanta/npm</code>):</p>
     
-    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+    <pre style="background-color: var(--dark-color); color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
 version: '3'
 services:
   app:
@@ -154,7 +154,7 @@ services:
 
     <h3 style="color: var(--text-color);">Step 4: Start Nginx Proxy Manager</h3>
     
-    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+    <pre style="background-color: var(--dark-color); color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
 # Navigate to the directory containing docker-compose.yml
 cd /home/shanta/npm
 
@@ -188,7 +188,7 @@ docker-compose up -d
     
     <p style="color: var(--text-color);">Create a configuration file for your environment (e.g., <code>npm-development.conf</code>) in the Comserv config directory:</p>
     
-    <pre style="background-color: var(--dark-color); color: var(--light-color); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
+    <pre style="background-color: var(--dark-color); color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-radius: 4px; overflow-x: auto;"><code>
 &lt;NPM&gt;
     endpoint = http://localhost:81/api
     api_key = your_generated_api_key
@@ -201,7 +201,7 @@ docker-compose up -d
 
     <h3 style="color: var(--text-color);">Connection Refused</h3>
     
-    <div style="background-color: var(--light-color); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+    <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <p style="color: var(--text-color);"><strong>If you see a "Connection refused" error, verify:</strong></p>
         <ul style="color: var(--text-color);">
             <li>Docker is running: <code>docker ps</code></li>
@@ -212,7 +212,7 @@ docker-compose up -d
 
     <h3 style="color: var(--text-color);">API Key Issues</h3>
     
-    <div style="background-color: var(--light-color); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+    <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warn-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <p style="color: var(--text-color);"><strong>If you see authentication errors:</strong></p>
         <ul style="color: var(--text-color);">
             <li>Verify the API key is correct</li>
@@ -223,7 +223,7 @@ docker-compose up -d
 
     <h3 style="color: var(--text-color);">Docker Not Installed</h3>
     
-    <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+    <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <p style="color: var(--text-color);">If Docker is not installed on your development server, you will see mock data in the ProxyManager interface. This is expected behavior to allow development without requiring Docker.</p>
     </div>
 

@@ -35,13 +35,13 @@
             <div class="admin-card">
                 <h3>Open Tickets</h3>
                 <p>View and manage all open support tickets.</p>
-                <a href="/HelpDesk/admin/tickets/open" class="btn btn-primary">View Open Tickets</a>
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" class="btn btn-primary">View Open Tickets</a>
             </div>
             
             <div class="admin-card">
-                <h3>Closed Tickets</h3>
-                <p>View archive of resolved support tickets.</p>
-                <a href="/HelpDesk/admin/tickets/closed" class="btn btn-primary">View Closed Tickets</a>
+                <h3>All Tickets</h3>
+                <p>View all support tickets across all statuses.</p>
+                <a href="[% c.uri_for('/HelpDesk/admin/tickets/all') %]" class="btn btn-primary">View All Tickets</a>
             </div>
             
             <div class="admin-card">
@@ -97,6 +97,17 @@
             </div>
         </div>
     </div>
+
+    <div class="admin-section">
+        <h2>Project Planning</h2>
+        <div class="admin-cards">
+            <div class="admin-card">
+                <h3>View All Projects</h3>
+                <p>Navigate to the ProjectPlanning system to view all registered projects.</p>
+                <a href="[% c.uri_for('/project/project') %]" class="btn btn-primary">View Projects</a>
+            </div>
+        </div>
+    </div>
 </div>
 
 <style>
@@ -111,7 +122,7 @@
     }
     
     .admin-section h2 {
-        border-bottom: 2px solid #007bff;
+        border-bottom: 2px solid var(--primary-color, #007bff);
         padding-bottom: 10px;
         margin-bottom: 20px;
     }
@@ -124,14 +135,14 @@
     
     .admin-card {
         flex: 1 1 300px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .admin-card h3 {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         margin-top: 0;
     }
     
@@ -144,8 +155,13 @@
     }
     
     .btn-primary {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
+    }
+
+    .btn-warning {
+        background-color: #ffc107;
+        color: #212529;
     }
     
     .error-message {

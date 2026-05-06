@@ -1,0 +1,110 @@
+[% PageVersion = 'Cart/checkout.tt v0.02 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+<div class="page-header">
+  <h1 style="color:var(--text-color);font-family:var(--header-font)"><i class="fas fa-credit-card"></i> Checkout</h1>
+</div>
+
+[% IF error_msg %]
+  <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:4px;padding:0.6em 1em;margin-bottom:1em">[% error_msg %]</div>
+[% END %]
+
+<div class="content-container">
+<div style="display:flex;gap:var(--spacing-large);flex-wrap:wrap">
+
+<div style="flex:1;min-width:280px">
+<h2 style="color:var(--text-color);font-family:var(--header-font)">Order Summary</h2>
+<table style="border-collapse:collapse;width:100%;font-family:var(--body-font)">
+  <thead>
+    <tr style="background:var(--table-header-bg);color:var(--text-color)">
+      <th style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:left">Item</th>
+      <th style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:center">Qty</th>
+      <th style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">Price</th>
+      <th style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">Total</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH key IN cart.keys %]
+    [% line = cart.$key %]
+    <tr style="color:var(--text-color)">
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color)">[% line.name %][% IF line.options %] <small style="color:var(--text-muted-color)">([% line.options %])</small>[% END %]</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:center">[% line.quantity %]</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">$[% line.unit_price | format('%.2f') %]</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">$[% (line.quantity * line.unit_price) | format('%.2f') %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+  <tfoot style="color:var(--text-color)">
+    <tr>
+      <td colspan="3" style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">Subtotal</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">$[% cart_total %]</td>
+    </tr>
+    <tr>
+      <td colspan="3" style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">Tax (13% HST)</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">$[% (cart_total * 0.13) | format('%.2f') %]</td>
+    </tr>
+    <tr style="font-weight:bold">
+      <td colspan="3" style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right">Total</td>
+      <td style="padding:0.5em 0.8em;border:1px solid var(--border-color);text-align:right;color:var(--primary-color)">$[% (cart_total * 1.13) | format('%.2f') %]</td>
+    </tr>
+  </tfoot>
+</table>
+<p style="margin-top:0.5em"><a href="/Cart" style="color:var(--primary-color);font-family:var(--body-font)">← Edit Cart</a></p>
+</div>
+
+<div style="flex:1;min-width:280px">
+<h2 style="color:var(--text-color);font-family:var(--header-font)">Your Information</h2>
+<form method="POST" action="/Cart/place_order">
+
+<div style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Name *<br>
+    <input type="text" name="customer_name" value="[% username %]" required style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+  </label>
+</div>
+<div style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Email<br>
+    <input type="email" name="customer_email" style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+  </label>
+</div>
+<div style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Phone<br>
+    <input type="text" name="customer_phone" style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)">
+  </label>
+</div>
+<div style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Delivery address / notes<br>
+    <textarea name="customer_address" rows="2" style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)"></textarea>
+  </label>
+</div>
+
+<h3 style="color:var(--text-color);font-family:var(--header-font)">Payment Method</h3>
+<div style="margin-bottom:var(--spacing-medium);font-family:var(--body-font);color:var(--text-color)">
+  <label style="display:block;margin-bottom:0.4em">
+    <input type="radio" name="payment_method" value="cash" checked> Cash / E-transfer
+  </label>
+  <label style="display:block;margin-bottom:0.4em">
+    <input type="radio" name="payment_method" value="ap"> Invoice Me (Net 30 / Accounts Payable)
+  </label>
+  [% IF user_id %]
+  <label style="display:block;margin-bottom:0.4em">
+    <input type="radio" name="payment_method" value="points"> Pay with Points (Balance: [% points_bal %] pts)
+  </label>
+  [% ELSE %]
+  <p style="font-size:var(--font-size-small);color:var(--text-muted-color)"><em><a href="/user/login" style="color:var(--primary-color)">Log in</a> to pay with points.</em></p>
+  [% END %]
+</div>
+
+<div style="margin-bottom:var(--spacing-medium)">
+  <label style="color:var(--text-color);font-family:var(--body-font)">Order Notes<br>
+    <textarea name="notes" rows="2" style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-family:var(--body-font)"></textarea>
+  </label>
+</div>
+
+<button type="submit" style="padding:0.5em 1.6em;background:var(--primary-color);color:var(--text-color);border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-size:var(--font-size-large);font-family:var(--body-font);font-weight:bold">Place Order →</button>
+</form>
+</div>
+
+</div>
+</div>
+</div>

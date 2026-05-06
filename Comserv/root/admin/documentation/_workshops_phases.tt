@@ -20,7 +20,7 @@
             <p><strong>Why:</strong> Without proper planning documentation, the project lacks visibility, tracking, and integration with the overall system planning workflow.</p>
             <p><strong>✅ Completion:</strong> Planning.tt updated with comprehensive WorkShops section, all 8 phases documented, port 4004 link added to Overview, Project ID 8 integrated.</p>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase0.id %]</li>
@@ -48,7 +48,7 @@
             <p><strong>What:</strong> Create/extend DBIx::Class Result classes for workshop data model. Schema system auto-generates database tables and columns.</p>
             <p><strong>✅ Completion:</strong> All 6 Result classes created (WorkShop.pm, Participant.pm, WorkshopContent.pm, WorkshopEmail.pm, WorkshopRole.pm, SiteWorkshop.pm), Schema.pm updated, database synced.</p>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase1.id %]</li>
@@ -82,7 +82,7 @@
             <div style="margin-top: 10px;">
                 <p><strong>What:</strong> [% phase_info.desc %]</p>
                 
-                <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+                <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                     <h5>📊 Database Project Details</h5>
                     <ul>
                         <li><strong>Project ID:</strong> [% phase.id %]</li>
@@ -110,7 +110,7 @@
             <p><strong>What:</strong> Create comprehensive unit tests for WorkShop controller actions (23 test cases covering all endpoints).</p>
             <p><strong>✅ Completion:</strong> controller_WorkShop_extended.t created with 23 tests, all tests passing, 100% endpoint coverage achieved.</p>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase8a.id %]</li>
@@ -136,7 +136,7 @@
             <p><strong>What:</strong> Integration tests, manual testing checklist, syntax checks, development server verification, documentation updates.</p>
             <p><strong>Status:</strong> Authorization fixes completed (edit permissions, dashboard access, NULL created_by handling), draft workshop filtering implemented, status field saving fixed, date/time formatting improved (12-hour AM/PM), logging system enhanced.</p>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase8b.id %]</li>
@@ -189,7 +189,7 @@
             <p><strong>What:</strong> Conduct comprehensive user testing with workshop leaders, participants, and admins. Identify and fix all critical bugs before production deployment.</p>
             <p><strong>Why:</strong> User testing ensures the system works in real-world scenarios, catches bugs automated tests miss, and validates workflow intuitiveness.</p>
             
-            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: white;">
+            <div style="margin: 10px 0; padding: 10px; border: 1px solid #ddd; background: var(--card-bg, rgba(255,255,255,0.88));">
                 <h5>📊 Database Project Details</h5>
                 <ul>
                     <li><strong>Project ID:</strong> [% phase8c.id %]</li>
@@ -223,7 +223,7 @@
 [% END %]
 
 <h4>📝 Implementation Summary</h4>
-<div style="margin: 10px 0; padding: 15px; background: white; border: 1px solid #dee2e6; border-radius: 4px;">
+<div style="margin: 10px 0; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid #dee2e6; border-radius: 4px;">
     <ul style="list-style: none; padding-left: 0;">
         <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 0:</span> Planning System Integration</li>
         <li style="margin: 8px 0;"><span class="status-delivered">✅ Phase 1:</span> Database Schema & Models (6 Result classes)</li>

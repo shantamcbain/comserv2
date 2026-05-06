@@ -30,8 +30,9 @@ branches:
   inventory-system-104a:
     name: "Inventory System"
     description: "Inventory management system — items, stock levels, suppliers, locations, transactions, purchase orders"
-    application_url: "http://workstation.local:4003"
-    api_url: "http://api.workstation.local:4003"
+    application_url: "http://workstation.local:4021"
+    api_url: "http://api.workstation.local:4021"
+    server_start: "cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4021 -r"
 
   # Add other branches as needed
   # branch-name:

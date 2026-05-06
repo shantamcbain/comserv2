@@ -106,13 +106,13 @@
             <div class="dropdown-divider"></div>
             <div class="submenu-item">
                 [% IF can_plan %]
-                    <a href="/Documentation/DailyPlan" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
+                    <a href="/planning/daily" class="submenu-header submenu-header-link"><i class="icon-calendar"></i>Planning</a>
                 [% ELSE %]
                     <span class="submenu-header"><i class="icon-calendar"></i>Planning</span>
                 [% END %]
                 <div class="submenu">
                     [% IF can_plan %]
-                        <a href="/Documentation/DailyPlan" class="submenu-link">
+                        <a href="/planning/daily" class="submenu-link">
                             <i class="icon-calendar"></i> Daily Plan
                         </a>
                         <a href="/todo" class="submenu-link">

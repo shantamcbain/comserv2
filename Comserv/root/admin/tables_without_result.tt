@@ -27,6 +27,11 @@
     
     <div class="content-container">
         <div class="content-primary">
+            <div style="border-left: 4px solid #ffc107; background: #fff8e1; padding: 12px 16px; margin-bottom: 16px; border-radius: 4px;">
+                <strong><i class="fas fa-exclamation-triangle" style="color: #856404;"></i> Non-Preferred Direction</strong>
+                <p style="margin: 6px 0 0;">These tables exist in the database <strong>without</strong> a corresponding Result file. Creating a Result file here is a <strong>recovery operation only</strong> — the generated file must be manually reviewed and corrected.</p>
+                <p style="margin: 4px 0 0; color: #155724;"><i class="fas fa-check-circle"></i> <strong>Preferred workflow:</strong> Always create the Result file first, then run "Create Table from Result" to create the DB table.</p>
+            </div>
             <p class="intro">Database tables that exist but do not have corresponding result files. These tables may need result files created or may be legacy tables that are no longer needed.</p>
             
             <!-- Statistics Summary -->

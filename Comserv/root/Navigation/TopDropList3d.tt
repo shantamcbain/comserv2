@@ -1,0 +1,44 @@
+[% PageVersion = 'Navigation/TopDropList3d.tt,v 1.00 2026/04/10 Shanta Exp Shanta' %]
+[% IF c.session.debug_mode == 1 %]<!-- Debug: TopDropList3d.tt loaded -->[% END %]
+
+<li class="horizontal-dropdown">
+    <a href="/3d" class="dropbtn"><i class="icon-3d"></i>3D Printing</a>
+    <div class="dropdown-content">
+
+        <a href="/3d" class="menu-item"><i class="icon-home"></i>3D Home</a>
+        <a href="/3d/browse" class="menu-item"><i class="icon-list"></i>Browse Models</a>
+        <a href="/3d/store" class="menu-item"><i class="icon-shop"></i>Shop Printed Items</a>
+
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <a href="/3d/my_orders" class="menu-item"><i class="icon-briefcase"></i>My Orders</a>
+        [% END %]
+
+        [% IF c.session.username %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-search"></i>Find a Model</span>
+            <div class="submenu">
+                <a href="/3d/browse" class="submenu-link"><i class="icon-database"></i>Browse Catalog</a>
+                <a href="/3d/search_deeper" class="submenu-link"><i class="icon-ai"></i>AI / Web Search</a>
+            </div>
+        </div>
+        [% END %]
+
+        [% IF c.session.roles.grep('admin').size %]
+        <div class="dropdown-divider"></div>
+        <div class="submenu-item">
+            <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
+            <div class="submenu">
+                <a href="/3d/admin" class="submenu-link"><i class="icon-dashboard"></i>3D Admin Dashboard</a>
+                <a href="/3d/queue" class="submenu-link"><i class="icon-list"></i>Print Queue</a>
+                <a href="/3d/printers" class="submenu-link"><i class="icon-server"></i>Printer Farm</a>
+                <a href="/Inventory/items?category=3d_filament" class="submenu-link"><i class="icon-resources"></i>Filament Stock</a>
+                <a href="/Inventory/items?category=3d_supply" class="submenu-link"><i class="icon-tools"></i>Supplies</a>
+                <a href="/Inventory/items?category=3d_printed_item" class="submenu-link"><i class="icon-shop"></i>Items for Sale</a>
+            </div>
+        </div>
+        [% END %]
+
+    </div>
+</li>

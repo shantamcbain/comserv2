@@ -255,19 +255,44 @@
 
 <h2>Status Values</h2>
 
-<p>The system uses the following status values:</p>
+<p>The system uses the following string status values (normalized in the controller before storage):</p>
 
-<ul>
-    <li><strong>1:</strong> New</li>
-    <li><strong>2:</strong> In Progress</li>
-    <li><strong>3:</strong> Completed</li>
-</ul>
+<table class="doc-table">
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+        <tr><td><strong>New</strong></td><td>Freshly created, not yet started</td></tr>
+        <tr><td><strong>In Process</strong></td><td>Work has begun (also accepts "In Progress", "In-Process", "inprocess" — all normalized to "In Process")</td></tr>
+        <tr><td><strong>Completed</strong></td><td>Done. Excluded from most default views.</td></tr>
+        <tr><td><strong>Pending</strong></td><td>Waiting on something external</td></tr>
+        <tr><td><strong>Cancelled</strong></td><td>Will not be done</td></tr>
+    </tbody>
+</table>
 
-<p>Status 3 (Completed) todos are excluded from most views by default unless explicitly requested.</p>
+<p><strong>Note:</strong> Status normalization runs in the Perl controller, not in templates. Templates always receive a clean string and should use the TT2 <code>eq</code> operator (not <code>==</code>) for comparisons. A cleanup script <code>normalize_todo_status.pl</code> is available to fix inconsistent historic values in the database.</p>
 
 <h2>Priority System</h2>
 
-<p>Todos are sorted by priority (ascending) where lower numbers indicate higher priority.</p>
+<p>Priorities are defined in the single source of truth module <code>Comserv::Util::Priority</code> (exported as <code>priority_options()</code>). All controllers and templates reference this module — there are no inline priority arrays elsewhere in the codebase.</p>
+
+<table class="doc-table">
+    <thead><tr><th>Number</th><th>Label</th><th>When to use</th></tr></thead>
+    <tbody>
+        <tr><td><strong>1</strong></td><td>P1: Critical</td><td>System/site broken — stop everything</td></tr>
+        <tr><td><strong>2</strong></td><td>P2: Urgent</td><td>Blocking key work, must resolve today</td></tr>
+        <tr><td><strong>3</strong></td><td>P3: High</td><td>Important, complete this sprint</td></tr>
+        <tr><td><strong>4</strong></td><td>P4: Above Normal</td><td>Scheduled soon, next sprint</td></tr>
+        <tr><td><strong>5</strong></td><td>P5: Medium</td><td>Standard backlog item</td></tr>
+        <tr><td><strong>6</strong></td><td>P6: Normal</td><td>Background work, no deadline pressure</td></tr>
+        <tr><td><strong>7</strong></td><td>P7: Low</td><td>Address when capacity allows</td></tr>
+        <tr><td><strong>8</strong></td><td>P8: Minor</td><td>Nice to have, no immediate impact</td></tr>
+        <tr><td><strong>9</strong></td><td>P9: Minimal</td><td>Someday/maybe</td></tr>
+        <tr><td><strong>10</strong></td><td>P10: Optional</td><td>Wishlist only</td></tr>
+    </tbody>
+</table>
+
+<p>Todos are sorted by priority ascending (lower number = higher urgency). The priority dropdown in the edit form displays the self-explanatory labels so staff can make the right choice without memorising numbers.</p>
+
+<p>The Daily Plan Audit Todos panel automatically surfaces any open todos with priority P1, P2, or P3 at the top of each day's planning session.</p>
 
 <h2>Integration Features</h2>
 
@@ -289,7 +314,7 @@
 <h3>Time Tracking Integration</h3>
 <ul>
     <li>Integration with the Log system for time tracking</li>
-    <li>Automatic accumulative time calculation</li>
+    <li><strong>Editable <code>accumulative_time</code> field</strong> — the details/edit form includes a text input so staff can manually enter or correct the total time spent on a todo (e.g. <code>2:30</code> for two and a half hours)</li>
     <li>Time display in HH:MM format</li>
     <li>Historical time tracking through log entries</li>
 </ul>
@@ -487,4 +512,4 @@
 
 <hr>
 
-<p><em>This documentation reflects the current state of the Todo system as of January 20, 2025. For the most up-to-date information, refer to the source code and changelog.</em></p>
+<p><em>Last updated: April 28, 2026. Reflects Priority single-source-of-truth, status normalization, editable accumulative_time, and Daily Plan integration.</em></p>

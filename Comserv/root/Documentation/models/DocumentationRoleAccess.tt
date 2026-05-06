@@ -86,7 +86,7 @@
                         <td>auto_increment</td>
                         <td>Primary key - auto-generated access rule ID</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>role</td>
                         <td>VARCHAR(100)</td>
                         <td>NO</td>
@@ -100,7 +100,7 @@
                         <td>REQUIRED</td>
                         <td>Path pattern with wildcards (e.g., 'Documentation/system/*', 'Documentation/admin/*') - part of UNIQUE constraint</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>can_access</td>
                         <td>BOOLEAN</td>
                         <td>NO</td>
@@ -143,7 +143,7 @@
                         <td>✅ 1 (TRUE)</td>
                         <td>Admins can access ALL documentation</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>developer</td>
                         <td>Documentation/system/*</td>
                         <td>✅ 1 (TRUE)</td>
@@ -155,7 +155,7 @@
                         <td>❌ 0 (FALSE)</td>
                         <td>Developers CANNOT access admin docs</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>user</td>
                         <td>Documentation/public/*</td>
                         <td>✅ 1 (TRUE)</td>
@@ -196,7 +196,7 @@
                         <td>Documentation/controllers, Documentation/models, Documentation/system</td>
                         <td>Documentation/system/advanced, Documentation (no slash)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>Documentation/system/*</td>
                         <td>Documentation/system/admin, Documentation/system/config</td>
                         <td>Documentation/system/admin/advanced, Documentation/models</td>
@@ -206,7 +206,7 @@
                         <td>Documentation/admin, Documentation/admin_guide, Documentation/admin/settings</td>
                         <td>Documentation/system/admin, Documentation/user</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>*admin*</td>
                         <td>Documentation/admin, admin_guide, system/admin (broad match)</td>
                         <td>(matches anything with 'admin' substring)</td>
@@ -214,7 +214,7 @@
                 </table>
 
                 <h3>Pattern Matching Implementation</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>How matches_doc_path() works:</strong></p>
                     <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->find($id);
 
@@ -247,7 +247,7 @@ if ($rule->matches_doc_path('Documentation/system/advanced')) {
                 </ul>
 
                 <h3>Decision Logic</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Check if role can access a documentation path:</strong></p>
                     <pre><code># Query all rules for a role
 my @rules = $schema->resultset('DocumentationRoleAccess')->search({
@@ -276,7 +276,7 @@ if ($can_access) {
                 <h2>API Methods & Helpers</h2>
                 
                 <h3>Standard DBIx::Class Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Creating Access Rules:</strong></p>
                     <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->create({
     role => 'developer',
@@ -291,7 +291,7 @@ my $deny_rule = $schema->resultset('DocumentationRoleAccess')->create({
 });</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Retrieving Rules:</strong></p>
                     <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->find(1);
 
@@ -308,7 +308,7 @@ my @deny_rules = $schema->resultset('DocumentationRoleAccess')->search({
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Updating Rules:</strong></p>
                     <pre><code>$rule->update({
     can_access => 0  # Change from allow to deny
@@ -319,14 +319,14 @@ $rule->update;</code></pre>
                 </div>
 
                 <h3>Helper Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>matches_doc_path($doc_path):</strong> Check if path matches rule pattern</p>
                     <pre><code>if ($rule->matches_doc_path('Documentation/system/admin')) {
     print "Pattern matches this path\n";
 }</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>grants_access():</strong> Get access grant boolean</p>
                     <pre><code>if ($rule->grants_access) {
     print "Access is ALLOWED\n";
@@ -340,7 +340,7 @@ $rule->update;</code></pre>
                 <h2>Usage Examples</h2>
                 
                 <h3>Example 1: Create Admin Access Rule</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $admin_rule = $schema->resultset('DocumentationRoleAccess')->create({
     role => 'admin',
     doc_section_pattern => 'Documentation/*',
@@ -351,7 +351,7 @@ print "Created rule: " . $admin_rule->role . " -> " . $admin_rule->doc_section_p
                 </div>
 
                 <h3>Example 2: Set Up Developer Permissions</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my @dev_permissions = (
     { pattern => 'Documentation/models/*', access => 1 },
     { pattern => 'Documentation/controllers/*', access => 1 },
@@ -369,7 +369,7 @@ foreach my $perm (@dev_permissions) {
                 </div>
 
                 <h3>Example 3: Check Access for User</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>sub can_user_access_doc {
     my ($schema, $user_role, $doc_path) = @_;
     
@@ -395,7 +395,7 @@ if (can_user_access_doc($schema, 'developer', 'Documentation/system/config')) {
                 </div>
 
                 <h3>Example 4: Update Access Rule</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $rule = $schema->resultset('DocumentationRoleAccess')->search({
     role => 'developer',
     doc_section_pattern => 'Documentation/internal/*'
@@ -410,7 +410,7 @@ if ($rule) {
                 </div>
 
                 <h3>Example 5: Query All Rules for Role</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my @editor_rules = $schema->resultset('DocumentationRoleAccess')->search({
     role => 'editor'
 })->all;

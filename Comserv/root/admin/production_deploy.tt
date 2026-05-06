@@ -170,8 +170,8 @@
 }
 
 .status-section, .deployment-section, .output-section, .branches-section, .quick-actions {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -188,9 +188,9 @@
     display: flex;
     justify-content: space-between;
     padding: 10px;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     border-radius: 4px;
-    border-left: 4px solid #007bff;
+    border-left: 4px solid var(--primary-color, #007bff);
 }
 
 .status-item.warning {
@@ -200,7 +200,7 @@
 
 .status-item label {
     font-weight: bold;
-    color: #495057;
+    color: var(--text-color, #495057);
 }
 
 .service-status.active {
@@ -214,10 +214,10 @@
 }
 
 .deployment-form {
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     padding: 20px;
     border-radius: 8px;
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
 }
 
 .form-group {
@@ -228,7 +228,7 @@
     display: block;
     font-weight: bold;
     margin-bottom: 5px;
-    color: #495057;
+    color: var(--text-color, #495057);
 }
 
 .form-group select, .form-group input[type="text"] {
@@ -253,7 +253,7 @@
 .help-text {
     display: block;
     margin-top: 5px;
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
     font-size: 12px;
 }
 
@@ -294,7 +294,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -303,7 +303,7 @@
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--secondary-color, #6c757d);
     color: white;
 }
 
@@ -317,8 +317,8 @@
 }
 
 .deployment-output {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
     padding: 15px;
     margin-top: 15px;
@@ -353,8 +353,8 @@
     justify-content: space-between;
     align-items: center;
     padding: 10px;
-    background: white;
-    border: 1px solid #dee2e6;
+    background: var(--card-bg, rgba(255,255,255,0.88));
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
 }
 
@@ -368,11 +368,11 @@
 }
 
 .branch-item.remote .branch-type {
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
 }
 
 .current-indicator {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
     padding: 2px 6px;
     border-radius: 3px;

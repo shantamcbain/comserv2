@@ -1,0 +1,222 @@
+[% META
+    title = "Consignment Tracking"
+    description = "Admin guide for managing consignment partners, batches, and settlements"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/consignment.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Consignment Tracking</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#partners"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Partners Setup</a>
+                <a href="#creating"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Creating a Consignment</a>
+                <a href="#print"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Print Slip</a>
+                <a href="#viewing"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing a Consignment</a>
+                <a href="#settling"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Settlement</a>
+                <a href="#gl"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">GL Entry</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Consignment</strong> means sending your items to a partner store who sells them on your behalf.
+                The partner keeps a commission percentage; you keep the remainder. You retain legal ownership of the items
+                until they are sold or returned. The system tracks what was sent, what was sold, what was returned,
+                and calculates your net revenue after commission.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Current consignment partners for 3D:</strong>
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Monashee Arts Council</strong> — 1975 Vernon St, Lumby BC. Commission rate: TBD — set when confirmed.</li>
+                <li><strong>Monashee Coop</strong> — 30% commission.</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="partners" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Setting Up Consignment Partners</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/consignment/partners" style="color:var(--link-color)">/Inventory/consignment/partners</a></li>
+                <li>Click <strong>+ New Partner</strong></li>
+                <li>Enter: Name, Contact Name, Phone, Email, Address, Commission % (e.g. 30), Payment Terms (e.g. "Monthly"), Notes</li>
+                <li>Save — the partner is now available when creating a consignment batch</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                You can also edit or delete partners from this page. Deleting a partner with active consignments is not recommended.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="creating" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Creating a Consignment Batch</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/consignment/new" style="color:var(--link-color)">/Inventory/consignment/new</a></li>
+                <li>Select the <strong>partner</strong> — commission rate shows automatically</li>
+                <li>Set <strong>Date Sent</strong> (today by default)</li>
+                <li>Enter an optional <strong>Reference #</strong> (e.g. a paper docket number)</li>
+                <li>Add item lines: select item, quantity, retail price (auto-fills from item's unit_price), notes</li>
+                <li>Click <strong>+ Add Another Item</strong> for multiple lines</li>
+                <li>Click <strong>Create Consignment</strong></li>
+            </ol>
+            <div style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+                <strong>Note:</strong> Only items with <em>Show in Shop = Yes</em> appear in the item dropdown.
+                If a print-on-demand item is not listed, go to <a href="/shop/admin" style="color:var(--link-color)">/shop/admin</a>
+                and enable Show in Shop for that item first.
+            </div>
+            <p style="color:var(--text-color);font-family:var(--body-font);margin-top:0.5em">
+                <strong>Stock impact:</strong> On save, stock is reduced by the quantity sent for each item.
+                A <em>consignment_out</em> transaction is recorded for the audit trail.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="print" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Printing the Consignment Slip</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Open the consignment at <a href="/Inventory/consignment" style="color:var(--link-color)">/Inventory/consignment</a> → click View</li>
+                <li>Click the <strong>Print Slip</strong> button in the top bar</li>
+                <li>Your browser's print dialog opens</li>
+                <li>The printed slip shows: your SiteName info (name, address, phone from SiteConfig), partner address, reference number, date, item table with quantities and retail prices, and a signature block (Received by Partner / Released by SiteName)</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                <strong>Tip:</strong> Set up your business address and phone in
+                <a href="/admin/SiteConfig" style="color:var(--link-color)">Site Config</a>
+                under the keys <em>business_address</em> and <em>business_phone</em> so they appear on the slip.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Give one copy to the partner and keep one for your records. The slip should be printed <em>after</em> creating the consignment so it has the correct reference number.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="viewing" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Viewing a Consignment</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/Inventory/consignment" style="color:var(--link-color)">/Inventory/consignment</a>.
+                Filter by status (All / Open / Partially Settled / Settled / Returned).
+                Click <strong>View</strong> on any row to see:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Partner details and commission rate</li>
+                <li>Date sent, reference number, status</li>
+                <li>Item table: sent / sold / returned / outstanding per line</li>
+                <li>Totals: gross revenue (sold × retail price), commission amount, net to you</li>
+                <li>Settlement form (if not yet settled)</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="settling" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Recording Settlement</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                When the partner reports how many items were sold and returns the rest:
+            </p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Open the consignment view</li>
+                <li>In the <strong>Record Settlement</strong> form, enter <em>Qty Sold</em> and <em>Qty Returned</em> per line</li>
+                <li>The preview shows gross, commission deducted, and your net</li>
+                <li>Optionally check <strong>Create GL Entry</strong> and enter the AR and income account IDs</li>
+                <li>Click <strong>Record Settlement</strong></li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Returned items are added back to stock with a <em>consignment_return</em> transaction.
+                The consignment status changes to <em>settled</em> (or <em>partially_settled</em> if some items are still outstanding).
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="gl" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. GL Entry on Settlement</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                When <em>Create GL Entry</em> is checked on settlement, the system posts:
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Account</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Amount</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">1100 Accounts Receivable</td><td style="border:1px solid var(--border-color);padding:6px 10px">DR</td><td style="border:1px solid var(--border-color);padding:6px 10px">Net to you (gross − commission)</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">5600 Commission Expense</td><td style="border:1px solid var(--border-color);padding:6px 10px">DR</td><td style="border:1px solid var(--border-color);padding:6px 10px">Commission amount</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">4000 Sales Revenue</td><td style="border:1px solid var(--border-color);padding:6px 10px">CR</td><td style="border:1px solid var(--border-color);padding:6px 10px">Gross (sold × retail price)</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Price not auto-filling</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Item must have unit_price set. Edit the item and enter a unit_price.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Only 1 item saved when multiple lines added</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Fixed in current version — uses indexed field names (item_id_0, item_id_1, etc.).</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Item not in consignment dropdown</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Enable <em>Show in Shop</em> for the item via /shop/admin.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Cannot delete a consignment</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Settled consignments cannot be deleted. Only open/returned consignments can be deleted.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/shop" style="color:var(--link-color)">Shop &amp; Marketplace</a></li>
+            <li><a href="/Documentation/Accounting/gl" style="color:var(--link-color)">General Ledger</a></li>
+            <li><a href="/Inventory/consignment/partners" style="color:var(--link-color)">Manage Consignment Partners</a></li>
+        </ul>
+    </div>
+</div>

@@ -1,4 +1,4 @@
-[% PageVersion = 'Navigation/TopDropListWeather.tt,v 0.01 2025/01/15 shanta Exp shanta ' %]
+[% PageVersion = 'Navigation/TopDropListWeather.tt,v 0.02 2026/04/22 theme-compliance: removed font tags, modernised admin checks' %]
 [% IF c.session.debug_mode == 1 %]
     [%# PageVersion %]
     [%# "Debugging HostName: " _ HostName %]
@@ -27,7 +27,7 @@
                     </div>
                     
                     <!-- Admin Weather Options -->
-                    [% IF c.session.group == 'admin' %]
+                    [% IF c.session.roles && c.session.roles.grep('admin').size %]
                     <div class="submenu-item">
                         <span class="submenu-header"><i class="icon-admin"></i>Admin</span>
                         <div class="submenu">
@@ -37,42 +37,40 @@
                         </div>
                     </div>
                     [% END %]
-                    
-                    <ul>
-                        <!-- populate from Page_tb for weather pages -->
-                        [% IF weather_pages.defined %]
-                            [% FOREACH link IN weather_pages %]
-                                <a href="&amp;page=[% link.page_code %]" name="Weather" target="[% link.target %]"
-                                   title=" [% link.view_name %] "><font class="LeftSideBarNavStyle">[% link.view_name %]</font></a>
-                                [% IF c.session.group == 'admin' %]
-                                   <a href="/edit_link?link_id=[% link.record_id %]">Edit/Delete</a>
-                                [% END %]
-                            [% END %]
-                        [% END %]
-                        
-                        <!-- populate from links_tb for weather links -->
-                        [% IF weather_links.defined %]
-                            [% FOREACH link IN weather_links %]
-                                <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Weather" target="[% link.target %]" title=" [% link.name %] "><font class="LeftSideBarNavStyle">[% link.name %]</font></a>
-                                [% IF c.session.group == 'admin' %]
-                                   <a href="/edit_link/[% link.record_id %]">Edit/Delete</a>
-                                [% END %]
-                            [% END %]
-                        [% END %]
-                    </ul>
-                    
-                    <!-- Weather module specific links -->
-                    [% IF c.session.weather_links.defined AND c.session.weather_links.size %]
-                        [% FOREACH link IN c.session.weather_links %]
-                            <a href="[% link.url %]">[% link.name %]</a>
-                            [% IF c.session.group == 'admin' %]
-                                <a href="/edit_link?link_id=[% link.id %]">Edit/Delete</a>
+
+                    <!-- populate from Page_tb for weather pages -->
+                    [% IF weather_pages.defined %]
+                        [% FOREACH link IN weather_pages %]
+                            <a href="&amp;page=[% link.page_code %]" name="Weather" target="[% link.target %]"
+                               title="[% link.view_name %]" class="menu-item">[% link.view_name %]</a>
+                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
+                               <a href="/edit_link?link_id=[% link.record_id %]" class="edit-link">Edit/Delete</a>
                             [% END %]
                         [% END %]
                     [% END %]
-                    
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/navigation/add_link?menu=weather"><i class="icon-plus"></i> Add Menu Link</a>
+
+                    <!-- populate from links_tb for weather links -->
+                    [% IF weather_links.defined %]
+                        [% FOREACH link IN weather_links %]
+                            <a href="[% link.url %]?site=[% SiteName %]&amp;[% link.view_name %]" name="Weather" target="[% link.target %]" title="[% link.name %]" class="menu-item">[% link.name %]</a>
+                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
+                               <a href="/edit_link/[% link.record_id %]" class="edit-link">Edit/Delete</a>
+                            [% END %]
+                        [% END %]
+                    [% END %]
+
+                    <!-- Weather module specific links -->
+                    [% IF c.session.weather_links.defined AND c.session.weather_links.size %]
+                        [% FOREACH link IN c.session.weather_links %]
+                            <a href="[% link.url %]" class="menu-item">[% link.name %]</a>
+                            [% IF c.session.roles && c.session.roles.grep('admin').size %]
+                                <a href="/edit_link?link_id=[% link.id %]" class="edit-link">Edit/Delete</a>
+                            [% END %]
+                        [% END %]
+                    [% END %]
+
+                    [% IF c.session.roles && c.session.roles.grep('admin').size %]
+                        <a href="/navigation/add_link?menu=weather" class="menu-item"><i class="icon-plus"></i> Add Menu Link</a>
                     [% END %]
                 </div>
         </li>

@@ -40,9 +40,8 @@
 <input type="text" id="group_of_poster" name="group_of_poster" value="[% log.group_of_poster %]"><br>
     <label for="priority">Priority:</label><br>
     <select id="priority" name="priority">
-        [% FOREACH key IN build_priority.keys.sort %]
-            <option value="[% key %]" [% 'selected' IF key == log.priority %]>[% build_priority.$key %]</option>
-        [% END %]
+        [% SET current_priority = log.priority %]
+        [% INCLUDE 'todo/priority_select.tt' %]
     </select><br>
 
     <label for="status">Status:</label><br>

@@ -1,11 +1,11 @@
-[% PageVersion = 'Inventory/items/add.tt,v 0.01 2026/03/30 shanta Exp' %]
+[% PageVersion = 'Inventory/items/add.tt,v 0.04 2026/04/16 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <h1>Add Inventory Item</h1>
 
 [% IF error_msg %]<p class="error">[% error_msg %]</p>[% END %]
 
-<form method="POST" action="/Inventory/item/add">
+<form method="POST" action="/Inventory/item/add[% IF is_popup %]?popup=1[% END %]">
   <table>
     <tr>
       <th><label for="sku">SKU *</label></th>
@@ -17,7 +17,40 @@
     </tr>
     <tr>
       <th><label for="category">Category</label></th>
-      <td><input type="text" id="category" name="category" maxlength="100"></td>
+      <td>
+        <input type="text" id="category" name="category" maxlength="100"
+               list="category-suggestions"
+               placeholder="Apiary, Garden, Hardware, 3D Print, Craft…">
+        <datalist id="category-suggestions">
+          <option value="3d_printer">3D Printer</option>
+          <option value="3d_filament">3D Filament</option>
+          <option value="3d_supply">3D Supply</option>
+          <option value="3d_printed_item">3D Printed Item (for sale)</option>
+          <option value="3dStock">3D Stock</option>
+          <option value="Hardware">Hardware</option>
+          <option value="Equipment">Equipment</option>
+          <option value="Supplies">Supplies</option>
+          <option value="Apiary">Apiary</option>
+          <option value="Garden">Garden</option>
+          <option value="Craft">Craft</option>
+          <option value="Electronics">Electronics</option>
+          <option value="Office">Office</option>
+          <option value="Service">Service</option>
+        </datalist>
+        <small>3D types: <code>3d_filament</code>, <code>3d_supply</code>, <code>3d_printed_item</code>, <code>3d_printer</code></small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="item_origin">Origin / How Made</label></th>
+      <td>
+        [% SET origin_opts = ['purchased','manufactured','service','crafted','grown','foraged','harvested','3d_printed','other'] %]
+        <select id="item_origin" name="item_origin">
+          [% FOREACH o IN origin_opts %]
+          <option value="[% o %]">[% o %]</option>
+          [% END %]
+        </select>
+        <small>Use <em>service</em> for provisioned accounts/hosting</small>
+      </td>
     </tr>
     <tr>
       <th><label for="description">Description</label></th>
@@ -26,21 +59,28 @@
     <tr>
       <th><label for="unit_of_measure">Unit of Measure</label></th>
       <td>
+        [% SET uom_opts = ['each','spool','g','kg','ml','L','cm','m','metre','sheet','box','case','lb','litre','hour','month','year'] %]
         <select id="unit_of_measure" name="unit_of_measure">
-          <option value="each">Each</option>
-          <option value="box">Box</option>
-          <option value="case">Case</option>
-          <option value="kg">kg</option>
-          <option value="lb">lb</option>
-          <option value="litre">Litre</option>
-          <option value="metre">Metre</option>
-          <option value="hour">Hour</option>
+          [% FOREACH u IN uom_opts %]
+          <option value="[% u %]">[% u %]</option>
+          [% END %]
         </select>
       </td>
     </tr>
     <tr>
       <th><label for="unit_cost">Unit Cost</label></th>
-      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0"></td>
+      <td><input type="number" id="unit_cost" name="unit_cost" step="0.01" min="0">
+          <small>Purchase/cost price (what you pay the supplier)</small></td>
+    </tr>
+    <tr>
+      <th><label for="unit_price">Selling Price</label></th>
+      <td><input type="number" id="unit_price" name="unit_price" step="0.01" min="0">
+          <small>Sale price charged to customer</small></td>
+    </tr>
+    <tr>
+      <th><label for="barcode">Barcode</label></th>
+      <td><input type="text" id="barcode" name="barcode" maxlength="100">
+          <small>UPC / EAN / QR / Code128</small></td>
     </tr>
     <tr>
       <th><label for="reorder_point">Reorder Point</label></th>
@@ -51,12 +91,23 @@
       <td><input type="number" id="reorder_quantity" name="reorder_quantity" value="0" min="0"></td>
     </tr>
     <tr>
+      <th><label for="is_consumable">Consumable?</label></th>
+      <td><input type="checkbox" id="is_consumable" name="is_consumable" value="1">
+          <small>Expensed when used (filament, wax, seed, infra allocation)</small></td>
+    </tr>
+    <tr>
+      <th><label for="is_assemblable">Has BOM / Recipe?</label></th>
+      <td><input type="checkbox" id="is_assemblable" name="is_assemblable" value="1">
+          <small>Made from other items — enables BOM editor after save</small></td>
+    </tr>
+    <tr>
       <th><label for="status">Status</label></th>
       <td>
+        [% SET status_opts = ['active','inactive','discontinued'] %]
         <select id="status" name="status">
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
-          <option value="discontinued">Discontinued</option>
+          [% FOREACH s IN status_opts %]
+          <option value="[% s %]">[% s %]</option>
+          [% END %]
         </select>
       </td>
     </tr>
@@ -64,11 +115,136 @@
       <th><label for="notes">Notes</label></th>
       <td><textarea id="notes" name="notes" rows="3" cols="40"></textarea></td>
     </tr>
+
+    <tbody id="3d-fields" style="display:none;">
+      <tr><td colspan="2"><hr><strong>3D Printing Details</strong>
+          <small style="font-weight:normal;color:#666;"> — shown for filament spools and printed items</small>
+      </td></tr>
+      <tr>
+        <th><label for="filament_color">Filament Colour</label></th>
+        <td>
+          <input type="text" id="filament_color" name="filament_color" maxlength="100"
+                 list="colour-suggestions" placeholder="e.g. Black, Red, Galaxy Blue">
+          <datalist id="colour-suggestions">
+            <option value="Black"><option value="White"><option value="Red">
+            <option value="Blue"><option value="Green"><option value="Yellow">
+            <option value="Orange"><option value="Purple"><option value="Grey">
+            <option value="Silver"><option value="Gold"><option value="Clear">
+            <option value="Natural"><option value="Galaxy Blue"><option value="Galaxy Black">
+          </datalist>
+          <small>For filament spools: colour of this spool. For printed items: required filament colour.</small>
+        </td>
+      </tr>
+      <tr>
+        <th><label for="filament_type">Filament Type</label></th>
+        <td>
+          <input type="text" id="filament_type" name="filament_type" maxlength="100"
+                 list="type-suggestions" placeholder="e.g. PLA, PETG, ABS">
+          <datalist id="type-suggestions">
+            <option value="PLA"><option value="PLA+"><option value="PETG">
+            <option value="ABS"><option value="ASA"><option value="TPU">
+            <option value="Nylon"><option value="PC"><option value="Wood PLA">
+            <option value="Metal PLA"><option value="Silk PLA"><option value="Resin">
+          </datalist>
+          <small>Material type. Used to auto-match filament stock when queueing print jobs.</small>
+        </td>
+      </tr>
+      <tr id="requires-printing-row">
+        <th><label for="requires_printing">Print on Demand?</label></th>
+        <td>
+          <input type="checkbox" id="requires_printing" name="requires_printing" value="1">
+          <small>Tick for items printed only when ordered (no standing stock). These appear in the print queue when an order or consignment is received.</small>
+        </td>
+      </tr>
+    </tbody>
+
+    [% IF coa_accounts.size %]
+    <tr><td colspan="2"><hr><strong>Accounting (optional)</strong></td></tr>
+    <tr>
+      <th><label for="inventory_accno_id">Inventory / Asset Account</label></th>
+      <td>
+        <select id="inventory_accno_id" name="inventory_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]">[% a.accno %] — [% a.description | html %]</option>
+          [% END %]
+        </select>
+        <small>e.g. 1200 Inventory Asset</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="income_accno_id">Income Account</label></th>
+      <td>
+        <select id="income_accno_id" name="income_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]">[% a.accno %] — [% a.description | html %]</option>
+          [% END %]
+        </select>
+        <small>e.g. 4000 Sales Revenue</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="expense_accno_id">Expense / COGS Account</label></th>
+      <td>
+        <select id="expense_accno_id" name="expense_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]">[% a.accno %] — [% a.description | html %]</option>
+          [% END %]
+        </select>
+        <small>e.g. 5000 Cost of Goods Sold</small>
+      </td>
+    </tr>
+    <tr>
+      <th><label for="returns_accno_id">Returns Account</label></th>
+      <td>
+        <select id="returns_accno_id" name="returns_accno_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN coa_accounts %]
+          <option value="[% a.id %]">[% a.accno %] — [% a.description | html %]</option>
+          [% END %]
+        </select>
+        <small>e.g. 4100 Sales Returns</small>
+      </td>
+    </tr>
+    [% END %]
     <tr>
       <td colspan="2">
         <input type="submit" value="Create Item">
+        [% IF is_popup %]
+        <button type="button" onclick="window.close()">Cancel</button>
+        [% ELSE %]
         <a href="/Inventory/items">Cancel</a>
+        [% END %]
       </td>
     </tr>
   </table>
 </form>
+<script>
+(function() {
+    var cat = document.getElementById('category');
+    var block = document.getElementById('3d-fields');
+    function toggle3d() {
+        var v = cat.value.toLowerCase();
+        var show = v.indexOf('filament') !== -1 || v.indexOf('3d_print') !== -1 || v === '3d_printer';
+        block.style.display = show ? '' : 'none';
+    }
+    cat.addEventListener('input', toggle3d);
+    cat.addEventListener('change', toggle3d);
+    toggle3d();
+})();
+</script>
+
+[% IF is_popup %]
+<script>
+[% IF c.req.params.done %]
+window.close();
+[% END %]
+</script>
+[% END %]
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'inventory item'
+   ai_form_context      = 'inventory item management'
+   ai_form_fields       = 'name, sku, description, category, item_origin, unit_of_measure, unit_cost, unit_price, reorder_point, reorder_quantity, status, notes, inventory_accno_id, income_accno_id, expense_accno_id, returns_accno_id'
+%]

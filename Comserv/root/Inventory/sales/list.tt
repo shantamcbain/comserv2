@@ -1,0 +1,77 @@
+<h1>Sales Invoices</h1>
+<p>
+  <a href="/Inventory/sales/new">+ New Invoice</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory">← Inventory</a>
+  &nbsp;|&nbsp;
+  <a href="/Accounting">Accounting</a>
+</p>
+
+[% IF c.flash.success_msg %]<p style="color:green;font-weight:bold">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p style="color:red;font-weight:bold">[% c.flash.error_msg %]</p>[% END %]
+[% IF error_msg %]<p style="color:red">Error: [% error_msg %]</p>[% END %]
+
+[% IF invoices.size %]
+<table border="1" cellpadding="6" style="border-collapse:collapse;width:100%;">
+  <thead>
+    <tr style="background:#f0f0f0;">
+      <th>Invoice #</th>
+      <th>Customer</th>
+      <th>Date</th>
+      <th>Due</th>
+      <th>Total</th>
+      <th>Status</th>
+      <th>Paid</th>
+      <th>Order</th>
+      <th></th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH inv IN invoices %]
+    [% SET row_bg = (inv.status == 'posted') ? '#f0fff0' : (inv.status == 'void') ? '#fff0f0' : '#fff' %]
+    <tr style="background:[% row_bg %]">
+      <td><a href="/Inventory/sales/view/[% inv.id %]">[% inv.invoice_number | html %]</a></td>
+      <td>[% inv.customer_name | html %]</td>
+      <td>[% inv.invoice_date | html %]</td>
+      <td>[% inv.due_date || '—' %]</td>
+      <td style="text-align:right">$[% inv.total_amount %]</td>
+      <td>
+        [% IF inv.status == 'posted' %]<span style="color:green;font-weight:bold">Posted</span>
+        [% ELSIF inv.status == 'void' %]<span style="color:red">Void</span>
+        [% ELSE %]<span style="color: var(--text-muted-color, #666)">Draft</span>
+        [% END %]
+      </td>
+      <td style="text-align:center">
+        [% IF inv.payment_status == 'paid' %]
+          <span style="color:green;font-weight:bold">&#10003; Paid</span>
+        [% ELSIF inv.amount_paid > 0 %]
+          <span style="color:#b45309">Partial $[% inv.amount_paid %]</span>
+        [% ELSE %]
+          <span style="color:#dc2626">Unpaid</span>
+        [% END %]
+      </td>
+      <td>
+        [% IF inv.customer_order %]
+          <a href="/CustomerOrder/view/[% inv.customer_order.id %]">Order #[% inv.customer_order.id %]</a>
+        [% ELSE %]—[% END %]
+      </td>
+      <td>
+        <a href="/Inventory/sales/view/[% inv.id %]">View</a>
+        [% IF inv.status == 'draft' %]
+          &nbsp;|&nbsp;
+          <form method="POST" action="/Inventory/sales/post/[% inv.id %]" style="display:inline"
+                onsubmit="return confirm('Post this invoice? This will update stock and create GL entries.');">
+            <input type="submit" value="Post"
+                   style="background: var(--success-color, #28a745);color:white;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;">
+          </form>
+        [% END %]
+      </td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No sales invoices yet. <a href="/Inventory/sales/new">Create the first one.</a></p>
+[% END %]
+
+

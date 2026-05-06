@@ -153,7 +153,7 @@
             </tbody>
         </table>
 
-        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <div style="background: #e8f5e9; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
             <p><strong>✅ Status:</strong> Theme CSS infrastructure is complete and functional. All necessary theme files present with clear organization.</p>
         </div>
     </div>
@@ -213,18 +213,18 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>weaverbeck</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">⚠️ NOT CONFIGURED</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Missing</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff3cd;">⚠️ Uses default</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff3cd);">⚠️ Uses default</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>shanta</strong></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">⚠️ NOT CONFIGURED</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">Missing</td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff3cd;">⚠️ Uses default</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff3cd);">⚠️ Uses default</td>
                 </tr>
             </tbody>
         </table>
 
-        <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <div style="background: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--caution-color, #ffc107);">
             <h4>⚠️ Issue Identified</h4>
             <p><strong>2 sites missing theme mappings:</strong> <code>weaverbeck</code> and <code>shanta</code> are not configured in `site_themes` section of `theme_definitions.json`. They fall back to `default` theme.</p>
             <p><strong>Recommendation:</strong> Add theme mappings for both sites or create site-specific themes.</p>
@@ -265,7 +265,7 @@
             <li><code>--font-size-xlarge</code> = 24px</li>
         </ul>
 
-        <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #28a745;">
+        <div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);">
             <p><strong>✅ Status:</strong> CSS variables are properly defined in all themes and can be used throughout the application with `var(--variable-name)` syntax.</p>
         </div>
     </div>
@@ -274,7 +274,7 @@
     <div class="content-section">
         <h2 id="finding-4-inline-styles">🔴 Finding 4: Inline Styles Compliance Gap (CRITICAL FINDING)</h2>
 
-        <div class="alert alert-warning" style="background: #fff3cd; border: 1px solid #ffc107;">
+        <div class="alert alert-warning" style="background: var(--caution-bg, #fff3cd); border: 1px solid var(--caution-color, #ffc107);">
             <h3>❌ COMPLIANCE ISSUE IDENTIFIED</h3>
             <p><strong>Total Inline Styles Found:</strong> <strong>1,936 style="..." attributes</strong></p>
             <p><strong>Affected Files:</strong> <strong>56 documentation .tt files</strong></p>
@@ -292,7 +292,7 @@
 
         <h3>Example of the Problem</h3>
         <pre><code>❌ BEFORE (Current - inline styles):
-&lt;div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #28a745;"&gt;
+&lt;div style="background: #d4edda; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--success-color, #28a745);"&gt;
 
 ✅ AFTER (Refactored - CSS variables):
 &lt;div style="background: var(--success-bg); padding: var(--spacing-medium); border-radius: var(--border-radius); margin: var(--spacing-lg) 0; border-left: 4px solid var(--success-color);"&gt;</code></pre>
@@ -347,31 +347,31 @@
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1.5 hours</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">6</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">6</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>DOCUMENTATION_SYSTEM_AUDIT_PLAN.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">292</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1-1.5 hours</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">7</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">7</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>MasterPlanCoordination.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">250</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1-1.5 hours</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">8</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">8</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>AI_CHAT_DOCUMENTATION_FEATURE_SPEC.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">243</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1-1.5 hours</td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">9</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">9</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">221</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1 hour</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff9c4; text-align: center;">10</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff9c4); text-align: center;">10</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><code>system/Phase0KubernetesReadinessPlan.tt</code></td>
                     <td style="padding: 10px; border: 1px solid var(--border-color); text-align: center; font-weight: bold;">209</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">1 hour</td>
@@ -474,7 +474,7 @@
                 </tr>
                 <tr>
                     <td style="padding: 10px; border: 1px solid var(--border-color);"><strong>Site Mappings</strong></td>
-                    <td style="padding: 10px; border: 1px solid var(--border-color); background: #fff3cd; text-align: center;">⚠️ Partial</td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color); background: var(--caution-bg, #fff3cd); text-align: center;">⚠️ Partial</td>
                     <td style="padding: 10px; border: 1px solid var(--border-color);">6/8 sites configured; 2 missing (weaverbeck, shanta)</td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
@@ -490,7 +490,7 @@
             </tbody>
         </table>
 
-        <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid #ffc107;">
+        <div style="background: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 4px; margin: 20px 0; border-left: 4px solid var(--caution-color, #ffc107);">
             <h4>🎯 Overall Assessment: FUNCTIONAL WITH QUALITY ISSUES</h4>
             <p><strong>The theme system works correctly</strong>, but quality standards are not being met. Inline styles make future theme maintenance difficult and violate CSS best practices.</p>
             <p><strong>Recommendation Level:</strong> <strong>MEDIUM PRIORITY</strong> - Should be addressed in next refactoring cycle (not blocking current operations).</p>
@@ -591,7 +591,7 @@
         </div>
     </div>
 
-    <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
+    <div class="footer" style="margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color, #ddd); text-align: center; color: var(--text-muted-color, #666); font-size: 12px;">
         <p>B.3 Theme Handling - Complete Audit Report | Version 0.01 | Generated Dec 26, 2025 19:25 UTC</p>
         <p>Part of Daily Plan Dec 26 Quick Wins | Reference: MasterPlanCoordination.tt</p>
         <p><strong>Audit Findings:</strong> Theme system functional (✅), CSS variables available (✅), Site mappings partial (⚠️), Inline styles compliance critical (❌)</p>

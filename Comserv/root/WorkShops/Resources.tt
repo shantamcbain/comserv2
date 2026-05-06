@@ -51,7 +51,7 @@
 .badge-access { font-size: 0.7em; padding: 2px 6px; border-radius: 10px; display: inline-block; margin-top: 4px; }
 .badge-all     { background: #d4edda; color: #155724; }
 .badge-site    { background: #cce5ff; color: #004085; }
-.badge-workshop { background: #fff3cd; color: #856404; }
+.badge-workshop { background: var(--caution-bg, #fff3cd); color: #856404; }
 
 /* Upload panel */
 .upload-panel {
@@ -398,7 +398,7 @@
         </details>
 
         [% IF lib_error %]
-        <div class="alert alert-warning" style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin-bottom:12px;">
+        <div class="alert alert-warning" style="background: var(--caution-bg, #fff3cd);border:1px solid var(--caution-color, #ffc107);padding:10px;border-radius:4px;margin-bottom:12px;">
             <strong>File library error:</strong>
             [% IF c.session.debug_mode == 1 %]<small>[% lib_error | html %]</small>[% ELSE %] Could not load file records.[% END %]
         </div>
@@ -484,12 +484,12 @@
                     [% ELSIF f.nfs_path %]
                         <a href="/workshop/resource_fs_download?path=[% f.nfs_path | uri | html %]" class="btn btn-sm" title="Download">⬇️</a>
                     [% END %]
-                    <button class="btn btn-sm" style="background:#007bff;color:#fff;"
+                    <button class="btn btn-sm" style="background: var(--primary-color, #007bff);color:#fff;"
                             onclick="openFileModal([% f.id %], '[% f.file_name | html %]', '[% ftype %]')"
                             title="Preview">🔍</button>
                     <details style="display:inline-block;position:relative;">
-                        <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#28a745;color:#fff;" title="Attach to Workshop">📎</summary>
-                        <div style="position:absolute;right:0;top:100%;z-index:200;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                        <summary class="btn btn-sm" style="display:inline-block;list-style:none;background: var(--success-color, #28a745);color:#fff;" title="Attach to Workshop">📎</summary>
+                        <div style="position:absolute;right:0;top:100%;z-index:200;background: rgba(255,255,255,0.88);border:1px solid #ccc;border-radius:6px;padding:12px;min-width:240px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/resource_attach">
                                 <input type="hidden" name="file_id" value="[% f.id %]">
                                 <div style="margin-bottom:7px;">
@@ -508,13 +508,13 @@
                                         <option value="all_leaders">All Leaders</option>
                                     </select>
                                 </div>
-                                <button type="submit" class="btn btn-sm" style="background:#28a745;color:#fff;width:100%;">📎 Attach</button>
+                                <button type="submit" class="btn btn-sm" style="background: var(--success-color, #28a745);color:#fff;width:100%;">📎 Attach</button>
                             </form>
                         </div>
                     </details>
                     <details style="display:inline-block;position:relative;">
                         <summary class="btn btn-sm" style="display:inline-block;list-style:none;background:#6c757d;color:#fff;" title="Edit File Record">✏️</summary>
-                        <div style="position:absolute;right:0;top:100%;z-index:210;background:#fff;border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
+                        <div style="position:absolute;right:0;top:100%;z-index:210;background: rgba(255,255,255,0.88);border:1px solid #ccc;border-radius:6px;padding:12px;min-width:320px;box-shadow:0 4px 12px rgba(0,0,0,0.2);">
                             <form method="POST" action="/workshop/file_update">
                                 <input type="hidden" name="file_id" value="[% f.id %]">
                                 <div style="margin-bottom:7px;">
@@ -710,7 +710,7 @@
 }
 .modal-overlay.open { display: flex; }
 .modal-content {
-    background: #fff;
+    background: rgba(255,255,255,0.88);
     padding: 24px;
     border-radius: 8px;
     position: relative;
@@ -889,7 +889,7 @@
                 ? '<img src="' + dl + '" alt="" loading="lazy" style="max-height:46px;max-width:56px;object-fit:cover;border-radius:3px;cursor:pointer;display:block;margin:auto;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')" onerror="this.replaceWith(Object.assign(document.createElement(\'span\'),{textContent:\'' + icon + '\',style:\'font-size:1.6em;cursor:pointer\'}))">'
                 : '<span style="font-size:1.6em;cursor:pointer;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + icon + '</span>';
             var searchBlob = ((f.file_name || '') + ' ' + (f.file_path || '')).toLowerCase();
-            var attachBtn = '<button class="btn btn-sm" style="background:#28a745;color:#fff;" onclick="openAttachModal(\'' + jsEsc(f.file_name) + '\', \'' + jsEsc(f.file_path) + '\')" title="Attach to Workshop">➕</button>';
+            var attachBtn = '<button class="btn btn-sm" style="background: var(--success-color, #28a745);color:#fff;" onclick="openAttachModal(\'' + jsEsc(f.file_name) + '\', \'' + jsEsc(f.file_path) + '\')" title="Attach to Workshop">➕</button>';
             var dbBadge = f.db_id ? '<span class="badge-access badge-site" title="Registered in Database">DB</span>' : '';
             
             return '<tr data-name="' + escHtml(f.file_name.toLowerCase()) + '" data-search="' + escHtml(searchBlob) + '" data-ftype="' + ftype + '">' +
@@ -897,7 +897,7 @@
                 '<td><span style="cursor:pointer;text-decoration:underline;" onclick="openFsModal(\'' + jsEsc(f.file_name) + '\',\'' + ext + '\',\'' + enc + '\')">' + escHtml(f.file_name) + '</span> ' + dbBadge + '</td>' +
                 '<td>' + escHtml((f.file_ext || '').toUpperCase()) + '</td>' +
                 '<td style="white-space:nowrap;">' + sizeLabel + '</td>' +
-                '<td style="font-size:0.78em;color:#666;">' + escHtml(f.file_path) + '</td>' +
+                '<td style="font-size:0.78em;color: var(--text-muted-color, #666);">' + escHtml(f.file_path) + '</td>' +
                 '<td><div style="display:flex;gap:4px;"><a href="' + dl + '" class="btn btn-sm">⬇️</a>' + attachBtn + '</div></td>' +
                 '</tr>';
         });

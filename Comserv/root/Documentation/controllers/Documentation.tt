@@ -15,7 +15,7 @@
         <div class="col-100">
             <h1 style="color: var(--primary-color); font-family: var(--header-font);">Documentation Controller</h1>
             
-            <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+            <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
                 <ul style="list-style-position: inside; color: var(--text-color);">
                     <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">Overview</a></li>
@@ -31,7 +31,7 @@
                 </ul>
             </div>
 
-            <div id="recent-changes" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
+            <div id="recent-changes" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-large) 0; border-radius: 4px; margin-bottom: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">📝 Recent Changes (v0.04 - Jan 13, 2026)</h3>
                 <ul style="color: var(--text-color); margin: 10px 0 0 20px;">
                     <li><strong>Documentation Structure:</strong> Created /Documentation/views/ directory to organize View documentation parallel to controllers/ and models/ directories</li>
@@ -46,7 +46,7 @@
             <div id="overview" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Overview</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
-                    The Documentation Controller (<code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">Comserv::Controller::Documentation</code>) manages the documentation system in the Comserv application. It provides routes for accessing documentation pages, handles role-based access control, and organizes documentation into categories.
+                    The Documentation Controller (<code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">Comserv::Controller::Documentation</code>) manages the documentation system in the Comserv application. It provides routes for accessing documentation pages, handles role-based access control, and organizes documentation into categories.
                 </p>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
@@ -54,7 +54,7 @@
             <div id="file-location" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">File Location</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>IMPORTANT</strong>: The controller file must be located at:</p>
-                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm</pre>
+                <pre style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">/home/shanta/PycharmProjects/comserv2/Comserv/lib/Comserv/Controller/Documentation.pm</pre>
                 
                 <div style="background-color: var(--warning-color); opacity: 0.1; border-left: 4px solid var(--warning-color); border-radius: 4px; padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
                     <p style="margin-top: 0;"><strong style="color: var(--warning-color);">⚠ WARNING</strong>: There was previously a critical issue where the filename (<code style="background-color: rgba(255,193,7,0.1); padding: 2px 6px; border-radius: 3px;">Documantation.pm</code> with an 'a') did not match the package name (<code style="background-color: rgba(255,193,7,0.1); padding: 2px 6px; border-radius: 3px;">Comserv::Controller::Documentation</code> with an 'o'). This mismatch caused route failures. Always ensure filenames match their package declarations.</p>
@@ -68,22 +68,22 @@
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Main Routes</h3>
                 <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation</code> - Main documentation index (uppercase)</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/documentation</code> - Alternative route (lowercase)</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/[page]</code> - View specific documentation page</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/documentation/[page]</code> - Alternative route for specific page</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation</code> - Main documentation index (uppercase)</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/documentation</code> - Alternative route (lowercase)</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/[page]</code> - View specific documentation page</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/documentation/[page]</code> - Alternative route for specific page</li>
                 </ul>
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Special Routes</h3>
                 <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_system_overview</code> - Overview of the documentation system</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_filename_issue</code> - Information about the filename/package mismatch issue</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/logging_best_practices</code> - Best practices for logging</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/ai_guidelines</code> - Guidelines for AI assistants</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/controller_routing_guidelines</code> - Guidelines for controller routing</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/controllers</code> - Documentation for controllers</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_update_summary</code> - Summary of documentation updates</li>
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/Documentation/linux_commands</code> - Linux Commands Reference (redirects to HelpDesk controller)</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_system_overview</code> - Overview of the documentation system</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_filename_issue</code> - Information about the filename/package mismatch issue</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/logging_best_practices</code> - Best practices for logging</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/ai_guidelines</code> - Guidelines for AI assistants</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/controller_routing_guidelines</code> - Guidelines for controller routing</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/controllers</code> - Documentation for controllers</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/documentation_update_summary</code> - Summary of documentation updates</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/Documentation/linux_commands</code> - Linux Commands Reference (redirects to HelpDesk controller)</li>
                 </ul>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
@@ -121,7 +121,7 @@
             <div id="logging" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Logging</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font);">The controller uses comprehensive logging to track access and troubleshoot issues:</p>
-                <pre style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
+                <pre style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-medium); color: var(--text-color); overflow-x: auto; font-size: var(--font-size-small);">$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name',
     "Detailed message with relevant information");</pre>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
@@ -181,7 +181,7 @@
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
 
-            <div id="last-updated" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
+            <div id="last-updated" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">Last Updated</h3>
                 <p style="color: var(--muted-color); font-size: var(--font-size-small); margin: 0;">
                     <strong>Date:</strong> Tue Jan 06 2026 15:17:55 UTC<br>

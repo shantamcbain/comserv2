@@ -60,7 +60,7 @@
                 <p>For administrative users, a persistent health banner will appear at the top of the browser if issues are detected. This banner is updated every 30 seconds via AJAX polling.</p>
                 <ul>
                     <li><span class="status-pending">⚠️ WARNING</span>: Triggered by recent error logs or high resource usage.</li>
-                    <li><span class="status-completed" style="background:#dc3545;color:white;">🔴 CRITICAL</span>: Triggered by database downtime or severe system deterioration.</li>
+                    <li><span class="status-completed" style="background: var(--danger-color, #dc3545);color:white;">🔴 CRITICAL</span>: Triggered by database downtime or severe system deterioration.</li>
                 </ul>
                 <p>Desktop notifications will also be triggered if browser permissions are granted.</p>
             </section>

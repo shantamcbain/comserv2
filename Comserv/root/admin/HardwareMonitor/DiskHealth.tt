@@ -1,0 +1,263 @@
+[% META
+   title        = "Disk Health & Cleanup"
+   description  = "Monitor disk space usage and clean up wasted space"
+   roles        = "admin"
+   TemplateType = "Application"
+   category     = "Admin"
+   page_version = "0.01"
+   last_updated = "2026-04-22"
+%]
+[% PageVersion = 'admin/HardwareMonitor/DiskHealth.tt,v 0.01 2026/04/22 AI Exp AI ' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.dh-grid      { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; margin-bottom:20px; }
+.dh-card      { border:1px solid #e0e0e0; border-radius:6px; padding:16px; background: var(--card-bg, rgba(255,255,255,0.88)); }
+.dh-card h3   { margin:0 0 12px; font-size:1rem; display:flex; align-items:center; gap:8px; }
+.dh-bar-wrap  { height:14px; background: var(--nav-hover-bg, rgba(255,255,255,0.15)); border-radius:3px; margin:6px 0; position:relative; overflow:hidden; }
+.dh-bar       { height:14px; border-radius:3px; }
+.dh-bar.ok       { background:#4caf50; }
+.dh-bar.warn     { background:#ff9800; }
+.dh-bar.critical { background:#f44336; }
+.dh-badge     { display:inline-block; padding:1px 7px; border-radius:10px; font-size:.72rem; font-weight:bold; vertical-align:middle; }
+.dh-badge.ok       { background:#e8f5e9; color:#1b5e20; }
+.dh-badge.warn     { background:#fff3e0; color:#e65100; }
+.dh-badge.critical { background:#ffebee; color:#b71c1c; }
+.dh-badge.open     { background:#ffe082; color:#7d4e00; }
+.dh-badge.ack      { background:#e3f2fd; color:#0d47a1; }
+.dh-badge.resolved { background:#e8f5e9; color:#1b5e20; }
+.dh-alert-row { border-left:4px solid; padding:10px 14px; margin-bottom:8px; border-radius:0 4px 4px 0; background: var(--bg-secondary, #f9f9f9); }
+.dh-alert-row.CRITICAL { border-color:#f44336; background:#fff5f5; }
+.dh-alert-row.HIGH     { border-color:#ff9800; background:#fff8f0; }
+.dh-section   { background: var(--card-bg, rgba(255,255,255,0.88)); border:1px solid #e0e0e0; border-radius:6px; padding:16px; margin-bottom:20px; }
+.dh-section h2 { margin:0 0 14px; font-size:1.05rem; border-bottom:1px solid #eee; padding-bottom:8px; }
+.dh-table     { width:100%; border-collapse:collapse; font-size:.88rem; }
+.dh-table th  { background: var(--bg-secondary, #f5f5f5); text-align:left; padding:6px 10px; border-bottom: 2px solid var(--border-color, #ddd); white-space:nowrap; }
+.dh-table td  { padding:5px 10px; border-bottom:1px solid #eee; vertical-align:middle; }
+.dh-cleanup-row { display:flex; align-items:center; justify-content:space-between; padding:10px 0; border-bottom:1px solid #eee; }
+.dh-cleanup-row:last-child { border-bottom:none; }
+.dh-cleanup-info { font-size:.9rem; }
+.dh-cleanup-info strong { display:block; margin-bottom:2px; }
+.dh-cleanup-info span { color: var(--text-muted-color, #666); font-size:.82rem; }
+pre.dh-pre    { background:#1e1e1e; color:#ddd; padding:12px; border-radius:4px; font-size:.8rem; overflow-x:auto; margin:0; }
+</style>
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#128202; Disk Health &amp; Cleanup</h1>
+  </div>
+
+  <div style="margin-bottom:10px">
+    <a href="/admin/hardware_monitor" class="btn btn-secondary btn-sm">&larr; Hardware Monitor</a>
+    <a href="/admin/hardware_monitor/disk_diagnose?hostname=workstation&path=/" class="btn btn-secondary btn-sm">&#128202; Disk Diagnose</a>
+    <a href="/file/duplicates" class="btn btn-secondary btn-sm">&#128461; Duplicates</a>
+    <a href="/file/admin_browser" class="btn btn-secondary btn-sm">&#128193; File Browser</a>
+  </div>
+
+  [% IF c.flash.success_msg %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#1b5e20">
+    <strong>&#10003;</strong> [% c.flash.success_msg | html %]
+  </div>
+  [% END %]
+  [% IF c.flash.error_msg %]
+  <div style="background:#fde8e8;border:1px solid #e57373;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#b71c1c">
+    <strong>&#9888;</strong> [% c.flash.error_msg | html %]
+  </div>
+  [% END %]
+
+  [%# ── OPEN ALERTS ─────────────────────────────────────────────── %]
+  [% IF open_alerts && open_alerts.size > 0 %]
+  <div class="dh-section">
+    <h2>&#128680; Open Disk Space Alerts ([% open_alerts.size %])</h2>
+    [% FOR alert IN open_alerts %]
+    <div class="dh-alert-row [% alert.level | html %]">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+        <div>
+          <span class="dh-badge [% alert.level == 'CRITICAL' ? 'critical' : 'warn' %]">
+            [% alert.level | html %]
+          </span>
+          <strong style="margin-left:6px">[% alert.description | html %]</strong><br>
+          <span style="font-size:.78rem;color: var(--text-muted-color, #666)">
+            First seen: [% alert.first_seen | html %] &nbsp;|&nbsp;
+            Last seen: [% alert.last_seen | html %] &nbsp;|&nbsp;
+            Occurrences: [% alert.occurrence_count | html %]
+          </span>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <form method="post" action="/admin/hardware_monitor/disk_health" style="display:inline">
+            <input type="hidden" name="action"   value="acknowledge">
+            <input type="hidden" name="alert_id" value="[% alert.id | html %]">
+            <button type="submit" class="btn btn-sm btn-secondary">Acknowledge</button>
+          </form>
+          <form method="post" action="/admin/hardware_monitor/disk_health" style="display:inline">
+            <input type="hidden" name="action"   value="resolve">
+            <input type="hidden" name="alert_id" value="[% alert.id | html %]">
+            <button type="submit" class="btn btn-sm btn-primary">Resolve</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    [% END %]
+  </div>
+  [% ELSE %]
+  <div style="background:#e8f5e9;border:1px solid #81c784;border-radius:4px;padding:10px 14px;margin-bottom:12px;color:#1b5e20;font-size:.9rem">
+    &#10003; No open disk space alerts.
+  </div>
+  [% END %]
+
+  [%# ── DISK USAGE BARS ─────────────────────────────────────────── %]
+  <div class="dh-section">
+    <h2>&#128190; Current Disk Usage (this server)</h2>
+    [% IF df_rows && df_rows.size > 0 %]
+    <table class="dh-table">
+      <thead>
+        <tr><th>Device</th><th>Mount</th><th>Size</th><th>Used</th><th>Free</th><th style="min-width:180px">Usage</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        [% FOR row IN df_rows %]
+        <tr>
+          <td style="font-family:monospace;font-size:.82rem">[% row.device | html %]</td>
+          <td><strong>[% row.mount | html %]</strong></td>
+          <td>[% row.size | html %]</td>
+          <td>[% row.used | html %]</td>
+          <td>[% row.avail | html %]</td>
+          <td>
+            <div class="dh-bar-wrap">
+              <div class="dh-bar [% row.level %]" style="width:[% row.pct %]%"></div>
+            </div>
+            [% row.pct %]%
+          </td>
+          <td>
+            <span class="dh-badge [% row.level %]">
+              [% row.level == 'critical' ? 'CRITICAL' : row.level == 'warn' ? 'WARNING' : 'OK' %]
+            </span>
+            [% IF row.level == 'warn' || row.level == 'critical' %]
+            <a href="/admin/hardware_monitor/disk_diagnose?hostname=workstation&path=[% row.mount | uri %]"
+               class="btn btn-sm" style="margin-left:6px;font-size:.72rem">&#9658; Diagnose</a>
+            [% END %]
+          </td>
+        </tr>
+        [% END %]
+      </tbody>
+    </table>
+    [% ELSE %]
+    <p class="empty-state">Could not retrieve disk usage data.</p>
+    [% END %]
+
+    [% IF nfs_usage && nfs_usage.pct %]
+    <div style="margin-top:14px;padding-top:10px;border-top:1px solid #eee">
+      <strong>NFS Storage ([% nfs_root | html %]):</strong>
+      [% nfs_usage.used | html %] used of [% nfs_usage.size | html %]
+      ([% nfs_usage.pct %]% — <span class="dh-badge [% nfs_usage.level %]">
+        [% nfs_usage.level == 'critical' ? 'CRITICAL' : nfs_usage.level == 'warn' ? 'WARNING' : 'OK' %]
+      </span>)
+      &nbsp;<a href="/file/admin_browser" class="btn btn-sm btn-secondary">Browse NFS</a>
+    </div>
+    [% END %]
+  </div>
+
+  [%# ── CLEANUP OPPORTUNITIES ─────────────────────────────────── %]
+  <div class="dh-section">
+    <h2>&#129529; Cleanup Opportunities</h2>
+
+    <div class="dh-cleanup-row">
+      <div class="dh-cleanup-info">
+        <strong>&#128461; Duplicate Files</strong>
+        <span>[% dup_count %] duplicate records in database
+          [% IF dup_size_mb > 0 %]— approximately [% dup_size_mb %] MB of wasted space[% END %]
+        </span>
+      </div>
+      [% IF dup_count > 0 %]
+      <a href="/file/duplicates" class="btn btn-primary btn-sm">Review &amp; Delete Duplicates</a>
+      [% ELSE %]
+      <span class="dh-badge ok">None</span>
+      [% END %]
+    </div>
+
+    <div class="dh-cleanup-row">
+      <div class="dh-cleanup-info">
+        <strong>&#127895; Orphaned DB Records</strong>
+        <span>[% orphaned_count %] file records whose files no longer exist on disk</span>
+      </div>
+      [% IF orphaned_count > 0 %]
+      <form method="post" action="/admin/hardware_monitor/disk_health">
+        <input type="hidden" name="action" value="purge_orphaned">
+        <button type="submit" class="btn btn-sm"
+                style="background:#e65100;color:#fff;border:none"
+                onclick="return confirm('Delete [% orphaned_count %] orphaned database records? This only removes DB records, not files on disk.')">
+          Purge [% orphaned_count %] Orphaned Records
+        </button>
+      </form>
+      [% ELSE %]
+      <span class="dh-badge ok">None</span>
+      [% END %]
+    </div>
+
+    <div class="dh-cleanup-row">
+      <div class="dh-cleanup-info">
+        <strong>&#128196; Application Logs</strong>
+        <span>[% log_files.size %] log files — largest shown below</span>
+      </div>
+      <a href="/file/admin_browser?dir_path=[% c.config.home | uri %]/logs" class="btn btn-sm btn-secondary">Browse Logs</a>
+    </div>
+
+    [% IF log_files && log_files.size > 0 %]
+    <table class="dh-table" style="margin-top:8px;font-size:.82rem">
+      <thead><tr><th>File</th><th>Size (MB)</th></tr></thead>
+      <tbody>
+        [% FOR lf IN log_files %]
+        <tr>
+          <td style="font-family:monospace">[% lf.name | html %]</td>
+          <td>[% lf.size_mb | html %] MB</td>
+        </tr>
+        [% END %]
+      </tbody>
+    </table>
+    [% END %]
+
+    <div class="dh-cleanup-row" style="margin-top:8px">
+      <div class="dh-cleanup-info">
+        <strong>&#128230; Docker Disk Usage</strong>
+        <span>Images, containers, volumes and build cache</span>
+      </div>
+      <a href="/admin/docker-system-df" class="btn btn-sm btn-secondary">Docker System DF</a>
+    </div>
+    [% IF docker_df %]
+    <pre class="dh-pre" style="margin-top:8px">[% docker_df | html %]</pre>
+    [% END %]
+  </div>
+
+  [%# ── QUICK ACTIONS ────────────────────────────────────────── %]
+  <div class="dh-section">
+    <h2>&#9889; Quick Actions</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:10px">
+      <a href="/admin/hardware_monitor/disk_diagnose?hostname=workstation&path=/" class="btn btn-secondary">
+        &#128202; Drill into disk usage
+      </a>
+      <a href="/file/duplicates" class="btn btn-secondary">
+        &#128461; Manage duplicates
+      </a>
+      <a href="/file/list?file_status=orphaned" class="btn btn-secondary">
+        &#127895; View orphaned files
+      </a>
+      <a href="/file/admin_browser" class="btn btn-secondary">
+        &#128193; File browser (NFS)
+      </a>
+      <a href="/file/nfs_allocations" class="btn btn-secondary">
+        &#128279; NFS allocations
+      </a>
+    </div>
+
+    <div style="margin-top:14px;padding:12px;background:#f5f5f5;border-radius:4px;font-size:.82rem;color: var(--text-color, #555)">
+      <strong>What eats disk space most often:</strong>
+      <ul style="margin:6px 0 0 16px">
+        <li>Duplicate files across NFS directories — use the <a href="/file/duplicates">Duplicates page</a></li>
+        <li>Application logs growing unbounded — truncate or archive regularly</li>
+        <li>Unused Docker images/volumes — run <code>docker system prune</code></li>
+        <li>Old workshop/upload files never cleaned up — use the <a href="/file/admin_browser">File Browser</a></li>
+        <li>Proxmox backups stored on the NFS drive — configure retention policy in Proxmox</li>
+      </ul>
+    </div>
+  </div>
+
+</div>

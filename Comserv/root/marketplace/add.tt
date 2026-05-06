@@ -1,0 +1,344 @@
+[% META title = 'Post a Listing' %]
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="listing_type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('input[name="listing_type"]').forEach(function(r) {
+                r.closest('label').style.borderColor = '#dee2e6';
+                r.closest('label').style.background  = '';
+            });
+            if (this.checked) {
+                this.closest('label').style.borderColor = 'var(--primary-color, #007bff)';
+                this.closest('label').style.background  = '#f0f7ff';
+            }
+        });
+    });
+
+    // Inject "Fill Listing" tab into the floating chat widget once it appears
+    function injectWidgetFillTab() {
+        var chatPanel = document.getElementById('chat-panel');
+        if (!chatPanel || document.getElementById('widget-fill-tab')) return;
+
+        var fillTab = document.createElement('div');
+        fillTab.id = 'widget-fill-tab';
+        fillTab.style.cssText = 'padding:6px 10px;background: var(--caution-bg, #fffbe6);border-top:1px solid #f0c000;font-size:0.85em;';
+        fillTab.innerHTML =
+            '<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">' +
+                '<span style="font-weight:bold;">🏷️ Fill Listing with AI:</span>' +
+                '<textarea id="wf-desc" rows="2" placeholder="e.g. Sell my 3D printer, $150, good condition, electronics" ' +
+                    'style="flex:1;min-width:160px;padding:4px 6px;border:1px solid #ccc;border-radius:4px;font-size:.85em;resize:none;"></textarea>' +
+                '<button id="wf-btn" style="padding:5px 12px;background:var(--primary-color,#007bff);color:#fff;' +
+                    'border:none;border-radius:4px;cursor:pointer;font-size:.85em;white-space:nowrap;">🤖 Fill</button>' +
+            '</div>' +
+            '<div id="wf-status" style="font-size:.8em;margin-top:4px;color: var(--text-muted-color, #555);"></div>';
+
+        var chatInput = chatPanel.querySelector('.chat-input');
+        if (chatInput) chatPanel.insertBefore(fillTab, chatInput);
+        else chatPanel.appendChild(fillTab);
+
+        document.getElementById('wf-btn').addEventListener('click', function() {
+            var desc = (document.getElementById('wf-desc').value || '').trim();
+            if (!desc) { document.getElementById('wf-status').textContent = 'Please describe your listing.'; return; }
+            var btn = document.getElementById('wf-btn');
+            var statusEl = document.getElementById('wf-status');
+            btn.disabled = true; btn.textContent = '⏳';
+            statusEl.textContent = 'Asking AI…';
+
+            var CATS = JSON.parse(document.getElementById('ai-cats-json').textContent || '[]');
+            var catList = CATS.map(function(c){ return c.id + '=' + c.name; }).join(', ');
+            var SYSTEM = 'You help fill in a marketplace listing form. ' +
+                'Return ONLY a raw JSON object with these exact keys: ' +
+                'listing_type (one of: sale, wanted, job), title (short compelling title), ' +
+                'description (detailed, 2-4 sentences), price (number, 0 if free/negotiable), ' +
+                'currency (CAD or USD), category_id (pick the best matching id from: ' + catList + '), ' +
+                'accepts_points (1 or 0). ' +
+                'No markdown, no explanation, no code fences — only the JSON object.';
+
+            fetch('/ai/get_user_providers', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(pd) {
+                var provider = 'ollama';
+                if (pd.success && pd.providers) {
+                    pd.providers.forEach(function(p) {
+                        if (p.service === 'grok' && p.models && p.models.length) provider = 'grok';
+                    });
+                }
+                return fetch('/ai/generate', {
+                    method: 'POST', credentials: 'include',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+                });
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                btn.disabled = false; btn.textContent = '🤖 Fill';
+                if (!data.success) { statusEl.textContent = '❌ ' + (data.error || 'AI error'); return; }
+                var raw = (data.response || '').trim();
+                var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+                if (js === -1) { statusEl.textContent = '❌ AI returned no JSON.'; return; }
+                var fields;
+                try { fields = JSON.parse(raw.substring(js, je + 1)); }
+                catch(e) { statusEl.textContent = '❌ Parse error: ' + e.message; return; }
+                var filled = 0;
+                Object.keys(fields).forEach(function(k) { if (window._mktFillField(k, fields[k])) filled++; });
+                statusEl.textContent = '✅ Filled ' + filled + ' field(s). Review the form above.';
+            })
+            .catch(function(e) { btn.disabled = false; btn.textContent = '🤖 Fill'; statusEl.textContent = '❌ ' + e; });
+        });
+    }
+
+    var observer = new MutationObserver(function() {
+        if (document.getElementById('chat-panel')) { injectWidgetFillTab(); observer.disconnect(); }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    injectWidgetFillTab(); // also try immediately in case widget already exists
+});
+</script>
+
+<div class="container" style="max-width:700px;margin:0 auto;padding:20px;">
+
+  <div style="margin-bottom:15px;">
+    <a href="/marketplace" style="color:var(--primary-color,#007bff);text-decoration:none;">← Back to Marketplace</a>
+  </div>
+
+  <h1 style="margin-bottom:20px;"><i class="fas fa-plus-circle"></i> Post a Listing</h1>
+
+  <!-- ── AI Listing Assistant ────────────────────────────────────────── -->
+  <details id="ai-fill-panel" style="background:var(--bg-secondary,#f8f9fa);border:1px solid var(--nav-bg,#dee2e6);
+           border-radius:8px;padding:14px 18px;margin-bottom:18px;" open>
+    <summary style="font-weight:bold;cursor:pointer;font-size:.95rem;list-style:none;display:flex;align-items:center;gap:.5rem;">
+      🤖 <span>Fill with AI — describe your listing</span>
+    </summary>
+    <div style="margin-top:12px;">
+      <textarea id="ai-listing-desc" rows="3" placeholder="e.g. I want to sell my FDM 3D printer, great condition, $150 CAD. It's electronics / computer equipment."
+                style="width:100%;box-sizing:border-box;padding:9px 12px;border:1px solid #ccc;
+                       border-radius:5px;resize:vertical;font-size:.9rem;"></textarea>
+      <div style="display:flex;gap:.6rem;align-items:center;margin-top:8px;flex-wrap:wrap;">
+        <button type="button" id="ai-fill-btn"
+                style="padding:8px 18px;background:var(--primary-color,#007bff);color:#fff;
+                       border:none;border-radius:5px;cursor:pointer;font-size:.9rem;font-weight:bold;">
+          🤖 Fill Form
+        </button>
+        <span id="ai-fill-status" style="font-size:.85rem;color: var(--text-muted-color, #555);"></span>
+      </div>
+      <pre id="ai-fill-raw" style="display:none;margin-top:8px;padding:8px;background:#f0f0f0;
+           border-radius:4px;font-size:.78rem;white-space:pre-wrap;max-height:120px;overflow:auto;"></pre>
+    </div>
+  </details>
+  <script id="ai-cats-json" type="application/json">[[% FOREACH cat IN categories %]{"id":"[% cat.id %]","name":"[% cat.name.replace('"', '\\"') %]"}[% ',' UNLESS loop.last %][% END %]]</script>
+  <script>
+  (function() {
+    var CATS = JSON.parse(document.getElementById('ai-cats-json').textContent || '[]');
+
+    function fillField(name, value) {
+      // Also exposed as window._mktFillField for the widget injection code above
+      if (value === undefined || value === null || value === '') return false;
+      var el = document.querySelector('[name="' + name + '"]');
+      if (!el) return false;
+      var v = String(value);
+      if (el.tagName === 'SELECT') {
+        var lv = v.toLowerCase();
+        for (var i = 0; i < el.options.length; i++) {
+          if (el.options[i].value.toLowerCase() === lv || el.options[i].text.toLowerCase() === lv) {
+            el.selectedIndex = i;
+            el.dispatchEvent(new Event('change', {bubbles:true}));
+            return true;
+          }
+        }
+        return false;
+      } else if (el.type === 'radio') {
+        var radios = document.querySelectorAll('[name="' + name + '"]');
+        var hit = false;
+        radios.forEach(function(r) {
+          if (r.value.toLowerCase() === v.toLowerCase()) {
+            r.checked = true;
+            r.dispatchEvent(new Event('change', {bubbles:true}));
+            hit = true;
+          } else { r.checked = false; }
+        });
+        return hit;
+      } else if (el.type === 'checkbox') {
+        el.checked = !!(v && v !== '0' && v.toLowerCase() !== 'false');
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+        return true;
+      } else {
+        el.value = v;
+        el.dispatchEvent(new Event('input',  {bubbles:true}));
+        el.dispatchEvent(new Event('change', {bubbles:true}));
+        return true;
+      }
+    }
+    window._mktFillField = fillField;
+
+    document.getElementById('ai-fill-btn').addEventListener('click', function() {
+      var desc = (document.getElementById('ai-listing-desc').value || '').trim();
+      if (!desc) { document.getElementById('ai-fill-status').textContent = 'Please describe your listing first.'; return; }
+
+      var btn = document.getElementById('ai-fill-btn');
+      var statusEl = document.getElementById('ai-fill-status');
+      btn.disabled = true;
+      btn.textContent = '⏳ Thinking…';
+      statusEl.textContent = '';
+
+      var catList = CATS.map(function(c){ return c.id + '=' + c.name; }).join(', ');
+      var SYSTEM = 'You help fill in a marketplace listing form. '
+        + 'Return ONLY a raw JSON object with these exact keys: '
+        + 'listing_type (one of: sale, wanted, job), title (short compelling title), '
+        + 'description (detailed, 2-4 sentences), price (number, 0 if free/negotiable), '
+        + 'currency (CAD or USD), category_id (pick the best matching id from: ' + catList + '), '
+        + 'accepts_points (1 or 0). '
+        + 'No markdown, no explanation, no code fences — only the JSON object.';
+
+      fetch('/ai/get_user_providers', { credentials: 'include' })
+      .then(function(r) { return r.json(); })
+      .then(function(pd) {
+        var provider = 'ollama';
+        if (pd.success && pd.providers) {
+          pd.providers.forEach(function(p) {
+            if (p.service === 'grok' && p.models && p.models.length) provider = 'grok';
+          });
+        }
+        return fetch('/ai/generate', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prompt: desc, system: SYSTEM, provider: provider, skip_role_prompt: true })
+        });
+      })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '🤖 Fill Form';
+        if (!data.success) { statusEl.textContent = '❌ AI error: ' + (data.error || 'unknown'); return; }
+        var raw = (data.response || '').trim();
+        var rawEl = document.getElementById('ai-fill-raw');
+        rawEl.textContent = raw;
+        rawEl.style.display = '';
+        var js = raw.indexOf('{'), je = raw.lastIndexOf('}');
+        if (js === -1) { statusEl.textContent = '❌ AI returned no JSON — see raw response below.'; return; }
+        var fields;
+        try { fields = JSON.parse(raw.substring(js, je + 1)); }
+        catch(e) { statusEl.textContent = '❌ JSON parse error: ' + e.message + ' — see raw response below.'; return; }
+        var filled = 0, skipped = [];
+        Object.keys(fields).forEach(function(k) {
+          if (fillField(k, fields[k])) filled++;
+          else skipped.push(k + '=' + fields[k]);
+        });
+        statusEl.textContent = '✅ Filled ' + filled + ' field(s).'
+          + (skipped.length ? ' Skipped: ' + skipped.join(', ') : '')
+          + ' Review and adjust as needed.';
+        if (filled > 0) document.getElementById('ai-fill-panel').open = false;
+      })
+      .catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '🤖 Fill Form';
+        statusEl.textContent = '❌ Request failed: ' + e;
+      });
+    });
+  })();
+  </script>
+
+  [% IF error_msg %]
+    <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% error_msg | html %]</div>
+  [% END %]
+
+  <form method="POST" action="/marketplace/add" style="background:var(--bg-color,#fff);border:1px solid var(--border-color, #ddd);border-radius:8px;padding:24px;">
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:8px;">Listing Type <span style="color:red;">*</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        [% FOR t IN [
+            {val => 'sale',   icon => '🏷️', label => 'For Sale',   desc => 'I have something to sell'},
+            {val => 'wanted', icon => '🔍', label => 'Wanted',     desc => 'I am looking for something'},
+            {val => 'job',    icon => '💼', label => 'Job / Gig',  desc => 'Offering or seeking work'},
+        ] %]
+        <label style="flex:1;min-width:140px;border:2px solid var(--border-color, #dee2e6);border-radius:6px;padding:10px;cursor:pointer;text-align:center;
+               [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]border-color:var(--primary-color,#007bff);background:#f0f7ff;[% END %]">
+          <input type="radio" name="listing_type" value="[% t.val %]"
+                 [% IF form.listing_type == t.val || (!form.listing_type && t.val == 'sale') %]checked[% END %]
+                 style="display:none;">
+          <div style="font-size:1.4rem;">[% t.icon %]</div>
+          <div style="font-weight:bold;font-size:0.95rem;">[% t.label %]</div>
+          <div style="font-size:0.75rem;color: var(--text-muted-color, #666);">[% t.desc %]</div>
+        </label>
+        [% END %]
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Title <span style="color:red;">*</span></label>
+      <input type="text" name="title" value="[% form.title | html %]" required maxlength="255"
+             placeholder="What are you selling / looking for / offering?"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Description <span style="color:red;">*</span></label>
+      <textarea name="description" required rows="6"
+                placeholder="Describe the item or service — condition, details, how to pick up or get it..."
+                style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;resize:vertical;">[% form.description | html %]</textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Price</label>
+        <input type="number" name="price" value="[% form.price || '0.00' %]" min="0" step="0.01"
+               style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+        <small style="color: var(--text-muted-color, #666);">Leave 0 for free or negotiable</small>
+      </div>
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Currency</label>
+        <select name="currency" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+          <option value="CAD" [% IF !form.currency || form.currency == 'CAD' %]selected[% END %]>CAD</option>
+          <option value="USD" [% IF form.currency == 'USD' %]selected[% END %]>USD</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Category</label>
+      <select name="category_id" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+        <option value="">— Select category —</option>
+        [% FOREACH cat IN categories %]
+          <option value="[% cat.id %]" [% IF form.category_id == cat.id %]selected[% END %]>[% cat.name | html %]</option>
+        [% END %]
+      </select>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Order / Contact URL <small style="font-weight:normal;color: var(--text-muted-color, #666);">(optional)</small></label>
+      <input type="url" name="order_url" value="[% form.order_url | html %]"
+             placeholder="https://... or leave blank"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+      <small style="color: var(--text-muted-color, #666);">Link to your ordering page or contact form</small>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Expires On <small style="font-weight:normal;color: var(--text-muted-color, #666);">(optional)</small></label>
+      <input type="date" name="expires_at" value="[% form.expires_at | html %]"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    [% IF c.stash.user_roles.grep('member').size || c.stash.user_roles.grep('admin').size %]
+    <div style="margin-bottom:20px;padding:12px;background:var(--bg-secondary,#f8f9fa);border-radius:5px;border:1px solid #e9ecef;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:bold;">
+        <input type="checkbox" name="accepts_points" value="1" [% IF form.accepts_points %]checked[% END %]
+               style="width:18px;height:18px;">
+        ★ I accept Points as payment
+      </label>
+    </div>
+    [% ELSE %]
+    <div style="margin-bottom:20px;padding:10px 14px;background:var(--bg-secondary,#f8f9fa);border-radius:5px;border:1px solid #e9ecef;color:var(--text-muted-color,#666);font-size:0.875rem;">
+      ★ <strong>Points payments</strong> are available to <a href="/membership/plans">paid members</a>. <a href="/membership/plans">Upgrade your membership</a> to offer this option.
+    </div>
+    [% END %]
+
+    <div style="display:flex;gap:10px;">
+      <button type="submit" style="padding:10px 24px;background:var(--primary-color,#007bff);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:1rem;">
+        <i class="fas fa-upload"></i> Post Listing
+      </button>
+      <a href="/marketplace" style="padding:10px 18px;border:1px solid #ccc;border-radius:5px;text-decoration:none;color:var(--text-color,#333);">Cancel</a>
+    </div>
+
+  </form>
+</div>

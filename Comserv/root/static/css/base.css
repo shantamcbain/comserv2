@@ -13,8 +13,10 @@
   --warning-color: #ff0000;
   --success-color: #009900;
   --info-color: #17a2b8;
+  --caution-color: #ffc107;
   --light-color: #f8f9fa;
   --text-muted-color: #6c757d;
+  --text-muted: var(--text-muted-color);
   --background-image: none;
   
   /* Spacing variables */
@@ -39,6 +41,18 @@
   --nav-bg: var(--primary-color);
   --nav-text: var(--text-color);
   --nav-hover-bg: rgba(0, 0, 0, 0.1);
+  --nav-link-color: var(--text-color);
+  --dropdown-bg: var(--secondary-color);
+  --header-bg: var(--primary-color);
+  --footer-bg: var(--secondary-color);
+  --footer-text-color: var(--text-color);
+  --header-color: var(--text-color);
+  --danger-color: #dc3545;
+
+  /* Alias variables for cross-theme compatibility */
+  --bg-color: var(--background-color);
+  --bg-secondary: var(--secondary-color);
+  --card-bg: var(--table-header-bg);
 }
 
 /* Base styles using variables */

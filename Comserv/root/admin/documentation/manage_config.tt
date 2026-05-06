@@ -9,7 +9,7 @@
 }
 
 .section {
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -18,7 +18,7 @@
 
 .section h2 {
     margin-top: 0;
-    color: #333;
+    color: var(--text-color, #333);
     border-bottom: 2px solid #667eea;
     padding-bottom: 10px;
 }
@@ -30,7 +30,7 @@
 }
 
 .pages-table th, .categories-table th {
-    background: #667eea;
+    background: var(--primary-color, #667eea);
     color: white;
     padding: 10px;
     text-align: left;
@@ -38,11 +38,11 @@
 
 .pages-table td, .categories-table td {
     padding: 10px;
-    border-bottom: 1px solid #ddd;
+    border-bottom: 1px solid var(--border-color, #ddd);
 }
 
 .pages-table tr:hover, .categories-table tr:hover {
-    background: #f5f5f5;
+    background: var(--bg-secondary, #f8f9fa);
 }
 
 .btn {
@@ -55,22 +55,22 @@
 }
 
 .btn-primary {
-    background: #667eea;
+    background: var(--primary-color, #667eea);
     color: white;
 }
 
 .btn-danger {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
 }
 
 .btn-success {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
 .btn-info {
-    background: #17a2b8;
+    background: var(--info-color, #17a2b8);
     color: white;
 }
 
@@ -92,7 +92,7 @@
 .form-group input, .form-group select, .form-group textarea {
     width: 100%;
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 4px;
 }
 
@@ -118,7 +118,7 @@
 }
 
 .modal-content {
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     padding: 30px;
     border-radius: 8px;
     max-width: 600px;
@@ -130,14 +130,14 @@
 .filter-box {
     margin-bottom: 20px;
     padding: 15px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     border-radius: 4px;
 }
 
 .filter-box input {
     padding: 8px;
     width: 300px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
     border-radius: 4px;
 }
 </style>
@@ -158,7 +158,7 @@
         <h2>Search Configuration</h2>
         <form method="GET" action="[% c.uri_for('/Documentation/manage_config') %]" style="margin-bottom: 20px;">
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                <input type="text" name="search_query" value="[% search_query %]" placeholder="Search for words in config..." style="flex: 1; min-width: 200px; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                <input type="text" name="search_query" value="[% search_query %]" placeholder="Search for words in config..." style="flex: 1; min-width: 200px; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                 <label style="display: flex; align-items: center; gap: 5px;">
                     <input type="checkbox" name="search_docs" value="1" [% IF search_docs %]checked[% END %]>
                     Search Documentation files
@@ -173,17 +173,17 @@
         [% IF search_results.size %]
         <div style="margin-top: 20px;">
             <h3>Search Results ([% search_results.size %])</h3>
-            <div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; border-radius: 4px;">
+            <div style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                 [% FOREACH result IN search_results %]
-                <div style="padding: 10px; border-bottom: 1px solid #eee; [% IF loop.first %]background: #f8f9fa;[% END %]">
-                    <div style="font-weight: bold; color: #333;">
+                <div style="padding: 10px; border-bottom: 1px solid var(--border-color, #eee); [% IF loop.first %]background: var(--bg-secondary, #f8f9fa);[% END %]">
+                    <div style="font-weight: bold; color: var(--text-color, #333);">
                         [% result.title %]
-                        <span style="font-size: 12px; color: #666; margin-left: 10px;">
+                        <span style="font-size: 12px; color: var(--text-muted-color, #666); margin-left: 10px;">
                             ([% result.type %], relevance: [% result.relevance %])
                         </span>
                     </div>
                     [% IF result.content %]
-                    <div style="color: #666; font-size: 14px; margin-top: 5px;">
+                    <div style="color: var(--text-muted-color, #666); font-size: 14px; margin-top: 5px;">
                         [% result.content %]
                     </div>
                     [% END %]
@@ -204,7 +204,7 @@
             </div>
         </div>
         [% ELSIF search_query %]
-        <div style="margin-top: 20px; padding: 15px; background: #f8f9fa; border-radius: 4px;">
+        <div style="margin-top: 20px; padding: 15px; background: var(--bg-secondary, #f8f9fa); border-radius: 4px;">
             No results found for "[% search_query %]".
         </div>
         [% END %]

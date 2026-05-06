@@ -25,17 +25,17 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Features</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">API</a>
-                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Access</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Features</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#api-endpoints" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">API</a>
+                <a href="#access-control" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Access</a>
+                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -59,7 +59,7 @@
                     <li><strong>Docker Restart</strong>: Trigger container restarts after critical variable changes</li>
                 </ul>
             </p>
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; color: var(--text-color);">
                 <strong>Architecture</strong>: Moose-based Catalyst subcontroller under Admin, with integrated logging (Comserv::Util::Logging), environment file management (EnvFileManager), and Docker integration (DockerManager). All methods require admin role authentication.
             </div>
             <p style="text-align: right; margin-top: var(--spacing-small);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -108,19 +108,19 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Action Methods (Catalyst Routes)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">begin() — Private Hook</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Access Control</strong>: Runs before every request. Checks admin role; returns 403 Forbidden if unauthorized.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">list() — GET /admin/environment_variables</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Display all environment variables ordered by key.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Returns</strong>: JSON/HTML list with fields: id, key, value (masked if secret), var_type, is_secret, is_editable, editable_by_roles, description, created_at, updated_at.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Error Handling</strong>: Logs errors and shows user-friendly error message on failure.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">create() — GET/POST /admin/environment_variables/create</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>GET</strong>: Shows creation form with empty fields and var_types list (string, int, bool, json, list).</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>POST</strong>: Creates new variable. Validates: key format (^[A-Za-z_][A-Za-z0-9_]*$), duplicate check. Parses affected_services CSV to JSON.</p>
@@ -128,7 +128,7 @@
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry created on success (action='create').</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">edit() — GET/POST /admin/environment_variables/edit/:id</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>GET</strong>: Shows edit form pre-populated with current variable data and affected_services list.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>POST</strong>: Updates variable value, type, secret flag, and description. Checks permissions via is_user_editable().</p>
@@ -136,21 +136,21 @@
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry with old_value/new_value on change.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">delete() — POST /admin/environment_variables/delete/:id</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Delete environment variable by ID.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Behavior</strong>: Soft-delete (may be supported) or hard delete depending on model configuration.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logging</strong>: Audit log entry (action='delete') with variable data.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">export() — GET /admin/environment_variables/export</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Export variables to a file (e.g., .env format) or JSON.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Security</strong>: Excludes secret variables by default (unless explicitly requested).</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Output</strong>: File download with exported configuration.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">audit_log() — GET /admin/environment_variables/audit_log</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Display audit trail of all variable changes (creation, edits, deletes).</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Fields</strong>: timestamp, action, user, variable_id, old_value, new_value, reason, status.</p>
@@ -159,20 +159,20 @@
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: 1.1em;">Helper Methods (Internal)</h3>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">_handle_docker_restart()</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Trigger Docker container restart for services affected by variable change.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Logic</strong>: Calls docker_manager to restart containers listed in affected_services.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">_log_audit()</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Write audit log entry for variable change.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Parameters</strong>: $c, $var_id, $action, $old_value, $new_value, $status</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Details</strong>: Stores user_id, timestamp, change metadata for compliance and debugging.</p>
             </div>
 
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); margin: var(--spacing-medium) 0; border-radius: 4px;">
                 <h4 style="color: var(--text-color); margin-top: 0;">_preview_changes()</h4>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Purpose</strong>: Show impact of proposed variable changes before committing.</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Output</strong>: Service restart list, affected dependent configurations, validation warnings.</p>
@@ -187,7 +187,7 @@
         <div class="col-100">
             <h2 id="api-endpoints" style="color: var(--text-color); font-family: var(--header-font);">4. API Endpoints</h2>
             <table style="width: 100%; border-collapse: collapse; color: var(--text-color);">
-                <thead style="background-color: var(--secondary-color);">
+                <thead style="background-color: rgba(255,255,255,0.12);">
                     <tr>
                         <th style="border: 1px solid var(--border-color); padding: 8px;">Method</th>
                         <th style="border: 1px solid var(--border-color); padding: 8px;">Path</th>
@@ -276,7 +276,7 @@
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background: #d4edda; border-left: 4px solid #28a745; padding: 12px; margin: 15px 0; border-radius: 4px;">
+            <div class="success" style="background: #d4edda; border-left: 4px solid var(--success-color, #28a745); padding: 12px; margin: 15px 0; border-radius: 4px;">
                 <h3 id="see-also" style="margin-top: 0; color: var(--text-color);">See Also</h3>
                 <ul style="color: var(--text-color);">
                     <li><a href="/Documentation/models/EnvVariable" style="color: var(--link-color);">EnvVariable Model Documentation</a></li>

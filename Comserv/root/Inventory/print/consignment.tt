@@ -1,0 +1,214 @@
+[% PageVersion = 'Inventory/print/consignment.tt,v 0.01 2026/04/21 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% SET con = consignment %]
+[% SET comm_pct = con.partner.commission_percent || 0 %]
+
+<style>
+  @media print {
+    .no-print { display: none !important; }
+    body { margin: 12mm; padding: 0; font-size: 10pt; }
+    table { font-size: 9pt; }
+    h1 { font-size: 15pt; }
+    tr { page-break-inside: avoid; }
+  }
+
+  body { font-family: Arial, sans-serif; background: #f5f5f5; margin: 0; }
+
+  .print-controls {
+    background: #333;
+    color: #fff;
+    padding: 10px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .print-controls a { color: #adf; text-decoration: none; }
+  .print-controls button {
+    background: #1565c0;
+    color: #fff;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: bold;
+  }
+
+  .slip-page {
+    max-width: 210mm;
+    margin: 12px auto;
+    background: #fff;
+    padding: 15mm;
+    box-shadow: 0 0 8px rgba(0,0,0,0.15);
+  }
+
+  @media print {
+    .slip-page { box-shadow: none; padding: 0; max-width: none; }
+  }
+
+  table.data { width: 100%; border-collapse: collapse; }
+  table.data th {
+    background: #444;
+    color: #fff;
+    padding: 5px 8px;
+    text-align: left;
+    font-size: 0.85em;
+  }
+  table.data th.right,
+  table.data td.right { text-align: right; }
+  table.data td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #ddd;
+    font-size: 0.9em;
+  }
+  table.data tr:nth-child(even) td { background: #f9f9f9; }
+  table.data tfoot td {
+    font-weight: bold;
+    border-top: 2px solid #333;
+    background: #f0f0f0;
+  }
+
+  .signature-block {
+    margin-top: 24px;
+    display: flex;
+    gap: 20mm;
+  }
+  .signature-line {
+    border-top: 1px solid #000;
+    flex: 1;
+    padding-top: 4px;
+    font-size: 0.8em;
+    color: #555;
+    text-align: center;
+  }
+</style>
+
+<div class="no-print print-controls">
+  <a href="/Inventory/consignment/view/[% con.id %]">&larr; Back to Consignment</a>
+  &nbsp;|&nbsp;
+  <a href="/Inventory/consignment">All Consignments</a>
+  &nbsp;
+  <button onclick="window.print()">&#128438; Print Slip</button>
+</div>
+
+<div class="slip-page">
+
+  <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10pt;margin-bottom:1em;border-bottom:2px solid #333;padding-bottom:0.8em">
+    <tr>
+      <td style="width:50%;vertical-align:top">
+        <strong style="font-size:13pt">[% site_info.display_name || sitename | html %]</strong>
+        [% IF site_info.business_address %]<br>[% site_info.business_address | html %][% END %]
+        [% IF site_info.business_phone %]<br>Tel: [% site_info.business_phone | html %][% END %]
+        [% IF site_info.email %]<br>[% site_info.email | html %][% END %]
+      </td>
+      <td style="width:50%;vertical-align:top;text-align:right">
+        <strong style="font-size:13pt">CONSIGNMENT SLIP</strong><br>
+        Ref: <strong>[% con.reference_number || ('C-' _ con.id) | html %]</strong><br>
+        Date: [% con.date_sent %]<br>
+        Status: [% con.status | ucfirst | html %]<br>
+        Printed: [% print_date %]
+      </td>
+    </tr>
+  </table>
+
+  <table style="width:100%;border-collapse:collapse;font-family:Arial,sans-serif;font-size:10pt;margin-bottom:1.2em">
+    <tr>
+      <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #999">
+        <strong>From:</strong><br>
+        [% site_info.display_name || sitename | html %]
+      </td>
+      <td style="width:50%;vertical-align:top;padding:6px 8px;border:1px solid #999;border-left:none">
+        <strong>To (Consignment Partner):</strong><br>
+        [% con.partner.name | html %]
+        [% IF con.partner.address %]<br>[% con.partner.address | html %][% END %]
+        [% IF con.partner.phone %]<br>Tel: [% con.partner.phone | html %][% END %]
+        [% IF con.partner.email %]<br>[% con.partner.email | html %][% END %]
+      </td>
+    </tr>
+  </table>
+
+  [% IF con.notes %]
+  <p style="font-size:0.88em;color:#555;margin:0 0 1em"><em>Notes: [% con.notes | html %]</em></p>
+  [% END %]
+
+  <table class="data" style="margin-bottom:1.2em">
+    <thead>
+      <tr>
+        <th>Item</th>
+        <th>SKU</th>
+        <th class="right">Sent</th>
+        <th class="right">Sold</th>
+        <th class="right">Returned</th>
+        <th class="right">Outstanding</th>
+        <th class="right">Retail $</th>
+        <th class="right">Gross</th>
+        <th class="right">Commission ([% comm_pct %]%)</th>
+        <th class="right">Our Net</th>
+      </tr>
+    </thead>
+    <tbody>
+    [% SET grand_gross = 0; SET grand_net = 0; SET grand_comm = 0 %]
+    [% FOREACH line IN con.lines %]
+    [% SET outstanding = line.quantity_sent - line.quantity_sold - line.quantity_returned %]
+    [% SET gross   = line.quantity_sold * (line.retail_price || 0) %]
+    [% SET comm    = gross * comm_pct / 100 %]
+    [% SET net     = gross - comm %]
+    [% grand_gross = grand_gross + gross %]
+    [% grand_net   = grand_net   + net   %]
+    [% grand_comm  = grand_comm  + comm  %]
+    <tr>
+      <td>[% line.item.name | html %]</td>
+      <td style="font-family:'Courier New',monospace;font-size:0.82em">[% line.item.sku | html %]</td>
+      <td class="right">[% line.quantity_sent %]</td>
+      <td class="right">[% line.quantity_sold %]</td>
+      <td class="right">[% line.quantity_returned %]</td>
+      <td class="right" style="font-weight:bold;color:[% outstanding > 0 ? '#e65100' : '#155724' %]">[% outstanding %]</td>
+      <td class="right">[% line.retail_price ? ('$' _ line.retail_price | format('%.2f')) : '—' %]</td>
+      <td class="right">[% gross > 0 ? ('$' _ gross | format('%.2f')) : '—' %]</td>
+      <td class="right">[% comm > 0 ? ('$' _ comm | format('%.2f')) : '—' %]</td>
+      <td class="right" style="font-weight:bold">[% net > 0 ? ('$' _ net | format('%.2f')) : '—' %]</td>
+    </tr>
+    [% END %]
+    </tbody>
+    [% IF grand_gross > 0 %]
+    <tfoot>
+      <tr>
+        <td colspan="7" style="text-align:right;padding-right:8px">Totals:</td>
+        <td class="right">$[% grand_gross | format('%.2f') %]</td>
+        <td class="right">$[% grand_comm | format('%.2f') %]</td>
+        <td class="right">$[% grand_net | format('%.2f') %]</td>
+      </tr>
+    </tfoot>
+    [% END %]
+  </table>
+
+  <p style="font-size:0.85em;color:#555;margin:0 0 0.4em">
+    Commission rate: [% comm_pct %]% — Items remain the property of [% site_info.display_name || sitename | html %] until sold.
+  </p>
+
+  <div class="signature-block" style="margin-top:2em">
+    <div class="signature-line">
+      Received by (Partner)<br>
+      <em>[% con.partner.name | html %]</em>
+    </div>
+    <div class="signature-line">
+      Released by ([% site_info.display_name || sitename | html %])<br>
+      Date: [% con.date_sent %]
+    </div>
+    <div class="signature-line">
+      Settlement received by<br>
+      <em>[% site_info.display_name || sitename | html %]</em>
+    </div>
+  </div>
+
+  <div style="margin-top:16px;font-size:0.75em;color:#aaa;text-align:right">
+    [% sitename %] Inventory System &mdash; Consignment Slip &mdash; [% print_date %]
+  </div>
+
+</div>
+
+<script>
+window.addEventListener('load', function() { window.print(); });
+</script>

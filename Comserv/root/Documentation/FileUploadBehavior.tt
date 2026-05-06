@@ -126,7 +126,7 @@
             you explicitly add it to the database.
           </li>
         </ol>
-        <p style="background:#fff3e0;border-left:4px solid #fb8c00;padding:8px 12px;border-radius:3px">
+        <p style="background: var(--caution-bg, #fff3e0);border-left:4px solid #fb8c00;padding:8px 12px;border-radius:3px">
           <strong>Result:</strong> Files appear in the Admin Browser directory listing immediately
           (because the browser reads the filesystem). They do <strong>NOT</strong> appear in the
           File List or Duplicates pages until you use the "+DB" button or the "Dir Sync" feature

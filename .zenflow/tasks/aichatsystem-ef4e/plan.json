@@ -14,36 +14,36 @@
     },
     {
       "id": "eb76e394-31c8-4839-abd7-9c351396e7b3",
-      "name": "Test all implemented features at port 4002",
-      "description": "User must test the following at workstation.local:4002 and shanta.local:4002: (1) Chat widget visible on Shanta site with black border, (2) Thinking trace visible on all responses, (3) Errors saved to conversation history, (4) Model keep-alive 2h (no cold-start on warm models), (5) create_todo AI action works when AI is asked to create a todo.",
-      "status": "Pending",
+      "name": "Planning integration + Schema Compare AI + Grok 410 fix",
+      "description": "COMPLETED: project_id/task_id/model on ai_conversations; _build_project_context injected into AI prompt; AI activity panels on todo/project/day templates; project_conversations endpoint (project+task); schema_compare guided fix with sync_schema_field ACTION; Grok pre-flight deprecated-model check; chain_query in Ollama.pm; branch merged with main.",
+      "status": "Completed",
       "sort_order": 1,
       "start_new_chat": false,
       "stop_after_completion": false,
       "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "updated_at": "2026-04-10T16:00:00.000000000Z"
     },
     {
-      "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
-      "name": "Merge aichatsystem-ef4e to main",
-      "description": "Once features are verified at port 4002, merge the branch to main. Key files changed: AI.pm, Ollama.pm, DBEncy.pm, local-chat.js, ai-chat.css, conversations.tt, TopDropListLogin.tt. Update todo #567 description to reflect full scope before merging.",
-      "status": "Pending",
+      "id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "name": "AI Project Planning Agent + 3D Print Agent + extractActions bug fix",
+      "description": "COMPLETED: _build_planning_system_prompt (5-step workflow, live project list injection, create_project+create_todo ACTIONs on confirmation); _build_3dprint_system_prompt (filament guide, troubleshooting, slicer settings, quality-first philosophy); create_project ACTION handler in AI.pm; agents.json updated with 3dprint+planning entries; Fixed extractActions regex in local-chat.js (greedy nested-JSON capture, smart-quote normalization, whitespace before ]). All merged to main.",
+      "status": "Completed",
       "sort_order": 2,
       "start_new_chat": false,
       "stop_after_completion": false,
-      "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "created_at": "2026-04-10T16:00:00.000000000Z",
+      "updated_at": "2026-04-10T17:35:00.000000000Z"
     },
     {
-      "id": "77a3a5a5-cc4e-4d4b-80db-b4aa05c140c4",
-      "name": "Planning System Integration (sub-task f1874939)",
-      "description": "Begin the 6-step Planning System Integration sub-task: (1) Audit current AI↔Planning state, (2) Add project_id/task_id to ai_conversations, (3) Inject project context into AI prompt, (4) Show AI activity on DailyPlan, (5) Link conversations to tasks, (6) End-to-end test.",
-      "status": "Pending",
+      "id": "dd34d544-b915-4a90-9825-ecd199dbd5c5",
+      "name": "AI Form Assistant + final sync to main",
+      "description": "COMPLETED: Created ai/partials/ai_form_assistant.tt (generic, role-gated, model-agnostic form-fill panel). Added to addtodo.tt, editproject.tt, AddWorkshop.tt, add_yard.tt, Navigation/add_link.tt. Features: Ask AI, Review & Correct, staged diff, field targeting, live web search toggle, model selector. Committed and synced to both worktree and main.",
+      "status": "Completed",
       "sort_order": 3,
       "start_new_chat": false,
       "stop_after_completion": false,
-      "created_at": "2026-04-01T06:06:11.607642862Z",
-      "updated_at": "2026-04-01T06:06:11.607642862Z"
+      "created_at": "2026-04-10T17:35:00.000000000Z",
+      "updated_at": "2026-04-10T19:21:00.000000000Z"
     }
   ]
 }

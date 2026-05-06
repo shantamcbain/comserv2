@@ -48,7 +48,7 @@
 
         <h3>Via CLI (Recommended for DevOps)</h3>
         <p>If you have <code>comserv-cli</code> installed, you can generate a token directly:</p>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>comserv-cli token generate --name "DailyBackup" --expires 30d</code></pre>
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>comserv-cli token generate --name "DailyBackup" --expires 30d</code></pre>
     </section>
 
     <section id="using-tokens">
@@ -56,12 +56,12 @@
         <p>Pass your token in the <code>Authorization</code> header of every API request using the <code>Bearer</code> scheme.</p>
 
         <h3>Example: curl</h3>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>curl -X GET "https://comserv.local/api/todo/1" \
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>curl -X GET "https://comserv.local/api/todo/1" \
      -H "Authorization: Bearer YOUR_API_TOKEN" \
      -H "Accept: application/json"</code></pre>
 
         <h3>Example: Python</h3>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>import requests
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>import requests
 
 api_key = "YOUR_API_TOKEN"
 url = "https://comserv.local/api/todo/create"
@@ -86,17 +86,17 @@ print(response.json())</code></pre>
         <p>To avoid passing your key manually in every command, store it in your environment or a credentials file.</p>
 
         <h3>Option A: Environment Variable (Temporary)</h3>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>export COMSERV_API_KEY="your_token_here"
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>export COMSERV_API_KEY="your_token_here"
 # Now use it in commands:
 curl -H "Authorization: Bearer $COMSERV_API_KEY" ...</code></pre>
 
         <h3>Option B: Credentials File (Permanent)</h3>
         <p>Store your key in <code>~/.comserv/credentials</code>:</p>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code># ~/.comserv/credentials
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code># ~/.comserv/credentials
 COMSERV_API_KEY=your_token_here
 COMSERV_URL=https://comserv.local</code></pre>
         <p>Set secure permissions on this file:</p>
-        <pre style="background: #f5f5f5; padding: 15px; border-radius: 4px; overflow-x: auto;"><code>chmod 600 ~/.comserv/credentials</code></pre>
+        <pre style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; overflow-x: auto;"><code>chmod 600 ~/.comserv/credentials</code></pre>
     </section>
 
     <section id="security-best-practices">
@@ -127,7 +127,7 @@ COMSERV_URL=https://comserv.local</code></pre>
         </dl>
     </section>
 
-    <div class="footer" style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: #666;">
+    <div class="footer" style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #eee; font-size: 0.9em; color: var(--text-muted-color, #666);">
         <p>Related Documents: 
             <a href="/Documentation/ImplementationPlanTodoAPIAndMasterPlanSync">Implementation Plan</a> | 
             <a href="/Documentation/Api">API Reference</a>

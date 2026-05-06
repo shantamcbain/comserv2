@@ -7,13 +7,13 @@
     max-width: 1400px;
     margin: 0 auto;
     padding: 20px;
-    background: var(--background-color);
+    background: transparent;
     min-height: calc(100vh - 200px);
 }
 
 /* Header Styles */
 .apiary-header {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     color: var(--text-color);
     padding: 30px;
     border-radius: 8px;
@@ -67,7 +67,7 @@
 }
 
 .stat-card {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     padding: 25px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -175,7 +175,7 @@
 
 /* Quick Actions */
 .quick-actions {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 30px;
@@ -210,7 +210,7 @@
 }
 
 .feature-card {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -593,7 +593,7 @@ table a.btn-success {
 }
 
 .info-card {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     padding: 25px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -614,7 +614,7 @@ table a.btn-success {
 }
 
 .access-section {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     padding: 30px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -632,7 +632,7 @@ table a.btn-success {
 
 /* Admin Section */
 .admin-section {
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     padding: 25px;
     margin-bottom: 30px;
@@ -665,7 +665,7 @@ table a.btn-success {
 
 .admin-card {
     flex: 1 1 300px;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     padding: 20px;
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
@@ -721,7 +721,7 @@ table a.btn-success {
     margin: 20px 0;
     position: static;
     z-index: auto;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     border-top: 3px solid var(--accent-color);
@@ -738,7 +738,7 @@ table a.btn-success {
 .no-data-message {
     text-align: center;
     padding: 40px 20px;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     box-shadow: 0 2px 8px rgba(0,0,0,0.1);
     border-top: 3px solid var(--primary-color);
@@ -857,7 +857,7 @@ table a.btn-success {
     padding: 12px 15px;
     border: 2px solid var(--border-color);
     border-radius: 8px;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     color: var(--text-color);
     font-size: 1rem;
     transition: all 0.3s ease;
@@ -1109,7 +1109,7 @@ textarea.form-input {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
 }
 
 .account-card h3 {
@@ -1158,7 +1158,7 @@ textarea.form-input {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     transition: transform 0.2s ease;
 }
 
@@ -1223,7 +1223,7 @@ textarea.form-input {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -1284,7 +1284,7 @@ textarea.form-input {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     text-align: center;
     position: relative;
 }
@@ -1365,7 +1365,7 @@ textarea.form-input {
     border-radius: 4px;
     font-size: 1rem;
     transition: border-color 0.2s ease;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     color: var(--text-color);
 }
 
@@ -1516,7 +1516,7 @@ textarea.form-input {
     align-items: flex-start;
     gap: 1rem;
     padding: 1rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 8px;
     box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
@@ -1566,7 +1566,7 @@ textarea.form-input {
 
 .contact-method {
     padding: 0.5rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     border-radius: 4px;
 }
 
@@ -1602,7 +1602,7 @@ textarea.form-input {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 1.5rem;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     text-align: center;
     transition: transform 0.2s ease;
 }
@@ -2119,7 +2119,7 @@ mark {
     padding: 12px 15px;
     border: 2px solid var(--border-color);
     border-radius: 6px;
-    background: var(--background-color);
+    background: var(--table-header-bg, rgba(255,255,255,0.15));
     color: var(--text-color);
     font-size: 1rem;
     transition: border-color 0.3s ease;

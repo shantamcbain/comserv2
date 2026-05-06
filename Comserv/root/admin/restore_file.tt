@@ -160,7 +160,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .admin-header {
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
     padding: 20px;
     border-radius: 8px;
     margin-bottom: 20px;
@@ -169,18 +169,18 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .admin-header h1 {
     margin: 0 0 10px 0;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .admin-description {
     margin: 0;
-    color: #666;
+    color: var(--text-muted-color, #666);
     font-size: 14px;
 }
 
 .admin-section {
-    background: white;
-    border: 1px solid #dee2e6;
+    background: var(--card-bg, rgba(255,255,255,0.88));
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin-bottom: 20px;
@@ -188,7 +188,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .admin-section h2 {
     margin: 0 0 15px 0;
-    color: #333;
+    color: var(--text-color, #333);
     font-size: 18px;
 }
 
@@ -199,10 +199,10 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .backup-card {
-    border: 1px solid #dee2e6;
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 15px;
-    background: #f8f9fa;
+    background: var(--bg-secondary, #f8f9fa);
 }
 
 .backup-header {
@@ -211,19 +211,19 @@ document.addEventListener('DOMContentLoaded', function() {
     align-items: center;
     margin-bottom: 10px;
     padding-bottom: 10px;
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
 }
 
 .backup-header h3 {
     margin: 0;
     font-size: 16px;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .backup-date {
     font-size: 12px;
-    color: #666;
-    background: white;
+    color: var(--text-muted-color, #666);
+    background: var(--card-bg, rgba(255,255,255,0.88));
     padding: 2px 8px;
     border-radius: 12px;
 }
@@ -238,8 +238,8 @@ document.addEventListener('DOMContentLoaded', function() {
     font-size: 12px;
     padding: 2px 8px;
     border-radius: 12px;
-    background: white;
-    color: #666;
+    background: var(--card-bg, rgba(255,255,255,0.88));
+    color: var(--text-muted-color, #666);
 }
 
 .backup-files {
@@ -257,13 +257,13 @@ document.addEventListener('DOMContentLoaded', function() {
     justify-content: space-between;
     align-items: center;
     padding: 8px;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
     border-radius: 4px;
     margin-bottom: 5px;
 }
 
 .file-list code {
-    background: #e9ecef;
+    background: var(--bg-secondary, #e9ecef);
     padding: 2px 6px;
     border-radius: 3px;
     font-size: 12px;
@@ -299,7 +299,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 .form-text {
     font-size: 12px;
-    color: #666;
+    color: var(--text-muted-color, #666);
     margin-top: 5px;
 }
 
@@ -328,7 +328,7 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -337,36 +337,36 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 
 .btn-secondary {
-    background: #6c757d;
+    background: var(--secondary-color, #6c757d);
     color: white;
 }
 
 .btn-outline-primary {
     border: 1px solid #007bff;
     color: #007bff;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .btn-outline-info {
     border: 1px solid #17a2b8;
     color: #17a2b8;
-    background: white;
+    background: var(--card-bg, rgba(255,255,255,0.88));
 }
 
 .no-backups {
     text-align: center;
     padding: 40px 20px;
-    color: #666;
+    color: var(--text-muted-color, #666);
 }
 
 .no-backups h3 {
     margin: 0 0 10px 0;
-    color: #333;
+    color: var(--text-color, #333);
 }
 
 .output-container {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 4px;
     padding: 15px;
 }

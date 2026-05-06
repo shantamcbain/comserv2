@@ -87,7 +87,7 @@
     }
     
     .changelog-entry {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-left: 4px solid #0066cc;
         padding: 20px;
         margin-bottom: 25px;
@@ -97,12 +97,12 @@
     
     .changelog-entry h2 {
         margin-top: 0;
-        color: #333;
+        color: var(--text-color, #333);
         font-size: 1.5em;
     }
     
     .changelog-meta {
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.9em;
         margin-bottom: 15px;
     }
@@ -177,8 +177,8 @@
     .back-link a {
         display: inline-block;
         padding: 8px 15px;
-        background-color: #f8f9fa;
-        border: 1px solid #dee2e6;
+        background-color: var(--bg-secondary, #f8f9fa);
+        border: 1px solid var(--border-color, #dee2e6);
         border-radius: 4px;
         color: #495057;
         text-decoration: none;

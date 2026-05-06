@@ -1,169 +1,184 @@
-# Comserv HelpDesk System Documentation
+[% PageVersion = 'Documentation/HelpDeskSystem.tt,v 2.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-**Last Updated:** April 24, 2024  
-**Author:** Shanta  
-**Status:** Active
+[% META title = 'HelpDesk System' %]
+[% META description = 'How to use and administer the HelpDesk support ticket system' %]
+[% META roles = 'admin developer editor' %]
 
-## Overview
+<h1>HelpDesk System</h1>
+<p><em>Last updated: April 28, 2026</em></p>
 
-The Comserv HelpDesk system provides a comprehensive support infrastructure for users, combining ticketing, knowledge base, documentation, and direct contact options. The system is designed to be user-friendly while providing powerful tools for support staff to manage and resolve user issues efficiently.
+<h2>Overview</h2>
+<p>
+The HelpDesk provides a support ticketing system for all Comserv-hosted sites.
+Visitors and registered users submit support tickets through the HelpDesk interface.
+Staff review and respond through the admin panel, and the system manages the full lifecycle
+from submission through resolution and auto-closure.
+</p>
 
-## System Components
+<hr>
 
-### 1. HelpDesk Controller
+<h2>Table of Contents</h2>
+<ol>
+    <li><a href="#submitting">Submitting a Ticket (User)</a></li>
+    <li><a href="#ticket-lifecycle">Ticket Lifecycle</a></li>
+    <li><a href="#admin-views">Admin Ticket Views</a></li>
+    <li><a href="#status-management">Status Management</a></li>
+    <li><a href="#reminders">Sending Reminders</a></li>
+    <li><a href="#auto-close">Auto-Close of Stale Tickets</a></li>
+    <li><a href="#reopen">Customer Reply Reopens Ticket</a></li>
+    <li><a href="#notifications">Email Notifications</a></li>
+    <li><a href="#daily-plan">HelpDesk in the Daily Plan</a></li>
+    <li><a href="#site-scoping">Site Scoping (Multi-Site)</a></li>
+    <li><a href="#urls">URL Reference</a></li>
+</ol>
 
-The HelpDesk controller (`Comserv::Controller::HelpDesk`) manages the core functionality of the HelpDesk system using Catalyst's chained dispatch system for consistent URL structure.
+<hr>
 
-#### Key Methods:
+<h2 id="submitting">1. Submitting a Ticket</h2>
+<p>Any visitor (including guests) can submit a support ticket at <a href="/HelpDesk/ticket/new">/HelpDesk/ticket/new</a>.</p>
+<ol>
+    <li>Fill in <strong>Subject</strong> and <strong>Description</strong>.</li>
+    <li>Provide your name and email address.</li>
+    <li>Click <strong>Submit</strong>. A unique ticket number is assigned (e.g. <code>TK-00042</code>).</li>
+    <li>Site admins are notified by email immediately.</li>
+    <li>Track your ticket at <a href="/HelpDesk/ticket/status">/HelpDesk/ticket/status</a> using your ticket number and email.</li>
+</ol>
 
-- **Base Methods**:
-  - `auto`: Common setup for all HelpDesk actions, initializes debug messages
-  - `base`: Base method for chained actions, sets up common stash variables
-  - `default`: Fallback for HelpDesk URLs that don't match any actions
+<hr>
 
-- **Page Methods**:
-  - `index`: Main HelpDesk landing page with support options
-  - `kb`: Knowledge Base page with categorized support articles
-  - `contact`: Contact Support page with various contact methods
-  - `admin`: Administrative interface for managing the HelpDesk system (admin-only)
-  - `linux_commands`: Reference page for common Linux commands (admin-only)
+<h2 id="ticket-lifecycle">2. Ticket Lifecycle</h2>
+<table class="doc-table">
+    <thead>
+        <tr><th>Status</th><th>Meaning</th><th>Who sets it</th></tr>
+    </thead>
+    <tbody>
+        <tr><td><strong>open</strong></td><td>Awaiting staff response</td><td>System (on submit or customer reply)</td></tr>
+        <tr><td><strong>on_hold</strong></td><td>Waiting on customer or third party</td><td>Staff</td></tr>
+        <tr><td><strong>resolved</strong></td><td>Staff has provided a resolution; awaiting customer confirmation</td><td>Staff</td></tr>
+        <tr><td><strong>closed</strong></td><td>Complete. Auto-closed after 14 days in resolved if no reply.</td><td>System or Staff</td></tr>
+    </tbody>
+</table>
+<p>
+When a ticket is moved to <strong>resolved</strong> or <strong>closed</strong> by staff, the customer receives an email with
+a direct link to view the ticket. The email explains that they can reply to reopen if the issue persists.
+</p>
 
-- **Ticket Methods**:
-  - `ticket_base`: Base method for all ticket-related actions
-  - `ticket_new`: Form for creating new support tickets
-  - `ticket_status`: Page for viewing existing ticket status
+<hr>
 
-#### URL Structure:
+<h2 id="admin-views">3. Admin Ticket Views</h2>
+<p>Staff with admin access see the HelpDesk admin panel at <a href="/HelpDesk/admin">/HelpDesk/admin</a>.</p>
+<table class="doc-table">
+    <thead><tr><th>URL</th><th>Shows</th></tr></thead>
+    <tbody>
+        <tr><td><code>/HelpDesk/admin/tickets</code></td><td>All tickets (default view)</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/open</code></td><td>Open tickets only</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/resolved</code></td><td>Resolved — awaiting auto-close</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/closed</code></td><td>Closed tickets</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets_alert</code></td><td>Count of open tickets (used by Daily Plan)</td></tr>
+    </tbody>
+</table>
+<p>Click a ticket number to view the full conversation thread and take actions.</p>
 
-- `/HelpDesk` - Main HelpDesk landing page
-- `/HelpDesk/admin` - HelpDesk administration (admin-only)
-- `/HelpDesk/ticket/new` - Create new support ticket
-- `/HelpDesk/ticket/status` - View ticket status
-- `/HelpDesk/kb` - Knowledge base
-- `/HelpDesk/kb/linux_commands` - Linux commands reference
-- `/HelpDesk/contact` - Contact support
+<hr>
 
-### 2. FAQ Controller
+<h2 id="status-management">4. Managing Ticket Status</h2>
+<p>From the ticket view page (<code>/HelpDesk/ticket/view/&lt;ticket_number&gt;</code>), staff can:</p>
+<ol>
+    <li>Select a new status from the <strong>Update Status</strong> dropdown.</li>
+    <li>Optionally add a <strong>Resolution Note</strong> — this is recorded in the ticket thread as an audit message.</li>
+    <li>Click <strong>Update</strong>. The change is logged and the customer is notified by email if the status moves to resolved or closed.</li>
+</ol>
 
-The FAQ controller (`Comserv::Controller::FAQ`) provides a dedicated system for frequently asked questions, organized by categories.
+<hr>
 
-#### Key Methods:
+<h2 id="reminders">5. Sending a Reminder</h2>
+<p>
+If a customer has not responded to an on_hold ticket, staff can send a reminder email
+from the ticket view page by clicking <strong>Send Reminder</strong>.
+This sends an email to the customer referencing the open ticket number and a link to view it.
+</p>
 
-- `index`: Main FAQ page with category listings and popular questions
-- `category`: Category-specific FAQ pages
+<hr>
 
-#### URL Structure:
+<h2 id="auto-close">6. Auto-Close of Stale Tickets</h2>
+<p>
+When the admin ticket list is loaded, the system checks for any <em>resolved</em> tickets
+that have not had an update in <strong>14 or more days</strong>.
+Those tickets are automatically moved to <em>closed</em> and a system message is added to the thread recording the auto-close date.
+No manual action is required — this prevents resolved queues from growing indefinitely.
+</p>
 
-- `/faq` - Main FAQ page
-- `/faq/category/{id}` - Category-specific FAQ pages
+<hr>
 
-### 3. Documentation System
+<h2 id="reopen">7. Customer Reply Reopens a Ticket</h2>
+<p>
+If a customer sends a reply on a ticket that is in <em>resolved</em> or <em>closed</em> status,
+the system automatically resets the status back to <em>open</em>. A status-change message is added to the thread.
+Staff are notified by email of the reopen.
+This means customers never need to file a new ticket if their original issue returns.
+</p>
 
-The Documentation system (`Comserv::Controller::Documentation`) provides comprehensive documentation for all aspects of the Comserv system, including user guides, admin guides, and technical documentation.
+<hr>
 
-#### URL Structure:
+<h2 id="notifications">8. Email Notifications</h2>
+<p>Email notifications are sent to all site admins in the following events:</p>
+<ul>
+    <li>New ticket submitted</li>
+    <li>Customer reply posted</li>
+    <li>Staff reply posted</li>
+</ul>
+<p>Customers receive email when:</p>
+<ul>
+    <li>Ticket moved to <em>resolved</em> or <em>closed</em> (includes link to view/reopen)</li>
+    <li>Staff sends a reminder</li>
+</ul>
+<p>Email uses <code>Comserv::Util::EmailNotification</code>. Ensure the site's outgoing mail configuration is correct for notifications to work.</p>
 
-- `/Documentation` - Main documentation page
-- `/Documentation/{page}` - Specific documentation pages
+<hr>
 
-### 4. Navigation Integration
+<h2 id="daily-plan">9. HelpDesk in the Daily Plan</h2>
+<p>
+The Daily Plan (<a href="/planning/daily">/planning/daily</a>) includes a collapsible <strong>HelpDesk Panel</strong>
+showing the count and summary of open support tickets. It is loaded from the
+<code>/HelpDesk/admin/tickets_alert</code> endpoint.
+</p>
+<p>
+The <strong>Start Day</strong> action also queries HelpDesk ticket counts as part of the AI-assisted morning briefing,
+so open tickets surface in the daily priorities even without manually opening the HelpDesk panel.
+</p>
 
-The HelpDesk system is integrated into the main navigation through the `TopDropListHelpDesk.tt` template, providing easy access to all HelpDesk components:
+<hr>
 
-- HelpDesk Home
-- Submit a Ticket
-- Check Ticket Status
-- Documentation
-- Knowledge Base
-- Linux Commands (admin-only)
-- FAQ
-- Contact Support
+<h2 id="site-scoping">10. Site Scoping (Multi-Site)</h2>
+<ul>
+    <li>Tickets belong to the site they were submitted on (<code>site_name</code> field).</li>
+    <li>Site admins only see tickets from their own site.</li>
+    <li><strong>CSC admins</strong> see tickets across all sites — allowing central support management.</li>
+    <li>The <code>tickets_alert</code> endpoint and Daily Plan panel respect the same site-scoping rules.</li>
+</ul>
 
-## Template Structure
+<hr>
 
-### HelpDesk Templates:
-
-- `CSC/HelpDesk.tt` - Main HelpDesk template
-- `CSC/HelpDesk/admin.tt` - HelpDesk administration interface
-- `CSC/HelpDesk/new_ticket.tt` - New ticket form
-- `CSC/HelpDesk/ticket_status.tt` - Ticket status page
-- `CSC/HelpDesk/kb.tt` - Knowledge base
-- `CSC/HelpDesk/linux_commands.tt` - Linux commands reference
-- `CSC/HelpDesk/contact.tt` - Contact page
-
-### FAQ Templates:
-
-- `CSC/FAQ/index.tt` - Main FAQ template
-- `CSC/FAQ/category.tt` - Category-specific FAQ template
-
-### Support Content:
-
-- `CSC/HelpdeskContents.tt` - Shared content included in the main template
-- `CSC/HelpDeskHomePagesql.tt` - SQL-based dynamic content
-
-## Access Control
-
-The HelpDesk system implements role-based access control:
-
-- **Anonymous Users**: Can view the HelpDesk, FAQ, and submit tickets
-- **Authenticated Users**: See personalized content and their ticket history
-- **Admin Users**: Have additional management capabilities through the admin interface
-
-## Logging and Debugging
-
-The HelpDesk system uses comprehensive logging with `log_with_details`:
-
-```perl
-$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'method_name', 
-    "Detailed message with relevant information");
-```
-
-Debug messages are stored in the stash for display in templates when debug mode is enabled:
-
-```perl
-push @{$c->stash->{debug_msg}}, "Debug message";
-```
-
-## Recent Enhancements
-
-### April 24, 2024 Update:
-
-1. **Menu Integration**:
-   - Fixed all links in the HelpDesk dropdown menu
-   - Ensured all links point to valid internal routes
-   - Added proper icons for better visual identification
-   - Improved role-based access control for admin features
-
-2. **New Features**:
-   - Added HelpDesk Admin interface for managing the HelpDesk system
-   - Implemented a dedicated FAQ system with category support
-   - Enhanced Linux Commands reference with copy-to-clipboard functionality
-
-3. **Bug Fixes**:
-   - Fixed external links that pointed to non-existent resources
-   - Corrected the Knowledge Base link to use the proper internal route
-   - Improved error handling and logging throughout the system
-
-## Future Plans
-
-1. **Ticket System Enhancement**:
-   - Implement ticket categories and priorities
-   - Add email notifications for ticket updates
-   - Create a ticket assignment system for support staff
-
-2. **Knowledge Base Expansion**:
-   - Implement a search function for the knowledge base
-   - Add category filtering and tagging
-   - Create a rating system for articles
-
-3. **Admin Tools**:
-   - Develop reporting and analytics for support tickets
-   - Create user management tools for support staff
-   - Implement customizable email templates for notifications
-
-## Related Documentation
-
-- [HelpDesk Controller Documentation](controllers/HelpDesk.md)
-- [FAQ Controller Documentation](controllers/FAQ.md)
-- [Documentation System Guide](documentation_config_guide.md)
-- [Mail System Documentation](MailSystem.tt)
+<h2 id="urls">11. URL Reference</h2>
+<table class="doc-table">
+    <thead><tr><th>URL</th><th>Description</th><th>Access</th></tr></thead>
+    <tbody>
+        <tr><td><code>/HelpDesk</code></td><td>HelpDesk landing page</td><td>All</td></tr>
+        <tr><td><code>/HelpDesk/ticket/new</code></td><td>Submit a new ticket</td><td>All</td></tr>
+        <tr><td><code>/HelpDesk/ticket/status</code></td><td>Check ticket status by number + email</td><td>All</td></tr>
+        <tr><td><code>/HelpDesk/ticket/view/&lt;num&gt;</code></td><td>Full ticket thread</td><td>Staff or ticket owner</td></tr>
+        <tr><td><code>/HelpDesk/ticket/reply/&lt;num&gt;</code></td><td>Post a reply</td><td>Staff or ticket owner</td></tr>
+        <tr><td><code>/HelpDesk/ticket/update_status/&lt;num&gt;</code></td><td>Change ticket status (POST)</td><td>Staff only</td></tr>
+        <tr><td><code>/HelpDesk/ticket/remind/&lt;num&gt;</code></td><td>Send reminder email (POST)</td><td>Staff only</td></tr>
+        <tr><td><code>/HelpDesk/ticket/list</code></td><td>Customer's own ticket list</td><td>Logged in</td></tr>
+        <tr><td><code>/HelpDesk/admin</code></td><td>Admin overview</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets</code></td><td>All tickets</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/open</code></td><td>Open tickets</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/resolved</code></td><td>Resolved tickets</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/admin/tickets/closed</code></td><td>Closed tickets</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/kb</code></td><td>Knowledge base</td><td>All</td></tr>
+        <tr><td><code>/HelpDesk/kb/linux_commands</code></td><td>Linux command reference</td><td>Admin</td></tr>
+        <tr><td><code>/HelpDesk/contact</code></td><td>Contact options</td><td>All</td></tr>
+    </tbody>
+</table>

@@ -138,11 +138,31 @@ sub check_health {
     # --- 2. Disk space ---
     check_disk_space('/');
     for my $mount (qw(/data/nfs /opt/comserv/logs)) {
-        check_disk_space($mount) if -d $mount;
+        next unless -d $mount;
+        # Only check separately if it is a real NFS mount.
+        # Bind mounts (ext4/overlay) reflect the host filesystem already
+        # checked above via '/' and would produce duplicate/misleading alerts.
+        next unless is_nfs_mount($mount);
+        check_disk_space($mount);
     }
 
     # --- 3. Memory ---
     check_memory();
+}
+
+sub is_nfs_mount {
+    my ($path) = @_;
+    return 0 unless -f '/proc/mounts';
+    open my $fh, '<', '/proc/mounts' or return 0;
+    while (my $line = <$fh>) {
+        my (undef, $mnt, $fstype) = split /\s+/, $line;
+        if ($mnt eq $path && $fstype =~ /^nfs/) {
+            close $fh;
+            return 1;
+        }
+    }
+    close $fh;
+    return 0;
 }
 
 sub check_disk_space {

@@ -1,0 +1,275 @@
+[% META
+   title        = "File Picker"
+   description  = "Select a file from the NFS or database for use in the application"
+   roles        = "user"
+   TemplateType = "Application"
+   category     = "FileManagement"
+   page_version = "0.01"
+   last_updated = "2026-04-17"
+%]
+[% PageVersion = 'file/FilePicker.tt,v 0.01 2026/04/17 AI Exp AI ' %]
+[% IF debug_mode == 1 %]
+  [% PageVersion %]
+[% END %]
+<style>
+.fp-layout     { display:flex; flex-direction:column; height:100vh; padding:10px 14px; box-sizing:border-box; font-size:.9rem; }
+.fp-header     { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+.fp-header h2  { margin:0; font-size:1.1rem; }
+.fp-toolbar    { display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px; }
+.fp-toolbar input[type=text] { flex:1; min-width:160px; padding:5px 8px; border:1px solid #ccc; border-radius:3px; font-size:.88rem; }
+.fp-toolbar select { padding:5px 8px; border:1px solid #ccc; border-radius:3px; font-size:.88rem; }
+.fp-toolbar button, .fp-toolbar a.btn { padding:5px 12px; font-size:.85rem; }
+.fp-tabs       { display:flex; gap:0; border-bottom:2px solid #1976d2; margin-bottom:10px; }
+.fp-tab        { padding:5px 16px; border:1px solid #ccc; border-bottom:none; border-radius:4px 4px 0 0; cursor:pointer; font-size:.85rem; background: var(--bg-secondary, #f5f5f5); color: var(--text-color, #333); margin-right:3px; }
+.fp-tab.active { background:#1976d2; color:#fff; border-color:#1976d2; font-weight:600; }
+.fp-panel      { display:none; flex:1; overflow-y:auto; }
+.fp-panel.active { display:block; }
+.fp-grid       { display:grid; grid-template-columns:repeat(auto-fill,minmax(120px,1fr)); gap:8px; }
+.fp-card       { border:2px solid #e0e0e0; border-radius:4px; overflow:hidden; cursor:pointer; background: rgba(255,255,255,0.88); transition:border-color .15s; }
+.fp-card:hover { border-color:#1976d2; box-shadow:0 0 0 2px #bbdefb; }
+.fp-card img   { width:100%; height:80px; object-fit:contain; background: var(--bg-secondary, #f5f5f5); display:block; }
+.fp-card .fp-icon { width:100%; height:80px; display:flex; align-items:center; justify-content:center; font-size:2.2rem; background: var(--bg-secondary, #f5f5f5); }
+.fp-card .fp-name { padding:3px 5px; font-size:.68rem; color: var(--text-muted-color, #555); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.fp-card .fp-src  { padding:0 5px 3px; font-size:.65rem; color:#888; }
+.fp-card .fp-use  { display:block; width:100%; padding:3px 0; background:#1976d2; color:#fff; border:none; cursor:pointer; font-size:.78rem; text-align:center; }
+.fp-card .fp-use:hover { background:#1565c0; }
+.fp-url-box    { padding:14px; background: var(--bg-secondary, #f5f5f5); border:1px solid #ccc; border-radius:4px; }
+.fp-url-box label { display:block; font-size:.85rem; font-weight:600; margin-bottom:6px; }
+.fp-url-box input { width:100%; padding:6px 8px; border:1px solid #ccc; border-radius:3px; font-family:monospace; font-size:.85rem; box-sizing:border-box; }
+.fp-url-box .fp-url-preview { margin-top:8px; text-align:center; min-height:60px; }
+.fp-url-box .fp-url-preview img { max-height:120px; max-width:100%; border-radius:3px; border:1px solid #ccc; }
+.fp-loading    { text-align:center; padding:20px; color: var(--text-muted-color, #666); font-style:italic; }
+.fp-empty      { text-align:center; padding:20px; color:#999; }
+.fp-sel-bar    { background:#e3f2fd; border:1px solid #90caf9; border-radius:4px; padding:8px 12px; margin-bottom:10px; display:none; align-items:center; gap:10px; font-size:.88rem; }
+.fp-sel-bar.visible { display:flex; }
+</style>
+
+<div class="fp-layout">
+
+  <div class="fp-header">
+    <h2>&#128193; Select File
+      [% IF type_filter %]
+      <span style="font-size:.8rem;color: var(--text-muted-color, #666);font-weight:normal"> — [% type_filter | html %]</span>
+      [% END %]
+    </h2>
+    <button onclick="window.close()"
+            style="padding:4px 12px;border:1px solid #ccc;background: var(--bg-secondary, #f5f5f5);border-radius:3px;cursor:pointer">
+      &times; Close
+    </button>
+  </div>
+
+  [%# ─── Toolbar ─────────────────────────────────────────────────── %]
+  <div class="fp-toolbar">
+    <input type="text" id="fp-q" placeholder="Search filename…"
+           value="[% search_q | html %]" onkeydown="if(event.key==='Enter')fpSearch()">
+    [% IF type_filter == '' %]
+    <select id="fp-type">
+      <option value="">All types</option>
+      <option value="image">Images</option>
+      <option value="video">Video</option>
+      <option value="pdf">PDF</option>
+      <option value="text">Text / Code</option>
+    </select>
+    [% ELSE %]
+    <select id="fp-type">
+      <option value="[% type_filter | html %]" selected>[% type_filter | html %]</option>
+      <option value="">All types</option>
+    </select>
+    [% END %]
+    [% IF is_csc && sites && sites.size > 0 %]
+    <select id="fp-site">
+      <option value="">All sites</option>
+      [% FOR s IN sites %]<option value="[% s.name | html %]"
+        [% 'selected' IF s.name == sitename %]>[% s.name | html %]</option>[% END %]
+    </select>
+    [% END %]
+    <select id="fp-source">
+      <option value="db">Database</option>
+      [% IF is_admin %]
+      <option value="nfs">NFS filesystem</option>
+      <option value="all">Both</option>
+      [% END %]
+    </select>
+    <button class="btn btn-primary" onclick="fpSearch()">&#128269; Search</button>
+  </div>
+
+  [%# Selected file indicator %]
+  <div class="fp-sel-bar" id="fp-sel-bar">
+    <strong>Selected:</strong>
+    <span id="fp-sel-name" style="font-family:monospace;font-size:.82rem;word-break:break-all"></span>
+    <button class="btn btn-primary btn-sm" onclick="fpConfirm()">&#10003; Use This File</button>
+  </div>
+
+  [%# ─── Tabs ───────────────────────────────────────────────────── %]
+  <div class="fp-tabs">
+    <div class="fp-tab active" id="tab-search" onclick="fpShowTab('search')">&#128269; Search Results</div>
+    <div class="fp-tab" id="tab-url" onclick="fpShowTab('url')">&#127758; URL / Path</div>
+  </div>
+
+  [%# ─── Search results panel ───────────────────────────────────── %]
+  <div class="fp-panel active" id="panel-search">
+    <div id="fp-results">
+      <div class="fp-loading">Enter a search term above and click Search, or leave blank to browse recent files.</div>
+    </div>
+  </div>
+
+  [%# ─── URL / manual path panel ────────────────────────────────── %]
+  <div class="fp-panel" id="panel-url">
+    <div class="fp-url-box">
+      <label for="fp-url-input">Enter URL or absolute path:</label>
+      <input type="text" id="fp-url-input" placeholder="https://… or /data/nfs/…"
+             oninput="fpUrlPreview()" onkeydown="if(event.key==='Enter')fpSelectUrl()">
+      <div class="fp-url-preview" id="fp-url-preview"></div>
+      <div style="margin-top:10px">
+        <button class="btn btn-primary" onclick="fpSelectUrl()">&#10003; Use This URL</button>
+      </div>
+      <div style="margin-top:14px;font-size:.8rem;color:#777">
+        <strong>NFS root:</strong> <code>[% nfs_root | html %]</code><br>
+        Paste a full URL (https://…), a static path (/static/…),
+        an NFS absolute path (/data/nfs/…), or a DB file path.
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var FP_TARGET = '[% target_field | html %]';
+
+function fpShowTab(name) {
+    document.querySelectorAll('.fp-tab,.fp-panel').forEach(function(el){
+        el.classList.remove('active');
+    });
+    document.getElementById('tab-'+name).classList.add('active');
+    document.getElementById('panel-'+name).classList.add('active');
+}
+
+function fpSearch() {
+    var q      = document.getElementById('fp-q').value.trim();
+    var type   = document.getElementById('fp-type').value;
+    var source = document.getElementById('fp-source').value;
+    var site   = '';
+    var sEl = document.getElementById('fp-site');
+    if (sEl) site = sEl.value;
+
+    var url = '/file/search?source='+encodeURIComponent(source)
+            + '&q='+encodeURIComponent(q)
+            + '&type='+encodeURIComponent(type)
+            + '&sitename='+encodeURIComponent(site)
+            + '&limit=100';
+
+    var panel = document.getElementById('fp-results');
+    panel.innerHTML = '<div class="fp-loading">Searching…</div>';
+    fpShowTab('search');
+
+    fetch(url, {credentials:'same-origin'})
+        .then(function(r){ return r.json(); })
+        .then(function(data){ fpRenderResults(data); })
+        .catch(function(e){ panel.innerHTML = '<div class="fp-empty">Error: '+e+'</div>'; });
+}
+
+function fpIconFor(name, fmt) {
+    var ext = (name.match(/\.(\w+)$/) || ['',''])[1].toLowerCase();
+    if (/^(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(ext)) return '';
+    if (/^(mp4|mkv|avi|mov|webm)$/.test(ext)) return '&#127916;';
+    if (ext === 'pdf') return '&#128196;';
+    if (/^(zip|tar|gz|bz2|7z|rar)$/.test(ext)) return '&#128230;';
+    if (/^(mp3|flac|ogg|wav|aac)$/.test(ext)) return '&#127925;';
+    if (/^(xls|xlsx|csv|ods)$/.test(ext)) return '&#128200;';
+    if (/^(doc|docx|odt|rtf)$/.test(ext)) return '&#128221;';
+    if (/^(txt|md|rst|log)$/.test(ext)) return '&#128196;';
+    if (/^(pl|pm|py|js|sh|rb|php|go|rs|ts|css|html?)$/.test(ext)) return '&#128421;';
+    return '&#128196;';
+}
+
+function fpRenderResults(data) {
+    var panel = document.getElementById('fp-results');
+    if (!data || data.length === 0) {
+        panel.innerHTML = '<div class="fp-empty">No files found.</div>';
+        return;
+    }
+    var html = '<div class="fp-grid">';
+    data.forEach(function(f) {
+        var ext = (f.file_name.match(/\.(\w+)$/) || ['',''])[1].toLowerCase();
+        var isImg = /^(jpg|jpeg|png|gif|webp|bmp)$/.test(ext);
+        var thumb = '';
+        if (isImg && f.preview_url) {
+            thumb = '<img src="'+f.preview_url+'" alt="'+esc(f.file_name)+'" loading="lazy"'
+                  + ' onerror="this.style.display=\'none\';this.nextSibling.style.display=\'flex\'">'
+                  + '<div class="fp-icon" style="display:none">&#128247;</div>';
+        } else {
+            var icon = fpIconFor(f.file_name, f.file_format || '');
+            thumb = '<div class="fp-icon">'+icon+'</div>';
+        }
+        var path = f.nfs_path || f.file_path || f.external_url || f.file_url || '';
+        var src  = f.source === 'db' ? '&#128449; DB' : '&#128190; NFS';
+        html += '<div class="fp-card" title="'+esc(path)+'">'
+              + thumb
+              + '<div class="fp-name">'+esc(f.file_name)+'</div>'
+              + '<div class="fp-src">'+src+' '+(f.sitename?'['+esc(f.sitename)+']':'')+'</div>'
+              + '<button class="fp-use" onclick="fpSelect('+JSON.stringify(path)+','+JSON.stringify(f.file_name)+','+JSON.stringify(f.preview_url||'')+')">&#10003; Use</button>'
+              + '</div>';
+    });
+    html += '</div>';
+    panel.innerHTML = html;
+}
+
+function esc(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+var _fpSelected = null;
+
+function fpSelect(path, name, previewUrl) {
+    _fpSelected = { path: path, name: name, preview: previewUrl };
+    var bar = document.getElementById('fp-sel-bar');
+    bar.classList.add('visible');
+    document.getElementById('fp-sel-name').textContent = name + '  (' + path + ')';
+    fpConfirm();
+}
+
+function fpSelectUrl() {
+    var val = document.getElementById('fp-url-input').value.trim();
+    if (!val) return;
+    var name = val.split('/').pop() || val;
+    fpSelect(val, name, val);
+}
+
+function fpConfirm() {
+    var path = _fpSelected ? _fpSelected.path : document.getElementById('fp-url-input').value.trim();
+    if (!path) return;
+    var name = _fpSelected ? _fpSelected.name : path.split('/').pop();
+    var preview = _fpSelected ? _fpSelected.preview : path;
+    if (window.opener && !window.opener.closed) {
+        if (typeof window.opener.fpCallback === 'function') {
+            window.opener.fpCallback(FP_TARGET, path, name, preview);
+        } else {
+            var el = window.opener.document.getElementById(FP_TARGET);
+            if (el) {
+                el.value = path;
+                el.dispatchEvent(new Event('input'));
+                el.dispatchEvent(new Event('change'));
+            }
+            var prev = window.opener.document.getElementById(FP_TARGET + '_preview');
+            if (prev && preview) { prev.src = preview; prev.style.display = 'block'; }
+        }
+        window.close();
+    }
+}
+
+function fpUrlPreview() {
+    var val = document.getElementById('fp-url-input').value.trim();
+    var prev = document.getElementById('fp-url-preview');
+    if (!val) { prev.innerHTML = ''; return; }
+    var ext = (val.match(/\.(\w+)(\?.*)?$/) || ['',''])[1].toLowerCase();
+    if (/^(jpg|jpeg|png|gif|webp|bmp|svg)$/.test(ext)) {
+        prev.innerHTML = '<img src="'+esc(val)+'" alt="preview" onerror="this.style.display=\'none\'">';
+    } else {
+        prev.innerHTML = '<div style="color:#888;font-size:.8rem">'+esc(val)+'</div>';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    fpSearch();
+});
+</script>

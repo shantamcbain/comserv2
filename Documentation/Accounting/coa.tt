@@ -1,0 +1,193 @@
+[% META
+    title = "Chart of Accounts"
+    description = "Admin guide to the Chart of Accounts — viewing, adding, and assigning accounts"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Accounting"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Accounting/coa.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Chart of Accounts</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#seeded"        style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Seeded Accounts</a>
+                <a href="#managing"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Managing Accounts</a>
+                <a href="#headings"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Account Headings</a>
+                <a href="#assigning"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Assigning to Items</a>
+                <a href="#troubleshoot"  style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The <strong>Chart of Accounts (COA)</strong> is the master list of all financial accounts.
+                Every GL transaction must reference a COA account. Accounts are numbered and organised by type.
+                Your COA is specific to your SiteName — each site maintains its own set of accounts.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Access the COA at <a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a>.
+                If no accounts exist yet, go to <a href="/Accounting" style="color:var(--link-color)">/Accounting</a>
+                and click <strong>Seed Default Accounts</strong>.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="seeded" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Seeded Default Accounts</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">These accounts are created by "Seed Default Accounts":</p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Accno</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Description</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px;color:var(--text-muted-color)" colspan="3"><em>Assets</em></td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1000</td><td style="border:1px solid var(--border-color);padding:5px 8px">Cash / Bank Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1100</td><td style="border:1px solid var(--border-color);padding:5px 8px">Accounts Receivable</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1200</td><td style="border:1px solid var(--border-color);padding:5px 8px">Prepaid Expenses</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1300</td><td style="border:1px solid var(--border-color);padding:5px 8px">Inventory Asset</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1400</td><td style="border:1px solid var(--border-color);padding:5px 8px">Equipment &amp; Fixtures</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">1500</td><td style="border:1px solid var(--border-color);padding:5px 8px">Accumulated Depreciation</td><td style="border:1px solid var(--border-color);padding:5px 8px">A</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px;color:var(--text-muted-color)" colspan="3"><em>Liabilities</em></td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">2000</td><td style="border:1px solid var(--border-color);padding:5px 8px">Accounts Payable</td><td style="border:1px solid var(--border-color);padding:5px 8px">L</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">2100</td><td style="border:1px solid var(--border-color);padding:5px 8px">Sales Tax / GST Payable</td><td style="border:1px solid var(--border-color);padding:5px 8px">L</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">2200</td><td style="border:1px solid var(--border-color);padding:5px 8px">Credit Card Payable</td><td style="border:1px solid var(--border-color);padding:5px 8px">L</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px;color:var(--text-muted-color)" colspan="3"><em>Equity</em></td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">3000</td><td style="border:1px solid var(--border-color);padding:5px 8px">Owner / Member Equity</td><td style="border:1px solid var(--border-color);padding:5px 8px">Q</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">3100</td><td style="border:1px solid var(--border-color);padding:5px 8px">Retained Earnings</td><td style="border:1px solid var(--border-color);padding:5px 8px">Q</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px;color:var(--text-muted-color)" colspan="3"><em>Income</em></td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">4000</td><td style="border:1px solid var(--border-color);padding:5px 8px">Sales Revenue</td><td style="border:1px solid var(--border-color);padding:5px 8px">I</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">4100</td><td style="border:1px solid var(--border-color);padding:5px 8px">Sales Returns &amp; Allowances</td><td style="border:1px solid var(--border-color);padding:5px 8px">I</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">4200</td><td style="border:1px solid var(--border-color);padding:5px 8px">Service Revenue</td><td style="border:1px solid var(--border-color);padding:5px 8px">I</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px;color:var(--text-muted-color)" colspan="3"><em>COGS / Expenses</em></td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5000</td><td style="border:1px solid var(--border-color);padding:5px 8px">Cost of Goods Sold</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5100</td><td style="border:1px solid var(--border-color);padding:5px 8px">Office Supplies</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5200</td><td style="border:1px solid var(--border-color);padding:5px 8px">Printing &amp; Materials</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5300</td><td style="border:1px solid var(--border-color);padding:5px 8px">Electricity &amp; Utilities</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5400</td><td style="border:1px solid var(--border-color);padding:5px 8px">Depreciation Expense</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5500</td><td style="border:1px solid var(--border-color);padding:5px 8px">Shipping &amp; Freight</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5600</td><td style="border:1px solid var(--border-color);padding:5px 8px">Commission Expense</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5700</td><td style="border:1px solid var(--border-color);padding:5px 8px">Bank Fees &amp; Charges</td><td style="border:1px solid var(--border-color);padding:5px 8px">E</td></tr>
+                </tbody>
+            </table>
+            <p style="color:var(--text-muted-color);font-family:var(--body-font);font-size:var(--font-size-small)">Types: A=Asset, L=Liability, Q=Equity, I=Income, E=Expense</p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="managing" class="row">
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Adding a Custom Account</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a></li>
+                <li>Click <strong>New Account</strong></li>
+                <li>Enter a unique <em>accno</em> (e.g. 5800)</li>
+                <li>Enter a description (e.g. "Workshop Materials")</li>
+                <li>Select the account type (Asset, Liability, Equity, Income, Expense)</li>
+                <li>Click Save</li>
+            </ol>
+        </div>
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Viewing the COA</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                At <a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a>:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>All accounts sorted by accno</li>
+                <li>Filter by type (Asset, Liability, etc.)</li>
+                <li>Balance shown if GL entries exist for the account</li>
+                <li>Click any account to view its GL entry history</li>
+            </ul>
+        </div>
+    </div>
+
+    <div id="headings" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Account Headings</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Headings group related accounts in COA printouts (e.g. "Current Assets" groups 1000–1199).
+                Create headings at <a href="/Accounting/coa/headings" style="color:var(--link-color)">/Accounting/coa/headings</a>.
+                Headings are cosmetic — they do not affect GL calculations.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="assigning" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Assigning Accounts to Inventory Items</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                On the item add/edit form, four COA dropdowns appear if accounts have been seeded.
+                Choose the correct account type for each field:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Inventory Account</strong> → select an <em>Asset</em> account (1000s) — e.g. 1300 Inventory Asset</li>
+                <li><strong>Income Account</strong> → select an <em>Income</em> account (4000s) — e.g. 4000 Sales Revenue</li>
+                <li><strong>Expense Account</strong> → select an <em>Expense</em> account (5000s) — e.g. 5000 Cost of Goods Sold</li>
+                <li><strong>Returns Account</strong> → select an <em>Income</em> account (4000s) — e.g. 4100 Sales Returns</li>
+            </ul>
+            <div style="background-color:var(--light-color);border-left:4px solid var(--warning-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+                The system does not enforce account type on these fields — it is your responsibility to choose the correct type.
+                Assigning a liability account as the income account, for example, will produce incorrect financial statements.
+            </div>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">"No COA accounts found" on item form</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Go to /Accounting and click "Seed Default Accounts" first.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Duplicate accno error</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Account numbers must be unique per SiteName. Choose a different number.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Wrong account type on item</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Edit the item and change the COA dropdowns to the correct type. GL entries already posted will not change.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Accounting/index" style="color:var(--link-color)">Accounting Overview</a></li>
+            <li><a href="/Documentation/Accounting/gl" style="color:var(--link-color)">General Ledger</a></li>
+            <li><a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices</a></li>
+            <li><a href="/Accounting/coa" style="color:var(--link-color)">Chart of Accounts (live)</a></li>
+        </ul>
+    </div>
+</div>

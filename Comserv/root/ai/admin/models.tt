@@ -149,6 +149,11 @@
                         <option value="coding">Coding</option>
                         <option value="editor">Editor</option>
                         <option value="documentation">Documentation</option>
+                        <option value="planning">Planning</option>
+                        <option value="3dprint">3D Print</option>
+                        <option value="accounting">Accounting</option>
+                        <option value="inventory">Inventory</option>
+                        <option value="bmaster">BMaster / Beekeeping</option>
                     </select>
                 </div>
             </div>
@@ -232,7 +237,7 @@
 }
 
 .model-card {
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     padding: 20px;
@@ -266,7 +271,7 @@
 }
 
 .model-status.enabled {
-    background: #28a745;
+    background: var(--success-color, #28a745);
     color: white;
 }
 
@@ -336,7 +341,7 @@
 }
 
 .btn-primary {
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
 }
 
@@ -354,7 +359,7 @@
 }
 
 .btn-delete {
-    background: #dc3545;
+    background: var(--danger-color, #dc3545);
     color: white;
     flex: 1;
 }
@@ -427,7 +432,7 @@
     padding: 8px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: var(--secondary-color);
+    background: var(--nav-bg);
     color: var(--text-color);
 }
 

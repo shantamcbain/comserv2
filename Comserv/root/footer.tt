@@ -1,14 +1,13 @@
-[% PageVersion	= 'footer.tt,v 0.04 2026/02/20 shanta Exp shanta '	%]
+[% PageVersion	= 'footer.tt,v 0.05 2026/04/22 shanta Exp shanta '	%]
 
 <!-- Footer spacing to prevent content blocking -->
 <div style="height: 80px; clear: both;"></div>
 
 <!-- Copyright footer -->
-<div style="text-align: center; padding: 20px 0; color: #666; font-size: 0.9em; border-top: 1px solid #ddd; margin-top: 30px;">
+<div style="text-align: center; padding: 20px 0; color: var(--text-muted-color, #666); font-size: 0.9em; border-top: 1px solid var(--border-color, #ddd); margin-top: 30px;">
     <p style="margin: 5px 0;">&copy; [% date.year || '2026' %] [% c.config.site_name || c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
 </div>
 
-[% PageVersion	= 'footer.tt,v 0.04 2026/02/23 shanta Exp shanta '	%]
 [% IF c.session.debug_mode == 1 %]
  <br>[%	PageVersion %] </br>
  <br><a href="/reset_session">Reset Session</a></br>

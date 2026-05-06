@@ -41,7 +41,7 @@
   <tbody>
   [% FOREACH s IN suppliers %]
     <tr>
-      <td>[% s.name %]</td>
+      <td><a href="/Inventory/supplier/view/[% s.id %]">[% s.name | html %]</a></td>
       <td>[% s.contact_name || '-' %]</td>
       <td>[% s.email ? '<a href="mailto:' _ s.email _ '">' _ s.email _ '</a>' : '-' %]</td>
       <td>[% s.phone || '-' %]</td>

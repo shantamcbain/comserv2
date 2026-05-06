@@ -1,0 +1,84 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-helpdesk-ticket-lifecycle.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'HelpDesk Ticket Lifecycle' %]
+[% META description = 'Full ticket lifecycle: close with resolution, customer reminders, auto-close stale tickets, reopen on customer reply, site-admin email notifications' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>HelpDesk: Ticket Lifecycle</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Feature Addition</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>Implemented a complete support-ticket lifecycle in the HelpDesk controller, covering staff status management, customer reminder emails, automatic stale-ticket closure, customer-reply reopen logic, and site-admin email notifications for all key events.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>New Endpoints</h2>
+
+        <h3>POST /HelpDesk/ticket/update_status/&lt;ticket_number&gt;</h3>
+        <ul>
+            <li>Staff-only action to change a ticket's status (open → resolved, closed, on_hold, etc.).</li>
+            <li>Accepts optional <code>resolution</code> parameter which is recorded as an audit note in TicketMessage.</li>
+            <li>When status becomes <em>resolved</em> or <em>closed</em>, sends the customer an email with a public link to reopen by replying.</li>
+            <li>Old and new status are logged via <code>log_with_details</code>.</li>
+        </ul>
+
+        <h3>POST /HelpDesk/ticket/remind/&lt;ticket_number&gt;</h3>
+        <ul>
+            <li>Sends a reminder email to the customer referencing the open ticket.</li>
+            <li>Only available to staff; redirects non-staff with a flash error.</li>
+        </ul>
+
+        <h2>Auto-Close Stale Tickets</h2>
+        <ul>
+            <li><code>_auto_close_stale_tickets</code> is called on every <code>admin_tickets</code> load.</li>
+            <li>Any ticket in <em>resolved</em> status that has not been updated in 14+ days is automatically moved to <em>closed</em>.</li>
+            <li>A system TicketMessage is appended recording the auto-close date.</li>
+        </ul>
+
+        <h2>Reopen on Customer Reply</h2>
+        <ul>
+            <li>When a customer posts a reply (<code>ticket_reply</code>) on a <em>resolved</em> or <em>closed</em> ticket, the ticket status is automatically reset to <em>open</em>.</li>
+            <li>A TicketMessage with <code>message_type = 'status_change'</code> is logged to record the reopen event.</li>
+        </ul>
+
+        <h2>Site-Admin Email Notifications</h2>
+        <ul>
+            <li><code>_notify_site_admins</code> helper sends email to all users with the <em>admin</em> role for the site when:
+                <ul>
+                    <li>A new ticket is submitted.</li>
+                    <li>Any reply is posted (staff or customer).</li>
+                </ul>
+            </li>
+            <li>CSC site admins receive notifications across all sites; other sites only see their own tickets.</li>
+        </ul>
+
+        <h2>Admin Ticket Views</h2>
+        <ul>
+            <li><code>/HelpDesk/admin/tickets/open</code> — open tickets only.</li>
+            <li><code>/HelpDesk/admin/tickets/closed</code> — closed tickets.</li>
+            <li><code>/HelpDesk/admin/tickets/resolved</code> — resolved (awaiting auto-close).</li>
+            <li><code>/HelpDesk/admin/tickets_alert</code> — alert endpoint used by Daily Plan panel.</li>
+            <li>CSC admins see tickets across all sites; other site-admins see their site only.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/HelpDesk.pm</code> — all new lifecycle actions</li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/SupportTicket.pm</code> — status field</li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/TicketMessage.pm</code> — message_type field</li>
+            <li><code>lib/Comserv/Util/EmailNotification.pm</code> — send helper</li>
+            <li><code>root/CSC/HelpDesk/ticket_view.tt</code>, <code>ticket_status.tt</code>, <code>admin_tickets.tt</code>, <code>admin.tt</code></li>
+        </ul>
+    </section>
+</div>
