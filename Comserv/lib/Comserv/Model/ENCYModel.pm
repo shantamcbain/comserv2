@@ -2564,32 +2564,27 @@ sub bulk_link_herbs_to_ncbi {
 }
 
 sub resync_organisms_from_ncbi {
-    my ($self, $c, $batch_size) = @_;
+    my ($self, $c, $batch_size, $after_id) = @_;
     $batch_size //= 10;
-
-    my $needs_resync_where = {
-        ncbi_tax_id => { '!=' => undef },
-        -or => [
-            { organism_type => 'animal' },
-            { kingdom       => undef    },
-            { kingdom       => ''       },
-        ],
-    };
+    $after_id   //= 0;
 
     my @organisms = $self->ency_schema->resultset('Ency::Organism')->search(
-        $needs_resync_where,
+        { ncbi_tax_id => { '!=' => undef },
+          record_id   => { '>'  => $after_id } },
         { order_by => 'record_id', rows => $batch_size }
     )->all;
 
+    my $total = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => { '!=' => undef } }
+    )->count;
+
     my @results;
     my $ext_model = $c->model('ExternalDB');
-
-    my $remaining = $self->ency_schema->resultset('Ency::Organism')->search(
-        $needs_resync_where
-    )->count;
+    my $max_id = $after_id;
 
     for my $org (@organisms) {
         my $tax_id = $org->ncbi_tax_id;
+        $max_id = $org->record_id if $org->record_id > $max_id;
         my $r = { organism_id => $org->record_id, ncbi_tax_id => $tax_id,
                   scientific_name => $org->scientific_name };
 
@@ -2615,20 +2610,26 @@ sub resync_organisms_from_ncbi {
         eval { $org->update(\%updates) } if %updates;
         $r->{status}  = 'updated';
         $r->{message} = "type=" . ($ncbi->{organism_type} // '?')
-                      . " kingdom=" . ($ncbi->{kingdom} // '?');
+                      . " kingdom=" . ($ncbi->{kingdom} // 'n/a');
         push @results, $r;
         select(undef, undef, undef, 0.35);
     }
 
-    my $updated = scalar grep { $_->{status} eq 'updated' } @results;
-    my $errors  = scalar grep { $_->{status} eq 'error'   } @results;
+    my $updated   = scalar grep { $_->{status} eq 'updated' } @results;
+    my $errors    = scalar grep { $_->{status} eq 'error'   } @results;
+    my $remaining = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => { '!=' => undef },
+          record_id   => { '>'  => $max_id } }
+    )->count;
 
     return {
-        processed => scalar @results,
-        updated   => $updated,
-        errors    => $errors,
-        remaining => ($remaining - scalar @organisms) > 0 ? ($remaining - scalar @organisms) : 0,
-        details   => \@results,
+        processed  => scalar @results,
+        updated    => $updated,
+        errors     => $errors,
+        remaining  => $remaining,
+        total      => $total,
+        last_id    => $max_id,
+        details    => \@results,
     };
 }
 

@@ -147,19 +147,20 @@
         btn.disabled = true;
         panel.style.display = 'block';
         log.innerHTML = '';
-        var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null;
+        var totalUpdated = 0, totalErrors = 0, totalDone = 0, grandTotal = null, lastId = 0;
 
         function runBatch() {
             status.textContent = 'Fetching NCBI data… (' + totalDone + ' done)';
             fetch('/ENCY/organism_ncbi_resync', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'batch_size=10'
+                body: 'batch_size=10&last_id=' + lastId
             })
             .then(function(r){ return r.json(); })
             .then(function(d) {
                 if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
-                if (grandTotal === null) grandTotal = d.remaining + d.processed;
+                if (grandTotal === null) grandTotal = d.total || 0;
+                if (d.last_id) lastId = d.last_id;
                 totalUpdated += d.updated;
                 totalErrors  += d.errors;
                 totalDone    += d.processed;
@@ -173,8 +174,8 @@
                     log.appendChild(line);
                     log.scrollTop = log.scrollHeight;
                 });
-                if (d.remaining > 0) {
-                    status.textContent = totalDone + ' processed — ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Continuing…';
+                if (d.processed > 0 && d.remaining > 0) {
+                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalUpdated + ' updated, ' + totalErrors + ' errors. Continuing…';
                     setTimeout(runBatch, 500);
                 } else {
                     bar.style.width = '100%';
