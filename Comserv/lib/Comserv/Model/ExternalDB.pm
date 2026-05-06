@@ -340,5 +340,103 @@ sub _infer_type {
     return 'animal';
 }
 
+sub gbif_lookup_by_name {
+    my ($self, $c, $scientific_name) = @_;
+    return undef unless $scientific_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'gbif_lookup_by_name',
+        "GBIF lookup for: $scientific_name");
+
+    my $enc  = $scientific_name;
+    $enc     =~ s/ /+/g;
+    my $match_url = "https://api.gbif.org/v1/species/match?name=$enc&strict=false";
+    my $match = $self->_get_json($c, $match_url);
+    return undef unless $match && $match->{usageKey};
+
+    my $gbif_id = $match->{usageKey};
+
+    my $media_url = "https://api.gbif.org/v1/species/$gbif_id/media?limit=5";
+    my $media_data = $self->_get_json($c, $media_url);
+    select(undef, undef, undef, 0.2);
+
+    my @images;
+    for my $item (@{ $media_data->{results} // [] }) {
+        next unless ($item->{type} // '') eq 'StillImage';
+        next unless $item->{identifier};
+        push @images, {
+            url          => $item->{identifier},
+            thumbnail_url => $item->{identifier},
+            license      => $item->{license}       // '',
+            rights_holder => $item->{rightsHolder} // '',
+            caption      => $item->{title}         // $item->{description} // '',
+            source       => 'GBIF',
+        };
+        last if @images >= 3;
+    }
+
+    return {
+        gbif_id     => $gbif_id,
+        images      => \@images,
+        source_url  => "https://www.gbif.org/species/$gbif_id",
+    };
+}
+
+sub wikipedia_summary {
+    my ($self, $c, $scientific_name) = @_;
+    return undef unless $scientific_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'wikipedia_summary',
+        "Wikipedia lookup for: $scientific_name");
+
+    my $title = $scientific_name;
+    $title =~ s/ /_/g;
+
+    my $api_base = 'https://en.wikipedia.org/w/api.php';
+    my $enc      = $title;
+    $enc         =~ s/([^A-Za-z0-9_~.-])/sprintf('%%%02X', ord($1))/ge;
+
+    my $url = "$api_base?action=query&prop=extracts|pageimages&exintro=1"
+            . "&titles=$enc&format=json&pithumbsize=800&redirects=1";
+
+    my $data = $self->_get_json($c, $url);
+    return undef unless $data;
+
+    my ($page) = values %{ $data->{query}{pages} // {} };
+    return undef unless $page && ($page->{pageid} // -1) > 0;
+
+    my $extract = $page->{extract} // '';
+    $extract =~ s/<[^>]+>//g;
+    $extract =~ s/\n{3,}/\n\n/g;
+    $extract =~ s/^\s+|\s+$//g;
+
+    my ($description, $habitat) = ('', '');
+    if ($extract) {
+        my @paras = split /\n\n+/, $extract;
+        $description = $paras[0] // '';
+        for my $p (@paras[1..$#paras]) {
+            if ($p =~ /habitat|distribution|range|found in|native to|grow/i) {
+                $habitat = $p;
+                last;
+            }
+        }
+        $description = substr($description, 0, 2000) if length($description) > 2000;
+        $habitat     = substr($habitat,     0, 1000) if length($habitat)     > 1000;
+    }
+
+    my $image_url = '';
+    if (my $thumb = $page->{thumbnail}) {
+        $image_url = $thumb->{source} // '';
+    }
+
+    return {
+        description  => $description,
+        habitat      => $habitat,
+        image_url    => $image_url,
+        wiki_title   => $page->{title} // $scientific_name,
+        wiki_url     => "https://en.wikipedia.org/wiki/$title",
+        source       => 'Wikipedia',
+    };
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

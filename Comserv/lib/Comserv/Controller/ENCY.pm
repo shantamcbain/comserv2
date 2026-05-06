@@ -3805,6 +3805,35 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     );
 }
 
+sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $record_id = $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid organism ID' }));
+        return;
+    }
+
+    my ($ok, $msg) = $c->model('ENCYModel')->enrich_organism_from_external($c, $record_id);
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
 __PACKAGE__->meta->make_immutable;
 
 1;

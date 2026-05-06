@@ -140,4 +140,10 @@ __PACKAGE__->has_many(
     'organism_id',
 );
 
+__PACKAGE__->has_many(
+    images => 'Comserv::Model::Schema::Ency::Result::Ency::OrganismImage',
+    'organism_id',
+    { order_by => 'sort_order' },
+);
+
 1;
