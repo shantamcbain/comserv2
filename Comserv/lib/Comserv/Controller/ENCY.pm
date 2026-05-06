@@ -3718,8 +3718,10 @@ sub organism_ncbi_resync : Path('/ENCY/organism_ncbi_resync') : Args(0) {
 
     my $batch_size = $c->request->body_parameters->{batch_size} // 10;
     $batch_size = 10 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 20;
+    my $after_id = $c->request->body_parameters->{last_id} // 0;
+    $after_id = 0 if $after_id !~ /^\d+$/;
 
-    my $result = $c->model('ENCYModel')->resync_organisms_from_ncbi($c, $batch_size);
+    my $result = $c->model('ENCYModel')->resync_organisms_from_ncbi($c, $batch_size, $after_id);
     $c->response->body(JSON::encode_json({ ok => 1, %$result }));
 }
 
