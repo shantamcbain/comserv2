@@ -53,9 +53,17 @@ __PACKAGE__->add_columns(
     group_of_poster    => { data_type => 'varchar',  size => 100, is_nullable => 1 },
     date_time_posted   => { data_type => 'varchar',  size => 30,  is_nullable => 1 },
     share              => { data_type => 'integer',  is_nullable => 0, default_value => 0 },
+    organism_id        => { data_type => 'integer',  size => 11, is_nullable => 1, default_value => undef,
+                            comment   => 'FK to ency_organism_tb; links herb to its NCBI taxonomy record' },
 );
 
 __PACKAGE__->set_primary_key('record_id');
+
+__PACKAGE__->belongs_to(
+    organism => 'Comserv::Model::Schema::Ency::Result::Ency::Organism',
+    'organism_id',
+    { join_type => 'LEFT' },
+);
 
 __PACKAGE__->has_many(
     herb_constituents => 'Comserv::Model::Schema::Ency::Result::Ency::HerbConstituent',

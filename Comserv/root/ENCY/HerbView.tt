@@ -118,6 +118,73 @@ Record ID:[% herb.record_id %]
     </tr>
 
     <tr>
+        <th colspan="2"><h2>Taxonomy</h2></th>
+    </tr>
+    <tr>
+        <td colspan="2">
+[% IF herb.organism %]
+[% SET org = herb.organism %]
+<table style="width:100%;border-collapse:collapse;">
+    <tr>
+        <td style="width:140px;font-weight:bold;">Kingdom</td>
+        <td>[% org.kingdom | html %]</td>
+        <td style="width:140px;font-weight:bold;">Phylum</td>
+        <td>[% org.phylum | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Class</td>
+        <td>[% org.class_name | html %]</td>
+        <td style="font-weight:bold;">Order</td>
+        <td>[% org.order_name | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Family</td>
+        <td>[% org.family_name | html %]</td>
+        <td style="font-weight:bold;">Genus</td>
+        <td>[% org.genus | html %]</td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Species</td>
+        <td>[% org.species | html %]</td>
+        <td style="font-weight:bold;">NCBI Tax ID</td>
+        <td>
+            [% IF org.ncbi_tax_id %]
+            <a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=[% org.ncbi_tax_id | html %]"
+               target="_blank">[% org.ncbi_tax_id | html %]</a>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td style="font-weight:bold;">Organism</td>
+        <td colspan="3">
+            <a href="[% c.uri_for('/ENCY/Organism', org.record_id) %]">[% org.common_name | html %]</a>
+            [% IF is_editor %]
+            &nbsp;<a href="[% c.uri_for('/ENCY/Organism/edit', { record_id => org.record_id }) %]"
+                    style="font-size:0.85em;">[edit organism]</a>
+            [% END %]
+        </td>
+    </tr>
+</table>
+[% ELSE %]
+<p style="color:#888;font-style:italic;">No taxonomy linked yet.
+[% IF is_editor %]
+<button type="button" id="ncbi-lookup-btn"
+        onclick="ncbiLookupHerb([% herb.record_id %])"
+        style="margin-left:1em;">Look up NCBI</button>
+[% END %]
+</p>
+[% END %]
+[% IF is_editor && herb.organism %]
+<p style="margin-top:0.4em;">
+<button type="button"
+        onclick="ncbiAcceptFields([% herb.record_id %], [% herb.organism.ncbi_tax_id || 0 %])"
+        style="font-size:0.85em;">Enrich from NCBI</button>
+</p>
+[% END %]
+        </td>
+    </tr>
+
+    <tr>
         <th colspan="2"><h2>Characteristics</h2></th>
     </tr>
     <tr>
@@ -550,6 +617,119 @@ Record ID:[% herb.record_id %]
     <div id="ency-glossary-modal-body">Loading&hellip;</div>
   </div>
 </div>
+
+<div id="ncbi-panel" style="display:none;border:1px solid #b0c4de;border-radius:5px;padding:1em;margin:0.5em 0;background:#f4f8ff;">
+  <strong>NCBI Taxonomy Result</strong>
+  <div id="ncbi-panel-body" style="margin-top:0.5em;"></div>
+  <div id="ncbi-panel-actions" style="margin-top:0.7em;display:none;">
+    <input type="hidden" id="ncbi-tax-id" value="" />
+    <label><input type="checkbox" name="ncbi_accept" value="common_name" /> Add NCBI common name to Common Names</label><br/>
+    <button type="button" onclick="ncbiApplyFields([% herb.record_id %])">Apply selected</button>
+    &nbsp;
+    <button type="button"
+            onclick="ncbiLinkOrganism([% herb.record_id %], document.getElementById('ncbi-tax-id').value)">
+      Link taxonomy &amp; create organism record
+    </button>
+    &nbsp;
+    <button type="button" onclick="document.getElementById('ncbi-panel').style.display='none'">Close</button>
+  </div>
+</div>
+
+<script>
+function ncbiLookupHerb(herbId) {
+  var panel = document.getElementById('ncbi-panel');
+  var body  = document.getElementById('ncbi-panel-body');
+  var actions = document.getElementById('ncbi-panel-actions');
+  body.innerHTML = 'Searching NCBI\u2026';
+  actions.style.display = 'none';
+  panel.style.display = 'block';
+  fetch('/ENCY/herb_ncbi_lookup?record_id=' + herbId)
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (!d.ok) { body.innerHTML = '<span style="color:red;">'+d.error+'</span>'; return; }
+      var n = d.ncbi;
+      document.getElementById('ncbi-tax-id').value = n.ncbi_tax_id || '';
+      var html = '<table style="border-collapse:collapse;">';
+      var rows = [
+        ['Scientific Name', n.scientific_name],
+        ['Common Name',     n.common_name],
+        ['Kingdom',         n.kingdom],
+        ['Phylum',          n.phylum],
+        ['Class',           n.class_name],
+        ['Order',           n.order_name],
+        ['Family',          n.family_name],
+        ['Genus',           n.genus],
+        ['NCBI Tax ID',     n.ncbi_tax_id ? '<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id='+n.ncbi_tax_id+'" target="_blank">'+n.ncbi_tax_id+'</a>' : ''],
+      ];
+      rows.forEach(function(r){
+        if (r[1]) html += '<tr><td style="font-weight:bold;padding:2px 8px 2px 0;">'+r[0]+'</td><td>'+r[1]+'</td></tr>';
+      });
+      html += '</table>';
+      body.innerHTML = html;
+      actions.style.display = 'block';
+    })
+    .catch(function(e){ body.innerHTML = '<span style="color:red;">Lookup failed: '+e+'</span>'; });
+}
+
+function ncbiLinkOrganism(herbId, taxId) {
+  if (!taxId) { alert('No NCBI Tax ID found. Run lookup first.'); return; }
+  if (!confirm('Create organism record from NCBI Tax ID '+taxId+' and link to this herb?')) return;
+  var fd = new FormData();
+  fd.append('action', 'link');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        alert('Linked! Organism #'+d.organism_id+' ('+d.scientific_name+'). Reloading page.');
+        location.reload();
+      } else {
+        alert('Error: ' + d.error);
+      }
+    });
+}
+
+function ncbiApplyFields(herbId) {
+  var taxId = document.getElementById('ncbi-tax-id').value;
+  if (!taxId) { alert('No NCBI Tax ID. Run lookup first.'); return; }
+  var checked = Array.from(document.querySelectorAll('input[name="ncbi_accept"]:checked'))
+                     .map(function(el){ return el.value; });
+  if (!checked.length) { alert('Select at least one field to apply.'); return; }
+  var fd = new FormData();
+  fd.append('action', 'accept_fields');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fd.append('fields', checked.join(','));
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      if (d.ok) {
+        var updated = d.updated ? Object.keys(d.updated).join(', ') : 'none';
+        alert('Applied fields: '+updated+'. Reloading.');
+        location.reload();
+      } else {
+        alert('Error: '+d.error);
+      }
+    });
+}
+
+function ncbiAcceptFields(herbId, taxId) {
+  if (!taxId) { alert('No NCBI Tax ID linked to this organism.'); return; }
+  if (!confirm('Enrich common_names from NCBI for this herb?')) return;
+  var fd = new FormData();
+  fd.append('action', 'accept_fields');
+  fd.append('record_id', herbId);
+  fd.append('ncbi_tax_id', taxId);
+  fd.append('fields', 'common_name');
+  fetch('/ENCY/herb_ncbi_lookup?record_id='+herbId, { method:'POST', body: fd })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      alert(d.ok ? 'Done. Reloading.' : 'Error: '+d.error);
+      if (d.ok) location.reload();
+    });
+}
+</script>
 
 <script>
 (function(){
