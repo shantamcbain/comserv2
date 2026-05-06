@@ -61,6 +61,70 @@
  <p> These Herbs are in the data base.
 [% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add new Herb</a>
+    &nbsp;
+    <button type="button" id="ncbi-bulk-btn" onclick="ncbiBulkLink()"
+            style="background:#2a7ae2;color:#fff;border:none;padding:6px 14px;border-radius:4px;cursor:pointer;">
+        Link all herbs to NCBI taxonomy
+    </button>
+    <div id="ncbi-bulk-panel" style="display:none;margin-top:0.8em;padding:0.8em;background:#f5f9ff;border:1px solid #c0d8f0;border-radius:4px;max-width:700px;">
+        <strong>NCBI Bulk Link</strong>
+        <div id="ncbi-bulk-status" style="margin:0.4em 0;color:#555;">Starting…</div>
+        <div style="background:#e8e8e8;border-radius:3px;height:14px;width:100%;margin-bottom:0.5em;">
+            <div id="ncbi-bulk-bar" style="background:#2a7ae2;height:14px;border-radius:3px;width:0%;transition:width 0.4s;"></div>
+        </div>
+        <div id="ncbi-bulk-log" style="font-size:0.82em;max-height:180px;overflow-y:auto;font-family:monospace;background:#fff;padding:0.4em;border:1px solid #ddd;border-radius:3px;"></div>
+    </div>
+    <script>
+    function ncbiBulkLink() {
+        var btn   = document.getElementById('ncbi-bulk-btn');
+        var panel = document.getElementById('ncbi-bulk-panel');
+        var bar   = document.getElementById('ncbi-bulk-bar');
+        var status= document.getElementById('ncbi-bulk-status');
+        var log   = document.getElementById('ncbi-bulk-log');
+        btn.disabled = true;
+        panel.style.display = 'block';
+        var totalLinked = 0, totalNotFound = 0, totalErrors = 0, totalDone = 0, grandTotal = null;
+
+        function runBatch() {
+            status.textContent = 'Processing batch… (' + totalDone + ' done)';
+            fetch('/ENCY/herb_ncbi_bulk_link', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                body: 'batch_size=10'
+            })
+            .then(function(r){ return r.json(); })
+            .then(function(d) {
+                if (!d.ok) { status.textContent = 'Error: ' + d.error; btn.disabled=false; return; }
+                if (grandTotal === null) grandTotal = d.total_unlinked;
+                totalLinked    += d.linked;
+                totalNotFound  += d.not_found;
+                totalErrors    += d.errors;
+                totalDone      += d.processed;
+                var pct = grandTotal > 0 ? Math.round(totalDone / grandTotal * 100) : 100;
+                bar.style.width = Math.min(pct, 100) + '%';
+                (d.details || []).forEach(function(r) {
+                    var line = document.createElement('div');
+                    var icon = r.status === 'linked' ? '✓' : r.status === 'not_found' ? '?' : '✗';
+                    line.style.color = r.status === 'linked' ? '#267326' : r.status === 'not_found' ? '#888' : '#c00';
+                    line.textContent = icon + ' ' + r.botanical_name + ': ' + r.message;
+                    log.appendChild(line);
+                    log.scrollTop = log.scrollHeight;
+                });
+                if (d.remaining > 0) {
+                    status.textContent = totalDone + ' of ' + grandTotal + ' processed — ' + totalLinked + ' linked, ' + totalNotFound + ' not found, ' + totalErrors + ' errors. Continuing…';
+                    setTimeout(runBatch, 500);
+                } else {
+                    bar.style.width = '100%';
+                    status.textContent = 'Complete. ' + totalLinked + ' linked, ' + totalNotFound + ' not in NCBI, ' + totalErrors + ' errors. Reload the page to see updated taxonomy.';
+                    btn.disabled = false;
+                    btn.textContent = 'Re-run NCBI link';
+                }
+            })
+            .catch(function(e) { status.textContent = 'Network error: ' + e; btn.disabled=false; });
+        }
+        runBatch();
+    }
+    </script>
 [% END %]
 
 <table>

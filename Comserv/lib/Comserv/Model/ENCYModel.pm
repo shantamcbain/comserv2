@@ -2389,7 +2389,6 @@ sub find_or_create_organism_from_ncbi {
     my $new_org;
     eval {
         $new_org = $self->ency_schema->resultset('Ency::Organism')->create({
-            common_name         => $ncbi_data->{common_name}   || $ncbi_data->{scientific_name},
             scientific_name     => $ncbi_data->{scientific_name},
             organism_type       => $ncbi_data->{organism_type} || 'plant',
             kingdom             => $ncbi_data->{kingdom}       || '',
@@ -2402,8 +2401,8 @@ sub find_or_create_organism_from_ncbi {
             ncbi_tax_id         => $ncbi_data->{ncbi_tax_id},
             description         => "Imported from NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
             sitename            => 'ENCY',
-            username_of_poster  => $c->session->{username} || 'system',
-            group_of_poster     => $c->session->{group}    || 'system',
+            username_of_poster  => ($c && $c->session->{username}) || 'system',
+            group_of_poster     => ($c && $c->session->{group})    || 'system',
             date_time_posted    => \'NOW()',
             share               => 1,
         });
@@ -2414,6 +2413,19 @@ sub find_or_create_organism_from_ncbi {
     };
 
     if ($new_org) {
+        if ($ncbi_data->{common_name}) {
+            eval {
+                $self->ency_schema->resultset('Ency::CommonName')->create({
+                    organism_id        => $new_org->record_id,
+                    name               => $ncbi_data->{common_name},
+                    language           => 'en',
+                    source             => 'NCBI',
+                    is_preferred       => 1,
+                    date_time_posted   => \'NOW()',
+                    username_of_poster => ($c && $c->session->{username}) || 'system',
+                });
+            };
+        }
         $c->model('ExternalDB')->save_external_id(
             $c,
             $self->ency_schema,
@@ -2467,6 +2479,75 @@ sub accept_ncbi_fields_to_herb {
     }
 
     return (1, \%updates);
+}
+
+sub bulk_link_herbs_to_ncbi {
+    my ($self, $c, $batch_size) = @_;
+    $batch_size //= 10;
+
+    my $total_unlinked = $self->ency_schema->resultset('Ency::Herb')->search(
+        { organism_id => undef },
+    )->count;
+
+    my @herbs = $self->ency_schema->resultset('Ency::Herb')->search(
+        { organism_id => undef,
+          botanical_name => { '!=' => '' } },
+        { order_by => 'botanical_name', rows => $batch_size }
+    )->all;
+
+    my @results;
+    my $ext_model = $c->model('ExternalDB');
+
+    for my $herb (@herbs) {
+        my $name = $herb->botanical_name;
+        my $result = { herb_id => $herb->record_id, botanical_name => $name };
+
+        my $ncbi_data = eval { $ext_model->ncbi_search_taxonomy($c, $name) };
+        if ($@ || !$ncbi_data) {
+            $result->{status}  = 'not_found';
+            $result->{message} = "No NCBI record for '$name'";
+            push @results, $result;
+            select(undef, undef, undef, 0.35);
+            next;
+        }
+
+        my $organism = $self->find_or_create_organism_from_ncbi($c, $ncbi_data);
+        if (!$organism) {
+            $result->{status}  = 'error';
+            $result->{message} = "Failed to create organism for '$name'";
+            push @results, $result;
+            next;
+        }
+
+        my ($ok, $msg) = $self->link_herb_to_organism($c, $herb->record_id, $organism->record_id);
+        if ($ok) {
+            $result->{status}      = 'linked';
+            $result->{organism_id} = $organism->record_id;
+            $result->{ncbi_tax_id} = $ncbi_data->{ncbi_tax_id};
+            $result->{message}     = "Linked to organism #" . $organism->record_id
+                                   . " (NCBI:" . $ncbi_data->{ncbi_tax_id} . ")";
+        } else {
+            $result->{status}  = 'error';
+            $result->{message} = $msg;
+        }
+
+        push @results, $result;
+        select(undef, undef, undef, 0.35);
+    }
+
+    my $linked    = scalar grep { $_->{status} eq 'linked'    } @results;
+    my $not_found = scalar grep { $_->{status} eq 'not_found' } @results;
+    my $errors    = scalar grep { $_->{status} eq 'error'     } @results;
+
+    return {
+        processed      => scalar @results,
+        linked         => $linked,
+        not_found      => $not_found,
+        errors         => $errors,
+        remaining      => $total_unlinked - scalar @results,
+        total_unlinked => $total_unlinked,
+        details        => \@results,
+    };
 }
 
 __PACKAGE__->meta->make_immutable;
