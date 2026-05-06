@@ -3670,6 +3670,33 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
     $c->response->body(JSON::encode_json({ ok => 1, ncbi => $data }));
 }
 
+sub herb_ncbi_bulk_link : Path('/ENCY/herb_ncbi_bulk_link') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size = $c->request->body_parameters->{batch_size} // 10;
+    $batch_size = 10 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 20;
+
+    my $result = $c->model('ENCYModel')->bulk_link_herbs_to_ncbi($c, $batch_size);
+    $c->response->body(JSON::encode_json({ ok => 1, %$result }));
+}
+
 sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     my ($self, $c) = @_;
 
