@@ -48,6 +48,32 @@ sub _get_json {
     return $data;
 }
 
+sub _get_xml {
+    my ($self, $c, $url) = @_;
+    my $ua = LWP::UserAgent->new(timeout => 15,
+        agent => 'ENCY-Encyclopedia/1.0 (comserv; educational)');
+    my $resp = $ua->get($url);
+    unless ($resp->is_success) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_xml',
+            "HTTP GET failed: " . $resp->status_line . " for $url");
+        return undef;
+    }
+    return $resp->decoded_content;
+}
+
+sub _parse_ncbi_lineage_xml {
+    my ($self, $xml) = @_;
+    return {} unless $xml;
+    my %rank_map;
+    while ($xml =~ m{<Taxon>\s*<TaxId>[^<]*</TaxId>\s*<ScientificName>([^<]+)</ScientificName>\s*<Rank>([^<]+)</Rank>}g) {
+        my ($name, $rank) = ($1, $2);
+        $rank = lc($rank);
+        next if $rank eq 'no rank' || $rank eq 'cellular root' || $rank eq 'clade';
+        $rank_map{$rank} = $name;
+    }
+    return \%rank_map;
+}
+
 sub ncbi_search_taxonomy {
     my ($self, $c, $scientific_name) = @_;
     return undef unless $scientific_name;
@@ -132,37 +158,31 @@ sub ncbi_fetch_by_tax_id {
     my $rec = $data->{result}{$tax_id} // {};
     return undef unless $rec->{scientificname};
 
-    my %lineage_rank;
-    if (ref $rec->{lineageex} eq 'ARRAY') {
-        for my $entry (@{ $rec->{lineageex} }) {
-            my $rank = lc($entry->{rank} // '');
-            my $sname = $entry->{scientificname} // '';
-            next unless $rank && $sname;
-            $lineage_rank{$rank} = $sname;
-        }
-    }
+    my $xml_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                . "?db=taxonomy&id=$tax_id&retmode=xml";
+    my $xml = $self->_get_xml($c, $xml_url);
+    my $lineage_rank = $self->_parse_ncbi_lineage_xml($xml);
+    select(undef, undef, undef, 0.25);
 
     my $result = {
         ncbi_tax_id     => $tax_id,
         scientific_name => $rec->{scientificname} // '',
         common_name     => $rec->{commonname}     // '',
-        kingdom         => $lineage_rank{kingdom}     // $lineage_rank{superkingdom} // '',
-        phylum          => $lineage_rank{phylum}      // '',
-        class_name      => $lineage_rank{class}       // '',
-        order_name      => $lineage_rank{order}       // '',
-        family_name     => $lineage_rank{family}      // '',
-        genus           => $lineage_rank{genus}       // '',
-        organism_type   => _infer_type($rec),
+        kingdom         => $lineage_rank->{kingdom}  // $lineage_rank->{superkingdom} // '',
+        phylum          => $lineage_rank->{phylum}   // '',
+        class_name      => $lineage_rank->{class}    // '',
+        order_name      => $lineage_rank->{order}    // '',
+        family_name     => $lineage_rank->{family}   // '',
+        genus           => $rec->{genus}             // $lineage_rank->{genus} // '',
+        organism_type   => _infer_type($rec, $lineage_rank),
         source_url      => "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$tax_id",
         db_name         => 'NCBI',
     };
 
-    if (!$result->{genus} && $result->{scientific_name} =~ /^(\S+)\s+(.+)$/) {
-        $result->{genus}   = $1;
-        $result->{species} = $2;
-    } elsif ($result->{genus} && $result->{scientific_name} =~ /^\S+\s+(.+)$/) {
-        $result->{species} = $1;
+    if ($result->{scientific_name} =~ /^\S+\s+(.+)$/) {
+        $result->{species} = $rec->{species} // $1;
     }
+    $result->{genus} ||= (split /\s+/, $result->{scientific_name})[0] // '';
 
     return $result;
 }
@@ -282,31 +302,41 @@ sub get_external_ids {
 }
 
 sub _infer_type {
-    my ($rec) = @_;
-    my $division = lc($rec->{division}         // '');
-    my $gendiv   = lc($rec->{genbankdivision}  // '');
-    my $lineage  = lc($rec->{lineage}          // '');
+    my ($rec, $lineage_rank) = @_;
+    $lineage_rank //= {};
 
-    return 'plant'     if $division =~ /plant/      || $gendiv eq 'pln';
-    return 'fungus'    if $division =~ /fung/       || $gendiv eq 'fun';
-    return 'bacterium' if $division =~ /bacter/     || $gendiv eq 'bct';
-    return 'virus'     if $division =~ /virus/      || $gendiv eq 'vrl';
-    return 'insect'    if $division =~ /insect/;
-    return 'bird'      if $division =~ /bird/;
-    return 'mammal'    if $division =~ /mammal/;
+    my $division = lc($rec->{division}        // '');
+    my $gendiv   = lc($rec->{genbankdivision} // '');
+
     return 'human'     if ($rec->{taxid} // 0) == 9606;
-    return 'fish'      if $division =~ /fish/;
 
-    return 'plant'     if $lineage =~ /viridiplantae|embryophyta/;
-    return 'fungus'    if $lineage =~ /fungi/;
-    return 'bacterium' if $lineage =~ /bacteria/;
-    return 'virus'     if $lineage =~ /viruses/;
-    return 'insect'    if $lineage =~ /insecta/;
-    return 'bird'      if $lineage =~ /aves/;
-    return 'fish'      if $lineage =~ /actinopterygii/;
-    return 'amphibian' if $lineage =~ /amphibia/;
-    return 'reptile'   if $lineage =~ /reptilia/;
-    return 'mammal'    if $lineage =~ /mammalia/;
+    return 'plant'     if $division =~ /eudicot|monocot|gymnosperm|angiosperm|land plant|green plant|streptophyt|embryophyt|charophyt/;
+    return 'plant'     if $division =~ /^(green algae)$/;
+    return 'fungus'    if $division =~ /fung|ascomycet|basidiomycet|lichen/;
+    return 'bacterium' if $division =~ /bacter|archaea/;
+    return 'virus'     if $division =~ /virus/;
+    return 'insect'    if $division =~ /insect|dipter|lepidopter|coleopt|hymenopter/;
+    return 'bird'      if $division =~ /bird/;
+    return 'reptile'   if $division =~ /reptil|lizard|snake|turtle|croc/;
+    return 'amphibian' if $division =~ /amphibi|frog|toad|salamand/;
+    return 'fish'      if $division =~ /fish|teleost|shark|ray/;
+    return 'mammal'    if $division =~ /mammal|primate|rodent|carnivore|ungulate|bat|whale/;
+
+    return 'plant'     if $gendiv =~ /plants? and fungi/i && $division !~ /fung/;
+    return 'plant'     if $gendiv =~ /^plants?$/i;
+    return 'fungus'    if $gendiv =~ /^fungi$/i || ($gendiv =~ /plants? and fungi/i && $division =~ /fung/);
+    return 'bacterium' if $gendiv =~ /bacter/i;
+    return 'virus'     if $gendiv =~ /virus/i;
+    return 'bird'      if $gendiv =~ /bird/i;
+    return 'mammal'    if $gendiv =~ /mammal|primate|rodent/i;
+    return 'fish'      if $gendiv =~ /fish/i;
+
+    my $kingdom = lc($lineage_rank->{kingdom} // $lineage_rank->{superkingdom} // '');
+    return 'plant'     if $kingdom =~ /viridiplantae/;
+    return 'fungus'    if $kingdom =~ /fungi/;
+    return 'bacterium' if $kingdom =~ /bacteria/;
+    return 'virus'     if $kingdom =~ /virus/;
+
     return 'animal';
 }
 
