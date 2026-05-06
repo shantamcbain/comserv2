@@ -12,11 +12,6 @@ __PACKAGE__->add_columns(
         is_auto_increment => 1,
         is_nullable       => 0,
     },
-    common_name => {
-        data_type   => 'varchar',
-        size        => 255,
-        is_nullable => 0,
-    },
     scientific_name => {
         data_type   => 'varchar',
         size        => 255,
@@ -84,14 +79,6 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
-    medicinal_uses => {
-        data_type   => 'text',
-        is_nullable => 1,
-    },
-    therapeutic_uses => {
-        data_type   => 'text',
-        is_nullable => 1,
-    },
     sub_population_note => {
         data_type   => 'text',
         is_nullable => 1,
@@ -140,6 +127,16 @@ __PACKAGE__->set_primary_key('record_id');
 
 __PACKAGE__->has_many(
     disease_hosts => 'Comserv::Model::Schema::Ency::Result::Ency::DiseaseHost',
+    'organism_id',
+);
+
+__PACKAGE__->has_many(
+    common_names => 'Comserv::Model::Schema::Ency::Result::Ency::CommonName',
+    'organism_id',
+);
+
+__PACKAGE__->has_many(
+    herbs => 'Comserv::Model::Schema::Ency::Result::Ency::Herb',
     'organism_id',
 );
 
