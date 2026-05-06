@@ -67,9 +67,79 @@ Record ID:[% herb.record_id %]
         <td>Common Names:</td>
         <td>
             [% IF !edit_mode %]
-                [% field_html.common_names %]
+                [% IF cn_list && cn_list.size %]
+                    [% FOREACH cn IN cn_list %][% cn.name | html %][% UNLESS loop.last %]; [% END %][% END %]
+                [% ELSIF herb.common_names %]
+                    [% field_html.common_names %]
+                [% END %]
             [% ELSE %]
-                <input type="text" id="common_names" name="common_names" value="[% herb.common_names %]" size="50" />
+                [% IF herb.organism_id %]
+                <div id="cn-manager" style="margin-bottom:0.5em;">
+                    <div id="cn-tag-list" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:6px;">
+                    [% FOREACH cn IN cn_list %]
+                    <span class="cn-tag" data-id="[% cn.record_id %]"
+                          style="background:#e8f0ff;border:1px solid #aac;border-radius:12px;padding:2px 8px;font-size:0.88em;display:inline-flex;align-items:center;gap:4px;">
+                        [% cn.name | html %]
+                        <button type="button" title="Remove"
+                                onclick="cnDelete([% cn.record_id %], this)"
+                                style="background:none;border:none;color:#c00;cursor:pointer;font-size:1em;line-height:1;padding:0 2px;">&#x2715;</button>
+                    </span>
+                    [% END %]
+                    </div>
+                    <div style="display:flex;gap:6px;align-items:center;">
+                        <input type="text" id="cn-new-name" placeholder="Add a common name…"
+                               style="flex:1;max-width:300px;font-size:0.9em;" />
+                        <button type="button" onclick="cnAdd([% herb.organism_id %])"
+                                style="padding:3px 10px;font-size:0.88em;">Add</button>
+                        <span id="cn-msg" style="font-size:0.82em;color:#555;"></span>
+                    </div>
+                    <div style="font-size:0.78em;color:#777;margin-top:4px;">Names stored in the common name table (linked to organism).</div>
+                </div>
+                <script>
+                function cnDelete(id, btn) {
+                    btn.disabled = true;
+                    fetch('/ENCY/common_name_delete', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                        body: 'record_id=' + id
+                    }).then(function(r){return r.json();}).then(function(d){
+                        if (d.ok) { btn.closest('.cn-tag').remove(); }
+                        else { btn.disabled=false; alert('Error: ' + d.error); }
+                    }).catch(function(){ btn.disabled=false; });
+                }
+                function cnAdd(orgId) {
+                    var inp = document.getElementById('cn-new-name');
+                    var msg = document.getElementById('cn-msg');
+                    var name = inp.value.trim();
+                    if (!name) return;
+                    msg.textContent = 'Adding…';
+                    fetch('/ENCY/common_name_add', {
+                        method: 'POST',
+                        headers: {'Content-Type':'application/x-www-form-urlencoded'},
+                        body: 'organism_id=' + orgId + '&name=' + encodeURIComponent(name)
+                    }).then(function(r){return r.json();}).then(function(d){
+                        if (d.ok) {
+                            var list = document.getElementById('cn-tag-list');
+                            var span = document.createElement('span');
+                            span.className = 'cn-tag';
+                            span.setAttribute('data-id', d.record_id);
+                            span.style.cssText = 'background:#e8f0ff;border:1px solid #aac;border-radius:12px;padding:2px 8px;font-size:0.88em;display:inline-flex;align-items:center;gap:4px;';
+                            span.innerHTML = d.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                                + ' <button type="button" title="Remove" onclick="cnDelete(' + d.record_id + ', this)" style="background:none;border:none;color:#c00;cursor:pointer;font-size:1em;line-height:1;padding:0 2px;">&#x2715;</button>';
+                            list.appendChild(span);
+                            inp.value = '';
+                            msg.textContent = 'Added.';
+                            setTimeout(function(){ msg.textContent=''; }, 2000);
+                        } else {
+                            msg.textContent = d.error || 'Error';
+                        }
+                    }).catch(function(){ msg.textContent = 'Network error'; });
+                }
+                </script>
+                [% ELSE %]
+                <input type="text" id="common_names" name="common_names" value="[% herb.common_names | html %]" size="50" />
+                <div style="font-size:0.78em;color:#777;">No organism linked yet — names saved as raw text and can be imported to the common name table once an organism is linked.</div>
+                [% END %]
             [% END %]
         </td>
     </tr>
