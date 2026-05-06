@@ -95,7 +95,7 @@ sub get_herbal_data {
     eval {
         @results = $self->ency_schema->resultset('Ency::Herb')->search(
             { botanical_name => { '!=' => '' } },
-            { order_by => 'botanical_name' }
+            { order_by => 'botanical_name', prefetch => 'organism' }
         )->all;
     };
     return \@results;
