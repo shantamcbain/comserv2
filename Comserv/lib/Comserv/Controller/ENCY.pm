@@ -345,9 +345,20 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '', $entities);
     }
 
+    my @org_images;
+    eval {
+        if ($herb->organism_id) {
+            @org_images = $c->model('ENCYModel')->ency_schema
+                ->resultset('Ency::OrganismImage')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'sort_order' })
+                ->all;
+        }
+    };
+
     $self->_stash_image_files($c);
     $c->stash(
         herb                    => $herb,
+        org_images              => \@org_images,
         constituents_html       => $constituents_html,
         parts_used_html         => $parts_used_html,
         sister_plants_html      => $sister_plants_html,
