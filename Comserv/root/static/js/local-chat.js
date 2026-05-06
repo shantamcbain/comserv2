@@ -773,10 +773,8 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
+                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
+                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -786,7 +784,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4.3';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -1412,9 +1410,8 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                            { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                            { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
+                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');
@@ -2273,7 +2270,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-4-0709';
+                                          : 'grok|grok-4.3';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
