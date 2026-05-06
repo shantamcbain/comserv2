@@ -2485,13 +2485,18 @@ sub bulk_link_herbs_to_ncbi {
     my ($self, $c, $batch_size) = @_;
     $batch_size //= 10;
 
-    my $total_unlinked = $self->ency_schema->resultset('Ency::Herb')->search(
-        { organism_id => undef },
-    )->count;
+    my $rs = $self->ency_schema->resultset('Ency::Herb');
 
-    my @herbs = $self->ency_schema->resultset('Ency::Herb')->search(
-        { organism_id => undef,
-          botanical_name => { '!=' => '' } },
+    my $total_pending = $rs->search({
+        organism_id        => undef,
+        ncbi_lookup_status => undef,
+        botanical_name     => { '!=' => '' },
+    })->count;
+
+    my @herbs = $rs->search(
+        { organism_id        => undef,
+          ncbi_lookup_status => undef,
+          botanical_name     => { '!=' => '' } },
         { order_by => 'botanical_name', rows => $batch_size }
     )->all;
 
@@ -2499,13 +2504,14 @@ sub bulk_link_herbs_to_ncbi {
     my $ext_model = $c->model('ExternalDB');
 
     for my $herb (@herbs) {
-        my $name = $herb->botanical_name;
+        my $name   = $herb->botanical_name;
         my $result = { herb_id => $herb->record_id, botanical_name => $name };
 
         my $ncbi_data = eval { $ext_model->ncbi_search_taxonomy($c, $name) };
         if ($@ || !$ncbi_data) {
             $result->{status}  = 'not_found';
             $result->{message} = "No NCBI record for '$name'";
+            eval { $herb->update({ ncbi_lookup_status => 'not_found' }) };
             push @results, $result;
             select(undef, undef, undef, 0.35);
             next;
@@ -2515,12 +2521,14 @@ sub bulk_link_herbs_to_ncbi {
         if (!$organism) {
             $result->{status}  = 'error';
             $result->{message} = "Failed to create organism for '$name'";
+            eval { $herb->update({ ncbi_lookup_status => 'error' }) };
             push @results, $result;
             next;
         }
 
         my ($ok, $msg) = $self->link_herb_to_organism($c, $herb->record_id, $organism->record_id);
         if ($ok) {
+            eval { $herb->update({ ncbi_lookup_status => 'linked' }) };
             $result->{status}      = 'linked';
             $result->{organism_id} = $organism->record_id;
             $result->{ncbi_tax_id} = $ncbi_data->{ncbi_tax_id};
@@ -2529,6 +2537,7 @@ sub bulk_link_herbs_to_ncbi {
                                    . " (NCBI:" . $ncbi_data->{ncbi_tax_id} . ")"
                                    . $matched_as;
         } else {
+            eval { $herb->update({ ncbi_lookup_status => 'error' }) };
             $result->{status}  = 'error';
             $result->{message} = $msg;
         }
@@ -2541,13 +2550,15 @@ sub bulk_link_herbs_to_ncbi {
     my $not_found = scalar grep { $_->{status} eq 'not_found' } @results;
     my $errors    = scalar grep { $_->{status} eq 'error'     } @results;
 
+    my $remaining = $total_pending - scalar @herbs;
+
     return {
         processed      => scalar @results,
         linked         => $linked,
         not_found      => $not_found,
         errors         => $errors,
-        remaining      => $total_unlinked - scalar @results,
-        total_unlinked => $total_unlinked,
+        remaining      => $remaining > 0 ? $remaining : 0,
+        total_pending  => $total_pending,
         details        => \@results,
     };
 }

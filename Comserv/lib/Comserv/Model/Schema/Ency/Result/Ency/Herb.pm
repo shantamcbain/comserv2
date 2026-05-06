@@ -55,6 +55,8 @@ __PACKAGE__->add_columns(
     share              => { data_type => 'integer',  is_nullable => 0, default_value => 0 },
     organism_id        => { data_type => 'integer',  size => 11, is_nullable => 1, default_value => undef,
                             comment   => 'FK to ency_organism_tb; links herb to its NCBI taxonomy record' },
+    ncbi_lookup_status => { data_type => 'varchar',  size => 20, is_nullable => 1, default_value => undef,
+                            comment   => 'NULL=not tried; linked; not_found; error' },
 );
 
 __PACKAGE__->set_primary_key('record_id');
