@@ -2079,6 +2079,18 @@
             console.debug('No conversation_id in state, starting new conversation');
         }
 
+        // Link audio/transcript files from the most recent voice recording.
+        // These are set by _transcribeAudioFile() after a successful transcription.
+        // Sent once with the first message after a recording, then cleared.
+        if (state.lastAudioFileId) {
+            requestPayload.audio_file_id = state.lastAudioFileId;
+            state.lastAudioFileId = null;
+        }
+        if (state.lastTranscriptFileId) {
+            requestPayload.transcript_file_id = state.lastTranscriptFileId;
+            state.lastTranscriptFileId = null;
+        }
+
         // Build conversation history from visible messages (exclude current user msg
         // which was just appended to the DOM before queryAI() was called).
         // Send last 4 prior messages (2 exchanges) as multi-turn context.
