@@ -242,7 +242,7 @@
 [% END %]
 </div>
 [% ELSIF organism.image %]
-[% PROCESS show_image path=organism.image alt=organism.scientific_name %]
+[% ency_img_tag(organism.image, 300, 325) %]
 [% END %]
 [% END %]
 

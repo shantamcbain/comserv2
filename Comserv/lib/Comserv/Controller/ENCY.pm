@@ -3950,6 +3950,38 @@ sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
     $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
 }
 
+sub herb_import_common_names : Path('/ENCY/herb_import_common_names') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size    = $c->request->body_parameters->{batch_size}    // 20;
+    my $last_herb_id  = $c->request->body_parameters->{last_herb_id}  // 0;
+    $batch_size   = int($batch_size)   || 20;
+    $last_herb_id = int($last_herb_id) || 0;
+
+    my $result = eval { $c->model('ENCYModel')->import_herb_common_names($c, $batch_size, $last_herb_id) };
+    if ($@) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "$@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1, %$result }));
+}
+
 sub clean_bad_organism_images : Path('/ENCY/clean_bad_organism_images') : Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
