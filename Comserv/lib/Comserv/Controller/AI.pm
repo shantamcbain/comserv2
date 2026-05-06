@@ -2039,7 +2039,9 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
-    
+    my $req_audio_file_id      = $json_data->{audio_file_id}      || undef;
+    my $req_transcript_file_id = $json_data->{transcript_file_id} || undef;
+
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -2745,6 +2747,14 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
             
+            my %_user_meta = (
+                system_prompt    => '',
+                format           => 'text',
+                is_guest         => $is_guest ? 1 : 0,
+                guest_session_id => $guest_session_id,
+            );
+            $_user_meta{audio_file_id}      = $req_audio_file_id      + 0 if $req_audio_file_id;
+            $_user_meta{transcript_file_id} = $req_transcript_file_id + 0 if $req_transcript_file_id;
             $schema->resultset('AiMessage')->create({
                 conversation_id => $final_conversation_id,
                 user_id => $user_id,
@@ -2752,12 +2762,7 @@ sub chat :Local :Args(0) {
                 content => $prompt,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => encode_json({
-                    system_prompt => '',
-                    format => 'text',
-                    is_guest => $is_guest ? 1 : 0,
-                    guest_session_id => $guest_session_id
-                }),
+                metadata => encode_json(\%_user_meta),
                 ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
