@@ -157,10 +157,8 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
+                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
                 }
             }
         } catch {
@@ -766,9 +764,18 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
             );
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -1055,7 +1062,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-3-fast');
+                    $fb_grok->model('grok-4.20-non-reasoning');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -1066,7 +1073,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-3-fast (cold-start fallback)',
+                            model          => 'grok-4.20-non-reasoning (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -2287,9 +2294,18 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
             );
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -6478,10 +6494,8 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-fast-reasoning' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-3' },
-                        { id => 'grok-3-mini' },
+                        { id => 'grok-4.3' },
+                        { id => 'grok-4.20-non-reasoning' },
                     ];
                 }
 
