@@ -896,9 +896,9 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         if (!$table_exists) {
             # Create the table using deployment_statements
             try {
-                my $source = $schema->source($result_name);
+                my $source = $schema->source($result_path);
                 unless ($source) {
-                    die "Could not find source '$result_name' in schema";
+                    die "Could not find source '$result_path' in schema";
                 }
 
                 my @statements = $schema->deployment_statements('MySQL');
