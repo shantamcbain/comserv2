@@ -226,10 +226,10 @@
     [% END %]
 </table>
 
-[% SET _org_images = organism.images.all %]
-[% IF _org_images || organism.image %]
+[% SET _org_images = org_images %]
+[% IF _org_images.size || organism.image %]
 <h2>Images</h2>
-[% IF _org_images %]
+[% IF _org_images.size %]
 <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
 [% FOREACH img IN _org_images %]
 <div style="border:1px solid #ccc;padding:6px;border-radius:4px;max-width:220px;text-align:center;background:#fafafa;">
