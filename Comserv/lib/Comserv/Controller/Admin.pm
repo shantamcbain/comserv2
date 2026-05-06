@@ -2607,8 +2607,15 @@ sub find_result_file {
     my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
     
     if (lc($database) eq 'ency') {
+        # If the input looks like a subdirectory path (e.g., "Ency/ExternalID"),
+        # also try a direct path match before falling back to computed result_name
+        if ($table_name =~ m{/}) {
+            my $direct = "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/${table_name}.pm";
+            return $direct if -f $direct;
+        }
         @search_paths = (
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/Ency/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
         );
@@ -2642,7 +2649,13 @@ sub table_name_to_result_name {
     
     # Handle database-specific table name patterns
     my $clean_name = $table_name;
-    
+
+    # Strip subdirectory prefix (e.g., "Ency/ExternalID" -> "ExternalID")
+    # scan_result_directory_recursive uses "/" to denote subdirectory nesting
+    if ($clean_name =~ m{^[A-Za-z][A-Za-z0-9]*/(.+)$}) {
+        $clean_name = $1;
+    }
+
     # Remove common prefixes
     $clean_name =~ s/^ency_//i;
     $clean_name =~ s/^forager_//i;
