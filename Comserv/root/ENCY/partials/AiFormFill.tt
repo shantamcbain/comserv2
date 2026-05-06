@@ -294,6 +294,10 @@
                         val = String(aiValue);
                     }
 
+                    // Strip Markdown link syntax [text](url "title") → text
+                    // The ENCY system expects plain text and auto-generates links on display
+                    val = val.replace(/\[([^\]]+)\]\([^)]*\)/g, '$1');
+
                     // --- Reference field: always APPEND, never replace ---
                     if (key === 'reference') {
                         var existing = (el.value || '').trim();
