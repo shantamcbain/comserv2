@@ -3549,8 +3549,25 @@ sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
 
 # ─── Organism routes ────────────────────────────────────────────────────────
 
+sub _require_editor {
+    my ($self, $c, $return_to) = @_;
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $return_to }));
+        return 0;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->status(403);
+        $c->stash(error_msg => "This page requires editor access.", template => 'error.tt');
+        return 0;
+    }
+    return 1;
+}
+
 sub organism_list : Path('/ENCY/Organism') : Args(0) {
     my ($self, $c) = @_;
+    return unless $self->_require_editor($c, '/ENCY/Organism');
     my $type   = $c->request->parameters->{organism_type} // '';
     my $search = $c->request->parameters->{q}             // '';
     my $where  = {};
@@ -3569,6 +3586,7 @@ sub organism_list : Path('/ENCY/Organism') : Args(0) {
 
 sub organism_detail : Path('/ENCY/Organism') : Args(1) {
     my ($self, $c, $id) = @_;
+    return unless $self->_require_editor($c, "/ENCY/Organism/$id");
     unless (defined $id && $id =~ /^\d+$/) {
         $c->response->status(400);
         $c->response->body('Invalid organism ID');
