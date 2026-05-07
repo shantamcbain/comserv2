@@ -147,9 +147,9 @@
                         title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
                 [% IF is_admin && (SiteName == 'CSC' || c.session.SiteName == 'CSC') %]
-                <button class="dl-btn" id="dl-deploy-btn" onclick="deployDocker(event)"
+                <button class="dl-btn" id="dl-deploy-btn" onclick="openDeployPopup()"
                         style="background:#005a8e;color:#fff;"
-                        title="git pull + docker restart comserv-web-prod">🐳 Deploy</button>
+                        title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
                 [% END %]
                 <span id="dl-feedback"></span>
                 &nbsp;|&nbsp;
@@ -1678,47 +1678,36 @@ function dailyLogAction(action) {
     });
 }
 
-function deployDocker(evt) {
-    if (evt) evt.preventDefault();
-    var btn      = document.getElementById('dl-deploy-btn');
-    var feedback = document.getElementById('dl-feedback');
-    if (btn) btn.disabled = true;
-    feedback.textContent = '🐳 Deploying…';
-    feedback.style.color = '#005a8e';
-
-    fetch('/admin/docker/deploy', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: ''
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(d) {
-        if (d.success) {
-            feedback.textContent = '✅ ' + (d.message || 'Deploy complete');
-            feedback.style.color = '#2a7a2a';
-        } else {
-            feedback.textContent = '❌ ' + (d.message || 'Deploy error');
+function openDeployPopup() {
+    var popup = window.open(
+        '/admin/docker/deploy_form',
+        'docker_deploy',
+        'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
+    );
+    if (popup) {
+        popup.focus();
+        var feedback = document.getElementById('dl-feedback');
+        if (feedback) {
+            feedback.textContent = '🐳 Deploy popup opened';
+            feedback.style.color = '#005a8e';
+        }
+        window.addEventListener('message', function onMsg(e) {
+            if (e.data && e.data.type === 'deploy_done') {
+                var feedback = document.getElementById('dl-feedback');
+                if (feedback) {
+                    feedback.textContent = e.data.success ? '✅ Deploy complete' : '⚠ Deploy had errors';
+                    feedback.style.color = e.data.success ? '#2a7a2a' : '#9b0000';
+                }
+                window.removeEventListener('message', onMsg);
+            }
+        });
+    } else {
+        var feedback = document.getElementById('dl-feedback');
+        if (feedback) {
+            feedback.textContent = '⚠ Popup blocked — allow popups for this site';
             feedback.style.color = '#9b0000';
         }
-        if (d.log) {
-            var pre = document.createElement('pre');
-            pre.style.cssText = 'position:fixed;bottom:0;left:0;right:0;max-height:40vh;overflow:auto;background:#111;color:#0f0;font-size:0.78em;padding:10px;z-index:9999;margin:0;border-top:2px solid #005a8e;';
-            pre.textContent = d.log;
-            var close = document.createElement('button');
-            close.textContent = '✕ Close';
-            close.style.cssText = 'position:absolute;top:6px;right:10px;background:#333;color:#fff;border:none;padding:4px 10px;cursor:pointer;border-radius:3px;';
-            close.onclick = function() { document.body.removeChild(pre); };
-            pre.appendChild(close);
-            document.body.appendChild(pre);
-        }
-        if (btn) btn.disabled = false;
-    })
-    .catch(function(e) {
-        feedback.textContent = '❌ Request failed';
-        feedback.style.color = '#9b0000';
-        if (btn) btn.disabled = false;
-    });
+    }
 }
 
 function toggleLogPanel() {
