@@ -1010,22 +1010,32 @@
 
         // ── Other events ──────────────────────────────────────────────────────
         // Chat bubble click:
+        // - Mobile devices: open the inline panel (popup windows don't work on mobile)
         // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
-        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
+        // - Desktop: open a moveable browser popup window (draggable across screens/monitors)
         //   Falls back to the inline panel if the browser blocks popups.
+        var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+            if (_isMobile || window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        // ⤢ button: focus / re-open the popup window if it was closed or hidden
-        document.getElementById('detach-chat').addEventListener('click', function() {
-            if (state._popupWindow && !state._popupWindow.closed) {
-                state._popupWindow.focus();
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden (desktop only)
+        var detachBtn = document.getElementById('detach-chat');
+        if (detachBtn) {
+            if (_isMobile) {
+                detachBtn.style.display = 'none';
             } else {
-                detachToPopup();
+                detachBtn.addEventListener('click', function() {
+                    if (state._popupWindow && !state._popupWindow.closed) {
+                        state._popupWindow.focus();
+                    } else {
+                        detachToPopup();
+                    }
+                });
             }
-        });
+        }
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
