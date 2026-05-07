@@ -73,9 +73,11 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
     my $sitename  = $c->session->{SiteName} || 'CSC';
     my $title     = "\x{1F433} Docker Deploy $today ${\$now->hms('.')}";
 
+    my $todo_record_id = $c->req->body_params->{todo_record_id} || 0;
+
     my $log_id;
     eval {
-        my $entry = $c->model('DBEncy')->resultset('Log')->create({
+        my %log_fields = (
             abstract        => $title,
             username        => $username,
             sitename        => $sitename,
@@ -88,7 +90,9 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             group_of_poster => 'admin',
             last_mod_by     => $username,
             details         => 'Deploy in progress…',
-        });
+        );
+        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
+        my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
 

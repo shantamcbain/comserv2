@@ -48,6 +48,7 @@
 var logId    = null;
 var logOutput = '';
 var baseUrl  = window.location.origin;
+var todoRecordId = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
 
 function appendLine(text, cls) {
     var con = document.getElementById('console');
@@ -77,7 +78,7 @@ window.addEventListener('load', function() {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: ''
+        body: todoRecordId ? 'todo_record_id=' + encodeURIComponent(todoRecordId) : ''
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
