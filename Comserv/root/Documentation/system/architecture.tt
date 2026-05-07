@@ -129,7 +129,7 @@
     }
     
     h1 {
-        color: #333;
+        color: var(--text-color, #333);
         border-bottom: 2px solid #eee;
         padding-bottom: 10px;
     }
@@ -140,7 +140,7 @@
     }
     
     h3 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-top: 15px;
     }
     
@@ -153,7 +153,7 @@
     }
     
     strong {
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     a {

@@ -408,8 +408,8 @@
 }
 
 .feature-details {
-    background: #f8f9fa;
-    border-left: 4px solid #007bff;
+    background: var(--bg-secondary, #f8f9fa);
+    border-left: 4px solid var(--primary-color, #007bff);
     padding: 15px;
     margin: 15px 0;
 }
@@ -442,12 +442,12 @@ h1, h2, h3 {
 }
 
 h1 {
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid var(--border-color, #dee2e6);
     padding-bottom: 10px;
 }
 
 h2 {
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
     padding-bottom: 5px;
 }
 </style>

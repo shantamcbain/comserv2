@@ -32,7 +32,7 @@
 }
 
 .modal-header {
-    background-color: #f8f9fa;
+    background-color: rgba(255,255,255,0.12);
     padding: 15px 20px;
     border-bottom: 1px solid #dee2e6;
     cursor: move;
@@ -52,7 +52,7 @@
 }
 
 .modal-footer {
-    background-color: #f8f9fa;
+    background-color: rgba(255,255,255,0.12);
     padding: 15px 20px;
     border-top: 1px solid #dee2e6;
     text-align: right;
@@ -95,7 +95,7 @@
     font-size: 1rem;
     line-height: 1.5;
     color: #495057;
-    background-color: #fff;
+    background-color: rgba(255,255,255,0.88);
     border: 1px solid #ced4da;
     border-radius: 0.25rem;
     box-sizing: border-box;
@@ -178,7 +178,7 @@
 .multi-backend-summary {
     margin-top: 20px;
     padding: 15px;
-    background-color: #f8f9fa;
+    background-color: rgba(255,255,255,0.12);
     border-radius: 5px;
     border-left: 4px solid #007bff;
 }
@@ -191,7 +191,7 @@
 
 .routing-item {
     padding: 8px 12px;
-    background-color: white;
+    background-color: rgba(255,255,255,0.88);
     border-radius: 4px;
     border: 1px solid #dee2e6;
 }

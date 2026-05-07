@@ -26,19 +26,19 @@
   </div>
 
   <!-- TABLE OF CONTENTS SECTION -->
-  <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+  <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
     <div class="col-100">
       <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
       <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
       <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-        <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-        <a href="#primary-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Primary Network</a>
-        <a href="#proxmox-hosts" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Proxmox Hosts</a>
-        <a href="#secondary-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Secondary Network</a>
-        <a href="#container-networks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Container Networks</a>
-        <a href="#zerotier-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">ZeroTier Network</a>
-        <a href="#available-addresses" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Available IPs</a>
-        <a href="#scanning-procedure" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Scanning Procedure</a>
+        <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+        <a href="#primary-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Primary Network</a>
+        <a href="#proxmox-hosts" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Proxmox Hosts</a>
+        <a href="#secondary-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Secondary Network</a>
+        <a href="#container-networks" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Container Networks</a>
+        <a href="#zerotier-network" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">ZeroTier Network</a>
+        <a href="#available-addresses" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Available IPs</a>
+        <a href="#scanning-procedure" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Scanning Procedure</a>
       </div>
     </div>
   </div>
@@ -85,7 +85,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Network Gateway/Router</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.2</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">poxmox720.lan</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">d4:ae:52:76:8a:7a</td>
@@ -99,7 +99,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Virtual Machine / Container</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.4</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">52:54:00:d2:4a:8b</td>
@@ -113,7 +113,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Production Database Server</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.128</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">pmg.ht.home</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">96:09:f6:e5:45:1e</td>
@@ -127,7 +127,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown Device</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.175</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">14:dd:a9:4f:fc:4d</td>
@@ -141,7 +141,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Bee Apiary Tracking System</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.199</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">workstation.computersystemconsulting.ca</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">9c:5c:8e:c2:c8:6c</td>
@@ -155,7 +155,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown Device</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.201</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">0e:63:6e:5d:4a:64</td>
@@ -169,7 +169,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown Device</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.220</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
@@ -212,7 +212,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">K8s Master (VM 100), Worker (VM 103), DR MySQL (VM 500)</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/proxmox_integration') %]" style="color: var(--link-color);">proxmox_integration.tt:11</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.12</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">proxmox720.lan</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">PVE 8.4.14</td>
@@ -228,7 +228,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Gateway (VM 101), OPNsense (VM 103) - Network Infrastructure</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/proxmox_integration') %]" style="color: var(--link-color);">proxmox_integration.tt:13</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.1.198</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">bmast.lan (Production DB)</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">N/A</td>
@@ -238,7 +238,7 @@
         </tr>
       </table>
 
-      <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+      <div style="background-color: var(--caution-bg, #fff3cd); border-left: 4px solid var(--caution-color, #ffc107); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <p style="color: var(--text-color); font-family: var(--body-font); margin: 0;"><strong>⚠️ Critical Note:</strong> Production database (192.168.1.198) is a bare-metal server <strong>OUTSIDE</strong> Proxmox. During Kubernetes migration, both this bare-metal DB and K8s databases will be kept in sync via MySQL replication. See <a href="[% c.uri_for('/Documentation/system/COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT') %]" style="color: var(--link-color);">COMSERV_INFRASTRUCTURE_MIGRATION_AMENDMENT.tt</a> for migration strategy.</p>
       </div>
 
@@ -272,7 +272,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">WiFi Gateway/Router</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.2.10</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">workstation.ht.home</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">d8:44:89:03:cd:f9</td>
@@ -286,7 +286,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown Device</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.2.28</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
@@ -300,7 +300,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown Device</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Active</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">192.168.2.38</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Unknown</td>
@@ -338,7 +338,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">docker0</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Default Docker (inactive)</td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Compose Network 1</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">172.19.0.0/16</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">br-2e59cfa2bdce</td>
@@ -376,7 +376,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color;);"><a href="#primary-network" style="color: var(--link-color);">192.168.1.x (Internal)</a></td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/proxy_troubleshooting') %]" style="color: var(--link-color);">proxy_troubleshooting.tt:31</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">172.30.161.222</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">zthnhd6k65</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">coop.local</td>
@@ -392,7 +392,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="#proxmox-hosts" style="color: var(--link-color);">192.168.1.11-12</a></td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]" style="color: var(--link-color);">K8s_Migration:355</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">172.30.204.11</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">zthnhd6k65</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">K8s Master Node</td>
@@ -458,7 +458,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VM 100 on proxmoxws (PVE 8.3.0)</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]" style="color: var(--link-color);">K8s_Migration:362</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">172.30.204.10</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">zthnhd6k65</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">K8s Worker Node 1</td>
@@ -474,7 +474,7 @@
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">VM 103 on proxmoxws (PVE 8.3.0)</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);"><a href="[% c.uri_for('/Documentation/system/PRODUCTION_DB_KUBERNETES_MIGRATION_PLAN') %]" style="color: var(--link-color);">K8s_Migration:369</a></td>
         </tr>
-        <tr style="background-color: var(--secondary-color);">
+        <tr style="background-color: rgba(255,255,255,0.12);">
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">172.30.131.126</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">zthnhd6k65</td>
           <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Local App Host / VPN Client</td>
@@ -494,7 +494,7 @@
 
       <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Verification & Troubleshooting</h3>
       <p style="color: var(--text-color); font-family: var(--body-font);">To verify ZeroTier connectivity from any K8s node:</p>
-      <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+      <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # List all connected ZeroTier networks
 zerotier-cli listnetworks
@@ -526,7 +526,7 @@ kubectl run --rm -it --image=busybox busybox -- \
       
       <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.1 Primary Network (192.168.1.0/24) - Recommended</h3>
       <p style="color: var(--text-color); font-family: var(--body-font);">15 devices in use, 239 available addresses.</p>
-      <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+      <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 192.168.1.5 - 192.168.1.125 (121 addresses available)
 192.168.1.127 - 192.168.1.143 (17 addresses available)
@@ -539,7 +539,7 @@ kubectl run --rm -it --image=busybox busybox -- \
 
       <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">6.2 Secondary Network (192.168.2.0/24) - WiFi</h3>
       <p style="color: var(--text-color); font-family: var(--body-font);">6 devices in use, 248 available addresses.</p>
-      <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+      <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 192.168.2.2 - 192.168.2.9 (8 addresses available)
 192.168.2.12 - 192.168.2.27 (16 addresses available)
@@ -569,7 +569,7 @@ kubectl run --rm -it --image=busybox busybox -- \
       </ol>
 
       <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.2 Running nmap Scans</h3>
-      <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+      <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 nmap -sn 192.168.1.0/24          # Quick discovery scan
 nmap -p 22,80,443,3306 192.168.1.0/24  # Scan common ports
@@ -579,7 +579,7 @@ nmap -sn 192.168.2.0/24          # Scan WiFi network
       </div>
 
       <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">7.3 Using ARP for Discovery</h3>
-      <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+      <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
         <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 arp -a | sort                    # Display all ARP entries
 arp -a | grep 192.168.1          # Filter by network
@@ -595,7 +595,7 @@ nslookup 192.168.1.X             # Hostname resolution
   <!-- SEE ALSO SECTION -->
   <div class="row">
     <div class="col-100">
-      <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+      <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
         <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
         <ul style="color: var(--text-color); font-family: var(--body-font);">
           <li><a href="[% c.uri_for('/Documentation/system/network_diagnostics') %]" style="color: var(--link-color);">Network Diagnostics Tool</a> - In-app network testing</li>

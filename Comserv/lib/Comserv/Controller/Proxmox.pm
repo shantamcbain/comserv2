@@ -50,8 +50,8 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_index')) {
-        $c->flash->{error_msg} = 'You must be an administrator to access Proxmox management.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -63,8 +63,15 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'index',
         "User roles: " . join(", ", @$roles));
 
-    # Use server_id from parameter or default
-    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id} || 'ProxmoxDevelopment';
+    # Use server_id from parameter or session; fall back to first saved server
+    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all_servers = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        if ($all_servers && @$all_servers) {
+            $server_id = $all_servers->[0]{id} || $all_servers->[0]{server_id};
+        }
+        $server_id ||= 'ProxmoxDevelopment';
+    }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         "Starting Proxmox VM management for server: $server_id");
@@ -338,8 +345,8 @@ sub create_vm_form :Path('create') :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_create_vm')) {
-        $c->flash->{error_msg} = 'You must be an administrator to create VMs.';
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
         $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
@@ -418,7 +425,7 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
     my ($self, $c) = @_;
 
     my $admin_auth = Comserv::Util::AdminAuth->new();
-    unless ($admin_auth->check_admin_access($c, 'proxmox_create_vm_action')) {
+    unless ($admin_auth->is_csc_admin($c)) {
         $c->response->status(403);
         $c->response->content_type('application/json');
         $c->response->body('{"success":false,"error":"Access denied: admin required"}');
@@ -594,20 +601,12 @@ Select a Proxmox server to use for management
 sub select_server :Path('select_server') :Args(0) {
     my ($self, $c) = @_;
 
-    # Check if user has admin role
-    my $roles = $c->session->{roles} || [];
-
-    # Log the roles for debugging
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'select_server',
-        "User roles: " . join(", ", @$roles));
-
-    # Check if the user has the 'admin' role using grep
-    unless (ref $roles eq 'ARRAY' && grep { $_ eq 'admin' } @$roles) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'select_server',
-            "User does not have admin role, access denied");
-
-        $c->flash->{error_msg} = "You need administrator privileges to manage Proxmox servers.";
-        $c->response->redirect($c->uri_for('/'));
+            "Access denied: CSC admin required");
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
+        $c->response->redirect($c->uri_for('/user/login'));
         return;
     }
 
@@ -639,7 +638,7 @@ sub select_server :Path('select_server') :Args(0) {
     $c->stash(
         template => 'proxmox/select_server.tt',
         servers => $servers,
-        current_server => $c->session->{proxmox_server_id} || 'ProxmoxDevelopment',
+        current_server => $c->session->{proxmox_server_id} || '',
     );
     $c->forward($c->view('TT'));
 }
@@ -653,20 +652,12 @@ Get the status of a VM
 sub vm_status :Path('status') :Args(1) {
     my ($self, $c, $vmid) = @_;
 
-    # Check if user has admin role
-    my $roles = $c->session->{roles} || [];
-
-    # Log the roles for debugging
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'vm_status',
-        "User roles: " . join(", ", @$roles));
-
-    # Check if the user has the 'admin' role using grep
-    unless (ref $roles eq 'ARRAY' && grep { $_ eq 'admin' } @$roles) {
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'vm_status',
-            "User does not have admin role, access denied");
-
+            "Access denied: CSC admin required");
         $c->stash(
-            json => { success => 0, error => 'You need administrator privileges to access VM status.' }
+            json => { success => 0, error => 'Proxmox management is restricted to CSC administrators.' }
         );
         $c->forward('View::JSON');
         return;

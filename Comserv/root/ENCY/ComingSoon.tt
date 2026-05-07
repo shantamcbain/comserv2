@@ -1,0 +1,57 @@
+[% META
+   title = "Coming Soon"
+   description = "This section is under development"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-04-04"
+%]
+[% PageVersion = 'ENCY/ComingSoon.tt,v 0.01 2026/04/04' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+<h1>[% entity_name | html %]</h1>
+
+<div class="alert alert-info">
+  <strong>Coming Soon</strong> — The [% entity_name | html %] section is currently under development and will be available shortly.
+</div>
+
+[% IF entity_desc %]
+<p>[% entity_desc | html %]</p>
+[% END %]
+
+[% IF is_editor && add_url %]
+<p>
+  <a href="[% add_url | html %]" class="btn btn-primary">Add [% entity_name | html %]</a>
+</p>
+[% END %]
+
+<p>In the meantime, you can use the <strong>Ask AI</strong> feature to look up information:</p>
+<div style="display:flex;gap:0.5rem;max-width:520px;margin:1rem 0;">
+  <input type="text" id="cs-ai-query" placeholder="Ask about a [% entity_name.lower | html %]..." style="flex:1;padding:0.4rem 0.7rem;border:1px solid var(--border-color);border-radius:4px;font-size:var(--font-size-small);background:var(--secondary-color);color:var(--text-color);" />
+  <button onclick="csAskAI()" style="padding:0.4rem 1rem;background:var(--info-color);color:#fff;border:none;border-radius:4px;cursor:pointer;">Ask AI</button>
+</div>
+<script>
+function csAskAI() {
+    var q = document.getElementById('cs-ai-query').value.trim();
+    if (!q) return;
+    var fullQuery = 'Tell me about this [% entity_name | html %] in the context of natural health and biological medicine: ' + q;
+
+    var chatBtn  = document.getElementById('chat-button');
+    var msgInput = document.getElementById('message-input');
+
+    if (chatBtn && msgInput) {
+        if (chatBtn.style.display !== 'none') { chatBtn.click(); }
+        setTimeout(function() {
+            msgInput.value = fullQuery;
+            msgInput.dispatchEvent(new Event('input'));
+            msgInput.focus();
+        }, 150);
+    } else {
+        window.open('/ai?prompt=' + encodeURIComponent(fullQuery), '_blank');
+    }
+}
+document.getElementById('cs-ai-query').addEventListener('keypress', function(e) { if (e.key === 'Enter') csAskAI(); });
+</script>

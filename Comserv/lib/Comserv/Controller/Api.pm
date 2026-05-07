@@ -17,8 +17,8 @@ has 'logging' => (
 
 sub _check_admin {
     my ($self, $c) = @_;
-    
-    unless ($c->user_exists) {
+
+    unless ($c->session->{username} && $c->session->{user_id}) {
         $c->res->status(401);
         $c->res->content_type('application/json');
         $c->res->body(encode_json({
@@ -28,14 +28,13 @@ sub _check_admin {
         }));
         $c->detach();
     }
-    
-    my $roles = $c->session->{roles} || [];
-    unless (grep { $_ eq 'admin' } @$roles) {
+
+    unless ($c->stash->{is_admin}) {
         $c->res->status(403);
         $c->res->content_type('application/json');
         $c->res->body(encode_json({
             success => 0,
-            error => 'Admin role required to generate API tokens.',
+            error => 'Admin role required.',
             code => 'insufficient_permissions'
         }));
         $c->detach();
@@ -78,7 +77,7 @@ sub api_generate_token :Local :Args(0) {
     my $expires_in_days = $params->{expires_in_days};
     
     my $schema = $c->model('DBEncy');
-    my $username = $c->user->username;
+    my $username = $c->session->{username};
     
     my $user = $schema->resultset('User')->search({
         username => $username
@@ -145,7 +144,7 @@ sub api_list_tokens :Local :Args(0) {
     $self->_check_admin($c);
     
     my $schema = $c->model('DBEncy');
-    my $username = $c->user->username;
+    my $username = $c->session->{username};
     
     my $user = $schema->resultset('User')->search({
         username => $username
@@ -203,7 +202,7 @@ sub api_revoke_token :Local :Args(1) {
     $self->_check_admin($c);
     
     my $schema = $c->model('DBEncy');
-    my $username = $c->user->username;
+    my $username = $c->session->{username};
     
     my $user = $schema->resultset('User')->search({
         username => $username
@@ -357,7 +356,7 @@ sub api_todo_create :Path('todo/create') :Args(0) {
     }
     
     my $schema = $c->model('DBEncy');
-    my $current_user = $api_user ? $api_user->username : ($c->user_exists ? $c->user->username : 'system');
+    my $current_user = $api_user ? $api_user->username : ($c->session->{username} || 'system');
     
     my @required = qw(subject start_date due_date priority status);
     my @missing = grep { !defined $params->{$_} || $params->{$_} eq '' } @required;
@@ -543,7 +542,7 @@ sub api_create_project :Path('project/create') :Args(0) {
         $c->detach();
     }
 
-    my $current_user = $api_user ? $api_user->username : ($c->user_exists ? $c->user->username : 'system');
+    my $current_user = $api_user ? $api_user->username : ($c->session->{username} || 'system');
     my $schema       = $c->model('DBEncy');
 
     my $parent_id = $params->{parent_id} || undef;

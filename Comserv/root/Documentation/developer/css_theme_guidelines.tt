@@ -125,8 +125,8 @@
 
 /* BAD - Hard-coded values */
 .my-component {
-    background: #ffffff;
-    color: #333333;
+    background: rgba(255,255,255,0.88);
+    color: var(--text-color, #333);
     border: 1px solid #dddddd;
 }</pre>
             </div>

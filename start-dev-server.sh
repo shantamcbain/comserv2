@@ -1,23 +1,25 @@
 #!/bin/bash
-# Development Server Startup Script
-# Runs Catalyst server on port 4006 with debug mode outside Zenflow
+# Development Server Startup Script — 3D Printing branch
+# Runs Catalyst server on port 4030 with debug mode outside Zenflow
+# Branch: 3dprinting-use-this-as-the-branc-41f3
 # This prevents resource consumption in the main Zenflow workspace
 
 cd "$(dirname "$0")/Comserv"
 
 echo "========================================="
 echo "Starting Comserv Development Server"
+echo "  Branch: 3dprinting"
 echo "========================================="
-echo "Port: 4006"
+echo "Port: 4030"
 echo "Debug: Enabled"
 echo "Auto-restart: Enabled (-r flag)"
 echo "========================================="
 echo ""
 
-# Check if port 4006 is already in use
-if lsof -Pi :4006 -sTCP:LISTEN -t >/dev/null ; then
-    echo "ERROR: Port 4006 is already in use"
-    echo "Kill the existing process with: kill \$(lsof -t -i:4006)"
+# Check if port 4030 is already in use
+if lsof -Pi :4030 -sTCP:LISTEN -t >/dev/null ; then
+    echo "ERROR: Port 4030 is already in use"
+    echo "Kill the existing process with: kill \$(lsof -t -i:4030)"
     exit 1
 fi
 
@@ -37,7 +39,7 @@ fi
 
 # Start the server with debug mode and auto-restart
 echo "Starting server..."
-CATALYST_DEBUG=1 script/comserv_server.pl -p 4006 -r
+CATALYST_DEBUG=1 script/comserv_server.pl -p 4030 -r
 
 # Note: -r flag enables auto-restart on file changes
 # This is useful for development but should NOT be used in production

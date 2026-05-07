@@ -1,0 +1,108 @@
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.fp-toolbar { display:flex; gap:8px; align-items:center; margin-bottom:12px; }
+.fp-toolbar input { flex:1; padding:5px 8px; border:1px solid var(--border-color); border-radius:3px; font-family:var(--body-font); }
+.fp-toolbar button { padding:5px 12px; background:var(--primary-color); color:#fff; border:none; border-radius:3px; cursor:pointer; font-family:var(--body-font); }
+.img-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(130px, 1fr)); gap:10px; }
+.img-card { border:2px solid var(--border-color); border-radius:4px; overflow:hidden; cursor:pointer; background:var(--background-color); transition:border-color 0.15s; }
+.img-card:hover { border-color:var(--primary-color); }
+.img-card img { width:100%; height:90px; object-fit:contain; background:var(--secondary-color); display:block; }
+.img-card .img-name { padding:3px 6px; font-size:0.7rem; color:var(--text-muted-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; font-family:var(--body-font); }
+.img-card button { display:block; width:100%; padding:4px 0; background:var(--primary-color); color:#fff; border:none; cursor:pointer; font-size:0.8rem; font-family:var(--body-font); }
+.img-card button:hover { opacity:0.85; }
+.fp-manual { background:var(--secondary-color); border:1px solid var(--border-color); border-radius:4px; padding:10px 12px; margin-top:16px; }
+.fp-manual label { display:block; font-size:0.82rem; font-family:var(--body-font); color:var(--text-color); margin-bottom:5px; font-weight:bold; }
+.fp-manual input { width:100%; padding:5px 8px; border:1px solid var(--border-color); border-radius:3px; font-family:monospace; font-size:0.82rem; background:var(--background-color); color:var(--text-color); box-sizing:border-box; }
+</style>
+
+<div class="app-container">
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <h2 style="margin:0;font-family:var(--header-font);color:var(--text-color);font-size:1.1rem">
+    <i class="fas fa-images"></i> Select Image — [% sitename | html %]
+  </h2>
+  <button onclick="window.close()" style="padding:4px 12px;border:1px solid var(--border-color);background:var(--secondary-color);color:var(--text-color);border-radius:3px;cursor:pointer;font-family:var(--body-font)">
+    &times; Close
+  </button>
+</div>
+
+<div class="content-container">
+
+<div class="fp-toolbar">
+  <form method="GET" action="/shop/file_picker" style="display:contents">
+    <input type="hidden" name="target_field" value="[% target_field | html %]">
+    <input type="text" name="q" value="[% search | html %]" placeholder="Search images by filename...">
+    <button type="submit"><i class="fas fa-search"></i> Search</button>
+    [% IF search %]
+    <a href="/shop/file_picker?target_field=[% target_field | uri %]" style="padding:5px 10px;border:1px solid var(--border-color);color:var(--text-color);border-radius:3px;text-decoration:none;font-family:var(--body-font)">Clear</a>
+    [% END %]
+  </form>
+</div>
+
+<h3 style="font-family:var(--header-font);color:var(--text-color);font-size:0.9rem;text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px">
+  Uploaded Shop Images
+  <span style="font-weight:normal;font-size:0.8rem;color:var(--text-muted-color)">(from /static/shop_images/[% sitename | html %]/)</span>
+</h3>
+
+[% IF local_images.size > 0 %]
+<div class="img-grid">
+  [% FOREACH img IN local_images %]
+  <div class="img-card">
+    <img src="[% img.url | html %]" alt="[% img.filename | html %]" loading="lazy">
+    <div class="img-name" title="[% img.filename | html %]">[% img.filename | html %]</div>
+    <button onclick="selectFile('[% img.url | html %]')"><i class="fas fa-check"></i> Use</button>
+  </div>
+  [% END %]
+</div>
+[% ELSE %]
+<p style="color:var(--text-muted-color);font-family:var(--body-font);padding:16px 0;text-align:center">
+  [% IF search %]
+    No images matching "<strong>[% search | html %]</strong>".
+  [% ELSE %]
+    No images uploaded yet. Upload an image via the item edit form first.
+  [% END %]
+</p>
+[% END %]
+
+<div style="margin:16px 0;padding:10px 12px;background:var(--secondary-color);border:1px solid var(--border-color);border-radius:4px;font-family:var(--body-font);font-size:0.85rem">
+  <strong style="color:var(--text-color)"><i class="fas fa-folder-open"></i> FileManager</strong><br>
+  <span style="color:var(--text-muted-color)">To use images from elsewhere on the server, open the full FileManager, copy the file path, and paste it below.</span><br>
+  <a href="/file/admin_browser" target="_blank" style="display:inline-block;margin-top:6px;padding:4px 12px;background:#6a1b9a;color:#fff;border-radius:3px;text-decoration:none">
+    <i class="fas fa-folder"></i> Open FileManager
+  </a>
+</div>
+
+<div class="fp-manual">
+  <label><i class="fas fa-link"></i> Or enter / paste an image path or URL:</label>
+  <div style="display:flex;gap:6px;margin-top:4px">
+    <input type="text" id="manual-path" placeholder="/static/shop_images/[% sitename | html %]/photo.jpg">
+    <button onclick="selectFile(document.getElementById('manual-path').value)"
+            style="padding:5px 12px;background:#2e7d32;color:#fff;border:none;border-radius:3px;cursor:pointer;font-family:var(--body-font);white-space:nowrap">
+      <i class="fas fa-check"></i> Use
+    </button>
+  </div>
+</div>
+
+</div>
+</div>
+
+<script>
+function selectFile(url) {
+    if (!url || !url.trim()) { alert('No file selected.'); return; }
+    url = url.trim();
+    var field = '[% target_field | html %]';
+    try {
+        if (window.opener && !window.opener.closed) {
+            var el = window.opener.document.getElementById(field)
+                  || window.opener.document.querySelector('[name="' + field + '"]');
+            if (el) {
+                el.value = url;
+                if (typeof window.opener.shopPickerCallback === 'function') {
+                    window.opener.shopPickerCallback(field, url);
+                }
+            }
+        }
+    } catch(e) {}
+    window.close();
+}
+</script>

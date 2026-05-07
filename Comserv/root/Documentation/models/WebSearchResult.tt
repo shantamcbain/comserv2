@@ -89,7 +89,7 @@
                         <td>auto_increment</td>
                         <td>Primary key - auto-generated result ID</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>query</td>
                         <td>VARCHAR(500)</td>
                         <td>NO</td>
@@ -103,7 +103,7 @@
                         <td>REQUIRED</td>
                         <td>Title/heading of the search result (REQUIRED, up to 512 chars)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>result_url</td>
                         <td>VARCHAR(1000)</td>
                         <td>NO</td>
@@ -117,7 +117,7 @@
                         <td>REQUIRED</td>
                         <td>Short excerpt from result (REQUIRED, unlimited length)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>full_content</td>
                         <td>LONGTEXT</td>
                         <td>YES</td>
@@ -131,7 +131,7 @@
                         <td>'web'</td>
                         <td>Source type: 'web', 'public_domain_book', 'arxiv', 'github', 'stackoverflow' (default: 'web')</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>found_by_user_id</td>
                         <td>INTEGER</td>
                         <td>NO</td>
@@ -145,7 +145,7 @@
                         <td>0</td>
                         <td>Verification status: 0=unverified, 1=verified, -1=rejected (default: 0)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>verified_by_user_id</td>
                         <td>INTEGER</td>
                         <td>YES</td>
@@ -159,7 +159,7 @@
                         <td>NULL</td>
                         <td>Notes from verifier (reason for verification/rejection)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>created_at</td>
                         <td>TIMESTAMP</td>
                         <td>NO</td>
@@ -173,7 +173,7 @@
                         <td>NULL</td>
                         <td>Timestamp when result was verified/rejected (optional)</td>
                     </tr>
-                    <tr style="background-color: var(--secondary-color);">
+                    <tr style="background-color: rgba(255,255,255,0.12);">
                         <td>used_in_ai_message_id</td>
                         <td>INTEGER</td>
                         <td>YES</td>
@@ -197,7 +197,7 @@
                 </ul>
                 
                 <h3>Source Type Usage</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $result = $schema->resultset('WebSearchResult')->create({
     query => 'Perl Catalyst authentication',
     result_title => 'Authentication in Catalyst',
@@ -234,26 +234,26 @@ my @academic = $schema->resultset('WebSearchResult')->search({
                 </ol>
 
                 <h3>Helper Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>is_pending_verification():</strong> Check if result needs admin review</p>
                     <pre><code>if ($result->is_pending_verification) {
     print "Waiting for admin approval\n";
 }</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>can_be_verified($user_role):</strong> Check if user can verify results</p>
                     <pre><code>if ($result->can_be_verified($user->role)) {
     # Show verification UI
 }</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>mark_as_verified($user_id, $notes):</strong> Approve result</p>
                     <pre><code>$result->mark_as_verified(42, 'Accurate and relevant source');</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>mark_as_rejected($user_id, $notes):</strong> Reject result</p>
                     <pre><code>$result->mark_as_rejected(42, 'Outdated information - 2015 version');</code></pre>
                 </div>
@@ -292,7 +292,7 @@ my @academic = $schema->resultset('WebSearchResult')->search({
                 <h2>API Methods & Helpers</h2>
                 
                 <h3>Standard DBIx::Class Methods</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Creating Results:</strong></p>
                     <pre><code>my $result = $schema->resultset('WebSearchResult')->create({
     query => 'Perl DBI tutorial',
@@ -304,7 +304,7 @@ my @academic = $schema->resultset('WebSearchResult')->search({
 });</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Retrieving Results:</strong></p>
                     <pre><code>my $result = $schema->resultset('WebSearchResult')->find(100);
 
@@ -317,7 +317,7 @@ my @verified = $schema->resultset('WebSearchResult')->search({
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Updating Results:</strong></p>
                     <pre><code>$result->update({
     full_content => $fetched_page_content
@@ -329,21 +329,21 @@ $result->update;</code></pre>
                 </div>
 
                 <h3>Query Patterns</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Find by Query:</strong></p>
                     <pre><code>my @results = $schema->resultset('WebSearchResult')->search({
     query => 'Catalyst web framework'
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Find Cited Results:</strong></p>
                     <pre><code>my @cited = $schema->resultset('WebSearchResult')->search({
     used_in_ai_message_id => { '!=' => undef }
 })->all;</code></pre>
                 </div>
 
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <p><strong>Find Awaiting Verification:</strong></p>
                     <pre><code>my @pending = $schema->resultset('WebSearchResult')->search({
     is_verified => 0
@@ -357,7 +357,7 @@ $result->update;</code></pre>
                 <h2>Usage Examples</h2>
                 
                 <h3>Example 1: Store Search Result from Web Search</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use JSON::MaybeXS;
 
 my $search_result = {
@@ -380,7 +380,7 @@ print "Stored result #" . $stored->id . " awaiting verification\n";</code></pre>
                 </div>
 
                 <h3>Example 2: Admin Verification Workflow</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my @pending = $schema->resultset('WebSearchResult')->search({
     is_verified => 0
 }, { 
@@ -404,7 +404,7 @@ foreach my $result (@pending) {
                 </div>
 
                 <h3>Example 3: Citation in AI Message</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $verified = $schema->resultset('WebSearchResult')->search({
     is_verified => 1,
     source_type => 'arxiv'
@@ -425,7 +425,7 @@ if ($verified) {
                 </div>
 
                 <h3>Example 4: Reject Inaccurate Result</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>my $result = $schema->resultset('WebSearchResult')->find(456);
 
 if ($result->is_pending_verification) {
@@ -441,7 +441,7 @@ if ($result->is_pending_verification) {
                 </div>
 
                 <h3>Example 5: Fetch and Update Full Content</h3>
-                <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+                <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                     <pre><code>use LWP::UserAgent;
 
 my $result = $schema->resultset('WebSearchResult')->find(200);

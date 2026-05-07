@@ -26,6 +26,11 @@
         <div class="action-bar">
           <a href="[% c.uri_for('/membership/admin/create_plan') %]" class="btn btn-primary">+ New Plan</a>
           <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-secondary">← Back to Admin</a>
+          [% IF c.session.SiteName == 'CSC' %]
+          <a href="[% c.uri_for('/membership/admin/seed_hosting_plans') %]" class="btn btn-secondary"
+             onclick="return confirm('Seed / update CSC hosting plans (Subdomain Hosting $6/mo + App-Only Hosting $15/mo)? Existing plans will be updated to current prices.')">
+            &#127760; Seed Hosting Plans</a>
+          [% END %]
         </div>
 
         [% IF plans.size %]

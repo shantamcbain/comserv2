@@ -32,7 +32,7 @@
                      style="width:1.1rem;height:1.1rem">
               <span><strong>Sandbox / Test Mode</strong></span>
             </label>
-            <p class="form-hint" style="margin:0.25rem 0 0 1.7rem;font-size:0.88em;color:#666">
+            <p class="form-hint" style="margin:0.25rem 0 0 1.7rem;font-size:0.88em;color: var(--text-muted-color, #666)">
               Check this while testing. Uncheck when you are ready to accept real payments.
             </p>
           </div>
@@ -43,7 +43,7 @@
                    value="[% current.paypal_business | html %]"
                    placeholder="yourname@example.com"
                    style="width:100%;max-width:420px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
-            <p class="form-hint" style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+            <p class="form-hint" style="font-size:0.88em;color: var(--text-muted-color, #666);margin:0.2rem 0 0">
               The email address of your PayPal Business account. Payments go here.
             </p>
           </div>
@@ -76,7 +76,7 @@
                    value="[% current.paypal_secret | html %]"
                    placeholder="EeFfGgHh…"
                    style="width:100%;max-width:520px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px;font-family:monospace">
-            <p class="form-hint" style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+            <p class="form-hint" style="font-size:0.88em;color: var(--text-muted-color, #666);margin:0.2rem 0 0">
               Stored encrypted in the database. Leave blank to keep the existing value unchanged.
             </p>
           </div>
@@ -136,7 +136,7 @@
           <li>When you are happy with testing, switch back to your real email and uncheck Sandbox</li>
         </ol>
 
-        <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em">
+        <div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em">
           <strong>Client ID / Secret fields</strong> — you can ignore these completely.
           They are only needed for a future feature (automatic recurring subscriptions).
           Leave them blank for now.
@@ -148,7 +148,7 @@
         <p style="font-size:0.88em">
           When a member pays, PayPal automatically notifies this site at:
         </p>
-        <code style="word-break:break-all;font-size:0.82em;display:block;padding:0.4rem;background:#fff;border:1px solid #ddd;border-radius:4px">
+        <code style="word-break:break-all;font-size:0.82em;display:block;padding:0.4rem;background: rgba(255,255,255,0.88);border:1px solid var(--border-color, #ddd);border-radius:4px">
           [% c.uri_for('/payment/paypal/ipn') %]
         </code>
         <p style="font-size:0.88em;margin-top:0.5rem">

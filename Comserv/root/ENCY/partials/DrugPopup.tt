@@ -1,0 +1,10 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3>[% drug.brand_name | html %][% IF drug.generic_name %] <small>([% drug.generic_name | html %])</small>[% END %]</h3>
+  [% IF drug.drug_class %]<p><strong>Class:</strong> [% drug.drug_class | html %]</p>[% END %]
+  [% IF drug.indications %]<p><strong>Indications:</strong> [% drug.indications | html %]</p>[% END %]
+  [% IF drug.mechanism_of_action %]<p><strong>Mechanism of Action:</strong> [% drug.mechanism_of_action | html %]</p>[% END %]
+  [% IF drug.contraindications %]<p><strong>Contraindications:</strong> [% drug.contraindications | html %]</p>[% END %]
+  [% IF drug.active_ingredients %]<p><strong>Active Ingredients:</strong> [% drug.active_ingredients | html %]</p>[% END %]
+  <p><a href="/ENCY/Drug/[% drug.record_id %]">View full drug details &rarr;</a></p>
+</div>

@@ -1,0 +1,128 @@
+[% META title = 'Edit Listing' TemplateType = 'Application' %]
+[% SET cur = form.defined ? form : listing %]
+
+<div class="container" style="max-width:700px;margin:0 auto;padding:20px;">
+
+  <div style="margin-bottom:15px;">
+    <a href="/marketplace/view/[% listing.id %]" style="color:var(--primary-color,#007bff);text-decoration:none;">← Back to Listing</a>
+  </div>
+
+  <h1 style="margin-bottom:20px;"><i class="fas fa-edit"></i> Edit Listing</h1>
+
+  [% IF error_msg %]
+    <div style="background:#f8d7da;color:#721c24;border:1px solid #f5c6cb;border-radius:5px;padding:10px 15px;margin-bottom:15px;">[% error_msg | html %]</div>
+  [% END %]
+
+  <form method="POST" action="/marketplace/edit/[% listing.id %]" style="background:var(--bg-color,#fff);border:1px solid #ddd;border-radius:8px;padding:24px;">
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:8px;">Listing Type <span style="color:red;">*</span></label>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        [% FOR t IN [
+            {val => 'sale',   icon => '🏷️', label => 'For Sale',   desc => 'I have something to sell'},
+            {val => 'wanted', icon => '🔍', label => 'Wanted',     desc => 'I am looking for something'},
+            {val => 'job',    icon => '💼', label => 'Job / Gig',  desc => 'Offering or seeking work'},
+        ] %]
+        [% SET sel = cur.listing_type || listing.listing_type || 'sale' %]
+        <label style="flex:1;min-width:140px;border:2px solid #dee2e6;border-radius:6px;padding:10px;cursor:pointer;text-align:center;
+               [% IF sel == t.val %]border-color:var(--primary-color,#007bff);background:#f0f7ff;[% END %]">
+          <input type="radio" name="listing_type" value="[% t.val %]"
+                 [% IF sel == t.val %]checked[% END %]
+                 style="display:none;">
+          <div style="font-size:1.4rem;">[% t.icon %]</div>
+          <div style="font-weight:bold;font-size:0.95rem;">[% t.label %]</div>
+          <div style="font-size:0.75rem;color:#666;">[% t.desc %]</div>
+        </label>
+        [% END %]
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Title <span style="color:red;">*</span></label>
+      <input type="text" name="title" value="[% (cur.title || listing.title) | html %]" required maxlength="255"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Description <span style="color:red;">*</span></label>
+      <textarea name="description" required rows="6"
+                style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;resize:vertical;">[% (cur.description || listing.description) | html %]</textarea>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 120px;gap:12px;margin-bottom:16px;">
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Price</label>
+        [% SET curprice = cur.price.defined ? cur.price : listing.price %]
+        <input type="number" name="price" value="[% curprice || '0.00' %]" min="0" step="0.01"
+               style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+        <small style="color:#666;">Leave 0 for free or negotiable</small>
+      </div>
+      <div>
+        <label style="display:block;font-weight:bold;margin-bottom:5px;">Currency</label>
+        [% SET curcur = cur.currency || listing.currency || 'CAD' %]
+        <select name="currency" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+          <option value="CAD" [% IF curcur == 'CAD' %]selected[% END %]>CAD</option>
+          <option value="USD" [% IF curcur == 'USD' %]selected[% END %]>USD</option>
+        </select>
+      </div>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Category</label>
+      [% SET curcat = cur.category_id || listing.category_id %]
+      <select name="category_id" style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;">
+        <option value="">— Select category —</option>
+        [% FOREACH cat IN categories %]
+          <option value="[% cat.id %]" [% IF curcat == cat.id %]selected[% END %]>[% cat.name | html %]</option>
+        [% END %]
+      </select>
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Order / Contact URL <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <input type="url" name="order_url" value="[% (cur.order_url || listing.order_url) | html %]"
+             placeholder="https://... or leave blank"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:16px;">
+      <label style="display:block;font-weight:bold;margin-bottom:5px;">Expires On <small style="font-weight:normal;color:#666;">(optional)</small></label>
+      <input type="date" name="expires_at" value="[% (cur.expires_at || listing.expires_at) | html %]"
+             style="width:100%;padding:9px 12px;border:1px solid #ccc;border-radius:5px;box-sizing:border-box;">
+    </div>
+
+    [% SET pts = cur.accepts_points.defined ? cur.accepts_points : listing.accepts_points %]
+    <div style="margin-bottom:20px;padding:12px;background:var(--bg-secondary,#f8f9fa);border-radius:5px;border:1px solid #e9ecef;">
+      <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-weight:bold;">
+        <input type="checkbox" name="accepts_points" value="1" [% IF pts %]checked[% END %]
+               style="width:18px;height:18px;">
+        ★ I accept Points as payment
+      </label>
+    </div>
+
+    <div style="display:flex;gap:10px;">
+      <button type="submit" style="padding:10px 24px;background:var(--primary-color,#007bff);color:#fff;border:none;border-radius:5px;cursor:pointer;font-size:1rem;">
+        <i class="fas fa-save"></i> Save Changes
+      </button>
+      <a href="/marketplace/view/[% listing.id %]" style="padding:10px 18px;border:1px solid #ccc;border-radius:5px;text-decoration:none;color:var(--text-color,#333);">Cancel</a>
+    </div>
+
+  </form>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('input[name="listing_type"]').forEach(function(radio) {
+        radio.addEventListener('change', function() {
+            document.querySelectorAll('input[name="listing_type"]').forEach(function(r) {
+                r.closest('label').style.borderColor = '#dee2e6';
+                r.closest('label').style.background  = '';
+            });
+            if (this.checked) {
+                this.closest('label').style.borderColor = 'var(--primary-color, #007bff)';
+                this.closest('label').style.background  = '#f0f7ff';
+            }
+        });
+    });
+});
+</script>

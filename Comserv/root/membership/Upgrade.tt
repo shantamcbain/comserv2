@@ -72,7 +72,7 @@
             <h3 style="margin:0 0 0.5rem">[% plan.name | html %]</h3>
 
             [% IF plan.description %]
-            <p style="font-size:0.85em;color:#666;margin:0 0 0.75rem">[% plan.description | html %]</p>
+            <p style="font-size:0.85em;color: var(--text-muted-color, #666);margin:0 0 0.75rem">[% plan.description | html %]</p>
             [% END %]
 
             <div style="font-size:1.4em;font-weight:bold;margin-bottom:0.25rem">
@@ -127,7 +127,7 @@
         </div>
       </div>
 
-      <div class="content-section" style="font-size:0.87em;color:#666">
+      <div class="content-section" style="font-size:0.87em;color: var(--text-muted-color, #666)">
         <p>
           <strong>Note:</strong> Upgrading takes effect immediately.
           Downgrading takes effect at the end of your current billing cycle.

@@ -293,7 +293,9 @@ sub create_table_from_result {
     # Check if the table exists
     if (!$result) {
         # The table does not exist, create it
-        my $result_class = "Comserv::Model::Schema::Ency::Result::$table_name";
+        # table_name may carry '/' subdir separators; convert to '::' for a valid Perl class path
+        (my $result_path = $table_name) =~ s{/}{::}g;
+        my $result_class = "Comserv::Model::Schema::Ency::Result::$result_path";
         eval "require $result_class";
         if ($@) {
             $c->controller('Base')->stash_message($c, "Package " . __PACKAGE__ . " Sub " . ((caller(1))[3]) . " Line " . __LINE__ . ": Could not load $result_class: $@. Table name: $table_name");

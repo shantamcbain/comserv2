@@ -1,0 +1,76 @@
+[% META
+   title = "Organisms - Encyclopedia of Biological Life"
+   description = "Browse all organisms in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-05-05"
+%]
+[% PageVersion = 'ENCY/OrganismList.tt,v 0.01 2026/05/05' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.success_msg %]
+<div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+[% END %]
+[% IF c.flash.error_msg %]
+<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+[% END %]
+
+<h1>Organisms</h1>
+
+<p><a href="[% c.uri_for('/ENCY') %]">&larr; Back to Encyclopedia</a></p>
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+[% IF is_editor %]
+<a href="[% c.uri_for('/ENCY/Organism/add') %]" class="btn btn-primary">Add Organism</a>
+[% END %]
+
+<form method="get" action="[% c.uri_for('/ENCY/Organism') %]" style="margin:0.8em 0;">
+    <label>Type:
+        <select name="organism_type">
+            <option value="">-- All --</option>
+            <option value="human"[%     IF organism_type == 'human'     %] selected="selected"[% END %]>Human</option>
+            <option value="animal"[%    IF organism_type == 'animal'    %] selected="selected"[% END %]>Animal</option>
+            <option value="plant"[%     IF organism_type == 'plant'     %] selected="selected"[% END %]>Plant</option>
+            <option value="insect"[%    IF organism_type == 'insect'    %] selected="selected"[% END %]>Insect</option>
+            <option value="bird"[%      IF organism_type == 'bird'      %] selected="selected"[% END %]>Bird</option>
+            <option value="fish"[%      IF organism_type == 'fish'      %] selected="selected"[% END %]>Fish</option>
+            <option value="reptile"[%   IF organism_type == 'reptile'   %] selected="selected"[% END %]>Reptile</option>
+            <option value="amphibian"[% IF organism_type == 'amphibian' %] selected="selected"[% END %]>Amphibian</option>
+            <option value="fungus"[%    IF organism_type == 'fungus'    %] selected="selected"[% END %]>Fungus</option>
+            <option value="bacterium"[% IF organism_type == 'bacterium' %] selected="selected"[% END %]>Bacterium</option>
+            <option value="virus"[%     IF organism_type == 'virus'     %] selected="selected"[% END %]>Virus</option>
+        </select>
+    </label>
+    <label>Search:
+        <input type="text" name="q" value="[% search | html %]" size="25" placeholder="common or scientific name" />
+    </label>
+    <input type="submit" value="Filter" class="btn btn-default" />
+    <a href="[% c.uri_for('/ENCY/Organism') %]">Clear</a>
+</form>
+
+[% IF organisms && organisms.size %]
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <th>Common Name</th>
+        <th>Scientific Name</th>
+        <th>Type</th>
+        <th>Taxonomy</th>
+        <th>NCBI Tax ID</th>
+        <th></th>
+    </tr>
+    [% FOREACH o IN organisms %]
+    <tr>
+        <td>[% o.common_name | html %]</td>
+        <td><em>[% o.scientific_name | html %]</em></td>
+        <td>[% o.organism_type | html %]</td>
+        <td>[% o.family_name | html %][% IF o.order_name %], [% o.order_name | html %][% END %]</td>
+        <td>[% IF o.ncbi_tax_id %]<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=[% o.ncbi_tax_id | html %]" target="_blank">[% o.ncbi_tax_id | html %]</a>[% END %]</td>
+        <td><a href="[% c.uri_for('/ENCY/Organism', o.record_id) %]">Details</a></td>
+    </tr>
+    [% END %]
+</table>
+[% ELSE %]
+<p>No organisms found.</p>
+[% END %]

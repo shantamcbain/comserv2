@@ -256,8 +256,8 @@
 }
 
 .initiative {
-    background: #f8f9fa;
-    border: 1px solid #dee2e6;
+    background: var(--bg-secondary, #f8f9fa);
+    border: 1px solid var(--border-color, #dee2e6);
     border-radius: 8px;
     padding: 20px;
     margin: 20px 0;
@@ -270,7 +270,7 @@
 }
 
 .initiative.future {
-    background: #fff3cd;
+    background: var(--caution-bg, #fff3cd);
     border-color: #ffeaa7;
 }
 
@@ -304,12 +304,12 @@
 }
 
 .task-list li.completed {
-    color: #28a745;
+    color: var(--success-color, #28a745);
     text-decoration: line-through;
 }
 
 .task-list li.pending {
-    color: #6c757d;
+    color: var(--text-muted-color, #6c757d);
 }
 
 .template-example {
@@ -328,17 +328,17 @@ h1, h2, h3 {
 }
 
 h1 {
-    border-bottom: 2px solid #dee2e6;
+    border-bottom: 2px solid var(--border-color, #dee2e6);
     padding-bottom: 10px;
 }
 
 h2 {
-    border-bottom: 1px solid #dee2e6;
+    border-bottom: 1px solid var(--border-color, #dee2e6);
     padding-bottom: 5px;
 }
 
 a {
-    color: #007bff;
+    color: var(--link-color, #007bff);
     text-decoration: none;
 }
 

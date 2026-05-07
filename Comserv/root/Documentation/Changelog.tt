@@ -98,12 +98,12 @@
         align-items: center;
         margin-bottom: 20px;
         padding-bottom: 10px;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
     }
     
     .changelog-header h3 {
         margin: 0;
-        color: #333;
+        color: var(--text-color, #333);
     }
     
     .view-all-link {
@@ -123,7 +123,7 @@
     }
     
     .changelog-meta {
-        color: #666;
+        color: var(--text-muted-color, #666);
         font-size: 0.9em;
         margin-bottom: 10px;
     }

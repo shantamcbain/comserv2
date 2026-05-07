@@ -28,7 +28,7 @@
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Quick Start (5 Minutes)</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">Get Node.js running immediately using the automated setup script:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 bash /home/shanta/PycharmProjects/comserv2/scripts/setup-nodejs.sh
                 </code></pre>
@@ -41,7 +41,7 @@ bash /home/shanta/PycharmProjects/comserv2/scripts/setup-nodejs.sh
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Architecture Overview</h2>
             <p style="color: var(--text-color); font-family: var(--body-font);">Node.js is integrated across three deployment tiers:</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 PyCharm IDE (Local Development)
 ├─ Node.js 20 LTS Interpreter
@@ -90,7 +90,7 @@ Production Deployment
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Implementation Commands</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Local Installation</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Step 1: Install Node.js
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -108,7 +108,7 @@ npm --version   # 10.x.x
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Integration</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Update Comserv/Dockerfile at both line 22 (builder) and line 49 (runtime):</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Install Node.js LTS
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
@@ -119,7 +119,7 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
             </div>
 
             <p style="color: var(--text-color); font-family: var(--body-font);">Then rebuild:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 docker-compose build --no-cache
 docker-compose exec web-dev node --version
@@ -165,7 +165,7 @@ docker-compose exec web-dev node --version
             <h2 style="color: var(--text-color); font-family: var(--header-font);">Testing Node.js Setup</h2>
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Local Testing</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Test Node.js availability
 node --version
@@ -180,7 +180,7 @@ npm run list-agents
             </div>
 
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">Docker Testing</h3>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Test in container
 docker-compose exec web-dev node --version

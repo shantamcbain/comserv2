@@ -1,0 +1,334 @@
+[% PageVersion = '3d/queue_sync.tt,v 1.01 2026/04/24 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sync-section { margin-bottom: 2em; }
+.sync-section h2 { color: var(--heading-color, var(--text-color)); border-bottom: 2px solid var(--border-color); padding-bottom: 0.3em; margin-bottom: 0.8em; }
+.sync-table { width: 100%; border-collapse: collapse; background: var(--secondary-color); border: 1px solid var(--border-color); border-radius: 6px; overflow: hidden; margin-bottom: 1em; }
+.sync-table th, .sync-table td { padding: 0.6em 0.9em; border-bottom: 1px solid var(--border-color); color: var(--text-color); vertical-align: middle; }
+.sync-table th { background: var(--table-header-bg, var(--secondary-color)); font-weight: bold; text-align: left; }
+.sync-table tr:last-child td { border-bottom: none; }
+.filament-match { font-size: 0.82em; color: var(--text-muted-color); }
+.filament-none  { font-size: 0.82em; }
+.badge-restock  { background: #ffc107; color: #333; padding: 0.15em 0.5em; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+.badge-consign  { background: #17a2b8; color: white; padding: 0.15em 0.5em; border-radius: 10px; font-size: 0.8em; font-weight: bold; }
+.btn-pick { background: none; border: 1px solid #dc3545; color: #dc3545; border-radius: 4px; padding: 0.15em 0.5em; font-size: 0.8em; cursor: pointer; }
+.btn-pick:hover { background: #dc3545; color: white; }
+.btn-pick.matched { border-color: var(--text-muted-color); color: var(--text-muted-color); }
+
+#filament-modal-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.55); z-index: 9000;
+    justify-content: center; align-items: flex-start; padding-top: 8vh;
+}
+#filament-modal-overlay.open { display: flex; }
+#filament-modal {
+    background: var(--bg-color, #fff); color: var(--text-color, #222);
+    border-radius: 8px; padding: 1.5em; width: 580px; max-width: 95vw;
+    max-height: 75vh; display: flex; flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+}
+#filament-modal h3 { margin: 0 0 0.3em; }
+#filament-modal-desc { font-size: 0.88em; color: var(--text-muted-color); margin-bottom: 0.8em; }
+#filament-modal-filter { width: 100%; padding: 0.4em 0.6em; margin-bottom: 0.7em; border: 1px solid var(--border-color); border-radius: 4px; background: var(--secondary-color); color: var(--text-color); box-sizing: border-box; }
+#filament-modal-table { overflow-y: auto; flex: 1; border: 1px solid var(--border-color); border-radius: 4px; }
+#filament-modal-table table { width: 100%; border-collapse: collapse; }
+#filament-modal-table th { position: sticky; top: 0; background: var(--table-header-bg, var(--secondary-color)); padding: 0.4em 0.7em; font-size: 0.85em; text-align: left; }
+#filament-modal-table td { padding: 0.45em 0.7em; border-top: 1px solid var(--border-color); font-size: 0.9em; cursor: pointer; }
+#filament-modal-table tr:hover td { background: var(--accent-color, #007bff); color: white; }
+.spool-avail-low { color: #e67e22; font-weight: bold; }
+.spool-avail-none { color: #c0392b; font-style: italic; }
+#filament-modal-footer { display: flex; justify-content: flex-end; gap: 0.8em; margin-top: 1em; }
+</style>
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1em;">
+    <h1>Sync Print Queue from Orders &amp; Inventory</h1>
+    <div>
+        <a href="/3d/queue" style="font-size:0.9em;">Print Queue</a> |
+        <a href="/3d/admin" style="font-size:0.9em;">Admin Dashboard</a>
+    </div>
+</div>
+
+<p style="color:var(--text-muted-color);font-size:0.95em;">
+    This page shows printed items that need to be queued for printing — either because
+    stock has fallen to or below the reorder point, or because an open consignment
+    contains items marked as <em>print on demand</em> or <em>3D printed origin</em>.
+    Select the jobs to create and click <strong>Add Selected to Queue</strong>.
+</p>
+
+[% IF cons_error %]
+<div style="background:#fff3cd;border:1px solid #ffc107;border-radius:6px;padding:0.8em 1em;margin-bottom:1em;color:#856404;">
+    <strong>DB Error fetching consignment lines:</strong> [% cons_error | html %]
+</div>
+[% END %]
+
+[% SET total = (restock_needed ? restock_needed.size : 0) + (consignment_needed ? consignment_needed.size : 0) %]
+
+[% IF total == 0 %]
+<div style="text-align:center;padding:2.5em;background:var(--secondary-color);border:1px dashed var(--border-color);border-radius:6px;color:var(--text-muted-color);">
+    <strong>Everything is up to date.</strong><br>
+    No printed items are below reorder point and no open consignment lines need printing.
+    [% IF cons_lines_total %]
+    <br><br>
+    <small>
+        <strong>[% cons_lines_total %]</strong> open consignment line(s) were scanned but none matched
+        the 3D printing filter.<br>
+        Items qualify when <code>item_origin</code> or <code>category</code> contains
+        <code>3d_print</code>, <code>printed</code>, or <code>filament</code>,
+        or the <em>Print on Demand</em> flag is set on the item in Inventory.
+    </small>
+    [% END %]
+</div>
+[% ELSE %]
+
+[% IF cons_lines_total && cons_lines_total > total %]
+<div style="background:var(--secondary-color);border:1px solid var(--border-color);border-radius:6px;padding:0.5em 1em;margin-bottom:1em;font-size:0.85em;color:var(--text-muted-color);">
+    ℹ [% cons_lines_total %] open consignment line(s) scanned — [% consignment_needed.size %] matched
+    the 3D printing filter. Items qualify when <code>item_origin</code> or <code>category</code>
+    contains <code>3d_print</code>, <code>printed</code>, or <code>filament</code>,
+    or the <em>Print on Demand</em> flag is set.
+</div>
+[% END %]
+
+<form method="post" action="/3d/queue_sync" id="sync-form">
+
+[% IF restock_needed && restock_needed.size %]
+<div class="sync-section">
+    <h2>Restock Needed — Stock at or Below Reorder Point ([% restock_needed.size %])</h2>
+    <table class="sync-table">
+        <thead>
+            <tr>
+                <th style="width:2em;"><input type="checkbox" id="chk-all-restock" title="Select all"></th>
+                <th>Item</th><th>Category</th><th>In Stock</th><th>Reorder Pt</th>
+                <th>Qty to Print</th><th>Filament</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH r IN restock_needed %]
+        <tr>
+            <td>
+                <input type="checkbox" name="create_job_restock_[% r.item.id %]"
+                       value="restock:[% r.item.id %]" class="chk-restock" checked>
+            </td>
+            <td>
+                [% r.item.name | html %]
+                [% IF r.item.filament_color || r.item.filament_type %]
+                <br><small class="filament-match">
+                    Requires: [% r.item.filament_type | html %] [% r.item.filament_color | html %]
+                </small>
+                [% END %]
+            </td>
+            <td><span class="badge-restock">[% r.item.category | html %]</span></td>
+            <td>[% r.avail %]</td>
+            <td>[% r.item.reorder_point %]</td>
+            <td>[% r.needed %]</td>
+            <td>
+                <input type="hidden" name="filament_override_restock_[% r.item.id %]"
+                       id="fil_override_restock_[% r.item.id %]" value="">
+                [% IF r.filament %]
+                <span class="filament-match" id="fil_label_restock_[% r.item.id %]">
+                    ✓ [% r.filament.name | html %]
+                    [% IF r.filament.type %]([% r.filament.type | html %][% IF r.filament.color %], [% r.filament.color | html %][% END %])[% END %]
+                </span>
+                <button type="button" class="btn-pick matched"
+                        onclick="openPicker('restock','[% r.item.id %]','[% r.item.name | html %]','[% r.item.filament_type | html %]','[% r.item.filament_color | html %]')">Change</button>
+                [% ELSE %]
+                <span id="fil_label_restock_[% r.item.id %]" style=""></span>
+                <button type="button" class="btn-pick"
+                        onclick="openPicker('restock','[% r.item.id %]','[% r.item.name | html %]','[% r.item.filament_type | html %]','[% r.item.filament_color | html %]')">⚠ No match — Pick Filament</button>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+[% IF consignment_needed && consignment_needed.size %]
+<div class="sync-section">
+    <h2>Consignment Orders Awaiting Printing ([% consignment_needed.size %])</h2>
+    <table class="sync-table">
+        <thead>
+            <tr>
+                <th style="width:2em;"><input type="checkbox" id="chk-all-consign" title="Select all"></th>
+                <th>Item</th><th>Consignment</th><th>Qty</th>
+                <th>Origin / Category</th><th>Avail Stock</th><th>Filament</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH r IN consignment_needed %]
+        <tr>
+            <td>
+                <input type="checkbox" name="create_job_consign_[% r.line.id %]"
+                       value="consignment:[% r.line.id %]" class="chk-consign" checked>
+            </td>
+            <td>
+                [% r.item_name | html %]
+                [% IF r.fil_color || r.fil_type %]
+                <br><small class="filament-match">
+                    Requires: [% r.fil_type | html %] [% r.fil_color | html %]
+                </small>
+                [% END %]
+
+            </td>
+            <td>
+                <span class="badge-consign">#[% r.line.consignment_id %]</span>
+                [% IF r.line.consignment && r.line.consignment.reference_number %]
+                <br><small>[% r.line.consignment.reference_number | html %]</small>
+                [% END %]
+            </td>
+            <td>[% r.outstanding %]</td>
+            <td>
+                [% IF r.item_origin %]<small>[% r.item_origin | html %]</small>[% END %]
+                [% IF r.item_origin && r.item_category %] / [% END %]
+                [% IF r.item_category %]<small>[% r.item_category | html %]</small>[% END %]
+                [% IF r.req_print %]<br><small style="color:#17a2b8;">print-on-demand</small>[% END %]
+            </td>
+            <td style="text-align:center;[% IF r.avail_stock > 0 %]color:#e67e22;font-weight:bold[% END %]">
+                [% r.avail_stock %]
+            </td>
+            <td>
+                <input type="hidden" name="filament_override_consignment_[% r.line.id %]"
+                       id="fil_override_consignment_[% r.line.id %]" value="">
+                [% IF r.filament %]
+                <span class="filament-match" id="fil_label_consignment_[% r.line.id %]">
+                    ✓ [% r.filament.name | html %]
+                    [% IF r.filament.type %]([% r.filament.type | html %][% IF r.filament.color %], [% r.filament.color | html %][% END %])[% END %]
+                </span>
+                <button type="button" class="btn-pick matched"
+                        onclick="openPicker('consignment','[% r.line.id %]','[% r.item_name | html %]','[% r.fil_type | html %]','[% r.fil_color | html %]')">Change</button>
+                [% ELSE %]
+                <span id="fil_label_consignment_[% r.line.id %]" style=""></span>
+                <button type="button" class="btn-pick"
+                        onclick="openPicker('consignment','[% r.line.id %]','[% r.item_name | html %]','[% r.fil_type | html %]','[% r.fil_color | html %]')">⚠ No match — Pick Filament</button>
+                [% END %]
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+<div style="display:flex;gap:1em;align-items:center;">
+    <button type="submit" style="padding:0.6em 1.6em;background:var(--button-bg,var(--accent-color));color:var(--button-text,white);border:none;border-radius:4px;font-size:1em;font-weight:bold;cursor:pointer;">
+        Add Selected to Queue
+    </button>
+    <a href="/3d/queue" style="font-size:0.9em;">Cancel</a>
+</div>
+
+</form>
+
+[% END %]
+
+<!-- ============================================================
+     Filament Picker Modal
+     ============================================================ -->
+<div id="filament-modal-overlay">
+  <div id="filament-modal">
+    <h3>Pick Filament Spool</h3>
+    <div id="filament-modal-desc"></div>
+    <input id="filament-modal-filter" type="text" placeholder="Filter by name, colour or type…" autocomplete="off">
+    <div id="filament-modal-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Spool Name</th><th>Type</th><th>Colour</th><th>Available</th>
+          </tr>
+        </thead>
+        <tbody id="filament-modal-tbody"></tbody>
+      </table>
+    </div>
+    <div id="filament-modal-footer">
+      <button type="button" onclick="closePicker()" style="padding:0.4em 1em;border:1px solid var(--border-color);border-radius:4px;background:none;color:var(--text-color);cursor:pointer;">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+var ALL_FILAMENTS = [% all_filaments_json %];
+
+var _pickerSrcType, _pickerSrcId;
+
+function openPicker(srcType, srcId, itemName, reqType, reqColor) {
+    _pickerSrcType = srcType;
+    _pickerSrcId   = srcId;
+    document.getElementById('filament-modal-desc').textContent =
+        'Selecting filament for: ' + itemName +
+        (reqType  ? ' | Needs type: '   + reqType  : '') +
+        (reqColor ? ' | Needs colour: ' + reqColor : '');
+    var initFilter = reqColor || reqType || '';
+    document.getElementById('filament-modal-filter').value = initFilter;
+    renderPickerRows(initFilter);
+    document.getElementById('filament-modal-overlay').classList.add('open');
+    document.getElementById('filament-modal-filter').focus();
+}
+
+function closePicker() {
+    document.getElementById('filament-modal-overlay').classList.remove('open');
+}
+
+function renderPickerRows(filterText) {
+    var f = filterText.toLowerCase();
+    var tbody = document.getElementById('filament-modal-tbody');
+    tbody.innerHTML = '';
+    var shown = 0;
+    ALL_FILAMENTS.forEach(function(spool) {
+        var text = (spool.name + ' ' + spool.type + ' ' + spool.color).toLowerCase();
+        if (f && text.indexOf(f) < 0) return;
+        var tr = document.createElement('tr');
+        var availCls = spool.avail <= 0 ? 'spool-avail-none' : (spool.avail < 100 ? 'spool-avail-low' : '');
+        tr.innerHTML =
+            '<td>' + esc(spool.name) + '</td>' +
+            '<td>' + esc(spool.type || '—') + '</td>' +
+            '<td>' + esc(spool.color || '—') + '</td>' +
+            '<td class="' + availCls + '">' + spool.avail + 'g</td>';
+        tr.addEventListener('click', function() { selectFilament(spool); });
+        tbody.appendChild(tr);
+        shown++;
+    });
+    if (shown === 0) {
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="4" style="text-align:center;color:var(--text-muted-color);padding:1em;">No filament spools found</td>';
+        tbody.appendChild(tr);
+    }
+}
+
+function selectFilament(spool) {
+    var overrideInput = document.getElementById('fil_override_' + _pickerSrcType + '_' + _pickerSrcId);
+    var label         = document.getElementById('fil_label_'    + _pickerSrcType + '_' + _pickerSrcId);
+    if (overrideInput) overrideInput.value = spool.id;
+    if (label) {
+        label.textContent = '✓ ' + spool.name +
+            (spool.type  ? ' (' + spool.type  : '') +
+            (spool.color ? (spool.type ? ', ' : ' (') + spool.color + ')' : (spool.type ? ')' : ''));
+        label.style.color = 'var(--text-muted-color)';
+        label.style.fontSize = '0.82em';
+    }
+    var btn = overrideInput && overrideInput.nextElementSibling;
+    if (btn && btn.classList.contains('btn-pick')) {
+        btn.textContent = 'Change';
+        btn.classList.add('matched');
+    }
+    closePicker();
+}
+
+function esc(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+document.getElementById('filament-modal-filter').addEventListener('input', function() {
+    renderPickerRows(this.value);
+});
+document.getElementById('filament-modal-overlay').addEventListener('click', function(e) {
+    if (e.target === this) closePicker();
+});
+
+document.getElementById('chk-all-restock') && document.getElementById('chk-all-restock').addEventListener('change', function() {
+    document.querySelectorAll('.chk-restock').forEach(function(c) { c.checked = this.checked; }, this);
+});
+document.getElementById('chk-all-consign') && document.getElementById('chk-all-consign').addEventListener('change', function() {
+    document.querySelectorAll('.chk-consign').forEach(function(c) { c.checked = this.checked; }, this);
+});
+</script>

@@ -20,24 +20,36 @@
 
 <h1>Add New Herb</h1>
 
+[% PROCESS 'ENCY/partials/ResolveQueue.tt' %]
+[% IF return_to && !(resolve_field || resolve_type) %]
+<div class="alert alert-info" style="margin-bottom:0.75em;">
+  Adding this herb so you can return to: <a href="[% return_to | html %]">[% return_to | html %]</a>
+  &mdash; you will be returned there automatically after saving.
+</div>
+[% END %]
 
 <form method="POST" action="/ENCY/add_herb">
+[% IF return_to %]<input type="hidden" name="return_to" value="[% return_to | html %]" />[% END %]
+[% PROCESS 'ENCY/partials/AiFormFill.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
-    <input type="text" id="botanical_name" name="botanical_name" required><br>
+    <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
 
     <label for="common_names">Common Names:</label><br>
-    <input type="text" id="common_names" name="common_names" required><br>
+    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
 
-    <label for="therapeutic_action">Therapeutic Action:</label><br>
+    <label for="therapeutic_action">Therapeutic Action:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
 
-    <label for="parts_used">Parts Used:</label><br>
+    <label for="parts_used">Parts Used:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="parts_used" name="parts_used"></textarea><br>
 
     <label for="comments">Comments:</label><br>
     <textarea id="comments" name="comments"></textarea><br>
 
-    <label for="medical_uses">Medical Uses:</label><br>
+    <label for="medical_uses">Medical Uses:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="medical_uses" name="medical_uses" required></textarea><br>
 
     <label for="homiopathic">Homeopathic Uses:</label><br>
@@ -51,15 +63,6 @@
 
     <label for="stem">Stem:</label><br>
     <textarea id="stem" name="stem"></textarea><br>
-
-    <label for="nectar">Nectar:</label><br>
-    <textarea id="nectar" name="nectar"></textarea><br>
-
-    <label for="pollinator">Pollinator:</label><br>
-    <textarea id="pollinator" name="pollinator"></textarea><br>
-
-    <label for="pollen">Pollen:</label><br>
-    <textarea id="pollen" name="pollen"></textarea><br>
 
     <label for="leaves">Leaves:</label><br>
     <textarea id="leaves" name="leaves"></textarea><br>
@@ -83,7 +86,7 @@
     <input type="text" id="distribution" name="distribution" maxlength="100" required><br>
 
     <label for="url">URL:</label><br>
-    <input type="url" id="url" name="url" maxlength="150" required><br>
+    <input type="text" id="url" name="url" maxlength="255"><br>
 
 <label for="nectar">Nectar:</label><br>
     <select id="nectar" name="nectar" required>
@@ -96,7 +99,7 @@
     </div>
 
     <label for="pollinator">Pollinator:</label><br>
-    <input type="text" id="pollinator" name="pollinator" maxlength="100" required><br>
+    <textarea id="pollinator" name="pollinator"></textarea><br>
 
     <label for="pollen">Pollen:</label><br>
     <select id="pollen" name="pollen" required>
@@ -111,7 +114,8 @@
         <label for="apis">Apis:</label>
         <input type="text" id="apis" name="apis" maxlength="100" required>
     </div>
-    <label for="constituents">Constituents:</label><br>
+    <label for="constituents">Constituents:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
@@ -123,7 +127,8 @@
     <label for="culinary">Culinary Uses:</label><br>
     <textarea id="culinary" name="culinary"></textarea><br>
 
-    <label for="contra_indications">Contra Indications:</label><br>
+    <label for="contra_indications">Contra Indications:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>
 
     <label for="dosage">Dosage:</label><br>
@@ -141,7 +146,8 @@
     <label for="cultivation">Cultivation:</label><br>
     <textarea id="cultivation" name="cultivation"></textarea><br>
 
-    <label for="sister_plants">Sister Plants:</label><br>
+    <label for="sister_plants">Sister Plants:</label>
+    [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
 
     <label for="harvest">Harvest:</label><br>

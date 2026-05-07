@@ -49,10 +49,10 @@
 
         [% IF is_admin %]
         <div style="margin-top: 15px; text-align: center;">
-            <button onclick="rescanDocumentation()" class="search-button" style="background: #28a745;" title="Scan for new or modified documentation files">
+            <button onclick="rescanDocumentation()" class="search-button" style="background: var(--success-color, #28a745);" title="Scan for new or modified documentation files">
                 🔄 Rescan Files
             </button>
-            <span id="rescan-status" style="margin-left: 10px; color: #666; font-size: 14px;"></span>
+            <span id="rescan-status" style="margin-left: 10px; color: var(--text-muted-color, #666); font-size: 14px;"></span>
         </div>
         [% END %]
     </div>

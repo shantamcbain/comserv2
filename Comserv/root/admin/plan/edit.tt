@@ -1,0 +1,74 @@
+[% META title = "Edit Plan" %]
+[% PageVersion = 'admin/plan/edit.tt v1.0 2026/04/24' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container" style="max-width:700px;margin:0 auto;padding:20px;">
+
+[% IF error_msg %]
+<div style="background:#fee;border:1px solid #f88;color:#c00;padding:12px 16px;border-radius:4px;margin-bottom:16px;">[% error_msg %]</div>
+[% END %]
+
+<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+    <h1 style="margin:0;font-size:1.3em;">Edit Plan</h1>
+    <a href="/admin/plan/[% plan.id %]" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.85em;color:var(--text-color);">← Cancel</a>
+</div>
+
+<form method="POST" action="/admin/plan/[% plan.id %]/edit">
+    <div style="display:flex;flex-direction:column;gap:16px;">
+
+        <div>
+            <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Plan Name</label>
+            <input type="text" name="plan_name" value="[% plan.plan_name | html %]" required
+                   style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;">
+        </div>
+
+        <div>
+            <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Description</label>
+            <textarea name="plan_description" rows="4"
+                      style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;resize:vertical;">[% plan.plan_description | html %]</textarea>
+        </div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+                <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Status</label>
+                <select name="status" style="width:100%;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;">
+                    [% FOREACH s IN ['active','paused','completed','archived'] %]
+                    <option value="[% s %]" [% IF plan.status == s %]selected[% END %]>[% s %]</option>
+                    [% END %]
+                </select>
+            </div>
+            <div style="flex:1;min-width:100px;">
+                <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Priority</label>
+                <input type="number" name="priority" value="[% plan.priority || 5 %]" min="1" max="10"
+                       style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;">
+            </div>
+        </div>
+
+        <div style="display:flex;gap:16px;flex-wrap:wrap;">
+            <div style="flex:1;min-width:140px;">
+                <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Start Date</label>
+                <input type="date" name="start_date" value="[% plan.start_date %]"
+                       style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;">
+            </div>
+            <div style="flex:1;min-width:140px;">
+                <label style="display:block;font-size:0.88em;font-weight:bold;margin-bottom:4px;">Due Date</label>
+                <input type="date" name="due_date" value="[% plan.due_date %]"
+                       style="width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--background-color);color:var(--text-color);font-size:0.95em;">
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:8px;">
+            <button type="submit"
+                    style="padding:8px 24px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.95em;font-weight:bold;">
+                💾 Save Changes
+            </button>
+            <a href="/admin/plan/[% plan.id %]"
+               style="padding:8px 16px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.95em;color:var(--text-color);">
+                Cancel
+            </a>
+        </div>
+
+    </div>
+</form>
+
+</div>

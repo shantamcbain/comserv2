@@ -1,0 +1,225 @@
+[% META
+    title = "Supplier Invoices (Accounts Payable)"
+    description = "Admin guide to recording supplier invoices with GL posting and stock updates"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Accounting"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Accounting/invoices.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Supplier Invoices (Accounts Payable)</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#fields"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Invoice Fields</a>
+                <a href="#creating"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Creating an Invoice</a>
+                <a href="#gl"           style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">GL Entry</a>
+                <a href="#tax-shipping" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Tax &amp; Shipping</a>
+                <a href="#viewing"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing Invoices</a>
+                <a href="#popup"        style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Popup Support</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                A <strong>supplier invoice</strong> records a purchase from a vendor. When saved, the system automatically:
+            </p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Updates <strong>stock levels</strong> — adds quantity received to the item's default location</li>
+                <li>Posts a <strong>GL double-entry</strong> — debits expense/inventory, credits Accounts Payable</li>
+                <li>Records an <strong>AP liability</strong> — outstanding amount owed to the supplier</li>
+            </ol>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Access supplier invoices at <a href="/Inventory/invoice" style="color:var(--link-color)">/Inventory/invoice</a>.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="fields" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Invoice Header Fields</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Required?</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Notes</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Supplier</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Select from supplier list. Use "+ Add Supplier" popup for new vendors.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Invoice Number</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Vendor's invoice/order reference number. E.g. INV-2026-0042 or EBAY-08-14516-76824</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Invoice Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Date on the vendor's invoice</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Due Date</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Payment due date for AP tracking</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">AP Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">✅ Yes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Select from Liability accounts (2000s). Usually 2000 Accounts Payable.</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Tax Amount + Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Total GST/PST on this invoice. Select tax account (e.g. 2100 GST Payable).</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Shipping Amount + Account</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Shipping/freight charge. Select account (e.g. 5500 Shipping &amp; Freight).</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Notes</td><td style="border:1px solid var(--border-color);padding:5px 8px">No</td><td style="border:1px solid var(--border-color);padding:5px 8px">Internal notes about this purchase</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="creating" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Creating an Invoice</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/invoice/new" style="color:var(--link-color)">/Inventory/invoice/new</a></li>
+                <li>Select <strong>Supplier</strong></li>
+                <li>Enter <strong>Invoice Number</strong> (from vendor's paper or email invoice)</li>
+                <li>Set <strong>Invoice Date</strong></li>
+                <li>Select <strong>AP Account</strong> (e.g. 2000 Accounts Payable)</li>
+                <li>Add line items: click <strong>+ Add Line</strong> for each item purchased:
+                    <ul>
+                        <li>Select Item → description and unit cost auto-fill from item record</li>
+                        <li>Enter quantity received</li>
+                        <li>Adjust unit cost if different from item's default</li>
+                    </ul>
+                </li>
+                <li>Add <strong>tax amount + account</strong> if applicable</li>
+                <li>Add <strong>shipping amount + account</strong> if applicable</li>
+                <li>Click <strong>Save Invoice</strong></li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="gl" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. GL Entry on Save</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Example: $100 item purchase + $5 GST + $8 shipping, AP account = 2000:</p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Account</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Amount</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5000 Cost of Goods Sold (item expense_accno)</td><td style="border:1px solid var(--border-color);padding:5px 8px">DR</td><td style="border:1px solid var(--border-color);padding:5px 8px">$100.00</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">2100 GST Payable (tax account)</td><td style="border:1px solid var(--border-color);padding:5px 8px">DR</td><td style="border:1px solid var(--border-color);padding:5px 8px">$5.00</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">5500 Shipping &amp; Freight (shipping account)</td><td style="border:1px solid var(--border-color);padding:5px 8px">DR</td><td style="border:1px solid var(--border-color);padding:5px 8px">$8.00</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">2000 Accounts Payable (AP account)</td><td style="border:1px solid var(--border-color);padding:5px 8px">CR</td><td style="border:1px solid var(--border-color);padding:5px 8px">$113.00</td></tr>
+                </tbody>
+            </table>
+            <p style="color:var(--text-color);font-family:var(--body-font);margin-top:0.5em">
+                The GL entry is linked to the invoice for reference. View it from the invoice detail page.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="tax-shipping" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Tax &amp; Shipping</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Tax and shipping are entered at the <strong>invoice header level</strong>, not per line.
+                Enter the total tax amount from the vendor invoice (not line-by-line).
+                Select the appropriate COA account for each:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Tax account</strong>: typically 2100 GST/Sales Tax Payable (Liability) for input tax credits, or 5800 Tax Expense if not recoverable</li>
+                <li><strong>Shipping account</strong>: typically 5500 Shipping &amp; Freight (Expense)</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The invoice view page shows tax and shipping breakdown with linked COA account names.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="viewing" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Viewing Invoices</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Go to <a href="/Inventory/invoice" style="color:var(--link-color)">/Inventory/invoice</a>.
+                Filter by status: <em>all</em>, <em>draft</em>, <em>received</em>, <em>paid</em>.
+                Click any invoice to view full detail including:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>All line items with quantities and unit costs</li>
+                <li>Tax and shipping breakdown</li>
+                <li>Linked GL entry with all debit/credit lines</li>
+                <li>Stock update confirmation per line item</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="popup" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Popup Support</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                From the new invoice form, two popup buttons appear:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>+ Add Supplier</strong> — opens a popup to create a new supplier without leaving the invoice form. After saving, the supplier dropdown refreshes automatically.</li>
+                <li><strong>+ Add Item</strong> — opens a popup to create a new inventory item. After saving, the item dropdown refreshes automatically.</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                All data entered in the invoice form is preserved when the popup opens and closes (no page reload).
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Stock not updated after invoice</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Invoice status must be <em>received</em>. At least one storage location must exist at /Inventory/locations.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">GL entry not posted</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">An AP account must be selected. Item must have expense_accno set (or a fallback account must be configured).</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">"Supplier required" error</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">You must select a supplier from the dropdown. Free-text entry is not accepted. Create the supplier first.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Unit cost not auto-filling</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">The inventory item must have unit_cost set. Edit the item and enter its purchase cost.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Accounting/index" style="color:var(--link-color)">Accounting Overview</a></li>
+            <li><a href="/Documentation/Accounting/coa" style="color:var(--link-color)">Chart of Accounts</a></li>
+            <li><a href="/Documentation/Accounting/gl" style="color:var(--link-color)">General Ledger</a></li>
+            <li><a href="/Documentation/Inventory/suppliers" style="color:var(--link-color)">Supplier Management</a></li>
+            <li><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Level Management</a></li>
+        </ul>
+    </div>
+</div>

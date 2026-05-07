@@ -161,4 +161,186 @@ None required for this phase. The existing database models (`ApiaryModel.pm`, `B
 - Never place `<head>`, `<meta>`, `<style>` tags inside template body content (layout.tt handles HTML structure)
 - Links to sub-sections should use absolute paths like `/BMaster/apiary`
 - For hardcoded localhost URLs, use a TT variable or remove until proper configuration exists
-- When switching Apiary templates from Bootstrap to theme classes, ensure accordion/collapse JS functionality is replaced with CSS-only alternatives or documented as requiring JS
+- When switching Apiary templates from Bootstrap to theme classes, ensure accordion/collapse JS functionality is replaced with CSS-only alternatives or documented as requiring js
+
+---
+
+## Hive Inspection Feature — Gap Analysis and Implementation Plan
+
+### Current State Assessment (April 2026)
+
+#### Existing Schema (DBIx::Class Result Classes)
+
+| Class | Table | Status |
+|-------|-------|--------|
+| `Hive.pm` | `hives` | ✓ Complete |
+| `Box.pm` | `boxes` | ✓ Complete |
+| `HiveFrame.pm` | `hive_frames` | ✓ Partial (see gaps) |
+| `Inspection.pm` | `inspections` | ✓ Partial (see gaps) |
+| `InspectionDetail.pm` | `inspection_details` | ✓ Partial (see gaps) |
+| `HiveConfiguration.pm` | `hive_configurations` | ✓ Rich model; references 4 missing Result classes |
+| `Queen.pm` | `ApisQueensTb` (legacy) | ✓ Exists |
+| `QueenEnhanced.pm` | (new) | ✓ Exists |
+| `Yard.pm` | `yards` | ✓ Exists |
+| `Treatment.pm` | `treatments` | ✓ Exists |
+| `HoneyHarvest.pm` | `honey_harvests` | ✓ Exists |
+
+#### SQL Schema (`apiary_schema.sql`)
+
+Tables defined: `hives`, `boxes`, `frames` (note: HiveFrame.pm maps to `hive_frames` — **name mismatch**), `inspections`, `inspection_details`, `hive_movements`, `honey_harvests`, `treatments`, `migration_log`, `legacy_data_mapping`
+
+Views defined: `hive_overview`, `latest_inspections`
+
+#### Existing Controller Actions (`Apiary.pm`)
+
+| Route | Action |
+|-------|--------|
+| `/Apiary` | index (dashboard) |
+| `/Apiary/QueenRearing` | queen_rearing |
+| `/Apiary/HiveManagement` | hive_management |
+| `/Apiary/BeeHealth` | bee_health |
+| `/Apiary/frames_for_queen/:tag` | data lookup |
+| `/Apiary/yards_for_site/:name` | data lookup |
+| `/Apiary/hives_for_yard/:id` | data lookup |
+| `/Apiary/queens_for_hive/:id` | data lookup |
+
+**Missing:** All inspection CRUD routes (templates exist but controller actions do not).
+
+#### Existing Templates
+
+| Template | Status |
+|----------|--------|
+| `Apiary/inspections.tt` | ✓ Exists, no controller action |
+| `Apiary/new_inspection.tt` | ✓ Exists, has `<head>` tag bug, refs unimplemented POST |
+| `ENCY/apiary/new_inspection.tt` | Duplicate/alternate version |
+| `Apiary/hive_management.tt` | ✓ Exists (overview only) |
+| `Apiary/queen_rearing.tt` | ✓ Exists |
+| `Apiary/bee_health.tt` | ✓ Exists |
+
+---
+
+### Gaps and Required Changes
+
+#### 1. Missing Result Classes (referenced by HiveConfiguration.pm)
+
+| Class | Description |
+|-------|-------------|
+| `ConfigurationBox.pm` | Box definitions within a configuration template |
+| `ConfigurationInventory.pm` | Inventory items required for a configuration |
+| `HiveConfigurationHistory.pm` | Change history for hive configurations |
+| `HiveAssembly.pm` | Assembled hive instance from a configuration template |
+| `HiveMovement.pm` | Frame/box movement between hives (SQL table exists as `hive_movements`) |
+
+#### 2. Schema Changes Required
+
+**`hive_frames` / `frames` table name mismatch:**
+- `HiveFrame.pm` declares `__PACKAGE__->table('hive_frames')` but `apiary_schema.sql` creates table as `frames`
+- Resolution: Standardize to `hive_frames` (update SQL schema to match Perl Result class)
+
+**`HiveFrame` — Add fields:**
+- `frame_type` enum — add values: `drone` (drone comb), `comb` (drawn comb, no food content currently)
+- `frame_size` ENUM(`deep`, `dadant`, `medium`, `shallow`) — frames are inventory items with a physical size
+- `frame_code` VARCHAR(50) nullable — barcode/ID label for individual frame tracking across hives
+- `sold_date` DATE nullable — when frame was sold
+- `sold_to` VARCHAR(100) nullable — buyer if frame sold
+
+**`Hive` — Add fields:**
+- `configuration_id` INT nullable, FK → `hive_configurations(id)` — link hive to its current configuration type (mating nuc, 5-frame nuc, single, main/two-box, two-queen, etc.)
+
+**`Inspection` — Add fields:**
+- `user_id` INT nullable, FK → `users(id)` — inspector as FK (currently only varchar)
+- `inspection_type` enum — add `queen_check` value (used in form dropdown but missing from schema)
+- `feeding_done` BOOLEAN DEFAULT FALSE
+- `feed_type` VARCHAR(50) nullable — e.g. sugar syrup, fondant, pollen patty
+- `feed_amount` VARCHAR(50) nullable — e.g. "2L", "500g"
+- `boosted_from_hive` INT nullable, FK → `hives(id)` — if brood/bees added from another hive
+
+**`InspectionDetail` — Changes:**
+- `treatment_applied` VARCHAR(100) — change to `treatment_id` INT nullable FK → `treatments(id)` (OR keep varchar but also add FK column)
+
+**New table: `inspection_feedings`** (alternative to adding fields to `inspections` if multiple feeding events per inspection):
+```sql
+CREATE TABLE inspection_feedings (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    inspection_id INT NOT NULL,
+    feed_type ENUM('sugar_syrup', 'fondant', 'pollen_patty', 'dry_sugar', 'other') NOT NULL,
+    amount VARCHAR(50),
+    concentration VARCHAR(20),  -- e.g. '1:1', '2:1'
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE CASCADE
+)
+```
+
+**New table: `frame_movements`** (frame repositioning within/between hives — more granular than `hive_movements`):
+```sql
+CREATE TABLE frame_movements (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    frame_id INT NOT NULL,
+    movement_date DATE NOT NULL,
+    movement_type ENUM('reposition', 'transfer', 'sold', 'stored', 'destroyed') NOT NULL,
+    from_box_id INT,
+    from_position INT,
+    to_box_id INT,
+    to_position INT,
+    reason VARCHAR(200),
+    inspection_id INT,  -- if done during inspection
+    performed_by VARCHAR(50) NOT NULL,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (frame_id) REFERENCES hive_frames(id) ON DELETE CASCADE,
+    FOREIGN KEY (from_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
+    FOREIGN KEY (to_box_id) REFERENCES boxes(id) ON DELETE SET NULL,
+    FOREIGN KEY (inspection_id) REFERENCES inspections(id) ON DELETE SET NULL
+)
+```
+
+#### 3. Controller Actions Required (`Apiary.pm`)
+
+| Route | Method | Description |
+|-------|--------|-------------|
+| `/Apiary/inspections` | GET | List inspections (filter by hive, date range) |
+| `/Apiary/inspections/new` | GET | Show new inspection form |
+| `/Apiary/inspections/create` | POST | Save new inspection + details |
+| `/Apiary/inspections/:id` | GET | View single inspection with hive diagram |
+| `/Apiary/inspections/:id/edit` | GET | Edit form |
+| `/Apiary/inspections/:id/update` | POST | Save edits |
+| `/Apiary/inspections/:id/delete` | POST | Soft delete |
+| `/Apiary/inspections/reports` | GET | Summary reports |
+| `/Apiary/inspections/calendar` | GET | Calendar view |
+| `/Apiary/api/queen_search` | GET | AJAX — search queens by tag/yard/pallet |
+| `/Apiary/api/hive_frame_layout/:hive_id` | GET | JSON — frame layout for visual diagram |
+
+#### 4. Template Changes Required
+
+- `Apiary/new_inspection.tt` — remove orphaned `<head>` tag at top, add `[% META title %]`
+- New template: `Apiary/inspection_view.tt` — view single inspection with visual hive frame diagram
+- New template: `Apiary/inspection_reports.tt` — summary/seasonal reports
+- New template: `Apiary/inspection_calendar.tt` — calendar view of scheduled inspections
+- New partial: `Apiary/_hive_diagram.tt` — reusable visual hive frame layout component
+
+#### 5. Visual Hive Diagram Feature
+
+- Render each box as a row, each frame as a cell showing frame_type (color-coded)
+- Frame types: brood (orange), honey (yellow), pollen (green), empty (white), foundation (grey), drone (blue), comb (tan)
+- Show frame position (1 = leftmost from entrance)
+- Show bee coverage indicator
+- Enable click-to-edit frame type during inspection recording
+- Track changes over time (compare current inspection vs previous)
+
+---
+
+### Implementation Priority
+
+| Priority | Item |
+|----------|------|
+| High | Inspection CRUD controller actions |
+| High | `inspection_type` enum fix (add queen_check) |
+| High | Fix new_inspection.tt `<head>` tag |
+| Medium | `HiveFrame` frame_size + frame_code fields |
+| Medium | `frame_movements` table + Result class |
+| Medium | Link `Hive` to `HiveConfiguration` |
+| Medium | Visual hive diagram template |
+| Low | Missing ConfigurationBox/ConfigurationInventory/HiveAssembly Result classes |
+| Low | inspection_feedings table |
+| Low | Frame sold tracking |

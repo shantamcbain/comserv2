@@ -1,8 +1,8 @@
 [% META
    title = "BMaster - Beekeeping Management System"
-   description = "Beekeeping education, apiary management, queen rearing, bee health, and community resources"
+   description = "Beekeeping education, apiary management, hive inspections, queen rearing, bee health, and community resources"
 %]
-[% PageVersion = 'BMaster/BMaster.tt,v 0.03 2026/03/18 shanta Exp shanta' %]
+[% PageVersion = 'BMaster/BMaster.tt,v 0.04 2026/04/21 shanta Exp shanta' %]
 [% IF debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
@@ -24,10 +24,11 @@
                 <div class="content-section">
                     <p>New to BMaster or beekeeping? Follow this path to get the most out of the platform.</p>
                     <ol>
-                        <li><strong>Create a free account</strong> — <a href="/user/create_account">Register now</a> to track your hives, save plants, and access member resources.</li>
-                        <li><strong>Attend a workshop</strong> — <a href="/workshop">Browse upcoming hands-on sessions</a> led by experienced beekeepers.</li>
-                        <li><strong>Set up your apiary</strong> — <a href="/BMaster/apiary">Start managing your hives and yards</a> in the Apiary Management System.</li>
+                        <li><strong>Create a free account</strong> — <a href="/user/create_account">Register now</a> to track your hives, record inspections, and access member resources.</li>
+                        <li><strong>Set up your apiary</strong> — <a href="/BMaster/yards">Register your yards</a> and <a href="/Apiary">explore the Apiary Management System</a>.</li>
+                        <li><strong>Record your first inspection</strong> — <a href="/Apiary/inspections/new">Start a hive inspection</a> to track queen status, brood patterns, and colony health.</li>
                         <li><strong>Plan your forage</strong> — <a href="/ENCY/BeePastureView">Explore the Bee Pasture database</a> to ensure your bees have forage throughout the season.</li>
+                        <li><strong>Attend a workshop</strong> — <a href="/workshop">Browse upcoming hands-on sessions</a> led by experienced beekeepers.</li>
                     </ol>
                     <p>
                         <a href="/user/create_account" class="btn btn-primary">Create Your Free Account</a>
@@ -37,39 +38,78 @@
             </div>
             [% END %]
 
+            <!-- Apiary Management System -->
+            <div class="app-section">
+                <h2>Apiary Management System</h2>
+                <div class="content-section">
+                    <p>Run your beekeeping operation with a full suite of management tools. Register yards, track hive populations, record detailed inspections, and follow colony health across every season. The system links your yards, hives, queens, and inspection records into one connected workflow.</p>
+                    <ul>
+                        <li><a href="/Apiary">Apiary Overview</a> — Your operation at a glance: yards, hives, and active queens</li>
+                        <li><a href="/BMaster/yards">Yard Management</a> — Register and manage all your bee yard locations</li>
+                        <li><a href="/Apiary/HiveManagement">Hive Management</a> — Seasonal management guides and hive record tracking</li>
+                        <li><a href="/Apiary/inspections">Hive Inspections</a> — Detailed inspection records with frame-by-frame visual diagrams</li>
+                        <li><a href="/Apiary/inspections/calendar">Inspection Calendar</a> — See upcoming and overdue inspections at a glance</li>
+                        <li><a href="/Apiary/inspections/reports">Inspection Reports</a> — Seasonal summaries and hive health trends</li>
+                    </ul>
+                    <p>
+                        <a href="/Apiary/inspections/new" class="btn btn-primary">New Hive Inspection</a>
+                        <a href="/Apiary" class="btn btn-secondary">Apiary Overview</a>
+                    </p>
+                </div>
+            </div>
+
+            <!-- Queen Rearing -->
+            <div class="app-section">
+                <h2>Queen Rearing Program</h2>
+                <div class="content-section">
+                    <p>A strong queen program is the foundation of a productive and gentle apiary. Plan grafting schedules, track queen emergence and mating, and maintain a full record of every queen in your operation. Use the inspection system to record queen checks and link queen performance to hive outcomes.</p>
+                    <ul>
+                        <li><a href="/Apiary/QueenRearing">Queen Rearing System</a> — Graft calendar, emergence tracking, and mating nuc management</li>
+                        <li><a href="/BMaster/Queens">Queen Records</a> — Browse and search your queen inventory</li>
+                        <li><a href="/Apiary/inspections/new">Record a Queen Check</a> — Log queen sighting, laying status, and cell counts during inspection</li>
+                    </ul>
+                    <p><a href="/Apiary/QueenRearing" class="btn btn-primary">Queen Rearing System</a></p>
+                </div>
+            </div>
+
+            <!-- Bee Health -->
+            <div class="app-section">
+                <h2>Bee Health Monitoring</h2>
+                <div class="content-section">
+                    <p>Healthy colonies are the key to productive beekeeping. Monitor your hives for Varroa mite loads, disease signs, and nutritional stress. Use the inspection system to record health observations per visit, and generate seasonal health trend reports across your operation.</p>
+                    <ul>
+                        <li><a href="/Apiary/BeeHealth">Bee Health Centre</a> — Disease identification guides, Varroa management, and treatment records</li>
+                        <li><a href="/BMaster/beehealth">Health Monitoring</a> — Protocols for regular hive health checks</li>
+                        <li><a href="/Apiary/inspections/reports">Health Trend Reports</a> — Review colony status summaries by season</li>
+                    </ul>
+                    <p><a href="/Apiary/BeeHealth" class="btn btn-primary">Bee Health Centre</a></p>
+                </div>
+            </div>
+
+            <!-- Bee Pasture & Forage -->
             <div class="app-section">
                 <h2>Bee Pasture &amp; Forage Planning</h2>
                 <div class="content-section">
                     <p>Diverse, year-round forage is the foundation of healthy, productive bees. Our Bee Pasture database catalogues hundreds of plants — noting their bloom time, nectar and pollen value, and suitability for different regions. Plan your garden or farm to ensure continuous forage from early spring through late autumn.</p>
                     <ul>
-                        <li><a href="/ENCY/BeePastureView">Browse Bee Pasture Plants</a> — Filter by bloom season, nectar value, and more</li>
-                        <li><a href="/ENCY/search">Search the Encyclopedia</a> — Find detailed plant profiles, insects, and forage guides</li>
+                        <li><a href="/ENCY/BeePastureView">Browse Bee Pasture Plants</a> — Filter by bloom season, nectar value, and region</li>
+                        <li><a href="/BMaster/environment">Environmental Planning</a> — Site selection, forage mapping, and seasonal considerations</li>
+                        <li><a href="/ENCY/search">Search the Encyclopedia</a> — Detailed plant profiles, insects, and forage guides</li>
                     </ul>
                     <p><a href="/ENCY/BeePastureView" class="btn btn-primary">Open Bee Pasture Database</a></p>
                 </div>
             </div>
 
+            <!-- Honey Production -->
             <div class="app-section">
-                <h2>Hive and Apiary Management</h2>
+                <h2>Honey Production</h2>
                 <div class="content-section">
-                    <p>Run your beekeeping operation efficiently with our apiary management tools. Track yards, hives, and colonies. Monitor health, record inspections, and plan your season with confidence.</p>
-                    <ul>
-                        <li><a href="/BMaster/apiary">Apiary Management System</a> — Overview of your operation</li>
-                        <li><a href="/BMaster/hive">Hive Management</a> — Track individual hive life and inspections</li>
-                        <li><a href="/BMaster/beehealth">Bee Health Monitoring</a> — Disease, pests, and treatment tracking</li>
-                        <li><a href="/BMaster/environment">Environmental Considerations</a> — Climate, forage, and site planning</li>
-                    </ul>
+                    <p>Track honey harvests, extraction records, and production data across your operation. Learn best practices for harvesting, filtering, and storing quality honey — and connect with the community to sell or share your crop.</p>
+                    <p><a href="/BMaster/honey" class="btn btn-primary">Honey Production Records</a></p>
                 </div>
             </div>
 
-            <div class="app-section">
-                <h2>Queen Rearing</h2>
-                <div class="content-section">
-                    <p>Raise quality queens with our dedicated queen rearing system. Plan grafting schedules, track emergence dates, and manage your mating nucleus colonies. A strong queen program is the foundation of a productive and gentle apiary.</p>
-                    <p><a href="/BMaster/Queens" class="btn btn-primary">Queen Rearing System</a></p>
-                </div>
-            </div>
-
+            <!-- Workshops and Learning -->
             <div class="app-section">
                 <h2>Workshops and Learning</h2>
                 <div class="content-section">
@@ -82,21 +122,14 @@
                 </div>
             </div>
 
-            <div class="app-section">
-                <h2>Honey Production</h2>
-                <div class="content-section">
-                    <p>Track honey harvests, extraction records, and production data across your operation. Learn best practices for harvesting, filtering, and storing quality honey for sale or personal use.</p>
-                    <p><a href="/BMaster/honey" class="btn btn-primary">Honey Production</a></p>
-                </div>
-            </div>
-
+            <!-- Community and Citizen Science -->
             <div class="app-section">
                 <h2>Community and Citizen Science</h2>
                 <div class="content-section">
-                    <p>BMaster is more than a management tool — it is a community of beekeepers contributing knowledge together. Members can contribute plant observations, pollen photos, and forage reports that benefit the entire community.</p>
+                    <p>BMaster is more than a management tool — it is a community of beekeepers contributing knowledge together. Members can share plant observations, pollen photos, forage reports, and inspection insights that benefit the entire beekeeping community.</p>
                     <ul>
-                        <li><a href="/ENCY/BeePastureView">Contribute plant forage data</a> — Share what is blooming in your area</li>
-                        <li><a href="/ENCY/search">Explore community plant observations</a> — Benefit from what others have shared</li>
+                        <li><a href="/ENCY/BeePastureView">Contribute forage data</a> — Share what is blooming in your area</li>
+                        <li><a href="/ENCY/search">Explore community observations</a> — Benefit from what others have shared</li>
                     </ul>
                     [% UNLESS c.user_exists %]
                     <p><a href="/user/create_account" class="btn btn-primary">Join the Community</a></p>
@@ -104,6 +137,7 @@
                 </div>
             </div>
 
+            <!-- Bee Products and Services -->
             <div class="app-section">
                 <h2>Bee Products and Services</h2>
                 <div class="content-section">
@@ -119,6 +153,8 @@
                     <ul>
                         <li><a href="/BMaster/yards">Manage Yards</a></li>
                         <li><a href="/BMaster/add_yard">Add a New Yard</a></li>
+                        <li><a href="/Apiary/inspections">All Inspection Records</a></li>
+                        <li><a href="/Apiary/inspections/reports">Inspection Reports</a></li>
                     </ul>
                 </div>
             </div>
@@ -131,19 +167,32 @@
             [% UNLESS c.user_exists %]
             <div class="sidebar-section">
                 <h4>Join BMaster</h4>
-                <p>Create a free account to track your hives, save plants, register for workshops, and connect with the beekeeping community.</p>
+                <p>Create a free account to track your hives, record inspections, save plants, register for workshops, and connect with the beekeeping community.</p>
                 <p><a href="/user/create_account" class="btn btn-primary">Create Account</a></p>
+            </div>
+            [% END %]
+
+            [% IF c.user_exists %]
+            <div class="sidebar-section">
+                <h4>Quick Actions</h4>
+                <ul class="sidebar-list">
+                    <li><a href="/Apiary/inspections/new">&#43; New Inspection</a></li>
+                    <li><a href="/Apiary/inspections/calendar">Inspection Calendar</a></li>
+                    <li><a href="/BMaster/yards">My Yards</a></li>
+                    <li><a href="/BMaster/add_yard">Add a Yard</a></li>
+                </ul>
             </div>
             [% END %]
 
             <div class="sidebar-section">
                 <h4>Quick Links</h4>
                 <ul class="sidebar-list">
+                    <li><a href="/Apiary">Apiary Overview</a></li>
+                    <li><a href="/Apiary/inspections">Hive Inspections</a></li>
+                    <li><a href="/Apiary/QueenRearing">Queen Rearing</a></li>
+                    <li><a href="/Apiary/BeeHealth">Bee Health</a></li>
                     <li><a href="/ENCY/BeePastureView">Bee Pasture Database</a></li>
-                    <li><a href="/BMaster/apiary">Apiary Management</a></li>
-                    <li><a href="/BMaster/Queens">Queen Rearing</a></li>
                     <li><a href="/workshop">Workshops</a></li>
-                    <li><a href="/BMaster/beehealth">Bee Health</a></li>
                     <li><a href="/BMaster/honey">Honey Production</a></li>
                     <li><a href="/BMaster/education">Education</a></li>
                     <li><a href="/BMaster/products">Products &amp; Services</a></li>

@@ -1,0 +1,235 @@
+[% META
+    title = "General Ledger"
+    description = "Admin guide to the General Ledger — viewing, manual entries, and reconciliation"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Accounting"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Accounting/gl.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">General Ledger</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#double-entry" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Double-Entry Basics</a>
+                <a href="#auto"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Automatic Entries</a>
+                <a href="#manual"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Manual Entry</a>
+                <a href="#examples"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Common Examples</a>
+                <a href="#viewing"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Viewing the GL</a>
+                <a href="#reconcile"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Reconciliation Tips</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The <strong>General Ledger (GL)</strong> is the complete, permanent record of all financial transactions.
+                Every transaction is recorded as one or more <strong>debit lines</strong> and one or more <strong>credit lines</strong>
+                whose totals must always be equal.
+                Access the GL at <a href="/Accounting/gl" style="color:var(--link-color)">/Accounting/gl</a>.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="double-entry" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Double-Entry Basics</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Every transaction has at least one DEBIT and one CREDIT of equal total value.
+                The rule: <strong>total debits always equal total credits</strong>.
+            </p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Account Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Debit Effect</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Credit Effect</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Normal Balance</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Assets (1000s)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Increase ↑</td><td style="border:1px solid var(--border-color);padding:5px 8px">Decrease ↓</td><td style="border:1px solid var(--border-color);padding:5px 8px">Debit</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Liabilities (2000s)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Decrease ↓</td><td style="border:1px solid var(--border-color);padding:5px 8px">Increase ↑</td><td style="border:1px solid var(--border-color);padding:5px 8px">Credit</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Equity (3000s)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Decrease ↓</td><td style="border:1px solid var(--border-color);padding:5px 8px">Increase ↑</td><td style="border:1px solid var(--border-color);padding:5px 8px">Credit</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Income (4000s)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Decrease ↓</td><td style="border:1px solid var(--border-color);padding:5px 8px">Increase ↑</td><td style="border:1px solid var(--border-color);padding:5px 8px">Credit</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Expenses (5000s)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Increase ↑</td><td style="border:1px solid var(--border-color);padding:5px 8px">Decrease ↓</td><td style="border:1px solid var(--border-color);padding:5px 8px">Debit</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="auto" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Automatic GL Entries</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Supplier invoices</strong> — GL entry posted automatically on save (DR expense + tax + shipping; CR AP)</li>
+                <li><strong>Consignment settlement</strong> — GL entry posted when "Create GL Entry" is checked on the settlement form</li>
+                <li><strong>Seed Accounts</strong> — creates COA accounts only, no GL entries</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="manual" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Manual GL Entry</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                For transactions not handled automatically (e.g. bank payments, payroll, corrections):
+            </p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Accounting/gl/new" style="color:var(--link-color)">/Accounting/gl/new</a></li>
+                <li>Enter a <strong>Date</strong>, <strong>Description</strong>, and optional <strong>Reference</strong></li>
+                <li>Add debit lines: select account, enter amount</li>
+                <li>Add credit lines: select account, enter amount</li>
+                <li>Verify the running total shows debits = credits (system validates this on save)</li>
+                <li>Click <strong>Save</strong></li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="examples" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Common Journal Entry Examples</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Transaction</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">DR</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">CR</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Purchase inventory on credit (supplier invoice)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">5000 COGS</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">2000 AP</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Pay supplier invoice by bank transfer</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">2000 AP</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1000 Bank</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Sale on account (future — not yet auto-posted)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1100 AR</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">4000 Sales Revenue</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Cost of goods sold (with above sale)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">5000 COGS</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1300 Inventory Asset</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Consignment settlement</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1100 AR + 5600 Commission Expense</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">4000 Sales Revenue</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Monthly depreciation (Kobra 3 printer)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">5400 Depreciation Expense</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1500 Accumulated Depreciation</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Owner payment (Shanta lease repayment)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">2000 AP (or Loans Payable)</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">3000 Owner Equity (or Points Payable)</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">GST remittance to CRA</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">2100 GST Payable</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">1000 Bank</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="viewing" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Viewing the GL</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                At <a href="/Accounting/gl" style="color:var(--link-color)">/Accounting/gl</a>:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>All journal entries sorted by date (newest first)</li>
+                <li>Each row shows: date, description, reference, total debits/credits</li>
+                <li>Click any entry to see all individual debit/credit lines with account names</li>
+                <li>Filter by date range, account number, or reference</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="reconcile" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Reconciliation Tips</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>AP balance check</strong>: The sum of all GL credits to 2000 AP minus debits should equal the total of outstanding (unpaid) supplier invoices.</li>
+                <li><strong>Inventory asset check</strong>: The balance on 1300 Inventory Asset should roughly match total stock value (qty × unit_cost) from the /Inventory/stock page.</li>
+                <li><strong>Bank reconciliation</strong>: Compare GL entries on 1000 Bank to your actual bank statement month by month. Any missing entries need manual GL journal entries.</li>
+                <li><strong>Monthly close</strong>: At month end, review all GL entries for the period. Ensure supplier invoices have been entered, consignment settlements posted, and depreciation recorded.</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">8. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">"Debits do not equal credits" on manual entry</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Add or adjust lines until the running total shows debits = credits. The system blocks saving until balanced.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Account not appearing in GL entry dropdown</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">The account must exist in the COA. Seed accounts or create a custom account first at /Accounting/coa.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Wrong account type chosen</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">The GL does not enforce account type. Review the entry, then create a reversing entry (same amounts, swap DR/CR) and post the corrected version.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">Supplier invoice GL entry missing</td>
+                        <td style="border:1px solid var(--border-color);padding:5px 8px">The item's expense_accno must be set and an AP account must be selected on the invoice. Check both and re-save if possible, or post a manual GL entry.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Accounting/index" style="color:var(--link-color)">Accounting Overview</a></li>
+            <li><a href="/Documentation/Accounting/coa" style="color:var(--link-color)">Chart of Accounts</a></li>
+            <li><a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices</a></li>
+            <li><a href="/Accounting/gl" style="color:var(--link-color)">General Ledger (live)</a></li>
+            <li><a href="/Accounting/gl/new" style="color:var(--link-color)">New GL Entry</a></li>
+        </ul>
+    </div>
+</div>

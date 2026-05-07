@@ -16,9 +16,9 @@
     <div class="data-container stats-row">
         <div>
             <h3>Total Records in system_log</h3>
-            <p class="stat-large">[% audit.total | html %] <small style="font-size:0.4em;color:#888">(estimate)</small></p>
+            <p class="stat-large">[% audit.total | html %] <small style="font-size:0.4em;color: var(--text-muted-color, #888)">(estimate)</small></p>
             <p>Recorded in last [% audit.hours | html %]h: <strong>[% audit.recent | html %]</strong></p>
-            <p style="font-size:0.85em;color:#888">Total shown is an InnoDB engine estimate; actual count may differ by up to 20%.</p>
+            <p style="font-size:0.85em;color: var(--text-muted-color, #888)">Total shown is an InnoDB engine estimate; actual count may differ by up to 20%.</p>
         </div>
     </div>
 

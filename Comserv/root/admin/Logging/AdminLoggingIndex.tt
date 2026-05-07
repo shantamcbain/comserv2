@@ -21,7 +21,7 @@
 .health-warn         { color:orange; font-weight:bold; }
 .health-critical     { color:red;    font-weight:bold; }
 .form-inline         { display:inline; }
-tr.level-debug       { color:#888; }
+tr.level-debug       { color: var(--text-muted-color, #888); }
 tr.level-info        { color:#000; }
 tr.level-warn        { background:#fff8e1; }
 tr.level-error       { background:#fdecea; }

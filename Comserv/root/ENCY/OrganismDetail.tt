@@ -1,0 +1,248 @@
+[% META
+   title = "Organism Detail - Encyclopedia of Biological Life"
+   description = "View and edit organism details in the ENCY encyclopedia"
+   roles = "public"
+   TemplateType = "Application"
+   category = "ENCY"
+   page_version = "0.01"
+   last_updated = "2026-05-05"
+%]
+[% PageVersion = 'ENCY/OrganismDetail.tt,v 0.01 2026/05/05' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+[% PROCESS 'ENCY/ImageHelper.tt' %]
+
+[% IF success_msg || c.flash.success_msg %]
+<div class="alert alert-success">[% success_msg || c.flash.success_msg | html %]</div>
+[% END %]
+[% IF error_msg || c.flash.error_msg %]
+<div class="alert alert-danger">[% error_msg || c.flash.error_msg | html %]</div>
+[% END %]
+
+[% is_editor = is_editor || 0; is_admin = is_admin || 0 %]
+
+[% IF edit_mode %]
+<h1>[% IF organism.record_id %]Editing Organism: [% organism.common_name | html %][% ELSE %]Add New Organism[% END %]</h1>
+[% ELSE %]
+<h1>[% organism.common_name | html %]</h1>
+[% END %]
+
+<p><a href="[% c.uri_for('/ENCY/Organism') %]">&larr; Back to Organisms</a>
+[% IF is_editor && !edit_mode && organism.record_id %]
+  | <a href="[% c.uri_for('/ENCY/Organism/edit', { record_id => organism.record_id }) %]">Edit</a>
+[% END %]
+</p>
+
+[% IF edit_mode %]
+<form action="[% IF organism.record_id %][% c.uri_for('/ENCY/Organism/edit') %][% ELSE %][% c.uri_for('/ENCY/Organism/add') %][% END %]" method="post">
+[% IF organism.record_id %]
+<input type="hidden" name="record_id" value="[% organism.record_id %]" />
+[% END %]
+[% INCLUDE 'ENCY/partials/AiFormFill.tt' %]
+[% END %]
+
+<h2>Identity</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Common Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="common_name" value="[% prefill_common_name || organism.common_name | html %]" size="50" />
+            [% ELSE %]
+            [% organism.common_name | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Scientific Name</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="scientific_name" value="[% organism.scientific_name | html %]" size="50" />
+            [% ELSE %]
+            <em>[% organism.scientific_name | html %]</em>
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Type</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <select name="organism_type">
+                [% SET _ot = organism.organism_type || 'animal' %]
+                [% FOREACH _t IN ['human','animal','plant','insect','bird','fish','reptile','amphibian','fungus','bacterium','virus','mammal'] %]
+                <option value="[% _t %]"[% IF _ot == _t %] selected="selected"[% END %]>[% _t | html %]</option>
+                [% END %]
+            </select>
+            [% ELSE %]
+            [% organism.organism_type | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Sub-population Note</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="sub_population_note" value="[% organism.sub_population_note | html %]" size="60" placeholder="e.g. Only affects HbSS genotype (sickle cell)" />
+            [% ELSE %]
+            [% organism.sub_population_note | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Taxonomy</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    [% FOREACH _row IN [
+          ['Kingdom',    'kingdom'],
+          ['Phylum',     'phylum'],
+          ['Class',      'class_name'],
+          ['Order',      'order_name'],
+          ['Family',     'family_name'],
+          ['Genus',      'genus'],
+          ['Species',    'species'],
+       ] %]
+    <tr>
+        <td><strong>[% _row.0 %]</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="[% _row.1 %]" value="[% organism.item(_row.1) | html %]" size="40" />
+            [% ELSE %]
+            [% organism.item(_row.1) | html %]
+            [% END %]
+        </td>
+    </tr>
+    [% END %]
+</table>
+
+<h2>External IDs</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>NCBI Tax ID</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="ncbi_tax_id" value="[% organism.ncbi_tax_id | html %]" size="15" />
+            [% ELSE %]
+            [% IF organism.ncbi_tax_id %]
+            <a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=[% organism.ncbi_tax_id | html %]" target="_blank">[% organism.ncbi_tax_id | html %]</a>
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>GBIF ID</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="gbif_id" value="[% organism.gbif_id | html %]" size="15" />
+            [% ELSE %]
+            [% IF organism.gbif_id %]
+            <a href="https://www.gbif.org/species/[% organism.gbif_id | html %]" target="_blank">[% organism.gbif_id | html %]</a>
+            [% END %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>IUCN ID</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="iucn_id" value="[% organism.iucn_id | html %]" size="20" />
+            [% ELSE %]
+            [% organism.iucn_id | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Biology &amp; Ecology</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Description</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="description" rows="4" cols="60">[% organism.description | html %]</textarea>
+            [% ELSE %]
+            [% organism.description | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Habitat</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="habitat" rows="3" cols="60">[% organism.habitat | html %]</textarea>
+            [% ELSE %]
+            [% organism.habitat | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>Medical Uses</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Medicinal Uses</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="medicinal_uses" rows="4" cols="60">[% organism.medicinal_uses | html %]</textarea>
+            [% ELSE %]
+            [% organism.medicinal_uses | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>Therapeutic Uses</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="therapeutic_uses" rows="4" cols="60">[% organism.therapeutic_uses | html %]</textarea>
+            [% ELSE %]
+            [% organism.therapeutic_uses | html %]
+            [% END %]
+        </td>
+    </tr>
+</table>
+
+<h2>References</h2>
+<table border="1" cellpadding="4" cellspacing="0">
+    <tr>
+        <td><strong>Reference</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="reference" rows="3" cols="60">[% organism.reference | html %]</textarea>
+            [% ELSE %]
+            [% organism.reference | html %]
+            [% END %]
+        </td>
+    </tr>
+    <tr>
+        <td><strong>URL</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <input type="text" name="url" value="[% organism.url | html %]" size="60" />
+            [% ELSE %]
+            [% IF organism.url %]<a href="[% organism.url | html %]" target="_blank">[% organism.url | html %]</a>[% END %]
+            [% END %]
+        </td>
+    </tr>
+    [% IF edit_mode %]
+    <tr>
+        <td><strong>Image</strong></td>
+        <td>
+            <input type="text" name="image" value="[% organism.image | html %]" size="60" />
+        </td>
+    </tr>
+    [% END %]
+</table>
+
+[% IF !edit_mode && organism.image %]
+<h2>Image</h2>
+[% PROCESS show_image path=organism.image alt=organism.common_name %]
+[% END %]
+
+[% IF edit_mode %]
+<br />
+<input type="submit" value="[% IF organism.record_id %]Update Organism[% ELSE %]Add Organism[% END %]" class="btn btn-primary" />
+<a href="[% c.uri_for('/ENCY/Organism') %]" class="btn btn-default">Cancel</a>
+</form>
+[% ELSE %]
+[% IF organism.record_id %]
+<p><strong>Record ID:</strong> [% organism.record_id %]</p>
+[% END %]
+[% END %]

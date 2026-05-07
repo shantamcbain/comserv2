@@ -1,0 +1,107 @@
+[% PageVersion = 'Inventory/timesheet.tt,v 0.01 2026/04/13 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Inventory Timesheet</h1>
+<p>Site: <strong>[% sitename %]</strong></p>
+
+[% IF c.flash.success_msg %]<p class="success">[% c.flash.success_msg %]</p>[% END %]
+[% IF c.flash.error_msg %]<p class="error">[% c.flash.error_msg %]</p>[% END %]
+
+<div class="actions">
+  <a href="/Inventory">Dashboard</a>
+</div>
+
+<h2>Log Time Against Inventory Work</h2>
+
+[% IF todos.size > 0 %]
+<form method="POST" action="/Inventory/timesheet/log">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Select</th>
+        <th>Todo</th>
+        <th>Status</th>
+        <th>Est. Hours</th>
+        <th>Accumulated</th>
+        <th>Billable</th>
+        <th>Point Rate</th>
+      </tr>
+    </thead>
+    <tbody>
+      [% FOREACH todo IN todos %]
+      <tr>
+        <td><input type="radio" name="todo_id" value="[% todo.record_id %]" required></td>
+        <td>[% todo.subject | html %]</td>
+        <td>
+          [% IF todo.status == 1 %]NEW
+          [% ELSIF todo.status == 2 %]IN PROGRESS
+          [% ELSIF todo.status == 3 %]<span style="color:#999">DONE</span>
+          [% ELSE %][% todo.status | html %]
+          [% END %]
+        </td>
+        <td>[% todo.estimated_man_hours || '-' %]</td>
+        <td>[% todo.accumulative_time || '00:00:00' %]</td>
+        <td>[% todo.billable ? 'Yes' : 'No' %]</td>
+        <td>[% todo.point_rate ? todo.point_rate : '-' %]</td>
+      </tr>
+      [% END %]
+    </tbody>
+  </table>
+
+  <div class="form-row" style="margin-top:1em">
+    <label>Date:
+      <input type="date" name="log_date" value="[% date.format(date.now, '%Y-%m-%d') %]" required>
+    </label>
+    &nbsp;
+    <label>Hours: <input type="number" name="hours" min="0" max="23" value="0" style="width:4em"></label>
+    &nbsp;
+    <label>Minutes: <input type="number" name="minutes" min="0" max="59" value="0" style="width:4em"></label>
+    &nbsp;
+    <label>Note: <input type="text" name="note" size="40" placeholder="Optional note"></label>
+    &nbsp;
+    <button type="submit">Log Time</button>
+  </div>
+</form>
+[% ELSE %]
+<p>No inventory todos found. <a href="/todo/new">Create a todo</a> with project code <strong>Inventory</strong> to track work here.</p>
+[% END %]
+
+<h2>Recent Time Entries</h2>
+
+[% IF recent_intervals.size > 0 %]
+<table class="data-table">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Todo</th>
+      <th>Duration</th>
+      <th>Logged By</th>
+    </tr>
+  </thead>
+  <tbody>
+    [% FOREACH interval IN recent_intervals %]
+    <tr>
+      <td>[% interval.start_date %]</td>
+      <td>[% interval.todo.subject | html %]</td>
+      <td>
+        [% IF interval.end_time %]
+          [% SET et = interval.end_time.split(':') %]
+          [% et.0 %]h [% et.1 %]m
+        [% ELSE %]
+          -
+        [% END %]
+      </td>
+      <td>[% interval.last_mod_by | html %]</td>
+    </tr>
+    [% END %]
+  </tbody>
+</table>
+[% ELSE %]
+<p>No time entries yet.</p>
+[% END %]
+
+[% IF debug_errors && debug_errors.size > 0 %]
+<div class="debug">
+  [% FOREACH err IN debug_errors %]<p>[% err %]</p>[% END %]
+</div>
+[% END %]

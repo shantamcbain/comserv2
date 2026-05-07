@@ -1,0 +1,82 @@
+[% PageVersion = 'Documentation/changelog/2026-04-28-todo-priority-system.tt,v 1.00 2026/04/28 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% META title = 'Todo Priority System &amp; Enhancements' %]
+[% META description = 'Comserv::Util::Priority single source of truth for priority labels, accumulative_time field, status normalization, priority dropdown with 12-hour time selector' %]
+[% META author = 'shanta' %]
+[% META date = '2026-04-28' %]
+[% META roles = 'admin developer' %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Todo Priority System &amp; Enhancements</h1>
+        <div class="changelog-meta">
+            <span class="date">April 28, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Enhancement</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>Priority labels are now a single source of truth in <code>Comserv::Util::Priority</code>. The todo details form gained an editable <code>accumulative_time</code> field, a labeled priority dropdown, and a 12-hour time selector. Status handling was normalized in Perl (not TT2) to eliminate string/numeric comparison bugs. Auto-error todo creation now correctly matches the controller name to a project.</p>
+    </section>
+
+    <section class="changelog-details">
+        <h2>Comserv::Util::Priority — Single Source of Truth</h2>
+        <ul>
+            <li>New module at <code>lib/Comserv/Util/Priority.pm</code> exports <code>priority_options()</code>.</li>
+            <li>Returns a hashref mapping numeric priority (1–10) to self-explanatory label strings:
+                <ul>
+                    <li>1 — P1: Critical — system/site broken, stop everything</li>
+                    <li>2 — P2: Urgent — blocking key work, must resolve today</li>
+                    <li>3 — P3: High — important, complete this sprint</li>
+                    <li>4 — P4: Above Normal — scheduled soon, next sprint</li>
+                    <li>5 — P5: Medium — standard backlog item</li>
+                    <li>6 — P6: Normal — background work, no deadline pressure</li>
+                    <li>7 — P7: Low — address when capacity allows</li>
+                    <li>8 — P8: Minor — nice to have, no immediate impact</li>
+                    <li>9 — P9: Minimal — someday/maybe</li>
+                    <li>10 — P10: Optional — wishlist only</li>
+                </ul>
+            </li>
+            <li>All controllers and templates that previously had inline priority arrays now call <code>priority_options()</code>.</li>
+        </ul>
+
+        <h2>Todo Details Form Enhancements</h2>
+        <ul>
+            <li><strong>Accumulative time field</strong> — editable text input in <code>details.tt</code> edit form, persisted in the <code>accumulative_time</code> column.</li>
+            <li><strong>Priority dropdown</strong> — now shows self-explanatory labels (e.g. "P1: Critical — system/site broken") instead of bare numbers. Sorted numerically.</li>
+            <li><strong>12-hour time selector</strong> — time fields use a 12-hour AM/PM selector for better usability.</li>
+        </ul>
+
+        <h2>Status Normalization</h2>
+        <ul>
+            <li><code>normalize_status</code> in the controller now handles <code>In-Process</code>, <code>inprocess</code>, and mixed-case variants, mapping them to <code>In Process</code>.</li>
+            <li>Status is normalized in Perl before being stored/displayed — TT2 templates use <code>current_status</code> (already a clean string) and the <code>eq</code> operator for string comparison, not <code>==</code>.</li>
+            <li>A <code>normalize_todo_status.pl</code> cleanup script is provided to retroactively fix inconsistent status values in the DB.</li>
+        </ul>
+
+        <h2>Auto-Error Todo Creation</h2>
+        <ul>
+            <li>When an application error auto-creates a todo, the controller name is now matched against the project list to assign the todo to the correct project.</li>
+            <li>Fixes cases where error todos landed in the wrong project bucket.</li>
+        </ul>
+
+        <h2>Other Fixes</h2>
+        <ul>
+            <li>Todo save now preserves all existing fields when only some fields are submitted (no accidental field erasure).</li>
+            <li>Todo modify redirects correctly after save.</li>
+            <li>Todo edit FK violation on the planning system fixed by passing correct <code>record_id</code>.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Util/Priority.pm</code> — new module</li>
+            <li><code>lib/Comserv/Controller/Todo.pm</code></li>
+            <li><code>root/todo/details.tt</code></li>
+            <li><code>root/todo/edit.tt</code></li>
+            <li><code>root/todo/priority_select.tt</code></li>
+        </ul>
+    </section>
+</div>

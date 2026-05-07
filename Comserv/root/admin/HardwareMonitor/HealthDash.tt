@@ -25,17 +25,17 @@
     [% END %]
 </div>
 <style>
-.health-dash-panel      { border:1px solid #ddd; border-radius:6px; margin-bottom:16px; overflow:hidden; }
-.health-dash-header     { background:#3a5a78; color:#fff; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; }
+.health-dash-panel      { border: 1px solid var(--border-color, #ddd); border-radius:6px; margin-bottom:16px; overflow:hidden; }
+.health-dash-header     { background: var(--nav-bg, #3a5a78); color:#fff; padding:8px 14px; display:flex; justify-content:space-between; align-items:center; font-weight:bold; }
 .health-dash-link       { color:#cde; font-size:.85em; text-decoration:none; }
 .health-dash-link:hover { color:#fff; }
-.health-dash-grid       { display:flex; flex-wrap:wrap; gap:6px; padding:10px; background:#f9f9f9; }
-.health-dash-card       { border-left:3px solid #4caf50; background:#fff; border-radius:4px; padding:6px 10px; min-width:120px; }
+.health-dash-grid       { display:flex; flex-wrap:wrap; gap:6px; padding:10px; background: var(--bg-secondary, #f8f9fa); }
+.health-dash-card       { border-left:3px solid #4caf50; background: var(--card-bg, rgba(255,255,255,0.88)); border-radius:4px; padding:6px 10px; min-width:120px; }
 .health-dash-card.level-warn     { border-left-color:#ff9800; background:#fff8e1; }
 .health-dash-card.level-error    { border-left-color:#f44336; background:#fdecea; }
 .health-dash-card.level-critical { border-left-color:#b71c1c; background:#f8d7da; }
-.hd-host   { font-size:.72em; color:#888; }
-.hd-metric { font-size:.78em; color:#555; }
+.hd-host   { font-size:.72em; color: var(--text-muted-color, #888); }
+.hd-metric { font-size:.78em; color: var(--text-color, #555); }
 .hd-value  { font-size:1.1em; font-weight:bold; }
-.health-dash-empty { padding:10px 14px; color:#888; font-size:.9em; }
+.health-dash-empty { padding:10px 14px; color: var(--text-muted-color, #888); font-size:.9em; }
 </style>

@@ -89,4 +89,5 @@ __PACKAGE__->has_many(
 );
 __PACKAGE__->many_to_many(sites => 'project_sites', 'site');
 __PACKAGE__->many_to_many(dailyplans => 'dailyplan_projects', 'plan');
+__PACKAGE__->has_many(ai_conversations => 'Comserv::Model::Schema::Ency::Result::AiConversation', 'project_id');
 1;

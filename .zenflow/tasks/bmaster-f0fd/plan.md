@@ -93,3 +93,73 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - Update `Documentation/BMaster.tt` route list to reflect current controller state
 - Write report to `.zenflow/tasks/bmaster-f0fd/report.md`
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Fix DailyPlan Tab CSS Variables and Merge Main
+- Merged latest main commit (schema compare menu fix)
+- Added `--bg-color` and `--bg-secondary` CSS variable aliases to `base/variables.css` — these were undefined, causing active tab styling to be invisible
+- Added dark theme overrides: `--bg-color: #121212`, `--bg-secondary: #2c2c2c`
+- Added apiary theme overrides: `--bg-color: #f1faee`, `--bg-secondary: #fdf6e3` (honey cream)
+- Run verification: syntax OK
+
+### [x] Step: Queen Log Data Model — Schema and Migration
+<!-- chat-id: 2fd469c9-90a1-4dbd-bbd8-fd58ef3c92d0 -->
+Design and implement the canonical queen data model. Keep `queens` as the canonical table name. `queens_enhanced` remains as a reference/staging table until migration is complete.
+
+**DB tracking:** Project 219 (QueenLogModel) under Apiary Management System (91) under BMaster (20).
+
+- Extend `queens` table with rich fields from `queens_enhanced`: `genetic_line`, `color_marking`, `parent_queen_id` (self-ref FK), `drone_source`, `mating_status` ENUM, `laying_status` ENUM, `temperament_rating` ENUM, `current_yard_id` FK, `current_pallet_id` FK, `current_hive_configuration_id` FK, `purpose` ENUM, `acquisition_cost`, `acquisition_date`, `updated_at`, `created_by`, `updated_by` — update `Queen.pm` Result class to match (todo 793)
+- Create `queen_events` table + `QueenEvent.pm` Result class: event_type ENUM (grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved), event_date, notes, inspector, hive_id nullable FK — add `has_many queen_events` to `Queen.pm` (todo 794)
+- Create `queen_hive_assignments` table + `QueenHiveAssignment.pm`: queen_id FK, hive_id FK, yard_id FK nullable, assigned_date, removed_date nullable, reason, notes — add `current_queen` helper to `Hive.pm` (todo 795)
+- Add `queen_id` INT FK nullable to `inspections` table; update `Inspection.pm` + `Queen.pm` relationships; fix `ApiaryModel::get_queens_for_hive()` bug (queries non-existent `hive_id` field — replace with query via `queen_hive_assignments`) (todo 796)
+- Data migration plan: Forager `ApisQueensTb` → `queens` (todo 797)
+- Data migration plan: Forager `ApisQueenLogTb` → `inspections` + `queen_events` (todo 798)
+- Documentation: Update `Queen.pm` POD, `Hive.pm` POD, `Inspection.pm` POD, `Planning.tt` Queen Log sub-project, `ApplicationTtTemplate.tt` queen patterns (todo 799)
+- All schema changes via Result class edits + `/admin/schema_comparison` — NOT direct SQL apply
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Hive Inspection — Schema Updates
+<!-- chat-id: ec2fe9ff-1523-481a-bb4d-af937a20d65d -->
+Complete gap analysis documented in `spec.md` (Hive Inspection Feature section). Apply the following schema changes:
+- Fix `Inspection.inspection_type` enum: add `queen_check` value (in DB and Result class)
+- Add `configuration_id` FK to `hives` table → `hive_configurations` (DB ALTER + Hive.pm update)
+- Add `frame_size` ENUM(`deep`,`dadant`,`medium`,`shallow`) to `hive_frames` table (DB ALTER + HiveFrame.pm update)
+- Add `frame_code` VARCHAR(50) to `hive_frames` table (DB ALTER + HiveFrame.pm)
+- Add feeding fields to `inspections`: `feeding_done` BOOLEAN, `feed_type` VARCHAR(50), `feed_amount` VARCHAR(50), `boosted_from_hive` INT FK (DB ALTER + Inspection.pm)
+- Create `frame_movements` table (DB CREATE + new `FrameMovement.pm` Result class)
+- Create `inspection_feedings` table (DB CREATE + new `InspectionFeeding.pm` Result class)
+- Add `treatment_id` INT FK to `inspection_details` alongside existing `treatment_applied` varchar
+- Create missing Result classes referenced by `HiveConfiguration.pm`: `ConfigurationBox.pm`, `ConfigurationInventory.pm`, `HiveConfigurationHistory.pm`, `HiveAssembly.pm`, `HiveMovement.pm`
+- Update `apiary_schema.sql` to rename `frames` table to `hive_frames` (for consistency with HiveFrame.pm)
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Hive Inspection — Controller Actions
+Implement all missing inspection CRUD actions in `Apiary.pm`:
+- `inspections` GET: list inspections for user's hives (with hive/date filter)
+- `inspections_new` GET: render `new_inspection.tt` (prefill hive from param)
+- `inspections_create` POST: save `Inspection` + `InspectionDetail` records per box/frame
+- `inspections_view` GET `/Apiary/inspections/:id`: view single inspection
+- `inspections_edit` GET `/Apiary/inspections/:id/edit`: edit form
+- `inspections_update` POST `/Apiary/inspections/:id/update`: save edits
+- `inspections_reports` GET: summary/seasonal reports
+- `inspections_calendar` GET: calendar view of scheduled inspections
+- `api_queen_search` GET `/Apiary/api/queen_search`: AJAX queen search for new_inspection form
+- `api_hive_frame_layout` GET `/Apiary/api/hive_frame_layout/:id`: JSON frame layout for diagram
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Hive Inspection — Templates and Visual Diagram
+<!-- chat-id: db2f0d4a-aa79-4665-ada2-dc13e077b480 -->
+- Fix `Apiary/new_inspection.tt`: remove `<head>` tag at line 2, add `[% META title = "New Hive Inspection" %]`
+- Create `Apiary/inspection_view.tt`: display full inspection record with visual hive diagram
+- Create `Apiary/_hive_diagram.tt`: reusable color-coded frame layout component (box rows, frame cells by type)
+- Create `Apiary/inspection_reports.tt`: seasonal summary charts
+- Create `Apiary/inspection_calendar.tt`: calendar view
+- Frame color scheme: brood=orange, honey=yellow, pollen=green, empty=white, foundation=grey, drone=blue, comb=tan
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
+### [x] Step: Navigation, Membership Workflow and 500 Error Fixes
+<!-- chat-id: db2f0d4a-aa79-4665-ada2-dc13e077b480 -->
+- Added `TopDropListBeekeeping.tt` to `pagetop.tt` (was missing — menu never displayed)
+- Fixed `debug.tt`: replaced crash-prone `Dumper(array)` calls with TRY/CATCH blocks — was causing 500 for users with `debug_mode=1` on pages with arrays in stash
+- Fixed `hosting_signup.tt` checkbox restoration: replaced `search()` (returns 0 for first match = falsy) with `saved_addons.grep('^key$').size`
+- Enhanced `membership/Index.tt` current plan section: added feature badges (Beekeeping, Planning, Hosting, AI, etc.)
+- Run verification: syntax OK

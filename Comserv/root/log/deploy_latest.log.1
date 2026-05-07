@@ -1,0 +1,52 @@
+================================================================================
+Docker Production Deployment Script
+================================================================================
+Production Host: 192.168.1.126
+Production Directory: ~/PycharmProjects/comserv2
+Service: web-prod
+SSH User: ubuntu
+SSH Port: 22
+Rollback on failure: Yes
+================================================================================
+
+
+========================================
+PHASE 1: CONNECTION & PRE-CHECKS
+========================================
+[TEST] Testing SSH connection to 192.168.1.126...
+  Connecting... (this may take a moment)
+✓ SSH connection OK
+[DISK CHECK] Checking available disk space on production...
+  /dev/mapper/ubuntu--vg-ubuntu--lv   65G   15G   48G  24% /
+[DOCKER STATUS] Current Docker resource usage:
+sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper
+sudo: a password is required
+
+========================================
+PHASE 2: CLEANUP OLD STATE
+========================================
+[CLEANUP] Removing old containers and images...
+  Removing old backup containers (sudo: a terminal is required to read the password; either use the -S option to read from standard input or configure an askpass helper
+sudo: a password is required
+)...
+  ✓ Removed old backup containers
+[PRUNE] Removing dangling images to free space...
+✓ Cleanup complete
+
+========================================
+PHASE 3: TRANSFER & BACKUP
+========================================
+[TRANSFER] Streaming Docker image via SSH pipe...
+  Streaming... (please wait, speed depends on your connection)
+CMD: docker save comserv2-web-prod:latest | sshpass -p 'Herbsrox2-' ssh -p 22 -o StrictHostKeyChecking=no ubuntu@192.168.1.126 'sudo docker load'
+⚠ SSH pipe failed, falling back to file transfer method...
+
+[LOCAL] Saving Docker image to tar file
+CMD: docker save -o /home/shanta/docker-exports/comserv2-web-prod_1773187523.tar comserv2-web-prod
+  Size: 593.76 MB
+
+[REMOTE] Creating remote directory
+CMD: mkdir -p /tmp/docker-deploy-1773187523
+
+[LOCAL] Copying tar file to production server
+CMD: scp -P 22 /home/shanta/docker-exports/comserv2-web-prod_1773187523.tar ubuntu@192.168.1.126:/tmp/docker-deploy-1773187523/

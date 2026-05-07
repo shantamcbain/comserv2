@@ -94,7 +94,7 @@
 
 <style>
     .warning-box {
-        background-color: #fff3cd;
+        background-color: var(--caution-bg, #fff3cd);
         border: 1px solid #ffeeba;
         border-radius: 5px;
         padding: 15px;
@@ -107,7 +107,7 @@
     }
     
     pre {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border: 1px solid #eaecf0;
         border-radius: 3px;
         padding: 10px;
@@ -116,7 +116,7 @@
     
     code {
         font-family: Consolas, Monaco, 'Andale Mono', monospace;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         padding: 2px 4px;
         border-radius: 3px;
     }

@@ -1,0 +1,151 @@
+[% META
+   title = "My CSC Membership"
+   description = "Manage your CSC hosting subscription and account"
+   roles = "user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-04-22"
+%]
+[% PageVersion = 'membership/csc_account.tt,v 0.01 2026/04/22 shanta Exp' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>&#127760; My CSC Membership</h1>
+    <p>Managing your CSC account from <strong>[% site_name | html %]</strong></p>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <!-- ── Points Balance ───────────────────────── -->
+      <div class="content-section">
+        <h2>CSC Points Balance</h2>
+        <p>Balance: <strong class="balance-amount">[% point_balance | format('%.2f') %] points</strong></p>
+        <p class="help-text">1 point = 1 CAD &mdash; use points for hosting payments and renewals.</p>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/payment/buy/coins') %]" class="btn btn-primary">Buy Points</a>
+          <a href="[% c.uri_for('/payment/balance') %]" class="btn btn-secondary">Transaction History</a>
+        </div>
+      </div>
+
+      <!-- ── Hosting Account Status ────────────────── -->
+      [% IF hosting_account %]
+      <div class="content-section">
+        <h2>Hosting Account &mdash; [% site_name | html %]</h2>
+        <div class="table-container">
+          <table class="data-table">
+            <tr>
+              <th>Status</th>
+              <td><span class="status-[% hosting_account.status | html %]">[% hosting_account.status | ucfirst | html %]</span></td>
+            </tr>
+            [% IF hosting_account.plan_sku %]
+            <tr><th>Plan</th><td>[% hosting_account.plan_sku | html %]</td></tr>
+            [% END %]
+            [% IF hosting_account.domain %]
+            <tr><th>Domain</th><td><code>[% hosting_account.domain | html %]</code></td></tr>
+            [% END %]
+            [% IF hosting_account.monthly_cost %]
+            <tr><th>Monthly Cost</th><td>CAD [% hosting_account.monthly_cost | format('%.2f') %]/mo</td></tr>
+            [% END %]
+            [% IF hosting_account.next_renewal_date %]
+            <tr><th>Next Renewal</th><td>[% hosting_account.next_renewal_date %]</td></tr>
+            [% END %]
+            [% IF hosting_account.notes %]
+            <tr><th>Notes</th><td>[% hosting_account.notes | html %]</td></tr>
+            [% END %]
+          </table>
+        </div>
+        [% IF hosting_account.status == 'active' %]
+        <div class="form-actions">
+          <a href="[% c.uri_for('/hosting/renew') %]" class="btn btn-primary">Renew Hosting</a>
+          <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary">Update Settings</a>
+        </div>
+        [% END %]
+      </div>
+      [% ELSE %]
+      <div class="content-section">
+        <h2>Hosting Account</h2>
+        <div class="empty-state">
+          <p><strong>[% site_name | html %]</strong> is not yet registered with CSC hosting.</p>
+        </div>
+        <div class="form-actions">
+          <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-primary">Register for CSC Hosting</a>
+        </div>
+      </div>
+      [% END %]
+
+      <!-- ── CSC Subscriptions ──────────────────────── -->
+      <div class="content-section">
+        <h2>CSC Subscriptions</h2>
+
+        [% IF csc_memberships.size %]
+        [% FOREACH m IN csc_memberships %]
+        [% SET renewal_cost = m.billing_cycle == 'annual' ? m.plan.price_annual : m.plan.price_monthly %]
+        [% SET coin_ok = point_balance >= renewal_cost %]
+
+        <div class="content-section">
+          <div class="membership-card-header">
+            <strong>[% m.plan.name | html %]</strong>
+            <span class="status-[% m.status | html %]">[% m.status | html %]</span>
+            <span class="help-text">[% m.billing_cycle | ucfirst | html %] &bull; Expires: <strong>[% m.expires_at || 'Never' | html %]</strong></span>
+          </div>
+
+          [% IF m.expires_at && m.status == 'active' && !coin_ok && renewal_cost > 0 %]
+          <div class="alert alert-warning">
+            <strong>Low balance warning:</strong>
+            Your point balance ([% point_balance | format('%.2f') %] points) may not cover the
+            next renewal of <strong>CAD [% renewal_cost %]</strong>.
+            <a href="[% c.uri_for('/payment/buy/coins') %]">Top up points</a>
+          </div>
+          [% END %]
+
+          <p class="help-text">Started: [% m.started_at | html %] &bull; Provider: [% m.payment_provider | html %]</p>
+
+          <div class="form-actions">
+            [% IF m.status == 'active' %]
+            <a href="[% c.uri_for('/membership/cancel', { membership_id => m.id }) %]" class="btn btn-secondary">Cancel</a>
+            [% ELSE %]
+            <a href="[% c.uri_for('/membership/subscribe') %]" class="btn btn-primary">Reactivate</a>
+            [% END %]
+          </div>
+        </div>
+        [% END %]
+
+        [% ELSE %]
+        <div class="empty-state">
+          <p>You have no CSC subscriptions.</p>
+        </div>
+
+        [% IF csc_plans.size %]
+        <h3>Available CSC Plans</h3>
+        [% FOREACH plan IN csc_plans %]
+        <div class="content-section">
+          <div class="membership-card-header">
+            <strong>[% plan.name | html %]</strong>
+            <span>[% plan.price_currency | html %] [% plan.price_monthly %]/mo</span>
+          </div>
+          [% IF plan.description %]<p>[% plan.description | html %]</p>[% END %]
+          <div class="form-actions">
+            <a href="[% c.uri_for('/membership/subscribe', { plan_id => plan.id }) %]" class="btn btn-primary">Subscribe</a>
+          </div>
+        </div>
+        [% END %]
+        [% END %]
+
+        [% END %]
+      </div>
+
+      <!-- ── Navigation ──────────────────────────── -->
+      <div class="form-actions">
+        <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">&larr; Back to Membership</a>
+        <a href="[% c.uri_for('/membership/account') %]" class="btn btn-secondary">My Local Account</a>
+      </div>
+
+    </div>
+  </div>
+</div>

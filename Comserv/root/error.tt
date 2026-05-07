@@ -46,13 +46,13 @@
 	max-width: 800px;
 	margin: 50px auto;
 	padding: 20px;
-	background-color: #f8f9fa;
+	background-color: var(--bg-secondary, #f8f9fa);
 	border-radius: 5px;
 	box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .error-container h1 {
-	color: #dc3545;
+	color: var(--danger-color, #dc3545);
 	margin-bottom: 20px;
 }
 
@@ -62,13 +62,13 @@
 
 .admin-message {
 	font-style: italic;
-	color: #6c757d;
+	color: var(--text-muted-color, #6c757d);
 }
 
 .debug-errors {
 	background-color: #f8d7da;
 	padding: 15px;
-	border-left: 4px solid #dc3545;
+	border-left: 4px solid var(--danger-color, #dc3545);
 	margin-top: 20px;
 }
 
@@ -94,12 +94,12 @@
 }
 
 .btn-primary {
-	background-color: #007bff;
+	background-color: var(--primary-color, #007bff);
 	color: white;
 }
 
 .btn-secondary {
-	background-color: #6c757d;
+	background-color: var(--text-muted-color, #6c757d);
 	color: white;
 }
 </style>

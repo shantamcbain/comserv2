@@ -25,6 +25,18 @@
                     <i class="fas fa-exclamation-triangle"></i> <strong>Warning:</strong> [% api_warning | html %]
                 </div>
             [% END %]
+
+            [% IF npm_not_configured %]
+                <div class="alert alert-info">
+                    <strong>NPM Not Configured</strong> — Set the <code>NPM_API_URL</code> and <code>NPM_API_KEY</code> environment variables to connect to Nginx Proxy Manager.
+                </div>
+            [% END %]
+
+            [% IF npm_fetch_error %]
+                <div class="alert alert-danger">
+                    <strong>Could not reach Nginx Proxy Manager:</strong> [% npm_fetch_error | html %]
+                </div>
+            [% END %]
             
             [% IF show_docker_install_button %]
                 <div class="alert alert-danger">

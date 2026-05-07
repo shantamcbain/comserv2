@@ -35,12 +35,12 @@
     
     .priority-container.priority-medium {
         border-left: 5px solid var(--accent-color);
-        background: var(--light-color);
+        background: rgba(255,255,255,0.15);
     }
     
     .priority-container.priority-low {
         border-left: 5px solid var(--success-color);
-        background: var(--secondary-color);
+        background: var(--nav-bg);
     }
     
     .priority-container summary {
@@ -164,7 +164,7 @@
     }
     
     .nav-jump {
-        background: var(--secondary-color);
+        background: var(--nav-bg);
         border: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 0;
@@ -210,13 +210,13 @@
     }
     
     .jump-link:hover {
-        background: var(--light-color);
+        background: rgba(255,255,255,0.15);
         border-color: var(--info-color);
         transform: translateX(5px);
     }
     
     .completed-section {
-        background: var(--secondary-color);
+        background: var(--nav-bg);
         border: 1px solid var(--border-color);
         border-radius: 6px;
         padding: 20px;

@@ -1,5 +1,6 @@
 [% META title = 'HelpDesk' %]
-[% PageVersion = 'CSC/HelpDesk.tt,v 0.03 2025/04/18 shanta Exp shanta ' %]
+[% PageVersion = 'CSC/HelpDesk.tt,v 0.04 2026/03/24 shanta Exp shanta ' %]
+[% site_display_name = c.stash.SiteName || c.session.SiteName || 'Our' %]
 
 [% IF c.session.debug_mode == 1 %]
  <br>[% PageVersion %]</br>
@@ -17,9 +18,9 @@
 <div class="helpdesk-container">
     <!-- HelpDesk View -->
     [% IF c.session.username %]
-        <h2>Hello [% c.session.firstname %] [% c.session.lastname %]! Welcome to Our HelpDesk System</h2>
+        <h2>Hello [% c.session.firstname %] [% c.session.lastname %]! Welcome to [% site_display_name %] HelpDesk</h2>
     [% ELSE %]
-        <h2>Hello! Welcome to Computer System Consulting HelpDesk System</h2>
+        <h2>Welcome to [% site_display_name %] HelpDesk</h2>
     [% END %]
 
     <div class="helpdesk-options">
@@ -46,6 +47,20 @@
             <p>Contact our support team directly.</p>
             <a href="[% c.uri_for('/HelpDesk/contact') %]" class="btn btn-primary">Contact Us</a>
         </div>
+
+        <div class="option-card option-card-ai">
+            <h3>AI Support Assistant</h3>
+            <p>Chat with our AI assistant for instant help. It can search the knowledge base, create tickets, and escalate to a live agent.</p>
+            <a href="[% c.uri_for('/ai') %]" class="btn btn-success">Chat with AI</a>
+        </div>
+
+        [% IF c.check_user_roles('admin') %]
+        <div class="option-card option-card-admin">
+            <h3>HelpDesk Admin</h3>
+            <p>Manage tickets, view open requests, and administer the support system.</p>
+            <a href="[% c.uri_for('/HelpDesk/admin') %]" class="btn btn-warning">Admin Panel</a>
+        </div>
+        [% END %]
     </div>
 
     <!-- Include the original HelpDesk contents -->
@@ -68,14 +83,14 @@
     
     .option-card {
         flex: 1 1 250px;
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         border-radius: 5px;
         padding: 20px;
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .option-card h3 {
-        color: #007bff;
+        color: var(--link-color, #007bff);
         margin-top: 0;
     }
     
@@ -88,8 +103,21 @@
     }
     
     .btn-primary {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
+    }
+    
+    .btn-success {
+        background-color: var(--success-color, #28a745);
+        color: white;
+    }
+    
+    .option-card-ai {
+        border-left: 4px solid var(--success-color, #28a745);
+    }
+
+    .option-card-admin {
+        border-left: 4px solid #fd7e14;
     }
     
     .debug-message {

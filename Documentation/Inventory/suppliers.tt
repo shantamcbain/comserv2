@@ -1,0 +1,168 @@
+[% META
+    title = "Supplier Management & Purchase Invoices"
+    description = "Admin guide to managing suppliers and recording purchases"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Inventory"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Inventory/suppliers.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Supplier Management &amp; Purchase Invoices</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Site Administrators</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:var(--light-color);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"     style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#adding"       style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Adding a Supplier</a>
+                <a href="#linking"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Linking to Items</a>
+                <a href="#invoice"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Supplier Invoices</a>
+                <a href="#ebay"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">eBay / Marketplace</a>
+                <a href="#troubleshoot" style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Troubleshooting</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                Suppliers are the vendors you purchase inventory from.
+                Each supplier can be linked to multiple items as preferred or alternate sources.
+                When a supplier invoice is saved, stock levels are updated automatically and a GL double-entry is posted.
+                Access suppliers at <a href="/Inventory/suppliers" style="color:var(--link-color)">/Inventory/suppliers</a>.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="adding" class="row">
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Adding a Supplier</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Inventory/suppliers" style="color:var(--link-color)">/Inventory/suppliers</a></li>
+                <li>Click <strong>+ New Supplier</strong></li>
+                <li>Fill in the form fields (see below)</li>
+                <li>Click <strong>Save</strong></li>
+            </ol>
+        </div>
+        <div class="col-50">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">Supplier Fields</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px"><strong>Name *</strong></td><td style="border:1px solid var(--border-color);padding:5px 8px">Company name (required)</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Contact Name</td><td style="border:1px solid var(--border-color);padding:5px 8px">Person to deal with</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Phone / Email</td><td style="border:1px solid var(--border-color);padding:5px 8px">Contact details</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Website</td><td style="border:1px solid var(--border-color);padding:5px 8px">Supplier's online store URL</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Address</td><td style="border:1px solid var(--border-color);padding:5px 8px">Mailing address</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Lead Time (days)</td><td style="border:1px solid var(--border-color);padding:5px 8px">Expected delivery time in days</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Payment Terms</td><td style="border:1px solid var(--border-color);padding:5px 8px">E.g. "Net 30", "COD", "Prepaid"</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Status</td><td style="border:1px solid var(--border-color);padding:5px 8px">active or inactive</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:5px 8px">Notes</td><td style="border:1px solid var(--border-color);padding:5px 8px">Internal notes (seller name for marketplace, etc.)</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="linking" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Linking Suppliers to Items</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                On the item edit page (<a href="/Inventory/item/edit/" style="color:var(--link-color)">/Inventory/item/edit/{id}</a>),
+                use the <strong>Suppliers</strong> section to link one or more suppliers:
+            </p>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Select a supplier from the dropdown and enter their price for the item</li>
+                <li>Mark one supplier as <strong>Preferred</strong> — their unit cost defaults to the item's purchase cost</li>
+                <li>Add multiple alternate suppliers for comparison</li>
+            </ul>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The item view page shows the preferred supplier's cost to help you spot price changes at a glance.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="invoice" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. Supplier Invoice Workflow</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Full invoice details are in <a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices (Accounting)</a>. Quick steps:</p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Receive goods from supplier</li>
+                <li>Go to <a href="/Inventory/invoice/new" style="color:var(--link-color)">/Inventory/invoice/new</a></li>
+                <li>Select supplier (or click <strong>+ Add Supplier</strong> popup to create on-the-fly)</li>
+                <li>Enter invoice number (from vendor's paper/email invoice), date, and select AP account</li>
+                <li>Add line items: select item → qty and unit cost auto-fill from item record</li>
+                <li>Add tax and shipping amounts with their respective accounts</li>
+                <li>Click <strong>Save Invoice</strong> — stock updated, GL posted automatically</li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="ebay" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. eBay / Online Marketplace Purchases</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">For purchases from eBay, Amazon, AliExpress, or other online marketplaces:</p>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Create a supplier named <strong>"eBay Marketplace"</strong> (or "Amazon", "AliExpress")</li>
+                <li>In Notes, record the individual seller name (e.g. "wowink")</li>
+                <li>Use the order number as the invoice number, prefixed with the marketplace name: <code>EBAY-08-14516-76824</code></li>
+                <li>Enter the item cost and shipping separately on the invoice</li>
+            </ol>
+            <div style="background-color:var(--light-color);border-left:4px solid var(--primary-color);padding:var(--spacing-medium);border-radius:4px;font-family:var(--body-font);color:var(--text-color);font-size:var(--font-size-small)">
+                <strong>Example — HP 126A Toner (eBay, Apr 2026):</strong><br>
+                Supplier: eBay Marketplace | Invoice: EBAY-08-14516-76824<br>
+                Line 1: HP 126A CE310A Toner (2-pack) × 1 = $43.45<br>
+                Shipping: $5.21 → account 5500 Shipping &amp; Freight<br>
+                Total: $48.66 → CR 2000 AP / DR 5100 Office Supplies + DR 5500 Shipping
+            </div>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="troubleshoot" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Troubleshooting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Issue</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Fix</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Supplier not in invoice dropdown</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Check supplier status is <em>active</em>. Inactive suppliers are hidden.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">"Supplier required" error on invoice</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Must select supplier from the dropdown. Free-text entry not accepted. Create the supplier first.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Unit cost not auto-filling on invoice line</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">The item must have unit_cost set. Edit the item and enter the purchase cost.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+            <li><a href="/Documentation/Inventory/stock" style="color:var(--link-color)">Stock Level Management</a></li>
+            <li><a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices (Accounting)</a></li>
+            <li><a href="/Documentation/Accounting/gl" style="color:var(--link-color)">General Ledger</a></li>
+        </ul>
+    </div>
+</div>

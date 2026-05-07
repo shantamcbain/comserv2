@@ -39,7 +39,7 @@
                      style="width:1.1rem;height:1.1rem">
               <span><strong>Enable Patreon as a payment option on this site</strong></span>
             </label>
-            <p style="font-size:0.88em;color:#666;margin:0.2rem 0 0 1.7rem">
+            <p style="font-size:0.88em;color: var(--text-muted-color, #666);margin:0.2rem 0 0 1.7rem">
               When checked, a "Support on Patreon" button appears on the membership subscribe page.
             </p>
           </div>
@@ -50,7 +50,7 @@
                    value="[% current.url | html %]"
                    placeholder="https://www.patreon.com/yoursitename"
                    style="width:100%;max-width:480px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
-            <p style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+            <p style="font-size:0.88em;color: var(--text-muted-color, #666);margin:0.2rem 0 0">
               The full URL of your Patreon creator page. Members are sent here to pledge.
             </p>
           </div>
@@ -61,7 +61,7 @@
                    value="[% current.email | html %]"
                    placeholder="patreon@yoursite.ca"
                    style="width:100%;max-width:380px;padding:0.5rem;border:1px solid var(--border-color,#ccc);border-radius:4px">
-            <p style="font-size:0.88em;color:#666;margin:0.2rem 0 0">
+            <p style="font-size:0.88em;color: var(--text-muted-color, #666);margin:0.2rem 0 0">
               Members email this address after pledging so you can manually activate their membership.
             </p>
           </div>
@@ -114,7 +114,7 @@
           and manually grant them the appropriate membership plan.
         </p>
 
-        <div style="background:#fff8e1;border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em;margin-top:0.75rem">
+        <div style="background: var(--caution-bg, #fff8e1);border:1px solid #ffcc02;border-radius:6px;padding:0.6rem 0.9rem;font-size:0.88em;margin-top:0.75rem">
           <strong>Tip:</strong> Set the same prices on Patreon tiers as your membership plans so patrons know which tier matches which plan.
         </div>
       </div>

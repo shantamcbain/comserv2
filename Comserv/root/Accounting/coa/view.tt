@@ -1,0 +1,43 @@
+[% PageVersion = 'Accounting/coa/view.tt,v 0.01 2026/04/10 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<h1>Account: [% account.accno %] — [% account.description %]</h1>
+<p><a href="/Accounting/coa">← Chart of Accounts</a></p>
+
+<table border="1" cellpadding="4">
+  <tr><th>Account Number</th><td>[% account.accno %]</td></tr>
+  <tr><th>Description</th><td>[% account.description %]</td></tr>
+  <tr><th>Category</th><td>[% account.category_label %]</td></tr>
+  <tr><th>Section</th><td>[% account.heading ? account.heading.description : '-' %]</td></tr>
+  <tr><th>Contra Account</th><td>[% account.is_contra ? 'Yes' : 'No' %]</td></tr>
+  <tr><th>Tax Account</th><td>[% account.is_tax ? 'Yes' : 'No' %]</td></tr>
+  <tr><th>Notes</th><td>[% account.notes || '-' %]</td></tr>
+</table>
+
+<h2>Recent GL Activity (last 50 lines)</h2>
+[% IF lines.size == 0 %]
+  <p>No journal lines posted to this account.</p>
+[% ELSE %]
+<table border="1" cellpadding="4">
+  <thead>
+    <tr>
+      <th>Date</th>
+      <th>Reference</th>
+      <th>Description</th>
+      <th>Debit</th>
+      <th>Credit</th>
+    </tr>
+  </thead>
+  <tbody>
+  [% FOREACH line IN lines %]
+    <tr>
+      <td>[% line.gl_entry.post_date %]</td>
+      <td><a href="/Accounting/gl/view/[% line.gl_entry_id %]">[% line.gl_entry.reference %]</a></td>
+      <td>[% line.memo || line.gl_entry.description || '-' %]</td>
+      <td>[% line.is_debit  ? line.display_amount : '' %]</td>
+      <td>[% line.is_credit ? line.display_amount : '' %]</td>
+    </tr>
+  [% END %]
+  </tbody>
+</table>
+[% END %]

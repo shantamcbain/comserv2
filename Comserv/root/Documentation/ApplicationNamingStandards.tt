@@ -24,18 +24,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#problem" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Problem Statement</a>
-                <a href="#industry-standards" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Industry Standards</a>
-                <a href="#naming-convention" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Naming Convention</a>
-                <a href="#domain-mapping" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Domain Mapping</a>
-                <a href="#implementation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Implementation</a>
-                <a href="#success-criteria" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Success Criteria</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#problem" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Problem Statement</a>
+                <a href="#industry-standards" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Industry Standards</a>
+                <a href="#naming-convention" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Naming Convention</a>
+                <a href="#domain-mapping" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Domain Mapping</a>
+                <a href="#implementation" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Implementation</a>
+                <a href="#success-criteria" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Success Criteria</a>
             </div>
         </div>
     </div>
@@ -106,7 +106,7 @@
             <h3 id="ddd-approach" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Domain-Driven Design (DDD) Approach</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Format:</strong> <code>[Domain].[Component].[Function]</code></p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Examples:</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 Project.Controller.List    → ProjectController with list action
 Backup.Util.Manager       → BackupManager utility class  
@@ -118,7 +118,7 @@ Todo.Service.Workflow     → TodoWorkflow service layer
             <h3 id="catalyst-implementation" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.2 Catalyst-Specific Implementation</h3>
             
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Controllers: <code>[Domain]Controller</code></h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 ProjectController.pm     → /lib/Comserv/Controller/Project.pm
 BackupController.pm      → /lib/Comserv/Controller/Admin/Backup.pm  
@@ -127,7 +127,7 @@ FileController.pm        → /lib/Comserv/Controller/File.pm
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Models: <code>[Domain]Model</code> or <code>[Domain][Entity]</code></h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 ProjectModel.pm          → /lib/Comserv/Model/Project.pm
 BackupConfig.pm          → /lib/Comserv/Model/BackupConfig.pm
@@ -136,7 +136,7 @@ FileStorage.pm           → /lib/Comserv/Model/File.pm
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Utilities: <code>[Domain]Manager</code> or <code>[Domain]Util</code></h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 BackupManager.pm         → /lib/Comserv/Util/BackupManager.pm
 ProjectManager.pm        → /lib/Comserv/Util/ProjectManager.pm
@@ -145,7 +145,7 @@ FileSystemUtil.pm        → /lib/Comserv/Util/FileSystem.pm
             </div>
 
             <h4 style="color: var(--text-color); font-family: var(--header-font);">Templates: <code>[domain]/[action].tt</code></h4>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 project/list.tt          → Project listing page
 backup/index.tt          → Backup management interface
@@ -163,7 +163,7 @@ file/upload.tt           → File upload interface
                 <li><code>docs/</code> - Documentation updates</li>
             </ul>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Examples:</strong></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 feature/backup-manager-refactor
 bugfix/file-upload-validation
@@ -192,7 +192,7 @@ docs/api-naming-standards
 
             <h3 id="issue-naming" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.2 Issue/Task Naming</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Format:</strong> <code>[DOMAIN] - [Component] - [Description]</code></p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 BACKUP - Controller - Add file restoration endpoint
 FILE - Model - Implement storage validation  
@@ -203,7 +203,7 @@ SYSTEM - Util - Create shared logger functionality
 
             <h3 id="doc-structure" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">5.3 Documentation Structure</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Format:</strong> <code>[Domain][Component]Documentation.tt</code> (CamelCase)</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 BackupControllerAPI.tt       → Backup controller endpoints
 FileManagerIntegration.tt    → File management system docs  
@@ -212,7 +212,7 @@ ProjectModelSchema.tt        → Project data model documentation
             </div>
 
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Configuration Files:</strong> <code>[Component]Config.json</code> (CamelCase)</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 DocumentationConfig.json     → Documentation system configuration
 DatabaseConfig.json          → Database configuration
@@ -293,7 +293,7 @@ ApplicationConfig.json       → Application-wide configuration
         <div class="col-100">
             <h2 id="success-criteria" style="color: var(--text-color); font-family: var(--header-font);">8. Success Criteria</h2>
             
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="clear-comm" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Clear Communication</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>No ambiguity when referencing system components</li>
@@ -302,7 +302,7 @@ ApplicationConfig.json       → Application-wide configuration
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="dev-efficiency" style="color: var(--success-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Development Efficiency</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Faster code location and understanding</li>
@@ -311,7 +311,7 @@ ApplicationConfig.json       → Application-wide configuration
                 </ul>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 id="scalability" style="color: var(--primary-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Scalability</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li>Standards support application growth</li>
@@ -326,7 +326,7 @@ ApplicationConfig.json       → Application-wide configuration
 
     <!-- FOOTER SECTION -->
     <div class="row">
-        <div class="col-100" style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin-top: var(--spacing-large); border-radius: 4px;">
+        <div class="col-100" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); margin-top: var(--spacing-large); border-radius: 4px;">
             <h3 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Next Session Priority</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>IMMEDIATE TASK:</strong> Apply naming standards to File Manager Enhancement Plan</p>
             <p style="color: var(--text-color); font-family: var(--body-font);"><strong>FOCUS:</strong> Use this document as foundation to clarify File Domain components and their interactions with Backup Domain</p>

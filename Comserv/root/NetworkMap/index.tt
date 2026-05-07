@@ -97,7 +97,7 @@
     }
     
     .btn-primary {
-        background-color: #007bff;
+        background-color: var(--primary-color, #007bff);
         color: white;
     }
     
@@ -107,7 +107,7 @@
     }
     
     .btn-secondary {
-        background-color: #6c757d;
+        background-color: var(--text-muted-color, #6c757d);
         color: white;
     }
     
@@ -140,19 +140,19 @@
     }
     
     .network-table th, .device-table th {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
         text-align: left;
         padding: 10px;
-        border-bottom: 2px solid #dee2e6;
+        border-bottom: 2px solid var(--border-color, #dee2e6);
     }
     
     .network-table td, .device-table td {
         padding: 10px;
-        border-bottom: 1px solid #dee2e6;
+        border-bottom: 1px solid var(--border-color, #dee2e6);
     }
     
     .network-table tr:hover, .device-table tr:hover {
-        background-color: #f8f9fa;
+        background-color: var(--bg-secondary, #f8f9fa);
     }
     
     .debug-message {

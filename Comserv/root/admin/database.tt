@@ -129,7 +129,7 @@
     font-size: 0.9em;
 }
 .table code {
-    background-color: #f8f9fa;
+    background-color: var(--bg-secondary, #f8f9fa);
     padding: 2px 4px;
     border-radius: 3px;
 }

@@ -1,14 +1,130 @@
-[% META title = 'List of Users' %]
-[% PageVersion = 'list_users.tt,v 0.01 2023/12/30 shanta Exp shanta ' %]
-[% IF debug_mode == 1 %]
-  [% PageVersion %]
-    [% INCLUDE 'debug.tt' %]
-[% END %]
-<ul>
-[% FOREACH user IN users %]
-    <li>
-        <a href="[% c.uri_for('/user/edit_user', user.id) %]">Edit</a>
-        [% user.username %]
-    </li>
-[% END %]
-</ul>
+[% META title = 'User Management' %]
+[% PageVersion = 'user/list_users.tt,v 0.02 2026/04/20' %]
+[% IF debug_mode == 1 %][% PageVersion %][% INCLUDE 'debug.tt' %][% END %]
+
+<div class="user-mgmt-container">
+    <h1>User Management</h1>
+
+    <form method="get" action="[% c.uri_for('/user/list_users') %]" class="user-search-form">
+        <div class="search-row">
+            <input type="text" name="q" value="[% q | html %]"
+                   placeholder="Search…" class="search-input" autofocus>
+            <select name="by" class="search-by">
+                <option value="email"    [% by == 'email'    ? 'selected' : '' %]>Email</option>
+                <option value="username" [% by == 'username' ? 'selected' : '' %]>Username</option>
+                <option value="roles"    [% by == 'roles'    ? 'selected' : '' %]>Role</option>
+            </select>
+            <button type="submit" class="btn btn-primary">Search</button>
+            [% IF q %]
+            <a href="[% c.uri_for('/user/list_users') %]" class="btn btn-secondary">Clear</a>
+            [% END %]
+        </div>
+    </form>
+
+    [% IF q %]
+    <p class="result-count">
+        [% users.size %] result[% users.size != 1 ? 's' : '' %] for
+        <strong>[% by | html %]</strong> containing <strong>[% q | html %]</strong>
+    </p>
+    [% END %]
+
+    [% IF users.size %]
+    <table class="user-table">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role(s)</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        [% FOREACH user IN users %]
+            <tr>
+                <td><strong>[% user.username | html %]</strong></td>
+                <td>[% (user.first_name || '') | html %] [% (user.last_name || '') | html %]</td>
+                <td>
+                    [% IF user.email %]
+                    <a href="mailto:[% user.email | html %]">[% user.email | html %]</a>
+                    [% ELSE %]
+                    <span class="no-email">(none)</span>
+                    [% END %]
+                </td>
+                <td>
+                    [% IF user.roles %]
+                    <span class="role-badge role-[% user.roles | lower | replace('\s+', '-') %]">
+                        [% user.roles | html %]
+                    </span>
+                    [% ELSE %]
+                    <span class="no-role">—</span>
+                    [% END %]
+                </td>
+                <td class="actions-cell">
+                    <a href="[% c.uri_for('/user/edit_user', user.id) %]"
+                       class="btn btn-sm btn-primary">Edit</a>
+                    <a href="[% c.uri_for('/user/admin_delete_user', user.id) %]"
+                       class="btn btn-sm btn-danger"
+                       onclick="return confirm('Delete user [% user.username | html %]? This cannot be undone.');">
+                        Delete
+                    </a>
+                </td>
+            </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <div class="no-results">
+        [% IF q %]
+        No users found matching your search.
+        [% ELSE %]
+        No users in the system.
+        [% END %]
+    </div>
+    [% END %]
+</div>
+
+<style>
+.user-mgmt-container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+.user-mgmt-container h1 { margin-bottom: 18px; }
+
+.user-search-form { margin-bottom: 16px; }
+.search-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.search-input {
+    flex: 1 1 260px; padding: 8px 12px; font-size: 0.95em;
+    border: 1px solid #ccc; border-radius: 4px;
+}
+.search-by {
+    padding: 8px 10px; font-size: 0.95em;
+    border: 1px solid #ccc; border-radius: 4px; background: #fff;
+}
+.result-count { font-size: 0.9em; color: #555; margin-bottom: 12px; }
+
+.user-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+.user-table th, .user-table td {
+    padding: 9px 12px; border: 1px solid #ddd; text-align: left; font-size: 0.9em;
+}
+.user-table th { background: #f5f5f5; font-weight: bold; }
+.user-table tr:nth-child(even) { background: #fafafa; }
+.user-table tr:hover { background: #f0f6ff; }
+
+.actions-cell { white-space: nowrap; }
+.no-email { color: #aaa; font-style: italic; }
+.no-role  { color: #bbb; }
+
+.role-badge {
+    display: inline-block; padding: 2px 8px; border-radius: 10px;
+    font-size: 0.8em; font-weight: bold;
+    background: #e9ecef; color: #333;
+}
+.role-badge.role-admin    { background: #c0392b; color: #fff; }
+.role-badge.role-helpdesk { background: #1a7a4a; color: #fff; }
+.role-badge.role-editor   { background: #2980b9; color: #fff; }
+
+.btn { display: inline-block; padding: 7px 14px; border-radius: 4px; border: none; cursor: pointer; font-size: 0.9em; text-decoration: none; }
+.btn-sm { padding: 3px 9px; font-size: 0.82em; }
+.btn-primary  { background: #007bff; color: #fff; }
+.btn-secondary{ background: #6c757d; color: #fff; }
+.btn-danger   { background: #dc3545; color: #fff; }
+.no-results   { padding: 20px; text-align: center; color: #666; border: 1px dashed #ccc; border-radius: 4px; }
+</style>

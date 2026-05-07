@@ -345,7 +345,7 @@ CREATE TABLE workshop_presentation (
     }
     
     .toc {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         margin-bottom: 30px;
@@ -376,7 +376,7 @@ CREATE TABLE workshop_presentation (
     
     h2 {
         color: #2c3e50;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
         padding-bottom: 5px;
     }
     
@@ -386,7 +386,7 @@ CREATE TABLE workshop_presentation (
     
     pre {
         background-color: #f0f0f0;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         border-radius: 3px;
         padding: 10px;
         overflow-x: auto;
@@ -417,12 +417,12 @@ CREATE TABLE workshop_presentation (
     
     th, td {
         padding: 10px;
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         text-align: left;
     }
     
     th {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
     }
     
     tr:nth-child(even) {

@@ -1,0 +1,134 @@
+[% PageVersion = '3d/admin.tt,v 1.00 2026/04/10 Shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.admin-3d-stats {
+    display: flex;
+    gap: 1em;
+    flex-wrap: wrap;
+    margin-bottom: 1.5em;
+}
+.admin-stat-card {
+    flex: 1;
+    min-width: 140px;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1em;
+    text-align: center;
+}
+.admin-stat-card .stat-num {
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--accent-color, var(--link-color));
+}
+.admin-stat-card .stat-lbl {
+    font-size: 0.85em;
+    color: var(--text-color);
+    margin-top: 0.2em;
+}
+.admin-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1em;
+    margin-bottom: 2em;
+}
+.admin-link-card {
+    flex: 1;
+    min-width: 200px;
+    background: var(--secondary-color);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 1.2em;
+    text-decoration: none;
+    color: var(--text-color);
+    transition: border-color 0.2s;
+}
+.admin-link-card:hover {
+    border-color: var(--accent-color, var(--link-color));
+    text-decoration: none;
+}
+.admin-link-card h3 { margin: 0 0 0.3em 0; color: var(--link-color); }
+.admin-link-card p  { margin: 0; font-size: 0.9em; color: var(--muted-color, var(--text-color)); }
+.section-header {
+    color: var(--heading-color, var(--text-color));
+    border-bottom: 2px solid var(--border-color);
+    padding-bottom: 0.3em;
+    margin-bottom: 0.8em;
+}
+</style>
+
+<h1>3D Printing — Admin Dashboard</h1>
+<p>Site: <strong>[% sitename | html %]</strong></p>
+
+<div class="admin-3d-stats">
+    <div class="admin-stat-card">
+        <div class="stat-num">[% total_printers || 0 %]</div>
+        <div class="stat-lbl">Total Printers</div>
+    </div>
+    <div class="admin-stat-card">
+        <div class="stat-num">[% idle_printers || 0 %]</div>
+        <div class="stat-lbl">Idle / Ready</div>
+    </div>
+    <div class="admin-stat-card">
+        <div class="stat-num">[% total_models || 0 %]</div>
+        <div class="stat-lbl">Models in Catalog</div>
+    </div>
+    <div class="admin-stat-card">
+        <div class="stat-num">[% queued_jobs || 0 %]</div>
+        <div class="stat-lbl">Jobs Queued</div>
+    </div>
+    <div class="admin-stat-card">
+        <div class="stat-num">[% active_jobs || 0 %]</div>
+        <div class="stat-lbl">Jobs Printing</div>
+    </div>
+</div>
+
+<h2 class="section-header">Quick Actions</h2>
+<div class="admin-links">
+    <a href="/3d/queue" class="admin-link-card">
+        <h3><i class="icon-list"></i> Print Queue</h3>
+        <p>View and manage queued and active print jobs. Assign printers to waiting jobs.</p>
+    </a>
+    <a href="/3d/queue_sync" class="admin-link-card">
+        <h3><i class="icon-refresh"></i> Sync Print Queue</h3>
+        <p>Scan open consignments and low-stock items to create print jobs automatically.</p>
+    </a>
+    <a href="/3d/printers" class="admin-link-card">
+        <h3><i class="icon-server"></i> Printer Farm</h3>
+        <p>Add, remove, and update the status of printers in your farm.</p>
+    </a>
+    <a href="/3d/browse" class="admin-link-card">
+        <h3><i class="icon-list"></i> Model Catalog</h3>
+        <p>Browse available 3D model files for printing.</p>
+    </a>
+    <a href="/3d/models" class="admin-link-card">
+        <h3>🗂 Model Manager</h3>
+        <p>Upload STL files, auto-calculate grams from geometry, and link models to inventory items.</p>
+    </a>
+</div>
+
+<h2 class="section-header">Inventory (Filaments &amp; Supplies)</h2>
+<div class="admin-links">
+    <a href="/Inventory/items?category=3d_filament" class="admin-link-card">
+        <h3><i class="icon-resources"></i> Filament Stock</h3>
+        <p>Manage filament inventory. Track types, colors, and stock levels.</p>
+    </a>
+    <a href="/Inventory/items?category=3d_supply" class="admin-link-card">
+        <h3><i class="icon-tools"></i> Supplies</h3>
+        <p>Track other 3D printing supplies (beds, nozzles, lubricants, etc.).</p>
+    </a>
+    <a href="/Inventory/items?category=3d_printed_item" class="admin-link-card">
+        <h3><i class="icon-shop"></i> Items for Sale</h3>
+        <p>Manage finished 3D printed items available for sale.</p>
+    </a>
+</div>
+
+<h2 class="section-header">AI / Web Search (Coming Soon)</h2>
+<div style="background:var(--schema-alert-warning-bg,#fff3cd);border:1px solid var(--border-color);border-radius:6px;padding:1em 1.2em;color:var(--text-color);">
+    <strong>BLOCKED:</strong> The AI-powered web search for 3D models is pending the
+    <strong>AIChatSystem</strong> web-search extension (<code>/ai/search_3d_models</code>).
+    This feature is tracked as a blocking Todo in the planning system.
+    Once the AIChatSystem task is complete, users will be able to search the web for
+    3D model files directly from the <a href="/3d/search_deeper">Deeper Search</a> page.
+</div>

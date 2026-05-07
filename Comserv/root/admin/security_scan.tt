@@ -11,13 +11,13 @@
 <style>
     .finding-PROTECTED             { background-color: #d4edda; }
     .finding-FORBIDDEN             { background-color: #d4edda; }
-    .finding-OK_PUBLIC             { background-color: #f8f9fa; }
+    .finding-OK_PUBLIC             { background-color: var(--bg-secondary, #f8f9fa); }
     .finding-EXPOSED_SENSITIVE     { background-color: #f8d7da; font-weight: bold; }
     .finding-EXPOSED_POST_ACCEPTED { background-color: #f8d7da; font-weight: bold; }
     .finding-LEAK_STACK_TRACE      { background-color: #f5c6cb; font-weight: bold; }
     .finding-LINK_LEAK             { background-color: #fff3cd; font-weight: bold; }
     .finding-SERVER_ERROR          { background-color: #ffeeba; }
-    .finding-NOT_FOUND             { background-color: #e2e3e5; color: #6c757d; }
+    .finding-NOT_FOUND             { background-color: #e2e3e5; color: var(--text-muted-color, #6c757d); }
     .finding-CONNECT_FAIL          { background-color: #343a40; color: #adb5bd; }
     .scan-terminal {
         font-family: monospace;
@@ -32,12 +32,12 @@
         word-break: break-all;
     }
     .badge-result { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 0.75em; }
-    .badge-EXPOSED_SENSITIVE, .badge-EXPOSED_POST_ACCEPTED { background-color: #dc3545; color: #fff; }
+    .badge-EXPOSED_SENSITIVE, .badge-EXPOSED_POST_ACCEPTED { background-color: var(--danger-color, #dc3545); color: #fff; }
     .badge-LEAK_STACK_TRACE  { background-color: #c82333; color: #fff; }
     .badge-LINK_LEAK         { background-color: #e0a800; color: #212529; }
     .badge-SERVER_ERROR      { background-color: #fd7e14; color: #fff; }
-    .badge-PROTECTED, .badge-FORBIDDEN { background-color: #28a745; color: #fff; }
-    .badge-OK_PUBLIC         { background-color: #6c757d; color: #fff; }
+    .badge-PROTECTED, .badge-FORBIDDEN { background-color: var(--success-color, #28a745); color: #fff; }
+    .badge-OK_PUBLIC         { background-color: var(--secondary-color, #6c757d); color: #fff; }
     .badge-NOT_FOUND         { background-color: #adb5bd; color: #fff; }
     .badge-CONNECT_FAIL      { background-color: #343a40; color: #adb5bd; }
     #scan-progress { display: none; }
@@ -45,10 +45,10 @@
     .stat-card { text-align: center; padding: 0.75rem; border-radius: 4px; color: #fff; flex: 1 1 120px; min-width: 100px; }
     .stat-card h3 { margin: 0; font-size: 2rem; }
     .stat-card small { font-size: 0.8rem; }
-    .stat-card.bg-danger  { background-color: #dc3545; }
+    .stat-card.bg-danger  { background-color: var(--danger-color, #dc3545); }
     .stat-card.bg-warning { background-color: #ffc107; color: #212529; }
-    .stat-card.bg-success { background-color: #28a745; }
-    .stat-card.bg-secondary { background-color: #6c757d; }
+    .stat-card.bg-success { background-color: var(--success-color, #28a745); }
+    .stat-card.bg-secondary { background-color: var(--secondary-color, #6c757d); }
     .stat-card.bg-dark    { background-color: #343a40; }
     #stat-row { display: flex; flex-wrap: wrap; gap: 0.5rem; }
 </style>

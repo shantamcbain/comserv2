@@ -1,0 +1,234 @@
+[% META
+    title = "Accounting System — Administrator Guide"
+    description = "Overview of the Comserv double-entry bookkeeping and accounting system"
+    roles = "admin"
+    TemplateType = "Documentation"
+    category = "Accounting"
+    page_version = "1.00"
+    last_updated = "2026-04-17"
+    site_specific = "false"
+%]
+[% PageVersion = 'Documentation/Accounting/index.tt v1.00 2026-04-17' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="container">
+    <h1 style="color:var(--text-color);font-family:var(--header-font)">Accounting System — Administrator Guide</h1>
+    <div class="last-updated" style="color:var(--text-muted-color);font-size:var(--font-size-small)">Last Updated: 2026-04-17 | Version: 1.00 | Audience: Administrators &amp; Accounting</div>
+
+    <div id="toc" class="row" style="margin:var(--spacing-large) 0;background-color:rgba(255,255,255,0.15);padding:var(--spacing-medium);border-left:4px solid var(--primary-color);border-radius:4px">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);margin-top:0">Quick Navigation</h2>
+            <div style="display:flex;flex-wrap:wrap;gap:var(--spacing-small)">
+                <a href="#overview"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Overview</a>
+                <a href="#concepts"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Key Concepts</a>
+                <a href="#accounts"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Account Types</a>
+                <a href="#setup"         style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">First-Time Setup</a>
+                <a href="#item-coa"      style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Item COA Fields</a>
+                <a href="#auto-posting"  style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Auto GL Posting</a>
+                <a href="#navigation"    style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Navigation</a>
+                <a href="#limitations"   style="color:var(--link-color);text-decoration:none;padding:4px 8px;border-radius:3px;background-color:var(--secondary-color);display:inline-block">Limitations</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="overview" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">1. Overview</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The Comserv Accounting system is a <strong>double-entry bookkeeping</strong> engine based on
+                SQL-Ledger / LedgerSMB conventions. Each SiteName has its own independent
+                <strong>Chart of Accounts (COA)</strong> and <strong>General Ledger (GL)</strong>.
+                Only admin users can access the accounting module at <a href="/Accounting" style="color:var(--link-color)">/Accounting</a>.
+            </p>
+            <p style="color:var(--text-color);font-family:var(--body-font)">
+                The accounting system is tightly integrated with Inventory — supplier purchases automatically post GL entries,
+                and each inventory item carries four COA account links for full double-entry tracking.
+            </p>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="concepts" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">2. Key Concepts</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Term</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Definition</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Chart of Accounts (COA)</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">The master numbered list of all financial accounts. Every GL transaction references a COA account.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>General Ledger (GL)</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">The complete record of every financial transaction. Each entry has one or more debit lines and one or more credit lines that must balance.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Accounts Payable (AP)</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Money you owe to suppliers for goods received but not yet paid for.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Accounts Receivable (AR)</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Money owed to you by customers for goods sold but not yet collected.</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px"><strong>Double-Entry</strong></td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Every transaction has at least one DEBIT and one CREDIT of equal total value. Total debits always equal total credits.</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="accounts" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">3. Account Types and Number Ranges</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Range</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Examples</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Debit = ?</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">1000–1999</td><td style="border:1px solid var(--border-color);padding:6px 10px">Assets</td><td style="border:1px solid var(--border-color);padding:6px 10px">Bank, Inventory, Equipment, AR</td><td style="border:1px solid var(--border-color);padding:6px 10px">Increases</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">2000–2999</td><td style="border:1px solid var(--border-color);padding:6px 10px">Liabilities</td><td style="border:1px solid var(--border-color);padding:6px 10px">AP, GST Payable, Credit Card</td><td style="border:1px solid var(--border-color);padding:6px 10px">Decreases</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">3000–3999</td><td style="border:1px solid var(--border-color);padding:6px 10px">Equity</td><td style="border:1px solid var(--border-color);padding:6px 10px">Owner Equity, Retained Earnings</td><td style="border:1px solid var(--border-color);padding:6px 10px">Decreases</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">4000–4999</td><td style="border:1px solid var(--border-color);padding:6px 10px">Income / Revenue</td><td style="border:1px solid var(--border-color);padding:6px 10px">Sales, Returns (4100), Services</td><td style="border:1px solid var(--border-color);padding:6px 10px">Decreases</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">5000–5999</td><td style="border:1px solid var(--border-color);padding:6px 10px">COGS / Expenses</td><td style="border:1px solid var(--border-color);padding:6px 10px">COGS, Supplies, Electricity, Depreciation</td><td style="border:1px solid var(--border-color);padding:6px 10px">Increases</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="setup" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">4. First-Time Setup</h2>
+            <ol style="color:var(--text-color);font-family:var(--body-font)">
+                <li>Go to <a href="/Accounting" style="color:var(--link-color)">/Accounting</a></li>
+                <li>Click <strong>"Seed Default Accounts"</strong> — creates a standard set of COA accounts (Assets, Liabilities, Equity, Income, COGS). This is idempotent — safe to run multiple times.</li>
+                <li>Review the accounts at <a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a></li>
+                <li>Edit inventory items to assign the 4 COA fields per item</li>
+                <li>You are now ready to record supplier invoices with full GL posting</li>
+            </ol>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="item-coa" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">5. Inventory Item COA Fields</h2>
+            <p style="color:var(--text-color);font-family:var(--body-font)">Each inventory item has four COA account links for complete double-entry tracking:</p>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Field</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Account Type</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Suggested Account</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">inventory_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Asset</td><td style="border:1px solid var(--border-color);padding:6px 10px">1300 Inventory Asset</td><td style="border:1px solid var(--border-color);padding:6px 10px">Track stock value on balance sheet</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">income_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Income</td><td style="border:1px solid var(--border-color);padding:6px 10px">4000 Sales Revenue</td><td style="border:1px solid var(--border-color);padding:6px 10px">Credit when item is sold</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">expense_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Expense / COGS</td><td style="border:1px solid var(--border-color);padding:6px 10px">5000 Cost of Goods Sold</td><td style="border:1px solid var(--border-color);padding:6px 10px">Debit on supplier invoice</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">returns_accno</td><td style="border:1px solid var(--border-color);padding:6px 10px">Income (contra)</td><td style="border:1px solid var(--border-color);padding:6px 10px">4100 Sales Returns</td><td style="border:1px solid var(--border-color);padding:6px 10px">Debit when customer returns item</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="auto-posting" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">6. Automatic GL Posting</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Action</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">GL Entry Posted?</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Example Entry</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Supplier invoice saved</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">✅ Automatic</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">DR expense/inventory + tax + shipping; CR AP</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Consignment settled</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">✅ Optional (checkbox on settlement form)</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">DR AR + commission; CR sales revenue</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Customer cart purchase</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">⏳ Future (not yet automated)</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">DR AR; CR sales revenue; DR COGS; CR inventory</td>
+                    </tr>
+                    <tr>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Manual GL entry</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">✅ Via /Accounting/gl/new</td>
+                        <td style="border:1px solid var(--border-color);padding:6px 10px">Any valid debit=credit pair</td>
+                    </tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="navigation" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font)">7. Navigation</h2>
+            <table style="width:100%;border-collapse:collapse;font-family:var(--body-font);font-size:var(--font-size-small)">
+                <thead>
+                    <tr style="background-color:var(--table-header-bg)">
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Page</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">URL</th>
+                        <th style="border:1px solid var(--border-color);padding:6px 10px;color:var(--text-color)">Purpose</th>
+                    </tr>
+                </thead>
+                <tbody style="color:var(--text-color)">
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Accounting Dashboard</td><td style="border:1px solid var(--border-color);padding:6px 10px"><a href="/Accounting" style="color:var(--link-color)">/Accounting</a></td><td style="border:1px solid var(--border-color);padding:6px 10px">Overview, seed accounts</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Chart of Accounts</td><td style="border:1px solid var(--border-color);padding:6px 10px"><a href="/Accounting/coa" style="color:var(--link-color)">/Accounting/coa</a></td><td style="border:1px solid var(--border-color);padding:6px 10px">View/add/edit COA accounts</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">General Ledger</td><td style="border:1px solid var(--border-color);padding:6px 10px"><a href="/Accounting/gl" style="color:var(--link-color)">/Accounting/gl</a></td><td style="border:1px solid var(--border-color);padding:6px 10px">View all GL entries</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">New GL Entry</td><td style="border:1px solid var(--border-color);padding:6px 10px"><a href="/Accounting/gl/new" style="color:var(--link-color)">/Accounting/gl/new</a></td><td style="border:1px solid var(--border-color);padding:6px 10px">Manual journal entry</td></tr>
+                    <tr><td style="border:1px solid var(--border-color);padding:6px 10px">Supplier Invoices</td><td style="border:1px solid var(--border-color);padding:6px 10px"><a href="/Inventory/invoice" style="color:var(--link-color)">/Inventory/invoice</a></td><td style="border:1px solid var(--border-color);padding:6px 10px">AP invoices with GL posting</td></tr>
+                </tbody>
+            </table>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="limitations" class="row">
+        <div class="col-100">
+            <h2 style="color:var(--text-color);font-family:var(--header-font);color:var(--warning-color)">8. Current Limitations</h2>
+            <ul style="color:var(--text-color);font-family:var(--body-font)">
+                <li><strong>Sales GL not auto-posted</strong> — customer cart purchases do not yet automatically create GL entries. This requires a manual GL entry or future development.</li>
+                <li><strong>Tax accounts</strong> — GST/PST handling requires manual GL entry in some cases. Supplier invoices support a tax line with account selection.</li>
+                <li><strong>Payroll</strong> — not included. Record payroll manually as a GL entry (DR Wages Expense, CR Bank/AP).</li>
+                <li><strong>Bank reconciliation</strong> — not yet built. Compare GL entries manually to bank statements.</li>
+                <li><strong>Financial reports</strong> — balance sheet and income statement are not yet generated. Use GL and COA views for reference.</li>
+            </ul>
+            <p style="text-align:right"><a href="#toc" style="color:var(--link-color);font-size:var(--font-size-small)">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <div id="see-also" style="background-color:rgba(255,255,255,0.15);border-left:4px solid var(--success-color);padding:var(--spacing-medium);border-radius:4px;margin:var(--spacing-medium) 0">
+        <h2 style="color:var(--success-color);font-family:var(--header-font);margin-top:0">See Also</h2>
+        <ul style="color:var(--text-color);font-family:var(--body-font)">
+            <li><a href="/Documentation/Accounting/coa" style="color:var(--link-color)">Chart of Accounts</a></li>
+            <li><a href="/Documentation/Accounting/gl" style="color:var(--link-color)">General Ledger</a></li>
+            <li><a href="/Documentation/Accounting/invoices" style="color:var(--link-color)">Supplier Invoices</a></li>
+            <li><a href="/Documentation/Inventory/index" style="color:var(--link-color)">Inventory System Overview</a></li>
+        </ul>
+    </div>
+</div>

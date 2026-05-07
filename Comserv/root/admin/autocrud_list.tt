@@ -46,7 +46,7 @@
 .autocrud-table th,
 .autocrud-table td {
     padding: 8px;
-    border: 1px solid #ddd;
+    border: 1px solid var(--border-color, #ddd);
 }
 
 .autocrud-controls {
@@ -55,7 +55,7 @@
 
 .button {
     padding: 8px 16px;
-    background: #007bff;
+    background: var(--primary-color, #007bff);
     color: white;
     text-decoration: none;
     border-radius: 4px;

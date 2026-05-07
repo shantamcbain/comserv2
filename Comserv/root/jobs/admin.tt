@@ -1,0 +1,130 @@
+[% META
+   title = "Jobs Admin"
+   description = "Site admin view for job postings and applications"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Jobs"
+   page_version = "0.01"
+   last_updated = "2026-04-09"
+%]
+[% IF c.flash.error_msg %]<div class="alert alert-danger">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1><i class="fas fa-briefcase"></i> Jobs Admin</h1>
+    <div class="header-actions">
+      <a href="[% c.uri_for('/jobs') %]" class="btn btn-secondary">&larr; Public Jobs Page</a>
+    </div>
+  </div>
+
+  <div class="content-container">
+    <div class="content-primary">
+
+      <h2>All Job Postings</h2>
+      [% IF jobs && jobs.size %]
+      <table class="data-table" style="width:100%">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Title</th>
+            <th>Posted By</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH job IN jobs %]
+          <tr>
+            <td>[% job.id %]</td>
+            <td><a href="[% c.uri_for('/jobs/view', [job.id]) %]">[% job.title | html %]</a></td>
+            <td>
+              [% IF job.posted_by %]
+                [% job.posted_by.display_name | html %]
+              [% ELSIF job.poster_name %]
+                [% job.poster_name | html %] (guest)
+              [% ELSE %]
+                &mdash;
+              [% END %]
+            </td>
+            <td>
+              [% IF job.status == 'open' %]
+                <span class="badge badge-success">Open</span>
+              [% ELSIF job.status == 'filled' %]
+                <span class="badge badge-info">Filled</span>
+              [% ELSE %]
+                <span class="badge">Closed</span>
+              [% END %]
+            </td>
+            <td style="font-size:0.85em;white-space:nowrap">[% job.created_at | html %]</td>
+            <td>
+              <form method="post" action="[% c.uri_for('/jobs/admin/update', [job.id]) %]" style="display:inline">
+                <select name="status" class="form-control" style="display:inline;width:auto">
+                  [% FOREACH s IN ['open','closed','filled'] %]
+                  <option value="[% s %]" [% IF job.status == s %]selected[% END %]>[% s | ucfirst %]</option>
+                  [% END %]
+                </select>
+                <button type="submit" class="btn btn-sm btn-primary">Update</button>
+              </form>
+              <form method="post" action="[% c.uri_for('/jobs/admin/delete', [job.id]) %]" style="display:inline"
+                    onsubmit="return confirm('Delete this job posting and all its applications?')">
+                <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+              </form>
+            </td>
+          </tr>
+          [% END %]
+        </tbody>
+      </table>
+      [% ELSE %]
+      <p class="text-muted">No job postings for this site.</p>
+      [% END %]
+
+      <h2 style="margin-top:2rem">All Applications</h2>
+      [% IF all_applications && all_applications.size %]
+      <table class="data-table" style="width:100%">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Job</th>
+            <th>Applicant</th>
+            <th>Email</th>
+            <th>Status</th>
+            <th>Points Pay</th>
+            <th>Submitted</th>
+          </tr>
+        </thead>
+        <tbody>
+          [% FOREACH app IN all_applications %]
+          <tr>
+            <td>[% app.id %]</td>
+            <td>
+              [% IF app.job %]
+                <a href="[% c.uri_for('/jobs/view', [app.job.id]) %]">[% app.job.title | html %]</a>
+              [% ELSE %]
+                &mdash;
+              [% END %]
+            </td>
+            <td>[% app.applicant_name | html %]</td>
+            <td>[% app.applicant_email | html %]</td>
+            <td>[% app.status | ucfirst | html %]</td>
+            <td>[% app.use_points_payment ? 'Yes' : 'No' %]</td>
+            <td style="font-size:0.85em;white-space:nowrap">[% app.created_at | html %]</td>
+          </tr>
+          [% IF app.cover_letter %]
+          <tr>
+            <td colspan="7" style="background:#f9f9f9;font-size:0.85em;padding:0.5em 1em">
+              <strong>Cover letter:</strong> [% app.cover_letter | html_line_break %]
+            </td>
+          </tr>
+          [% END %]
+          [% END %]
+        </tbody>
+      </table>
+      [% ELSE %]
+      <p class="text-muted">No applications yet.</p>
+      [% END %]
+
+    </div>
+  </div>
+</div>

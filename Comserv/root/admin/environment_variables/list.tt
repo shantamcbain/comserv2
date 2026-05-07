@@ -25,14 +25,14 @@
         <div class="content-primary">
             
             [% IF error_msg %]
-            <div class="alert alert-error" style="background-color: var(--light-color); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="alert alert-error" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--error-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--error-color);">Error</h4>
                 <p>[% error_msg | html %]</p>
             </div>
             [% END %]
             
             [% IF success_msg %]
-            <div class="alert alert-success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="alert alert-success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h4 style="color: var(--success-color);">Success</h4>
                 <p>[% success_msg | html %]</p>
             </div>
