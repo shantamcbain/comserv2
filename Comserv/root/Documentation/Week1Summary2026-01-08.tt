@@ -47,7 +47,7 @@
         <h2>✅ Week 1 Major Accomplishments</h2>
         
         <h3>1. Schema Recovery & Database Consistency (Chat 40-41) - B.4</h3>
-        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid var(--success-color, #28a745); margin: 10px 0;">
             <p><strong>Status:</strong> ✅ COMPLETE</p>
             <p><strong>Deliverables:</strong></p>
             <ul>
@@ -61,7 +61,7 @@
         </div>
 
         <h3>2. AI Chat Phase 3 Code Finalization - E.1</h3>
-        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid var(--success-color, #28a745); margin: 10px 0;">
             <p><strong>Status:</strong> ✅ CODE COMPLETE (Deployment pending test suite validation)</p>
             <p><strong>Deliverables:</strong></p>
             <ul>
@@ -74,7 +74,7 @@
         </div>
 
         <h3>3. Infrastructure Readiness Audit - A.2</h3>
-        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid var(--success-color, #28a745); margin: 10px 0;">
             <p><strong>Status:</strong> ✅ AUDIT COMPLETE</p>
             <p><strong>Key Findings:</strong></p>
             <ul>
@@ -87,7 +87,7 @@
         </div>
 
         <h3>4. Documentation Consolidation - F.4</h3>
-        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid var(--success-color, #28a745); margin: 10px 0;">
             <p><strong>Status:</strong> ✅ PHASE 1 COMPLETE (Backlog: 45+ UPDATE, 30+ CREATE files identified)</p>
             <p><strong>Completed:</strong></p>
             <ul>
@@ -101,7 +101,7 @@
         </div>
 
         <h3>5. Zencoder Compliance & Workflow Enforcement - F.1</h3>
-        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid #28a745; margin: 10px 0;">
+        <div style="background-color: #f0f0f0; padding: 15px; border-left: 4px solid var(--success-color, #28a745); margin: 10px 0;">
             <p><strong>Status:</strong> ✅ COMPLETE</p>
             <p><strong>Deliverables:</strong></p>
             <ul>
@@ -116,7 +116,7 @@
     </div>
 
     <!-- WEEK 2 PRIORITIES -->
-    <div style="background-color: #fff3cd; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <div style="background-color: var(--caution-bg, #fff3cd); padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h2>📅 Week 2 (Jan 9-15) Priorities</h2>
         <ol>
             <li><strong>Documentation Sync Continuation (Chat 45+)</strong> - Complete 45+ UPDATE + 30+ CREATE files from backlog</li>
@@ -135,41 +135,41 @@
         <table style="width: 100%; border-collapse: collapse; margin: 15px 0;">
             <thead style="background-color: #e6f2ff;">
                 <tr>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Plan ID</th>
-                    <th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Description</th>
-                    <th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Status</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color, #ddd);">Plan ID</th>
+                    <th style="padding: 10px; text-align: left; border: 1px solid var(--border-color, #ddd);">Description</th>
+                    <th style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);">Status</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.2</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">K8s Readiness & Infrastructure Audit</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>A.2</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">K8s Readiness & Infrastructure Audit</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>B.4</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Schema Comparison & Recovery</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>B.4</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Schema Comparison & Recovery</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>E.1</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">AI Chat Phase 3 Code Finalization</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ CODE DONE</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>E.1</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">AI Chat Phase 3 Code Finalization</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ CODE DONE</span></td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>F.1</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">IDE Integration & Compliance Framework</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>F.1</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">IDE Integration & Compliance Framework</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #d4edda; padding: 5px 10px; border-radius: 3px;">✅ COMPLETE</span></td>
                 </tr>
                 <tr>
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>F.4</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Documentation Sync (Phase 1)</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #ffc107; padding: 5px 10px; border-radius: 3px; color: #333;">🔄 IN PROGRESS</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>F.4</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Documentation Sync (Phase 1)</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #ffc107; padding: 5px 10px; border-radius: 3px; color: var(--text-color, #333);">🔄 IN PROGRESS</span></td>
                 </tr>
                 <tr style="background-color: #f9f9f9;">
-                    <td style="padding: 10px; border: 1px solid #ddd;"><strong>A.3</strong></td>
-                    <td style="padding: 10px; border: 1px solid #ddd;">Credentials Audit & Security</td>
-                    <td style="padding: 10px; text-align: center; border: 1px solid #ddd;"><span style="background-color: #ffc107; padding: 5px 10px; border-radius: 3px; color: #333;">🔄 FINDINGS READY</span></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>A.3</strong></td>
+                    <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Credentials Audit & Security</td>
+                    <td style="padding: 10px; text-align: center; border: 1px solid var(--border-color, #ddd);"><span style="background-color: #ffc107; padding: 5px 10px; border-radius: 3px; color: var(--text-color, #333);">🔄 FINDINGS READY</span></td>
                 </tr>
             </tbody>
         </table>
@@ -177,7 +177,7 @@
     </div>
 
     <!-- TEAM WORKFLOW METRICS -->
-    <div style="background-color: #f5f5f5; padding: 20px; border-radius: 8px; margin: 20px 0;">
+    <div style="background-color: var(--bg-secondary, #f5f5f5); padding: 20px; border-radius: 8px; margin: 20px 0;">
         <h2>Workflow & Compliance Metrics</h2>
         <ul style="list-style-type: none; padding: 0;">
             <li style="padding: 8px 0;"><strong>Prompts Logged:</strong> 62 (Chat 41-43, all decisions tracked)</li>
@@ -200,7 +200,7 @@
     </div>
 
     <!-- FOOTER -->
-    <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+    <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--border-color, #ddd); color: var(--text-muted-color, #666); font-size: 12px;">
         <p>Week 1 Summary generated by MainAgent (Zencoder) on 2026-01-08 at 20:10 UTC</p>
         <p>Report reflects completed work, audit findings, and Week 2 planning</p>
     </div>

@@ -15,7 +15,7 @@
         <div class="col-100">
             <h1 style="color: var(--primary-color); font-family: var(--header-font);">HostingSignup Controller</h1>
             
-            <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+            <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
                 <ul style="list-style-position: inside; color: var(--text-color);">
                     <li><a href="#overview" style="color: var(--link-color); text-decoration: none;">Overview</a></li>
@@ -62,18 +62,18 @@
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Attributes</h3>
                 <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">logging</code>: Logging utility instance for detailed logging</li>
+                    <li><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">logging</code>: Logging utility instance for detailed logging</li>
                 </ul>
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Methods</h3>
                 
-                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">auto</code></h4>
+                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">auto</code></h4>
                 <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small);">Private method that runs before any action. It logs controller activity and initializes the debug_errors array.</p>
                 
-                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">index</code></h4>
+                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">index</code></h4>
                 <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small);">Main entry point that displays the hosting signup form. Sets up the form with the appropriate action URL.</p>
                 
-                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">process_signup</code></h4>
+                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">process_signup</code></h4>
                 <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small);">Processes the form submission:</p>
                 <ol style="color: var(--text-color); line-height: 1.8;">
                     <li>Validates required fields (full name, email, username, password, domain name, site name)</li>
@@ -84,7 +84,7 @@
                     <li>Displays success page or error messages as appropriate</li>
                 </ol>
                 
-                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">success</code></h4>
+                <h4 style="color: var(--text-color); margin-top: var(--spacing-small);"><code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">success</code></h4>
                 <p style="color: var(--text-color); font-family: var(--body-font); margin-top: var(--spacing-small);">Displays the success page after a successful signup. This page is normally reached via a redirect from process_signup.</p>
                 
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
@@ -154,12 +154,12 @@
             <div id="related-files" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Related Files</h2>
                 <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li><strong>Controller</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Controller/HostingSignup.pm</code></li>
-                    <li><strong>Form Template</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/root/hosting/signup_form.tt</code></li>
-                    <li><strong>Success Template</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/root/hosting/signup_success.tt</code></li>
-                    <li><strong>Model</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/User.pm</code> (for user creation)</li>
-                    <li><strong>Model</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/Site.pm</code> (for site creation)</li>
-                    <li><strong>Model</strong>: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/DBEncy/SiteDomain.pm</code> (for domain association)</li>
+                    <li><strong>Controller</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Controller/HostingSignup.pm</code></li>
+                    <li><strong>Form Template</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/root/hosting/signup_form.tt</code></li>
+                    <li><strong>Success Template</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/root/hosting/signup_success.tt</code></li>
+                    <li><strong>Model</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/User.pm</code> (for user creation)</li>
+                    <li><strong>Model</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/Site.pm</code> (for site creation)</li>
+                    <li><strong>Model</strong>: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/lib/Comserv/Model/DBEncy/SiteDomain.pm</code> (for domain association)</li>
                 </ul>
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
@@ -193,7 +193,7 @@
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Duplicate Site Prevention</h2>
                 <p style="color: var(--text-color); font-family: var(--body-font);">The system now includes robust duplicate site prevention:</p>
                 <ol style="color: var(--text-color); line-height: 1.8;">
-                    <li><strong>Proactive Checking</strong>: The <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">add_site</code> method in Site.pm checks for existing sites with the same name before attempting to create a new site.</li>
+                    <li><strong>Proactive Checking</strong>: The <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">add_site</code> method in Site.pm checks for existing sites with the same name before attempting to create a new site.</li>
                     <li><strong>Error Handling</strong>: If a site with the same name already exists, the system returns a descriptive error message.</li>
                     <li><strong>Detailed Logging</strong>: The system logs all duplicate site detection events for troubleshooting.</li>
                     <li><strong>User Feedback</strong>: Clear error messages are displayed to the user when a duplicate site is detected.</li>
@@ -203,12 +203,12 @@
 
             <div id="site-deletion-feature" style="margin-bottom: var(--spacing-large);">
                 <h2 style="color: var(--primary-color); font-family: var(--header-font); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">Site Deletion Feature</h2>
-                <p style="color: var(--text-color); font-family: var(--body-font);">A complete site deletion system has been implemented and is accessible via <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/site/delete</code>. This feature:</p>
+                <p style="color: var(--text-color); font-family: var(--body-font);">A complete site deletion system has been implemented and is accessible via <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/site/delete</code>. This feature:</p>
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Access Methods</h3>
                 <ul style="color: var(--text-color); line-height: 1.8;">
-                    <li>By ID: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/site/delete?id=X</code> (where X is the site ID)</li>
-                    <li>By name: <code style="background-color: var(--light-color); padding: 2px 6px; border-radius: 3px;">/site/delete?name=sitename</code> (where sitename is the site name)</li>
+                    <li>By ID: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/site/delete?id=X</code> (where X is the site ID)</li>
+                    <li>By name: <code style="background-color: rgba(255,255,255,0.15); padding: 2px 6px; border-radius: 3px;">/site/delete?name=sitename</code> (where sitename is the site name)</li>
                 </ul>
                 
                 <h3 style="color: var(--secondary-color); margin-top: var(--spacing-medium);">Confirmation Process</h3>
@@ -250,7 +250,7 @@
                 <p style="text-align: right; margin-top: var(--spacing-medium);"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
             </div>
 
-            <div id="last-updated" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
+            <div id="last-updated" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-top: var(--spacing-large);">
                 <h3 style="margin-top: 0; color: var(--primary-color);">Last Updated</h3>
                 <p style="color: var(--muted-color); font-size: var(--font-size-small); margin: 0;">
                     <strong>Date:</strong> Tue Jan 06 2026 15:20:15 UTC<br>

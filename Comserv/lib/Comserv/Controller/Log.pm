@@ -7,6 +7,8 @@ use DateTime::Format::Strptime;
 use Data::Dumper;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Util::PointSystem;
+use Comserv::Util::Priority qw(priority_options);
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -30,7 +32,7 @@ sub begin :Private {
 
 sub BUILD {
     my $self = shift;
-    $self->priority({ map {$_ => $_} (1 .. 10) });
+    $self->priority(priority_options());
     $self->status({
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -231,6 +233,34 @@ sub update :Path('/log/update') :Args(0) {
 
     # Call the modify method on the Log model instance
     $log_model->modify($c, $record_id, $new_values);
+
+    # When a log entry is closed (status=3/DONE), apply points billing/earning
+    if ($status == 3) {
+        eval {
+            my $updated_log = $c->model('DBEncy')->resultset('Log')->find($record_id);
+            if ($updated_log && !$updated_log->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = $ps->bill_time_log($updated_log);
+                if ($ok) {
+                    $self->logging->log_with_details(
+                        $c, 'info', __FILE__, __LINE__, 'update',
+                        "Points processed for log #$record_id"
+                    );
+                } elsif ($err && $err ne 'already processed' && $err ne 'zero duration — nothing to bill') {
+                    $self->logging->log_with_details(
+                        $c, 'warn', __FILE__, __LINE__, 'update',
+                        "Points processing skipped for log #$record_id: $err"
+                    );
+                }
+            }
+        };
+        if ($@) {
+            $self->logging->log_with_details(
+                $c, 'error', __FILE__, __LINE__, 'update',
+                "Points billing error for log #$record_id: $@"
+            );
+        }
+    }
 
     # Redirect to the log details page after successful update
     $c->response->redirect($c->uri_for("/log", { record_id => $record_id }));
@@ -454,23 +484,24 @@ sub create_log :Path('/log/create_log') :Args() {
     );
 
     my $logEntry = $rs->create({
-        todo_record_id  => $c->request->body_parameters->{todo_record_id},
-        username        => $username,
-        sitename        => $sitename,
-        start_date      => $start_date || $current_date,
-        project_code    => $project_id, # Use project_id from project_list.tt
-        due_date        => $c->request->body_parameters->{due_date},
-        abstract        => $subject,
-        details         => $c->request->body_parameters->{details},
-        start_time      => $start_time, # Now has a default value if empty
-        end_time        => $end_time,   # Now has a default value if empty
-        time            => $time_diff,
-        group_of_poster => $group_of_poster, # Use the converted string value
-        status          => $c->request->body_parameters->{status},
-        priority        => $c->request->body_parameters->{priority},
-        last_mod_by     => $c->session->{username},
-        last_mod_date   => DateTime->now->ymd,
-        comments        => $c->request->body_parameters->{comments}
+        todo_record_id   => $c->request->body_parameters->{todo_record_id},
+        username         => $username,
+        sitename         => $sitename,
+        start_date       => $start_date || $current_date,
+        project_code     => $project_id,
+        due_date         => $c->request->body_parameters->{due_date},
+        abstract         => $subject,
+        details          => $c->request->body_parameters->{details},
+        start_time       => $start_time,
+        end_time         => $end_time,
+        time             => $time_diff,
+        group_of_poster  => $group_of_poster,
+        status           => $c->request->body_parameters->{status},
+        priority         => $c->request->body_parameters->{priority},
+        last_mod_by      => $c->session->{username},
+        last_mod_date    => DateTime->now->ymd,
+        comments         => $c->request->body_parameters->{comments},
+        points_processed => 0,
     });
 
     # Log the success event
@@ -480,6 +511,70 @@ sub create_log :Path('/log/create_log') :Args() {
 
     # Redirect to /log after save
     $c->response->redirect($c->uri_for('/log'));
+}
+
+sub log_credits :Path('/log/credits') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        $c->detach;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $filter  = $c->req->param('filter') || 'pending';
+    my $page    = int($c->req->param('page') || 1);
+    my $per     = 50;
+
+    my %where = (status => 3);
+    if ($filter eq 'pending') {
+        $where{points_processed} = 0;
+    } elsif ($filter eq 'credited') {
+        $where{points_processed} = 1;
+    }
+
+    my $rs = $schema->resultset('Log')->search(
+        \%where,
+        {
+            order_by => { -desc => 'record_id' },
+            page     => $page,
+            rows     => $per,
+        }
+    );
+
+    my @logs   = $rs->all;
+    my $total  = $rs->pager->total_entries;
+    my $pages  = $rs->pager->last_page;
+
+    if ($c->req->method eq 'POST' && $c->req->param('action') eq 'credit_one') {
+        my $log_id = int($c->req->param('log_id') || 0);
+        if ($log_id) {
+            my $log_row = $schema->resultset('Log')->find($log_id);
+            if ($log_row && $log_row->status == 3 && !$log_row->points_processed) {
+                my $ps = Comserv::Util::PointSystem->new(c => $c);
+                my ($ok, $err) = eval { $ps->bill_time_log($log_row) };
+                if ($@) {
+                    $c->flash->{error_msg} = "Error crediting log #$log_id: $@";
+                } elsif ($ok) {
+                    $c->flash->{success_msg} = "Log #$log_id credited successfully.";
+                } else {
+                    $c->flash->{error_msg} = "Log #$log_id skipped: $err";
+                }
+            }
+        }
+        $c->res->redirect($c->uri_for('/log/credits', { filter => $filter, page => $page }));
+        $c->detach;
+    }
+
+    $c->stash(
+        logs     => \@logs,
+        filter   => $filter,
+        page     => $page,
+        pages    => $pages,
+        total    => $total,
+        template => 'admin/Logging/LogCredits.tt',
+    );
 }
 
 __PACKAGE__->meta->make_immutable;

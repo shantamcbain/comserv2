@@ -901,20 +901,26 @@ sub _get_real_vms_new {
             "Failed to get nodes list, using default node: " . $self->{node});
     }
 
-    # Try a direct test with the 'proxmox' node
-    my $direct_proxmox_vms = $self->_try_get_node_vms($ua, 'proxmox');
-    if ($direct_proxmox_vms && @$direct_proxmox_vms > 0) {
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-            "Successfully retrieved " . scalar(@$direct_proxmox_vms) . " VMs directly from node 'proxmox'");
-        return $direct_proxmox_vms;
+    # Try each discovered node first (auto-discovered from /nodes API)
+    for my $node_name (@node_names) {
+        next unless $node_name;
+        my $discovered_vms = $self->_try_get_node_vms($ua, $node_name);
+        if ($discovered_vms && @$discovered_vms > 0) {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                "Successfully retrieved " . scalar(@$discovered_vms) . " VMs from discovered node '$node_name'");
+            return $discovered_vms;
+        }
     }
-    
-    # Also try with 'pve' node which is common in Proxmox installations
-    my $direct_pve_vms = $self->_try_get_node_vms($ua, 'pve');
-    if ($direct_pve_vms && @$direct_pve_vms > 0) {
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
-            "Successfully retrieved " . scalar(@$direct_pve_vms) . " VMs directly from node 'pve'");
-        return $direct_pve_vms;
+
+    # Fall back to common default node names
+    for my $fallback_node ('proxmox', 'pve') {
+        next if grep { $_ eq $fallback_node } @node_names;
+        my $fallback_vms = $self->_try_get_node_vms($ua, $fallback_node);
+        if ($fallback_vms && @$fallback_vms > 0) {
+            $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_get_real_vms_new',
+                "Successfully retrieved " . scalar(@$fallback_vms) . " VMs from fallback node '$fallback_node'");
+            return $fallback_vms;
+        }
     }
 
     # Don't try with type=qemu as it's not a valid parameter according to the API error

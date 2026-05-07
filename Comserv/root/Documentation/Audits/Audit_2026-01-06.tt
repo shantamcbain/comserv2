@@ -33,7 +33,7 @@
 
     <h2 id="work-completed">Work Completed Today</h2>
     
-    <div style="background: #fff3cd; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--caution-bg, #fff3cd); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">🔧 Daily Plan Automator Workflow - INITIATED</h3>
         <ul>
             <li>✅ <strong>Phase 0:</strong> validation_step0.pl executed - PASSED</li>
@@ -51,7 +51,7 @@
     </div>
 
     <h3>A.3 Credentials Audit - Phase 1</h3>
-    <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0;">
+    <div style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; margin: 15px 0;">
         <p><strong>Status:</strong> PENDING EXECUTION (scheduled for day-of-plan execution)</p>
         <p><strong>Scope:</strong> Scan codebase for hardcoded credentials, classify findings, create interim report</p>
         <p><strong>Expected Duration:</strong> 3-4 hours</p>
@@ -59,7 +59,7 @@
     </div>
 
     <h3>B.1 Docker Secrets - Phase 2</h3>
-    <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0;">
+    <div style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; margin: 15px 0;">
         <p><strong>Status:</strong> PENDING EXECUTION (scheduled for day-of-plan execution)</p>
         <p><strong>Scope:</strong> Implement Docker Secrets infrastructure for credentials identified in A.3 Phase 1</p>
         <p><strong>Expected Duration:</strong> 2-3 hours</p>
@@ -67,7 +67,7 @@
     </div>
 
     <h3>B.3 Theme Refactoring - Phase 2</h3>
-    <div style="background: #f5f5f5; padding: 15px; border-radius: 4px; margin: 15px 0;">
+    <div style="background: var(--bg-secondary, #f5f5f5); padding: 15px; border-radius: 4px; margin: 15px 0;">
         <p><strong>Status:</strong> PENDING EXECUTION (scheduled for day-of-plan execution)</p>
         <p><strong>Scope:</strong> Continue refactoring next 5-10 files, replace inline styles with CSS variables</p>
         <p><strong>Expected Duration:</strong> 2 hours</p>
@@ -95,38 +95,38 @@
     <h2 id="metrics">Metrics & Progress Tracking</h2>
     
     <table style="width: 100%; margin: 20px 0; border-collapse: collapse;">
-        <thead style="background: #f5f5f5;">
+        <thead style="background: var(--bg-secondary, #f5f5f5);">
             <tr>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Item</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: center;">Today</th>
-                <th style="padding: 10px; border: 1px solid #ddd; text-align: left;">Note</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Item</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">Today</th>
+                <th style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: left;">Note</th>
             </tr>
         </thead>
         <tbody>
-            <tr style="background: #fafafa;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Master Plan Version</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">1.0</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Last Updated: 2026-01-05; 16 plans tracked</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Master Plan Version</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">1.0</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Last Updated: 2026-01-05; 16 plans tracked</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>MasterPlanCoordination.tt</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">0.23</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Last Updated: 2026-01-06 05:18:00 UTC</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>MasterPlanCoordination.tt</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">0.23</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Last Updated: 2026-01-06 05:18:00 UTC</td>
             </tr>
-            <tr style="background: #fafafa;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Daily Plan v0.07</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">0.07</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">Last Updated: 2026-01-06 05:18:00 UTC; 4 parallel tasks</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Daily Plan v0.07</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">0.07</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">Last Updated: 2026-01-06 05:18:00 UTC; 4 parallel tasks</td>
             </tr>
             <tr>
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Security Vulnerabilities Addressed</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">1/13</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">G.1 SQL Injection complete; 5 ready for implementation (G.2-G.6)</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Security Vulnerabilities Addressed</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">1/13</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">G.1 SQL Injection complete; 5 ready for implementation (G.2-G.6)</td>
             </tr>
-            <tr style="background: #fafafa;">
-                <td style="padding: 10px; border: 1px solid #ddd;"><strong>Plans Completed</strong></td>
-                <td style="padding: 10px; border: 1px solid #ddd; text-align: center;">4/16</td>
-                <td style="padding: 10px; border: 1px solid #ddd;">E.2, E.3, E.1 (feature planning), A.2 (K8s Phase 1 in progress)</td>
+            <tr style="background: var(--bg-secondary, #fafafa);">
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);"><strong>Plans Completed</strong></td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd); text-align: center;">4/16</td>
+                <td style="padding: 10px; border: 1px solid var(--border-color, #ddd);">E.2, E.3, E.1 (feature planning), A.2 (K8s Phase 1 in progress)</td>
             </tr>
         </tbody>
     </table>
@@ -159,7 +159,7 @@
 
     <h2 id="tomorrow-plan">Tomorrow's Plan (January 7)</h2>
     
-    <div style="background: #fff9c4; padding: 15px; border-radius: 4px; margin: 20px 0;">
+    <div style="background: var(--caution-bg, #fff9c4); padding: 15px; border-radius: 4px; margin: 20px 0;">
         <h3 style="margin-top: 0;">📅 Planned Work for Jan 7</h3>
         <p><strong>Focus Areas:</strong> C.1 Documentation Audit + B.3 Theme Completion + E.1 LLMGrok Planning</p>
         <ul>
@@ -184,7 +184,7 @@
         </ul>
     </div>
 
-    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd;">
+    <div style="color: var(--text-muted-color); font-size: var(--font-size-small); margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border-color, #ddd);">
         <p><strong>Audit v0.01 | Tuesday January 6, 2026 | Generated 2026-01-06 17:42:00 UTC</strong></p>
         <p>This audit tracks the Daily Plan Automator workflow initiation and daily progress for project synchronization and accountability.</p>
     </div>

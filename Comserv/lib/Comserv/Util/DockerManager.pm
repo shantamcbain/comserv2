@@ -4,7 +4,12 @@ use strict;
 use warnings;
 use Moose;
 use Try::Tiny;
-use IPC::Run qw(run);
+BEGIN {
+    if (!eval { require IPC::Run; IPC::Run->import('run'); 1 }) {
+        warn "Warning: IPC::Run not available — Docker management features disabled\n";
+        *run = sub { warn "IPC::Run not installed\n"; return 0 };
+    }
+}
 use JSON;
 use POSIX qw(strftime);
 use File::Spec;

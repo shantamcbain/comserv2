@@ -144,7 +144,7 @@
                     <span style="display:inline-flex;flex-direction:column;align-items:center;margin:4px 8px;gap:4px;">
                         <img src="/favicon/port/[% p %]" alt="port [% p %]"
                              style="width:32px;height:32px;border:1px solid #ccc;border-radius:4px;">
-                        <span style="font-size:11px;color:#666;">:[% p %]</span>
+                        <span style="font-size:11px;color: var(--text-muted-color, #666);">:[% p %]</span>
                     </span>
                     [% END %]
                 </div>
@@ -178,7 +178,7 @@
                 </form>
 
                 <h3 style="margin-top:16px;">Domain favicon (overrides site favicon)</h3>
-                <p style="font-size:13px;color:#555;">
+                <p style="font-size:13px;color: var(--text-color, #555);">
                     Set a unique icon for a specific domain hostname (e.g. <em>[% req_host %]</em>).
                     Domain icons take priority over the site icon when no port is in the URL.
                 </p>

@@ -164,7 +164,7 @@
 
 <style>
     pre {
-        background-color: #f5f5f5;
+        background-color: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         overflow-x: auto;
@@ -181,7 +181,7 @@
     .section-toggle {
         cursor: pointer;
         padding: 10px 0;
-        border-bottom: 1px solid #ddd;
+        border-bottom: 1px solid var(--border-color, #ddd);
     }
     
     .section-content {
@@ -194,7 +194,7 @@
     }
     
     h4 {
-        color: #333;
+        color: var(--text-color, #333);
         margin-top: 15px;
     }
     

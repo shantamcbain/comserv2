@@ -4,8 +4,8 @@
    roles = "admin,developer"
    TemplateType = "Documentation"
    category = "templates"
-   page_version = "0.05" #start new documents with 0.01
-   last_updated = "Thu Dec 18 2025"
+   page_version = "0.07"
+   last_updated = "Tue Apr 22 2026"
    site_specific = "false"
 %]
 # all links must be Documentation/DocumentationTemplate format
@@ -25,19 +25,19 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#prerequisites" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Prerequisites</a>
-                <a href="#features" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Key Features</a>
-                <a href="#getting-started" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Getting Started</a>
-                <a href="#advanced" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Advanced Usage</a>
-                <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Troubleshooting</a>
-                <a href="#config-ref" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Configuration</a>
-                <a href="#see-also" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">See Also</a>
+                <a href="#overview" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Overview</a>
+                <a href="#prerequisites" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Prerequisites</a>
+                <a href="#features" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Key Features</a>
+                <a href="#getting-started" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Getting Started</a>
+                <a href="#advanced" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Advanced Usage</a>
+                <a href="#troubleshooting" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Troubleshooting</a>
+                <a href="#config-ref" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">Configuration</a>
+                <a href="#see-also" style="color: var(--nav-text); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--nav-bg); display: inline-block;">See Also</a>
             </div>
         </div>
     </div>
@@ -85,7 +85,7 @@
             <h3 id="gs-step1" style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">4.1 Step 1: Initial Setup</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">Detailed instructions for the first step.</p>
             
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); border-radius: 4px; margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>
 # Example code or command
 example_command --parameter value
@@ -127,14 +127,14 @@ example_command --parameter value
         <div class="col-100">
             <h2 id="troubleshooting" style="color: var(--text-color); font-family: var(--header-font);">6. Troubleshooting</h2>
             
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--warning-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0;">
                 <h3 id="ts-issue1" style="color: var(--warning-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Common Issue 1</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Description of symptoms</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Step by step solution</p>
             </div>
 
-            <div style="background-color: var(--light-color); border-left: 4px solid var(--info-color); padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
-                <h3 id="ts-issue2" style="color: var(--info-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Common Issue 2</h3>
+            <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--info-color, #17a2b8); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-small) 0;">
+                <h3 id="ts-issue2" style="color: var(--info-color, #17a2b8); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">Problem: Common Issue 2</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Symptoms:</strong> Description of symptoms</p>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Solution:</strong> Step by step solution</p>
             </div>
@@ -161,7 +161,7 @@ example_command --parameter value
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">"default_value"</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">Description of parameter</td>
                 </tr>
-                <tr style="background-color: var(--secondary-color);">
+                <tr style="background-color: rgba(255,255,255,0.12);">
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">parameter_2</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">boolean</td>
                     <td style="color: var(--text-color); font-family: var(--body-font); padding: var(--spacing-small); border: 1px solid var(--border-color);">true</td>
@@ -176,7 +176,7 @@ example_command --parameter value
     <!-- SEE ALSO SECTION -->
     <div class="row">
         <div class="col-100">
-            <div id="see-also" class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div id="see-also" class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); border-radius: 4px; margin: var(--spacing-medium) 0;">
                 <h2 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">8. See Also</h2>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/related_doc_1" style="color: var(--link-color);">Related Documentation 1</a></li>
@@ -205,7 +205,64 @@ THEME COMPLIANCE NOTES FOR DEVELOPERS:
 
 This template is fully theme-compliant using the actual Comserv theme system:
 
-1. **CSS Variables Used**: All styling uses CSS custom properties from base.css:
+1. **Canonical CSS Variables** (defined in static/css/base.css — use ONLY these names):
+
+   COLOURS:
+   --primary-color        Brand primary; nav bars, headings           default: #ccffff
+   --secondary-color      Muted secondary surfaces                    default: #f9f9f9
+   --accent-color         Highlight / call-to-action                  default: #FF9900
+   --text-color           Body text and headings                      default: #000000
+   --background-color     Page background solid colour                default: #ffffff
+   --link-color           Hyperlink colour                            default: #0000FF
+   --link-hover-color     Hyperlink hover colour                      default: #000099
+   --border-color         Borders and dividers                        default: #cccccc
+   --table-header-bg      Table <th> and card header background       default: #f2f2f2
+   --success-color        Success / positive state                    default: #009900
+   --warning-color        Warning / danger / error state              default: #ff0000
+   --info-color           Informational highlights                    default: #17a2b8
+   --caution-color        Caution / staging-environment (amber)       default: #ffc107
+   --light-color          Very light neutral surface                  default: #f8f9fa
+   --text-muted-color     De-emphasised / secondary text (canonical)  default: #6c757d
+   --text-muted           Alias → --text-muted-color (compat only)
+
+   BACKGROUND / ALIASES:
+   --background-image     Optional background-image URL               default: none
+   --bg-color             Alias → --background-color
+   --bg-secondary         Alias → --secondary-color
+   --card-bg              Alias → --table-header-bg
+
+   NAVIGATION:
+   --nav-bg               Nav bar background   → --primary-color
+   --nav-text             Nav bar text colour  → --text-color
+   --nav-hover-bg         Nav item hover bg    default: rgba(0,0,0,0.1)
+
+   TYPOGRAPHY:
+   --header-font          Heading font stack   default: Verdana, Helvetica, sans-serif
+   --body-font            Body font stack      default: Verdana, Helvetica, sans-serif
+   --font-size-base       Base font size       default: 16px
+   --font-size-small      Small text           default: 14px
+   --font-size-large      Large sub-heading    default: 20px
+   --font-size-xlarge     Extra-large / hero   default: 24px
+
+   SPACING & LAYOUT:
+   --spacing-small        Compact pad/gap      default: 0.5rem
+   --spacing-medium       Standard pad/gap     default: 1rem
+   --spacing-large        Section pad/gap      default: 2rem
+   --container-width      Max page width       default: 1200px
+
+   BUTTONS:
+   --button-bg            Button background    default: #f2f2f2
+   --button-text          Button text colour   default: #000000
+   --button-border        Button border        default: #cccccc
+   --button-hover-bg      Button hover bg      default: #e0e0e0
+
+   NAMING RULES:
+   - Use canonical names in all new CSS. --text-muted alias is backward-compat only.
+   - Never hardcode colours in .tt inline styles; always use var(--name, fallback).
+   - Site-specific vars (--bee-yellow etc.) belong in the site's theme file only.
+   - Admin-component vars belong in admin.css, delegating to canonical vars.
+
+   CSS Variables Used in this template:
    - --text-color, --background-color, --primary-color, --secondary-color
    - --header-font, --body-font, --font-size-* variables
    - --spacing-small, --spacing-medium, --spacing-large for consistent spacing

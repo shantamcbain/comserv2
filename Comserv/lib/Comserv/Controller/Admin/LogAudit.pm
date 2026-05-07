@@ -5,6 +5,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::HealthLogger;
 use Template;
+use DateTime;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
 
@@ -12,6 +13,17 @@ has 'logging' => (
     is      => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    unless ($c->session->{username} && ($c->stash->{is_admin} || grep { lc($_) eq 'admin' } @{ $c->session->{roles} // [] })) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+            "Unauthenticated access attempt to LogAudit from IP " . ($c->req->address || 'unknown'));
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri->path }));
+        $c->detach;
+    }
+    return 1;
+}
 
 # GET /admin/logging/audit
 # Main audit dashboard — renders instantly; heavy stats loaded async via /audit/stats
@@ -38,6 +50,27 @@ sub index :Path('/admin/logging/audit') :Args(0) {
         );
     };
 
+    # When arriving via a health-alert link fetch the actual log entries that
+    # triggered the alert so the admin can see them immediately at the top.
+    my $recent_alerts = [];
+    if ($filter_system || $filter_level) {
+        eval {
+            my %cond;
+            $cond{system_identifier} = $filter_system if $filter_system;
+            $cond{level}             = $filter_level  if $filter_level;
+            # Limit to the last 30 minutes so the list stays relevant
+            my $cutoff = DateTime->now->subtract(minutes => 30)->strftime('%Y-%m-%d %H:%M:%S');
+            $cond{timestamp} = { '>=' => $cutoff };
+
+            $recent_alerts = [
+                $c->model('DBEncy')->resultset('SystemLog')->search(
+                    \%cond,
+                    { order_by => { -desc => 'timestamp' }, rows => 20 }
+                )->all
+            ];
+        };
+    }
+
     $c->stash(
         template         => 'admin/Logging/LogAudit.tt',
         docker_health    => $docker_health,
@@ -45,6 +78,7 @@ sub index :Path('/admin/logging/audit') :Args(0) {
         hours            => $hours,
         filter_system    => $filter_system,
         filter_level     => $filter_level,
+        recent_alerts    => $recent_alerts,
     );
 }
 
@@ -167,6 +201,7 @@ sub prune :Path('/admin/logging/audit/prune') :Args(0) {
         $c->flash->{success_msg} = "Pruned $deleted records from system_log.";
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 # POST /admin/logging/audit/alert_action
@@ -196,6 +231,7 @@ sub alert_action :Path('/admin/logging/audit/alert_action') :Args(0) {
         $c->flash->{error_msg} = "Error updating alert: $@" if $@;
     }
     $c->res->redirect($c->uri_for('/admin/logging/audit'));
+    $c->detach;
 }
 
 __PACKAGE__->meta->make_immutable;

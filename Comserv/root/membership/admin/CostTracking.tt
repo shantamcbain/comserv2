@@ -80,7 +80,7 @@
 
       <div class="content-section">
         <h2>Benefactor Contributions — Shanta McBain</h2>
-        <p style="font-size:0.9em;color:#555;">
+        <p style="font-size:0.9em;color: var(--text-muted-color, #555);">
           Shanta is the founding benefactor of this platform: she covers all operating expenses,
           performs all programming and system administration, and donates her labour. Each logged
           contribution is credited to her internal coin account at 1 coin = 1 CAD.
@@ -153,7 +153,7 @@
       [% IF pricing_recommendation %]
       <div class="content-section">
         <h2>Pricing Recommendation</h2>
-        <p style="color:#666;font-size:0.9em;">
+        <p style="color: var(--text-muted-color, #666);font-size:0.9em;">
           Based on [% active_member_count || 0 %] active members and [% total_monthly_cost %] [% default_currency || 'CAD' %]/mo in costs.
           Overhead factor: [% overhead_pct || 30 %]% added for sustainability.
         </p>
@@ -173,7 +173,7 @@
                 <td><strong>[% pr.name | html %]</strong></td>
                 <td>[% pr.monthly %] [% default_currency || 'CAD' %]</td>
                 <td>[% pr.annual %] [% default_currency || 'CAD' %]</td>
-                <td style="font-size:0.85em;color:#666;">[% pr.notes | html %]</td>
+                <td style="font-size:0.85em;color: var(--text-muted-color, #666);">[% pr.notes | html %]</td>
               </tr>
               [% END %]
             </tbody>

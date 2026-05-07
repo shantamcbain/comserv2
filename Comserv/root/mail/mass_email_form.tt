@@ -150,6 +150,12 @@
     </footer>
 </div>
 
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'mass email'
+   ai_form_context      = 'mass email composition for site users'
+   ai_form_fields       = 'subject, body, bcc_addresses'
+%]
+
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const form = document.querySelector('.email-compose-form');

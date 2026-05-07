@@ -45,7 +45,7 @@
                 <tr>
                     <td>
                         <strong>[% server.site_name || 'Unknown' %]</strong><br>
-                        <small style="color: #666;">ID: [% server.site_id %]</small>
+                        <small style="color: var(--text-muted-color, #666);">ID: [% server.site_id %]</small>
                     </td>
                     <td>[% server.smtp_host || 'Not set' %]</td>
                     <td>[% server.smtp_port || 'Not set' %]</td>
@@ -76,7 +76,7 @@
 
     <div class="function-section" style="background:#f0f8ff;border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:18px;">
         <h4 style="margin-top:0;">🧪 Send Test Email</h4>
-        <p style="margin:0 0 10px;font-size:0.92em;color:#555;">
+        <p style="margin:0 0 10px;font-size:0.92em;color: var(--text-muted-color, #555);">
             Sends a real test message through the <strong>full unified mail path</strong> using the site SMTP config (harper.whc.ca:465).
             Check the <a href="/health/recent_errors">application log</a> for the SMTP transcript if it fails.
         </p>
@@ -90,7 +90,7 @@
         </form>
     </div>
 
-    <div class="function-section" style="border-left-color:#28a745;">
+    <div class="function-section" style="border-left-color: var(--success-color, #28a745);">
         <h4>Mailing Lists &amp; Mailouts</h4>
         <ul>
             <li><a href="[% c.uri_for('/mail/lists') %]"><strong>Manage Mailing Lists</strong></a> — Create, edit and view subscriber lists for this site</li>
@@ -136,7 +136,7 @@
 
 <style>
     .admin-stats {
-        background: #f5f5f5;
+        background: var(--bg-secondary, #f5f5f5);
         padding: 15px;
         border-radius: 5px;
         margin: 20px 0;
@@ -145,13 +145,13 @@
     .function-section {
         margin: 20px 0;
         padding: 15px;
-        border-left: 3px solid #007bff;
+        border-left: 3px solid var(--primary-color, #007bff);
         background: #f9f9f9;
     }
     
     .function-section h4 {
         margin-top: 0;
-        color: #007bff;
+        color: var(--link-color, #007bff);
     }
     
     .function-section ul {
@@ -189,7 +189,7 @@
     }
     
     .btn-primary {
-        background: #007bff;
+        background: var(--primary-color, #007bff);
         color: white;
     }
     
@@ -215,13 +215,13 @@
     
     .smtp-servers-table th,
     .smtp-servers-table td {
-        border: 1px solid #ddd;
+        border: 1px solid var(--border-color, #ddd);
         padding: 10px;
         text-align: left;
     }
     
     .smtp-servers-table th {
-        background: #f5f5f5;
+        background: var(--bg-secondary, #f5f5f5);
         font-weight: bold;
     }
     
@@ -235,7 +235,7 @@
         margin: 2px;
         text-decoration: none;
         border-radius: 3px;
-        background: #007bff;
+        background: var(--primary-color, #007bff);
         color: white;
         font-size: 12px;
     }
@@ -245,7 +245,7 @@
     }
     
     .btn-test {
-        background: #28a745;
+        background: var(--success-color, #28a745);
     }
     
     .btn-test:hover {
@@ -255,7 +255,7 @@
     .info-message {
         padding: 15px;
         background: #e7f3ff;
-        border-left: 4px solid #007bff;
+        border-left: 4px solid var(--primary-color, #007bff);
         margin: 15px 0;
     }
 </style>

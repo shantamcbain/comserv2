@@ -157,18 +157,18 @@
     padding: 2px 6px; border-radius: 3px;
     white-space: nowrap; flex-shrink: 0;
 }
-.pri-1  { background: #dc3545; color: #fff; }
+.pri-1  { background: var(--danger-color, #dc3545); color: #fff; }
 .pri-2  { background: #c0392b; color: #fff; }
 .pri-3  { background: #e67e22; color: #fff; }
 .pri-4  { background: #fd7e14; color: #fff; }
-.pri-5  { background: #ffc107; color: #333; }
-.pri-6  { background: #f0ad4e; color: #333; }
+.pri-5  { background: #ffc107; color: var(--text-color, #333); }
+.pri-6  { background: #f0ad4e; color: var(--text-color, #333); }
 .pri-7  { background: #6c757d; color: #fff; }
-.pri-8,.pri-9,.pri-10 { background: #adb5bd; color: #333; }
+.pri-8,.pri-9,.pri-10 { background: #adb5bd; color: var(--text-color, #333); }
 
 .status-new      { background: #6c757d; color: #fff; }
 .status-progress { background: #17a2b8; color: #fff; }
-.status-done     { background: #28a745; color: #fff; }
+.status-done     { background: var(--success-color, #28a745); color: #fff; }
 
 .todo-subject { font-weight: 600; font-size: 0.95em; flex: 1; min-width: 0; }
 .todo-meta    { font-size: 0.78em; color: var(--text-muted-color, #6c757d); white-space: nowrap; }
@@ -241,7 +241,7 @@
 
         [%# Overdue badge %]
         [% IF is_overdue && st_cls != 'status-done' %]
-        <span class="todo-badge" style="background:#dc3545;color:#fff;">OVERDUE</span>
+        <span class="todo-badge" style="background: var(--danger-color, #dc3545);color:#fff;">OVERDUE</span>
         [% END %]
 
         [%# Subject %]
@@ -252,7 +252,7 @@
         <span class="todo-meta">📁 [% proj_name.${task.project_id} || task.project_id %]</span>
         [% END %]
         [% IF task.due_date %]
-        <span class="todo-meta" [% IF is_overdue && st_cls != 'status-done' %]style="color:#dc3545;font-weight:bold"[% END %]>📅 [% task.due_date %]</span>
+        <span class="todo-meta" [% IF is_overdue && st_cls != 'status-done' %]style="color: var(--danger-color, #dc3545);font-weight:bold"[% END %]>📅 [% task.due_date %]</span>
         [% END %]
         [% IF is_csc_admin && task.sitename %]
         <span class="todo-meta">[% task.sitename %]</span>
@@ -272,7 +272,7 @@
             [% IF task.due_date %]
             <div class="todo-field">
                 <label>Due Date</label>
-                <div class="val" [% IF is_overdue && st_cls != 'status-done' %]style="color:#dc3545;font-weight:bold"[% END %]>[% task.due_date %]</div>
+                <div class="val" [% IF is_overdue && st_cls != 'status-done' %]style="color: var(--danger-color, #dc3545);font-weight:bold"[% END %]>[% task.due_date %]</div>
             </div>
             [% END %]
             [% IF task.developer %]

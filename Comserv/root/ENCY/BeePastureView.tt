@@ -36,7 +36,7 @@
             <div class="app-section">
                 <h2>Bee Forage Plants by Botanical Name</h2>
 
-                [% IF is_admin %]
+                [% IF is_editor %]
                 <div class="content-section">
                     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
                 </div>

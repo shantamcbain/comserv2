@@ -25,18 +25,18 @@
     </div>
 
     <!-- TABLE OF CONTENTS SECTION -->
-    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
+    <div id="toc" class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--primary-color); border-radius: 4px;">
         <div class="col-100">
             <h2 style="color: var(--text-color); font-family: var(--header-font); margin-top: 0;">Quick Navigation</h2>
             <p style="color: var(--text-muted-color); font-family: var(--body-font); font-size: var(--font-size-small);">Jump to section:</p>
             <div style="display: flex; flex-wrap: wrap; gap: var(--spacing-small);">
-                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Overview</a>
-                <a href="#auth" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Authentication</a>
-                <a href="#dashboard" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Dashboard</a>
-                <a href="#database" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Database</a>
-                <a href="#refactoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Refactoring Audit</a>
-                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Methods</a>
-                <a href="#integration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: var(--secondary-color); display: inline-block;">Integration</a>
+                <a href="#overview" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Overview</a>
+                <a href="#auth" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Authentication</a>
+                <a href="#dashboard" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Dashboard</a>
+                <a href="#database" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Database</a>
+                <a href="#refactoring" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Refactoring Audit</a>
+                <a href="#methods" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Methods</a>
+                <a href="#integration" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Integration</a>
             </div>
         </div>
     </div>
@@ -55,7 +55,7 @@
     </div>
 
     <!-- RECENT CHANGES SECTION -->
-    <div class="row" style="margin: var(--spacing-large) 0; background-color: var(--light-color); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
+    <div class="row" style="margin: var(--spacing-large) 0; background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border-left: 4px solid var(--success-color); border-radius: 4px;">
         <div class="col-100">
             <h3 style="color: var(--text-color); font-family: var(--header-font);">Recent Changes (v0.05 - Jan 11, 2026)</h3>
             <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -86,7 +86,7 @@
             
             <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large);">2.2 Base Action (Chained)</h3>
             <p style="color: var(--text-color); font-family: var(--body-font);">The `base` action chains from root and is the entry point for all admin routes:</p>
-            <div style="background-color: var(--light-color); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
+            <div style="background-color: rgba(255,255,255,0.15); padding: var(--spacing-medium); border: 1px solid var(--border-color); margin: var(--spacing-small) 0;">
                 <pre style="color: var(--text-color); font-family: monospace; margin: 0;"><code>sub base :Chained('/') :PathPart('admin') :CaptureArgs(0)</code></pre>
             </div>
             <p style="color: var(--text-color); font-family: var(--body-font);">Sets section stash to 'admin' and validates admin access.</p>
@@ -151,7 +151,7 @@
         <div class="col-100">
             <h2 id="refactoring" style="color: var(--text-color); font-family: var(--header-font);">5. Refactoring Audit - Schema Code Consolidation (v1.12)</h2>
             
-            <div class="warning" style="background-color: var(--light-color); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
+            <div class="warning" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid #ff9800; padding: var(--spacing-medium); margin: var(--spacing-small) 0;">
                 <h3 style="color: #ff9800; font-family: var(--header-font); font-size: var(--font-size-large); margin-top: 0;">⚠️ BLOAT ALERT</h3>
                 <p style="color: var(--text-color); font-family: var(--body-font);"><strong>Problem:</strong> Admin.pm has become severely bloated with ~2,900 lines of schema-related code (approximately 71% of the file, lines 1191-4076). This code was added to handle database schema fixes but creates maintenance issues.</p>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
@@ -256,7 +256,7 @@
     <!-- FOOTER SECTION -->
     <div class="row">
         <div class="col-100">
-            <div class="success" style="background-color: var(--light-color); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
+            <div class="success" style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--success-color); padding: var(--spacing-medium); margin: var(--spacing-medium) 0;">
                 <h3 style="color: var(--success-color); font-family: var(--header-font); margin-top: 0;">See Also</h3>
                 <ul style="color: var(--text-color); font-family: var(--body-font);">
                     <li><a href="/Documentation/controllers/Admin/SchemaComparison" style="color: var(--link-color);">Admin/SchemaComparison Controller</a> - Dedicated schema operations</li>

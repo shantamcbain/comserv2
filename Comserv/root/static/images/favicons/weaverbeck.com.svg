@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <!-- Blue-grey — weaverbeck family/organisation site -->
+  <rect width="32" height="32" rx="4" fill="#37474f"/>
+  <!-- Woven grid lines suggesting weaving / web -->
+  <line x1="8"  y1="6"  x2="8"  y2="26" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="16" y1="6"  x2="16" y2="26" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="24" y1="6"  x2="24" y2="26" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="6"  y1="10" x2="26" y2="10" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="6"  y1="16" x2="26" y2="16" stroke="white" stroke-width="1" opacity="0.3"/>
+  <line x1="6"  y1="22" x2="26" y2="22" stroke="white" stroke-width="1" opacity="0.3"/>
+  <!-- W letter -->
+  <text x="16" y="23" text-anchor="middle" font-family="Georgia,serif" font-weight="bold" font-size="20" fill="white">W</text>
+</svg>

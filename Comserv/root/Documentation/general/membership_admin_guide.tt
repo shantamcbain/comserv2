@@ -20,7 +20,7 @@
         Last Updated: 2026-04-03 | Version: 1.0 | Audience: Site Admins | Status: Active
     </div>
 
-    <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-bottom: var(--spacing-large);">
+    <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-bottom: var(--spacing-large);">
         <strong style="color: var(--text-color);">Access:</strong>
         <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">
             The admin panel is at <a href="/membership/admin" style="color: var(--link-color);">/membership/admin</a>. You must have the <code>admin</code> or <code>site_admin</code> role on this site to access it.
@@ -28,7 +28,7 @@
     </div>
 
     <!-- TABLE OF CONTENTS -->
-    <div id="toc" style="background-color: var(--light-color); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
+    <div id="toc" style="background-color: rgba(255,255,255,0.15); border: 1px solid var(--border-color); border-radius: 4px; padding: var(--spacing-large); margin-bottom: var(--spacing-large);">
         <h3 style="margin-top: 0; color: var(--primary-color);">Table of Contents</h3>
         <ul style="list-style-position: inside; color: var(--text-color);">
             <li><a href="#plans" style="color: var(--link-color); text-decoration: none;">Managing Membership Plans</a></li>
@@ -66,7 +66,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>name</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Display name (e.g. "Supporter")</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>slug</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">URL-safe identifier (e.g. "supporter") — used in CSS classes and URLs</td>
                 </tr>
@@ -74,7 +74,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>price_monthly_usd</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Base monthly price in USD (regional overrides set separately)</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>price_annual_usd</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Annual price (should be ~15–20% cheaper than 12 × monthly)</td>
                 </tr>
@@ -82,7 +82,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>ai_models_allowed</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">JSON array of Ollama model names (e.g. <code>["llama3.2","phi3"]</code>). Leave empty to allow all.</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Feature flags</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>has_beekeeping</code>, <code>has_planning</code>, <code>has_hosting</code>, <code>has_email</code>, <code>has_domain</code>, <code>has_currency</code> — toggle which services this plan enables</td>
                 </tr>
@@ -120,7 +120,7 @@
             <li>Base USD price from the plan itself if no pricing row exists</li>
         </ol>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
             <strong style="color: var(--text-color);">Tip:</strong>
             <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Add a <code>DEFAULT</code> row at a lower price than the USD base to create a global reduced price for all non-specifically-listed regions. Then add specific rows for high-income countries at the full rate.</p>
         </div>
@@ -191,7 +191,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>cost_type</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Category: hosting, bandwidth, hardware, software, support, other</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>amount_usd</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Cost in USD</td>
                 </tr>
@@ -199,14 +199,14 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>period</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Month and year this cost applies to (YYYY-MM)</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);"><code>description</code></td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Free-text note (e.g. "AWS EC2 invoice #1234")</td>
                 </tr>
             </tbody>
         </table>
 
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
             <strong style="color: var(--text-color);">Why track costs?</strong>
             <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">Transparent cost data lets you price plans accurately and show the community that membership fees are going directly to keeping the site alive. Cost + revenue data can also be made visible to members to build trust.</p>
         </div>
@@ -226,7 +226,7 @@
             <li><code>PAYPAL_MODE</code> — <code>sandbox</code> for testing, <code>live</code> for production</li>
             <li><code>PAYPAL_IPN_URL</code> — must be set to <code>https://yoursite.com/payment/paypal_ipn</code> in your PayPal account's IPN settings</li>
         </ul>
-        <div style="background-color: var(--light-color); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
+        <div style="background-color: rgba(255,255,255,0.15); border-left: 4px solid var(--primary-color); padding: var(--spacing-medium); border-radius: 4px; margin-top: var(--spacing-medium);">
             <strong style="color: var(--text-color);">IPN Verification:</strong>
             <p style="color: var(--text-color); margin: var(--spacing-small) 0 0 0; line-height: 1.5;">The system verifies every IPN message by posting it back to PayPal before acting on it. Duplicate IPN messages are silently ignored (idempotent by transaction ID).</p>
         </div>
@@ -305,7 +305,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Bypassed</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Global admins always have full access to everything</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">site_admin</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Bypassed</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Site admins always have full access on their site</td>
@@ -315,7 +315,7 @@
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Applied</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Access to gated services depends on active membership plan</td>
                 </tr>
-                <tr style="background-color: var(--light-color);">
+                <tr style="background-color: rgba(255,255,255,0.15);">
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">anonymous</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Redirected to login</td>
                     <td style="padding: var(--spacing-small); border: 1px solid var(--border-color); color: var(--text-color);">Membership requires being logged in</td>

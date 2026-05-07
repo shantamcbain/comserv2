@@ -25,7 +25,7 @@
     <p class="success">[% c.flash.success_msg %]</p>
 [% END %]
 
-<p style="background: #fffacd; padding: 10px; border: 1px solid #daa520;">
+<p style="background: var(--caution-bg, #fffacd); padding: 10px; border: 1px solid #daa520;">
     <strong>Form Action:</strong> [% c.uri_for('/mail/add_mail_config') %]<br>
     <strong>Current URL:</strong> [% c.req.uri %]
 </p>
@@ -41,10 +41,10 @@
                 </option>
             [% END %]
         </select>
-        <small style="display: block; margin-left: 150px; color: #666;">CSC can configure any site</small><br>
+        <small style="display: block; margin-left: 150px; color: var(--text-muted-color, #666);">CSC can configure any site</small><br>
     [% ELSE %]
         <input type="text" id="site_id" name="site_id" value="[% current_sitename %]" readonly style="background: #f0f0f0;">
-        <small style="display: block; margin-left: 150px; color: #666;">Your site: [% current_sitename %]</small><br>
+        <small style="display: block; margin-left: 150px; color: var(--text-muted-color, #666);">Your site: [% current_sitename %]</small><br>
     [% END %]
     
     <label for="smtp_host">SMTP Host:</label>
@@ -135,7 +135,7 @@ document.querySelector('form').addEventListener('submit', function(e) {
     input[type="submit"] {
         margin-top: 15px;
         padding: 10px 20px;
-        background: #007bff;
+        background: var(--primary-color, #007bff);
         color: white;
         border: none;
         border-radius: 4px;

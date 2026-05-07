@@ -200,6 +200,9 @@ sub auto :Private {
         # Set up theme using canonical ThemeConfig model with timeout protection
         my $SiteName = $c->stash->{SiteName} || $c->session->{SiteName} || 'default';
 
+        # CSS cache-busting version (Unix timestamp, changes every request forcing fresh CSS)
+        $c->stash->{css_v} = time();
+
         # Determine request domain (host without port) and non-standard port
         my $req_host = $c->req->uri->host;   # strips port already
         my $req_port = $c->req->uri->port;
@@ -220,6 +223,11 @@ sub auto :Private {
             my $bg_raw      = $theme_vars->{'primary-color'} || $theme_vars->{'background-color'} || '#ccffff';
             (my $bg_hex = $bg_raw) =~ s/^#//;
             $c->stash->{favicon_bg_color} = $bg_hex;
+            # Flag whether this theme has a background image so templates can
+            # add the 'has-bg-image' body class, which theme-overrides.css uses
+            # to make all structural containers transparent.
+            my $bg_img = $theme_vars->{'background-image'} || '';
+            $c->stash->{has_bg_image} = ($bg_img && $bg_img ne 'none') ? 1 : 0;
             alarm(0);
         };
         alarm(0);  # Make sure alarm is cancelled
@@ -298,7 +306,7 @@ sub auto :Private {
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
-        
+
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
         $c->stash->{member_pages} = [];
@@ -423,7 +431,72 @@ sub auto :Private {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'auto',
                 "Navigation controller not found - menus will be empty");
         }
-        
+
+        # Load enabled_modules for current SiteName from site_modules table.
+        # Populates $c->stash->{enabled_modules} as a hashref: module_name => 1/0
+        # Templates gate content with: [% IF c.stash.enabled_modules.planning %]
+        eval {
+            my $mod_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+            my %enabled;
+            my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search(
+                { sitename => $mod_site },
+                { columns  => [qw(module_name enabled)] }
+            )->all;
+            for my $row (@site_mods) {
+                $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+            }
+
+            # Apply per-user overrides from user_module_access
+            if ($c->session->{username}) {
+                my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({
+                    username => $c->session->{username},
+                    sitename => $mod_site,
+                })->all;
+                for my $ov (@overrides) {
+                    $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
+                }
+            }
+
+            # Apply per-user service grants from membership_service_access
+            # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
+            if ($c->session->{user_id}) {
+                my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
+                    { name => $mod_site }, { rows => 1 }
+                )->single;
+                if ($svc_site) {
+                    my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
+                        user_id   => $c->session->{user_id},
+                        site_id   => $svc_site->id,
+                        is_active => 1,
+                    })->all;
+                    for my $sg (@svc_grants) {
+                        next if $sg->is_expired;
+                        $enabled{ $sg->service_name } = 1;
+                    }
+                }
+            }
+            $c->stash->{enabled_modules} = \%enabled;
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
+                "enabled_modules load failed (table may not exist yet): $@");
+            $c->stash->{enabled_modules} = {};
+        }
+
+        # Check if current site has active priced inventory items (for Shop nav visibility)
+        eval {
+            my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
+            my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
+                sitename     => $shop_site,
+                status       => 'active',
+                show_in_shop => 1,
+            }, { rows => 1 })->count;
+            $c->stash->{site_has_shop} = $shop_count ? 1 : 0;
+        };
+        if ($@) {
+            $c->stash->{site_has_shop} = 0;
+        }
+
         # CRITICAL: Debug Bar Implementation - DO NOT REMOVE
         # This section provides server information for the debug bar UI
         # which displays hostname, IP, and database connection info to admins/debug mode.
@@ -945,56 +1018,52 @@ sub fetch_and_set {
     }
 
     if (!defined $c->stash->{SiteName}) {
-        if (defined $c->session->{SiteName}) {
-            $c->stash->{SiteName} = $c->session->{SiteName};
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName found in session: " . $c->session->{SiteName});
-        } else {
-            my $domain = $c->req->uri->host;
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
+        my $domain = $c->req->uri->host;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
-            my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
 
-            if ($site_domain) {
-                my $site_id = $site_domain->site_id;
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
+        if ($site_domain) {
+            my $site_id = $site_domain->site_id;
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
-                my $site = $c->model('Site')->get_site_details($c, $site_id);
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            my $site = $c->model('Site')->get_site_details($c, $site_id);
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
 
-                if ($site) {
-                    $value = $site->name;
-                    $c->stash->{SiteName} = $value;
-                    $c->session->{SiteName} = $value;
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
+            if ($site) {
+                $value = $site->name;
+                $c->stash->{SiteName} = $value;
+                $c->session->{SiteName} = $value;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "SiteName set to: $value");
 
-                    # Set ControllerName based on the site's home_view
-                    my $home_view = $site->home_view || 'Root';  # Ensure this is domain-specific
+                my $home_view = $site->home_view || 'Root';
+                my $controller_exists = 0;
+                eval {
+                    my $ctrl = $c->controller($home_view);
+                    $controller_exists = 1 if $ctrl;
+                };
 
-                    # Verify the controller exists before setting it
-                    my $controller_exists = 0;
-                    eval {
-                        my $controller = $c->controller($home_view);
-                        $controller_exists = 1 if $controller;
-                    };
-
-                    if ($controller_exists) {
-                        $c->stash->{ControllerName} = $home_view;
-                        $c->session->{ControllerName} = $home_view;
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
-                    } else {
-                        # If controller doesn't exist, fall back to Root
-                        $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
-                            "Controller '$home_view' not found or not loaded. Falling back to 'Root'.");
-                        $c->stash->{ControllerName} = 'Root';
-                        $c->session->{ControllerName} = 'Root';
-                    }
+                if ($controller_exists) {
+                    $c->stash->{ControllerName} = $home_view;
+                    $c->session->{ControllerName} = $home_view;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "ControllerName set to: $home_view");
+                } else {
+                    $self->logging->log_with_details($c, 'warning', __FILE__, __LINE__, 'fetch_and_set',
+                        "Controller '$home_view' not found. Falling back to 'Root'.");
+                    $c->stash->{ControllerName} = 'Root';
+                    $c->session->{ControllerName} = 'Root';
                 }
+            }
+        } else {
+            if (defined $c->session->{SiteName}) {
+                $c->stash->{SiteName} = $c->session->{SiteName};
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Domain not in DB; using session SiteName: " . $c->session->{SiteName});
             } else {
                 $c->session->{SiteName} = 'none';
                 $c->stash->{SiteName} = 'none';
                 $c->session->{ControllerName} = 'Root';
-                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName and ControllerName to 'none' and 'Root'");
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "No site domain found, defaulting SiteName to 'none'");
             }
         }
     }
@@ -1590,18 +1659,13 @@ sub site_setup {
 
     # Using Catalyst's built-in proxy configuration for URLs without port
     # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
-
-    # Log the configuration for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
 
     # Test the configuration by generating a sample URL
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
 
-    # Add to debug_msg for visibility in templates
-    # Ensure debug_msg is always an array
     $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
-    push @{$c->stash->{debug_msg}}, "Using Catalyst's built-in proxy configuration. Test URL: $test_url";
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
@@ -1719,10 +1783,15 @@ sub site_setup {
 
 sub debug :Path('/debug') {
     my ($self, $c) = @_;
+    unless ($c->stash->{is_admin}) {
+        $c->response->status(403);
+        $c->stash(template => 'error.tt', error_msg => 'Access denied.');
+        return;
+    }
     my $site_name = $c->stash->{SiteName};
     $c->stash(template => 'debug.tt');
     $c->forward($c->view('TT'));
-   $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Completed site_setup action");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'debug', "Admin debug page accessed");
 }
 
 sub accounts :Path('/accounts') :Args(0) {
@@ -1815,6 +1884,12 @@ sub reset_session :Global {
 sub begin :Private {
     my ($self, $c) = @_;
     
+    # Skip all site/session setup for health check endpoints.
+    # Health checks run every 30s from Docker — no DB, no session, no logging needed.
+    if ($c->req->path =~ m{^/health(?:/|$)}) {
+        return;
+    }
+
     # Store request start time for timing analysis
     $c->stash->{_request_start_time} = time();
     $c->stash->{_request_start_hires} = [gettimeofday()];
@@ -1844,10 +1919,48 @@ sub begin :Private {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
+
+    eval {
+        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { status => 'active' },
+            { order_by => 'sitename' }
+        )->all;
+        $c->stash->{nav_hosting_accounts} = \@ha;
+    };
+    if ($@) {
+        $c->stash->{nav_hosting_accounts} = [];
+    }
 }
 
 sub _port_label {
     my ($port) = @_;
+    my %named = (
+        3000 => 'PC',   # ProjectConfig
+        4001 => 'Pl',   # PlanningSystem
+        4002 => 'SM',   # SchemaManagement
+        4003 => 'HA',   # InfrastructureHA
+        4004 => 'WS',   # WorkShops
+        4005 => 'Us',   # Users
+        4006 => 'FM',   # FileManagement
+        4007 => 'Ma',   # UnifiedMail
+        4008 => 'Mb',   # Membership
+        4009 => 'Pt',   # PointSystem
+        4010 => 'AI',   # AIChatSystem
+        4011 => 'Cs',   # CssThemes
+        4012 => 'En',   # ENCY
+        4013 => 'HD',   # HelpDesk
+        4014 => 'Hp',   # HealthPlanning
+        4015 => 'SH',   # ProdServerHealth
+        4016 => 'Sc',   # Security
+        4017 => 'Dc',   # Documentation
+        4018 => 'AP',   # APISystem
+        4019 => 'BM',   # BMaster
+        4020 => 'Ch',   # AIChatPlanInt
+        4021 => 'In',   # InventorySystem
+        4022 => 'DL',   # DevTimeLogging
+        4030 => '3D',   # 3DPrinting
+    );
+    return $named{$port} if exists $named{$port};
     my $s = "$port";
     $s =~ s/0+$// if $s =~ /0+$/;
     if (length($s) > 2) { $s = substr($s, -2) }
@@ -1903,6 +2016,17 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
     $c->response->body($svg);
 }
 
+sub helpdesk_favicon :Path('/favicon/helpdesk') :Args(0) {
+    my ($self, $c) = @_;
+    my $svg = q{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>};
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
 sub site_favicon :Path('/favicon/site') :Args(1) {
     my ($self, $c, $sitename) = @_;
 
@@ -1935,7 +2059,14 @@ sub end : ActionClass('RenderView') {
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
     # show its full error page so developers can see the real stack trace.
-    if (@{$c->error || []} && !$c->response->body && !$c->debug) {
+    #
+    # NOTE: $c->debug is a class method set by the -Debug plugin flag, NOT by
+    # the 'debug' config key.  We therefore also check the config hash and the
+    # CATALYST_DEBUG env var so that CATALYST_DEBUG=1 works without recompiling.
+    my $catalyst_debug = $c->debug || $c->config->{debug} || $ENV{CATALYST_DEBUG} || 0;
+    my $app_debug      = $c->session->{debug_mode} || 0;   # session-level admin debug
+
+    if (@{$c->error || []} && !$c->response->body && !$catalyst_debug) {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
 
@@ -1953,12 +2084,19 @@ sub end : ActionClass('RenderView') {
 
         $c->clear_errors;
         $c->response->status(500);
+
+        # Show the real error text to admins who have session debug_mode on —
+        # production visitors always see the generic friendly message.
+        my $user_msg = $app_debug
+            ? "Application error: $err_text"
+            : 'We encountered an error processing your request. '
+            . 'The system administrator has been notified. '
+            . 'Please try again in a few minutes, or use the Back button.';
+
         $c->stash(
             template    => 'error.tt',
             error_title => 'Temporary Service Issue',
-            error_msg   => 'We encountered an error processing your request. '
-                         . 'The system administrator has been notified. '
-                         . 'Please try again in a few minutes, or use the Back button.',
+            error_msg   => $user_msg,
         );
     }
 

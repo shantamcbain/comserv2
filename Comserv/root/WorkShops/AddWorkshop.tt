@@ -138,6 +138,11 @@
                     </div>
                     
                 </form>
+[% PROCESS 'ai/partials/ai_form_assistant.tt'
+   ai_form_entity_label = 'workshop event'
+   ai_form_context      = 'workshop and event management'
+   ai_form_fields       = 'workshop_name, description, location, start_date, end_date, capacity, instructor'
+%]
             </div>
             
         </div>

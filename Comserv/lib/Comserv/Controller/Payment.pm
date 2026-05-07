@@ -293,7 +293,7 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                     $c->session->{roles} = \@roles;
                 }
 
-                $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+                $c->model('DBEncy')->resultset('Accounting::PaymentTransaction')->create({
                     user_id      => $c->session->{user_id},
                     payable_type => 'membership',
                     payable_id   => $plan->id,
@@ -306,6 +306,28 @@ sub internal_checkout :Path('internal/checkout') :Args(0) {
                         . ($promo ? ' [promo: ' . $promo->code . ']' : ''),
                     ip_address   => $c->req->address,
                 });
+
+                eval {
+                    my $plan_with_item = $c->model('DBEncy')->resultset('MembershipPlan')->find(
+                        $plan->id, { prefetch => 'inventory_item' }
+                    );
+                    if ($plan_with_item && $plan_with_item->inventory_item_id) {
+                        $c->model('DBEncy')->resultset('Accounting::InventoryTransaction')->create({
+                            item_id          => $plan_with_item->inventory_item_id,
+                            sitename         => $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC',
+                            transaction_type => 'sale',
+                            quantity         => 1,
+                            unit_cost        => $final_price,
+                            reference_number => 'MBR-' . $plan->slug . '-' . $c->session->{user_id},
+                            performed_by     => $c->session->{username} || 'system',
+                            notes            => 'Membership subscription: ' . $plan->name
+                                               . ' (' . $billing_cycle . ')'
+                                               . ' user=' . ($c->session->{username} || $c->session->{user_id}),
+                            transaction_date => \'NOW()',
+                            created_at       => \'NOW()',
+                        });
+                    }
+                };
             });
         };
         if ($@) {
@@ -411,7 +433,7 @@ sub balance :Path('balance') :Args(0) {
     my $display  = {};
 
     eval {
-        my $acct = $c->model('DBEncy')->resultset('PointAccount')
+        my $acct = $c->model('DBEncy')->resultset('Accounting::PointAccount')
             ->find({ user_id => $user_id });
         if ($acct) {
             $bal            = $acct->balance + 0;
@@ -457,7 +479,7 @@ sub buy_coins :Path('buy/coins') :Args(0) {
     eval {
         my $ps = Comserv::Util::PointSystem->new(c => $c);
         $balance  = $ps->balance($c->session->{user_id});
-        @packages = $c->model('DBEncy')->resultset('PointPackage')
+        @packages = $c->model('DBEncy')->resultset('Accounting::PointPackage')
             ->search({ is_active => 1 }, { order_by => 'sort_order' })->all;
     };
 
@@ -650,7 +672,7 @@ sub _credit_coins {
 
     if ($tx_id && $provider) {
         my $existing = eval {
-            $c->model('DBEncy')->resultset('PaymentTransaction')->search({
+            $c->model('DBEncy')->resultset('Accounting::PaymentTransaction')->search({
                 provider                => $provider,
                 provider_transaction_id => $tx_id,
             })->first;
@@ -670,7 +692,7 @@ sub _credit_coins {
         description      => $description,
     );
 
-    $c->model('DBEncy')->resultset('PaymentTransaction')->create({
+    $c->model('DBEncy')->resultset('Accounting::PaymentTransaction')->create({
         user_id                 => $user_id,
         payable_type            => 'point_purchase',
         payable_id              => undef,
@@ -772,7 +794,7 @@ sub _activate_paypal_membership {
 
     if ($tx_id) {
         my $existing_tx = eval {
-            $c->model('DBEncy')->resultset('PaymentTransaction')->search({
+            $c->model('DBEncy')->resultset('Accounting::PaymentTransaction')->search({
                 provider                => 'paypal',
                 provider_transaction_id => $tx_id,
                 status                  => 'completed',
@@ -841,7 +863,7 @@ sub _activate_paypal_membership {
             $c->session->{roles} = \@roles;
         }
 
-        $schema->resultset('PaymentTransaction')->create({
+        $schema->resultset('Accounting::PaymentTransaction')->create({
             user_id      => $user_id,
             payable_type => 'membership',
             payable_id   => $plan_id,
@@ -999,7 +1021,7 @@ sub patreon_callback :Path('patreon/callback') :Args(0) {
             ->search({ name => { -like => $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC' } })->single;
 
         $schema->txn_do(sub {
-            my $existing_tx = $schema->resultset('PaymentTransaction')->search({
+            my $existing_tx = $schema->resultset('Accounting::PaymentTransaction')->search({
                 provider                => 'patreon',
                 provider_transaction_id => 'patron-' . $patron_id,
                 status                  => 'completed',
@@ -1057,7 +1079,7 @@ sub patreon_callback :Path('patreon/callback') :Args(0) {
                             $c->session->{roles} = \@roles;
                         }
 
-                        $schema->resultset('PaymentTransaction')->create({
+                        $schema->resultset('Accounting::PaymentTransaction')->create({
                             user_id                 => $user_id,
                             payable_type            => 'membership',
                             payable_id              => $plan->id,
