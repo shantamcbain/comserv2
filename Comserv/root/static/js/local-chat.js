@@ -667,6 +667,7 @@
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<a id="conversations-link" class="chat-header-icon-btn" href="/ai/conversations" title="View all conversations" target="_self">📋 History</a>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="voice-mode-btn" class="chat-header-icon-btn" title="Voice conversation mode — speak to AI, AI speaks back" style="display:none;">🔊</button>' +
                 '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
@@ -1138,6 +1139,139 @@
                     if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
                 });
             });
+        })();
+
+        // ── Voice Conversation Mode ────────────────────────────────────────────
+        // Full hands-free loop: user speaks → auto-sent to AI → AI response read aloud
+        // → listening restarts. Uses Web Speech API (SpeechRecognition + SpeechSynthesis).
+        // SpeechRecognition: Chrome/Edge/Safari. SpeechSynthesis: all browsers.
+        (function() {
+            var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var _hasTTS = !!(window.speechSynthesis);
+            var _voiceBtn = document.getElementById('voice-mode-btn');
+            if (!_voiceBtn) return;
+
+            if (_hasTTS) { _voiceBtn.style.display = ''; }
+
+            var _voiceActive  = false;
+            var _recog        = null;
+            var _ttsSpeaking  = false;
+            var _voiceStatus  = document.getElementById('audio-transcribe-status');
+
+            function _setVoiceStatus(msg) {
+                if (_voiceStatus) { _voiceStatus.textContent = msg; _voiceStatus.style.display = msg ? '' : 'none'; }
+            }
+
+            function _speak(text) {
+                if (!_hasTTS || !_voiceActive) return;
+                window.speechSynthesis.cancel();
+                var clean = text
+                    .replace(/\[ACTION:[^\]]*\]/gi, '')
+                    .replace(/#{1,6}\s*/g, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/`[^`]+`/g, function(m){ return m.replace(/`/g,''); })
+                    .replace(/https?:\/\/\S+/g, '')
+                    .trim();
+                if (!clean) { _startListening(); return; }
+
+                _ttsSpeaking = true;
+                _setVoiceStatus('🔈 Speaking…');
+                var utter = new window.SpeechSynthesisUtterance(clean);
+                utter.lang  = 'en-US';
+                utter.rate  = 1.05;
+                utter.pitch = 1.0;
+                utter.onend = function() {
+                    _ttsSpeaking = false;
+                    if (_voiceActive) { _setVoiceStatus(''); _startListening(); }
+                };
+                utter.onerror = function() {
+                    _ttsSpeaking = false;
+                    if (_voiceActive) { _setVoiceStatus(''); _startListening(); }
+                };
+                window.speechSynthesis.speak(utter);
+            }
+
+            state._speakResponse = _speak;
+
+            function _startListening() {
+                if (!_voiceActive || !_SpeechRec) return;
+                if (_recog) { try { _recog.abort(); } catch(e){} }
+
+                _recog = new _SpeechRec();
+                _recog.lang = 'en-US';
+                _recog.continuous = false;
+                _recog.interimResults = true;
+                _recog.maxAlternatives = 1;
+
+                var _inputEl = document.getElementById('message-input');
+                _setVoiceStatus('👂 Listening… (speak now)');
+
+                _recog.onresult = function(ev) {
+                    var interim = '', final = '';
+                    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+                        var t = ev.results[i][0].transcript;
+                        if (ev.results[i].isFinal) { final += t; } else { interim += t; }
+                    }
+                    if (_inputEl) _inputEl.value = final || interim;
+                };
+
+                _recog.onend = function() {
+                    var txt = _inputEl ? (_inputEl.value || '').trim() : '';
+                    if (txt && _voiceActive) {
+                        _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                        sendMessage();
+                    } else if (_voiceActive) {
+                        _setVoiceStatus('👂 Listening… (nothing heard, trying again)');
+                        setTimeout(_startListening, 800);
+                    }
+                };
+
+                _recog.onerror = function(ev) {
+                    if (ev.error === 'no-speech' && _voiceActive) {
+                        setTimeout(_startListening, 600);
+                    } else if (ev.error !== 'aborted' && _voiceActive) {
+                        _setVoiceStatus('⚠️ Voice recognition error: ' + ev.error);
+                        setTimeout(_startListening, 2000);
+                    }
+                };
+
+                try { _recog.start(); } catch(e) {}
+            }
+
+            function _stopVoiceMode() {
+                _voiceActive = false;
+                window.speechSynthesis.cancel();
+                if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
+                _voiceBtn.textContent = '🔊';
+                _voiceBtn.style.background = '';
+                _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
+                _setVoiceStatus('');
+            }
+
+            _voiceBtn.addEventListener('click', function() {
+                if (_voiceActive) {
+                    _stopVoiceMode();
+                    return;
+                }
+                if (!_SpeechRec) {
+                    alert('Your browser does not support speech recognition.\nVoice input works in Chrome, Edge, and Safari.\n\nText-to-speech (AI reading responses aloud) still works — just enable it below.');
+                    if (!_hasTTS) return;
+                }
+                _voiceActive = true;
+                _voiceBtn.textContent = '🔇';
+                _voiceBtn.style.background = '#d0ffd0';
+                _voiceBtn.title = 'Voice mode ON — click to stop';
+                if (_SpeechRec) {
+                    _startListening();
+                } else {
+                    _setVoiceStatus('🔈 TTS-only mode: AI will speak responses. Type to send.');
+                }
+            });
+
+            document.getElementById('close-chat').addEventListener('click', function() {
+                if (_voiceActive) _stopVoiceMode();
+            }, true);
         })();
 
         document.getElementById('ai-provider').addEventListener('change', function(e) {
@@ -2426,6 +2560,9 @@
                 const _needsSupport = _detectSupportNeeded(_rawClean);
                 const cleanText = _stripSupportTag(_rawClean);
                 addMessage(cleanText, 'ai-message');
+
+                // Voice mode: read the AI response aloud, then restart listening
+                if (state._speakResponse) { state._speakResponse(cleanText); }
 
                 if (_needsSupport && !state.supportMode) {
                     _showEscalationButtons();
