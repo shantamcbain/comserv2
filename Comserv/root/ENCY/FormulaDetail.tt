@@ -142,6 +142,19 @@
         <td><strong>Notes</strong></td>
         <td>[% IF edit_mode %]<textarea name="notes" rows="3" cols="70">[% formula.notes | html %]</textarea>[% ELSE %][% formula.notes | html %][% END %]</td>
     </tr>
+    [% IF is_editor || formula.comments %]
+    <tr>
+        <td><strong>Editor Comments</strong></td>
+        <td>
+            [% IF edit_mode %]
+            <textarea name="comments" rows="3" cols="70" placeholder="Internal notes for editors — not visible to the public.">[% formula.comments | html %]</textarea>
+            <div style="font-size:0.78em;color:#777;">Editor-only field. Use for workflow notes, sourcing questions, verification status, etc.</div>
+            [% ELSIF formula.comments %]
+            <div style="background:#fffbe6;border:1px solid #e0c040;padding:0.4em 0.7em;border-radius:4px;font-size:0.9em;">[% formula.comments | html %]</div>
+            [% END %]
+        </td>
+    </tr>
+    [% END %]
     <tr>
         <td><strong>Reference</strong></td>
         <td>[% IF edit_mode %]<textarea name="reference" rows="2" cols="70">[% formula.reference | html %]</textarea>[% ELSE %][% formula.reference | html %][% END %]</td>

@@ -3077,6 +3077,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             dosage             => $c->request->param('dosage')             || undef,
             administration     => $c->request->param('administration')     || undef,
             notes              => $c->request->param('notes')              || undef,
+            comments           => $c->request->param('comments')          || undef,
             reference          => $c->request->param('reference')          || undef,
             url                => $c->request->param('url')                || undef,
             image              => $c->request->param('image')              || undef,
@@ -3101,11 +3102,12 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
         return;
     }
     $c->stash(
-        formula   => {},
-        edit_mode => 1,
-        is_admin  => $is_admin,
-        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
-        template  => 'ENCY/FormulaDetail.tt',
+        formula        => {},
+        edit_mode      => 1,
+        is_admin       => $is_admin,
+        is_editor      => $is_editor,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
+        template       => 'ENCY/FormulaDetail.tt',
     );
 }
 
@@ -3135,6 +3137,7 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
             dosage             => $c->request->param('dosage')             || undef,
             administration     => $c->request->param('administration')     || undef,
             notes              => $c->request->param('notes')              || undef,
+            comments           => $c->request->param('comments')          || undef,
             reference          => $c->request->param('reference')          || undef,
             url                => $c->request->param('url')                || undef,
             image              => $c->request->param('image')              || undef,
@@ -3158,13 +3161,14 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
         return;
     }
     $c->stash(
-        formula       => $formula,
-        herb_links    => $herb_links,
-        disease_links => $disease_links,
-        edit_mode     => 1,
-        is_admin      => $is_admin,
-        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
-        template      => 'ENCY/FormulaDetail.tt',
+        formula        => $formula,
+        herb_links     => $herb_links,
+        disease_links  => $disease_links,
+        edit_mode      => 1,
+        is_admin       => $is_admin,
+        is_editor      => $is_editor,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
+        template       => 'ENCY/FormulaDetail.tt',
     );
 }
 
