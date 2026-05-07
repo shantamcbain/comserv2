@@ -1,0 +1,20 @@
+{
+  "name": "Shanta — Comserv Platform",
+  "short_name": "Shanta",
+  "description": "Comserv integrated platform — AI assistant, inventory, accounting, apiary management",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#1565c0",
+  "icons": [
+    {
+      "src": "/favicon/site/Shanta",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "business"],
+  "lang": "en-CA"
+}

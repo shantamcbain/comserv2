@@ -1143,20 +1143,41 @@
 
         // ── Voice Conversation Mode ────────────────────────────────────────────
         // Full hands-free loop: user speaks → auto-sent to AI → AI response read aloud
-        // → listening restarts. Uses Web Speech API (SpeechRecognition + SpeechSynthesis).
-        // SpeechRecognition: Chrome/Edge/Safari. SpeechSynthesis: all browsers.
+        // → listening restarts.
+        //
+        // STT strategy (in priority order):
+        //   1. Web Speech API  — Chrome/Edge/Safari (streaming, instant)
+        //   2. VAD + Whisper   — Firefox and any browser without SpeechRecognition
+        //                        Uses AudioContext to detect speech, records via
+        //                        MediaRecorder, uploads to /ai/transcribe (our server).
+        //                        No audio leaves to third-party servers. 1-3s delay.
+        // TTS: speechSynthesis — all browsers.
         (function() {
             var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
-            var _hasTTS = !!(window.speechSynthesis);
-            var _voiceBtn = document.getElementById('voice-mode-btn');
+            var _hasTTS    = !!(window.speechSynthesis);
+            var _hasVAD    = !!(window.AudioContext || window.webkitAudioContext) && !!(window.MediaRecorder) && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            var _voiceBtn  = document.getElementById('voice-mode-btn');
             if (!_voiceBtn) return;
 
-            if (_hasTTS) { _voiceBtn.style.display = ''; }
+            if (_hasTTS || _SpeechRec || _hasVAD) { _voiceBtn.style.display = ''; }
 
-            var _voiceActive  = false;
-            var _recog        = null;
-            var _ttsSpeaking  = false;
-            var _voiceStatus  = document.getElementById('audio-transcribe-status');
+            var _voiceActive = false;
+            var _recog       = null;
+            var _ttsSpeaking = false;
+            var _voiceStatus = document.getElementById('audio-transcribe-status');
+
+            var _vadStream   = null;
+            var _vadCtx      = null;
+            var _vadRec      = null;
+            var _vadChunks   = [];
+            var _vadSpeaking = false;
+            var _vadSilTimer = null;
+            var _vadRafId    = null;
+
+            var VAD_SPEAK_THRESH  = 18;
+            var VAD_SILENCE_MS    = 1400;
+            var VAD_MIN_SPEECH_MS = 300;
+            var _vadSpeakStart    = 0;
 
             function _setVoiceStatus(msg) {
                 if (_voiceStatus) { _voiceStatus.textContent = msg; _voiceStatus.style.display = msg ? '' : 'none'; }
@@ -1174,48 +1195,138 @@
                     .replace(/https?:\/\/\S+/g, '')
                     .trim();
                 if (!clean) { _startListening(); return; }
-
                 _ttsSpeaking = true;
                 _setVoiceStatus('🔈 Speaking…');
                 var utter = new window.SpeechSynthesisUtterance(clean);
                 utter.lang  = 'en-US';
                 utter.rate  = 1.05;
                 utter.pitch = 1.0;
-                utter.onend = function() {
-                    _ttsSpeaking = false;
-                    if (_voiceActive) { _setVoiceStatus(''); _startListening(); }
-                };
-                utter.onerror = function() {
-                    _ttsSpeaking = false;
-                    if (_voiceActive) { _setVoiceStatus(''); _startListening(); }
-                };
+                utter.onend  = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
+                utter.onerror = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
                 window.speechSynthesis.speak(utter);
             }
 
             state._speakResponse = _speak;
 
-            function _startListening() {
-                if (!_voiceActive || !_SpeechRec) return;
-                if (_recog) { try { _recog.abort(); } catch(e){} }
+            function _stopVAD() {
+                if (_vadRafId) { cancelAnimationFrame(_vadRafId); _vadRafId = null; }
+                if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                if (_vadRec && _vadRec.state !== 'inactive') { try { _vadRec.stop(); } catch(e){} }
+                if (_vadStream) { _vadStream.getTracks().forEach(function(t){ t.stop(); }); _vadStream = null; }
+                if (_vadCtx) { try { _vadCtx.close(); } catch(e){} _vadCtx = null; }
+                _vadRec = null; _vadChunks = []; _vadSpeaking = false;
+            }
 
+            function _uploadVADBlob(blob) {
+                if (!blob || blob.size < 1000) { _startListening(); return; }
+                _setVoiceStatus('⏳ Transcribing speech…');
+                var ext = (blob.type.indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                var file = new File([blob], 'voice.' + ext, { type: blob.type });
+                var fd = new FormData();
+                fd.append('audio', file, file.name);
+                fd.append('diarize', '0');
+                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                .then(function(r){ return r.json(); })
+                .then(function(data) {
+                    if (!_voiceActive) return;
+                    var txt = (data.transcript || '').trim();
+                    if (!txt) { _setVoiceStatus('👂 Nothing heard — listening…'); _startListening(); return; }
+                    var inputEl = document.getElementById('message-input');
+                    if (inputEl) inputEl.value = txt;
+                    _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                    sendMessage();
+                })
+                .catch(function() {
+                    if (_voiceActive) { _setVoiceStatus('⚠️ Transcription failed — retrying…'); setTimeout(_startListening, 1500); }
+                });
+            }
+
+            function _startVAD() {
+                if (!_voiceActive) return;
+                _setVoiceStatus('👂 Listening… (speak now)');
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    if (!_voiceActive) { stream.getTracks().forEach(function(t){ t.stop(); }); return; }
+                    _vadStream  = stream;
+                    _vadChunks  = [];
+                    _vadSpeaking = false;
+                    var ACtx = window.AudioContext || window.webkitAudioContext;
+                    _vadCtx = new ACtx();
+                    var source   = _vadCtx.createMediaStreamSource(stream);
+                    var analyser = _vadCtx.createAnalyser();
+                    analyser.fftSize = 512;
+                    source.connect(analyser);
+                    var buf = new Uint8Array(analyser.fftSize);
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                    _vadRec.ondataavailable = function(ev) { if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                    _vadRec.onstop = function() {
+                        var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' });
+                        _vadChunks = [];
+                        _uploadVADBlob(blob);
+                    };
+                    function _tick() {
+                        if (!_voiceActive) { _stopVAD(); return; }
+                        analyser.getByteTimeDomainData(buf);
+                        var rms = 0;
+                        for (var i = 0; i < buf.length; i++) { var d = (buf[i] - 128); rms += d * d; }
+                        rms = Math.sqrt(rms / buf.length);
+                        if (rms > VAD_SPEAK_THRESH) {
+                            if (!_vadSpeaking) {
+                                _vadSpeaking = true;
+                                _vadSpeakStart = Date.now();
+                                _vadChunks = [];
+                                _vadRec.start(100);
+                                _setVoiceStatus('🔴 Recording…');
+                            }
+                            if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                        } else if (_vadSpeaking) {
+                            if (!_vadSilTimer) {
+                                _vadSilTimer = setTimeout(function() {
+                                    _vadSilTimer = null;
+                                    if (!_vadSpeaking) return;
+                                    _vadSpeaking = false;
+                                    var dur = Date.now() - _vadSpeakStart;
+                                    if (dur < VAD_MIN_SPEECH_MS) {
+                                        _vadRec.stop();
+                                        _vadChunks = [];
+                                        _setVoiceStatus('👂 Listening… (speak now)');
+                                        _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                                        _vadRec.ondataavailable = function(ev){ if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                                        _vadRec.onstop = function(){ var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' }); _vadChunks = []; _uploadVADBlob(blob); };
+                                    } else {
+                                        _vadRec.stop();
+                                    }
+                                }, VAD_SILENCE_MS);
+                            }
+                        }
+                        _vadRafId = requestAnimationFrame(_tick);
+                    }
+                    _vadRafId = requestAnimationFrame(_tick);
+                }).catch(function(err) {
+                    _setVoiceStatus('⚠️ Microphone access denied: ' + err.message);
+                });
+            }
+
+            function _startSpeechRec() {
+                if (!_voiceActive) return;
+                if (_recog) { try { _recog.abort(); } catch(e){} }
                 _recog = new _SpeechRec();
                 _recog.lang = 'en-US';
                 _recog.continuous = false;
                 _recog.interimResults = true;
                 _recog.maxAlternatives = 1;
-
                 var _inputEl = document.getElementById('message-input');
                 _setVoiceStatus('👂 Listening… (speak now)');
-
                 _recog.onresult = function(ev) {
-                    var interim = '', final = '';
+                    var interim = '', fin = '';
                     for (var i = ev.resultIndex; i < ev.results.length; i++) {
                         var t = ev.results[i][0].transcript;
-                        if (ev.results[i].isFinal) { final += t; } else { interim += t; }
+                        if (ev.results[i].isFinal) { fin += t; } else { interim += t; }
                     }
-                    if (_inputEl) _inputEl.value = final || interim;
+                    if (_inputEl) _inputEl.value = fin || interim;
                 };
-
                 _recog.onend = function() {
                     var txt = _inputEl ? (_inputEl.value || '').trim() : '';
                     if (txt && _voiceActive) {
@@ -1223,26 +1334,29 @@
                         sendMessage();
                     } else if (_voiceActive) {
                         _setVoiceStatus('👂 Listening… (nothing heard, trying again)');
-                        setTimeout(_startListening, 800);
+                        setTimeout(_startSpeechRec, 800);
                     }
                 };
-
                 _recog.onerror = function(ev) {
-                    if (ev.error === 'no-speech' && _voiceActive) {
-                        setTimeout(_startListening, 600);
-                    } else if (ev.error !== 'aborted' && _voiceActive) {
+                    if (ev.error === 'no-speech' && _voiceActive) { setTimeout(_startSpeechRec, 600); }
+                    else if (ev.error !== 'aborted' && _voiceActive) {
                         _setVoiceStatus('⚠️ Voice recognition error: ' + ev.error);
-                        setTimeout(_startListening, 2000);
+                        setTimeout(_startSpeechRec, 2000);
                     }
                 };
-
                 try { _recog.start(); } catch(e) {}
+            }
+
+            function _startListening() {
+                if (!_voiceActive) return;
+                if (_SpeechRec) { _startSpeechRec(); } else { _startVAD(); }
             }
 
             function _stopVoiceMode() {
                 _voiceActive = false;
                 window.speechSynthesis.cancel();
                 if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
+                _stopVAD();
                 _voiceBtn.textContent = '🔊';
                 _voiceBtn.style.background = '';
                 _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
@@ -1250,23 +1364,15 @@
             }
 
             _voiceBtn.addEventListener('click', function() {
-                if (_voiceActive) {
-                    _stopVoiceMode();
-                    return;
-                }
-                if (!_SpeechRec) {
-                    alert('Your browser does not support speech recognition.\nVoice input works in Chrome, Edge, and Safari.\n\nText-to-speech (AI reading responses aloud) still works — just enable it below.');
-                    if (!_hasTTS) return;
+                if (_voiceActive) { _stopVoiceMode(); return; }
+                if (!_SpeechRec && !_hasVAD) {
+                    if (!_hasTTS) { alert('Your browser does not support voice features. Please use Chrome, Edge, Safari, or Firefox.'); return; }
                 }
                 _voiceActive = true;
                 _voiceBtn.textContent = '🔇';
                 _voiceBtn.style.background = '#d0ffd0';
                 _voiceBtn.title = 'Voice mode ON — click to stop';
-                if (_SpeechRec) {
-                    _startListening();
-                } else {
-                    _setVoiceStatus('🔈 TTS-only mode: AI will speak responses. Type to send.');
-                }
+                _startListening();
             });
 
             document.getElementById('close-chat').addEventListener('click', function() {
