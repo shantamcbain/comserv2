@@ -567,6 +567,10 @@
                            style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                         <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
                            style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
+                        [% IF is_admin && ap.subject.match('(?i)docker') %]
+                        <button onclick="openDeployPopup([% ap.record_id %])"
+                            style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #005a8e;border-radius:3px;background:transparent;color:#005a8e;cursor:pointer;margin-bottom:4px;" title="Log time + run Docker deploy">🐳 Deploy</button>
+                        [% END %]
                         [% IF is_admin %]
                         <button onclick="quickClose([% ap.record_id %])"
                             style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
@@ -1686,35 +1690,26 @@ function dailyLogAction(action) {
     });
 }
 
-function openDeployPopup() {
+function openDeployPopup(todoId) {
+    var url = '/admin/docker/deploy_form';
+    if (todoId) { url += '?todo_record_id=' + encodeURIComponent(todoId); }
     var popup = window.open(
-        '/admin/docker/deploy_form',
+        url,
         'docker_deploy',
         'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
     );
     if (popup) {
         popup.focus();
-        var feedback = document.getElementById('dl-feedback');
-        if (feedback) {
-            feedback.textContent = '🐳 Deploy popup opened';
-            feedback.style.color = '#005a8e';
-        }
         window.addEventListener('message', function onMsg(e) {
             if (e.data && e.data.type === 'deploy_done') {
-                var feedback = document.getElementById('dl-feedback');
-                if (feedback) {
-                    feedback.textContent = e.data.success ? '✅ Deploy complete' : '⚠ Deploy had errors';
-                    feedback.style.color = e.data.success ? '#2a7a2a' : '#9b0000';
-                }
                 window.removeEventListener('message', onMsg);
+                var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                alert(msg);
+                location.reload();
             }
         });
     } else {
-        var feedback = document.getElementById('dl-feedback');
-        if (feedback) {
-            feedback.textContent = '⚠ Popup blocked — allow popups for this site';
-            feedback.style.color = '#9b0000';
-        }
+        alert('⚠ Popup blocked — allow popups for this site and try again.');
     }
 }
 
