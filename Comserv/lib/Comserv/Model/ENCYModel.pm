@@ -478,7 +478,11 @@ sub update_disease {
 
 sub get_disease_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Ency::Disease')->find($id);
+    my $record = eval { $self->ency_schema->resultset('Ency::Disease')->find($id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_disease_by_id', "DB error fetching disease $id: $@");
+        return undef;
+    }
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_disease_by_id', "Disease with ID $id fetched successfully.");
     } else {
