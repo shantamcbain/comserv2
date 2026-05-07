@@ -870,6 +870,7 @@
             let dragging = false, startX, startY, origLeft, origBottom, origTop, origRight;
 
             handle.addEventListener('mousedown', function(e) {
+                if (window.innerWidth <= 600) return;
                 e.preventDefault();
                 dragging = true;
                 startX = e.clientX;
@@ -904,6 +905,7 @@
 
             // Touch support
             handle.addEventListener('touchstart', function(e) {
+                if (window.innerWidth <= 600) return;
                 const t = e.touches[0];
                 startX = t.clientX; startY = t.clientY;
                 const rect = chatPanel.getBoundingClientRect();
