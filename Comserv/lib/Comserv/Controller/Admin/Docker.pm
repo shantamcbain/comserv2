@@ -96,24 +96,32 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         $log_id = $entry->id;
     };
 
-    my $repo_path = '/home/shanta/PycharmProjects/comserv2';
+    my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
+    my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
     my @lines;
     my $success = 1;
 
     my $t0 = time();
     push @lines, "[${\scalar localtime}] === git pull ===";
-    my $git_out   = `cd '$repo_path' && git pull 2>&1`;
-    my $git_exit  = $? >> 8;
+    my $git_out  = `cd '$repo_path' && git pull 2>&1`;
+    my $git_exit = $? >> 8;
     push @lines, $git_out;
     push @lines, "git pull exited with code $git_exit" if $git_exit;
     $success = 0 if $git_exit;
 
-    push @lines, "[${\scalar localtime}] === docker restart comserv-web-prod ===";
-    my $docker_out  = `docker restart comserv-web-prod 2>&1`;
-    my $docker_exit = $? >> 8;
-    push @lines, $docker_out;
-    push @lines, "docker restart exited with code $docker_exit" if $docker_exit;
-    $success = 0 if $docker_exit;
+    push @lines, "[${\scalar localtime}] === docker compose down + up (new container) ===";
+    my $docker_result = $c->model('Docker')->restart_containers(
+        services     => ['web-prod'],
+        force        => 1,
+        compose_file => $compose_file,
+    );
+    push @lines, $docker_result->{stdout} if $docker_result->{stdout};
+    push @lines, $docker_result->{stderr} if $docker_result->{stderr};
+    push @lines, "command: " . ($docker_result->{command} || 'n/a');
+    unless ($docker_result->{success}) {
+        $success = 0;
+        push @lines, "docker compose exited with errors";
+    }
 
     my $elapsed = time() - $t0;
     push @lines, "[${\scalar localtime}] Done in ${elapsed}s — " . ($success ? 'SUCCESS' : 'ERRORS DETECTED');
