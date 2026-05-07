@@ -140,6 +140,60 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
     }));
 }
 
+sub init_log :Path('/admin/docker/init_log') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, message => 'POST required' }));
+        return;
+    }
+
+    my $now            = DateTime->now(time_zone => 'local');
+    my $today          = $now->ymd;
+    my $now_time       = $now->hms;
+    my $username       = $c->session->{username} || 'system';
+    my $sitename       = $c->session->{SiteName} || 'CSC';
+    my $todo_record_id = $c->req->body_params->{todo_record_id} || 0;
+    my $title          = "\x{1F433} Docker Hub Deploy $today ${\$now->hms('.')}";
+
+    my $log_id;
+    eval {
+        my %log_fields = (
+            abstract        => $title,
+            username        => $username,
+            sitename        => $sitename,
+            start_date      => $today,
+            start_time      => $now_time,
+            end_time        => $now_time,
+            time            => '00:00:00',
+            status          => 1,
+            priority        => 3,
+            group_of_poster => 'admin',
+            last_mod_by     => $username,
+            details         => 'Hub deploy in progress\x{2026}',
+        );
+        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
+        my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
+        $log_id = $entry->id;
+    };
+
+    if ($@) {
+        $c->response->body(encode_json({ success => 0, message => "Log creation failed: $@" }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => 1, log_id => $log_id, title => $title }));
+}
+
 sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
     my ($self, $c) = @_;
 

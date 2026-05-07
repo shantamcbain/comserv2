@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>🐳 Docker Deploy</title>
+<title>🐳 Docker Hub Deploy</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: monospace; background: #0d1117; color: #c9d1d9; min-height: 100vh; display: flex; flex-direction: column; }
@@ -31,11 +31,11 @@
 <body>
 
 <div id="header">
-  <h1>🐳 Docker Deploy</h1>
-  <span id="status-badge" class="running"><span id="spinner"></span> Running…</span>
+  <h1>🐳 Docker Hub Deploy</h1>
+  <span id="status-badge" class="running"><span id="spinner"></span> Starting…</span>
 </div>
 
-<pre id="console"><span class="info">Connecting to deploy endpoint…</span>
+<pre id="console"><span class="info">Initialising deploy log…</span>
 </pre>
 
 <div id="footer">
@@ -45,13 +45,15 @@
 </div>
 
 <script>
-var logId    = null;
-var logOutput = '';
-var baseUrl  = window.location.origin;
-var todoRecordId = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
+var logId         = null;
+var logOutput     = '';
+var todoRecordId  = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
+var pollingTimer  = null;
+var lastContent   = '';
+
+var con = document.getElementById('console');
 
 function appendLine(text, cls) {
-    var con = document.getElementById('console');
     if (cls) {
         var span = document.createElement('span');
         span.className = cls;
@@ -61,82 +63,135 @@ function appendLine(text, cls) {
         con.appendChild(document.createTextNode(text + '\n'));
     }
     con.scrollTop = con.scrollHeight;
+    logOutput += text + '\n';
 }
 
 function setStatus(state, text) {
     var badge = document.getElementById('status-badge');
-    var spinner = document.getElementById('spinner');
     badge.className = 'status-badge ' + state;
-    badge.innerHTML = (state === 'running' ? '<span id="spinner"></span> ' : '') + text;
     badge.id = 'status-badge';
+    badge.innerHTML = (state === 'running' ? '<span id="spinner"></span> ' : '') + text;
+}
+
+function safeFetch(url, options) {
+    var opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
+    return fetch(url, opts).then(function(response) {
+        if (response.type === 'opaqueredirect' || response.status === 0 ||
+            (response.status >= 300 && response.status < 400)) {
+            appendLine('✗ Session expired — reload and log in again.', 'err');
+            return Promise.reject(new Error('session-expired'));
+        }
+        if (!response.ok) {
+            appendLine('✗ Server error (HTTP ' + response.status + ')', 'err');
+            return Promise.reject(new Error('HTTP ' + response.status));
+        }
+        return response;
+    });
+}
+
+function startPolling() {
+    if (pollingTimer) clearInterval(pollingTimer);
+    lastContent = '';
+    pollingTimer = setInterval(function() {
+        safeFetch('/admin/docker-deploy-status')
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    if (data.output && data.output !== lastContent) {
+                        var newContent = data.output.substring(lastContent.length);
+                        if (newContent) {
+                            con.appendChild(document.createTextNode(newContent));
+                            con.scrollTop = con.scrollHeight;
+                            logOutput += newContent;
+                            lastContent = data.output;
+                        }
+                    }
+                    if (!data.is_running) {
+                        clearInterval(pollingTimer);
+                        pollingTimer = null;
+                        appendLine('', null);
+                        appendLine('='.repeat(60), 'ok');
+                        appendLine('✅ DEPLOYMENT FINISHED', 'ok');
+                        appendLine('='.repeat(60), 'ok');
+                        setStatus('success', '✅ Done');
+                        document.getElementById('btn-close').disabled = false;
+                        if (logId) {
+                            document.getElementById('btn-view').href = '/log/' + logId;
+                        }
+                        if (window.opener && window.opener.postMessage) {
+                            window.opener.postMessage({ type: 'deploy_done', success: 1 }, '*');
+                        }
+                        alert('✅ Docker Hub deploy complete — review log and close the window to save.');
+                    }
+                }
+            })
+            .catch(function(e) {
+                if (e.message !== 'session-expired') {
+                    appendLine('Polling error: ' + e.message, 'err');
+                }
+            });
+    }, 1000);
 }
 
 window.addEventListener('load', function() {
-    appendLine('[' + new Date().toLocaleTimeString() + '] Starting deploy…', 'info');
-
-    fetch(baseUrl + '/admin/docker/deploy', {
+    safeFetch('/admin/docker/init_log', {
         method: 'POST',
-        credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: todoRecordId ? 'todo_record_id=' + encodeURIComponent(todoRecordId) : ''
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        logId     = d.log_id;
-        logOutput = d.output || '';
-
-        if (d.output) {
-            var lines = d.output.split('\n');
-            for (var i = 0; i < lines.length; i++) {
-                var l = lines[i];
-                var cls = l.match(/error|fail|ERRORS/i) ? 'err'
-                        : l.match(/^\[.*\] ===/) ? 'info'
-                        : l.match(/SUCCESS|Already up|up-to-date/i) ? 'ok'
-                        : null;
-                appendLine(l, cls);
+        if (!d.success) {
+            appendLine('⚠ Log creation failed: ' + (d.message || 'unknown'), 'err');
+        } else {
+            logId = d.log_id;
+            if (logId) {
+                document.getElementById('btn-view').href = '/log/' + logId;
             }
         }
+        appendLine('[' + new Date().toLocaleTimeString() + '] Log created — starting Hub deploy…', 'info');
+        setStatus('running', 'Deploying…');
 
-        if (d.success) {
-            setStatus('success', '✅ Success');
-            appendLine('', null);
-            appendLine('Deploy completed successfully. Add notes if needed, then close the log.', 'ok');
+        return safeFetch('/admin/docker-deploy-to-production', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: ''
+        });
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        if (data.success) {
+            appendLine('Background deploy process started.', 'ok');
+            appendLine('Streaming output…', 'info');
+            startPolling();
         } else {
-            setStatus('error', '❌ Errors detected');
-            appendLine('', null);
-            appendLine('Deploy finished with errors. Review output above.', 'err');
-        }
-
-        var closeBtn = document.getElementById('btn-close');
-        if (closeBtn) closeBtn.disabled = false;
-
-        if (logId) {
-            var viewBtn = document.getElementById('btn-view');
-            if (viewBtn) viewBtn.href = baseUrl + '/log/' + logId;
-        }
-
-        if (window.opener && window.opener.postMessage) {
-            window.opener.postMessage({ type: 'deploy_done', success: d.success ? 1 : 0 }, '*');
+            appendLine('❌ Failed to start deploy: ' + (data.error || 'unknown error'), 'err');
+            setStatus('error', '❌ Failed');
+            document.getElementById('btn-close').disabled = false;
+            if (window.opener && window.opener.postMessage) {
+                window.opener.postMessage({ type: 'deploy_done', success: 0 }, '*');
+            }
+            alert('⚠️ Docker Hub deploy failed to start — review output for details.');
         }
     })
     .catch(function(e) {
-        setStatus('error', '❌ Request failed');
-        appendLine('Error: ' + e.message, 'err');
-        var closeBtn = document.getElementById('btn-close');
-        if (closeBtn) closeBtn.disabled = false;
+        if (e.message !== 'session-expired') {
+            setStatus('error', '❌ Error');
+            document.getElementById('btn-close').disabled = false;
+        }
     });
 });
 
 function closeLog() {
-    var notes   = (document.getElementById('notes') || {}).value || '';
+    var notes    = (document.getElementById('notes') || {}).value || '';
     var closeBtn = document.getElementById('btn-close');
     if (closeBtn) { closeBtn.disabled = true; closeBtn.textContent = 'Saving…'; }
 
-    var body = 'log_id=' + encodeURIComponent(logId || '')
+    var body = 'log_id='  + encodeURIComponent(logId || '')
              + '&output=' + encodeURIComponent(logOutput)
              + '&notes='  + encodeURIComponent(notes);
 
-    fetch(baseUrl + '/admin/docker/close_deploy_log', {
+    fetch('/admin/docker/close_deploy_log', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -159,7 +214,7 @@ window.addEventListener('beforeunload', function() {
     if (logId) {
         var notes = (document.getElementById('notes') || {}).value || '';
         navigator.sendBeacon(
-            baseUrl + '/admin/docker/close_deploy_log',
+            '/admin/docker/close_deploy_log',
             new URLSearchParams({ log_id: logId, output: logOutput, notes: notes })
         );
     }
