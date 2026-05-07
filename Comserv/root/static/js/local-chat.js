@@ -733,7 +733,7 @@
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
             '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
             '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
-            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
+            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -1068,8 +1068,16 @@
         (function _initMicRecorder() {
             var micBtn = document.getElementById('mic-record-btn');
             if (!micBtn) return;
-            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-            micBtn.style.display = '';
+            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                micBtn.addEventListener('click', function() {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    var msg = window.isSecureContext === false
+                        ? '⚠️ Microphone requires HTTPS. Use the 📂 button to upload a saved audio file instead.'
+                        : '⚠️ Microphone recording is not available in this browser. Use the 📂 button to upload a saved audio file instead.';
+                    if (_statusEl) { _statusEl.textContent = msg; _statusEl.style.display = ''; }
+                });
+                return;
+            }
 
             var _mediaRec   = null;
             var _chunks     = [];
