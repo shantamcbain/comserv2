@@ -1853,10 +1853,12 @@ sub quick_close :Path('quick_close') :Args(0) {
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
         die "Todo not found\n" unless $todo;
 
+        my $close_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
         $todo->update({
-            status       => 3,
-            last_mod_by  => $username,
+            status        => 3,
+            last_mod_by   => $username,
             last_mod_date => $today,
+            time_of_day   => $close_time,
         });
 
         my $proj_code = '';

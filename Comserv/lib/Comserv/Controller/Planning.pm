@@ -834,29 +834,103 @@ sub _run_audit_scan {
         };
 
         if ($existing_audit) {
-            $todo_created = 0;
-            my $root_id = $existing_audit->record_id;
-            my $ollama;
-            eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
-            for my $sub (sort keys %groups) {
-                my $safe_sub = $sub;
-                $safe_sub =~ s/[%_]/\\$&/g;
-                my $open_exists;
-                eval {
-                    $open_exists = $schema->resultset('Todo')->search(
-                        { parent_id  => $root_id,
-                          subject    => { -like => "%$safe_sub%" },
-                          start_date => $today,
-                          status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
-                        { rows => 1 }
-                    )->first;
-                };
-                next if $open_exists;
-                my @entries = @{ $groups{$sub} };
-                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
-                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
-                push @subjects, $ai_subject if $ai_subject;
-                $todo_created++ if $ai_subject;
+            my $root_st = $existing_audit->status // 0;
+            my $root_closed = ($root_st == 3 || $root_st =~ /^(done|completed|closed)$/i);
+
+            if ($root_closed) {
+                my $close_date = $existing_audit->last_mod_date || $today;
+                my $close_tod  = $existing_audit->time_of_day   || '23:59:59';
+                my $cutoff = $close_date . ' ' . $close_tod;
+                my %new_groups;
+                for my $sub (keys %groups) {
+                    my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                    $new_groups{$sub} = \@newer if @newer;
+                }
+                if (keys %new_groups) {
+                    my $ollama;
+                    eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                    my $new_error_count = scalar keys %new_groups;
+                    my $root_desc = "=== Audit Refresh - $today ===\n\n"
+                        . "Found $new_error_count area(s) with new errors since previous audit was closed.\n"
+                        . "Each sub-todo below was created from the system error log.\n"
+                        . "Resolve each sub-todo to clear this audit.";
+                    my $root_todo;
+                    eval {
+                        $root_todo = $schema->resultset('Todo')->create({
+                            subject             => "\x{26A0}\x{FE0F} Morning Audit: $new_error_count area(s) need review ($today)",
+                            description         => $root_desc,
+                            status              => 1,
+                            priority            => 1,
+                            is_blocking         => 1,
+                            sitename            => $sitename,
+                            developer           => $username,
+                            username_of_poster  => $username,
+                            user_id             => $admin_user_id,
+                            project_id          => $system_project_id,
+                            last_mod_by         => $username,
+                            last_mod_date       => $today,
+                            date_time_posted    => $today . ' 00:00:00',
+                            start_date          => $today,
+                            due_date            => $today,
+                            parent_todo         => '',
+                            estimated_man_hours => 0,
+                            accumulative_time   => '00:00:00',
+                            group_of_poster     => 'admin',
+                            project_code        => 'PLANNING',
+                            share               => 0,
+                        });
+                    };
+                    if ($root_todo && !$@) {
+                        $todo_created = 1;
+                        my $root_id = $root_todo->record_id;
+                        for my $sub (sort keys %new_groups) {
+                            my @entries = @{ $new_groups{$sub} };
+                            my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                                $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                            push @subjects, $ai_subject if $ai_subject;
+                        }
+                    }
+                }
+            } else {
+                $todo_created = 0;
+                my $root_id = $existing_audit->record_id;
+                my $ollama;
+                eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                for my $sub (sort keys %groups) {
+                    my $safe_sub = $sub;
+                    $safe_sub =~ s/[%_]/\\$&/g;
+                    my $open_exists;
+                    eval {
+                        $open_exists = $schema->resultset('Todo')->search(
+                            { parent_id  => $root_id,
+                              subject    => { -like => "%$safe_sub%" },
+                              status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { rows => 1 }
+                        )->first;
+                    };
+                    next if $open_exists;
+                    my $closed_child;
+                    eval {
+                        $closed_child = $schema->resultset('Todo')->search(
+                            { parent_id => $root_id,
+                              subject   => { -like => "%$safe_sub%" },
+                              status    => { -in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { order_by => { -desc => 'last_mod_date' }, rows => 1 }
+                        )->first;
+                    };
+                    if ($closed_child) {
+                        my $close_date = $closed_child->last_mod_date || $today;
+                        my $close_tod  = $closed_child->time_of_day   || '23:59:59';
+                        my $cutoff = $close_date . ' ' . $close_tod;
+                        my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                        next unless @newer;
+                    }
+                    my @entries = @{ $groups{$sub} };
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                    push @subjects, $ai_subject if $ai_subject;
+                    $todo_created++ if $ai_subject;
+                }
             }
         } else {
             my $ollama;
