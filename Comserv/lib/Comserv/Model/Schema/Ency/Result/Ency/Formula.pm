@@ -50,6 +50,10 @@ __PACKAGE__->add_columns(
         data_type   => 'text',
         is_nullable => 1,
     },
+    comments => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
     reference => {
         data_type   => 'text',
         is_nullable => 1,

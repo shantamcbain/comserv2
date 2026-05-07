@@ -727,8 +727,8 @@
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
             '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
-            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
-            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
+            '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -1056,13 +1056,24 @@
             if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
             micBtn.style.display = '';
 
-            var _mediaRec = null;
-            var _chunks   = [];
-            var _stream   = null;
+            var _mediaRec   = null;
+            var _chunks     = [];
+            var _stream     = null;
+            var _recTimer   = null;
+            var _recStart   = null;
+
+            function _fmtElapsed(ms) {
+                var s = Math.floor(ms / 1000);
+                var m = Math.floor(s / 60);
+                s = s % 60;
+                return m + ':' + (s < 10 ? '0' : '') + s;
+            }
 
             micBtn.addEventListener('click', function() {
                 if (_mediaRec && _mediaRec.state === 'recording') {
                     _mediaRec.stop();
+                    clearInterval(_recTimer);
+                    _recTimer = null;
                     return;
                 }
                 navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
@@ -1078,23 +1089,36 @@
                     };
 
                     _mediaRec.onstop = function() {
+                        clearInterval(_recTimer);
+                        _recTimer = null;
                         stream.getTracks().forEach(function(t) { t.stop(); });
                         var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
                         var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                        var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
                         var file = new File([blob], 'recording.' + ext, { type: blob.type });
                         _transcribeAudioFile(file);
-                        micBtn.textContent = '⏺';
-                        micBtn.title = 'Record voice inspection';
+                        micBtn.textContent = '🎤';
+                        micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
                         micBtn.style.background = '';
+                        var _statusEl = document.getElementById('audio-transcribe-status');
+                        if (_statusEl) { _statusEl.textContent = '⏳ Recording stopped (' + elapsed + ') — uploading…'; }
                     };
 
                     _mediaRec.start(1000);
+                    _recStart = Date.now();
                     micBtn.textContent = '⏹';
                     micBtn.title = 'Stop recording';
                     micBtn.style.background = '#ffd0d0';
 
                     var _statusEl = document.getElementById('audio-transcribe-status');
-                    if (_statusEl) { _statusEl.textContent = '🔴 Recording… click ⏹ to stop'; _statusEl.style.display = ''; }
+                    if (_statusEl) { _statusEl.textContent = '🔴 Recording 0:00 — click ⏹ to stop (no time limit)'; _statusEl.style.display = ''; }
+
+                    _recTimer = setInterval(function() {
+                        var el = document.getElementById('audio-transcribe-status');
+                        if (el && _recStart) {
+                            el.textContent = '🔴 Recording ' + _fmtElapsed(Date.now() - _recStart) + ' — click ⏹ to stop (no time limit)';
+                        }
+                    }, 1000);
                 }).catch(function(err) {
                     var _statusEl = document.getElementById('audio-transcribe-status');
                     if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
@@ -2025,6 +2049,18 @@
             console.debug('Adding conversation_id to request:', state.currentConversationId);
         } else {
             console.debug('No conversation_id in state, starting new conversation');
+        }
+
+        // Link audio/transcript files from the most recent voice recording.
+        // These are set by _transcribeAudioFile() after a successful transcription.
+        // Sent once with the first message after a recording, then cleared.
+        if (state.lastAudioFileId) {
+            requestPayload.audio_file_id = state.lastAudioFileId;
+            state.lastAudioFileId = null;
+        }
+        if (state.lastTranscriptFileId) {
+            requestPayload.transcript_file_id = state.lastTranscriptFileId;
+            state.lastTranscriptFileId = null;
         }
 
         // Build conversation history from visible messages (exclude current user msg
