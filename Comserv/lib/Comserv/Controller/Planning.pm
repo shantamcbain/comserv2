@@ -570,6 +570,20 @@ sub daily :Path('/planning/daily') :Args {
             };
             \@dp_entries;
         },
+        stale_log_count => do {
+            my $cnt = 0;
+            my $_lu = $c->session->{username} || '';
+            eval {
+                my $today_str = $current_date_str;
+                $cnt = $c->model('DBEncy')->resultset('Log')->search(
+                    { username   => $_lu,
+                      start_date => { '<' => $today_str },
+                      status     => { -in => [1, 2, 'open', 'in-progress'] } }
+                )->count || 0;
+            };
+            $cnt;
+        },
+
         open_log_entry => do {
             my $open;
             my $_log_user = $c->session->{username} || '';
