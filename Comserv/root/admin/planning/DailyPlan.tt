@@ -650,10 +650,12 @@
                     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
                     if (d.success) {
+                        var msg = d.todo_created ? d.todo_created + ' new error todo(s) created.' : 'No new errors found.';
+                        alert('Audit scan complete. ' + msg);
                         location.reload();
                     } else {
-                        if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
                         alert('Refresh failed: ' + (d.error || 'unknown error'));
                     }
                 }).catch(function(e){
@@ -1660,24 +1662,27 @@ function dailyLogAction(action) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+        var msg = d.response || d.message || (d.success ? (action === 'start' ? 'Day started!' : 'Day closed!') : (d.error || 'Error'));
+        var plainMsg = msg.replace(/<[^>]+>/g, '');
         if (d.success) {
-            feedback.innerHTML = d.response || d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#2a7a2a';
-            var dest = window.location.pathname + window.location.search;
-            if (action === 'start') { dest += '#log-panel-open'; }
-            setTimeout(function() { window.location.href = dest; }, 2500);
+            window.location.reload();
         } else {
-            feedback.innerHTML = d.response || d.error || 'Error';
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#9b0000';
-            if (startBtn) startBtn.disabled = false;
-            if (endBtn)   endBtn.disabled   = false;
         }
     })
     .catch(function(e) {
-        feedback.textContent = 'Request failed';
-        feedback.style.color = '#9b0000';
         if (startBtn) startBtn.disabled = false;
         if (endBtn)   endBtn.disabled   = false;
+        alert('Request failed: ' + e);
+        feedback.textContent = 'Request failed';
+        feedback.style.color = '#9b0000';
     });
 }
 
