@@ -152,6 +152,9 @@
                         title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
                 [% END %]
                 <span id="dl-feedback"></span>
+                [% IF stale_log_count %]
+                &nbsp;<a href="/log?status=open" style="font-size:0.82em;color:#856404;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:2px 7px;text-decoration:none;white-space:nowrap;" title="View unclosed logs from previous days">⚠️ [% stale_log_count %] unclosed log(s)</a>
+                [% END %]
                 &nbsp;|&nbsp;
                 <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
