@@ -414,7 +414,7 @@ sub constituent_popup : Path('/ENCY/constituent_popup') : Args(1) {
     unless ($constituent) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt');
+    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt', wrapper => '');
 }
 
 sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
@@ -426,7 +426,7 @@ sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
     unless ($herb) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt');
+    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt', wrapper => '');
 }
 
 sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
@@ -438,7 +438,7 @@ sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
     unless ($drug) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt');
+    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt', wrapper => '');
 }
 
 sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
@@ -450,7 +450,7 @@ sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
     unless ($term) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt');
+    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt', wrapper => '');
 }
 
 sub _build_constituent_html {
