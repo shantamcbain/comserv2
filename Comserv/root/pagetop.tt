@@ -332,13 +332,23 @@ document.addEventListener('DOMContentLoaded', function() {
     [% IF _coin_acct AND _coin_acct.balance > 0 %]
         <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
     [% END %]
-    [% IF c.session.user_id %]
-        <a href="/mail/my_subscriptions" title="Manage email subscriptions" style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;padding:0 4px;">&#9993; Subscriptions</a>
-    [% ELSE %]
-        <a href="/mail/subscribe" title="Subscribe to our mailing lists" style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;padding:0 4px;">&#9993; Subscribe</a>
-    [% END %]
+    <a href="/mail/my_subscriptions" title="Manage your email subscriptions"
+       style="font-size:0.85em;background:var(--primary-color,#007bff);color:#fff;text-decoration:none;padding:2px 10px;border-radius:10px;margin-left:6px;white-space:nowrap;">
+        &#9993; My Subscriptions
+    </a>
 </div>
 [% CATCH %][% END %]
+[% END %]
+
+[% IF !c.session.user_id %]
+<div style="background:var(--primary-color,#007bff);color:#fff;padding:4px 16px;font-size:0.88em;text-align:right;">
+    <a href="/mail/subscribe"
+       style="color:#fff;text-decoration:none;font-weight:bold;">
+        &#9993; Join Our Mailing List
+    </a>
+    &nbsp;&middot;&nbsp;
+    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;">Sign In</a>
+</div>
 [% END %]
 
 
