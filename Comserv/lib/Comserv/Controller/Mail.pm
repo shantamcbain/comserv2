@@ -836,6 +836,60 @@ sub _get_site_id {
     return $site_id;
 }
 
+sub _has_mail_role {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    return grep { /^(admin|editor|workshop_leader)$/ } @$roles;
+}
+
+sub newsletter_signup :Path('/mail/newsletter_signup') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $email = $c->req->param('email') || '';
+    unless ($email =~ /\@/) {
+        $c->flash->{error_msg} = 'A valid email address is required.';
+        $c->res->redirect($c->req->referer || $c->uri_for('/'));
+        return;
+    }
+
+    my $site_id = $self->_get_site_id($c);
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my ($list_id) = $dbh->selectrow_array(
+            "SELECT id FROM mailing_lists WHERE site_id=? AND is_active=1 ORDER BY id LIMIT 1",
+            {}, $site_id
+        );
+        if ($list_id) {
+            my ($existing) = $dbh->selectrow_array(
+                "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=?",
+                {}, $list_id, lc $email
+            );
+            if ($existing) {
+                $dbh->do("UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?", {}, $existing);
+            } else {
+                $dbh->do(
+                    "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, subscription_source, is_active) VALUES (?,?,?,1)",
+                    {}, $list_id, lc($email), 'newsletter'
+                );
+            }
+            my ($list_email) = $dbh->selectrow_array(
+                "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
+            );
+            if ($list_email) {
+                $c->model('Mail')->subscribe_cpanel_list($c, list_address => $list_email, email => lc $email);
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup', "Error: $@");
+        $c->flash->{error_msg} = 'Could not subscribe — please try again.';
+    } else {
+        $c->flash->{success_msg} = 'Thank you for subscribing!';
+    }
+    $c->res->redirect($c->req->referer || $c->uri_for('/'));
+}
+
 sub lists :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -1082,10 +1136,8 @@ sub lists_subscribers {
 sub mass_email :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error_msg} = 'Admin access required.';
+    unless ($self->_has_mail_role($c)) {
+        $c->flash->{error_msg} = 'Access restricted to admin, editor, and workshop leaders.';
         $c->res->redirect($c->uri_for('/mail'));
         return;
     }
@@ -1126,10 +1178,8 @@ sub mass_email :Local :Args(0) {
 sub send_mass_email :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error_msg} = 'Admin access required.';
+    unless ($self->_has_mail_role($c)) {
+        $c->flash->{error_msg} = 'Access restricted to admin, editor, and workshop leaders.';
         $c->res->redirect($c->uri_for('/mail'));
         return;
     }
@@ -1268,10 +1318,9 @@ sub send_mass_email :Local :Args(0) {
 sub send_mailout_test :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->res->body('Forbidden'); $c->res->status(403); return;
+    unless ($self->_has_mail_role($c)) {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body('{"ok":0,"msg":"Forbidden"}'); $c->res->status(403); return;
     }
 
     my $site_id   = $self->_get_site_id($c);
