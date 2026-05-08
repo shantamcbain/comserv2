@@ -739,10 +739,40 @@ sub mail_admin_dashboard :Local {
             "Error loading mail statistics: $_");
     };
     
+    my @mailing_lists;
+    my $list_stats = { total => 0, public => 0, private => 0, total_subscribers => 0 };
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $site_id = $self->_get_site_id($c);
+        my $sth = $dbh->prepare("
+            SELECT ml.id, ml.name, ml.description, ml.is_public,
+                   ml.list_backend, ml.is_active,
+                   COUNT(mls.id) AS sub_count
+            FROM mailing_lists ml
+            LEFT JOIN mailing_list_subscriptions mls
+                   ON mls.mailing_list_id = ml.id AND mls.is_active = 1
+            WHERE ml.site_id = ? AND ml.is_active = 1
+            GROUP BY ml.id
+            ORDER BY ml.name
+        ");
+        $sth->execute($site_id);
+        while (my $row = $sth->fetchrow_hashref) {
+            push @mailing_lists, $row;
+            $list_stats->{total}++;
+            $list_stats->{public}++            if $row->{is_public};
+            $list_stats->{private}++           unless $row->{is_public};
+            $list_stats->{total_subscribers}  += ($row->{sub_count} || 0);
+        }
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard',
+        "Mailing list stats error: $@") if $@;
+
     $c->stash(
-        mail_stats => $mail_stats,
-        smtp_servers => \@smtp_servers,
-        template => 'mail/AdminDashboard.tt'
+        mail_stats    => $mail_stats,
+        smtp_servers  => \@smtp_servers,
+        mailing_lists => \@mailing_lists,
+        list_stats    => $list_stats,
+        template      => 'mail/AdminDashboard.tt',
     );
     
     $c->forward($c->view('TT'));
@@ -965,12 +995,16 @@ sub lists :Local :Args(0) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'lists',
                     "Subscription query failed for list " . $list->id . ": $@");
             }
+            my $is_public    = eval { $list->is_public    } // 0;
+            my $list_backend = eval { $list->list_backend } // 'local';
             my $row = {
                 id               => $list->id,
                 name             => $list->name,
                 description      => $list->description,
                 list_email       => $list->list_email,
                 is_software_only => $list->is_software_only,
+                is_public        => $is_public,
+                list_backend     => $list_backend,
                 is_default       => ($list->description =~ /^\[auto\]/) ? 1 : 0,
                 subscriber_count => scalar @subs,
                 subscribers      => \@subs,
