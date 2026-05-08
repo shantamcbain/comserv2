@@ -2055,6 +2055,11 @@ sub backup :Path('/admin/backup') :Args(0) {
 }
 
 # Keeping it here for backward compatibility
+sub mail :Path('/admin/mail') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+}
+
 sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
     my ($self, $c) = @_;
 
