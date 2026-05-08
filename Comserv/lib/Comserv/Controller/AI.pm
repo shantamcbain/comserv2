@@ -4724,7 +4724,7 @@ sub _pick_ollama_tier {
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
-        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'gemma4'     => 12, 'gemma3'  => 4, 'gemma2' => 9, 'gemma' => 7,
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
@@ -5257,72 +5257,87 @@ Choose the best installed Ollama model for a given agent/page context.
 
 =cut
 
+sub _score_ollama_model {
+    my ($name, $ctx) = @_;
+    $ctx //= 'general';
+    my $lname = lc($name);
+
+    my %fq = (
+        'gemma4'        => 90,
+        'deepseek-r1'   => 85,
+        'phi4'          => 82,
+        'qwen2.5-coder' => 80,
+        'starcoder2'    => 78,
+        'qwen2.5'       => 78,
+        'llama3.1'      => 75,
+        'llama3.2'      => 74,
+        'gemma3'        => 73,
+        'mistral-small' => 72,
+        'qwen2'         => 70,
+        'llama3'        => 68,
+        'mistral'       => 68,
+        'codellama'     => 67,
+        'phi3'          => 65,
+        'gemma2'        => 63,
+        'gemma'         => 55,
+        'llama2'        => 50,
+        'phi'           => 50,
+    );
+
+    my $score = 50;
+    for my $fam (sort { length($b) <=> length($a) } keys %fq) {
+        if (index($lname, $fam) == 0) { $score = $fq{$fam}; last; }
+    }
+
+    my $params = 0;
+    $params = $1 + 0 if $lname =~ /[:\-](\d+(?:\.\d+)?)b/i;
+    $score += $params >= 30 ? 20
+            : $params >= 20 ? 16
+            : $params >= 12 ? 12
+            : $params >=  7 ?  8
+            : $params >=  3 ?  4
+            :                  0;
+
+    $score += 15 if $lname =~ /-cloud\b/;
+
+    $score += 20 if $ctx eq 'code' && $lname =~ /coder|starcoder|codellama/i;
+
+    return $score;
+}
+
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
 
-    $agent_id    //= 'general';
-    $page_context //= 'general';
+    $agent_id         //= 'general';
+    $page_context     //= 'general';
     $installed_models //= [];
 
-    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
     my $is_chat_model = sub {
         my ($n) = @_;
         return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
     };
 
-    # Build a quick lookup: short name → full model name (chat models only)
-    my %installed;
+    my %seen;
+    my @chat_names;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-        next unless $name;
-        next unless $is_chat_model->($name);
-        $installed{$name} = $name;
-        (my $short = $name) =~ s/:.*$//;
-        $installed{$short} = $name;
+        next unless $name && !$seen{$name}++ && $is_chat_model->($name);
+        push @chat_names, $name;
     }
 
-    # Preferred models per context (ordered: first match wins).
-    # tinyllama intentionally excluded — too small for reliable answers.
-    my %context_prefs = (
-        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        csc         => ['llama3.1', 'llama3', 'mistral'],
-        general     => ['llama3.1', 'llama3', 'mistral'],
-        navigation  => ['llama3.1', 'llama3'],
-        simple      => ['llama3.1', 'llama3'],
-        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
-    );
+    unless (@chat_names) {
+        return $default_model if $default_model && $is_chat_model->($default_model);
+        return 'llama3.1:latest';
+    }
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
-    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
-    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
-    $ctx = 'csc'        if $ctx =~ /^csc$/;
-    $ctx = 'ency'       if $ctx =~ /^ency$/;
-    $ctx = 'docker'     if $ctx =~ /docker/;
-    $ctx = 'general'    unless exists $context_prefs{$ctx};
+    $ctx = 'code' if $ctx =~ /code|developer|starcoder|docker/;
 
-    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+    my @ranked = sort {
+        _score_ollama_model($b, $ctx) <=> _score_ollama_model($a, $ctx)
+    } @chat_names;
 
-    for my $pref (@$prefs) {
-        for my $key (keys %installed) {
-            if ($key =~ /\Q$pref\E/i) {
-                return $installed{$key};
-            }
-        }
-    }
-
-    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
-    if ($default_model && $is_chat_model->($default_model)) {
-        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
-    }
-    my @chat_values = values %installed;
-    return $chat_values[0] if @chat_values;
-    return 'llama3.1:latest';
+    return $ranked[0];
 }
 
 =head2 _get_current_ollama_config
@@ -6711,6 +6726,133 @@ sub sync_models :Local :Args(0) {
             'sync_models', "Error syncing models: $_");
         $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
     };
+}
+
+=head2 auto_sync_models
+
+Pull all recommended Ollama models that are not yet installed and remove
+explicitly deprecated models across all configured Ollama servers.
+Admin/developer only.  Returns JSON with per-server results.
+
+=cut
+
+sub auto_sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin = ref($user_roles) eq 'ARRAY'
+        ? grep { /^(admin|developer)$/i } @$user_roles : 0;
+
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    my $ollama_cfg    = $c->config->{Ollama} || {};
+    my $primary_host  = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
+    my $port          = $ollama_cfg->{port}           || 11434;
+
+    my @server_hosts = ($primary_host);
+    push @server_hosts, $fallback_host if $fallback_host ne $primary_host;
+
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama model unavailable' }));
+        return;
+    }
+
+    my $catalog     = $ollama->list_available_models();
+    my @recommended = grep { $_->{recommended} } @$catalog;
+    my $deprecated  = $ollama->deprecated_models();
+
+    my @results;
+    for my $host (@server_hosts) {
+        my %sr = (
+            host    => $host,
+            port    => $port,
+            pulled  => [],
+            skipped => [],
+            removed => [],
+            errors  => [],
+        );
+
+        $ollama->host($host);
+        $ollama->port($port);
+        $ollama->clear_endpoint;
+
+        unless ($ollama->check_connection()) {
+            $sr{error} = "Cannot connect to $host:$port";
+            push @results, \%sr;
+            next;
+        }
+
+        my $installed = $ollama->list_models() || [];
+        my %inst_set;
+        for my $m (@$installed) {
+            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+            $inst_set{$n} = 1;
+            (my $base = $n) =~ s/:.*$//;
+            $inst_set{$base} = 1;
+        }
+
+        for my $model (@recommended) {
+            my $name = $model->{name};
+            (my $base = $name) =~ s/:.*$//;
+            if ($inst_set{$name} || $inst_set{$base}) {
+                push @{ $sr{skipped} }, "$name (already installed)";
+                next;
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Pulling recommended model: $name on $host:$port");
+            my $result = $ollama->pull_model(model => $name);
+            if ($result && $result->{success}) {
+                push @{ $sr{pulled} }, $name;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "$name: $err";
+            }
+        }
+
+        for my $dep (@$deprecated) {
+            next unless $inst_set{$dep};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Removing deprecated model: $dep on $host:$port");
+            my $result = $ollama->remove_model(model => $dep);
+            if ($result && $result->{success}) {
+                push @{ $sr{removed} }, $dep;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "remove $dep: $err";
+            }
+        }
+
+        push @results, \%sr;
+    }
+
+    my ($total_pulled, $total_removed) = (0, 0);
+    $total_pulled  += scalar @{ $_->{pulled}  } for @results;
+    $total_removed += scalar @{ $_->{removed} } for @results;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'auto_sync_models', "Auto-sync complete: pulled=$total_pulled removed=$total_removed");
+
+    $c->response->body(encode_json({
+        success       => JSON::true,
+        servers       => \@results,
+        total_pulled  => $total_pulled,
+        total_removed => $total_removed,
+    }));
 }
 
 =head2 project_conversations
