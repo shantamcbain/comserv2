@@ -74,7 +74,7 @@ requires 'IO::Pty';
 # Cryptography and Security
 requires 'Crypt::CBC';
 requires 'Crypt::OpenSSL::AES';
-requires 'Crypt::Random';
+requires 'Crypt::URandom';
 requires 'MIME::Base64';
 requires 'Digest::SHA';
 
