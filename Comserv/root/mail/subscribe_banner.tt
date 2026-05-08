@@ -1,12 +1,13 @@
 [%#
   mail/subscribe_banner.tt — Mailing list CTA banner
   Included in layout.tt above page content.
-  Visible on all pages; dismissible via localStorage (once per browser).
+  Shows only on home/index pages (action name = 'index', or path = '/').
+  Dismissible via localStorage once per browser per site.
   Guests see "Join Our Mailing List", members see "Manage My Subscriptions".
-  Does not show on /mail/subscribe or /mail/my_subscriptions pages.
 %]
-[% SET _cur_path = c.req.path %]
-[% IF _cur_path != '/mail/subscribe' AND _cur_path != '/mail/my_subscriptions' AND _cur_path != '/mail/newsletter_signup' %]
+[% SET _cur_action = c.action.name %]
+[% SET _cur_path   = c.req.path %]
+[% IF _cur_action == 'index' OR _cur_path == '/' OR _cur_path == '' %]
 <div id="ml-subscribe-banner"
      style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),#1976d2);color:#fff;
             padding:10px 20px;text-align:center;font-size:0.95em;position:relative;z-index:100;">
