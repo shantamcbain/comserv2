@@ -1,0 +1,108 @@
+[%
+   title = "User Subscriptions — Admin"
+   description = "View and manage all mailing list subscriptions for a user"
+   roles = "admin site_admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "1.0"
+   last_updated = "2026-05-08"
+%]
+[% PageVersion = 'mail/AdminUserSubscriptions.tt,v 1.0 2026/05/08 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>User Subscriptions</h1>
+        <h2 class="page-subtitle">
+            Mailing list memberships for
+            <strong>[% target_user.username | html %]</strong>
+            ([% target_user.email | html %])
+        </h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+
+            <div style="margin-bottom:var(--spacing-medium);">
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">&#8592; Back to Lists</a>
+                <a href="[% c.uri_for('/user/admin_user_list') %]" class="btn btn-secondary">User List</a>
+            </div>
+
+            [% IF subscriptions.size > 0 %]
+
+                <table class="app-table" style="width:100%;border-collapse:collapse;">
+                    <thead>
+                        <tr style="background:var(--primary-color);color:#fff;">
+                            <th style="padding:8px;text-align:left;">List</th>
+                            <th style="padding:8px;text-align:left;">Status</th>
+                            <th style="padding:8px;text-align:left;">Subscribed At</th>
+                            <th style="padding:8px;text-align:left;">Notes</th>
+                            <th style="padding:8px;text-align:center;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        [% FOREACH sub IN subscriptions %]
+                        <tr style="border-bottom:1px solid var(--border-color);">
+                            <td style="padding:6px 8px;">[% sub.list_name | html %]</td>
+                            <td style="padding:6px 8px;">
+                                [% IF sub.status == 'subscribed' %]
+                                    <span style="color:var(--success-color,green);font-weight:bold;">Subscribed</span>
+                                [% ELSIF sub.status == 'blocked' %]
+                                    <span style="color:var(--danger-color,#c0392b);font-weight:bold;">Blocked</span>
+                                [% ELSE %]
+                                    <span style="color:var(--text-muted-color);">Unsubscribed</span>
+                                [% END %]
+                            </td>
+                            <td style="padding:6px 8px;white-space:nowrap;">[% sub.subscribed_at | html %]</td>
+                            <td style="padding:6px 8px;font-size:var(--font-size-small);color:var(--text-muted-color);">
+                                [% sub.blocked_reason | html %]
+                            </td>
+                            <td style="padding:6px 8px;text-align:center;white-space:nowrap;">
+                                [% IF sub.status == 'subscribed' %]
+                                    <form method="POST" action="[% c.uri_for('/mail/admin_unsubscribe_user', sub.sub_id) %]"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('Unsubscribe this user from [% sub.list_name | html %]?');">
+                                        <button type="submit" class="btn btn-secondary"
+                                                style="padding:2px 8px;font-size:var(--font-size-small);">Unsubscribe</button>
+                                    </form>
+                                    <form method="POST" action="[% c.uri_for('/mail/admin_block_subscriber', sub.sub_id) %]"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('Block this user from [% sub.list_name | html %]?');">
+                                        <input type="hidden" name="reason" value="Admin action">
+                                        <button type="submit"
+                                                style="background:var(--danger-color,#c0392b);color:#fff;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:var(--font-size-small);">Block</button>
+                                    </form>
+                                [% ELSIF sub.status == 'unsubscribed' %]
+                                    <span style="color:var(--text-muted-color);font-size:var(--font-size-small);">—</span>
+                                [% ELSIF sub.status == 'blocked' %]
+                                    <form method="POST" action="[% c.uri_for('/mail/admin_unsubscribe_user', sub.sub_id) %]"
+                                          style="display:inline;"
+                                          onsubmit="return confirm('Unblock and unsubscribe this user?');">
+                                        <button type="submit" class="btn btn-secondary"
+                                                style="padding:2px 8px;font-size:var(--font-size-small);">Unblock</button>
+                                    </form>
+                                [% END %]
+                            </td>
+                        </tr>
+                        [% END %]
+                    </tbody>
+                </table>
+
+            [% ELSE %]
+                <div class="info-box" style="padding:var(--spacing-large);text-align:center;color:var(--text-muted-color);">
+                    This user has no mailing list subscriptions.
+                </div>
+            [% END %]
+
+        </div>
+    </div>
+
+</div>

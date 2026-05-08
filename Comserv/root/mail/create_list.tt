@@ -48,6 +48,32 @@
                 <small class="form-help">Check this for application-managed lists. Uncheck if using Virtualmin server lists.</small>
             </div>
 
+            <div class="form-group">
+                <label class="checkbox-label">
+                    <input type="checkbox" name="is_public" value="1">
+                    Public list (visible on the subscribe page)
+                </label>
+                <small class="form-help">Public lists appear on <code>/mail/subscribe</code> so anyone can sign up. Private lists are managed by admins only.</small>
+            </div>
+
+            <div class="form-group">
+                <label for="list_backend">List Backend</label>
+                <select id="list_backend" name="list_backend" class="form-input">
+                    <option value="local" selected>Local (application database)</option>
+                    <option value="mailchimp">Mailchimp</option>
+                    <option value="mailserver">Mail Server (SMTP list)</option>
+                    <option value="virtualmin">Virtualmin</option>
+                </select>
+                <small class="form-help">Where subscription data is stored/sent. Use <em>Local</em> unless integrating with an external service.</small>
+            </div>
+
+            <div class="form-group" id="backend_config_group" style="display:none;">
+                <label for="backend_config">Backend Configuration (JSON)</label>
+                <textarea id="backend_config" name="backend_config" rows="3"
+                          placeholder='e.g. {"api_key":"abc123","list_id":"xyz"}'></textarea>
+                <small class="form-help">JSON config for the chosen backend (API keys, list IDs, etc.).</small>
+            </div>
+
             <div class="form-actions">
                 <button type="submit" class="btn btn-primary">Create Mailing List</button>
                 <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
@@ -55,3 +81,13 @@
         </form>
     </div>
 </div>
+
+<script>
+(function(){
+    var sel = document.getElementById('list_backend');
+    var cfg = document.getElementById('backend_config_group');
+    function toggle(){ cfg.style.display = (sel.value !== 'local') ? '' : 'none'; }
+    sel.addEventListener('change', toggle);
+    toggle();
+})();
+</script>
