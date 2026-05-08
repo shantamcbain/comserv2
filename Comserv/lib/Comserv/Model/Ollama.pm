@@ -1445,6 +1445,29 @@ sub list_available_models {
     return \@available_models;
 }
 
+=head2 deprecated_models
+
+Returns a list of model names that are old or superseded and safe to remove
+when running an auto-sync.  Only models explicitly listed here will be
+auto-removed — no other installed models are touched.
+
+=cut
+
+sub deprecated_models {
+    return [
+        'llama2',
+        'llama2:7b',
+        'llama2:13b',
+        'llama3:8b',
+        'llama3',
+        'phi:2.7b',
+        'phi3:3.8b',
+        'gemma:7b',
+        'gemma:2b',
+        'gemma2:2b',
+    ];
+}
+
 =head2 set_host
 
 Helper method to change the Ollama server host and automatically rebuild the endpoint.
