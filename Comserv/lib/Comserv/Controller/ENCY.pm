@@ -115,14 +115,10 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     # Validate the record_id; if invalid, show error (stay on the HerbView page)
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_herb',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing herb record for editing. Please try again.",
-            template  => 'ENCY/HerbView.tt',
-            edit_mode => 0, # Keep edit_mode off since no valid record is loaded
-        );
-        return; # Do not redirect; just render the view with an error message
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_herb',
+            "No record_id — redirecting to herb list.");
+        $c->response->redirect($c->uri_for('/ENCY/Herb'));
+        return;
     }
 
     # Retrieve the herb record from ENCY database
@@ -1264,12 +1260,9 @@ sub edit_animal : Path('/ENCY/Animal/edit') : Args(0) {
     my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_animal',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing animal record for editing. Please try again.",
-            template  => 'ENCY/AnimalList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_animal',
+            "No record_id — redirecting to animal list.");
+        $c->response->redirect($c->uri_for('/ENCY/Animal'));
         return;
     }
 
@@ -1496,12 +1489,9 @@ sub edit_insect : Path('/ENCY/Insect/edit') : Args(0) {
     my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_insect',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing insect record for editing. Please try again.",
-            template  => 'ENCY/InsectList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_insect',
+            "No record_id — redirecting to insect list.");
+        $c->response->redirect($c->uri_for('/ENCY/Insect'));
         return;
     }
 
@@ -1740,12 +1730,9 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_disease',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing disease record for editing. Please try again.",
-            template  => 'ENCY/DiseaseList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_disease',
+            "No record_id — redirecting to disease list.");
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
         return;
     }
 
@@ -1977,12 +1964,9 @@ sub edit_symptom : Path('/ENCY/Symptom/edit') : Args(0) {
     my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_symptom',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing symptom record for editing. Please try again.",
-            template  => 'ENCY/SymptomList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_symptom',
+            "No record_id — redirecting to symptom list.");
+        $c->response->redirect($c->uri_for('/ENCY/Symptom'));
         return;
     }
 
@@ -2238,12 +2222,9 @@ sub edit_constituent : Path('/ENCY/Constituent/edit') : Args(0) {
     my $record_id = $c->request->param('record_id') || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_constituent',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing constituent record for editing. Please try again.",
-            template  => 'ENCY/ConstituentList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_constituent',
+            "No record_id — redirecting to constituent list.");
+        $c->response->redirect($c->uri_for('/ENCY/Constituent'));
         return;
     }
 
@@ -2500,12 +2481,9 @@ sub edit_glossary : Path('/ENCY/Glossary/edit') : Args(0) {
     my $record_id = $c->request->param("record_id") || $c->session->{record_id};
 
     unless (defined $record_id && $record_id =~ /^\d+$/) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_glossary',
-            "Invalid or missing record_id in session.");
-        $c->stash(
-            error_msg => "Invalid or missing glossary record for editing. Please try again.",
-            template  => 'ENCY/GlossaryList.tt',
-        );
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_glossary',
+            "No record_id — redirecting to glossary list.");
+        $c->response->redirect($c->uri_for('/ENCY/Glossary'));
         return;
     }
 
