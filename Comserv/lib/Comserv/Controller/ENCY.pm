@@ -2645,9 +2645,34 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
         }
     }
 
+    my @herbal_data;
+    for my $herb (@$bee_plants) {
+        my $org          = eval { $herb->organism_id ? $herb->organism : undef };
+        my $org_id       = $org ? $org->record_id : undef;
+        my $display_name = ($org && $org->scientific_name) ? $org->scientific_name
+                         : ($herb->botanical_name // '');
+        my $display_image = $org_image{$org_id // ''} // ''
+                          || ($org  ? ($org->image // '')  : '')
+                          || ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
+        push @herbal_data, {
+            record_id    => $herb->record_id,
+            display_name => $display_name,
+            display_image => $display_image,
+            common_names => $cn_text,
+            apis         => $herb->apis    // '',
+            nectar       => $herb->nectar  // 0,
+            pollen       => $herb->pollen  // 0,
+        };
+    }
+
     $c->stash(
-        herbal_data => $bee_plants,
-        org_image   => \%org_image,
+        herbal_data => \@herbal_data,
         is_editor   => $is_editor,
         template    => 'ENCY/BeePastureView.tt',
     );
