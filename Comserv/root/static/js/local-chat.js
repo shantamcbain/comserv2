@@ -663,6 +663,7 @@
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<a id="conversations-link" class="chat-header-icon-btn" href="/ai/conversations" title="View all conversations" target="_self">📋 History</a>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="voice-mode-btn" class="chat-header-icon-btn" title="Voice conversation mode — speak to AI, AI speaks back" style="display:none;">🔊</button>' +
                 '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
@@ -727,8 +728,8 @@
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
             '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
-            '<label id="attach-audio-btn" title="Upload audio recording for voice inspection" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio">🎤<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
-            '<button id="mic-record-btn" title="Record voice inspection (hold to record)" style="display:none;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">⏺</button>' +
+            '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -773,10 +774,8 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
+                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
+                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -786,7 +785,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4.3';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -1010,22 +1009,32 @@
 
         // ── Other events ──────────────────────────────────────────────────────
         // Chat bubble click:
+        // - Mobile devices: open the inline panel (popup windows don't work on mobile)
         // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
-        // - On a normal page: open a moveable browser popup window (draggable across screens/monitors)
+        // - Desktop: open a moveable browser popup window (draggable across screens/monitors)
         //   Falls back to the inline panel if the browser blocks popups.
+        var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            if (window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+            if (_isMobile || window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        // ⤢ button: focus / re-open the popup window if it was closed or hidden
-        document.getElementById('detach-chat').addEventListener('click', function() {
-            if (state._popupWindow && !state._popupWindow.closed) {
-                state._popupWindow.focus();
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden (desktop only)
+        var detachBtn = document.getElementById('detach-chat');
+        if (detachBtn) {
+            if (_isMobile) {
+                detachBtn.style.display = 'none';
             } else {
-                detachToPopup();
+                detachBtn.addEventListener('click', function() {
+                    if (state._popupWindow && !state._popupWindow.closed) {
+                        state._popupWindow.focus();
+                    } else {
+                        detachToPopup();
+                    }
+                });
             }
-        });
+        }
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -1057,16 +1066,35 @@
         (function _initMicRecorder() {
             var micBtn = document.getElementById('mic-record-btn');
             if (!micBtn) return;
-            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
-            micBtn.style.display = '';
+            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                micBtn.addEventListener('click', function() {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    var msg = window.isSecureContext === false
+                        ? '⚠️ Microphone requires HTTPS. Use the 📂 button to upload a saved audio file instead.'
+                        : '⚠️ Microphone recording is not available in this browser. Use the 📂 button to upload a saved audio file instead.';
+                    if (_statusEl) { _statusEl.textContent = msg; _statusEl.style.display = ''; }
+                });
+                return;
+            }
 
-            var _mediaRec = null;
-            var _chunks   = [];
-            var _stream   = null;
+            var _mediaRec   = null;
+            var _chunks     = [];
+            var _stream     = null;
+            var _recTimer   = null;
+            var _recStart   = null;
+
+            function _fmtElapsed(ms) {
+                var s = Math.floor(ms / 1000);
+                var m = Math.floor(s / 60);
+                s = s % 60;
+                return m + ':' + (s < 10 ? '0' : '') + s;
+            }
 
             micBtn.addEventListener('click', function() {
                 if (_mediaRec && _mediaRec.state === 'recording') {
                     _mediaRec.stop();
+                    clearInterval(_recTimer);
+                    _recTimer = null;
                     return;
                 }
                 navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
@@ -1082,28 +1110,280 @@
                     };
 
                     _mediaRec.onstop = function() {
+                        clearInterval(_recTimer);
+                        _recTimer = null;
                         stream.getTracks().forEach(function(t) { t.stop(); });
                         var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
                         var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                        var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
                         var file = new File([blob], 'recording.' + ext, { type: blob.type });
                         _transcribeAudioFile(file);
-                        micBtn.textContent = '⏺';
-                        micBtn.title = 'Record voice inspection';
+                        micBtn.textContent = '🎤';
+                        micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
                         micBtn.style.background = '';
+                        var _statusEl = document.getElementById('audio-transcribe-status');
+                        if (_statusEl) { _statusEl.textContent = '⏳ Recording stopped (' + elapsed + ') — uploading…'; }
                     };
 
                     _mediaRec.start(1000);
+                    _recStart = Date.now();
                     micBtn.textContent = '⏹';
                     micBtn.title = 'Stop recording';
                     micBtn.style.background = '#ffd0d0';
 
                     var _statusEl = document.getElementById('audio-transcribe-status');
-                    if (_statusEl) { _statusEl.textContent = '🔴 Recording… click ⏹ to stop'; _statusEl.style.display = ''; }
+                    if (_statusEl) { _statusEl.textContent = '🔴 Recording 0:00 — click ⏹ to stop (no time limit)'; _statusEl.style.display = ''; }
+
+                    _recTimer = setInterval(function() {
+                        var el = document.getElementById('audio-transcribe-status');
+                        if (el && _recStart) {
+                            el.textContent = '🔴 Recording ' + _fmtElapsed(Date.now() - _recStart) + ' — click ⏹ to stop (no time limit)';
+                        }
+                    }, 1000);
                 }).catch(function(err) {
                     var _statusEl = document.getElementById('audio-transcribe-status');
                     if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
                 });
             });
+        })();
+
+        // ── Voice Conversation Mode ────────────────────────────────────────────
+        // Full hands-free loop: user speaks → auto-sent to AI → AI response read aloud
+        // → listening restarts.
+        //
+        // STT strategy (in priority order):
+        //   1. Web Speech API  — Chrome/Edge/Safari (streaming, instant)
+        //   2. VAD + Whisper   — Firefox and any browser without SpeechRecognition
+        //                        Uses AudioContext to detect speech, records via
+        //                        MediaRecorder, uploads to /ai/transcribe (our server).
+        //                        No audio leaves to third-party servers. 1-3s delay.
+        // TTS: speechSynthesis — all browsers.
+        (function() {
+            var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var _hasTTS    = !!(window.speechSynthesis);
+            var _hasVAD    = !!(window.AudioContext || window.webkitAudioContext) && !!(window.MediaRecorder) && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            var _voiceBtn  = document.getElementById('voice-mode-btn');
+            if (!_voiceBtn) return;
+
+            if (_hasTTS || _SpeechRec || _hasVAD) { _voiceBtn.style.display = ''; }
+
+            var _voiceActive = false;
+            var _recog       = null;
+            var _ttsSpeaking = false;
+            var _voiceStatus = document.getElementById('audio-transcribe-status');
+
+            var _vadStream   = null;
+            var _vadCtx      = null;
+            var _vadRec      = null;
+            var _vadChunks   = [];
+            var _vadSpeaking = false;
+            var _vadSilTimer = null;
+            var _vadRafId    = null;
+
+            var VAD_SPEAK_THRESH  = 18;
+            var VAD_SILENCE_MS    = 1400;
+            var VAD_MIN_SPEECH_MS = 300;
+            var _vadSpeakStart    = 0;
+
+            function _setVoiceStatus(msg) {
+                if (_voiceStatus) { _voiceStatus.textContent = msg; _voiceStatus.style.display = msg ? '' : 'none'; }
+            }
+
+            function _speak(text) {
+                if (!_hasTTS || !_voiceActive) return;
+                window.speechSynthesis.cancel();
+                var clean = text
+                    .replace(/\[ACTION:[^\]]*\]/gi, '')
+                    .replace(/#{1,6}\s*/g, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/`[^`]+`/g, function(m){ return m.replace(/`/g,''); })
+                    .replace(/https?:\/\/\S+/g, '')
+                    .trim();
+                if (!clean) { _startListening(); return; }
+                _ttsSpeaking = true;
+                _setVoiceStatus('🔈 Speaking…');
+                var utter = new window.SpeechSynthesisUtterance(clean);
+                utter.lang  = 'en-US';
+                utter.rate  = 1.05;
+                utter.pitch = 1.0;
+                utter.onend  = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
+                utter.onerror = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
+                window.speechSynthesis.speak(utter);
+            }
+
+            state._speakResponse = _speak;
+
+            function _stopVAD() {
+                if (_vadRafId) { cancelAnimationFrame(_vadRafId); _vadRafId = null; }
+                if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                if (_vadRec && _vadRec.state !== 'inactive') { try { _vadRec.stop(); } catch(e){} }
+                if (_vadStream) { _vadStream.getTracks().forEach(function(t){ t.stop(); }); _vadStream = null; }
+                if (_vadCtx) { try { _vadCtx.close(); } catch(e){} _vadCtx = null; }
+                _vadRec = null; _vadChunks = []; _vadSpeaking = false;
+            }
+
+            function _uploadVADBlob(blob) {
+                if (!blob || blob.size < 1000) { _startListening(); return; }
+                _setVoiceStatus('⏳ Transcribing speech…');
+                var ext = (blob.type.indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                var file = new File([blob], 'voice.' + ext, { type: blob.type });
+                var fd = new FormData();
+                fd.append('audio', file, file.name);
+                fd.append('diarize', '0');
+                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                .then(function(r){ return r.json(); })
+                .then(function(data) {
+                    if (!_voiceActive) return;
+                    var txt = (data.transcript || '').trim();
+                    if (!txt) { _setVoiceStatus('👂 Nothing heard — listening…'); _startListening(); return; }
+                    var inputEl = document.getElementById('message-input');
+                    if (inputEl) inputEl.value = txt;
+                    _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                    sendMessage();
+                })
+                .catch(function() {
+                    if (_voiceActive) { _setVoiceStatus('⚠️ Transcription failed — retrying…'); setTimeout(_startListening, 1500); }
+                });
+            }
+
+            function _startVAD() {
+                if (!_voiceActive) return;
+                _setVoiceStatus('👂 Listening… (speak now)');
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    if (!_voiceActive) { stream.getTracks().forEach(function(t){ t.stop(); }); return; }
+                    _vadStream  = stream;
+                    _vadChunks  = [];
+                    _vadSpeaking = false;
+                    var ACtx = window.AudioContext || window.webkitAudioContext;
+                    _vadCtx = new ACtx();
+                    var source   = _vadCtx.createMediaStreamSource(stream);
+                    var analyser = _vadCtx.createAnalyser();
+                    analyser.fftSize = 512;
+                    source.connect(analyser);
+                    var buf = new Uint8Array(analyser.fftSize);
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                    _vadRec.ondataavailable = function(ev) { if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                    _vadRec.onstop = function() {
+                        var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' });
+                        _vadChunks = [];
+                        _uploadVADBlob(blob);
+                    };
+                    function _tick() {
+                        if (!_voiceActive) { _stopVAD(); return; }
+                        analyser.getByteTimeDomainData(buf);
+                        var rms = 0;
+                        for (var i = 0; i < buf.length; i++) { var d = (buf[i] - 128); rms += d * d; }
+                        rms = Math.sqrt(rms / buf.length);
+                        if (rms > VAD_SPEAK_THRESH) {
+                            if (!_vadSpeaking) {
+                                _vadSpeaking = true;
+                                _vadSpeakStart = Date.now();
+                                _vadChunks = [];
+                                _vadRec.start(100);
+                                _setVoiceStatus('🔴 Recording…');
+                            }
+                            if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                        } else if (_vadSpeaking) {
+                            if (!_vadSilTimer) {
+                                _vadSilTimer = setTimeout(function() {
+                                    _vadSilTimer = null;
+                                    if (!_vadSpeaking) return;
+                                    _vadSpeaking = false;
+                                    var dur = Date.now() - _vadSpeakStart;
+                                    if (dur < VAD_MIN_SPEECH_MS) {
+                                        _vadRec.stop();
+                                        _vadChunks = [];
+                                        _setVoiceStatus('👂 Listening… (speak now)');
+                                        _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                                        _vadRec.ondataavailable = function(ev){ if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                                        _vadRec.onstop = function(){ var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' }); _vadChunks = []; _uploadVADBlob(blob); };
+                                    } else {
+                                        _vadRec.stop();
+                                    }
+                                }, VAD_SILENCE_MS);
+                            }
+                        }
+                        _vadRafId = requestAnimationFrame(_tick);
+                    }
+                    _vadRafId = requestAnimationFrame(_tick);
+                }).catch(function(err) {
+                    _setVoiceStatus('⚠️ Microphone access denied: ' + err.message);
+                });
+            }
+
+            function _startSpeechRec() {
+                if (!_voiceActive) return;
+                if (_recog) { try { _recog.abort(); } catch(e){} }
+                _recog = new _SpeechRec();
+                _recog.lang = 'en-US';
+                _recog.continuous = false;
+                _recog.interimResults = true;
+                _recog.maxAlternatives = 1;
+                var _inputEl = document.getElementById('message-input');
+                _setVoiceStatus('👂 Listening… (speak now)');
+                _recog.onresult = function(ev) {
+                    var interim = '', fin = '';
+                    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+                        var t = ev.results[i][0].transcript;
+                        if (ev.results[i].isFinal) { fin += t; } else { interim += t; }
+                    }
+                    if (_inputEl) _inputEl.value = fin || interim;
+                };
+                _recog.onend = function() {
+                    var txt = _inputEl ? (_inputEl.value || '').trim() : '';
+                    if (txt && _voiceActive) {
+                        _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                        sendMessage();
+                    } else if (_voiceActive) {
+                        _setVoiceStatus('👂 Listening… (nothing heard, trying again)');
+                        setTimeout(_startSpeechRec, 800);
+                    }
+                };
+                _recog.onerror = function(ev) {
+                    if (ev.error === 'no-speech' && _voiceActive) { setTimeout(_startSpeechRec, 600); }
+                    else if (ev.error !== 'aborted' && _voiceActive) {
+                        _setVoiceStatus('⚠️ Voice recognition error: ' + ev.error);
+                        setTimeout(_startSpeechRec, 2000);
+                    }
+                };
+                try { _recog.start(); } catch(e) {}
+            }
+
+            function _startListening() {
+                if (!_voiceActive) return;
+                if (_SpeechRec) { _startSpeechRec(); } else { _startVAD(); }
+            }
+
+            function _stopVoiceMode() {
+                _voiceActive = false;
+                window.speechSynthesis.cancel();
+                if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
+                _stopVAD();
+                _voiceBtn.textContent = '🔊';
+                _voiceBtn.style.background = '';
+                _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
+                _setVoiceStatus('');
+            }
+
+            _voiceBtn.addEventListener('click', function() {
+                if (_voiceActive) { _stopVoiceMode(); return; }
+                if (!_SpeechRec && !_hasVAD) {
+                    if (!_hasTTS) { alert('Your browser does not support voice features. Please use Chrome, Edge, Safari, or Firefox.'); return; }
+                }
+                _voiceActive = true;
+                _voiceBtn.textContent = '🔇';
+                _voiceBtn.style.background = '#d0ffd0';
+                _voiceBtn.title = 'Voice mode ON — click to stop';
+                _startListening();
+            });
+
+            document.getElementById('close-chat').addEventListener('click', function() {
+                if (_voiceActive) _stopVoiceMode();
+            }, true);
         })();
 
         document.getElementById('ai-provider').addEventListener('change', function(e) {
@@ -1414,9 +1694,8 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                            { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                            { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
+                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');
@@ -1883,13 +2162,22 @@
         const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
             && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
         const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
-        if (state.pageContext.agent_id === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
-            state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
+        if (_agentId === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
+            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
         }
 
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (_agentId === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
         // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
         // Parses bill text from chat history and fires navigate_and_fill directly.
-        if (state.pageContext.agent_id === 'accounting') {
+        if (_agentId === 'accounting') {
             const _pu2 = prompt.toUpperCase();
             const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
                 || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
@@ -1904,6 +2192,7 @@
                 const _nfFields = {};
                 const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
                 if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                // Date: MM/DD/YYYY or YYYY-MM-DD or DD/MM/YYYY
                 const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
                     || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
                 if (_dateM) {
@@ -1911,6 +2200,7 @@
                         ? _dateM[0]
                         : (_dateM[3] + '-' + _dateM[1] + '-' + _dateM[2]);
                 }
+                // Invoice number: "Invoice number: XXX" or "Payment Number: XXX"
                 const _invNumM = _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
                     || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
                 if (_invNumM) _nfFields.invoice_number = _invNumM[1];
@@ -1983,6 +2273,45 @@
             }
         }
 
+        // ENCY fast path: when ENCY agent is active and the prompt or chat history mentions
+        // "Unresolved term in constituent#N", navigate directly to that constituent's page.
+        // When adding a named constituent, navigate to the add form pre-filled.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '…';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // Build request payload with page context and agent info
         const requestPayload = {
             prompt: prompt,
@@ -2030,6 +2359,18 @@
             console.debug('Adding conversation_id to request:', state.currentConversationId);
         } else {
             console.debug('No conversation_id in state, starting new conversation');
+        }
+
+        // Link audio/transcript files from the most recent voice recording.
+        // These are set by _transcribeAudioFile() after a successful transcription.
+        // Sent once with the first message after a recording, then cleared.
+        if (state.lastAudioFileId) {
+            requestPayload.audio_file_id = state.lastAudioFileId;
+            state.lastAudioFileId = null;
+        }
+        if (state.lastTranscriptFileId) {
+            requestPayload.transcript_file_id = state.lastTranscriptFileId;
+            state.lastTranscriptFileId = null;
         }
 
         // Build conversation history from visible messages (exclude current user msg
@@ -2275,7 +2616,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-4-0709';
+                                          : 'grok|grok-4.3';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
@@ -2357,6 +2698,9 @@
                 const _needsSupport = _detectSupportNeeded(_rawClean);
                 const cleanText = _stripSupportTag(_rawClean);
                 addMessage(cleanText, 'ai-message');
+
+                // Voice mode: read the AI response aloud, then restart listening
+                if (state._speakResponse) { state._speakResponse(cleanText); }
 
                 if (_needsSupport && !state.supportMode) {
                     _showEscalationButtons();
