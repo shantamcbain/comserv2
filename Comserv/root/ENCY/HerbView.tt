@@ -229,10 +229,12 @@ Record ID:[% herb.record_id %]
     <tr>
         <td style="font-weight:bold;">Organism</td>
         <td colspan="3">
-            <a href="[% c.uri_for('/ENCY/Organism', org.record_id) %]">[% org.common_name | html %]</a>
             [% IF is_editor %]
+            <a href="[% c.uri_for('/ENCY/Organism', org.record_id) %]">[% org.scientific_name || org.common_name | html %]</a>
             &nbsp;<a href="[% c.uri_for('/ENCY/Organism/edit', { record_id => org.record_id }) %]"
                     style="font-size:0.85em;">[edit organism]</a>
+            [% ELSE %]
+            [% org.scientific_name || org.common_name | html %]
             [% END %]
         </td>
     </tr>
