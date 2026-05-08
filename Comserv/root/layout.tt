@@ -28,6 +28,7 @@
 [% ELSE %]
     [% INCLUDE 'pagetop.tt' %]
 [%# INCLUDE 'home.tt' %]
+    [% TRY %][% INCLUDE 'mail/subscribe_banner.tt' %][% CATCH %][% END %]
     [% content %]
     [% INCLUDE 'AdminNotes.tt' %]
     
