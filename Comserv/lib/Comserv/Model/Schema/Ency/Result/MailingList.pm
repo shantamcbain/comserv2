@@ -42,6 +42,20 @@ __PACKAGE__->add_columns(
         data_type => 'tinyint',
         default_value => 1,
     },
+    is_public => {
+        data_type     => 'tinyint',
+        default_value => 0,
+    },
+    list_backend => {
+        data_type     => 'varchar',
+        size          => 50,
+        default_value => 'local',
+        is_nullable   => 0,
+    },
+    backend_config => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
     created_by => {
         data_type => 'integer',
         is_nullable => 0,

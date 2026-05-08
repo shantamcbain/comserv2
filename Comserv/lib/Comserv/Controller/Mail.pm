@@ -3,6 +3,8 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use Comserv::Util::Logging;
+use Digest::SHA qw(sha256_hex);
+use POSIX qw(strftime);
 BEGIN { extends 'Catalyst::Controller'; }
 
 has 'logging' => (
@@ -959,13 +961,16 @@ sub lists_create :Path('/mail/lists/create') :Args(0) {
         }
         eval {
             $c->model('DBEncy')->resultset('MailingList')->create({
-                site_id         => $site_id,
-                name            => $name,
-                description     => $c->req->param('description') || '',
-                list_email      => $c->req->param('list_email')  || undef,
+                site_id          => $site_id,
+                name             => $name,
+                description      => $c->req->param('description')    || '',
+                list_email       => $c->req->param('list_email')      || undef,
                 is_software_only => $c->req->param('is_software_only') ? 1 : 0,
-                is_active       => 1,
-                created_by      => $c->session->{user_id} || 0,
+                is_public        => $c->req->param('is_public')        ? 1 : 0,
+                list_backend     => $c->req->param('list_backend')     || 'local',
+                backend_config   => $c->req->param('backend_config')   || undef,
+                is_active        => 1,
+                created_by       => $c->session->{user_id} || 0,
             });
         };
         if ($@) {
@@ -1018,10 +1023,13 @@ sub lists_edit {
     if ($c->req->method eq 'POST') {
         eval {
             $list->update({
-                name            => $c->req->param('name')        || $list->name,
-                description     => $c->req->param('description') // $list->description,
-                list_email      => $c->req->param('list_email')  || undef,
+                name             => $c->req->param('name')             || $list->name,
+                description      => $c->req->param('description')      // $list->description,
+                list_email       => $c->req->param('list_email')       || undef,
                 is_software_only => $c->req->param('is_software_only') ? 1 : 0,
+                is_public        => $c->req->param('is_public')        ? 1 : 0,
+                list_backend     => $c->req->param('list_backend')     || $list->list_backend || 'local',
+                backend_config   => $c->req->param('backend_config')   // $list->backend_config,
             });
         };
         if ($@) {
@@ -1715,6 +1723,438 @@ sub _sync_workshop_attendees_list {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
         "Synced Workshop Attendees: " . scalar(@entries) . " entries for site_id=$site_id (" .
         scalar(@workshop_ids) . " workshops)");
+}
+
+sub subscribe :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $schema  = $c->model('DBEncy');
+    my $site_id = $self->_get_site_id($c);
+
+    my @public_lists;
+    eval {
+        my $rs = $schema->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1, is_public => 1 },
+            { order_by => 'name' }
+        );
+        while (my $list = $rs->next) {
+            push @public_lists, {
+                id          => $list->id,
+                name        => $list->name,
+                description => $list->description,
+            };
+        }
+    };
+    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'subscribe', "DB error: $@") if $@;
+
+    my %subscribed_ids;
+    my $prefill = {};
+    if ($c->session->{user_id}) {
+        my $uid = $c->session->{user_id};
+        my $user = eval { $schema->resultset('User')->find($uid) };
+        if ($user) {
+            $prefill = {
+                email      => $user->email      // '',
+                first_name => $user->first_name // '',
+                last_name  => $user->last_name  // '',
+            };
+        }
+        eval {
+            my $subs = $schema->resultset('MailingListSubscription')->search(
+                { user_id => $uid, status => 'subscribed', is_active => 1 }
+            );
+            while (my $s = $subs->next) {
+                $subscribed_ids{ $s->mailing_list_id } = 1;
+            }
+        };
+    }
+
+    $c->stash(
+        public_lists    => \@public_lists,
+        subscribed_ids  => \%subscribed_ids,
+        prefill         => $prefill,
+        template        => 'mail/Subscribe.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub newsletter_signup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $schema    = $c->model('DBEncy');
+    my $site_id   = $self->_get_site_id($c);
+    my $email     = $c->req->param('email')      // '';
+    my $first     = $c->req->param('first_name') // '';
+    my $last      = $c->req->param('last_name')  // '';
+    my @list_ids  = $c->req->param('list_ids[]') ? $c->req->param('list_ids[]')
+                  : ($c->req->param('list_id') // ());
+    my $is_ajax   = ($c->req->header('X-Requested-With') // '') eq 'XMLHttpRequest';
+
+    $email =~ s/^\s+|\s+$//g;
+
+    unless ($email && $email =~ /\@/) {
+        if ($is_ajax) {
+            $c->response->content_type('application/json');
+            $c->response->body('{"ok":0,"error":"A valid email address is required."}');
+            return;
+        }
+        $c->flash->{error_msg} = 'A valid email address is required.';
+        $c->response->redirect($c->uri_for('/mail/subscribe'));
+        return;
+    }
+
+    unless (@list_ids) {
+        my @public = eval {
+            $schema->resultset('MailingList')->search(
+                { site_id => $site_id, is_active => 1, is_public => 1 },
+                { order_by => 'name' }
+            )->all;
+        };
+        @list_ids = map { $_->id } @public;
+    }
+
+    my $uid = $c->session->{user_id};
+    my $subscribed = 0;
+
+    for my $list_id (@list_ids) {
+        next unless $list_id =~ /^\d+$/;
+        my $list = eval { $schema->resultset('MailingList')->find($list_id) };
+        next unless $list && $list->site_id == $site_id && $list->is_public;
+
+        my $token = sha256_hex(time . $email . $list_id . rand());
+
+        eval {
+            my $existing = $schema->resultset('MailingListSubscription')->search({
+                mailing_list_id => $list_id,
+                $uid ? (user_id => $uid) : (email => $email),
+            })->single;
+
+            if ($existing) {
+                $existing->update({
+                    status            => 'subscribed',
+                    is_active         => 1,
+                    unsubscribed_at   => undef,
+                    first_name        => $first || $existing->first_name,
+                    last_name         => $last  || $existing->last_name,
+                    unsubscribe_token => $existing->unsubscribe_token // $token,
+                });
+            } else {
+                $schema->resultset('MailingListSubscription')->create({
+                    mailing_list_id     => $list_id,
+                    ($uid ? (user_id    => $uid) : ()),
+                    email               => $email,
+                    first_name          => $first,
+                    last_name           => $last,
+                    status              => 'subscribed',
+                    is_active           => 1,
+                    subscription_source => 'web',
+                    unsubscribe_token   => $token,
+                });
+            }
+            $subscribed++;
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup',
+            "Error subscribing $email to list $list_id: $@") if $@;
+    }
+
+    if ($is_ajax) {
+        $c->response->content_type('application/json');
+        $c->response->body(
+            $subscribed
+                ? '{"ok":1,"message":"You have been subscribed successfully."}'
+                : '{"ok":0,"error":"Could not subscribe. Please try again."}'
+        );
+        return;
+    }
+
+    if ($subscribed) {
+        $c->flash->{success_msg} = 'You have been subscribed successfully.';
+    } else {
+        $c->flash->{error_msg} = 'Could not subscribe. Please try again.';
+    }
+    $c->response->redirect($c->uri_for('/mail/subscribe'));
+}
+
+sub my_subscriptions :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{user_id}) {
+        $c->flash->{error_msg} = 'Please log in to manage your subscriptions.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $uid     = $c->session->{user_id};
+    my $site_id = $self->_get_site_id($c);
+
+    if ($c->req->method eq 'POST') {
+        my @checked_ids = ref($c->req->param('list_ids[]')) eq 'ARRAY'
+            ? @{$c->req->param('list_ids[]')}
+            : ($c->req->param('list_ids[]') ? ($c->req->param('list_ids[]')) : ());
+
+        my %checked = map { $_ => 1 } grep { /^\d+$/ } @checked_ids;
+
+        my @all_public = eval {
+            $schema->resultset('MailingList')->search(
+                { site_id => $site_id, is_active => 1, is_public => 1 }
+            )->all;
+        };
+
+        for my $list (@all_public) {
+            my $lid = $list->id;
+            my $existing = eval {
+                $schema->resultset('MailingListSubscription')->search(
+                    { mailing_list_id => $lid, user_id => $uid }
+                )->single;
+            };
+
+            if ($checked{$lid}) {
+                if ($existing) {
+                    $existing->update({ status => 'subscribed', is_active => 1, unsubscribed_at => undef })
+                        unless $existing->status eq 'blocked';
+                } else {
+                    my $user = $schema->resultset('User')->find($uid);
+                    eval {
+                        $schema->resultset('MailingListSubscription')->create({
+                            mailing_list_id     => $lid,
+                            user_id             => $uid,
+                            email               => ($user ? $user->email : undef),
+                            first_name          => ($user ? $user->first_name : undef),
+                            last_name           => ($user ? $user->last_name  : undef),
+                            status              => 'subscribed',
+                            is_active           => 1,
+                            subscription_source => 'web',
+                            unsubscribe_token   => sha256_hex(time . $uid . $lid . rand()),
+                        });
+                    };
+                }
+            } else {
+                if ($existing && $existing->status eq 'subscribed') {
+                    $existing->update({
+                        status          => 'unsubscribed',
+                        is_active       => 0,
+                        unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
+                    });
+                }
+            }
+        }
+
+        $c->flash->{success_msg} = 'Your subscriptions have been updated.';
+        $c->response->redirect($c->uri_for('/mail/my_subscriptions'));
+        return;
+    }
+
+    my @public_lists;
+    eval {
+        my $rs = $schema->resultset('MailingList')->search(
+            { site_id => $site_id, is_active => 1, is_public => 1 },
+            { order_by => 'name' }
+        );
+        while (my $list = $rs->next) {
+            my $sub = $schema->resultset('MailingListSubscription')->search(
+                { mailing_list_id => $list->id, user_id => $uid }
+            )->single;
+            push @public_lists, {
+                id          => $list->id,
+                name        => $list->name,
+                description => $list->description,
+                status      => ($sub ? $sub->status : 'not_subscribed'),
+                is_subscribed => ($sub && $sub->status eq 'subscribed') ? 1 : 0,
+                is_blocked    => ($sub && $sub->status eq 'blocked')    ? 1 : 0,
+            };
+        }
+    };
+
+    $c->stash(
+        public_lists => \@public_lists,
+        template     => 'mail/MySubscriptions.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub unsubscribe :Local :Args(1) {
+    my ($self, $c, $token) = @_;
+
+    my $schema = $c->model('DBEncy');
+    my $sub;
+    eval {
+        $sub = $schema->resultset('MailingListSubscription')->search(
+            { unsubscribe_token => $token }
+        )->single;
+    };
+
+    unless ($sub) {
+        $c->stash(
+            error_msg => 'Invalid or expired unsubscribe link.',
+            template  => 'mail/UnsubscribeResult.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    if ($sub->status eq 'blocked') {
+        $c->stash(
+            error_msg => 'This address cannot be unsubscribed via link. Please contact support.',
+            template  => 'mail/UnsubscribeResult.tt',
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    eval {
+        $sub->update({
+            status          => 'unsubscribed',
+            is_active       => 0,
+            unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+    };
+
+    my $list_name = '';
+    eval { $list_name = $sub->mailing_list->name };
+
+    $c->stash(
+        success_msg => "You have been unsubscribed from \"$list_name\".",
+        template    => 'mail/UnsubscribeResult.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub admin_user_subscriptions :Local :Args(1) {
+    my ($self, $c, $user_id) = @_;
+
+    my $is_csc_admin = (($c->session->{roles} // '') =~ /admin/i
+                     && ($c->stash->{SiteName} // '') =~ /^CSC/i);
+    my $is_site_admin = (($c->session->{roles} // '') =~ /admin|site_admin/i);
+
+    unless ($is_csc_admin || $is_site_admin) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $site_id = $self->_get_site_id($c);
+    my $target  = eval { $schema->resultset('User')->find($user_id) };
+
+    unless ($target) {
+        $c->flash->{error_msg} = 'User not found.';
+        $c->response->redirect($c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my @subscriptions;
+    eval {
+        my $subs_rs = $schema->resultset('MailingListSubscription')->search(
+            { user_id => $user_id },
+            { prefetch => 'mailing_list', order_by => 'mailing_list.name' }
+        );
+        while (my $s = $subs_rs->next) {
+            next unless $is_csc_admin || $s->mailing_list->site_id == $site_id;
+            push @subscriptions, {
+                sub_id        => $s->id,
+                list_id       => $s->mailing_list_id,
+                list_name     => $s->mailing_list->name,
+                status        => $s->status,
+                subscribed_at => $s->subscribed_at,
+                blocked_reason => $s->blocked_reason,
+            };
+        }
+    };
+
+    $c->stash(
+        target_user   => $target,
+        subscriptions => \@subscriptions,
+        template      => 'mail/AdminUserSubscriptions.tt',
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub admin_block_subscriber :Local :Args(1) {
+    my ($self, $c, $sub_id) = @_;
+
+    my $is_admin = (($c->session->{roles} // '') =~ /admin|site_admin/i);
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $site_id = $self->_get_site_id($c);
+    my $reason  = $c->req->param('reason') // '';
+    my $sub     = eval { $schema->resultset('MailingListSubscription')->find($sub_id) };
+
+    unless ($sub) {
+        $c->flash->{error_msg} = 'Subscription record not found.';
+        $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my $is_csc_admin = (($c->session->{roles} // '') =~ /admin/i
+                     && ($c->stash->{SiteName} // '') =~ /^CSC/i);
+    unless ($is_csc_admin || $sub->mailing_list->site_id == $site_id) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
+        return;
+    }
+
+    eval {
+        $sub->update({
+            status         => 'blocked',
+            is_active      => 0,
+            blocked_by     => $c->session->{user_id},
+            blocked_at     => strftime('%Y-%m-%d %H:%M:%S', localtime),
+            blocked_reason => $reason,
+        });
+    };
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_block_subscriber',
+        "AUDIT: Admin " . ($c->session->{username} // 'unknown') . " blocked subscription id=$sub_id reason=$reason");
+
+    $c->flash->{success_msg} = 'Subscriber has been blocked.';
+    $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
+}
+
+sub admin_unsubscribe_user :Local :Args(1) {
+    my ($self, $c, $sub_id) = @_;
+
+    my $is_admin = (($c->session->{roles} // '') =~ /admin|site_admin/i);
+    unless ($is_admin) {
+        $c->res->status(403);
+        $c->response->body('Access denied');
+        return;
+    }
+
+    my $schema  = $c->model('DBEncy');
+    my $site_id = $self->_get_site_id($c);
+    my $sub     = eval { $schema->resultset('MailingListSubscription')->find($sub_id) };
+
+    unless ($sub) {
+        $c->flash->{error_msg} = 'Subscription record not found.';
+        $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
+        return;
+    }
+
+    my $is_csc_admin = (($c->session->{roles} // '') =~ /admin/i
+                     && ($c->stash->{SiteName} // '') =~ /^CSC/i);
+    unless ($is_csc_admin || $sub->mailing_list->site_id == $site_id) {
+        $c->flash->{error_msg} = 'Access denied.';
+        $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
+        return;
+    }
+
+    eval {
+        $sub->update({
+            status          => 'unsubscribed',
+            is_active       => 0,
+            unsubscribed_at => strftime('%Y-%m-%d %H:%M:%S', localtime),
+        });
+    };
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'admin_unsubscribe_user',
+        "AUDIT: Admin " . ($c->session->{username} // 'unknown') . " force-unsubscribed subscription id=$sub_id");
+
+    $c->flash->{success_msg} = 'User has been unsubscribed.';
+    $c->response->redirect($c->req->referer || $c->uri_for('/mail/lists'));
 }
 
 __PACKAGE__->meta->make_immutable;
