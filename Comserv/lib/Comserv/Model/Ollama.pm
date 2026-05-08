@@ -1261,11 +1261,45 @@ sub get_running_models {
 sub list_available_models {
     my ($self) = @_;
     
-    # Current recommended Ollama models (updated 2026-04)
+    # Current recommended Ollama models (updated 2026-05)
     # CPU-friendly picks marked recommended => 1 (run well on 8-16 GB RAM)
+    # cloud => 1 marks Ollama-hosted cloud models (no local GPU needed, no API key required).
     # NOTE: Ollama has no public registry API — this list must be updated manually.
     #       See https://ollama.com/library for current models.
     my @available_models = (
+        # ── Gemma 4 (Google, 2026) — 2x faster via native MTP ───────────────────
+        {
+            name        => 'gemma4:4b',
+            description => 'Google Gemma 4 4B — fast, capable, native MTP acceleration',
+            size        => '3.3GB',
+            params      => '4B',
+            tags        => ['general', 'chat', 'fast', 'cpu-friendly'],
+            recommended => 1,
+        },
+        {
+            name        => 'gemma4:12b',
+            description => 'Google Gemma 4 12B — strong reasoning, 2x faster via MTP',
+            size        => '7.7GB',
+            params      => '12B',
+            tags        => ['general', 'chat', 'reasoning'],
+            recommended => 1,
+        },
+        {
+            name        => 'gemma4:27b',
+            description => 'Google Gemma 4 27B — top quality, needs 16+ GB RAM',
+            size        => '17GB',
+            params      => '27B',
+            tags        => ['general', 'chat', 'advanced'],
+        },
+        {
+            name        => 'gemma4:31b-cloud',
+            description => 'Google Gemma 4 31B — Ollama cloud hosted, 2x faster via MTP, no local GPU needed',
+            size        => 'cloud',
+            params      => '31B',
+            tags        => ['general', 'chat', 'reasoning', 'cloud', 'fast'],
+            recommended => 1,
+            cloud       => 1,
+        },
         # ── Gemma 3 (Google) ────────────────────────────────────────────────────
         {
             name        => 'gemma3:1b',

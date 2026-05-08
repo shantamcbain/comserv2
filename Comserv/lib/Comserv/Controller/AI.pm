@@ -5257,72 +5257,87 @@ Choose the best installed Ollama model for a given agent/page context.
 
 =cut
 
+sub _score_ollama_model {
+    my ($name, $ctx) = @_;
+    $ctx //= 'general';
+    my $lname = lc($name);
+
+    my %fq = (
+        'gemma4'        => 90,
+        'deepseek-r1'   => 85,
+        'phi4'          => 82,
+        'qwen2.5-coder' => 80,
+        'starcoder2'    => 78,
+        'qwen2.5'       => 78,
+        'llama3.1'      => 75,
+        'llama3.2'      => 74,
+        'gemma3'        => 73,
+        'mistral-small' => 72,
+        'qwen2'         => 70,
+        'llama3'        => 68,
+        'mistral'       => 68,
+        'codellama'     => 67,
+        'phi3'          => 65,
+        'gemma2'        => 63,
+        'gemma'         => 55,
+        'llama2'        => 50,
+        'phi'           => 50,
+    );
+
+    my $score = 50;
+    for my $fam (sort { length($b) <=> length($a) } keys %fq) {
+        if (index($lname, $fam) == 0) { $score = $fq{$fam}; last; }
+    }
+
+    my $params = 0;
+    $params = $1 + 0 if $lname =~ /[:\-](\d+(?:\.\d+)?)b/i;
+    $score += $params >= 30 ? 20
+            : $params >= 20 ? 16
+            : $params >= 12 ? 12
+            : $params >=  7 ?  8
+            : $params >=  3 ?  4
+            :                  0;
+
+    $score += 15 if $lname =~ /-cloud\b/;
+
+    $score += 20 if $ctx eq 'code' && $lname =~ /coder|starcoder|codellama/i;
+
+    return $score;
+}
+
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
 
-    $agent_id    //= 'general';
-    $page_context //= 'general';
+    $agent_id         //= 'general';
+    $page_context     //= 'general';
     $installed_models //= [];
 
-    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
     my $is_chat_model = sub {
         my ($n) = @_;
         return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
     };
 
-    # Build a quick lookup: short name → full model name (chat models only)
-    my %installed;
+    my %seen;
+    my @chat_names;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-        next unless $name;
-        next unless $is_chat_model->($name);
-        $installed{$name} = $name;
-        (my $short = $name) =~ s/:.*$//;
-        $installed{$short} = $name;
+        next unless $name && !$seen{$name}++ && $is_chat_model->($name);
+        push @chat_names, $name;
     }
 
-    # Preferred models per context (ordered: first match wins).
-    # tinyllama intentionally excluded — too small for reliable answers.
-    my %context_prefs = (
-        chat        => ['gemma4', 'llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        helpdesk    => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
-        ency        => ['gemma4', 'phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['gemma4', 'phi4', 'llama3.1', 'llama3', 'mistral'],
-        csc         => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
-        general     => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
-        navigation  => ['gemma4', 'llama3.1', 'llama3'],
-        simple      => ['gemma4', 'llama3.1', 'llama3'],
-        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'gemma4', 'llama3.1'],
-        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'gemma4', 'llama3.1'],
-        docker      => ['starcoder2', 'qwen2.5-coder', 'gemma4', 'llama3.1'],
-    );
+    unless (@chat_names) {
+        return $default_model if $default_model && $is_chat_model->($default_model);
+        return 'llama3.1:latest';
+    }
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
-    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
-    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
-    $ctx = 'csc'        if $ctx =~ /^csc$/;
-    $ctx = 'ency'       if $ctx =~ /^ency$/;
-    $ctx = 'docker'     if $ctx =~ /docker/;
-    $ctx = 'general'    unless exists $context_prefs{$ctx};
+    $ctx = 'code' if $ctx =~ /code|developer|starcoder|docker/;
 
-    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+    my @ranked = sort {
+        _score_ollama_model($b, $ctx) <=> _score_ollama_model($a, $ctx)
+    } @chat_names;
 
-    for my $pref (@$prefs) {
-        for my $key (keys %installed) {
-            if ($key =~ /\Q$pref\E/i) {
-                return $installed{$key};
-            }
-        }
-    }
-
-    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
-    if ($default_model && $is_chat_model->($default_model)) {
-        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
-    }
-    my @chat_values = values %installed;
-    return $chat_values[0] if @chat_values;
-    return 'llama3.1:latest';
+    return $ranked[0];
 }
 
 =head2 _get_current_ollama_config
