@@ -6728,6 +6728,133 @@ sub sync_models :Local :Args(0) {
     };
 }
 
+=head2 auto_sync_models
+
+Pull all recommended Ollama models that are not yet installed and remove
+explicitly deprecated models across all configured Ollama servers.
+Admin/developer only.  Returns JSON with per-server results.
+
+=cut
+
+sub auto_sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin = ref($user_roles) eq 'ARRAY'
+        ? grep { /^(admin|developer)$/i } @$user_roles : 0;
+
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    my $ollama_cfg    = $c->config->{Ollama} || {};
+    my $primary_host  = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
+    my $port          = $ollama_cfg->{port}           || 11434;
+
+    my @server_hosts = ($primary_host);
+    push @server_hosts, $fallback_host if $fallback_host ne $primary_host;
+
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama model unavailable' }));
+        return;
+    }
+
+    my $catalog    = $ollama->list_available_models();
+    my @recommended = grep { $_->{recommended} } @$catalog;
+    my $deprecated  = $ollama->deprecated_models();
+
+    my @results;
+    for my $host (@server_hosts) {
+        my %sr = (
+            host    => $host,
+            port    => $port,
+            pulled  => [],
+            skipped => [],
+            removed => [],
+            errors  => [],
+        );
+
+        $ollama->host($host);
+        $ollama->port($port);
+        $ollama->clear_endpoint;
+
+        unless ($ollama->check_connection()) {
+            $sr{error} = "Cannot connect to $host:$port";
+            push @results, \%sr;
+            next;
+        }
+
+        my $installed = $ollama->list_models() || [];
+        my %inst_set;
+        for my $m (@$installed) {
+            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+            $inst_set{$n} = 1;
+            (my $base = $n) =~ s/:.*$//;
+            $inst_set{$base} = 1;
+        }
+
+        for my $model (@recommended) {
+            my $name = $model->{name};
+            (my $base = $name) =~ s/:.*$//;
+            if ($inst_set{$name} || $inst_set{$base}) {
+                push @{ $sr{skipped} }, "$name (already installed)";
+                next;
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Pulling recommended model: $name on $host:$port");
+            my $result = $ollama->pull_model(model => $name);
+            if ($result && $result->{success}) {
+                push @{ $sr{pulled} }, $name;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "$name: $err";
+            }
+        }
+
+        for my $dep (@$deprecated) {
+            next unless $inst_set{$dep};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Removing deprecated model: $dep on $host:$port");
+            my $result = $ollama->remove_model(model => $dep);
+            if ($result && $result->{success}) {
+                push @{ $sr{removed} }, $dep;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "remove $dep: $err";
+            }
+        }
+
+        push @results, \%sr;
+    }
+
+    my ($total_pulled, $total_removed) = (0, 0);
+    $total_pulled  += scalar @{ $_->{pulled}  } for @results;
+    $total_removed += scalar @{ $_->{removed} } for @results;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'auto_sync_models', "Auto-sync complete: pulled=$total_pulled removed=$total_removed");
+
+    $c->response->body(encode_json({
+        success       => JSON::true,
+        servers       => \@results,
+        total_pulled  => $total_pulled,
+        total_removed => $total_removed,
+    }));
+}
+
 =head2 project_conversations
 
 JSON endpoint: returns recent AI conversations for a given project_id.
