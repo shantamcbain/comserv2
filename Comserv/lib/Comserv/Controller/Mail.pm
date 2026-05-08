@@ -836,6 +836,60 @@ sub _get_site_id {
     return $site_id;
 }
 
+sub _has_mail_role {
+    my ($self, $c) = @_;
+    my $roles = $c->session->{roles} || [];
+    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
+    return grep { /^(admin|editor|workshop_leader)$/ } @$roles;
+}
+
+sub newsletter_signup :Path('/mail/newsletter_signup') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $email = $c->req->param('email') || '';
+    unless ($email =~ /\@/) {
+        $c->flash->{error_msg} = 'A valid email address is required.';
+        $c->res->redirect($c->req->referer || $c->uri_for('/'));
+        return;
+    }
+
+    my $site_id = $self->_get_site_id($c);
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my ($list_id) = $dbh->selectrow_array(
+            "SELECT id FROM mailing_lists WHERE site_id=? AND is_active=1 ORDER BY id LIMIT 1",
+            {}, $site_id
+        );
+        if ($list_id) {
+            my ($existing) = $dbh->selectrow_array(
+                "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=?",
+                {}, $list_id, lc $email
+            );
+            if ($existing) {
+                $dbh->do("UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?", {}, $existing);
+            } else {
+                $dbh->do(
+                    "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, subscription_source, is_active) VALUES (?,?,?,1)",
+                    {}, $list_id, lc($email), 'newsletter'
+                );
+            }
+            my ($list_email) = $dbh->selectrow_array(
+                "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
+            );
+            if ($list_email) {
+                $c->model('Mail')->subscribe_cpanel_list($c, list_address => $list_email, email => lc $email);
+            }
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'newsletter_signup', "Error: $@");
+        $c->flash->{error_msg} = 'Could not subscribe — please try again.';
+    } else {
+        $c->flash->{success_msg} = 'Thank you for subscribing!';
+    }
+    $c->res->redirect($c->req->referer || $c->uri_for('/'));
+}
+
 sub lists :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -1076,233 +1130,14 @@ sub lists_subscribers {
 }
 
 # ─────────────────────────────────────────────────────────────
-#  cPanel list provisioning (admin)
-# ─────────────────────────────────────────────────────────────
-
-sub lists_cpanel_provision :Path('/mail/lists/cpanel_provision') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error_msg} = 'Admin access required.';
-        $c->res->redirect($c->uri_for('/mail/lists'));
-        return;
-    }
-
-    if ($c->req->method eq 'POST') {
-        my $list_id   = $c->req->param('list_id')   || '';
-        my $domain    = $c->req->param('domain')     || '';
-        my $list_name = $c->req->param('list_name')  || '';
-
-        unless ($list_id && $domain && $list_name) {
-            $c->flash->{error_msg} = 'List ID, domain, and list name are required.';
-            $c->res->redirect($c->uri_for('/mail/lists'));
-            return;
-        }
-
-        my ($ok, $err) = $c->model('Mail')->create_cpanel_list(
-            $c,
-            list_name => $list_name,
-            domain    => $domain,
-        );
-
-        if ($ok) {
-            my $list_email = "$list_name\@$domain";
-            eval {
-                my $list = $c->model('DBEncy')->resultset('MailingList')->find($list_id);
-                $list->update({ list_email => $list_email, is_software_only => 0 }) if $list;
-            };
-            $c->flash->{success_msg} = "cPanel mailing list $list_email created and linked.";
-        } else {
-            $c->flash->{error_msg} = "cPanel provisioning failed: $err";
-        }
-        $c->res->redirect($c->uri_for('/mail/lists'));
-        return;
-    }
-
-    my $site_id = $self->_get_site_id($c);
-    my @lists;
-    eval {
-        my $rs = $c->model('DBEncy')->resultset('MailingList')->search(
-            { site_id => $site_id, is_active => 1 }, { order_by => 'name' }
-        );
-        while (my $l = $rs->next) {
-            push @lists, { id => $l->id, name => $l->name, list_email => $l->list_email };
-        }
-    };
-    $c->stash(lists => \@lists, template => 'mail/cpanel_provision.tt');
-    $c->forward($c->view('TT'));
-}
-
-# ─────────────────────────────────────────────────────────────
-#  User mailing list subscribe / unsubscribe
-# ─────────────────────────────────────────────────────────────
-
-sub my_subscriptions :Path('/mail/my_subscriptions') :Args(0) {
-    my ($self, $c) = @_;
-
-    unless ($c->session->{user_id}) {
-        $c->flash->{error_msg} = 'Please log in to manage your subscriptions.';
-        $c->res->redirect($c->uri_for('/user/login'));
-        return;
-    }
-
-    my $site_id = $self->_get_site_id($c);
-    my $user_id = $c->session->{user_id};
-
-    my (@lists);
-    eval {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my $sth = $dbh->prepare(
-            "SELECT ml.id, ml.name, ml.description, ml.list_email,
-                    (SELECT COUNT(*) FROM mailing_list_subscriptions s2
-                     WHERE s2.mailing_list_id = ml.id AND s2.user_id = ? AND s2.is_active = 1) AS subscribed
-             FROM mailing_lists ml
-             WHERE ml.site_id = ? AND ml.is_active = 1
-             ORDER BY ml.name"
-        );
-        $sth->execute($user_id, $site_id);
-        while (my $row = $sth->fetchrow_hashref) {
-            push @lists, {
-                id         => $row->{id},
-                name       => $row->{name},
-                description => $row->{description} || '',
-                list_email => $row->{list_email} || '',
-                subscribed => $row->{subscribed} ? 1 : 0,
-            };
-        }
-    };
-    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'my_subscriptions', "DB error: $@") if $@;
-
-    $c->stash(lists => \@lists, template => 'mail/my_subscriptions.tt');
-    $c->forward($c->view('TT'));
-}
-
-sub toggle_subscription :Path('/mail/toggle_subscription') :Args(0) {
-    my ($self, $c) = @_;
-
-    unless ($c->session->{user_id}) {
-        $c->res->body('{"ok":0,"msg":"Not logged in"}');
-        $c->res->content_type('application/json');
-        return;
-    }
-
-    my $list_id   = $c->req->param('list_id')  || '';
-    my $subscribe = $c->req->param('subscribe') || '0';
-    my $user_id   = $c->session->{user_id};
-    my $email     = $c->session->{email} || '';
-
-    unless ($list_id =~ /^\d+$/) {
-        $c->res->body('{"ok":0,"msg":"Invalid list"}');
-        $c->res->content_type('application/json');
-        return;
-    }
-
-    my ($ok, $msg);
-    eval {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        if ($subscribe) {
-            my ($existing) = $dbh->selectrow_array(
-                "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND user_id=?",
-                {}, $list_id, $user_id
-            );
-            if ($existing) {
-                $dbh->do("UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?", {}, $existing);
-            } else {
-                $dbh->do(
-                    "INSERT INTO mailing_list_subscriptions (mailing_list_id, user_id, email, subscription_source, is_active) VALUES (?,?,?,'self',1)",
-                    {}, $list_id, $user_id, $email
-                );
-            }
-            # Also subscribe on cPanel if the list has a real list_email
-            my ($list_email) = $dbh->selectrow_array(
-                "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
-            );
-            if ($list_email && $email) {
-                $c->model('Mail')->subscribe_cpanel_list($c, list_address => $list_email, email => $email);
-            }
-            $ok = 1; $msg = 'Subscribed';
-        } else {
-            $dbh->do(
-                "UPDATE mailing_list_subscriptions SET is_active=0 WHERE mailing_list_id=? AND user_id=?",
-                {}, $list_id, $user_id
-            );
-            my ($list_email) = $dbh->selectrow_array(
-                "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
-            );
-            if ($list_email && $email) {
-                $c->model('Mail')->unsubscribe_cpanel_list($c, list_address => $list_email, email => $email);
-            }
-            $ok = 1; $msg = 'Unsubscribed';
-        }
-    };
-    if ($@) {
-        $ok = 0; $msg = "DB error: $@";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'toggle_subscription', $msg);
-    }
-
-    $c->res->content_type('application/json; charset=utf-8');
-    $msg =~ s/"/\\"/g;
-    $c->res->body('{"ok":' . ($ok ? 1 : 0) . ',"msg":"' . $msg . '"}');
-}
-
-# Public (no login required) subscribe via newsletter form
-sub public_subscribe :Path('/mail/public_subscribe') :Args(0) {
-    my ($self, $c) = @_;
-
-    my $list_id = $c->req->param('list_id') || '';
-    my $email   = $c->req->param('email')   || '';
-    my $fn      = $c->req->param('first_name') || '';
-    my $ln      = $c->req->param('last_name')  || '';
-
-    unless ($list_id =~ /^\d+$/ && $email =~ /\@/) {
-        $c->flash->{error_msg} = 'A valid email address is required.';
-        $c->res->redirect($c->req->referer || $c->uri_for('/'));
-        return;
-    }
-
-    eval {
-        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        my ($existing) = $dbh->selectrow_array(
-            "SELECT id FROM mailing_list_subscriptions WHERE mailing_list_id=? AND email=?",
-            {}, $list_id, lc $email
-        );
-        if ($existing) {
-            $dbh->do("UPDATE mailing_list_subscriptions SET is_active=1 WHERE id=?", {}, $existing);
-        } else {
-            $dbh->do(
-                "INSERT INTO mailing_list_subscriptions (mailing_list_id, email, first_name, last_name, subscription_source, is_active) VALUES (?,?,?,?,'public',1)",
-                {}, $list_id, lc($email), $fn, $ln
-            );
-        }
-        my ($list_email) = $dbh->selectrow_array(
-            "SELECT list_email FROM mailing_lists WHERE id=? AND is_software_only=0", {}, $list_id
-        );
-        if ($list_email) {
-            $c->model('Mail')->subscribe_cpanel_list($c, list_address => $list_email, email => lc $email);
-        }
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'public_subscribe', "Error: $@");
-        $c->flash->{error_msg} = 'Could not complete subscription — please try again.';
-    } else {
-        $c->flash->{success_msg} = 'You have been subscribed. Thank you!';
-    }
-    $c->res->redirect($c->req->referer || $c->uri_for('/'));
-}
-
-# ─────────────────────────────────────────────────────────────
 #  SITE MAILOUT — send to users / paid members / custom list
 # ─────────────────────────────────────────────────────────────
 
 sub mass_email :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error_msg} = 'Admin access required.';
+    unless ($self->_has_mail_role($c)) {
+        $c->flash->{error_msg} = 'Access restricted to admin, editor, and workshop leaders.';
         $c->res->redirect($c->uri_for('/mail'));
         return;
     }
@@ -1343,10 +1178,8 @@ sub mass_email :Local :Args(0) {
 sub send_mass_email :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->flash->{error_msg} = 'Admin access required.';
+    unless ($self->_has_mail_role($c)) {
+        $c->flash->{error_msg} = 'Access restricted to admin, editor, and workshop leaders.';
         $c->res->redirect($c->uri_for('/mail'));
         return;
     }
@@ -1485,10 +1318,9 @@ sub send_mass_email :Local :Args(0) {
 sub send_mailout_test :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $roles = $c->session->{roles} || [];
-    $roles = ref $roles ? $roles : ($roles ? [$roles] : []);
-    unless (grep { $_ eq 'admin' } @$roles) {
-        $c->res->body('Forbidden'); $c->res->status(403); return;
+    unless ($self->_has_mail_role($c)) {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body('{"ok":0,"msg":"Forbidden"}'); $c->res->status(403); return;
     }
 
     my $site_id   = $self->_get_site_id($c);
