@@ -73,9 +73,11 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
     my $sitename  = $c->session->{SiteName} || 'CSC';
     my $title     = "\x{1F433} Docker Deploy $today ${\$now->hms('.')}";
 
+    my $todo_record_id = $c->req->body_params->{todo_record_id} || 0;
+
     my $log_id;
     eval {
-        my $entry = $c->model('DBEncy')->resultset('Log')->create({
+        my %log_fields = (
             abstract        => $title,
             username        => $username,
             sitename        => $sitename,
@@ -88,28 +90,38 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             group_of_poster => 'admin',
             last_mod_by     => $username,
             details         => 'Deploy in progress…',
-        });
+        );
+        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
+        my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
 
-    my $repo_path = '/home/shanta/PycharmProjects/comserv2';
+    my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
+    my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
     my @lines;
     my $success = 1;
 
     my $t0 = time();
     push @lines, "[${\scalar localtime}] === git pull ===";
-    my $git_out   = `cd '$repo_path' && git pull 2>&1`;
-    my $git_exit  = $? >> 8;
+    my $git_out  = `cd '$repo_path' && git pull 2>&1`;
+    my $git_exit = $? >> 8;
     push @lines, $git_out;
     push @lines, "git pull exited with code $git_exit" if $git_exit;
     $success = 0 if $git_exit;
 
-    push @lines, "[${\scalar localtime}] === docker restart comserv-web-prod ===";
-    my $docker_out  = `docker restart comserv-web-prod 2>&1`;
-    my $docker_exit = $? >> 8;
-    push @lines, $docker_out;
-    push @lines, "docker restart exited with code $docker_exit" if $docker_exit;
-    $success = 0 if $docker_exit;
+    push @lines, "[${\scalar localtime}] === docker compose down + up (new container) ===";
+    my $docker_result = $c->model('Docker')->restart_containers(
+        services     => ['web-prod'],
+        force        => 1,
+        compose_file => $compose_file,
+    );
+    push @lines, $docker_result->{stdout} if $docker_result->{stdout};
+    push @lines, $docker_result->{stderr} if $docker_result->{stderr};
+    push @lines, "command: " . ($docker_result->{command} || 'n/a');
+    unless ($docker_result->{success}) {
+        $success = 0;
+        push @lines, "docker compose exited with errors";
+    }
 
     my $elapsed = time() - $t0;
     push @lines, "[${\scalar localtime}] Done in ${elapsed}s — " . ($success ? 'SUCCESS' : 'ERRORS DETECTED');
@@ -126,6 +138,60 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         output  => $output,
         title   => $title,
     }));
+}
+
+sub init_log :Path('/admin/docker/init_log') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($self->_csc_admin_check($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, message => 'CSC admin only' }));
+        return;
+    }
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => 0, message => 'POST required' }));
+        return;
+    }
+
+    my $now            = DateTime->now(time_zone => 'local');
+    my $today          = $now->ymd;
+    my $now_time       = $now->hms;
+    my $username       = $c->session->{username} || 'system';
+    my $sitename       = $c->session->{SiteName} || 'CSC';
+    my $todo_record_id = $c->req->body_params->{todo_record_id} || 0;
+    my $title          = "\x{1F433} Docker Hub Deploy $today ${\$now->hms('.')}";
+
+    my $log_id;
+    eval {
+        my %log_fields = (
+            abstract        => $title,
+            username        => $username,
+            sitename        => $sitename,
+            start_date      => $today,
+            start_time      => $now_time,
+            end_time        => $now_time,
+            time            => '00:00:00',
+            status          => 1,
+            priority        => 3,
+            group_of_poster => 'admin',
+            last_mod_by     => $username,
+            details         => 'Hub deploy in progress\x{2026}',
+        );
+        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
+        my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
+        $log_id = $entry->id;
+    };
+
+    if ($@) {
+        $c->response->body(encode_json({ success => 0, message => "Log creation failed: $@" }));
+        return;
+    }
+
+    $c->response->body(encode_json({ success => 1, log_id => $log_id, title => $title }));
 }
 
 sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {

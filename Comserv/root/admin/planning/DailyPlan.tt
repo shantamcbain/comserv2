@@ -152,6 +152,9 @@
                         title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
                 [% END %]
                 <span id="dl-feedback"></span>
+                [% IF stale_log_count %]
+                &nbsp;<a href="/log?status=open" style="font-size:0.82em;color:#856404;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:2px 7px;text-decoration:none;white-space:nowrap;" title="View unclosed logs from previous days">⚠️ [% stale_log_count %] unclosed log(s)</a>
+                [% END %]
                 &nbsp;|&nbsp;
                 <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
@@ -647,10 +650,12 @@
                     headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
                     if (d.success) {
+                        var msg = d.todo_created ? d.todo_created + ' new error todo(s) created.' : 'No new errors found.';
+                        alert('Audit scan complete. ' + msg);
                         location.reload();
                     } else {
-                        if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
                         alert('Refresh failed: ' + (d.error || 'unknown error'));
                     }
                 }).catch(function(e){
@@ -1657,56 +1662,50 @@ function dailyLogAction(action) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+        var msg = d.response || d.message || (d.success ? (action === 'start' ? 'Day started!' : 'Day closed!') : (d.error || 'Error'));
+        var plainMsg = msg.replace(/<[^>]+>/g, '');
         if (d.success) {
-            feedback.innerHTML = d.response || d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#2a7a2a';
-            var dest = window.location.pathname + window.location.search;
-            if (action === 'start') { dest += '#log-panel-open'; }
-            setTimeout(function() { window.location.href = dest; }, 2500);
+            window.location.reload();
         } else {
-            feedback.innerHTML = d.response || d.error || 'Error';
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#9b0000';
-            if (startBtn) startBtn.disabled = false;
-            if (endBtn)   endBtn.disabled   = false;
         }
     })
     .catch(function(e) {
-        feedback.textContent = 'Request failed';
-        feedback.style.color = '#9b0000';
         if (startBtn) startBtn.disabled = false;
         if (endBtn)   endBtn.disabled   = false;
+        alert('Request failed: ' + e);
+        feedback.textContent = 'Request failed';
+        feedback.style.color = '#9b0000';
     });
 }
 
-function openDeployPopup() {
+function openDeployPopup(todoId) {
+    var url = '/admin/docker/deploy_form';
+    if (todoId) { url += '?todo_record_id=' + encodeURIComponent(todoId); }
     var popup = window.open(
-        '/admin/docker/deploy_form',
+        url,
         'docker_deploy',
         'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
     );
     if (popup) {
         popup.focus();
-        var feedback = document.getElementById('dl-feedback');
-        if (feedback) {
-            feedback.textContent = '🐳 Deploy popup opened';
-            feedback.style.color = '#005a8e';
-        }
         window.addEventListener('message', function onMsg(e) {
             if (e.data && e.data.type === 'deploy_done') {
-                var feedback = document.getElementById('dl-feedback');
-                if (feedback) {
-                    feedback.textContent = e.data.success ? '✅ Deploy complete' : '⚠ Deploy had errors';
-                    feedback.style.color = e.data.success ? '#2a7a2a' : '#9b0000';
-                }
                 window.removeEventListener('message', onMsg);
+                var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                alert(msg);
+                location.reload();
             }
         });
     } else {
-        var feedback = document.getElementById('dl-feedback');
-        if (feedback) {
-            feedback.textContent = '⚠ Popup blocked — allow popups for this site';
-            feedback.style.color = '#9b0000';
-        }
+        alert('⚠ Popup blocked — allow popups for this site and try again.');
     }
 }
 
