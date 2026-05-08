@@ -1611,8 +1611,8 @@ sub _sync_all_members_list {
         '[auto] Everyone who has created an account on this site'
     );
 
-    # All users with any role on this site
-    my @user_ids = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+    # Use user_sites table (canonical user-to-site association)
+    my @user_ids = $c->model('DBEncy')->resultset('System::SiteUser')->search(
         { site_id => $site_id },
         { columns => ['user_id'], distinct => 1 }
     )->get_column('user_id')->all;
@@ -1626,29 +1626,59 @@ sub _sync_all_members_list {
 sub _sync_role_lists {
     my ($self, $c, $site_id) = @_;
 
-    # Get all distinct roles for this site
-    my @roles = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-        { site_id => $site_id },
-        { columns => ['role'], distinct => 1 }
-    )->get_column('role')->all;
+    # Get all users for this site via user_sites, then read roles from users.roles (text field)
+    my @site_user_ids = eval {
+        $c->model('DBEncy')->resultset('System::SiteUser')->search(
+            { site_id => $site_id },
+            { columns => ['user_id'], distinct => 1 }
+        )->get_column('user_id')->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_role_lists',
+            "Could not fetch site users: $@");
+        return;
+    }
 
-    for my $role (@roles) {
-        next unless $role;
+    # Also include any entries from user_site_roles if present (new system)
+    my @site_role_rows = eval {
+        $c->model('DBEncy')->resultset('UserSiteRole')->search(
+            { site_id => $site_id }
+        )->all;
+    };
+
+    # Build role → [user_ids] map
+    my %role_users;
+
+    # From user_sites + users.roles (existing system)
+    for my $uid (@site_user_ids) {
+        my $user = eval { $c->model('DBEncy')->resultset('User')->find($uid) };
+        next unless $user;
+        my $roles_raw = eval { $user->roles } // '';
+        my @roles = map { s/^\s+|\s+$//gr } split /,/, $roles_raw;
+        for my $r (@roles) {
+            next unless $r;
+            push @{ $role_users{lc $r} }, $uid;
+        }
+    }
+
+    # From user_site_roles (new system — may be empty)
+    for my $row (@site_role_rows) {
+        my $r = lc($row->role // '');
+        next unless $r;
+        push @{ $role_users{$r} }, $row->user_id;
+    }
+
+    for my $role (sort keys %role_users) {
+        my %seen;
+        my @unique_uids = grep { !$seen{$_}++ } @{ $role_users{$role} };
         my $list_name = "Role: $role";
         my $list = $self->_find_or_create_list($c, $site_id,
             $list_name,
             "[auto] All users with the '$role' role on this site"
         );
-
-        my @user_ids = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-            { site_id => $site_id, role => $role },
-            { columns => ['user_id'] }
-        )->get_column('user_id')->all;
-
-        $self->_upsert_list_subscriptions($c, $list->id, \@user_ids, 'auto-role');
-
+        $self->_upsert_list_subscriptions($c, $list->id, \@unique_uids, 'auto-role');
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_role_lists',
-            "Synced role list '$list_name': " . scalar(@user_ids) . " users for site_id=$site_id");
+            "Synced role list '$list_name': " . scalar(@unique_uids) . " users for site_id=$site_id");
     }
 }
 
