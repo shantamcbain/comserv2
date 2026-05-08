@@ -332,6 +332,11 @@ document.addEventListener('DOMContentLoaded', function() {
     [% IF _coin_acct AND _coin_acct.balance > 0 %]
         <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
     [% END %]
+    [% IF c.session.user_id %]
+        <a href="/mail/my_subscriptions" title="Manage email subscriptions" style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;padding:0 4px;">&#9993; Subscriptions</a>
+    [% ELSE %]
+        <a href="/mail/subscribe" title="Subscribe to our mailing lists" style="font-size:0.8em;color:var(--text-muted-color);text-decoration:none;padding:0 4px;">&#9993; Subscribe</a>
+    [% END %]
 </div>
 [% CATCH %][% END %]
 [% END %]
