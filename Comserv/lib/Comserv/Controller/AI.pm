@@ -157,10 +157,8 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
+                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
                 }
             }
         } catch {
@@ -766,9 +764,18 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
             );
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -1055,7 +1062,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-3-fast');
+                    $fb_grok->model('grok-4.20-non-reasoning');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -1066,7 +1073,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-3-fast (cold-start fallback)',
+                            model          => 'grok-4.20-non-reasoning (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -2032,7 +2039,9 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
-    
+    my $req_audio_file_id      = $json_data->{audio_file_id}      || undef;
+    my $req_transcript_file_id = $json_data->{transcript_file_id} || undef;
+
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -2287,9 +2296,18 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
             );
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2729,6 +2747,14 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
             
+            my %_user_meta = (
+                system_prompt    => '',
+                format           => 'text',
+                is_guest         => $is_guest ? 1 : 0,
+                guest_session_id => $guest_session_id,
+            );
+            $_user_meta{audio_file_id}      = $req_audio_file_id      + 0 if $req_audio_file_id;
+            $_user_meta{transcript_file_id} = $req_transcript_file_id + 0 if $req_transcript_file_id;
             $schema->resultset('AiMessage')->create({
                 conversation_id => $final_conversation_id,
                 user_id => $user_id,
@@ -2736,12 +2762,7 @@ sub chat :Local :Args(0) {
                 content => $prompt,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => encode_json({
-                    system_prompt => '',
-                    format => 'text',
-                    is_guest => $is_guest ? 1 : 0,
-                    guest_session_id => $guest_session_id
-                }),
+                metadata => encode_json(\%_user_meta),
                 ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
@@ -4703,7 +4724,7 @@ sub _pick_ollama_tier {
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
-        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'gemma4'     => 12, 'gemma3'  => 4, 'gemma2' => 9, 'gemma' => 7,
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
@@ -5236,72 +5257,87 @@ Choose the best installed Ollama model for a given agent/page context.
 
 =cut
 
+sub _score_ollama_model {
+    my ($name, $ctx) = @_;
+    $ctx //= 'general';
+    my $lname = lc($name);
+
+    my %fq = (
+        'gemma4'        => 90,
+        'deepseek-r1'   => 85,
+        'phi4'          => 82,
+        'qwen2.5-coder' => 80,
+        'starcoder2'    => 78,
+        'qwen2.5'       => 78,
+        'llama3.1'      => 75,
+        'llama3.2'      => 74,
+        'gemma3'        => 73,
+        'mistral-small' => 72,
+        'qwen2'         => 70,
+        'llama3'        => 68,
+        'mistral'       => 68,
+        'codellama'     => 67,
+        'phi3'          => 65,
+        'gemma2'        => 63,
+        'gemma'         => 55,
+        'llama2'        => 50,
+        'phi'           => 50,
+    );
+
+    my $score = 50;
+    for my $fam (sort { length($b) <=> length($a) } keys %fq) {
+        if (index($lname, $fam) == 0) { $score = $fq{$fam}; last; }
+    }
+
+    my $params = 0;
+    $params = $1 + 0 if $lname =~ /[:\-](\d+(?:\.\d+)?)b/i;
+    $score += $params >= 30 ? 20
+            : $params >= 20 ? 16
+            : $params >= 12 ? 12
+            : $params >=  7 ?  8
+            : $params >=  3 ?  4
+            :                  0;
+
+    $score += 15 if $lname =~ /-cloud\b/;
+
+    $score += 20 if $ctx eq 'code' && $lname =~ /coder|starcoder|codellama/i;
+
+    return $score;
+}
+
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
 
-    $agent_id    //= 'general';
-    $page_context //= 'general';
+    $agent_id         //= 'general';
+    $page_context     //= 'general';
     $installed_models //= [];
 
-    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
     my $is_chat_model = sub {
         my ($n) = @_;
         return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
     };
 
-    # Build a quick lookup: short name → full model name (chat models only)
-    my %installed;
+    my %seen;
+    my @chat_names;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-        next unless $name;
-        next unless $is_chat_model->($name);
-        $installed{$name} = $name;
-        (my $short = $name) =~ s/:.*$//;
-        $installed{$short} = $name;
+        next unless $name && !$seen{$name}++ && $is_chat_model->($name);
+        push @chat_names, $name;
     }
 
-    # Preferred models per context (ordered: first match wins).
-    # tinyllama intentionally excluded — too small for reliable answers.
-    my %context_prefs = (
-        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        csc         => ['llama3.1', 'llama3', 'mistral'],
-        general     => ['llama3.1', 'llama3', 'mistral'],
-        navigation  => ['llama3.1', 'llama3'],
-        simple      => ['llama3.1', 'llama3'],
-        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
-    );
+    unless (@chat_names) {
+        return $default_model if $default_model && $is_chat_model->($default_model);
+        return 'llama3.1:latest';
+    }
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
-    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
-    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
-    $ctx = 'csc'        if $ctx =~ /^csc$/;
-    $ctx = 'ency'       if $ctx =~ /^ency$/;
-    $ctx = 'docker'     if $ctx =~ /docker/;
-    $ctx = 'general'    unless exists $context_prefs{$ctx};
+    $ctx = 'code' if $ctx =~ /code|developer|starcoder|docker/;
 
-    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+    my @ranked = sort {
+        _score_ollama_model($b, $ctx) <=> _score_ollama_model($a, $ctx)
+    } @chat_names;
 
-    for my $pref (@$prefs) {
-        for my $key (keys %installed) {
-            if ($key =~ /\Q$pref\E/i) {
-                return $installed{$key};
-            }
-        }
-    }
-
-    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
-    if ($default_model && $is_chat_model->($default_model)) {
-        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
-    }
-    my @chat_values = values %installed;
-    return $chat_values[0] if @chat_values;
-    return 'llama3.1:latest';
+    return $ranked[0];
 }
 
 =head2 _get_current_ollama_config
@@ -6478,10 +6514,8 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-fast-reasoning' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-3' },
-                        { id => 'grok-3-mini' },
+                        { id => 'grok-4.3' },
+                        { id => 'grok-4.20-non-reasoning' },
                     ];
                 }
 
@@ -6692,6 +6726,133 @@ sub sync_models :Local :Args(0) {
             'sync_models', "Error syncing models: $_");
         $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
     };
+}
+
+=head2 auto_sync_models
+
+Pull all recommended Ollama models that are not yet installed and remove
+explicitly deprecated models across all configured Ollama servers.
+Admin/developer only.  Returns JSON with per-server results.
+
+=cut
+
+sub auto_sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin = ref($user_roles) eq 'ARRAY'
+        ? grep { /^(admin|developer)$/i } @$user_roles : 0;
+
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    my $ollama_cfg    = $c->config->{Ollama} || {};
+    my $primary_host  = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
+    my $port          = $ollama_cfg->{port}           || 11434;
+
+    my @server_hosts = ($primary_host);
+    push @server_hosts, $fallback_host if $fallback_host ne $primary_host;
+
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama model unavailable' }));
+        return;
+    }
+
+    my $catalog    = $ollama->list_available_models();
+    my @recommended = grep { $_->{recommended} } @$catalog;
+    my $deprecated  = $ollama->deprecated_models();
+
+    my @results;
+    for my $host (@server_hosts) {
+        my %sr = (
+            host    => $host,
+            port    => $port,
+            pulled  => [],
+            skipped => [],
+            removed => [],
+            errors  => [],
+        );
+
+        $ollama->host($host);
+        $ollama->port($port);
+        $ollama->clear_endpoint;
+
+        unless ($ollama->check_connection()) {
+            $sr{error} = "Cannot connect to $host:$port";
+            push @results, \%sr;
+            next;
+        }
+
+        my $installed = $ollama->list_models() || [];
+        my %inst_set;
+        for my $m (@$installed) {
+            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+            $inst_set{$n} = 1;
+            (my $base = $n) =~ s/:.*$//;
+            $inst_set{$base} = 1;
+        }
+
+        for my $model (@recommended) {
+            my $name = $model->{name};
+            (my $base = $name) =~ s/:.*$//;
+            if ($inst_set{$name} || $inst_set{$base}) {
+                push @{ $sr{skipped} }, "$name (already installed)";
+                next;
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Pulling recommended model: $name on $host:$port");
+            my $result = $ollama->pull_model(model => $name);
+            if ($result && $result->{success}) {
+                push @{ $sr{pulled} }, $name;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "$name: $err";
+            }
+        }
+
+        for my $dep (@$deprecated) {
+            next unless $inst_set{$dep};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Removing deprecated model: $dep on $host:$port");
+            my $result = $ollama->remove_model(model => $dep);
+            if ($result && $result->{success}) {
+                push @{ $sr{removed} }, $dep;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "remove $dep: $err";
+            }
+        }
+
+        push @results, \%sr;
+    }
+
+    my ($total_pulled, $total_removed) = (0, 0);
+    $total_pulled  += scalar @{ $_->{pulled}  } for @results;
+    $total_removed += scalar @{ $_->{removed} } for @results;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'auto_sync_models', "Auto-sync complete: pulled=$total_pulled removed=$total_removed");
+
+    $c->response->body(encode_json({
+        success       => JSON::true,
+        servers       => \@results,
+        total_pulled  => $total_pulled,
+        total_removed => $total_removed,
+    }));
 }
 
 =head2 project_conversations
