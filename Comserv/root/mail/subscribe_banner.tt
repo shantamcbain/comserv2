@@ -7,7 +7,7 @@
 %]
 [% SET _cur_action = c.action.name %]
 [% SET _cur_path   = c.req.path %]
-[% IF _cur_action == 'index' OR _cur_path == '/' OR _cur_path == '' %]
+[% IF _cur_action eq 'index' OR _cur_path eq '/' OR _cur_path eq '' %]
 <div id="ml-subscribe-banner"
      style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),#1976d2);color:#fff;
             padding:10px 20px;text-align:center;font-size:0.95em;position:relative;z-index:100;">

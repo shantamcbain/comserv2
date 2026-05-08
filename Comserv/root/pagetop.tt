@@ -333,7 +333,7 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
     [% END %]
     <a href="/mail/my_subscriptions" title="Manage your email subscriptions"
-       style="font-size:0.85em;background:var(--primary-color,#007bff);color:#fff;text-decoration:none;padding:2px 10px;border-radius:10px;margin-left:6px;white-space:nowrap;">
+       style="font-size:0.9em;font-weight:bold;background:#e65c00;color:#fff;text-decoration:none;padding:4px 14px;border-radius:12px;margin-left:10px;white-space:nowrap;border:2px solid #c75000;box-shadow:0 1px 3px rgba(0,0,0,0.25);">
         &#9993; My Subscriptions
     </a>
 </div>
@@ -341,13 +341,13 @@ document.addEventListener('DOMContentLoaded', function() {
 [% END %]
 
 [% IF !c.session.user_id %]
-<div style="background:var(--primary-color,#007bff);color:#fff;padding:4px 16px;font-size:0.88em;text-align:right;">
+<div style="background:#e65c00;color:#fff;padding:5px 18px;font-size:0.92em;text-align:right;font-weight:bold;">
     <a href="/mail/subscribe"
-       style="color:#fff;text-decoration:none;font-weight:bold;">
+       style="color:#fff;text-decoration:none;">
         &#9993; Join Our Mailing List
     </a>
     &nbsp;&middot;&nbsp;
-    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;">Sign In</a>
+    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;font-weight:normal;">Sign In</a>
 </div>
 [% END %]
 
