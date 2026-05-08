@@ -1,0 +1,20 @@
+{
+  "name": "ENCY — Herbal Encyclopedia",
+  "short_name": "ENCY",
+  "description": "Comserv ENCY: Herbal Encyclopedia and constituent reference",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#2e7d32",
+  "icons": [
+    {
+      "src": "/favicon/site/ENCY",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["productivity", "education", "health"],
+  "lang": "en-CA"
+}
