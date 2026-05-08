@@ -59,9 +59,19 @@
                     <p>Manage newsletter subscriptions and mailing list preferences</p>
                 </div>
                 <div class="feature-actions">
-                    <a href="/mail/lists" class="btn btn-secondary">
-                        <i class="fas fa-list"></i> View Mailing Lists
+                    <a href="/mail/subscribe" class="btn btn-primary">
+                        <i class="fas fa-envelope-open-text"></i> Subscribe to Lists
                     </a>
+                    [% IF c.session.username %]
+                    <a href="/mail/my_subscriptions" class="btn btn-secondary">
+                        <i class="fas fa-cog"></i> My Subscriptions
+                    </a>
+                    [% END %]
+                    [% IF c.session.roles.match('admin') %]
+                    <a href="/mail/lists" class="btn btn-secondary">
+                        <i class="fas fa-list"></i> Manage Lists
+                    </a>
+                    [% END %]
                 </div>
             </div>
 

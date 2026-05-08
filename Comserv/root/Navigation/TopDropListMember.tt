@@ -11,6 +11,11 @@
     <div class="dropdown-content">
         <!-- Core Membership Services -->
         <a href="/membership" class="menu-item"><i class="icon-info"></i>Membership Information</a>
+        [% IF c.session.user_id %]
+        <a href="/mail/my_subscriptions" class="menu-item"><i class="icon-mail"></i>My Email Subscriptions</a>
+        [% ELSE %]
+        <a href="/mail/subscribe" class="menu-item"><i class="icon-mail"></i>Join Mailing List</a>
+        [% END %]
         
         [% IF c.session.username %]
         <div class="dropdown-divider"></div>
