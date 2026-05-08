@@ -89,9 +89,9 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
-            details         => 'Deploy in progress…',
+            details         => "Deploy in progress\x{2026}",
+            todo_record_id  => $todo_record_id || 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
@@ -179,9 +179,9 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
-            details         => 'Hub deploy in progress\x{2026}',
+            details         => "Hub deploy in progress\x{2026}",
+            todo_record_id  => $todo_record_id || 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id if $todo_record_id;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
