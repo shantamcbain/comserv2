@@ -2620,8 +2620,34 @@ sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
     }
 
+    my %org_image;
+    if ($bee_plants && @$bee_plants) {
+        my @org_ids = do {
+            my %seen;
+            grep { !$seen{$_}++ }
+            grep { defined $_ }
+            map  { eval { my $o = $_->organism; $o ? $o->record_id : undef } }
+            @$bee_plants;
+        };
+        if (@org_ids) {
+            my @imgs = eval {
+                $c->model('ENCYModel')->ency_schema
+                    ->resultset('Ency::OrganismImage')
+                    ->search(
+                        { organism_id => { -in => \@org_ids } },
+                        { order_by => [qw(organism_id sort_order)] }
+                    )->all
+            };
+            for my $img (@imgs) {
+                my $oid = $img->organism_id;
+                $org_image{$oid} //= $img->url;
+            }
+        }
+    }
+
     $c->stash(
         herbal_data => $bee_plants,
+        org_image   => \%org_image,
         is_editor   => $is_editor,
         template    => 'ENCY/BeePastureView.tt',
     );
