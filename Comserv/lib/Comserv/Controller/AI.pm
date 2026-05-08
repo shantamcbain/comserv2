@@ -4724,7 +4724,7 @@ sub _pick_ollama_tier {
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
-        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'gemma4'     => 12, 'gemma3'  => 4, 'gemma2' => 9, 'gemma' => 7,
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
@@ -5284,17 +5284,17 @@ sub _select_model_for_context {
     # Preferred models per context (ordered: first match wins).
     # tinyllama intentionally excluded — too small for reliable answers.
     my %context_prefs = (
-        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        csc         => ['llama3.1', 'llama3', 'mistral'],
-        general     => ['llama3.1', 'llama3', 'mistral'],
-        navigation  => ['llama3.1', 'llama3'],
-        simple      => ['llama3.1', 'llama3'],
-        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+        chat        => ['gemma4', 'llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        helpdesk    => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
+        ency        => ['gemma4', 'phi4', 'llama3.1', 'llama3', 'mistral'],
+        bmaster     => ['gemma4', 'phi4', 'llama3.1', 'llama3', 'mistral'],
+        csc         => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
+        general     => ['gemma4', 'llama3.1', 'llama3', 'mistral'],
+        navigation  => ['gemma4', 'llama3.1', 'llama3'],
+        simple      => ['gemma4', 'llama3.1', 'llama3'],
+        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'gemma4', 'llama3.1'],
+        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'gemma4', 'llama3.1'],
+        docker      => ['starcoder2', 'qwen2.5-coder', 'gemma4', 'llama3.1'],
     );
 
     my $ctx = lc($agent_id);
