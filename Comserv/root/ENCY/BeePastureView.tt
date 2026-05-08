@@ -67,17 +67,22 @@
                         <tbody>
                         [% IF herbal_data && herbal_data.size %]
                         [% FOREACH link IN herbal_data %]
+                            [% SET _org = link.organism %]
+                            [% SET _botanical = _org ? _org.scientific_name : link.botanical_name %]
+                            [% SET _org_imgs = _org ? _org.org_images : [] %]
+                            [% SET _first_img = _org_imgs.size ? _org_imgs.first : undef %]
+                            [% SET _img_val = _first_img ? _first_img.image_url : link.image %]
                             <tr>
                                 <td>
-                                    <strong>Botanical Name:</strong> [% link.botanical_name | html %]<br>
-                                    <strong>Common Name:</strong> [% link.common_names %]<br>
+                                    <strong>Botanical Name:</strong> <em>[% _botanical | html %]</em><br>
+                                    <strong>Common Name:</strong> [% link.common_names | html %]<br>
                                     <strong>Forage:</strong> [% link.apis | html %]<br>
                                     <strong>Nectar:</strong> [% link.nectar | html %]<br>
                                     <strong>Pollen:</strong> [% link.pollen | html %]<br>
                                     <a href="/ENCY/herb_detail/[% link.record_id %]" class="btn btn-primary" title="View details">Details</a>
                                 </td>
                                 <td>
-                                    [% ency_img_tag(link.image, 300, 325) %]
+                                    [% ency_img_tag(_img_val, 300, 325) %]
                                 </td>
                             </tr>
                         [% END %]

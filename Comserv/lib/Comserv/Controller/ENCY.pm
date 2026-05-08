@@ -2631,28 +2631,21 @@ sub create_category :Local {
 sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Initialize debug_errors array
-    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    my $roles     = $c->session->{roles} || [];
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' }
+                        (ref $roles ? @$roles : split(/\s*,\s*/, $roles));
 
-    # Log entry into the bee_pasture_view method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Entered bee_pasture_view method');
-    push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
-
-    # Fetch bee forage plants data
     my $bee_plants = $c->model('ENCYModel')->get_bee_forage_plants($c);
 
-    # If no specific bee forage plants method exists, use the general herbal data
     if (!$bee_plants || !@$bee_plants) {
         $bee_plants = $c->model('ENCYModel')->get_herbal_data($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
-        push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
     }
 
-    # Pass the data to the template
     $c->stash(
         herbal_data => $bee_plants,
-        template => 'ENCY/BeePastureView.tt',
-        debug_msg => "Bee Pasture View loaded with " . scalar(@$bee_plants) . " plants"
+        is_editor   => $is_editor,
+        template    => 'ENCY/BeePastureView.tt',
     );
 }
 

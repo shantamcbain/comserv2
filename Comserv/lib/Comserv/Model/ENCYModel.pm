@@ -127,7 +127,7 @@ sub get_bee_forage_plants {
                 OR ( nectar IS NOT NULL AND nectar > 0 )
                 OR ( pollen IS NOT NULL AND pollen > 0 )" ],
             { order_by => 'botanical_name',
-              columns  => [qw(record_id botanical_name common_names apis nectar pollen image)] }
+              prefetch => { organism => 'org_images' } }
         )->all;
     };
     return \@results;
