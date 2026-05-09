@@ -156,6 +156,21 @@ Implement all missing inspection CRUD actions in `Apiary.pm`:
 - Frame color scheme: brood=orange, honey=yellow, pollen=green, empty=white, foundation=grey, drone=blue, comb=tan
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
+### [ ] Step: Beekeeping Controller Refactoring — Separate Feature from SiteName
+<!-- project-id: 228 (sub-project of Apiary Management System 91 under BMaster 20) -->
+Resolve the naming conflict between the BMaster SiteName and the BMaster beekeeping feature by moving all beekeeping-specific code into a dedicated `Beekeeping` controller hierarchy and model. The `Result/Beekeeping/` subdirectory was already created by a prior main merge.
+
+- Create `Comserv/Controller/Beekeeping.pm` — base chain `:PathPart('Beekeeping')`, index at `/Beekeeping`, move `bee_pasture`, `apiary`, `queens`, `hive`, `environment`, `education`, `products` from BMaster.pm; add `/BMaster/*` backward-compat stubs (todo 1320)
+- Create `Comserv/Controller/Beekeeping/Yards.pm` — `yards` and `add_yard` at `/Beekeeping/yards` and `/Beekeeping/add_yard`; move templates `BMaster/yards.tt` → `Beekeeping/Yards/index.tt` (todo 1321)
+- Create `Comserv/Controller/Beekeeping/Health.pm` — `beehealth` at `/Beekeeping/health`; move `BMaster/beehealth.tt` → `Beekeeping/health.tt` (todo 1322)
+- Create `Comserv/Controller/Beekeeping/Harvest.pm` — `honey` at `/Beekeeping/harvest`; move `BMaster/honey.tt` → `Beekeeping/harvest.tt` (todo 1323)
+- Create `Comserv/Model/BeekeepingModel.pm` — extract yard/hive-list helpers from `ApiaryModel` and `Model/BMaster`; `ApiaryModel` retains inspections/queen assignments (todo 1324)
+- Move and rename remaining templates: `BMaster/apiary.tt`, `BMaster/Queens.tt`, `BMaster/environment.tt`, `BMaster/education.tt`, `BMaster/products.tt` → `Beekeeping/` equivalents (todo 1325)
+- Update `Navigation/TopDropListBeekeeping.tt` — change all `/BMaster/*` hrefs to `/Beekeeping/*` (todo 1326)
+- Verify all 19 `Result/Beekeeping/` package names match their subdirectory path; run `/admin/schema_comparison` (todo 1327)
+- Integration test all `/Beekeeping/*` routes; verify `/BMaster/*` redirects still work; run verification (todo 1328)
+- Run verification: `perl -cw Comserv/script/comserv_server.pl`
+
 ### [x] Step: Navigation, Membership Workflow and 500 Error Fixes
 <!-- chat-id: db2f0d4a-aa79-4665-ada2-dc13e077b480 -->
 - Added `TopDropListBeekeeping.tt` to `pagetop.tt` (was missing — menu never displayed)
