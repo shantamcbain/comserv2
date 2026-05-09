@@ -1409,7 +1409,7 @@ sub generate :Local :Args(0) {
         # Log success metrics
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
-        my $ai_response = $response->{response} || '';
+        my $ai_response = $self->_sanitize_ai_urls($response->{response} || '');
         # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
         my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
             ? $response->{usage}{total_tokens}
@@ -2694,6 +2694,8 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
+
+        $ai_response = $self->_sanitize_ai_urls($ai_response);
 
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
@@ -4496,6 +4498,13 @@ Poor indicators:
   - Mostly repeats the question back
 
 =cut
+
+sub _sanitize_ai_urls {
+    my ($self, $text) = @_;
+    return $text unless defined $text && length $text;
+    $text =~ s{https?://(?:example\.com|localhost(?::\d+)?)((?:/[^\s"')\]>]*)?)}{$1 || '/'}ge;
+    return $text;
+}
 
 sub _assess_response_quality {
     my ($self, $response, $prompt) = @_;

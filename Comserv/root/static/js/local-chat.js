@@ -2721,7 +2721,7 @@
                 // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
                 const { cleanText: _rawClean, actions } = extractActions(data.response || '');
                 const _needsSupport = _detectSupportNeeded(_rawClean);
-                const cleanText = _stripSupportTag(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean).replace(/https?:\/\/(?:example\.com|localhost(?::\d+)?)(\/[^\s"')\]>]*)/g, '$1');
                 addMessage(cleanText, 'ai-message');
 
                 // Voice mode: read the AI response aloud, then restart listening
