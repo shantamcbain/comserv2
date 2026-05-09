@@ -2970,6 +2970,36 @@
         return t.large || t.medium || state.selectedProvider;
     }
 
+    // Static FAQ fast-path — instant canned answers for common support questions.
+    // These fire BEFORE any AI call, so the user gets an immediate response.
+    // Each entry: { match: RegExp, answer: string (markdown supported) }
+    var STATIC_FAQ = [
+        {
+            match: /\b(create|make|get|open|set.?up)\b.{0,20}\baccount\b|\bsign.?up\b|\bregister\b|\bhow.{0,20}\bjoin\b|\bnew.{0,10}\buser\b/i,
+            answer: 'Account creation is managed by the site administrator.\n\nTo request access, [submit a HelpDesk ticket](/HelpDesk) and an admin will set up your account. If a self-registration page is available on your site it will be linked on the login page.',
+        },
+        {
+            match: /\b(reset|forgot|forgotten|lost|change)\b.{0,15}\bpassword\b|\bpassword.{0,15}\b(reset|forgot|change|lost)\b/i,
+            answer: 'To reset your password, click **Forgot Password** on the login page. A reset link will be emailed to your registered address.\n\nIf you no longer have access to that email, [submit a HelpDesk ticket](/HelpDesk) and an administrator can reset it for you.',
+        },
+        {
+            match: /\bhow.{0,20}\blog.{0,5}(in|out)\b|\bsign.{0,5}(in|out)\b|\bcannot.{0,10}log.{0,5}in\b|\bcan.?t.{0,10}log.{0,5}in\b/i,
+            answer: 'To log in, enter your username and password on the [login page](/login). Your username is usually your email address.\n\nIf you are having trouble logging in, try **Forgot Password** on the login page or [submit a HelpDesk ticket](/HelpDesk).',
+        },
+        {
+            match: /\bhow.{0,25}\b(report|submit|log|file).{0,15}\b(bug|error|issue|problem|ticket)\b|\bhow.{0,20}\bget.{0,10}\bhelp\b/i,
+            answer: 'To report a problem or get help:\n\n1. [Submit a HelpDesk ticket](/HelpDesk) — include what you were doing and any error message you saw.\n2. Or use this chat — describe the issue and I can help diagnose it.',
+        },
+        {
+            match: /\bwhat.{0,20}\b(this|site|system|application|app|platform)\b|\bwhat (is|does).{0,20}\b(comserv|bmaster|beemaster|ency)\b/i,
+            answer: 'This is **Comserv** — a multi-site community platform. Depending on your site it includes:\n\n- **BeeMaster** — apiary and beekeeping management\n- **ENCY** — herbal and plant encyclopedia\n- **HelpDesk** — support tickets\n- **Planning** — project and todo management\n- **Workshops** — local event listings\n\nAsk me anything about the features available on your site.',
+        },
+        {
+            match: /\bcontact.{0,20}\b(support|admin|administrator|someone|staff|team)\b|\bhow.{0,20}\b(contact|reach|talk to|speak to).{0,20}\b(support|admin|help)\b/i,
+            answer: 'To contact support, [submit a HelpDesk ticket](/HelpDesk). An administrator will respond as soon as possible.\n\nYou can also continue this chat — I can answer most questions right here.',
+        },
+    ];
+
     // Content-based agent keyword overrides.
     // When a prompt clearly targets a different domain than the current page agent,
     // the agent is switched automatically — no need to navigate to the right page first.
@@ -3520,6 +3550,22 @@
                 const lbl = bareMatches[0].label;
                 if (lbl === normalised || lbl.startsWith(normalised) || normalised.startsWith(lbl.split(/\s+/).slice(0, 2).join(' '))) {
                     _executeNavMatch(message, messageInput, bareMatches);
+                    return;
+                }
+            }
+        }
+
+        // FAQ fast-path: instant canned answer for common support questions.
+        // Fires before queryAI so the user never waits on Ollama for trivial questions.
+        if (message && !state.pendingImage) {
+            for (var _fqi = 0; _fqi < STATIC_FAQ.length; _fqi++) {
+                if (STATIC_FAQ[_fqi].match.test(message)) {
+                    addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+                    messageInput.value = '';
+                    persistMessages();
+                    addMessage(STATIC_FAQ[_fqi].answer, 'ai-message');
+                    persistMessages();
+                    _showEscalationButtons(null);
                     return;
                 }
             }
