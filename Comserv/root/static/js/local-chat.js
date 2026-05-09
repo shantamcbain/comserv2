@@ -3025,28 +3025,51 @@
         { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
+        { label: 'bmaster',                    url: '/BMaster' },
+        { label: 'bee master',                 url: '/BMaster' },
+        { label: 'beekeeping',                 url: '/BMaster' },
+        { label: 'apiary',                     url: '/Apiary' },
+        { label: 'apiary overview',            url: '/Apiary' },
+        { label: 'hive management',            url: '/Apiary/HiveManagement' },
+        { label: 'hives',                      url: '/Apiary/HiveManagement' },
+        { label: 'queen rearing',              url: '/Apiary/QueenRearing' },
+        { label: 'queens',                     url: '/Apiary/QueenRearing' },
+        { label: 'bee health',                 url: '/Apiary/BeeHealth' },
+        { label: 'bee forage',                 url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture',                url: '/ENCY/BeePastureView' },
+        { label: 'forage plants',              url: '/ENCY/BeePastureView' },
+        { label: 'forage',                     url: '/ENCY/BeePastureView' },
+        { label: 'pollinator plants',          url: '/ENCY/BeePastureView' },
+        { label: 'pollinators',                url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture view',           url: '/ENCY/BeePastureView' },
     ];
 
     // Build a flat {label, url} navigation map from:
     //   1. Static core routes (STATIC_NAV above)
-    //   2. Links extracted from the current page (navLinks + contentLinks in system_prompt)
-    //      The page-link format is:  "Label: https://host/path"  (no leading dash)
-    //      The agent nav-guide format is: "  - Label: https://host/path" (with dash)
-    //      The regex matches BOTH.
+    //   2. Links extracted from the agent system_prompt, matching both:
+    //      - Absolute: "  - Label: https://host/path"
+    //      - Relative: "  - Label: /path/to/page"   (agent nav-guide style)
     function buildNavigationMap() {
         const origin = window.location.origin;
         const map = STATIC_NAV.map(function(e) {
             return { label: e.label, url: origin + e.url };
         });
         const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
-        // Match both "  - Label: URL" and "  Label: URL"
-        const re = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reAbs = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reRel = /^[ \t]*-[ \t]+(.+?):\s*(\/[^\s(→,]+)/gm;
         let m;
-        while ((m = re.exec(prompt)) !== null) {
+        while ((m = reAbs.exec(prompt)) !== null) {
             const label = m[1].trim().toLowerCase();
             const url   = m[2].trim();
-            // Skip section headers and meta-lines that aren't real page links
             if (label.length > 80 || /^\[/.test(label)) continue;
+            if (!map.some(function(e) { return e.label === label; })) {
+                map.push({ label, url });
+            }
+        }
+        while ((m = reRel.exec(prompt)) !== null) {
+            const label = m[1].trim().toLowerCase();
+            const url   = origin + m[2].trim().replace(/\s.*$/, '');
+            if (label.length > 80 || /^\[/.test(label) || /^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) continue;
             if (!map.some(function(e) { return e.label === label; })) {
                 map.push({ label, url });
             }
