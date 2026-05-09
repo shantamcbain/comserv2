@@ -2970,6 +2970,39 @@
         return t.large || t.medium || state.selectedProvider;
     }
 
+    // Content-based agent keyword overrides.
+    // When a prompt clearly targets a different domain than the current page agent,
+    // the agent is switched automatically — no need to navigate to the right page first.
+    // Format: { agentId, pattern }  — first match wins.
+    var AGENT_KEYWORD_OVERRIDES = [
+        {
+            agentId: 'accounting',
+            pattern: /\b(accounts payable|accounts receivable|supplier bill|purchase order)\b|open.*invoice.*form|file.*invoice|enter.*bill|record.*invoice/i,
+        },
+        {
+            agentId: 'helpdesk',
+            pattern: /\b(helpdesk|help desk|submit.*ticket|create.*ticket|report.*error|report.*bug|report.*issue)\b|how do i report/i,
+        },
+    ];
+
+    // Concept synonym groups for smarter nav resolution.
+    // When resolveNavIntent cannot match a query via STATIC_NAV label matching, it falls
+    // back to these concept groups so that "medicinal plants" → /ENCY/herbs etc.
+    // Each entry: { url, concepts[] }  — concepts are lowercase strings to match against query.
+    var NAV_CONCEPT_GROUPS = [
+        { url: '/ENCY/glossary',         concepts: ['terminology', 'dictionary', 'vocab', 'vocabulary', 'definitions', 'define', 'look up term', 'beekeeping terms', 'herbal terms'] },
+        { url: '/ENCY/herbs',            concepts: ['medicinal plants', 'herb database', 'plant database', 'botanical list', 'herbal list', 'flora', 'herb search'] },
+        { url: '/ENCY/diseases',         concepts: ['conditions', 'ailments', 'health conditions', 'bee diseases', 'hive diseases', 'disorders', 'bee conditions'] },
+        { url: '/ENCY/BeePastureView',   concepts: ['nectar plants', 'pollen plants', 'bee garden', 'foraging plants', 'bee friendly plants', 'melliferous', 'pasture plants', 'pollinator garden'] },
+        { url: '/ENCY/symptoms',         concepts: ['signs', 'hive symptoms', 'bee symptoms', 'warning signs', 'colony symptoms'] },
+        { url: '/ENCY/Constituent',      concepts: ['active compounds', 'chemical constituents', 'phytochemicals', 'active ingredients'] },
+        { url: '/ENCY/formula',          concepts: ['remedy', 'remedies', 'preparation', 'preparations', 'compound formula', 'herbal recipe'] },
+        { url: '/Inventory/invoice/new', concepts: ['new invoice', 'add invoice', 'create invoice', 'log bill', 'record bill', 'enter bill', 'new bill'] },
+        { url: '/HelpDesk',              concepts: ['get help', 'support system', 'contact support', 'tech support', 'it support'] },
+        { url: '/BMaster',              concepts: ['beekeeping home', 'bee management', 'beemaster', 'bee master home'] },
+        { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
+    ];
+
     // Static nav entries always available regardless of current page links.
     // Keyed by label (lowercase) → path. Merged into the nav map at build time.
     // The origin is prepended at runtime so they work on any host.
@@ -3157,7 +3190,18 @@
             return words.filter(function(w) { return w.length >= 3; })
                 .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
         });
-        return fuzzy.length ? fuzzy : null;
+        if (fuzzy.length) return fuzzy;
+        // Concept synonym fallback: match query against NAV_CONCEPT_GROUPS synonyms.
+        // Catches natural-language phrases like "medicinal plants", "nectar plants", etc.
+        const _origin3 = window.location.origin;
+        for (var _cgi = 0; _cgi < NAV_CONCEPT_GROUPS.length; _cgi++) {
+            const _cg = NAV_CONCEPT_GROUPS[_cgi];
+            const _matched = _cg.concepts.some(function(c) {
+                return q === c || q.includes(c) || c.includes(q);
+            });
+            if (_matched) return [{ label: _cg.concepts[0], url: _origin3 + _cg.url }];
+        }
+        return null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
@@ -3416,6 +3460,32 @@
             messageInput.value = '';
             window.open('/ai/template_editor?' + params.toString(), '_blank');
             return;
+        }
+
+        // Content-based agent override: if the prompt clearly targets a different domain
+        // (e.g. "open the invoice form" from BMaster), switch to the correct agent before
+        // any fast-path or AI call — so the right system prompt and logic apply.
+        if (state.agentsConfig && state.agentsConfig.agents && message) {
+            const _curAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            for (var _ovIdx = 0; _ovIdx < AGENT_KEYWORD_OVERRIDES.length; _ovIdx++) {
+                const _ovRule = AGENT_KEYWORD_OVERRIDES[_ovIdx];
+                if (_curAgentId !== _ovRule.agentId && _ovRule.pattern.test(message)) {
+                    const _ovAgent = state.agentsConfig.agents[_ovRule.agentId];
+                    if (_ovAgent && _ovAgent.system_prompt) {
+                        state.pageContext = Object.assign({}, state.pageContext || {}, {
+                            agent_id: _ovRule.agentId,
+                            system_prompt: _ovAgent.system_prompt,
+                            display_name: _ovAgent.display_name || _ovRule.agentId,
+                        });
+                        const _siOv = document.getElementById('chat-status');
+                        if (_siOv) {
+                            _siOv.textContent = 'Using ' + (_ovAgent.display_name || _ovRule.agentId) + ' agent\u2026';
+                            _siOv.className = 'chat-status connected';
+                        }
+                    }
+                    break;
+                }
+            }
         }
 
         // ENCY agent: let the ENCY fast path inside sendAIRequest handle section navigation.
