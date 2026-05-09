@@ -230,7 +230,7 @@
         });
         // Site-name → default agent map (when no saved preference)
         var siteAgentMap = {
-            'BMaster':    'bmaster',
+            'BMaster':    'beemaster',
             'ENCY':       'ency',
             'CSC':        'csc',
             'HelpDesk':   'helpdesk',
@@ -429,9 +429,9 @@
                 console.debug('Agent selected from todo content: ency');
                 return agents.ency;
             }
-            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
-                console.debug('Agent selected from todo content: bmaster');
-                return agents.bmaster;
+            if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.beemaster) {
+                console.debug('Agent selected from todo content: beemaster');
+                return agents.beemaster;
             }
             if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
                 console.debug('Agent selected from todo content: inventory');
@@ -3059,6 +3059,7 @@
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
         { label: 'bmaster',                    url: '/BMaster' },
+        { label: 'beemaster',                  url: '/BMaster' },
         { label: 'bee master',                 url: '/BMaster' },
         { label: 'beekeeping',                 url: '/BMaster' },
         { label: 'apiary',                     url: '/Apiary' },
@@ -4352,7 +4353,7 @@
                 var agents = state.agentsConfig.agents;
                 var picked = null;
                 if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
-                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
                 else if (agents.planning) picked = agents.planning;
@@ -5091,7 +5092,7 @@
                 var agents = state.agentsConfig.agents;
                 var picked = null;
                 if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
-                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
                 else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
