@@ -1018,7 +1018,7 @@
         var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            if (_isMobile || window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+            openChat();
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
