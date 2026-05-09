@@ -310,7 +310,7 @@ sub daily :Path('/planning/daily') :Args {
                     { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
-                rows => 100,
+                rows => 2000,
             }
         )->all;
 
@@ -403,7 +403,7 @@ sub daily :Path('/planning/daily') :Args {
             @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
         }
 
-        @active_priorities = grep { defined } @all_sorted[0..24];
+        @active_priorities = @all_sorted;
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
