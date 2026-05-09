@@ -1260,25 +1260,46 @@ sub generate :Local :Args(0) {
             }
 
             # ── Tier 1 query ─────────────────────────────────────────────────
-            my $query_start = time();
+            # Hard wall-clock timeout via alarm() — LWP timeout only covers socket
+            # idle time, so a slowly-streaming Ollama response can block forever.
+            my $query_start  = time();
+            my $_alarm_secs  = $timeout_secs + 30;
+            my $_alarm_fired = 0;
+            my $_tier1_err   = '';
             if (@$history_items || $system) {
                 push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
                     $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
-                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->chat(messages => \@ollama_msgs);
+                eval {
+                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
+                    alarm($_alarm_secs);
+                    $response = $ollama->chat(messages => \@ollama_msgs);
+                    alarm(0);
+                };
+                alarm(0);
+                $_tier1_err = $@ if $@;
             } else {
                 push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
                     $current_host, $use_model);
-                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->query(
-                    prompt => $prompt,
-                    format => $format eq 'json' ? 'json' : undef,
-                    system => $system || undef
-                );
+                eval {
+                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
+                    alarm($_alarm_secs);
+                    $response = $ollama->query(
+                        prompt => $prompt,
+                        format => $format eq 'json' ? 'json' : undef,
+                        system => $system || undef
+                    );
+                    alarm(0);
+                };
+                alarm(0);
+                $_tier1_err = $@ if $@;
+            }
+            if ($_alarm_fired || $_tier1_err) {
+                $ollama->last_error("Wall-clock timeout after ${_alarm_secs}s") if $_alarm_fired;
+                $response = undef;
             }
             my $query_elapsed = time() - $query_start;
 
