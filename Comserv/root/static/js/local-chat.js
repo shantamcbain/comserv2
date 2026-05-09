@@ -2117,6 +2117,9 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
+        const _agentId = (state.pageContext && state.pageContext.agent_id) || '';
+        let _agentSys = (state.pageContext && state.pageContext.system_prompt) || '';
+
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -3996,7 +3999,7 @@
                 if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
                     window.opener.location.href = abs;
                 } else {
-                    window.open(abs, '_blank');
+                    window.location.href = abs;
                 }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
@@ -4005,7 +4008,7 @@
                 lbl.textContent = 'System';
                 const el = document.createElement('div');
                 el.className = 'message system-message';
-                el.innerHTML = '\uD83D\uDD17 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                el.innerHTML = '\uD83D\uDD17 Navigating to: <a href="' + abs + '">' + navUrl + '</a>';
                 wrapper.appendChild(lbl);
                 wrapper.appendChild(el);
                 chatMessages.appendChild(wrapper);
@@ -4028,7 +4031,7 @@
                         ts:      Date.now()
                     }));
                 } catch(e) { console.warn('localStorage write failed', e); }
-                window.open(abs, '_blank');
+                window.location.href = abs;
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
