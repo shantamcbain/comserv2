@@ -375,14 +375,15 @@ sub daily :Path('/planning/daily') :Args {
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
-                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                    $proj_cache{$h{project_id}} = $p ? { name => $p->name, parent_id => ($p->parent_id || '') } : { name => '', parent_id => '' };
                 }
-                $h{project_name} = $proj_cache{$h{project_id}};
+                $h{project_name} = $proj_cache{$h{project_id}}{name};
                 $ap_projects_seen{$h{project_id}} //= {
                     project_id   => $h{project_id},
-                    project_name => $proj_cache{$h{project_id}} || $h{project_code} || "Project #$h{project_id}",
+                    project_name => $proj_cache{$h{project_id}}{name} || $h{project_code} || "Project #$h{project_id}",
                     project_code => $h{project_code} || '',
                     sitename     => $h{sitename}     || '',
+                    parent_id    => $proj_cache{$h{project_id}}{parent_id} || '',
                 };
             }
 

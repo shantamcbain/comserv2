@@ -444,17 +444,46 @@
                     </details>
                     [% END %]
 
-                    [%# Focus: project single-select %]
+                    [%# Focus: project multi-select with parent/child grouping %]
                     [% IF ap_projects && ap_projects.size %]
-                    <select id="ap-project-filter" onchange="applyProjectFilterLocal(this.value)"
-                        style="font-size:0.78em;padding:3px 6px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);max-width:200px;">
-                        <option value="">Focus: All</option>
-                        [% FOREACH proj IN ap_projects %]
-                        <option value="[% proj.project_id %]">
-                            [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] ([% proj.sitename %])[% END %]
-                        </option>
-                        [% END %]
-                    </select>
+                    <details class="ap-dropdown" id="ap-project-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="project-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Focus: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:220px;max-height:280px;overflow-y:auto;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [%# Parent projects first %]
+                            [% FOREACH proj IN ap_projects %]
+                            [% NEXT IF proj.parent_id %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;font-weight:bold;">
+                                <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
+                                    data-is-parent="1"
+                                    onchange="onProjectParentChange(this)">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="font-weight:normal;color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                            </label>
+                            [%# Children of this parent %]
+                            [% FOREACH child IN ap_projects %]
+                            [% NEXT UNLESS child.parent_id == proj.project_id %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.8em;padding:2px 0 2px 16px;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="project-cb" value="[% child.project_id %]" checked
+                                    data-parent-id="[% proj.project_id %]"
+                                    onchange="applyAllFilters();updateProjectSummary()">
+                                ↳ [% child.project_name %][% IF is_csc && child.sitename && child.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% child.sitename %])</span>[% END %]
+                            </label>
+                            [% END %]
+                            [% END %]
+                            [%# Standalone projects (no parent among the list) %]
+                            [% FOREACH proj IN ap_projects %]
+                            [% NEXT UNLESS proj.parent_id %]
+                            [%# Check if parent is NOT in ap_projects (orphan sub-project) %]
+                            [% SET parent_in_list = 0 %]
+                            [% FOREACH pp IN ap_projects %][% IF pp.project_id == proj.parent_id %][% SET parent_in_list = 1 %][% END %][% END %]
+                            [% NEXT IF parent_in_list %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
+                                    onchange="applyAllFilters();updateProjectSummary()">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
                     [% END %]
 
                     [%# Sort buttons %]
@@ -667,8 +696,6 @@
                 evt.stopPropagation();
                 location.reload();
             }
-            var _activeProject = '';
-
             function applyAllFilters() {
                 var allRoleCbs    = document.querySelectorAll('.role-cb');
                 var checkedRoles  = new Set(Array.from(document.querySelectorAll('.role-cb:checked')).map(function(cb){ return cb.value; }));
@@ -676,6 +703,9 @@
                 var allSiteCbs    = document.querySelectorAll('.site-cb');
                 var checkedSites  = new Set(Array.from(document.querySelectorAll('.site-cb:checked')).map(function(cb){ return cb.value; }));
                 var siteFiltered  = allSiteCbs.length > 0 && checkedSites.size < allSiteCbs.length;
+                var allProjCbs    = document.querySelectorAll('.project-cb');
+                var checkedProjs  = new Set(Array.from(document.querySelectorAll('.project-cb:checked')).map(function(cb){ return String(cb.value); }));
+                var projFiltered  = allProjCbs.length > 0 && checkedProjs.size < allProjCbs.length;
 
                 var cards = document.querySelectorAll('#priorities-list > div[id^="ap-row-"]');
                 var visible = 0;
@@ -687,7 +717,7 @@
                         return checkedRoles.has(cr);
                     });
                     var showSite    = !siteFiltered || checkedSites.has(card.dataset.site || '');
-                    var showProject = !_activeProject || String(card.dataset.projectId || '') === String(_activeProject);
+                    var showProject = !projFiltered  || checkedProjs.has(String(card.dataset.projectId || ''));
                     var show = showRole && showSite && showProject;
                     card.style.display = show ? '' : 'none';
                     if (show) visible++;
@@ -695,6 +725,32 @@
                 var countEl = document.getElementById('ap-visible-count');
                 if (countEl) countEl.textContent = visible;
                 _updateDropdownSummaries();
+            }
+
+            function onProjectParentChange(cb) {
+                var parentId = cb.value;
+                var checked  = cb.checked;
+                document.querySelectorAll('.project-cb[data-parent-id="' + parentId + '"]').forEach(function(child) {
+                    child.checked = checked;
+                });
+                applyAllFilters();
+                updateProjectSummary();
+            }
+
+            function updateProjectSummary() {
+                var sumEl = document.getElementById('project-summary');
+                if (!sumEl) return;
+                var all     = document.querySelectorAll('.project-cb');
+                var checked = document.querySelectorAll('.project-cb:checked');
+                if (all.length === checked.length) {
+                    sumEl.textContent = 'Focus: All \u25be';
+                } else {
+                    var names = Array.from(document.querySelectorAll('.project-cb:checked')).map(function(cb) {
+                        return cb.closest('label').textContent.replace(/[\u2192\u21b3]/g,'').trim().replace(/\s*\(.*\)\s*$/,'').trim();
+                    });
+                    var label = names.length <= 2 ? names.join(', ') : names.length + ' projects';
+                    sumEl.textContent = 'Focus: ' + label + ' \u25be';
+                }
             }
 
             function _updateDropdownSummaries() {
@@ -714,20 +770,11 @@
                         ? 'Site: All \u25be'
                         : 'Site: ' + Array.from(checkedS).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
                 }
-            }
-
-            function applyProjectFilterLocal(projId) {
-                _activeProject = projId || '';
-                var sel = document.getElementById('ap-project-filter');
-                if (sel) { sel.style.borderColor = projId ? 'var(--primary-color)' : 'var(--border-color)'; }
-                applyAllFilters();
+                updateProjectSummary();
             }
 
             function clearAllFilters() {
-                document.querySelectorAll('.role-cb,.site-cb').forEach(function(cb){ cb.checked = true; });
-                _activeProject = '';
-                var sel = document.getElementById('ap-project-filter');
-                if (sel) { sel.value = ''; sel.style.borderColor = 'var(--border-color)'; }
+                document.querySelectorAll('.role-cb,.site-cb,.project-cb').forEach(function(cb){ cb.checked = true; });
                 applyAllFilters();
             }
 
