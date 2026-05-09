@@ -2821,20 +2821,20 @@
             statusIndicator.className = 'chat-status error';
 
             const isTimeout = error.name === 'AbortError';
+            const ollamaTimeout = isTimeout && isOllama;
             const msg = isTimeout
                 ? 'Request timed out after ' + (clientTimeoutMs / 1000) + 's.'
-                    + (isOllama ? ' Ollama may be loading a large model.' : ' The AI server may be busy.')
+                    + (ollamaTimeout
+                        ? ' The local Ollama model is overloaded or too large for the current hardware. Try switching to a cloud provider (Grok) for instant responses.'
+                        : ' The AI server may be busy.')
                 : 'Network error: ' + error.message + '. Please try again.';
 
-            // Convert live thinking block into a permanent error trace instead of discarding it.
-            // This preserves the pre-send context (page, history, prompt) for diagnostics.
             _liveStep('❌', (isTimeout ? 'Client timed out after ' + (clientTimeoutMs/1000) + 's' : 'Network error: ' + error.message));
             liveSum.textContent = '⚠️ AI Thinking — ' + (isTimeout ? 'Timeout' : 'Network Error')
                 + ' Trace (' + liveBody.children.length + ' steps)';
             liveThinkEl.className = 'ai-thinking';
             liveThinkEl.open = true;
 
-            // Show error with a Retry button (always — network errors are usually transient)
             const chatMessages = document.getElementById('chat-messages');
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
@@ -2846,22 +2846,40 @@
             errEl.textContent = msg;
             wrapper.appendChild(label);
             wrapper.appendChild(errEl);
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'chat-retry-btn';
-            retryBtn.textContent = '↺ Retry';
-            retryBtn.onclick = function() {
-                // Remove the live thinking block (it's BEFORE wrapper in DOM, not after)
-                // and any thinking block immediately following this wrapper
-                persistMessages();    // save state (including liveThinkEl) in history first
+
+            function _doRetry(switchProvider) {
+                persistMessages();
                 liveThinkEl.remove();
                 var nextEl = wrapper.nextElementSibling;
                 if (nextEl && nextEl.classList.contains('ai-thinking')) nextEl.remove();
                 wrapper.remove();
+                if (switchProvider) {
+                    var sel = document.getElementById('provider-select');
+                    if (sel) {
+                        sel.value = switchProvider;
+                        sel.dispatchEvent(new Event('change'));
+                    }
+                }
                 queryAI(prompt);
-            };
+            }
+
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'chat-retry-btn';
+            retryBtn.textContent = '↺ Retry Ollama';
+            retryBtn.onclick = function() { _doRetry(null); };
             wrapper.appendChild(retryBtn);
+
+            if (ollamaTimeout) {
+                var switchGrokBtn = document.createElement('button');
+                switchGrokBtn.className = 'chat-retry-btn';
+                switchGrokBtn.style.cssText = 'margin-left:8px;background:#1a1a2e;color:#fff;';
+                switchGrokBtn.textContent = '⚡ Switch to Grok';
+                switchGrokBtn.onclick = function() { _doRetry('grok'); };
+                wrapper.appendChild(switchGrokBtn);
+            }
+
             chatMessages.appendChild(wrapper);
-            persistMessages();  // save network error into session history
+            persistMessages();
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
     }
