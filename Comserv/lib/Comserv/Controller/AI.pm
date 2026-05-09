@@ -8725,6 +8725,14 @@ NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - Environment / habitat: /BMaster/environment
 - Education: /BMaster/education
 - ENCY herb/plant search: /ENCY/search?q=TERM
+- Herbs / plants list: /ENCY/herbs
+- Glossary (beekeeping & herbal terms): /ENCY/glossary
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
+- Insects: /ENCY/insects
+- Constituents list: /ENCY/Constituent
+- Formulas / recipes: /ENCY/formula
+- Therapeutic actions: /ENCY/therapeutic_actions
 - Workshops (local beekeeping events): /workshop
 - Membership: /membership
 
