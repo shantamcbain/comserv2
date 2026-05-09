@@ -3042,6 +3042,29 @@
         { label: 'pollinator plants',          url: '/ENCY/BeePastureView' },
         { label: 'pollinators',                url: '/ENCY/BeePastureView' },
         { label: 'bee pasture view',           url: '/ENCY/BeePastureView' },
+        { label: 'herbs',                      url: '/ENCY/herbs' },
+        { label: 'herbs list',                 url: '/ENCY/herbs' },
+        { label: 'herb list',                  url: '/ENCY/herbs' },
+        { label: 'plant list',                 url: '/ENCY/herbs' },
+        { label: 'plants',                     url: '/ENCY/herbs' },
+        { label: 'botanical names',            url: '/ENCY/BotanicalNameView' },
+        { label: 'glossary',                   url: '/ENCY/glossary' },
+        { label: 'beekeeping glossary',        url: '/ENCY/glossary' },
+        { label: 'terms',                      url: '/ENCY/glossary' },
+        { label: 'diseases',                   url: '/ENCY/diseases' },
+        { label: 'diseases list',              url: '/ENCY/diseases' },
+        { label: 'bee diseases',               url: '/ENCY/diseases' },
+        { label: 'symptoms',                   url: '/ENCY/symptoms' },
+        { label: 'symptoms list',              url: '/ENCY/symptoms' },
+        { label: 'constituents',               url: '/ENCY/Constituent' },
+        { label: 'constituent list',           url: '/ENCY/Constituent' },
+        { label: 'formulas',                   url: '/ENCY/formula' },
+        { label: 'recipes',                    url: '/ENCY/formula' },
+        { label: 'insects',                    url: '/ENCY/insects' },
+        { label: 'animals',                    url: '/ENCY/animals' },
+        { label: 'therapeutic actions',        url: '/ENCY/therapeutic_actions' },
+        { label: 'drug herb interactions',     url: '/ENCY/drug_herb_interactions' },
+        { label: 'herb interactions',          url: '/ENCY/drug_herb_interactions' },
     ];
 
     // Build a flat {label, url} navigation map from:
@@ -3140,7 +3163,7 @@
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
     // NOTE: "show me" and "find" are intentionally excluded — they are question/display words
     // that should be answered by the AI, not treated as navigation commands.
-    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+(.+)/i;
+    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|take me to the|go to the)\s+(.+)/i;
 
     // Helper: handle a resolved navigation match — announce and navigate
     function _executeNavMatch(message, messageInput, matches) {
