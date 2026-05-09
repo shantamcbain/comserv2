@@ -3397,9 +3397,16 @@
             return;
         }
 
+        // ENCY agent: let the ENCY fast path inside sendAIRequest handle section navigation.
+        // Skip resolveNavIntent entirely so it cannot misfire on words like "list".
+        const _smAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+        const _isEncyNav = (_smAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+            && message && /\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/i.test(message)
+            && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(message);
+
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message && message.match(NAV_RE);
+        const navMatch = !_isEncyNav && message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -4319,7 +4326,11 @@
             }
 
             // Client-side navigation interception
-            const navMatch = prompt.match(NAV_RE);
+            // Skip for ENCY agent nav — handled by fast path inside sendAIRequest
+            const _pmAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            const _pmIsEncyNav = (_pmAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+                && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(prompt);
+            const navMatch = !_pmIsEncyNav && prompt.match(NAV_RE);
             if (navMatch) {
                 const matches = resolveNavIntent(prompt);
                 if (matches && matches.length === 1) {
