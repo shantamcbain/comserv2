@@ -9116,20 +9116,30 @@ DATABASE SCHEMA — ENCY tables you can reference:
 
 NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - ENCY home: /ENCY
-- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Herbs list (browse all herbs): /ENCY/herbs
+- Search herbs: /ENCY/search?q=TERM
+- Botanical name index (A-Z): /ENCY/BotanicalNameView
 - Bee pasture / forage plants: /ENCY/BeePastureView
 - View herb detail: /ENCY/herb_detail?record_id=ID
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
+- Animals: /ENCY/animals
 - Constituent list: /ENCY/Constituent
 - Constituent detail: /ENCY/Constituent/ID
 - Add constituent: /ENCY/Constituent/add
 - Edit constituent: /ENCY/Constituent/edit?record_id=ID
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
-- Formulas: /ENCY/formula
-- Recipes: /ENCY/recipes
+- Formulas / Recipes: /ENCY/formula
+- Glossary: /ENCY/glossary
+
+When the user asks to "open", "show", "list", "browse", or "go to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/herbs"}]
+Do NOT just describe the page — always emit the ACTION so the browser navigates there automatically.
+If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT guess a URL.
 $editor_section
 DATA ALREADY INJECTED:
 The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below

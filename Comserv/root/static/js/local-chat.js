@@ -2249,7 +2249,53 @@
             }
         }
 
-        // ENCY fast path: when ENCY agent is active and the prompt or chat history mentions
+        // ENCY section navigation fast path — no AI round-trip needed for common section requests
+        if (_agentId === 'ency' || (state.pageContext.page_path || '').startsWith('/ENCY')) {
+            const _pu5 = prompt.toUpperCase().replace(/['']/g, '');
+            if (/\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/.test(_pu5)) {
+                var _encyNavUrl = null;
+                var _encyNavLabel = null;
+                if (/\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL)\b/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/herbs'; _encyNavLabel = 'Herbs List';
+                } else if (/\bCONSTIT/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/Constituent'; _encyNavLabel = 'Constituent List';
+                } else if (/\bGLOSSARY\b/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/glossary'; _encyNavLabel = 'Glossary';
+                } else if (/\bDISEASE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/diseases'; _encyNavLabel = 'Diseases List';
+                } else if (/\bSYMPTOM/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/symptoms'; _encyNavLabel = 'Symptoms List';
+                } else if (/\bFORMULA|RECIPE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/formula'; _encyNavLabel = 'Formulas / Recipes';
+                } else if (/\bINSECT/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/insects'; _encyNavLabel = 'Insects';
+                } else if (/\bANIMAL/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/animals'; _encyNavLabel = 'Animals';
+                } else if (/\bPOLLINATOR|BEE\s*PASTURE|FORAGE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/BeePastureView'; _encyNavLabel = 'Bee Pasture / Pollinators';
+                }
+                if (_encyNavUrl) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening ' + _encyNavLabel + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: _encyNavUrl });
+                    const _nw = document.createElement('div');
+                    _nw.className = 'msg-wrapper msg-wrapper-ai';
+                    const _nlbl = document.createElement('div');
+                    _nlbl.className = 'msg-label';
+                    _nlbl.textContent = 'ENCY Agent';
+                    const _nel = document.createElement('div');
+                    _nel.className = 'message ai-message';
+                    _nel.innerHTML = 'Opening <strong>' + _encyNavLabel + '</strong> in a new tab.';
+                    _nw.appendChild(_nlbl);
+                    _nw.appendChild(_nel);
+                    const _ncm = document.getElementById('chat-messages');
+                    if (_ncm) { _ncm.appendChild(_nw); _ncm.scrollTop = _ncm.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
         // "Unresolved term in constituent#N", navigate directly to that constituent's page.
         // When adding a named constituent, navigate to the add form pre-filled.
         if (_agentId === 'ency') {
@@ -2860,36 +2906,7 @@
         });
     }
     
-    // Extract visible text content of the current page to give the AI direct context.
-    // Strips the chat widget, nav, scripts and style elements, then trims whitespace.
-    // Result is capped at 4000 chars so the system prompt doesn't balloon.
-    function extractPageContent() {
-        try {
-            const clone = document.body.cloneNode(true);
-            // Remove elements that add noise or duplicate the nav guide
-            clone.querySelectorAll(
-                'script, style, noscript, ' +
-                '.local-chat-widget, #chat-panel, ' +
-                'nav, header, footer, ' +
-                '.navigation, #navigation, .nav-bar, ' +
-                '.debug-info, .page-debug'
-            ).forEach(function(el) { el.remove(); });
 
-            let text = clone.textContent || '';
-            // Collapse runs of whitespace/blank lines
-            text = text.replace(/[ \t]+/g, ' ')
-                       .replace(/\n[ \t]*/g, '\n')
-                       .replace(/\n{3,}/g, '\n\n')
-                       .trim();
-
-            if (text.length > 2000) {
-                text = text.substring(0, 2000) + '\n[... page content truncated]';
-            }
-            return text;
-        } catch(e) {
-            return '';
-        }
-    }
 
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
@@ -3974,7 +3991,13 @@
             const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
             if (navUrl) {
                 const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
-                window.open(abs, '_blank');
+                const _navSi = document.getElementById('chat-status');
+                if (_navSi) { _navSi.textContent = '\uD83D\uDD17 Opening: ' + navUrl; _navSi.className = 'chat-status connected'; }
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.open(abs, '_blank');
+                }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -3982,7 +4005,7 @@
                 lbl.textContent = 'System';
                 const el = document.createElement('div');
                 el.className = 'message system-message';
-                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                el.innerHTML = '\uD83D\uDD17 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
                 wrapper.appendChild(lbl);
                 wrapper.appendChild(el);
                 chatMessages.appendChild(wrapper);
