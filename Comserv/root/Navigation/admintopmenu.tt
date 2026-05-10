@@ -47,6 +47,7 @@
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
                         <a href="/admin/ai/configure"><i class="icon-config"></i>AI Configuration</a>
+                        <a href="/chat/admin" id="nav-support-chat-link"><i class="icon-chat"></i>Support Chat <span id="nav-support-badge" style="display:none;background:#e55;color:#fff;border-radius:10px;padding:1px 7px;font-size:.75em;margin-left:4px;vertical-align:middle;"></span></a>
                     </div>
                 [% END %]
             </div>
@@ -439,4 +440,22 @@
             </div>
         </div>
     </div>
+<script>
+(function() {
+    function _updateSupportBadge() {
+        var badge = document.getElementById('nav-support-badge');
+        if (!badge) return;
+        fetch('/chat/pending_count', { credentials: 'include' })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            var n = d && d.count ? parseInt(d.count, 10) : 0;
+            if (n > 0) { badge.textContent = n; badge.style.display = ''; }
+            else { badge.style.display = 'none'; }
+        })
+        .catch(function() {});
+    }
+    _updateSupportBadge();
+    setInterval(_updateSupportBadge, 30000);
+})();
+</script>
 </li>
