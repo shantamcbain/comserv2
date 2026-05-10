@@ -157,8 +157,8 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4.3',                  provider => 'grok', label => 'Grok 4.3 (xAI)' };
-                    push @external_models, { name => 'grok-4.20-non-reasoning',   provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
+                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
                 }
             }
         } catch {
@@ -4888,6 +4888,7 @@ ACTION
              . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
+             . "If a user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
              . "If a user asks about the admin panel or any admin feature, say: "
              . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
              . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
@@ -4912,6 +4913,7 @@ ACTION
          . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
          . "NEVER guess or invent application URLs using your training knowledge. "
          . "NEVER provide /admin URLs to users who do not have admin role. "
+         . "If the user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
          . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
          . "say: 'That section requires administrator privileges.'"
          . $no_internet
@@ -6772,7 +6774,7 @@ sub auto_sync_models :Local :Args(0) {
         return;
     }
 
-    my $catalog     = $ollama->list_available_models();
+    my $catalog    = $ollama->list_available_models();
     my @recommended = grep { $_->{recommended} } @$catalog;
     my $deprecated  = $ollama->deprecated_models();
 
@@ -9095,20 +9097,29 @@ DATABASE SCHEMA — ENCY tables you can reference:
 
 NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - ENCY home: /ENCY
-- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Herbs list (browse all herbs): /ENCY/herbs
+- Search herbs: /ENCY/search?q=TERM
+- Botanical name index (A-Z herb list): /ENCY/BotanicalNameView
 - Bee pasture / forage plants: /ENCY/BeePastureView
 - View herb detail: /ENCY/herb_detail?record_id=ID
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
+- Animals: /ENCY/animals
 - Constituent list: /ENCY/Constituent
 - Constituent detail: /ENCY/Constituent/ID
 - Add constituent: /ENCY/Constituent/add
 - Edit constituent: /ENCY/Constituent/edit?record_id=ID
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
-- Formulas: /ENCY/formula
-- Recipes: /ENCY/recipes
+- Formulas / Recipes: /ENCY/formula
+- Glossary: /ENCY/glossary
+
+When the user asks to "open", "show", "list", or "browse" any of the above sections, emit a navigate action on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/herbs"}]
+Do NOT just describe the page — always emit the ACTION so the browser navigates there automatically.
 $editor_section
 DATA ALREADY INJECTED:
 The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below

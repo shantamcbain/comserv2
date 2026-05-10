@@ -4,6 +4,7 @@ use namespace::autoclean;
 use JSON;
 use DateTime;
 use Try::Tiny;
+use POSIX qw(strftime);
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -129,14 +130,44 @@ sub send_message :Path('send_message') :Args(0) {
             "Message stored - message_id=" . $ai_message->id . ", conversation_id=$conversation_id, user_id=$user_id");
         
         $ai_message->discard_changes;
-        
+
+        # Auto-create a HelpDesk ticket when a new live-support chat starts (system flag)
+        my $ticket_number;
+        if ($agent_type eq 'support' && !$c->req->params->{conversation_id}) {
+            eval {
+                my $ticket_num = uc($site_name) . '-CHAT-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', int(rand(9999)) + 1);
+                $schema->resultset('SupportTicket')->create({
+                    ticket_number => $ticket_num,
+                    site_name     => $site_name,
+                    user_id       => $user_id,
+                    username      => $username,
+                    email         => $c->session->{email} || '',
+                    subject       => 'Live support chat request from ' . $username,
+                    description   => "User initiated a live support chat.\n\nFirst message:\n" . $message
+                                   . "\n\nView chat: " . $c->uri_for('/chat/admin'),
+                    category      => 'support',
+                    priority      => 'medium',
+                    status        => 'open',
+                    created_at    => strftime('%Y-%m-%d %H:%M:%S', localtime),
+                });
+                $ticket_number = $ticket_num;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_message',
+                    "Auto-created HelpDesk ticket $ticket_num for support chat conversation_id=$conversation_id");
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_message',
+                    "Could not auto-create HelpDesk ticket: $@");
+            }
+        }
+
         # Return success response
         $c->response->content_type('application/json');
         $c->response->body(encode_json({
             success => 1,
             message_id => $ai_message->id,
             conversation_id => $conversation_id,
-            timestamp => $ai_message->created_at->iso8601
+            timestamp => $ai_message->created_at->iso8601,
+            ($ticket_number ? (ticket_number => $ticket_number) : ()),
         }));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_message',
