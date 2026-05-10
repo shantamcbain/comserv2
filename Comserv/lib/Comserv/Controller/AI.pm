@@ -562,7 +562,7 @@ sub generate :Local :Args(0) {
             'generate', "ENCY agent: injected system prompt");
     }
 
-    if (lc($normalized_agent_type) =~ /^bmaster$/ && !$system) {
+    if (lc($normalized_agent_type) =~ /^beemaster$/ && !$system) {
         $system = $self->_build_bmaster_system_prompt($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "BMaster agent: injected system prompt");
@@ -670,7 +670,7 @@ sub generate :Local :Args(0) {
     # Planning agent already injects project list via _build_planning_system_prompt;
     # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
     my $inject_prompt = $prompt;
-    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+    if ($normalized_agent_type =~ /^(planning|ency|beemaster)$/i) {
         $inject_prompt = "project todo $prompt";
     }
     if ($normalized_agent_type =~ /^accounting$/i) {
@@ -969,7 +969,7 @@ sub generate :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $force_large = (!$is_guest && !$manual_model &&
-                $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+                $normalized_agent_type =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
             my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
@@ -1182,10 +1182,10 @@ sub generate :Local :Args(0) {
                 $_gr = [split /,/, $_gr] unless ref $_gr;
                 grep { /^(admin|developer|editor)$/i } @$_gr;
             };
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 20_000
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency beemaster 3dprint accounting)) ? 20_000
                               : $_gen_is_admin ? 14_000
                               : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|bmaster)$/)        ? 16_000
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|beemaster)$/)        ? 16_000
                                : ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
                                : $_gen_is_admin                                         ? 10_000
                                : 6_000;
@@ -1409,7 +1409,7 @@ sub generate :Local :Args(0) {
         # Log success metrics
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
-        my $ai_response = $response->{response} || '';
+        my $ai_response = $self->_sanitize_ai_urls($response->{response} || '');
         # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
         my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
             ? $response->{usage}{total_tokens}
@@ -2158,7 +2158,7 @@ sub chat :Local :Args(0) {
     if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_ency_system_prompt($c);
     }
-    if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
+    if (lc($chat_agent_id) =~ /^beemaster$/ && !$chat_agent_system) {
         $chat_agent_system = $self->_build_bmaster_system_prompt($c);
     }
 
@@ -2209,7 +2209,7 @@ sub chat :Local :Args(0) {
 
     # Fetch live module data — force inject for agents that always need project/todo data
     my $chat_inject_prompt = $prompt;
-    if ($chat_agent_id =~ /^(planning|ency|bmaster)$/i) {
+    if ($chat_agent_id =~ /^(planning|ency|beemaster)$/i) {
         $chat_inject_prompt = "project todo $prompt";
     }
     my $module_data = $self->_get_module_data($c, $chat_inject_prompt, $chat_agent_id);
@@ -2457,7 +2457,7 @@ sub chat :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $chat_force_large = (!$is_guest && !$manual_model &&
-                $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+                $chat_agent_id =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
@@ -2517,7 +2517,7 @@ sub chat :Local :Args(0) {
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
             # Admin users have larger nav guides — raise limits so admin links are not truncated.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency beemaster 3dprint)) ? 16_000
                               : $can_select_model_perm ? 14_000
                               : 8_000;
             my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
@@ -2694,6 +2694,8 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
+
+        $ai_response = $self->_sanitize_ai_urls($ai_response);
 
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
@@ -3985,7 +3987,7 @@ context so it automatically respects the current user's session / role.
 
   $c        - Catalyst context
   $prompt   - the user's raw query text
-  $agent_id - agent id string (e.g. 'bmaster', 'csc')
+  $agent_id - agent id string (e.g. 'beemaster', 'csc')
 
 Returns a string of data context, or empty string when nothing relevant found.
 
@@ -4342,7 +4344,7 @@ sub _get_module_data {
 
     # --- BMaster / Apiary live data ---
     # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
-    my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
+    my $is_bmaster_agent = lc($agent_id) =~ /^beemaster$/;
     if ($is_bmaster_agent || $prompt =~ /hive|apiary|yard|queen|varroa|swarm|inspect|honey|harvest|brood|beekeeper|bee\s*keep/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -4497,6 +4499,13 @@ Poor indicators:
 
 =cut
 
+sub _sanitize_ai_urls {
+    my ($self, $text) = @_;
+    return $text unless defined $text && length $text;
+    $text =~ s{https?://(?:example\.com|localhost(?::\d+)?)((?:/[^\s"')\]>]*)?)}{$1 || '/'}ge;
+    return $text;
+}
+
 sub _assess_response_quality {
     my ($self, $response, $prompt) = @_;
     $response //= '';
@@ -4532,7 +4541,7 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
+#   ency / beemaster  →  brave (if key) → searxng (if configured) → ddg
 #   all others      →  ollama-cloud (if key) → ddg → brave → searxng
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
@@ -4573,7 +4582,7 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|beemaster|bmast|usbm|accounting)$/i) ? 1 : 0;
     my @order = $is_precise_agent
         ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
         : ('ollama_cloud', 'ddg', 'brave', 'searxng');
@@ -5272,7 +5281,7 @@ sub _build_page_navigation_hint {
 
 Choose the best installed Ollama model for a given agent/page context.
 
-  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
+  chat / helpdesk / ency / beemaster  → prefer llama3.1 (instruction-tuned chat)
   code / developer / docker         → prefer starcoder2 or qwen-coder
   fallback                          → first installed model, then hardcoded default
 
@@ -8671,7 +8680,7 @@ sub support_send :Local :Args(1) {
 
 =head2 _build_bmaster_system_prompt
 
-Builds a BMaster beekeeping-aware system prompt for the AI when agent_id is 'bmaster'.
+Builds a BeeMaster beekeeping-aware system prompt for the AI when agent_id is 'beemaster'.
 Bee-welfare philosophy: not agribiz-driven, always answers with the bees' best interests first.
 Includes full apiary schema, seasonal calendar, editor workflow, and cross-context awareness.
 
@@ -8704,6 +8713,33 @@ EDITOR
 
     return <<END_PROMPT;
 You are the expert BMaster beekeeping assistant for $site_name.
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- BMaster dashboard: /BMaster
+- Apiary overview: /Apiary
+- Hive management: /Apiary/HiveManagement
+- Queen rearing: /Apiary/QueenRearing
+- Bee health: /Apiary/BeeHealth
+- Bee forage / bee pasture / forage plants: /ENCY/BeePastureView
+- Honey production: /BMaster/honey
+- Environment / habitat: /BMaster/environment
+- Education: /BMaster/education
+- ENCY herb/plant search: /ENCY/search?q=TERM
+- Herbs / plants list: /ENCY/herbs
+- Glossary (beekeeping & herbal terms): /ENCY/glossary
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
+- Insects: /ENCY/insects
+- Constituents list: /ENCY/Constituent
+- Formulas / recipes: /ENCY/formula
+- Therapeutic actions: /ENCY/therapeutic_actions
+- Workshops (local beekeeping events): /workshop
+- Membership: /membership
+
+When the user asks to "open", "show", "go to", "list", "browse", or "take me to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/BeePastureView"}]
+Do NOT just describe the page or give a link — always emit the ACTION so the browser navigates automatically.
+If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT invent or guess a URL.
 
 PHILOSOPHY — This system is NOT driven by agribusiness profits. It is designed around
 what is best for the bees and healthy, sustainable apiculture:
@@ -8750,20 +8786,6 @@ DATABASE SCHEMA — BMaster / Apiary tables:
 - HiveConfiguration: hive setup templates
 - HiveFrame: linked to Box (frame-level detail)
 
-NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
-- BMaster dashboard: /BMaster
-- Apiary overview: /Apiary
-- Hive management: /Apiary/HiveManagement
-- Queen rearing: /Apiary/QueenRearing
-- Bee health: /Apiary/BeeHealth
-- Bee pasture / forage plants: /BMaster/bee_pasture  (→ /ENCY/BeePastureView)
-- Honey production: /BMaster/honey
-- Environment / habitat: /BMaster/environment
-- Education: /BMaster/education
-- ENCY herb/plant search: /ENCY/search?q=TERM
-- ENCY bee forage view: /ENCY/BeePastureView
-- Workshops (local beekeeping events): /workshop
-- Membership: /membership
 $editor_section
 VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
 You can record a hive inspection by voice directly in this chat widget:
@@ -9116,20 +9138,30 @@ DATABASE SCHEMA — ENCY tables you can reference:
 
 NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - ENCY home: /ENCY
-- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Herbs list (browse all herbs): /ENCY/herbs
+- Search herbs: /ENCY/search?q=TERM
+- Botanical name index (A-Z): /ENCY/BotanicalNameView
 - Bee pasture / forage plants: /ENCY/BeePastureView
 - View herb detail: /ENCY/herb_detail?record_id=ID
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
+- Animals: /ENCY/animals
 - Constituent list: /ENCY/Constituent
 - Constituent detail: /ENCY/Constituent/ID
 - Add constituent: /ENCY/Constituent/add
 - Edit constituent: /ENCY/Constituent/edit?record_id=ID
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
-- Formulas: /ENCY/formula
-- Recipes: /ENCY/recipes
+- Formulas / Recipes: /ENCY/formula
+- Glossary: /ENCY/glossary
+
+When the user asks to "open", "show", "list", "browse", or "go to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/herbs"}]
+Do NOT just describe the page — always emit the ACTION so the browser navigates there automatically.
+If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT guess a URL.
 $editor_section
 DATA ALREADY INJECTED:
 The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
