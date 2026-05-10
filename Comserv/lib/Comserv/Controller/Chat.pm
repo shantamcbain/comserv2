@@ -4,6 +4,7 @@ use namespace::autoclean;
 use JSON;
 use DateTime;
 use Try::Tiny;
+use POSIX qw(strftime);
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Catalyst::Controller'; }
@@ -129,14 +130,14 @@ sub send_message :Path('send_message') :Args(0) {
             "Message stored - message_id=" . $ai_message->id . ", conversation_id=$conversation_id, user_id=$user_id");
         
         $ai_message->discard_changes;
-        
+
         # Return success response
         $c->response->content_type('application/json');
         $c->response->body(encode_json({
             success => 1,
             message_id => $ai_message->id,
             conversation_id => $conversation_id,
-            timestamp => $ai_message->created_at->iso8601
+            timestamp => $ai_message->created_at->iso8601,
         }));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_message',
@@ -518,6 +519,67 @@ sub support_conversations :Path('support_conversations') :Args(0) {
         }
     };
     $c->response->body(encode_json({ success => 1, conversations => \@convs }));
+}
+
+=head2 admin_heartbeat
+
+Admin presence ping — call every 30 s from any admin page to mark admin as online.
+
+=cut
+
+sub admin_heartbeat :Path('admin_heartbeat') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($c->check_user_roles('admin')) {
+        $c->response->body(encode_json({ success => 0 }));
+        return;
+    }
+    my $username = $c->session->{username} || 'admin';
+    my $presence_file = '/tmp/comserv_admin_presence.json';
+    my $data = {};
+    eval {
+        if (-f $presence_file) {
+            open my $fh, '<', $presence_file or die;
+            local $/; my $raw = <$fh>; close $fh;
+            $data = decode_json($raw) if $raw;
+        }
+    };
+    $data->{admins} //= {};
+    $data->{admins}{$username} = time();
+    eval {
+        open my $fh, '>', $presence_file or die;
+        print $fh encode_json($data);
+        close $fh;
+    };
+    $c->response->body(encode_json({ success => 1 }));
+}
+
+=head2 check_admin_online
+
+Returns whether any admin is currently online (heartbeat within last 5 minutes).
+
+=cut
+
+sub check_admin_online :Path('check_admin_online') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $presence_file = '/tmp/comserv_admin_presence.json';
+    my $count = 0;
+    eval {
+        if (-f $presence_file) {
+            open my $fh, '<', $presence_file or die;
+            local $/; my $raw = <$fh>; close $fh;
+            my $data = decode_json($raw || '{}');
+            my $cutoff = time() - 300;
+            for my $adm (keys %{$data->{admins} || {}}) {
+                $count++ if ($data->{admins}{$adm} || 0) > $cutoff;
+            }
+        }
+    };
+    $c->response->body(encode_json({
+        online => ($count > 0 ? \1 : \0),
+        count  => $count,
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;
