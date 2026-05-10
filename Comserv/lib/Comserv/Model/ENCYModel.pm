@@ -95,7 +95,7 @@ sub get_herbal_data {
     eval {
         @results = $self->ency_schema->resultset('Ency::Herb')->search(
             { botanical_name => { '!=' => '' } },
-            { order_by => 'botanical_name' }
+            { order_by => 'botanical_name', prefetch => { organism => 'common_names' } }
         )->all;
     };
     return \@results;
@@ -127,7 +127,7 @@ sub get_bee_forage_plants {
                 OR ( nectar IS NOT NULL AND nectar > 0 )
                 OR ( pollen IS NOT NULL AND pollen > 0 )" ],
             { order_by => 'botanical_name',
-              columns  => [qw(record_id botanical_name common_names apis nectar pollen image)] }
+              prefetch => 'organism' }
         )->all;
     };
     return \@results;
@@ -478,7 +478,11 @@ sub update_disease {
 
 sub get_disease_by_id {
     my ($self, $c, $id) = @_;
-    my $record = $self->ency_schema->resultset('Ency::Disease')->find($id);
+    my $record = eval { $self->ency_schema->resultset('Ency::Disease')->find($id) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_disease_by_id', "DB error fetching disease $id: $@");
+        return undef;
+    }
     if ($record) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_disease_by_id', "Disease with ID $id fetched successfully.");
     } else {
@@ -2285,7 +2289,7 @@ sub preprocess_field_markers {
 
 sub add_organism {
     my ($self, $c, $data) = @_;
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Adding organism: " . ($data->{common_name} || ''));
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Adding organism: " . ($data->{scientific_name} || ''));
     my $rec;
     eval {
         $rec = $self->ency_schema->resultset('Ency::Organism')->create($data);
@@ -2390,7 +2394,7 @@ sub find_or_create_organism_from_ncbi {
     eval {
         $new_org = $self->ency_schema->resultset('Ency::Organism')->create({
             scientific_name     => $ncbi_data->{scientific_name},
-            organism_type       => $ncbi_data->{organism_type} || 'plant',
+            organism_type       => $ncbi_data->{organism_type} || 'unknown',
             kingdom             => $ncbi_data->{kingdom}       || '',
             phylum              => $ncbi_data->{phylum}        || '',
             class_name          => $ncbi_data->{class_name}    || '',
@@ -2399,7 +2403,8 @@ sub find_or_create_organism_from_ncbi {
             genus               => $ncbi_data->{genus}         || '',
             species             => $ncbi_data->{species}       || '',
             ncbi_tax_id         => $ncbi_data->{ncbi_tax_id},
-            description         => "Imported from NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
+            reference           => "NCBI Taxonomy ID: $ncbi_data->{ncbi_tax_id}",
+            url                 => $ncbi_data->{source_url} || "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$ncbi_data->{ncbi_tax_id}",
             sitename            => 'ENCY',
             username_of_poster  => ($c && $c->session->{username}) || 'system',
             group_of_poster     => ($c && $c->session->{group})    || 'system',
@@ -2560,6 +2565,293 @@ sub bulk_link_herbs_to_ncbi {
         remaining      => $remaining > 0 ? $remaining : 0,
         total_pending  => $total_pending,
         details        => \@results,
+    };
+}
+
+sub enrich_organism_from_external {
+    my ($self, $c, $org_id) = @_;
+    my $org = $self->ency_schema->resultset('Ency::Organism')->find($org_id);
+    return (0, "Organism not found") unless $org;
+
+    my $ext      = $c->model('ExternalDB');
+    my $sci_name = $org->scientific_name // '';
+    return (0, "No scientific name") unless $sci_name;
+
+    my %updates;
+    my @image_records;
+    my @messages;
+
+    my $gbif = eval { $ext->gbif_lookup_by_name($c, $sci_name) };
+    if ($gbif && $gbif->{gbif_id}) {
+        $updates{gbif_id} = $gbif->{gbif_id} unless $org->gbif_id;
+        push @messages, "GBIF:$gbif->{gbif_id}";
+    }
+    select(undef, undef, undef, 0.3);
+
+    my $wiki = eval { $ext->wikipedia_summary($c, $sci_name) };
+    if ($wiki) {
+        $updates{description} = $wiki->{description}
+            if $wiki->{description} && !($org->description // '');
+        $updates{habitat} = $wiki->{habitat}
+            if $wiki->{habitat} && !($org->habitat // '');
+        push @messages, "Wiki:ok";
+
+        if ($wiki->{image_url}) {
+            push @image_records, {
+                url           => $wiki->{image_url},
+                thumbnail_url => $wiki->{image_url},
+                caption       => $wiki->{wiki_title},
+                source        => 'Wikipedia',
+                license       => 'Wikimedia',
+                rights_holder => '',
+            };
+        }
+    }
+
+    if ($gbif && $gbif->{images}) {
+        push @image_records, @{ $gbif->{images} };
+    }
+
+    eval { $org->update(\%updates) } if %updates;
+
+    if (@image_records) {
+        my $img_rs = $self->ency_schema->resultset('Ency::OrganismImage');
+        my $existing_count = eval { $img_rs->search({ organism_id => $org_id })->count } // 0;
+        my $sort = $existing_count;
+        for my $img (@image_records) {
+            eval {
+                $img_rs->create({
+                    organism_id        => $org_id,
+                    url                => $img->{url},
+                    thumbnail_url      => $img->{thumbnail_url},
+                    caption            => $img->{caption}       // '',
+                    source             => $img->{source}        // '',
+                    license            => $img->{license}       // '',
+                    rights_holder      => $img->{rights_holder} // '',
+                    is_primary         => ($sort == 0 && !$existing_count) ? 1 : 0,
+                    sort_order         => $sort++,
+                    date_time_posted   => \'NOW()',
+                    username_of_poster => ($c && $c->session->{username}) || 'system',
+                });
+            };
+        }
+        push @messages, scalar(@image_records) . " image(s) added";
+    }
+
+    my $bad_img_pat = qr{zenodo|pensoft|plos(?:one)?|figshare|researchgate|academia\.edu
+                        |doi\.org|pubmed|ncbi\.nlm|springer|elsevier|wiley
+                        |nature\.com/articles|sciencedirect|bioone|\.pdf
+                        |[/_](?:graph|chart|figure)}xi;
+    my $cur_img = $org->image // '';
+    if (@image_records && (!$cur_img || $cur_img =~ $bad_img_pat)) {
+        eval { $org->update({ image => $image_records[0]{url} }) };
+    }
+
+    return (1, join('; ', @messages) || 'ok');
+}
+
+sub resync_organisms_from_ncbi {
+    my ($self, $c, $batch_size, $after_id) = @_;
+    $batch_size //= 10;
+    $after_id   //= 0;
+
+    my @organisms = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => { '!=' => undef },
+          record_id   => { '>'  => $after_id } },
+        { order_by => 'record_id', rows => $batch_size }
+    )->all;
+
+    my $total = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => { '!=' => undef } }
+    )->count;
+
+    my @results;
+    my $ext_model = $c->model('ExternalDB');
+    my $max_id = $after_id;
+
+    for my $org (@organisms) {
+        my $tax_id = $org->ncbi_tax_id;
+        $max_id = $org->record_id if $org->record_id > $max_id;
+        my $r = { organism_id => $org->record_id, ncbi_tax_id => $tax_id,
+                  scientific_name => $org->scientific_name };
+
+        my $ncbi = eval { $ext_model->ncbi_fetch_by_tax_id($c, $tax_id) };
+        if ($@ || !$ncbi) {
+            $r->{status}  = 'error';
+            $r->{message} = "NCBI fetch failed for tax_id $tax_id";
+            push @results, $r;
+            select(undef, undef, undef, 0.35);
+            next;
+        }
+
+        my %updates;
+        $updates{organism_type} = $ncbi->{organism_type} if $ncbi->{organism_type};
+        $updates{kingdom}       = $ncbi->{kingdom}       if $ncbi->{kingdom};
+        $updates{phylum}        = $ncbi->{phylum}        if $ncbi->{phylum};
+        $updates{class_name}    = $ncbi->{class_name}    if $ncbi->{class_name};
+        $updates{order_name}    = $ncbi->{order_name}    if $ncbi->{order_name};
+        $updates{family_name}   = $ncbi->{family_name}   if $ncbi->{family_name};
+        $updates{genus}         = $ncbi->{genus}         if $ncbi->{genus};
+        $updates{species}       = $ncbi->{species}       if $ncbi->{species};
+
+        my $cur_desc = $org->description // '';
+        if ($cur_desc =~ /^(?:Imported from )?NCBI Taxonomy ID:/i) {
+            $updates{description} = '';
+        }
+        my $cur_ref = $org->reference // '';
+        if (!$cur_ref) {
+            $updates{reference} = "NCBI Taxonomy ID: $tax_id";
+        }
+        my $cur_url = $org->url // '';
+        if (!$cur_url || $cur_url !~ m{^https?://}) {
+            $updates{url} = $ncbi->{source_url} || "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$tax_id";
+        }
+
+        eval { $org->update(\%updates) } if %updates;
+        $r->{status}  = 'updated';
+        $r->{message} = "type=" . ($ncbi->{organism_type} // '?')
+                      . " kingdom=" . ($ncbi->{kingdom} // 'n/a');
+        push @results, $r;
+        select(undef, undef, undef, 0.35);
+    }
+
+    my $updated   = scalar grep { $_->{status} eq 'updated' } @results;
+    my $errors    = scalar grep { $_->{status} eq 'error'   } @results;
+    my $remaining = $self->ency_schema->resultset('Ency::Organism')->search(
+        { ncbi_tax_id => { '!=' => undef },
+          record_id   => { '>'  => $max_id } }
+    )->count;
+
+    return {
+        processed  => scalar @results,
+        updated    => $updated,
+        errors     => $errors,
+        remaining  => $remaining,
+        total      => $total,
+        last_id    => $max_id,
+        details    => \@results,
+    };
+}
+
+sub _parse_common_name_string {
+    my ($self, $raw) = @_;
+    return () unless defined $raw && length $raw;
+
+    my $str = $raw;
+
+    $str =~ s/\x{2019}/'/g;
+    $str =~ s/\x{2018}/'/g;
+    $str =~ s/\x{201C}|\x{201D}/"/g;
+    $str =~ s/\?{2,}/'/g;
+
+    $str =~ s/\s*\(\s*(?:\d+(?:\s*,\s*\d+)*)\s*\)//g;
+
+    $str =~ s/[;,\/]+/;/g;
+
+    my @names;
+    for my $part (split /;/, $str) {
+        $part =~ s/^\s+|\s+$//g;
+        $part =~ s/\s+/ /g;
+        next unless length($part) > 1;
+        next if $part =~ /^\d+$/;
+        next if $part =~ /^(?:numbers?\s+are|see\s+also|ref(?:erence)?s?|note)/i;
+        next if length($part) > 120;
+        push @names, $part;
+    }
+    return @names;
+}
+
+sub import_herb_common_names {
+    my ($self, $c, $batch_size, $last_herb_id) = @_;
+    $batch_size   //= 20;
+    $last_herb_id //= 0;
+
+    my $herb_rs = $self->ency_schema->resultset('Ency::Herb');
+    my $total   = $herb_rs->search({ 'me.record_id' => { '>' => 0 } })->count;
+
+    my @herbs = $herb_rs->search(
+        {
+            'me.record_id'    => { '>' => $last_herb_id },
+            'me.common_names' => { '!=' => undef },
+            'me.organism_id'  => { '!=' => undef },
+        },
+        { order_by => 'me.record_id', rows => $batch_size }
+    )->all;
+
+    my $cn_rs    = $self->ency_schema->resultset('Ency::CommonName');
+    my @results;
+    my ($added, $skipped, $errors) = (0, 0, 0);
+    my $max_id = $last_herb_id;
+
+    for my $herb (@herbs) {
+        $max_id = $herb->record_id if $herb->record_id > $max_id;
+        my $org_id   = $herb->organism_id;
+        my $raw      = $herb->common_names // '';
+        my @names    = $self->_parse_common_name_string($raw);
+        my $r = {
+            herb_id         => $herb->record_id,
+            botanical_name  => $herb->botanical_name // '',
+            parsed          => scalar @names,
+            added           => 0,
+            skipped         => 0,
+        };
+
+        for my $name (@names) {
+            my $existing = eval {
+                $cn_rs->search({
+                    organism_id => $org_id,
+                    name        => $name,
+                    language    => 'en',
+                    region      => undef,
+                })->first
+            };
+            if ($existing) {
+                $r->{skipped}++;
+                $skipped++;
+                next;
+            }
+            eval {
+                $cn_rs->create({
+                    organism_id        => $org_id,
+                    name               => $name,
+                    language           => 'en',
+                    is_preferred       => 0,
+                    is_historical      => 0,
+                    source             => 'herb_import',
+                    date_time_posted   => \'NOW()',
+                    username_of_poster => ($c && $c->session->{username}) || 'system',
+                });
+                $r->{added}++;
+                $added++;
+            };
+            if ($@) {
+                if ("$@" =~ /Duplicate entry/i) {
+                    $r->{skipped}++;
+                    $skipped++;
+                } else {
+                    $r->{error} = "$@";
+                    $errors++;
+                }
+            }
+        }
+        push @results, $r;
+    }
+
+    my $remaining = $herb_rs->search({
+        'me.record_id'    => { '>' => $max_id },
+        'me.common_names' => { '!=' => undef },
+        'me.organism_id'  => { '!=' => undef },
+    })->count;
+
+    return {
+        processed => scalar @herbs,
+        added     => $added,
+        skipped   => $skipped,
+        errors    => $errors,
+        remaining => $remaining,
+        total     => $total,
+        last_id   => $max_id,
+        details   => \@results,
     };
 }
 

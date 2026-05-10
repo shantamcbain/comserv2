@@ -48,6 +48,32 @@ sub _get_json {
     return $data;
 }
 
+sub _get_xml {
+    my ($self, $c, $url) = @_;
+    my $ua = LWP::UserAgent->new(timeout => 15,
+        agent => 'ENCY-Encyclopedia/1.0 (comserv; educational)');
+    my $resp = $ua->get($url);
+    unless ($resp->is_success) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_get_xml',
+            "HTTP GET failed: " . $resp->status_line . " for $url");
+        return undef;
+    }
+    return $resp->decoded_content;
+}
+
+sub _parse_ncbi_lineage_xml {
+    my ($self, $xml) = @_;
+    return {} unless $xml;
+    my %rank_map;
+    while ($xml =~ m{<Taxon>\s*<TaxId>[^<]*</TaxId>\s*<ScientificName>([^<]+)</ScientificName>\s*<Rank>([^<]+)</Rank>}g) {
+        my ($name, $rank) = ($1, $2);
+        $rank = lc($rank);
+        next if $rank eq 'no rank' || $rank eq 'cellular root' || $rank eq 'clade';
+        $rank_map{$rank} = $name;
+    }
+    return \%rank_map;
+}
+
 sub ncbi_search_taxonomy {
     my ($self, $c, $scientific_name) = @_;
     return undef unless $scientific_name;
@@ -132,24 +158,31 @@ sub ncbi_fetch_by_tax_id {
     my $rec = $data->{result}{$tax_id} // {};
     return undef unless $rec->{scientificname};
 
+    my $xml_url = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+                . "?db=taxonomy&id=$tax_id&retmode=xml";
+    my $xml = $self->_get_xml($c, $xml_url);
+    my $lineage_rank = $self->_parse_ncbi_lineage_xml($xml);
+    select(undef, undef, undef, 0.25);
+
     my $result = {
         ncbi_tax_id     => $tax_id,
         scientific_name => $rec->{scientificname} // '',
         common_name     => $rec->{commonname}     // '',
-        kingdom         => $rec->{kingdom}         // '',
-        phylum          => $rec->{phylum}          // '',
-        class_name      => $rec->{class}           // '',
-        order_name      => $rec->{order}           // '',
-        family_name     => $rec->{family}          // '',
-        organism_type   => _infer_type($rec),
+        kingdom         => $lineage_rank->{kingdom}  // $lineage_rank->{superkingdom} // '',
+        phylum          => $lineage_rank->{phylum}   // '',
+        class_name      => $lineage_rank->{class}    // '',
+        order_name      => $lineage_rank->{order}    // '',
+        family_name     => $lineage_rank->{family}   // '',
+        genus           => $rec->{genus}             // $lineage_rank->{genus} // '',
+        organism_type   => _infer_type($rec, $lineage_rank),
         source_url      => "https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=$tax_id",
         db_name         => 'NCBI',
     };
 
-    if ($result->{scientific_name} =~ /^(\S+)\s+(.+)$/) {
-        $result->{genus}   = $1;
-        $result->{species} = $2;
+    if ($result->{scientific_name} =~ /^\S+\s+(.+)$/) {
+        $result->{species} = $rec->{species} // $1;
     }
+    $result->{genus} ||= (split /\s+/, $result->{scientific_name})[0] // '';
 
     return $result;
 }
@@ -269,20 +302,146 @@ sub get_external_ids {
 }
 
 sub _infer_type {
-    my ($rec) = @_;
-    my $lineage = lc($rec->{lineage} // '');
-    return 'plant'     if $lineage =~ /viridiplantae|embryophyta|plantae/;
-    return 'fungus'    if $lineage =~ /fungi/;
-    return 'bacterium' if $lineage =~ /bacteria/;
-    return 'virus'     if $lineage =~ /viruses/;
-    return 'insect'    if $lineage =~ /insecta/;
-    return 'bird'      if $lineage =~ /aves/;
-    return 'fish'      if $lineage =~ /actinopterygii/;
-    return 'amphibian' if $lineage =~ /amphibia/;
-    return 'reptile'   if $lineage =~ /reptilia/;
+    my ($rec, $lineage_rank) = @_;
+    $lineage_rank //= {};
+
+    my $division = lc($rec->{division}        // '');
+    my $gendiv   = lc($rec->{genbankdivision} // '');
+
     return 'human'     if ($rec->{taxid} // 0) == 9606;
-    return 'mammal'    if $lineage =~ /mammalia/;
+
+    return 'plant'     if $division =~ /eudicot|monocot|gymnosperm|angiosperm|land plant|green plant|streptophyt|embryophyt|charophyt/;
+    return 'plant'     if $division =~ /^(green algae)$/;
+    return 'fungus'    if $division =~ /fung|ascomycet|basidiomycet|lichen/;
+    return 'bacterium' if $division =~ /bacter|archaea/;
+    return 'virus'     if $division =~ /virus/;
+    return 'insect'    if $division =~ /insect|dipter|lepidopter|coleopt|hymenopter/;
+    return 'bird'      if $division =~ /bird/;
+    return 'reptile'   if $division =~ /reptil|lizard|snake|turtle|croc/;
+    return 'amphibian' if $division =~ /amphibi|frog|toad|salamand/;
+    return 'fish'      if $division =~ /fish|teleost|shark|ray/;
+    return 'mammal'    if $division =~ /mammal|primate|rodent|carnivore|ungulate|bat|whale/;
+
+    return 'plant'     if $gendiv =~ /plants? and fungi/i && $division !~ /fung/;
+    return 'plant'     if $gendiv =~ /^plants?$/i;
+    return 'fungus'    if $gendiv =~ /^fungi$/i || ($gendiv =~ /plants? and fungi/i && $division =~ /fung/);
+    return 'bacterium' if $gendiv =~ /bacter/i;
+    return 'virus'     if $gendiv =~ /virus/i;
+    return 'bird'      if $gendiv =~ /bird/i;
+    return 'mammal'    if $gendiv =~ /mammal|primate|rodent/i;
+    return 'fish'      if $gendiv =~ /fish/i;
+
+    my $kingdom = lc($lineage_rank->{kingdom} // $lineage_rank->{superkingdom} // '');
+    return 'plant'     if $kingdom =~ /viridiplantae/;
+    return 'fungus'    if $kingdom =~ /fungi/;
+    return 'bacterium' if $kingdom =~ /bacteria/;
+    return 'virus'     if $kingdom =~ /virus/;
+
     return 'animal';
+}
+
+sub gbif_lookup_by_name {
+    my ($self, $c, $scientific_name) = @_;
+    return undef unless $scientific_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'gbif_lookup_by_name',
+        "GBIF lookup for: $scientific_name");
+
+    my $enc  = $scientific_name;
+    $enc     =~ s/ /+/g;
+    my $match_url = "https://api.gbif.org/v1/species/match?name=$enc&strict=false";
+    my $match = $self->_get_json($c, $match_url);
+    return undef unless $match && $match->{usageKey};
+
+    my $gbif_id = $match->{usageKey};
+
+    my $media_url = "https://api.gbif.org/v1/species/$gbif_id/media?limit=5";
+    my $media_data = $self->_get_json($c, $media_url);
+    select(undef, undef, undef, 0.2);
+
+    my @images;
+    for my $item (@{ $media_data->{results} // [] }) {
+        next unless ($item->{type} // '') eq 'StillImage';
+        my $url = $item->{identifier} // '';
+        next unless $url;
+        next if $url =~ m{plos|plosone|pensoft|zenodo|researchgate|academia\.edu
+                         |doi\.org|pubmed|ncbi\.nlm|figshare|springer|elsevier
+                         |wiley|nature\.com/articles|sciencedirect|bioone
+                         |\.pdf|graph|chart|figure}xi;
+        next if ($item->{publisher} // '') =~ m{journal|proceedings|society|press}i;
+        push @images, {
+            url           => $url,
+            thumbnail_url => $url,
+            license       => $item->{license}       // '',
+            rights_holder => $item->{rightsHolder}  // '',
+            caption       => $item->{title}         // $item->{description} // '',
+            source        => 'GBIF',
+        };
+        last if @images >= 3;
+    }
+
+    return {
+        gbif_id     => $gbif_id,
+        images      => \@images,
+        source_url  => "https://www.gbif.org/species/$gbif_id",
+    };
+}
+
+sub wikipedia_summary {
+    my ($self, $c, $scientific_name) = @_;
+    return undef unless $scientific_name;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'wikipedia_summary',
+        "Wikipedia lookup for: $scientific_name");
+
+    my $title = $scientific_name;
+    $title =~ s/ /_/g;
+
+    my $api_base = 'https://en.wikipedia.org/w/api.php';
+    my $enc      = $title;
+    $enc         =~ s/([^A-Za-z0-9_~.-])/sprintf('%%%02X', ord($1))/ge;
+
+    my $url = "$api_base?action=query&prop=extracts|pageimages&exintro=1"
+            . "&titles=$enc&format=json&pithumbsize=800&redirects=1";
+
+    my $data = $self->_get_json($c, $url);
+    return undef unless $data;
+
+    my ($page) = values %{ $data->{query}{pages} // {} };
+    return undef unless $page && ($page->{pageid} // -1) > 0;
+
+    my $extract = $page->{extract} // '';
+    $extract =~ s/<[^>]+>//g;
+    $extract =~ s/\n{3,}/\n\n/g;
+    $extract =~ s/^\s+|\s+$//g;
+
+    my ($description, $habitat) = ('', '');
+    if ($extract) {
+        my @paras = split /\n\n+/, $extract;
+        $description = $paras[0] // '';
+        for my $p (@paras[1..$#paras]) {
+            if ($p =~ /habitat|distribution|range|found in|native to|grow/i) {
+                $habitat = $p;
+                last;
+            }
+        }
+        $description = substr($description, 0, 2000) if length($description) > 2000;
+        $habitat     = substr($habitat,     0, 1000) if length($habitat)     > 1000;
+    }
+
+    my $image_url = '';
+    if (my $thumb = $page->{thumbnail}) {
+        $image_url = $thumb->{source} // '';
+    }
+
+    return {
+        description  => $description,
+        habitat      => $habitat,
+        image_url    => $image_url,
+        wiki_title   => $page->{title} // $scientific_name,
+        wiki_url     => "https://en.wikipedia.org/wiki/$title",
+        source       => 'Wikipedia',
+    };
 }
 
 __PACKAGE__->meta->make_immutable;
