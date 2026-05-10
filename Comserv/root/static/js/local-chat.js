@@ -3401,6 +3401,7 @@
         fetch('/chat/check_admin_online', { credentials: 'include' })
         .then(function(r) { return r.json(); })
         .then(function(presence) {
+            console.log('[Chat] check_admin_online:', presence);
             if (!presence.online) {
                 _showNoAdminMessage();
                 return;
@@ -5159,7 +5160,10 @@
             .catch(function() {});
         }
         function _sendAdminHeartbeat() {
-            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' }).catch(function() {});
+            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (!d.success) console.warn('[Chat] admin_heartbeat rejected (not admin role?)'); })
+            .catch(function() {});
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -5167,7 +5171,7 @@
             _sendAdminHeartbeat();
             setTimeout(_checkPendingSupport, 2000);
             setInterval(_checkPendingSupport, 30000);
-            setInterval(_sendAdminHeartbeat, 30000);
+            setInterval(_sendAdminHeartbeat, 20000);
         });
     })();
 
