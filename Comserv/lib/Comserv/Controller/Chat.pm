@@ -570,7 +570,7 @@ sub check_admin_online :Path('check_admin_online') :Args(0) {
             open my $fh, '<', $presence_file or die;
             local $/; my $raw = <$fh>; close $fh;
             my $data = decode_json($raw || '{}');
-            my $cutoff = time() - 300;
+            my $cutoff = time() - 90;
             for my $adm (keys %{$data->{admins} || {}}) {
                 $count++ if ($data->{admins}{$adm} || 0) > $cutoff;
             }
