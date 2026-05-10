@@ -4918,6 +4918,7 @@ ACTION
              . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
+             . "If a user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
              . "If a user asks about the admin panel or any admin feature, say: "
              . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
              . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
@@ -4942,6 +4943,7 @@ ACTION
          . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
          . "NEVER guess or invent application URLs using your training knowledge. "
          . "NEVER provide /admin URLs to users who do not have admin role. "
+         . "If the user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
          . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
          . "say: 'That section requires administrator privileges.'"
          . $no_internet

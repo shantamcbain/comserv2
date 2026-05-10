@@ -226,6 +226,16 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
     my $is_admin  = grep { $_ eq 'admin' || $_ eq 'developer' } @{$c->session->{roles} || []};
     my $is_editor = $is_admin || grep { $_ eq 'editor' } @{$c->session->{roles} || []};
 
+    my @cn_list_edit;
+    eval {
+        if ($herb->organism_id) {
+            @cn_list_edit = $c->model('ENCYModel')->ency_schema
+                ->resultset('Ency::CommonName')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'record_id' })
+                ->all;
+        }
+    };
+
     my $entities_edit = _fetch_linkable_entities($c);
     my %field_html_edit;
     for my $f (qw(
@@ -245,6 +255,7 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 
     $c->stash(
         herb            => $herb,
+        cn_list         => \@cn_list_edit,
         field_html      => \%field_html_edit,
         edit_mode       => 1,
         is_admin        => $is_admin,
@@ -284,12 +295,31 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Fetch the herbal data
-    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
+    my $rows = $c->model('ENCYModel')->get_herbal_data($c);
 
-    # Pass the data to the template
-    my $herbal_data = $forager_data;
-    $c->stash(herbal_data => $herbal_data, template => 'ENCY/BotanicalNameView.tt');
+    my @herbal_data;
+    for my $herb (@$rows) {
+        my $org          = eval { $herb->organism_id ? $herb->organism : undef };
+        my $display_name = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
+        my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
+        push @herbal_data, {
+            record_id       => $herb->record_id,
+            display_name    => $display_name,
+            display_image   => $display_image,
+            common_names    => $cn_text,
+            ident_character => $herb->ident_character // '',
+            distribution    => $herb->distribution    // '',
+            medical_uses    => $herb->medical_uses    // '',
+        };
+    }
+
+    $c->stash(herbal_data => \@herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     my ( $self, $c, $id ) = @_;
@@ -345,9 +375,25 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         $field_html{$f} = _build_glossary_popup_html($c, eval { $herb->$f } // '', $entities);
     }
 
+    my @org_images;
+    my @cn_list;
+    eval {
+        if ($herb->organism_id) {
+            my $schema = $c->model('ENCYModel')->ency_schema;
+            @org_images = $schema->resultset('Ency::OrganismImage')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'sort_order' })
+                ->all;
+            @cn_list = $schema->resultset('Ency::CommonName')
+                ->search({ organism_id => $herb->organism_id }, { order_by => 'record_id' })
+                ->all;
+        }
+    };
+
     $self->_stash_image_files($c);
     $c->stash(
         herb                    => $herb,
+        org_images              => \@org_images,
+        cn_list                 => \@cn_list,
         constituents_html       => $constituents_html,
         parts_used_html         => $parts_used_html,
         sister_plants_html      => $sister_plants_html,
@@ -368,7 +414,7 @@ sub constituent_popup : Path('/ENCY/constituent_popup') : Args(1) {
     unless ($constituent) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt');
+    $c->stash(constituent => $constituent, template => 'ENCY/partials/ConstituentPopup.tt', no_wrapper => 1);
 }
 
 sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
@@ -380,7 +426,7 @@ sub herb_popup : Path('/ENCY/herb_popup') : Args(1) {
     unless ($herb) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt');
+    $c->stash(herb => $herb, template => 'ENCY/partials/HerbPopup.tt', no_wrapper => 1);
 }
 
 sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
@@ -392,7 +438,7 @@ sub drug_popup : Path('/ENCY/drug_popup') : Args(1) {
     unless ($drug) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt');
+    $c->stash(drug => $drug, template => 'ENCY/partials/DrugPopup.tt', no_wrapper => 1);
 }
 
 sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
@@ -404,7 +450,7 @@ sub glossary_popup : Path('/ENCY/glossary_popup') : Args(1) {
     unless ($term) {
         $c->response->status(404); $c->response->body('Not found'); return;
     }
-    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt');
+    $c->stash(glossary_term => $term, template => 'ENCY/partials/GlossaryPopup.tt', no_wrapper => 1);
 }
 
 sub _build_constituent_html {
@@ -2585,28 +2631,72 @@ sub create_category :Local {
 sub bee_pasture_view :Path('/ENCY/BeePastureView') :Args(0) {
     my ( $self, $c ) = @_;
 
-    # Initialize debug_errors array
-    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    my $roles     = $c->session->{roles} || [];
+    my $is_editor = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' }
+                        (ref $roles ? @$roles : split(/\s*,\s*/, $roles));
 
-    # Log entry into the bee_pasture_view method
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Entered bee_pasture_view method');
-    push @{$c->stash->{debug_errors}}, "Entered bee_pasture_view method";
-
-    # Fetch bee forage plants data
     my $bee_plants = $c->model('ENCYModel')->get_bee_forage_plants($c);
 
-    # If no specific bee forage plants method exists, use the general herbal data
     if (!$bee_plants || !@$bee_plants) {
         $bee_plants = $c->model('ENCYModel')->get_herbal_data($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture_view', 'Using general herbal data for bee pasture view');
-        push @{$c->stash->{debug_errors}}, "Using general herbal data for bee pasture view";
     }
 
-    # Pass the data to the template
+    my %org_image;
+    if ($bee_plants && @$bee_plants) {
+        my @org_ids = do {
+            my %seen;
+            grep { !$seen{$_}++ }
+            grep { defined $_ }
+            map  { eval { my $o = $_->organism; $o ? $o->record_id : undef } }
+            @$bee_plants;
+        };
+        if (@org_ids) {
+            my @imgs = eval {
+                $c->model('ENCYModel')->ency_schema
+                    ->resultset('Ency::OrganismImage')
+                    ->search(
+                        { organism_id => { -in => \@org_ids } },
+                        { order_by => [qw(organism_id sort_order)] }
+                    )->all
+            };
+            for my $img (@imgs) {
+                my $oid = $img->organism_id;
+                $org_image{$oid} //= $img->url;
+            }
+        }
+    }
+
+    my @herbal_data;
+    for my $herb (@$bee_plants) {
+        my $org          = eval { $herb->organism_id ? $herb->organism : undef };
+        my $org_id       = $org ? $org->record_id : undef;
+        my $display_name = ($org && $org->scientific_name) ? $org->scientific_name
+                         : ($herb->botanical_name // '');
+        my $display_image = $org_image{$org_id // ''} // ''
+                          || ($org  ? ($org->image // '')  : '')
+                          || ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
+        push @herbal_data, {
+            record_id    => $herb->record_id,
+            display_name => $display_name,
+            display_image => $display_image,
+            common_names => $cn_text,
+            apis         => $herb->apis    // '',
+            nectar       => $herb->nectar  // 0,
+            pollen       => $herb->pollen  // 0,
+        };
+    }
+
     $c->stash(
-        herbal_data => $bee_plants,
-        template => 'ENCY/BeePastureView.tt',
-        debug_msg => "Bee Pasture View loaded with " . scalar(@$bee_plants) . " plants"
+        herbal_data => \@herbal_data,
+        is_editor   => $is_editor,
+        template    => 'ENCY/BeePastureView.tt',
     );
 }
 
@@ -2636,8 +2726,29 @@ sub legacy : Path('/ENCY/legacy') : Args(1) {
 sub herb_list : Path('/ENCY/Herb') : Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_list', 'Entered herb_list');
-    my $forager_data = $c->model('ENCYModel')->get_herbal_data($c);
-    $c->stash(herbal_data => $forager_data, template => 'ENCY/BotanicalNameView.tt');
+    my $rows = $c->model('ENCYModel')->get_herbal_data($c);
+    my @herbal_data;
+    for my $herb (@$rows) {
+        my $org           = eval { $herb->organism_id ? $herb->organism : undef };
+        my $display_name  = ($org && $org->scientific_name) ? $org->scientific_name : ($herb->botanical_name // '');
+        my $display_image = ($org && $org->image) ? $org->image : ($herb->image // '');
+        my $cn_text = '';
+        if ($org) {
+            my @cns = eval { $org->common_names->all };
+            $cn_text = join('; ', map { $_->name } @cns) if @cns;
+        }
+        $cn_text ||= $herb->common_names // '';
+        push @herbal_data, {
+            record_id       => $herb->record_id,
+            display_name    => $display_name,
+            display_image   => $display_image,
+            common_names    => $cn_text,
+            ident_character => $herb->ident_character // '',
+            distribution    => $herb->distribution    // '',
+            medical_uses    => $herb->medical_uses    // '',
+        };
+    }
+    $c->stash(herbal_data => \@herbal_data, template => 'ENCY/BotanicalNameView.tt');
 }
 
 sub herb_detail_by_id : Path('/ENCY/Herb') : Args(1) {
@@ -3010,6 +3121,7 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
             dosage             => $c->request->param('dosage')             || undef,
             administration     => $c->request->param('administration')     || undef,
             notes              => $c->request->param('notes')              || undef,
+            comments           => $c->request->param('comments')          || undef,
             reference          => $c->request->param('reference')          || undef,
             url                => $c->request->param('url')                || undef,
             image              => $c->request->param('image')              || undef,
@@ -3034,11 +3146,12 @@ sub add_formula : Path('/ENCY/Formula/add') : Args(0) {
         return;
     }
     $c->stash(
-        formula   => {},
-        edit_mode => 1,
-        is_admin  => $is_admin,
-        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
-        template  => 'ENCY/FormulaDetail.tt',
+        formula        => {},
+        edit_mode      => 1,
+        is_admin       => $is_admin,
+        is_editor      => $is_editor,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
+        template       => 'ENCY/FormulaDetail.tt',
     );
 }
 
@@ -3068,6 +3181,7 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
             dosage             => $c->request->param('dosage')             || undef,
             administration     => $c->request->param('administration')     || undef,
             notes              => $c->request->param('notes')              || undef,
+            comments           => $c->request->param('comments')          || undef,
             reference          => $c->request->param('reference')          || undef,
             url                => $c->request->param('url')                || undef,
             image              => $c->request->param('image')              || undef,
@@ -3091,13 +3205,14 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
         return;
     }
     $c->stash(
-        formula       => $formula,
-        herb_links    => $herb_links,
-        disease_links => $disease_links,
-        edit_mode     => 1,
-        is_admin      => $is_admin,
-        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, reference',
-        template      => 'ENCY/FormulaDetail.tt',
+        formula        => $formula,
+        herb_links     => $herb_links,
+        disease_links  => $disease_links,
+        edit_mode      => 1,
+        is_admin       => $is_admin,
+        is_editor      => $is_editor,
+        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
+        template       => 'ENCY/FormulaDetail.tt',
     );
 }
 
@@ -3482,17 +3597,31 @@ sub resolve_skip : Path('/ENCY/resolve_skip') : Args(0) {
 
 # ─── Organism routes ────────────────────────────────────────────────────────
 
+sub _require_editor {
+    my ($self, $c, $return_to) = @_;
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login', { return_to => $return_to }));
+        return 0;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->status(403);
+        $c->stash(error_msg => "This page requires editor access.", template => 'error.tt');
+        return 0;
+    }
+    return 1;
+}
+
 sub organism_list : Path('/ENCY/Organism') : Args(0) {
     my ($self, $c) = @_;
+    return unless $self->_require_editor($c, '/ENCY/Organism');
     my $type   = $c->request->parameters->{organism_type} // '';
     my $search = $c->request->parameters->{q}             // '';
     my $where  = {};
     $where->{organism_type} = $type   if $type;
     if ($search) {
-        $where->{-or} = [
-            common_name     => { like => "%$search%" },
-            scientific_name => { like => "%$search%" },
-        ];
+        $where->{scientific_name} = { like => "%$search%" };
     }
     my $organisms = $c->model('ENCYModel')->list_organisms($c, { where => $where });
     $c->stash(
@@ -3505,6 +3634,7 @@ sub organism_list : Path('/ENCY/Organism') : Args(0) {
 
 sub organism_detail : Path('/ENCY/Organism') : Args(1) {
     my ($self, $c, $id) = @_;
+    return unless $self->_require_editor($c, "/ENCY/Organism/$id");
     unless (defined $id && $id =~ /^\d+$/) {
         $c->response->status(400);
         $c->response->body('Invalid organism ID');
@@ -3516,10 +3646,18 @@ sub organism_detail : Path('/ENCY/Organism') : Args(1) {
         $c->stash(error_message => "Organism #$id not found.", template => 'error.tt');
         return;
     }
+    my @org_images;
+    eval {
+        @org_images = $c->model('ENCYModel')->ency_schema
+            ->resultset('Ency::OrganismImage')
+            ->search({ organism_id => $id }, { order_by => 'sort_order' })
+            ->all;
+    };
     $c->stash(
-        organism  => $organism,
-        edit_mode => 0,
-        template  => 'ENCY/OrganismDetail.tt',
+        organism    => $organism,
+        org_images  => \@org_images,
+        edit_mode   => 0,
+        template    => 'ENCY/OrganismDetail.tt',
     );
 }
 
@@ -3540,10 +3678,10 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $common_name_val = $p->{common_name} // '';
         my $data = {
-            common_name         => $p->{common_name}         // '',
             scientific_name     => $p->{scientific_name}     // '',
-            organism_type       => $p->{organism_type}       || 'animal',
+            organism_type       => $p->{organism_type}       || 'unknown',
             kingdom             => $p->{kingdom}             // '',
             phylum              => $p->{phylum}              // '',
             class_name          => $p->{class_name}          // '',
@@ -3551,13 +3689,11 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
             family_name         => $p->{family_name}         // '',
             genus               => $p->{genus}               // '',
             species             => $p->{species}             // '',
-            ncbi_tax_id         => ($p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
-            gbif_id             => ($p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
+            ncbi_tax_id         => ($p->{ncbi_tax_id} && $p->{ncbi_tax_id} =~ /^\d+$/ ? $p->{ncbi_tax_id} : undef),
+            gbif_id             => ($p->{gbif_id}     && $p->{gbif_id}     =~ /^\d+$/ ? $p->{gbif_id}     : undef),
             iucn_id             => $p->{iucn_id}             // '',
             description         => $p->{description}         // '',
             habitat             => $p->{habitat}             // '',
-            medicinal_uses      => $p->{medicinal_uses}      // '',
-            therapeutic_uses    => $p->{therapeutic_uses}    // '',
             sub_population_note => $p->{sub_population_note} // '',
             image               => $p->{image}               // '',
             url                 => $p->{url}                 // '',
@@ -3568,24 +3704,29 @@ sub add_organism : Path('/ENCY/Organism/add') : Args(0) {
             date_time_posted    => \'NOW()',
             share               => 1,
         };
-        unless ($data->{common_name}) {
-            $c->stash(error_msg => "Common name is required.", organism => $data, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        unless ($data->{scientific_name}) {
+            $c->stash(error_msg => "Scientific name is required.", edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
             return;
         }
-        $c->model('ENCYModel')->add_organism($c, $data);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{common_name}");
+        my $new_org = $c->model('ENCYModel')->add_organism($c, $data);
+        if ($new_org && $common_name_val) {
+            eval {
+                $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName')->create(
+                    { organism_id => $new_org->record_id, name => $common_name_val, language => 'en', is_preferred => 1 }
+                );
+            };
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_organism', "Organism added: $data->{scientific_name}");
         $c->flash->{success_msg} = 'Organism added successfully.';
         $c->response->redirect($c->uri_for('/ENCY/Organism'));
         return;
     }
 
-    my $prefill_common_name = $c->request->param('common_name') // '';
     $self->_stash_image_files($c);
     $c->stash(
-        edit_mode           => 1,
-        prefill_common_name => $prefill_common_name,
-        ency_ai_prompt      => 'common_name, scientific_name, organism_type (one of: human, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
-        template            => 'ENCY/OrganismDetail.tt',
+        edit_mode      => 1,
+        ency_ai_prompt => 'scientific_name, organism_type (one of: human, mammal, animal, plant, insect, bird, fish, reptile, amphibian, fungus, bacterium, virus, unknown), kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, sub_population_note, reference, url',
+        template       => 'ENCY/OrganismDetail.tt',
     );
 }
 
@@ -3697,6 +3838,34 @@ sub herb_ncbi_bulk_link : Path('/ENCY/herb_ncbi_bulk_link') : Args(0) {
     $c->response->body(JSON::encode_json({ ok => 1, %$result }));
 }
 
+sub organism_ncbi_resync : Path('/ENCY/organism_ncbi_resync') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size = $c->request->body_parameters->{batch_size} // 10;
+    $batch_size = 10 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 20;
+    my $after_id = $c->request->body_parameters->{last_id} // 0;
+    $after_id = 0 if $after_id !~ /^\d+$/;
+
+    my $result = $c->model('ENCYModel')->resync_organisms_from_ncbi($c, $batch_size, $after_id);
+    $c->response->body(JSON::encode_json({ ok => 1, %$result }));
+}
+
 sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     my ($self, $c) = @_;
 
@@ -3726,10 +3895,10 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
 
     if ($c->request->method eq 'POST') {
         my $p = $c->request->body_parameters;
+        my $common_name_val = $p->{common_name} // '';
         my $data = {
-            common_name         => $p->{common_name}         // '',
             scientific_name     => $p->{scientific_name}     // '',
-            organism_type       => $p->{organism_type}       || 'animal',
+            organism_type       => $p->{organism_type}       || 'unknown',
             kingdom             => $p->{kingdom}             // '',
             phylum              => $p->{phylum}              // '',
             class_name          => $p->{class_name}          // '',
@@ -3742,23 +3911,28 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
             iucn_id             => $p->{iucn_id}             // '',
             description         => $p->{description}         // '',
             habitat             => $p->{habitat}             // '',
-            medicinal_uses      => $p->{medicinal_uses}      // '',
-            therapeutic_uses    => $p->{therapeutic_uses}    // '',
             sub_population_note => $p->{sub_population_note} // '',
             image               => $p->{image}               // '',
             url                 => $p->{url}                 // '',
             reference           => $p->{reference}           // '',
         };
-        unless ($data->{common_name}) {
-            $c->stash(error_msg => "Common name is required.", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+        unless ($data->{scientific_name}) {
+            $c->stash(error_msg => "Scientific name is required.", organism => $organism, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
             return;
         }
         my ($ok, $msg) = $c->model('ENCYModel')->update_organism($c, $record_id, $data);
         if ($ok) {
+            if ($common_name_val) {
+                my $cn_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName');
+                my $existing = eval { $cn_rs->search({ organism_id => $record_id, name => $common_name_val })->first };
+                unless ($existing) {
+                    eval { $cn_rs->create({ organism_id => $record_id, name => $common_name_val, language => 'en', is_preferred => 1 }) };
+                }
+            }
             $c->flash->{success_msg} = 'Organism updated successfully.';
             $c->response->redirect($c->uri_for('/ENCY/Organism', $record_id));
         } else {
-            $c->stash(error_msg => "Failed to update: $msg", organism => { $organism->get_columns, %$data }, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
+            $c->stash(error_msg => "Failed to update: $msg", organism => $organism, edit_mode => 1, template => 'ENCY/OrganismDetail.tt');
         }
         return;
     }
@@ -3767,9 +3941,290 @@ sub edit_organism : Path('/ENCY/Organism/edit') : Args(0) {
     $c->stash(
         organism       => $organism,
         edit_mode      => 1,
-        ency_ai_prompt => 'common_name, scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, medicinal_uses, therapeutic_uses, sub_population_note, reference, url',
+        ency_ai_prompt => 'scientific_name, organism_type, kingdom, phylum, class_name, order_name, family_name, genus, species, ncbi_tax_id, description, habitat, sub_population_note, reference, url',
         template       => 'ENCY/OrganismDetail.tt',
     );
+}
+
+sub organism_bulk_enrich : Path('/ENCY/organism_bulk_enrich') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size = $c->request->body_parameters->{batch_size} // 3;
+    $batch_size = 3 if $batch_size !~ /^\d+$/ || $batch_size < 1 || $batch_size > 10;
+    my $after_id = $c->request->body_parameters->{last_id} // 0;
+    $after_id = 0 if $after_id !~ /^\d+$/;
+
+    my $schema = $c->model('ENCYModel')->ency_schema;
+    my @organisms = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef },
+          record_id       => { '>'  => $after_id } },
+        { order_by => 'record_id', rows => $batch_size }
+    )->all;
+
+    my $total = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef } }
+    )->count;
+
+    my $remaining = $schema->resultset('Ency::Organism')->search(
+        { scientific_name => { '!=' => undef },
+          record_id       => { '>'  => ($organisms[-1] ? $organisms[-1]->record_id : $after_id) } }
+    )->count if @organisms;
+    $remaining //= 0;
+
+    my @details;
+    my ($updated, $errors, $last_id) = (0, 0, $after_id);
+    for my $org (@organisms) {
+        $last_id = $org->record_id;
+        my ($ok, $msg) = eval { $c->model('ENCYModel')->enrich_organism_from_external($c, $org->record_id) };
+        if ($@) { $ok = 0; $msg = $@; }
+        if ($ok) { $updated++ } else { $errors++ }
+        push @details, {
+            organism_id     => $org->record_id,
+            scientific_name => $org->scientific_name,
+            status          => $ok ? 'enriched' : 'error',
+            message         => $msg // '',
+        };
+        select(undef, undef, undef, 0.2);
+    }
+
+    $c->response->body(JSON::encode_json({
+        ok        => 1,
+        processed => scalar @organisms,
+        updated   => $updated,
+        errors    => $errors,
+        remaining => $remaining,
+        total     => $total,
+        last_id   => $last_id,
+        details   => \@details,
+    }));
+}
+
+sub organism_enrich : Path('/ENCY/Organism/enrich') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $record_id = $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid organism ID' }));
+        return;
+    }
+
+    my ($ok, $msg) = $c->model('ENCYModel')->enrich_organism_from_external($c, $record_id);
+    $c->response->body(JSON::encode_json({ ok => $ok ? 1 : 0, message => $msg }));
+}
+
+sub common_name_add : Path('/ENCY/common_name_add') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $organism_id = $c->request->body_parameters->{organism_id} // '';
+    my $name        = $c->request->body_parameters->{name}        // '';
+    my $language    = $c->request->body_parameters->{language}    || 'en';
+
+    unless ($organism_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid organism_id' }));
+        return;
+    }
+    $name =~ s/^\s+|\s+$//g;
+    unless (length($name) > 0) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Name is required' }));
+        return;
+    }
+
+    my $cn_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName');
+    my $existing = eval {
+        $cn_rs->search({ organism_id => $organism_id, name => $name, language => $language, region => undef })->first
+    };
+    if ($existing) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Name already exists', record_id => $existing->record_id }));
+        return;
+    }
+
+    my $new_cn = eval {
+        $cn_rs->create({
+            organism_id        => $organism_id,
+            name               => $name,
+            language           => $language,
+            is_preferred       => 0,
+            is_historical      => 0,
+            source             => 'manual',
+            date_time_posted   => \'NOW()',
+            username_of_poster => $c->session->{username} || 'editor',
+        });
+    };
+    if ($@ || !$new_cn) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "DB error: $@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1, record_id => $new_cn->record_id, name => $name }));
+}
+
+sub common_name_delete : Path('/ENCY/common_name_delete') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $record_id = $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid record_id' }));
+        return;
+    }
+
+    my $cn = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::CommonName')->find($record_id) };
+    unless ($cn) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Record not found' }));
+        return;
+    }
+    eval { $cn->delete };
+    if ($@) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "Delete failed: $@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1 }));
+}
+
+sub herb_import_common_names : Path('/ENCY/herb_import_common_names') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $batch_size    = $c->request->body_parameters->{batch_size}    // 20;
+    my $last_herb_id  = $c->request->body_parameters->{last_herb_id}  // 0;
+    $batch_size   = int($batch_size)   || 20;
+    $last_herb_id = int($last_herb_id) || 0;
+
+    my $result = eval { $c->model('ENCYModel')->import_herb_common_names($c, $batch_size, $last_herb_id) };
+    if ($@) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "$@" }));
+        return;
+    }
+    $c->response->body(JSON::encode_json({ ok => 1, %$result }));
+}
+
+sub clean_bad_organism_images : Path('/ENCY/clean_bad_organism_images') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Insufficient permissions' }));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'POST required' }));
+        return;
+    }
+
+    my $bad_pattern = qr{zenodo|pensoft|plos(?:one)?|figshare|researchgate|academia\.edu
+                        |doi\.org|pubmed|ncbi\.nlm|springer|elsevier|wiley
+                        |nature\.com/articles|sciencedirect|bioone|\.pdf
+                        |[/_](?:graph|chart|figure)}xi;
+
+    my $img_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::OrganismImage');
+    my @bad = eval { $img_rs->search({})->all };
+    my $deleted = 0;
+    for my $img (@bad) {
+        my $url = $img->url // '';
+        next unless $url =~ $bad_pattern;
+        eval { $img->delete };
+        $deleted++ unless $@;
+    }
+
+    my $org_rs = $c->model('ENCYModel')->ency_schema->resultset('Ency::Organism');
+    my @orgs = eval { $org_rs->search({ image => { '!=' => undef } })->all };
+    my $cleared = 0;
+    for my $org (@orgs) {
+        my $img = $org->image // '';
+        next unless $img =~ $bad_pattern;
+        eval { $org->update({ image => undef }) };
+        $cleared++ unless $@;
+    }
+
+    $c->response->body(JSON::encode_json({
+        ok      => 1,
+        deleted => $deleted,
+        cleared => $cleared,
+        message => "Deleted $deleted bad image record(s); cleared $cleared organism image field(s)"
+    }));
 }
 
 __PACKAGE__->meta->make_immutable;
