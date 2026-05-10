@@ -3601,6 +3601,20 @@
             }
         }
 
+        // Direct live-chat trigger — user explicitly wants a human, skip AI entirely.
+        var DIRECT_SUPPORT_RE = /\b(chat|talk|speak|connect|transfer|escalate)\b.{0,25}\b(admin|administrator|support|agent|human|person|someone|staff|live)\b|\b(live|human|real)\s*(chat|support|agent|help)\b|\bi\s*(want|need|d like|would like).{0,20}\b(chat|talk|speak).{0,15}\b(admin|support|human|person|live)\b/i;
+        if (message && !state.pendingImage && DIRECT_SUPPORT_RE.test(message)) {
+            addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+            messageInput.value = '';
+            persistMessages();
+            var _lastCtx = '';
+            document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+                _lastCtx = el.textContent.trim();
+            });
+            _initSupportChat(_lastCtx.slice(-300) || message);
+            return;
+        }
+
         // FAQ fast-path: instant canned answer for common support questions.
         // Fires before queryAI so the user never waits on Ollama for trivial questions.
         if (message && !state.pendingImage) {
