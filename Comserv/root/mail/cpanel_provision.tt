@@ -1,0 +1,52 @@
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>Provision cPanel Mailing List</h1>
+        <div class="admin-actions">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Back to Lists</a>
+        </div>
+    </div>
+
+    [% IF c.flash.success_msg %]<div class="alert alert-success">[% c.flash.success_msg | html %]</div>[% END %]
+    [% IF c.flash.error_msg  %]<div class="alert alert-danger">[% c.flash.error_msg  | html %]</div>[% END %]
+
+    <div class="admin-card">
+        <p style="color:#555;margin-bottom:16px;">
+            This creates a real mailing list on your cPanel account and links it to the selected site list.
+            Subscribers will be kept in sync: when a user subscribes/unsubscribes in the app, cPanel is updated automatically.
+        </p>
+
+        <form method="POST" action="[% c.uri_for('/mail/lists/cpanel_provision') %]">
+            <div class="form-group">
+                <label for="list_id">Site Mailing List</label>
+                <select name="list_id" id="list_id" required style="width:100%;padding:6px;">
+                    <option value="">— select list —</option>
+                    [% FOREACH l IN lists %]
+                    <option value="[% l.id %]"[% IF l.list_email %] data-email="[% l.list_email | html %]"[% END %]>
+                        [% l.name | html %][% IF l.list_email %] (already linked: [% l.list_email | html %])[% END %]
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+
+            <div class="form-group" style="margin-top:12px;">
+                <label for="list_name">cPanel List Name <small style="color:#888;">(no spaces, letters/digits/hyphen)</small></label>
+                <input type="text" name="list_name" id="list_name" required
+                       pattern="[a-zA-Z0-9_\-]+" style="width:100%;padding:6px;"
+                       placeholder="e.g. newsletter">
+            </div>
+
+            <div class="form-group" style="margin-top:12px;">
+                <label for="domain">Domain</label>
+                <input type="text" name="domain" id="domain" required
+                       style="width:100%;padding:6px;" placeholder="e.g. beemaster.ca">
+                <small style="color:#888;">The email address will be <em>listname@domain</em></small>
+            </div>
+
+            <div class="form-actions" style="margin-top:16px;">
+                <button type="submit" class="btn btn-primary">Create on cPanel &amp; Link</button>
+                <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Cancel</a>
+            </div>
+        </form>
+    </div>
+</div>

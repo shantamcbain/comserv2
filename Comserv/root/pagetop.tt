@@ -193,16 +193,18 @@ header h1 {
      to admins and users in debug mode. Removing this breaks diagnostic visibility
      and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
 [% IF is_admin || c.session.debug_mode == 1 %]
-<div class="server-info">
+<div class="server-info" id="server-info-bar">
     [% IF is_admin || c.session.debug_mode == 1 %]
-    <div style="text-align: right;">
+    <div style="text-align: right; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+        <span id="server-info-content">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
         [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code style="font-size:0.85em;">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
-        [% IF c.session.debug_mode == 1 %] | [% END %] |
+        [% IF c.session.debug_mode == 1 %] | [% END %]
+        </span>
         [% IF is_admin %]
         <button id="css-edit-toggle"
                 data-theme-name="[% theme_name || 'default' %]"
@@ -210,9 +212,31 @@ header h1 {
             <i class="fas fa-paint-brush"></i> Theme Editor
         </button>
         [% END %]
+        <button id="server-info-toggle" title="Show/hide server info"
+                style="padding:1px 7px;font-size:.75em;background:rgba(255,255,255,.15);color:inherit;border:1px solid rgba(255,255,255,.3);border-radius:3px;cursor:pointer;">▲ Hide</button>
     </div>
     [% END %]
 </div>
+<script>
+(function(){
+    var btn = document.getElementById('server-info-toggle');
+    var content = document.getElementById('server-info-content');
+    var bar = document.getElementById('server-info-bar');
+    if (!btn || !content || !bar) return;
+    var hidden = localStorage.getItem('serverInfoHidden') === '1';
+    function applyState() {
+        content.style.display = hidden ? 'none' : '';
+        btn.textContent = hidden ? '▼ Info' : '▲ Hide';
+        if (window._fitLayout) window._fitLayout();
+    }
+    applyState();
+    btn.addEventListener('click', function() {
+        hidden = !hidden;
+        localStorage.setItem('serverInfoHidden', hidden ? '1' : '0');
+        applyState();
+    });
+})();
+</script>
 [% END %]
 
 <!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->

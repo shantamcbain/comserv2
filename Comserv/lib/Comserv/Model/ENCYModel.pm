@@ -2323,7 +2323,7 @@ sub list_organisms {
     $opts ||= {};
     my $where = $opts->{where} || {};
     my %attrs;
-    $attrs{order_by} = $opts->{order_by} || 'common_name';
+    $attrs{order_by} = $opts->{order_by} || 'scientific_name';
     $attrs{rows}     = $opts->{rows}     if $opts->{rows};
     $attrs{page}     = $opts->{page}     if $opts->{page};
     my @results;
