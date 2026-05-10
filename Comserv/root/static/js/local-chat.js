@@ -437,10 +437,6 @@
                 console.debug('Agent selected from todo content: inventory');
                 return agents.inventory;
             }
-            if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bLEDGER\b|\bGL ENTRY\b|\bACCOUNTS PAYABLE\b/.test(candidateText) && agents.accounting) {
-                console.debug('Agent selected from todo content: accounting');
-                return agents.accounting;
-            }
             if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
                 console.debug('Agent selected from todo content: helpdesk');
                 return agents.helpdesk;
@@ -873,6 +869,7 @@
             let dragging = false, startX, startY, origLeft, origBottom, origTop, origRight;
 
             handle.addEventListener('mousedown', function(e) {
+                if (window.innerWidth <= 600) return;
                 e.preventDefault();
                 dragging = true;
                 startX = e.clientX;
@@ -907,6 +904,7 @@
 
             // Touch support
             handle.addEventListener('touchstart', function(e) {
+                if (window.innerWidth <= 600) return;
                 const t = e.touches[0];
                 startX = t.clientX; startY = t.clientY;
                 const rect = chatPanel.getBoundingClientRect();
@@ -2152,22 +2150,16 @@
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
         }
 
-        // Prompt-based agent override: switch to accounting agent when invoice/accounting keywords detected
-        let _agentId   = state.pageContext.agent_id;
-        let _agentName = state.pageContext.agent_name;
-        let _agentSys  = state.pageContext.system_prompt;
-        if (!state.userModelOverride && state.agentsConfig && state.agentsConfig.agents) {
-            const _pu = prompt.toUpperCase();
-            if (/\bINVOICE\b|\bACCOUNTING\b|\bGL ENTRY\b|\bACCOUNTS PAYABLE\b|\bCOA\b|CHART OF ACCOUNTS|\bSUPPLIER BILL\b|\bENTER.*BILL\b|\bPOST.*EXPENSE\b/.test(_pu)) {
-                const _aa = state.agentsConfig.agents.accounting;
-                if (_aa && _agentId !== 'accounting') {
-                    console.debug('Prompt keyword \u2192 switching to accounting agent');
-                    _agentId   = _aa.id;
-                    _agentName = _aa.display_name || 'Accounting Assistant';
-                    _agentSys  = _aa.system_prompt || _agentSys;
-                }
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
             }
         }
+
         // When accounting agent is active AND the prompt looks like a pasted bill,
         // inject the navigate_and_fill instruction so Grok emits the ACTION block.
         const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
@@ -2186,7 +2178,6 @@
                 _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
             }
         }
-
         // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
         // Parses bill text from chat history and fires navigate_and_fill directly.
         if (_agentId === 'accounting') {
@@ -2229,24 +2220,20 @@
                     + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
                 if (_nfFields.unit_cost_0) {
                     loadingMessage.remove();
-                    statusIndicator.textContent = 'Opening invoice form…';
+                    statusIndicator.textContent = 'Opening invoice form\u2026';
                     statusIndicator.className = 'chat-status connected';
                     executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
-                    const _w = document.createElement('div');
-                    _w.className = 'msg-wrapper msg-wrapper-ai';
-                    const _lbl = document.createElement('div');
-                    _lbl.className = 'msg-label';
-                    _lbl.textContent = 'Accounting Agent';
-                    const _el = document.createElement('div');
-                    _el.className = 'message ai-message';
-                    _el.innerHTML = 'Opening invoice form for <strong>' + _supplierName + '</strong>. '
-                        + 'Please select the supplier from the dropdown, then review and save.<br>'
-                        + '<small>Amount: $' + _nfFields.unit_cost_0
-                        + (_nfFields.invoice_date ? ' | Date: ' + _nfFields.invoice_date : '')
-                        + (_nfFields.auto_pay_method ? ' | ' + _nfFields.auto_pay_method : '') + '</small>';
-                    _w.appendChild(_lbl);
-                    _w.appendChild(_el);
-                    if (_chatMsgs) { _chatMsgs.appendChild(_w); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    const _wAcc = document.createElement('div');
+                    _wAcc.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lblAcc = document.createElement('div');
+                    _lblAcc.className = 'msg-label';
+                    _lblAcc.textContent = 'Accounting Agent';
+                    const _elAcc = document.createElement('div');
+                    _elAcc.className = 'message ai-message';
+                    _elAcc.innerHTML = 'Opening invoice form pre-filled with the detected bill details.';
+                    _wAcc.appendChild(_lblAcc);
+                    _wAcc.appendChild(_elAcc);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
                     return;
                 }
             }
@@ -2299,6 +2286,44 @@
             }
         }
 
+        // ENCY fast path: navigate to constituent#N page or add form directly.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY fast path: when ENCY agent is active and the prompt or chat history mentions
         // "Unresolved term in constituent#N", navigate directly to that constituent's page.
         // When adding a named constituent, navigate to the add form pre-filled.
         if (_agentId === 'ency') {
@@ -2344,9 +2369,9 @@
             page_context: state.pageContext.page_type,
             page_path: state.pageContext.page_path,
             page_title: state.pageContext.page_title,
-            system: _agentSys,
-            agent_id: _agentId,
-            agent_name: _agentName,
+            system: state.pageContext.system_prompt,
+            agent_id: state.pageContext.agent_id,
+            agent_name: state.pageContext.agent_name,
             page_content: extractPageContent()
         };
 
@@ -3197,7 +3222,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -3292,7 +3317,7 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
-    function _enterSupportMode(convId, lastMsgId) {
+    function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
@@ -3301,10 +3326,13 @@
             header.style.background = '#1a6bb5';
             header.textContent = '💬 Support Chat (live)';
         }
-        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
         var placeholder = document.getElementById('message-input');
-        if (placeholder) placeholder.placeholder = 'Type a message to support…';
-        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        if (placeholder) placeholder.placeholder = 'Describe your issue here…';
+        var guidance = '✅ Your request has been sent to an administrator.'
+            + (ticketNumber ? ' Ticket **' + ticketNumber + '** has been created.' : '')
+            + '\n\n**Please type your question or describe your issue below** — include any error messages, what you were doing, and what you expected to happen.'
+            + '\n\nAn administrator will reply here as soon as they are available. You can also track your request at [HelpDesk](/HelpDesk).';
+        _addSupportSystemMsg(guidance);
         _startSupportPolling();
     }
 
@@ -3322,8 +3350,14 @@
     function _addSupportSystemMsg(text) {
         var el = document.createElement('div');
         el.className = 'message system-message';
-        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
-        el.textContent = text;
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:8px 14px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;line-height:1.5;';
+        var html = text
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1a6bb5;">$1</a>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        el.innerHTML = html;
         var container = document.getElementById('chat-messages');
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
@@ -3363,7 +3397,7 @@
         .then(function(d) {
             if (d.success && d.conversation_id) {
                 state.supportLastMsgId = d.message_id || 0;
-                _enterSupportMode(d.conversation_id, d.message_id);
+                _enterSupportMode(d.conversation_id, d.message_id, d.ticket_number || null);
             } else {
                 _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
             }
@@ -3624,6 +3658,27 @@
 
         Object.keys(fields).forEach(function(fieldName) {
             const value = fields[fieldName];
+
+            // Multi-checkbox group: multiple checkboxes sharing this name
+            const allCheckboxes = Array.from(
+                targetDoc.querySelectorAll('input[type="checkbox"][name="' + fieldName + '"]')
+            );
+            if (allCheckboxes.length > 1) {
+                const strVal = Array.isArray(value)
+                    ? value.join('; ')
+                    : (value !== null && typeof value === 'object')
+                        ? Object.values(value).join('; ')
+                        : String(value || '');
+                const selected = strVal.split(/[;,]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                allCheckboxes.forEach(function(cb) {
+                    const cbVal = cb.value.toLowerCase();
+                    cb.checked = selected.some(function(s) { return cbVal === s || cbVal.indexOf(s) !== -1 || s.indexOf(cbVal) !== -1; });
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                filled.push(fieldName);
+                return;
+            }
+
             // Try by name first, then by id
             let el = targetDoc.querySelector('[name="' + fieldName + '"]')
                   || targetDoc.getElementById(fieldName);
@@ -3649,7 +3704,15 @@
                     });
                 }
             } else {
-                el.value = value !== null && value !== undefined ? String(value) : '';
+                var strVal;
+                if (Array.isArray(value)) {
+                    strVal = value.join('; ');
+                } else if (value !== null && typeof value === 'object') {
+                    strVal = Object.values(value).join('; ');
+                } else {
+                    strVal = value !== null && value !== undefined ? String(value) : '';
+                }
+                el.value = strVal;
             }
 
             // Fire change/input events so any JS listeners react
@@ -4210,7 +4273,7 @@
                 const el = document.createElement('div');
                 el.className = 'message system-message';
                 const fieldCount = Object.keys(nfFields).length;
-                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                el.innerHTML = '🔗 Navigating to: <a href="' + abs + '">' + nfUrl + '</a>'
                     + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
                 wrapper.appendChild(lbl);
                 wrapper.appendChild(el);
@@ -4840,7 +4903,6 @@
                 background-color: #fafafa;
                 border-top: 1px solid #ddd;
                 color: #555;
-                flex-shrink: 0;
             }
             
             .chat-status.connected {
@@ -4874,8 +4936,6 @@
                 align-items: center;
                 gap: 10px;
                 font-size: 13px;
-                flex-shrink: 0;
-                flex-wrap: wrap;
             }
             
             .provider-selector label {
@@ -4913,13 +4973,9 @@
             }
             
             .chat-input {
-                padding: 8px 10px;
+                padding: 10px;
                 border-top: 1px solid var(--border-color);
                 display: flex;
-                flex-direction: column;
-                gap: 4px;
-                flex-shrink: 0;   /* never shrink — always visible at bottom */
-                background: var(--background-color, #fff);
             }
             
             #message-input {
@@ -4927,16 +4983,11 @@
                 border: 1px solid #ccc;
                 border-radius: 4px;
                 padding: 8px;
-                resize: vertical;
-                min-height: 40px;
-                max-height: 120px;
+                resize: none;
                 height: 40px;
-                margin-right: 0;
+                margin-right: 8px;
                 background-color: #fff;
                 color: #222;
-                overflow-y: auto;
-                font-family: inherit;
-                font-size: inherit;
             }
             
             #send-message {
@@ -5004,6 +5055,105 @@
     }
 
     // Initialize chat when the DOM is loaded
+    // Admin: poll for pending support chats and fire browser notification from any page
+    (function() {
+        if (!window.AI_CHAT_USER_CONFIG || !window.AI_CHAT_USER_CONFIG.isAdmin) return;
+        var _adminNotifPerm = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
+        var _adminLastPending = 0;
+        var _adminTitleFlashTimer = null;
+        var _adminOrigTitle = null;
+
+        function _requestAdminNotifPerm() {
+            if (typeof Notification === 'undefined') return;
+            if (Notification.permission === 'granted') { _adminNotifPerm = 'granted'; return; }
+            if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(function(p) { _adminNotifPerm = p; });
+            }
+        }
+
+        function _adminBeep() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {}
+        }
+
+        function _adminTitleFlash(n) {
+            if (_adminTitleFlashTimer) return;
+            if (!_adminOrigTitle) _adminOrigTitle = document.title;
+            var alertTitle = '💬 ' + n + ' Support Request' + (n > 1 ? 's' : '') + '!';
+            var on = true;
+            var count = 0;
+            _adminTitleFlashTimer = setInterval(function() {
+                document.title = on ? alertTitle : _adminOrigTitle;
+                on = !on;
+                if (++count >= 20) {
+                    clearInterval(_adminTitleFlashTimer);
+                    _adminTitleFlashTimer = null;
+                    document.title = _adminOrigTitle;
+                }
+            }, 800);
+        }
+
+        function _adminShowToast(n) {
+            var existing = document.getElementById('admin-support-toast');
+            if (existing) existing.parentNode.removeChild(existing);
+            var toast = document.createElement('div');
+            toast.id = 'admin-support-toast';
+            toast.style.cssText = 'position:fixed;top:70px;right:20px;z-index:99999;background:#1a6bb5;color:#fff;'
+                + 'padding:14px 20px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);'
+                + 'font-size:.95em;font-weight:600;cursor:pointer;max-width:320px;line-height:1.4;';
+            toast.innerHTML = '💬 ' + n + ' support chat request' + (n > 1 ? 's' : '') + ' awaiting reply'
+                + '<br><small style="font-weight:normal;opacity:.85;">Click to open Support Chat Admin</small>';
+            toast.onclick = function() {
+                window.location.href = '/chat/admin';
+            };
+            document.body.appendChild(toast);
+            setTimeout(function() {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            }, 30000);
+        }
+
+        function _checkPendingSupport() {
+            fetch('/chat/pending_count', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var n = d && d.count ? parseInt(d.count, 10) : 0;
+                if (n > 0 && n > _adminLastPending) {
+                    if (_adminNotifPerm === 'granted') {
+                        new Notification('💬 Support Chat: ' + n + ' request' + (n > 1 ? 's' : '') + ' awaiting reply', {
+                            body: 'Open Support Chat Admin to respond.',
+                            icon: '/static/images/favicon.ico',
+                            tag: 'admin-support-pending',
+                            requireInteraction: true
+                        });
+                    }
+                    _adminBeep();
+                    _adminTitleFlash(n);
+                    _adminShowToast(n);
+                }
+                _adminLastPending = n;
+                var badge = document.getElementById('nav-support-badge');
+                if (badge) { badge.textContent = n || ''; badge.style.display = n > 0 ? '' : 'none'; }
+            })
+            .catch(function() {});
+        }
+        document.addEventListener('DOMContentLoaded', function() {
+            _requestAdminNotifPerm();
+            setTimeout(_checkPendingSupport, 2000);
+            setInterval(_checkPendingSupport, 30000);
+        });
+    })();
+
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
