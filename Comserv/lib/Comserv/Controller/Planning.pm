@@ -617,7 +617,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                    status  => { -in => [1, 2] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
