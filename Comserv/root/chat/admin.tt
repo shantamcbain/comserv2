@@ -1,7 +1,7 @@
 [% META title = 'Support Chat Admin' %]
 
 <style>
-#sa-layout { display:flex; gap:0; height:calc(100vh - 120px); }
+#sa-layout { display:flex; gap:0; height:calc(100vh - 120px); transition:height .2s; }
 #sa-sidebar { width:280px; min-width:200px; border-right:1px solid #ddd; overflow-y:auto; background:#f8f9fa; }
 #sa-main   { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 #sa-conv-list { list-style:none; margin:0; padding:0; }
@@ -236,6 +236,17 @@ document.getElementById('sa-reply-text').addEventListener('keydown', function(e)
 
 _loadConvList();
 setInterval(_loadConvList, 15000);
+
+window._fitLayout = function() {
+  var el = document.getElementById('sa-layout');
+  if (!el) return;
+  var top = el.getBoundingClientRect().top + window.pageYOffset;
+  el.style.height = (window.innerHeight - top - 10) + 'px';
+};
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(window._fitLayout, 50);
+});
+window.addEventListener('resize', window._fitLayout);
 
 (function() {
   var params = new URLSearchParams(window.location.search);
