@@ -56,6 +56,32 @@ var _activeConvId = null;
 var _lastMsgId = 0;
 var _pollTimer = null;
 var _convCache = {};
+var _knownConvIds = {};
+var _notifPermission = 'default';
+
+function _requestNotifPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') { _notifPermission = 'granted'; return; }
+    if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(function(p) { _notifPermission = p; });
+    }
+}
+
+function _fireNotification(title, body, convId) {
+    if (_notifPermission !== 'granted') return;
+    var n = new Notification(title, {
+        body: body,
+        icon: '/static/images/favicon.ico',
+        tag: 'support-chat-' + convId,
+        requireInteraction: true
+    });
+    n.onclick = function() {
+        window.focus();
+        n.close();
+    };
+}
+
+_requestNotifPermission();
 
 var QUICK = [
   "Thank you for reaching out. I'm looking into this now.",
@@ -103,7 +129,17 @@ function _loadConvList() {
       var li = document.createElement('li');
       li.dataset.id = conv.conversation_id;
       var awaiting = conv.last_role === 'user';
-      if (awaiting) pending++;
+      if (awaiting) {
+        pending++;
+        if (!_knownConvIds[conv.conversation_id]) {
+          _fireNotification(
+            '💬 New Support Chat Request',
+            (conv.title || 'Chat #' + conv.conversation_id) + '\n' + conv.last_message.slice(0, 80),
+            conv.conversation_id
+          );
+        }
+      }
+      _knownConvIds[conv.conversation_id] = true;
       li.className = awaiting ? 'awaiting' : 'responded';
       if (_activeConvId && conv.conversation_id == _activeConvId) li.className += ' active';
       li.innerHTML = '<div class="conv-title">' + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
@@ -200,5 +236,17 @@ document.getElementById('sa-reply-text').addEventListener('keydown', function(e)
 
 _loadConvList();
 setInterval(_loadConvList, 15000);
+
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var convParam = params.get('conv');
+  if (convParam) {
+    var _waitAndOpen = setInterval(function() {
+      var li = document.querySelector('#sa-conv-list li[data-id="' + convParam + '"]');
+      if (li) { clearInterval(_waitAndOpen); li.click(); }
+    }, 500);
+    setTimeout(function() { clearInterval(_waitAndOpen); }, 5000);
+  }
+})();
 })();
 </script>

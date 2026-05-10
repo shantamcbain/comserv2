@@ -3317,21 +3317,20 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
-    function _enterSupportMode(convId, lastMsgId, ticketNumber) {
+    function _enterSupportMode(convId, lastMsgId) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
-            header.textContent = '💬 Support Chat (live)';
+            header.textContent = '💬 Live Support Chat';
         }
         var placeholder = document.getElementById('message-input');
         if (placeholder) placeholder.placeholder = 'Describe your issue here…';
-        var guidance = '✅ Your request has been sent to an administrator.'
-            + (ticketNumber ? ' Ticket **' + ticketNumber + '** has been created.' : '')
-            + '\n\n**Please type your question or describe your issue below** — include any error messages, what you were doing, and what you expected to happen.'
-            + '\n\nAn administrator will reply here as soon as they are available. You can also track your request at [HelpDesk](/HelpDesk).';
+        var guidance = '✅ **An administrator has been notified and will join shortly.**\n\n'
+            + 'Please describe your issue below — include any error messages, what you were doing, and what you expected to happen.\n\n'
+            + 'If no admin responds within a few minutes you can [create a support ticket](/HelpDesk/ticket/new) instead.';
         _addSupportSystemMsg(guidance);
         _startSupportPolling();
     }
@@ -3385,49 +3384,61 @@
         }, 5000);
     }
 
+    function _showNoAdminMessage() {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
+        el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
+            + 'You can submit a support ticket and an admin will respond when available:<br>'
+            + '<button onclick="(function(){var _s=window.__aiChatSupportFns;if(_s)_s.ticket();})()" '
+            + 'style="margin-top:8px;padding:6px 14px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.88em;">📋 Create Support Ticket</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
     function _initSupportChat(contextMsg) {
-        _addSupportSystemMsg('⏳ Connecting to support…');
-        var body = new URLSearchParams({
-            message: contextMsg || 'User requested live support',
-            agent_type: 'support',
-            title: 'Support Chat - ' + (document.title || window.location.pathname)
-        });
-        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        _addSupportSystemMsg('⏳ Checking admin availability…');
+        fetch('/chat/check_admin_online', { credentials: 'include' })
         .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success && d.conversation_id) {
-                state.supportLastMsgId = d.message_id || 0;
-                _enterSupportMode(d.conversation_id, d.message_id, d.ticket_number || null);
-            } else {
-                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+        .then(function(presence) {
+            if (!presence.online) {
+                _showNoAdminMessage();
+                return;
             }
+            var body = new URLSearchParams({
+                message: contextMsg || 'User requested live support',
+                agent_type: 'support',
+                title: 'Support Chat - ' + (document.title || window.location.pathname)
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.conversation_id) {
+                    state.supportLastMsgId = d.message_id || 0;
+                    _enterSupportMode(d.conversation_id, d.message_id);
+                } else {
+                    _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+                }
+            })
+            .catch(function() {
+                _addSupportSystemMsg('❌ Network error. Please try again.');
+            });
         })
         .catch(function() {
-            _addSupportSystemMsg('❌ Network error. Please try again.');
+            _addSupportSystemMsg('❌ Could not check admin status. Please try again.');
         });
     }
 
     function _createTicketFromSupport() {
-        var lastAiMsg = '';
-        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
-        var body = new URLSearchParams({
-            action: 'create_helpdesk_ticket',
-            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
-            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
-            category: 'General',
-            priority: 'normal'
+        var msgs = [];
+        document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+            var role = el.classList.contains('user-message') ? 'You' : 'AI';
+            msgs.push(role + ': ' + el.textContent.trim());
         });
-        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success) {
-                var url = d.ticket_url || '/HelpDesk';
-                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
-            } else {
-                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
-            }
-        })
-        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+        var subject = 'Support request — ' + (document.title || window.location.pathname);
+        var description = 'Chat transcript from AI widget:\n\n' + msgs.slice(-10).join('\n\n').slice(0, 1000);
+        var params = new URLSearchParams({ subject: subject, description: description, category: 'support', priority: 'normal', from_chat: '1' });
+        window.location.href = '/HelpDesk/ticket/new?' + params.toString();
     }
 
     window.__aiChatSupportFns = {
@@ -5147,10 +5158,16 @@
             })
             .catch(function() {});
         }
+        function _sendAdminHeartbeat() {
+            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' }).catch(function() {});
+        }
+
         document.addEventListener('DOMContentLoaded', function() {
             _requestAdminNotifPerm();
+            _sendAdminHeartbeat();
             setTimeout(_checkPendingSupport, 2000);
             setInterval(_checkPendingSupport, 30000);
+            setInterval(_sendAdminHeartbeat, 30000);
         });
     })();
 
