@@ -1886,6 +1886,19 @@ sub sync_formula_herbs {
     }
 }
 
+sub get_herb_formulas {
+    my ($self, $c, $herb_id) = @_;
+    return [] unless $herb_id;
+    my @rows;
+    eval {
+        @rows = $self->ency_schema->resultset('Ency::FormulaHerb')->search(
+            { herb_id => $herb_id },
+            { prefetch => 'formula', order_by => 'formula.formula_number' }
+        )->all;
+    } or do {};
+    return \@rows;
+}
+
 sub find_herb_by_name {
     my ($self, $c, $name) = @_;
     return undef unless $name && length($name) > 2;
