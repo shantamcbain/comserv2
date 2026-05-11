@@ -502,7 +502,7 @@ Record ID:[% herb.record_id %]
         </td>
     </tr>
     <tr>
-        <td>Contra Indications:</td>
+        <td>Contraindications:</td>
         <td>
             [% IF !edit_mode %]
                 [% field_html.contra_indications %]
