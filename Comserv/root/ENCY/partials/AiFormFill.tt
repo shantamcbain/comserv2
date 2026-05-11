@@ -32,6 +32,15 @@
            title="Only these fields will be filled by AI. All other fields are untouched regardless of what AI returns." />
     <span style="color:#888;margin-left:0.4em;">⚠ Always fill specific fields when correcting a single field.</span>
   </div>
+  <div style="margin-top:0.5em;font-size:0.85em;color: var(--text-muted-color, #555);">
+    <label style="font-weight:bold;" title="Optional extra instructions appended to the AI prompt, e.g. 'include at least 3 references' or 'search for historical herb quantities'">
+      Additional instructions to AI (optional):
+    </label>
+    <textarea id="ency-ai-extra-instructions"
+              rows="2" cols="80"
+              placeholder="e.g. Please search for and provide at least 3 references for this formula. Include historical quantities for each herb where known. Use 1 part as default when no quantity is found."
+              style="display:block;width:100%;margin-top:0.3em;font-size:0.9em;box-sizing:border-box;"></textarea>
+  </div>
   <div style="margin-top:0.4em;font-size:0.82em;color: var(--text-muted-color, #666);">
     <label style="cursor:pointer;">
       <input type="checkbox" id="ency-ai-override" style="vertical-align:middle;">
@@ -195,8 +204,13 @@
             ? 'Return ONLY a raw JSON object containing ONLY these specific fields (no other fields): ' + fieldList + '. Do NOT include any other fields in the response even if you know them.'
             : 'Return ONLY a raw JSON object (no markdown, no code blocks, no explanation) with encyclopedia fields. Fields to include: ' + fieldList;
 
+        var extraInstructionsEl = document.getElementById('ency-ai-extra-instructions');
+        var extraInstructions   = extraInstructionsEl ? extraInstructionsEl.value.trim() : '';
+        var basePrompt = fieldInstruction + ' The subject is: ' + name;
+        var fullPrompt = extraInstructions ? basePrompt + '\n\nAdditional instructions: ' + extraInstructions : basePrompt;
+
         var payload = {
-            prompt:     fieldInstruction + ' The subject is: ' + name,
+            prompt:     fullPrompt,
             system:     INTEGRATIVE_SYSTEM,
             provider:   mp.provider,
             model:      mp.model,
