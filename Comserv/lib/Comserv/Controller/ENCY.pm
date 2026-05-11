@@ -3213,8 +3213,9 @@ sub edit_formula : Path('/ENCY/Formula/edit') : Args(0) {
         edit_mode      => 1,
         is_admin       => $is_admin,
         is_editor      => $is_editor,
-        ency_ai_prompt => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
-        template       => 'ENCY/FormulaDetail.tt',
+        ency_ai_prompt       => 'name, formula_number, indications, description, herbs_raw (one herb per line with quantity and botanical name), preparation, dosage, administration, notes, comments, reference',
+        ency_ai_entity_name  => ($formula ? 'Formula #' . ($formula->formula_number || $id) . ': ' . ($formula->name || '') : ''),
+        template             => 'ENCY/FormulaDetail.tt',
     );
 }
 
