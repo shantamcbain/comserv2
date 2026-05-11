@@ -1761,8 +1761,9 @@ sub list_formulas {
         1;
     } or do {
         my $err = $@ || 'unknown';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_formulas', "Error: $err");
-        die $err;
+        my $level = ($err =~ /Unknown column/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'list_formulas', "Error: $err");
+        return [];
     };
     return \@results;
 }
