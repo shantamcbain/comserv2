@@ -502,12 +502,35 @@ sub support_conversations :Path('support_conversations') :Args(0) {
                 { columns => ['conversation_id'], distinct => 1,
                   order_by => { -desc => 'conversation_id' } }
             )->all;
+        my $now = time();
+        my $stale_threshold  = 900;  # 15 min: user gone → auto-archive
+        my $grace_period     = 300;  # 5 min: new conv before first heartbeat fires
+        my $online_threshold = 120;  # 2 min: user counts as "online"
+
         foreach my $cid (@conv_ids) {
             my $conv = $schema->resultset('AiConversation')->find($cid);
             next unless $conv;
             next if $conv->status eq 'archived';
             my $_title = $conv->title || '';
             next if $_title =~ /^__admin_hb__/;
+
+            my $meta = {};
+            eval { $meta = decode_json($conv->metadata || '{}') };
+            my $user_last_seen = $meta->{user_last_seen} || 0;
+            my $conv_age = $now - $conv->created_at->epoch;
+
+            # Auto-archive stale conversations (user has left)
+            if ($user_last_seen == 0 && $conv_age > $grace_period) {
+                $conv->update({ status => 'archived' });
+                next;
+            }
+            if ($user_last_seen > 0 && ($now - $user_last_seen) > $stale_threshold) {
+                $conv->update({ status => 'archived' });
+                next;
+            }
+
+            my $user_online = ($user_last_seen > 0 && ($now - $user_last_seen) <= $online_threshold) ? 1 : 0;
+
             my @msgs = map { { $_->get_columns } }
                 $schema->resultset('AiMessage')->search(
                     { conversation_id => $cid, agent_type => 'support' },
@@ -523,11 +546,40 @@ sub support_conversations :Path('support_conversations') :Args(0) {
                 last_role       => $last ? $last->{role} : '',
                 last_message    => $last ? substr($last->{content}, 0, 100) : '',
                 status          => $conv->status || 'active',
+                user_online     => $user_online,
                 messages        => \@msgs,
             };
         }
     };
     $c->response->body(encode_json({ success => 1, conversations => \@convs }));
+}
+
+=head2 user_heartbeat
+
+User presence ping — called every 30s from the widget while in support mode.
+Updates conversation metadata so admin knows the user is still connected.
+
+=cut
+
+sub user_heartbeat :Path('user_heartbeat') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $conversation_id = $c->req->params->{conversation_id};
+    unless ($conversation_id) {
+        $c->response->body(encode_json({ success => 0 }));
+        return;
+    }
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+        if ($conv) {
+            my $meta = {};
+            eval { $meta = decode_json($conv->metadata || '{}') };
+            $meta->{user_last_seen} = time();
+            $conv->update({ metadata => encode_json($meta) });
+        }
+    };
+    $c->response->body(encode_json({ success => 1 }));
 }
 
 =head2 admin_heartbeat
