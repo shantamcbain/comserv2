@@ -1112,6 +1112,16 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
 
         if ($ok) {
             my $new_id = $result->record_id;
+            my $ncbi_tax_id = $form_data->{ncbi_tax_id} // '';
+            if ($ncbi_tax_id =~ /^\d+$/) {
+                my $ncbi_data = eval { $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id) };
+                if ($ncbi_data) {
+                    my $organism = eval { $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data) };
+                    if ($organism) {
+                        eval { $c->model('ENCYModel')->link_herb_to_organism($c, $new_id, $organism->record_id) };
+                    }
+                }
+            }
             my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
@@ -3890,6 +3900,32 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
     }
 
     $c->response->body(JSON::encode_json({ ok => 1, ncbi => $data }));
+}
+
+sub ncbi_lookup_by_name : Path('/ENCY/ncbi_lookup_by_name') : Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'Not authenticated' }));
+        return;
+    }
+
+    my $botanical = $c->request->param('botanical_name') // '';
+    $botanical =~ s/^\s+|\s+$//g;
+    unless (length($botanical) > 2) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => 'botanical_name required' }));
+        return;
+    }
+
+    my $ncbi_data = $c->model('ExternalDB')->ncbi_search_taxonomy($c, $botanical);
+    unless ($ncbi_data) {
+        $c->response->body(JSON::encode_json({ ok => 0, error => "No NCBI record found for '$botanical'" }));
+        return;
+    }
+
+    $ncbi_data->{botanical_name} = $botanical;
+    $c->response->body(JSON::encode_json({ ok => 1, ncbi => $ncbi_data }));
 }
 
 sub herb_ncbi_bulk_link : Path('/ENCY/herb_ncbi_bulk_link') : Args(0) {
