@@ -1,0 +1,65 @@
+[% META title = "Our Bee Products" %]
+[% PageVersion = 'Beekeeping/products.tt,v 0.02 2026/03/17 shanta Exp shanta' %]
+[% IF debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Our Bee Products</h1>
+        <p class="page-subtitle">Pure, natural products from healthy, well-managed hives.</p>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            <div class="app-section">
+                <p>We offer a variety of bee products, each carefully harvested and processed to ensure the highest quality. Explore our range below.</p>
+            </div>
+
+            <div class="app-section">
+                <div class="content-section">
+                    <h2>Honey</h2>
+                    <p>Our honey is 100% pure, raw, and unfiltered, harvested from our healthy hives. Rich in flavor and packed with natural enzymes, antioxidants, and natural goodness.</p>
+                    <p><a href="/Beekeeping/harvest">Learn about our honey production</a></p>
+                </div>
+
+                <div class="content-section">
+                    <h2>Bee Pollen</h2>
+                    <p>Bee pollen is a superfood packed with proteins, vitamins, and minerals. Harvested from our hives and carefully dried at low temperatures to preserve its full nutritional content.</p>
+                </div>
+
+                <div class="content-section">
+                    <h2>Beeswax</h2>
+                    <p>Our beeswax is pure and natural — harvested from the comb cappings during honey extraction. Ideal for making candles, cosmetics, wood polish, and leather treatments.</p>
+                </div>
+
+                <div class="content-section">
+                    <h2>Propolis</h2>
+                    <p>Propolis is a resinous substance collected by bees from tree buds, used to seal and protect the hive. Known for its antimicrobial and anti-inflammatory properties, it is available in tincture and raw form.</p>
+                </div>
+
+                <div class="content-section">
+                    <h2>Royal Jelly</h2>
+                    <p>Royal jelly is the nutrient-rich secretion produced by worker bees and fed exclusively to queen larvae. Harvested carefully from queen-rearing cells and refrigerated to preserve potency.</p>
+                </div>
+            </div>
+
+            <div class="app-section">
+                <h2>Advertise Your Products and Services</h2>
+                <div class="content-section">
+                    <p>Members of the BMaster community can list their own bee products and services here. Contact us to learn about adding your listing.</p>
+                </div>
+            </div>
+
+            <div class="page-footer">
+                <div class="footer-actions">
+                    <a href="/BMaster" class="btn btn-secondary">Back to BMaster Home</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+</div>

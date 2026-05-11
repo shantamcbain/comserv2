@@ -83,183 +83,83 @@ sub chained_index :Chained('base') :PathPart('') :Args(0) {
     }
 }
 
-# Route for Bee Pasture
+# Backward-compat stubs — redirect /BMaster/* to canonical /Beekeeping/* routes
+
 sub bee_pasture :Path('/BMaster/bee_pasture') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture', "BMaster bee_pasture method called");
-    push @{$c->stash->{debug_errors}}, "BMaster bee_pasture method called";
-
-    # Redirect to the ENCY BeePastureView
-    $c->response->redirect('/ENCY/BeePastureView');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bee_pasture', "BMaster bee_pasture → /Beekeeping/bee_pasture");
+    $c->response->redirect('/Beekeeping/bee_pasture');
 }
 
-# Route for Apiary Management System
 sub apiary :Path('/BMaster/apiary') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apiary', "BMaster apiary method called");
-    push @{$c->stash->{debug_errors}}, "BMaster apiary method called";
-
-    if ($c->session->{user_id}) {
-        $c->response->redirect($c->uri_for('/Apiary'));
-    } else {
-        $c->stash(template => 'BMaster/apiary.tt');
-    }
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'apiary', "BMaster apiary → /Beekeeping/apiary");
+    $c->response->redirect('/Beekeeping/apiary');
 }
 
-# Route for Queen Rearing System
 sub queens :Path('/BMaster/Queens') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queens', "BMaster queens method called");
-    push @{$c->stash->{debug_errors}}, "BMaster queens method called";
-
-    # Redirect to the Queen Rearing page
-    $c->response->redirect('/Apiary/QueenRearing');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'queens', "BMaster queens → /Beekeeping/Queens");
+    $c->response->redirect('/Beekeeping/Queens');
 }
 
-# Route for Hive Management
 sub hive :Path('/BMaster/hive') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hive', "BMaster hive method called");
-    push @{$c->stash->{debug_errors}}, "BMaster hive method called";
-
-    # Redirect to the Hive Management page
-    $c->response->redirect('/Apiary/HiveManagement');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'hive', "BMaster hive → /Beekeeping/hive");
+    $c->response->redirect('/Beekeeping/hive');
 }
 
-# Route for Bee Health
 sub beehealth :Path('/BMaster/beehealth') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'beehealth', "BMaster beehealth method called");
-    push @{$c->stash->{debug_errors}}, "BMaster beehealth method called";
-
-    # Redirect to the Bee Health page
-    $c->response->redirect('/Apiary/BeeHealth');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'beehealth', "BMaster beehealth → /Beekeeping/health");
+    $c->response->redirect('/Beekeeping/health');
 }
 
-# Placeholder routes for sections that don't have dedicated pages yet
 sub honey :Path('/BMaster/honey') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'honey', "BMaster honey method called");
-    push @{$c->stash->{debug_errors}}, "BMaster honey method called";
-
-    $c->stash(
-        template => 'BMaster/honey.tt',
-        debug_msg => "Honey Production"
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'honey', "BMaster honey → /Beekeeping/harvest");
+    $c->response->redirect('/Beekeeping/harvest');
 }
 
 sub environment :Path('/BMaster/environment') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'environment', "BMaster environment method called");
-    push @{$c->stash->{debug_errors}}, "BMaster environment method called";
-
-    $c->stash(
-        template => 'BMaster/environment.tt',
-        debug_msg => "Environmental Considerations"
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'environment', "BMaster environment → /Beekeeping/environment");
+    $c->response->redirect('/Beekeeping/environment');
 }
 
 sub education :Path('/BMaster/education') :Args(0) {
     my ($self, $c) = @_;
-
-    # Initialize debug_errors array
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'education', "BMaster education method called");
-    push @{$c->stash->{debug_errors}}, "BMaster education method called";
-
-    $c->stash(
-        template => 'BMaster/education.tt',
-        debug_msg => "Education and Collaboration"
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'education', "BMaster education → /Beekeeping/education");
+    $c->response->redirect('/Beekeeping/education');
 }
 
 sub yards :Path('/BMaster/yards') :Args(0) {
     my ($self, $c) = @_;
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'yards', "BMaster yards method called");
-
-    my $sitename = $c->session->{SiteName} || $c->session->{sitename};
-    my @yards;
-    eval {
-        @yards = $c->model('DBEncy')->resultset('Beekeeping::Yard')->search(
-            { sitename => $sitename },
-            { order_by => 'yard_name' }
-        )->all;
-    };
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'yards', "DB error: $@") if $@;
-
-    $c->stash(
-        yards    => \@yards,
-        template => 'BMaster/yards.tt',
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'yards', "BMaster yards → /Beekeeping/yards");
+    $c->response->redirect('/Beekeeping/yards');
 }
 
 sub add_yard :Path('/BMaster/add_yard') :Args(0) {
     my ($self, $c) = @_;
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_yard', "BMaster add_yard method called");
-
-    if ($c->req->method eq 'POST') {
-        my $p = $c->req->body_parameters;
-        eval {
-            $c->model('DBEncy')->resultset('Beekeeping::Yard')->create({
-                yard_code        => $p->{yard_code},
-                yard_name        => $p->{yard_name},
-                sitename         => $c->session->{SiteName} || $p->{sitename},
-                total_yard_size  => $p->{total_yard_size} || 0,
-                date_established => $p->{date_established} || undef,
-                notes            => $p->{notes} || '',
-            });
-        };
-        if ($@) {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'add_yard', "Create failed: $@");
-            $c->stash->{error_messages} = ["Failed to add yard: $@"];
-        } else {
-            $c->flash->{success_msg} = "Yard '${\$p->{yard_name}}' added successfully.";
-            return $c->response->redirect($c->uri_for('/BMaster/yards'));
-        }
-    }
-
-    $c->stash(template => 'BMaster/add_yard.tt');
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_yard', "BMaster add_yard → /Beekeeping/add_yard");
+    $c->response->redirect('/Beekeeping/add_yard');
 }
 
 sub products :Path('/BMaster/products') :Args(0) {
     my ($self, $c) = @_;
     $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', "BMaster products method called");
-    $c->stash(
-        template  => 'BMaster/products.tt',
-        debug_msg => 'Bee Products and Services',
-    );
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', "BMaster products → /Beekeeping/products");
+    $c->response->redirect('/Beekeeping/products');
 }
 
 # Default action to handle any undefined routes

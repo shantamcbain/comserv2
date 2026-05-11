@@ -156,7 +156,8 @@ Implement all missing inspection CRUD actions in `Apiary.pm`:
 - Frame color scheme: brood=orange, honey=yellow, pollen=green, empty=white, foundation=grey, drone=blue, comb=tan
 - Run verification: `perl -cw Comserv/script/comserv_server.pl`
 
-### [ ] Step: Beekeeping Controller Refactoring — Separate Feature from SiteName
+### [x] Step: Beekeeping Controller Refactoring — Separate Feature from SiteName
+<!-- chat-id: 06e328a9-bbdd-4af5-8fdf-cbcec012c148 -->
 <!-- project-id: 228 (sub-project of Apiary Management System 91 under BMaster 20) -->
 Resolve the naming conflict between the BMaster SiteName and the BMaster beekeeping feature by moving all beekeeping-specific code into a dedicated `Beekeeping` controller hierarchy and model. The `Result/Beekeeping/` subdirectory was already created by a prior main merge.
 

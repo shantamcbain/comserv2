@@ -1,4 +1,4 @@
-        package Comserv::Model::Schema::Ency::Result::Beekeeping::Yard;
+package Comserv::Model::Schema::Ency::Result::Beekeeping::Yard;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->table('yards');
