@@ -3379,6 +3379,12 @@
                         }
                     }
                 });
+                if (d.conv_status === 'archived') {
+                    clearInterval(state.supportPollTimer);
+                    state.supportPollTimer = null;
+                    _addSupportSystemMsg('🔒 This support chat has been closed by the administrator. Thank you for contacting us!');
+                    _exitSupportMode();
+                }
             })
             .catch(function() {});
         }, 5000);
@@ -3406,10 +3412,12 @@
                 _showNoAdminMessage();
                 return;
             }
+            var _rawTitle = (document.title || '').replace(/https?:\/\/[^\s|:]+[:|]?\s*/g, '').replace(/\s*[:|]\s*$/, '').trim();
+            var _chatTitle = 'Support Chat — ' + (_rawTitle || window.location.pathname);
             var body = new URLSearchParams({
                 message: contextMsg || 'User requested live support',
                 agent_type: 'support',
-                title: 'Support Chat - ' + (document.title || window.location.pathname)
+                title: _chatTitle
             });
             fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
             .then(function(r) { return r.json(); })

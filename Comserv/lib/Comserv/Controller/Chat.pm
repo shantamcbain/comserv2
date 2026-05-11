@@ -239,12 +239,18 @@ sub get_messages :Path('get_messages') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_messages',
             "Returning " . scalar(@formatted_messages) . " formatted messages");
         
-        # Return messages
+        my $conv_status = 'active';
+        if ($conversation_id) {
+            my $conv_obj = $schema->resultset('AiConversation')->find($conversation_id);
+            $conv_status = $conv_obj->status if $conv_obj;
+        }
+
         $c->response->content_type('application/json');
         $c->response->body(encode_json({
             success => 1,
             messages => \@formatted_messages,
-            count => scalar(@formatted_messages)
+            count => scalar(@formatted_messages),
+            conv_status => $conv_status,
         }));
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_messages',
@@ -452,18 +458,17 @@ sub pending_count :Path('pending_count') :Args(0) {
     my $count = 0;
     eval {
         my $schema = $c->model('DBEncy')->schema;
-        # Support conversations: AiMessage with agent_type='support' and role='user'
-        # that have no corresponding admin response in the same conversation
         my @support_convs = $schema->resultset('AiMessage')->search(
             { agent_type => 'support', role => 'user' },
             { columns => ['conversation_id'], distinct => 1 }
         )->all;
         foreach my $row (@support_convs) {
             my $cid = $row->conversation_id;
-            my $has_admin = $schema->resultset('AiMessage')->count(
-                { conversation_id => $cid, agent_type => 'support', role => 'assistant' }
-            );
-            # Count conversations where last message is from user (awaiting response)
+            my $conv = $schema->resultset('AiConversation')->find($cid);
+            next unless $conv;
+            next if $conv->status eq 'archived';
+            my $title = $conv->title || '';
+            next if $title =~ /^__admin_hb__/;
             my $last = $schema->resultset('AiMessage')->search(
                 { conversation_id => $cid, agent_type => 'support' },
                 { order_by => { -desc => 'id' }, rows => 1 }
@@ -500,6 +505,9 @@ sub support_conversations :Path('support_conversations') :Args(0) {
         foreach my $cid (@conv_ids) {
             my $conv = $schema->resultset('AiConversation')->find($cid);
             next unless $conv;
+            next if $conv->status eq 'archived';
+            my $_title = $conv->title || '';
+            next if $_title =~ /^__admin_hb__/;
             my @msgs = map { { $_->get_columns } }
                 $schema->resultset('AiMessage')->search(
                     { conversation_id => $cid, agent_type => 'support' },
@@ -514,6 +522,7 @@ sub support_conversations :Path('support_conversations') :Args(0) {
                 message_count   => scalar @msgs,
                 last_role       => $last ? $last->{role} : '',
                 last_message    => $last ? substr($last->{content}, 0, 100) : '',
+                status          => $conv->status || 'active',
                 messages        => \@msgs,
             };
         }
@@ -523,7 +532,7 @@ sub support_conversations :Path('support_conversations') :Args(0) {
 
 =head2 admin_heartbeat
 
-Admin presence ping — call every 30 s from any admin page to mark admin as online.
+Admin presence ping — updates a DB record so heartbeat works across multiple servers.
 
 =cut
 
@@ -535,51 +544,88 @@ sub admin_heartbeat :Path('admin_heartbeat') :Args(0) {
         return;
     }
     my $username = $c->session->{username} || 'admin';
-    my $presence_file = '/tmp/comserv_admin_presence.json';
-    my $data = {};
+    my $user_id  = $c->session->{user_id}  || 1;
+    my $hb_title = '__admin_hb__' . $username;
     eval {
-        if (-f $presence_file) {
-            open my $fh, '<', $presence_file or die;
-            local $/; my $raw = <$fh>; close $fh;
-            $data = decode_json($raw) if $raw;
+        my $schema = $c->model('DBEncy')->schema;
+        my $rec = $schema->resultset('AiConversation')->find({ title => $hb_title });
+        if ($rec) {
+            $rec->update({ metadata => encode_json({ heartbeat => 1, ts => time() }) });
+        } else {
+            $schema->resultset('AiConversation')->create({
+                user_id  => $user_id,
+                title    => $hb_title,
+                status   => 'archived',
+                metadata => encode_json({ heartbeat => 1, ts => time() }),
+            });
         }
-    };
-    $data->{admins} //= {};
-    $data->{admins}{$username} = time();
-    eval {
-        open my $fh, '>', $presence_file or die;
-        print $fh encode_json($data);
-        close $fh;
     };
     $c->response->body(encode_json({ success => 1 }));
 }
 
 =head2 check_admin_online
 
-Returns whether any admin is currently online (heartbeat within last 5 minutes).
+Returns whether any admin is currently online (heartbeat within last 90 seconds).
+Uses shared DB so works across multiple server instances.
 
 =cut
 
 sub check_admin_online :Path('check_admin_online') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
-    my $presence_file = '/tmp/comserv_admin_presence.json';
     my $count = 0;
     eval {
-        if (-f $presence_file) {
-            open my $fh, '<', $presence_file or die;
-            local $/; my $raw = <$fh>; close $fh;
-            my $data = decode_json($raw || '{}');
-            my $cutoff = time() - 90;
-            for my $adm (keys %{$data->{admins} || {}}) {
-                $count++ if ($data->{admins}{$adm} || 0) > $cutoff;
-            }
-        }
+        my $schema = $c->model('DBEncy')->schema;
+        my $cutoff = strftime('%Y-%m-%d %H:%M:%S', localtime(time() - 90));
+        $count = $schema->resultset('AiConversation')->count({
+            title      => { like => '__admin_hb__%' },
+            status     => 'archived',
+            updated_at => { '>=' => $cutoff },
+        });
     };
     $c->response->body(encode_json({
         online => ($count > 0 ? \1 : \0),
         count  => $count,
     }));
+}
+
+=head2 resolve
+
+Admin endpoint: mark a support conversation as resolved (archived).
+
+=cut
+
+sub resolve :Path('resolve') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    unless ($c->check_user_roles('admin')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => 0, error => 'Unauthorized' }));
+        return;
+    }
+    my $conversation_id = $c->req->params->{conversation_id};
+    unless ($conversation_id) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => 0, error => 'conversation_id required' }));
+        return;
+    }
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        my $conv = $schema->resultset('AiConversation')->find($conversation_id);
+        unless ($conv) {
+            $c->response->status(404);
+            $c->response->body(encode_json({ success => 0, error => 'Conversation not found' }));
+            return;
+        }
+        $conv->update({ status => 'archived' });
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'resolve',
+            "Conversation $conversation_id resolved by admin " . ($c->session->{username} || 'unknown'));
+        $c->response->body(encode_json({ success => 1 }));
+    };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => 0, error => 'Failed to resolve conversation' }));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;

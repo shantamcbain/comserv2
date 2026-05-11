@@ -45,6 +45,7 @@
       <div style="display:flex;flex-direction:column;gap:6px;">
         <button onclick="saSend()">Send ↵</button>
         <button onclick="saQuick()" style="background:#555;font-size:.78em;padding:5px 10px;">Quick…</button>
+        <button onclick="saResolve()" style="background:#28a745;font-size:.78em;padding:5px 10px;" title="Mark this chat as resolved">✅ Resolve</button>
       </div>
     </div>
   </div>
@@ -228,6 +229,35 @@ window.saQuick = function() {
   if (idx >= 1 && idx <= QUICK.length) {
     document.getElementById('sa-reply-text').value = QUICK[idx - 1];
   }
+};
+
+window.saResolve = function() {
+  if (!_activeConvId) { alert('Select a conversation first.'); return; }
+  if (!confirm('Mark this conversation as resolved and close it?')) return;
+  fetch('/chat/resolve', {
+    method: 'POST',
+    credentials: 'include',
+    body: new URLSearchParams({ conversation_id: _activeConvId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+      var li = document.querySelector('#sa-conv-list li[data-id="' + _activeConvId + '"]');
+      if (li) li.parentNode.removeChild(li);
+      delete _convCache[_activeConvId];
+      delete _knownConvIds[_activeConvId];
+      _activeConvId = null;
+      _lastMsgId = 0;
+      document.getElementById('sa-messages').innerHTML = '<div id="sa-msg-none" style="color:#888;font-size:.9em;align-self:center;margin-top:40px;">Conversation resolved.</div>';
+      document.getElementById('sa-chat-title').textContent = 'Select a conversation';
+      document.getElementById('sa-chat-user').textContent = '';
+      _loadConvList();
+    } else {
+      alert('Could not resolve: ' + (d.error || 'unknown error'));
+    }
+  })
+  .catch(function() { alert('Network error.'); });
 };
 
 document.getElementById('sa-reply-text').addEventListener('keydown', function(e) {
