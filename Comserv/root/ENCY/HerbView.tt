@@ -174,7 +174,7 @@ Record ID:[% herb.record_id %]
             [% ELSE %]
                 [% term_preview(field_html.sister_plants) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-                <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
+                <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" />
             [% END %]
         </td>
     </tr>
@@ -520,7 +520,7 @@ Record ID:[% herb.record_id %]
                 [% field_html.preparation %]
             [% ELSE %]
                 [% term_preview(field_html.preparation) %]
-                <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
+                <textarea id="preparation" name="preparation" rows="4" cols="50">[% herb.preparation %]</textarea>
             [% END %]
         </td>
     </tr>
@@ -651,7 +651,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.culinary %]
             [% ELSE %]
-                <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" required />
+                <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" />
             [% END %]
         </td>
     </tr>
@@ -681,7 +681,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 <a href="[% herb.url %]">[% herb.url %]</a>
             [% ELSE %]
-                <input type="url" id="url" name="url" value="[% herb.url %]" size="50" required />
+                <input type="url" id="url" name="url" value="[% herb.url %]" size="50" />
             [% END %]
         </td>
     </tr>

@@ -351,13 +351,19 @@
                         var hasSelection = (el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '');
                         if (hasSelection && !overrideAll) { skipped.push(key); return; }
                         var matched = false;
+                        var aiVal   = val.toLowerCase().trim();
+                        // Normalise yes/no/true/false/1/0 AI responses for binary selects
+                        var isBoolTrue  = /^(1|yes|true|y)\b/.test(aiVal);
+                        var isBoolFalse = /^(0|no|false|n)\b/.test(aiVal);
                         for (var i = 0; i < el.options.length; i++) {
                             var optVal  = el.options[i].value.toLowerCase();
                             var optText = el.options[i].text.toLowerCase();
-                            var aiVal   = val.toLowerCase();
-                            if (optVal === aiVal || optText === aiVal ||
+                            var directMatch = (optVal === aiVal || optText === aiVal ||
                                 optVal === aiVal.replace(/\s*(only|required|status)\s*/gi,'').trim() ||
-                                aiVal.indexOf(optVal) !== -1 || optVal.indexOf(aiVal) !== -1) {
+                                aiVal.indexOf(optVal) !== -1 || optVal.indexOf(aiVal) !== -1);
+                            var boolMatch = (isBoolTrue  && (optVal === '1' || optText === 'yes')) ||
+                                           (isBoolFalse && (optVal === '0' || optText === 'no'));
+                            if (directMatch || boolMatch) {
                                 el.selectedIndex = i;
                                 matched = true; filled++;
                                 break;
@@ -730,7 +736,11 @@
         constituents:          'Chemical constituents present in the herb. e.g. alkaloids, flavonoids, terpenes, essential oils.',
         solvents:              'Solvents used in preparation. e.g. water (infusion/decoction), alcohol (tincture), oil (infused oil), DMSO (topical carrier).',
         contra_indications:    'Conditions or circumstances where this herb should NOT be used. e.g. pregnancy, specific drug interactions, liver disease.',
-        apis:                  'Honeybee (Apis mellifera) interaction: does this plant attract or repel bees?',
+        apis:                  'Is this plant a nectar or pollen source for honeybees (Apis mellifera)? Return 1 for Yes or 0 for No.',
+        pollen:                'Does this plant produce significant pollen for bees or pollinators? Return 1 for Yes or 0 for No.',
+        nectar:                'Does this plant produce nectar accessible to bees or pollinators? Return 1 for Yes or 0 for No.',
+        pollennotes:           'Details about pollen production: bloom time, pollen type, forage value, amount produced, any toxicity concerns.',
+        nectarnotes:           'Details about nectar production: bloom time, nectar yield, sugar concentration, forage value, seasonal availability.',
         pollinator:            'Detailed notes on pollinator relationships — which insects visit, what they collect (nectar, pollen, resin), any known effects on pollinators.',
         cas_number:            'CAS Registry Number — unique numerical identifier assigned by Chemical Abstracts Service for chemical substances. e.g. 117-39-5 for Quercetin.',
         iupac_name:            'IUPAC systematic chemical name following International Union of Pure and Applied Chemistry nomenclature.',
