@@ -33,6 +33,49 @@
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
+    <input type="hidden" id="ncbi_tax_id" name="ncbi_tax_id" value="" />
+    <div style="margin:0.4em 0 0.8em 0;">
+      <button type="button" onclick="addFormNcbiLookup()" style="font-size:0.9em;">Look up NCBI Taxonomy</button>
+    </div>
+    <div id="add-ncbi-panel" style="display:none;border:1px solid #b0c4de;border-radius:5px;padding:0.8em;margin-bottom:0.8em;background:#f4f8ff;">
+      <strong>NCBI Taxonomy Result</strong>
+      <div id="add-ncbi-body" style="margin-top:0.5em;"></div>
+    </div>
+    <script>
+    function addFormNcbiLookup() {
+      var name = document.getElementById('botanical_name').value.trim();
+      if (!name) { alert('Enter a botanical name first.'); return; }
+      var panel = document.getElementById('add-ncbi-panel');
+      var body  = document.getElementById('add-ncbi-body');
+      body.innerHTML = 'Searching NCBI\u2026';
+      panel.style.display = 'block';
+      fetch('/ENCY/ncbi_lookup_by_name?botanical_name=' + encodeURIComponent(name))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.ok) { body.innerHTML = '<span style="color:red;">' + d.error + '</span>'; return; }
+          var n = d.ncbi;
+          document.getElementById('ncbi_tax_id').value = n.ncbi_tax_id || '';
+          var html = '<table style="border-collapse:collapse;">';
+          [
+            ['Scientific Name', n.scientific_name],
+            ['Common Name',     n.common_name],
+            ['Kingdom',         n.kingdom],
+            ['Phylum',          n.phylum],
+            ['Class',           n.class_name],
+            ['Order',           n.order_name],
+            ['Family',          n.family_name],
+            ['Genus',           n.genus],
+            ['NCBI Tax ID',     n.ncbi_tax_id ? '<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id='+n.ncbi_tax_id+'" target="_blank">'+n.ncbi_tax_id+'</a>' : ''],
+          ].forEach(function(row){
+            if (row[1]) html += '<tr><td style="font-weight:bold;padding:2px 8px 2px 0;">' + row[0] + '</td><td>' + row[1] + '</td></tr>';
+          });
+          html += '</table>';
+          if (n.ncbi_tax_id) html += '<p style="color:green;margin-top:0.5em;">&#10003; Taxonomy will be linked automatically when you save.</p>';
+          body.innerHTML = html;
+        })
+        .catch(function(e){ body.innerHTML = '<span style="color:red;">Lookup failed: ' + e + '</span>'; });
+    }
+    </script>
 
     <label for="common_names">Common Names:</label><br>
     <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]"><br>
