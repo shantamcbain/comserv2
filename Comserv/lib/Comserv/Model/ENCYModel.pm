@@ -1049,9 +1049,15 @@ sub auto_link_herb_data {
         next if $lookup =~ /^\w+ing\s/i;
         my $found = $_lookup_medical->($lookup);
         unless ($found) {
-            my $lookup_type = ($lookup =~ /^(?:anti|pro|non|re|de|pre|post|hyper|hypo|chrono|auto|pseudo)\w/i
-                               || $lookup =~ /(?:ic|ive|ant|ent|ary|ory|ent|ous|tic)\b/i)
-                              ? 'glossary' : 'disease';
+            my $lookup_type;
+            if ($lookup =~ /\b(?:extract|tincture|infusion|decoction|poultice|compress|tea|capsule|tablet|salve|ointment|cream|oil|syrup|powder|fluid|dose|drops?|preparation|liniment|fomentation|suppository|enema|wash|lotion|plaster|bolus)\b/i) {
+                $lookup_type = 'glossary';
+            } elsif ($lookup =~ /^(?:anti|pro|non|re|de|pre|post|hyper|hypo|chrono|auto|pseudo)\w/i
+                     || $lookup =~ /(?:ic|ive|ant|ent|ary|ory|ous|tic)\b/i) {
+                $lookup_type = 'glossary';
+            } else {
+                $lookup_type = 'disease';
+            }
             push @todos, { field => 'therapeutic_action', term => $lookup, lookup_type => $lookup_type };
         }
     }
