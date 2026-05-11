@@ -965,6 +965,32 @@ sub auto_link_herb_data {
                split /[,;\n]+/, $text;
     };
 
+    my $_lookup_medical = sub {
+        my ($term) = @_;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Disease')->search(
+                { -or => [ common_name => { like => "%$term%" }, scientific_name => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'disease' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Symptom')->search(
+                { name => { like => "%$term%" } },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'symptom' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'glossary' if $rec;
+        return undef;
+    };
+
     # --- constituents text → HerbConstituent junctions ---
     my $sitename = ($c && blessed($c) && $c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'ENCY') : 'ENCY';
     my $username = ($c && blessed($c) && $c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
@@ -1021,14 +1047,12 @@ sub auto_link_herb_data {
         next if scalar(split /\s+/, $lookup) > 3;
         next if $lookup =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
         next if $lookup =~ /^\w+ing\s/i;
-        my $rec = eval {
-            $self->ency_schema->resultset('Ency::Glossary')->search(
-                { -or => [ term => { like => "%$lookup%" }, alternate_terms => { like => "%$lookup%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        unless ($rec) {
-            push @todos, { field => 'therapeutic_action', term => $lookup };
+        my $found = $_lookup_medical->($lookup);
+        unless ($found) {
+            my $lookup_type = ($lookup =~ /^(?:anti|pro|non|re|de|pre|post|hyper|hypo|chrono|auto|pseudo)\w/i
+                               || $lookup =~ /(?:ic|ive|ant|ent|ary|ory|ent|ous|tic)\b/i)
+                              ? 'glossary' : 'disease';
+            push @todos, { field => 'therapeutic_action', term => $lookup, lookup_type => $lookup_type };
         }
     }
 
@@ -1107,33 +1131,6 @@ sub auto_link_herb_data {
         $t =~ s/^(?:used?\s+(?:for|in|as)|treats?\s*|for\s+|in\s+cases?\s+of\s*|as\s+(?:a\s+)?)\s*//i;
         $t =~ s/^\s+|\s+$//g;
         return $t;
-    };
-
-    # shared helper: look up a term in Disease, Symptom, Glossary; return found type or undef
-    my $_lookup_medical = sub {
-        my ($term) = @_;
-        my $rec = eval {
-            $self->ency_schema->resultset('Ency::Disease')->search(
-                { -or => [ common_name => { like => "%$term%" }, scientific_name => { like => "%$term%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'disease' if $rec;
-        $rec = eval {
-            $self->ency_schema->resultset('Ency::Symptom')->search(
-                { name => { like => "%$term%" } },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'symptom' if $rec;
-        $rec = eval {
-            $self->ency_schema->resultset('Ency::Glossary')->search(
-                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'glossary' if $rec;
-        return undef;
     };
 
     # --- medical_uses terms → Disease, Symptom, Glossary lookup ---
