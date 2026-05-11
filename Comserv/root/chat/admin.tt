@@ -148,7 +148,10 @@ function _loadConvList() {
       _knownConvIds[conv.conversation_id] = true;
       li.className = awaiting ? 'awaiting' : 'responded';
       if (_activeConvId && conv.conversation_id == _activeConvId) li.className += ' active';
-      li.innerHTML = '<div class="conv-title">' + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
+      var onlineDot = conv.user_online
+        ? '<span title="User is connected" style="display:inline-block;width:8px;height:8px;background:#28a745;border-radius:50%;margin-right:5px;"></span>'
+        : '<span title="User may have disconnected" style="display:inline-block;width:8px;height:8px;background:#aaa;border-radius:50%;margin-right:5px;"></span>';
+      li.innerHTML = '<div class="conv-title">' + onlineDot + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
         + '<div class="conv-meta">'
         + (awaiting ? '<strong style="color:#c00">⏳ Awaiting reply</strong>' : '✅ Replied')
         + ' · ' + conv.message_count + ' msg(s)'

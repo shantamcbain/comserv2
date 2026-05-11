@@ -3317,10 +3317,21 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
+    function _sendUserHeartbeat() {
+        if (!state.supportConvId) return;
+        fetch('/chat/user_heartbeat', {
+            method: 'POST',
+            credentials: 'include',
+            body: new URLSearchParams({ conversation_id: state.supportConvId })
+        }).catch(function() {});
+    }
+
     function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
+        _sendUserHeartbeat();
+        state.userHeartbeatTimer = setInterval(_sendUserHeartbeat, 30000);
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
@@ -3337,6 +3348,7 @@
 
     function _exitSupportMode() {
         if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        if (state.userHeartbeatTimer) { clearInterval(state.userHeartbeatTimer); state.userHeartbeatTimer = null; }
         state.supportMode   = false;
         state.supportConvId = null;
         state.supportLastMsgId = 0;
