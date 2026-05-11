@@ -35,7 +35,7 @@
     <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
 
     <label for="common_names">Common Names:</label><br>
-    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
+    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]"><br>
 
     <label for="therapeutic_action">Therapeutic Action:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
@@ -50,13 +50,13 @@
 
     <label for="medical_uses">Medical Uses:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <textarea id="medical_uses" name="medical_uses" required></textarea><br>
+    <textarea id="medical_uses" name="medical_uses"></textarea><br>
 
     <label for="homiopathic">Homeopathic Uses:</label><br>
     <textarea id="homiopathic" name="homiopathic"></textarea><br>
 
     <label for="ident_character">Identifying Character:</label><br>
-    <textarea id="ident_character" name="ident_character" required></textarea><br>
+    <textarea id="ident_character" name="ident_character"></textarea><br>
 
     <label for="image">Image:</label><br>
     [% ency_img_picker('image', '') %]<br>
@@ -80,46 +80,49 @@
     <textarea id="taste" name="taste"></textarea><br>
 
     <label for="odour">Odour:</label><br>
-    <input type="text" id="odour" name="odour" maxlength="100" required><br>
+    <input type="text" id="odour" name="odour" maxlength="100"><br>
 
     <label for="distribution">Distribution:</label><br>
-    <input type="text" id="distribution" name="distribution" maxlength="100" required><br>
+    <input type="text" id="distribution" name="distribution" maxlength="100"><br>
 
     <label for="url">URL:</label><br>
     <input type="text" id="url" name="url" maxlength="255"><br>
 
-<label for="nectar">Nectar:</label><br>
-    <select id="nectar" name="nectar" required>
+    <label for="nectar">Nectar:</label><br>
+    <select id="nectar" name="nectar">
         <option value="0">No</option>
         <option value="1">Yes</option>
     </select><br>
-   <div>
+    <div>
         <label for="nectarnotes">Nectar Notes:</label><br>
-        <textarea id="nectarnotes" name="nectarnotes" required></textarea>
+        <textarea id="nectarnotes" name="nectarnotes"></textarea>
     </div>
 
     <label for="pollinator">Pollinator:</label><br>
     <textarea id="pollinator" name="pollinator"></textarea><br>
 
     <label for="pollen">Pollen:</label><br>
-    <select id="pollen" name="pollen" required>
+    <select id="pollen" name="pollen">
         <option value="0">No</option>
         <option value="1">Yes</option>
     </select><br>
     <div>
         <label for="pollennotes">Pollen Notes:</label>
-        <textarea id="pollennotes" name="pollennotes" required></textarea>
+        <textarea id="pollennotes" name="pollennotes"></textarea>
     </div>
-     <div>
-        <label for="apis">Apis:</label>
-        <input type="text" id="apis" name="apis" maxlength="100" required>
+    <div>
+        <label for="apis">Apis (honeybee forage):</label>
+        <select id="apis" name="apis">
+            <option value="0">No</option>
+            <option value="1">Yes</option>
+        </select>
     </div>
     <label for="constituents">Constituents:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
-    <input type="text" id="solvents" name="solvents" maxlength="100" required><br>
+    <input type="text" id="solvents" name="solvents" maxlength="100"><br>
 
     <label for="chinese">Chinese:</label><br>
     <textarea id="chinese" name="chinese"></textarea><br>
@@ -127,9 +130,9 @@
     <label for="culinary">Culinary Uses:</label><br>
     <textarea id="culinary" name="culinary"></textarea><br>
 
-    <label for="contra_indications">Contra Indications:</label>
+    <label for="contra_indications">Contraindications:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>
+    <input type="text" id="contra_indications" name="contra_indications" maxlength="150"><br>
 
     <label for="dosage">Dosage:</label><br>
     <textarea id="dosage" name="dosage"></textarea><br>
@@ -148,7 +151,7 @@
 
     <label for="sister_plants">Sister Plants:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
+    <input type="text" id="sister_plants" name="sister_plants" maxlength="100"><br>
 
     <label for="harvest">Harvest:</label><br>
     <textarea id="harvest" name="harvest"></textarea><br>
@@ -162,16 +165,15 @@
     <label for="reference">Reference:</label><br>
     <textarea id="reference" name="reference"></textarea><br>
 
-    <!-- New fields -->
+    <label for="preparation">Preparation:</label><br>
+    <input type="text" id="preparation" name="preparation" maxlength="150"><br>
+
     <div>
         <label for="share">Share:</label>
-          <select id="share" name="share">
+        <select id="share" name="share">
             <option value="0">Public</option>
             <option value="1">Private</option>
         </select>
- </div>
-    <label for="preparation">Preparation:</label>
-        <input type="text" id="preparation" name="preparation" maxlength="150" required>
     </div>
 <br>
     <input type="submit" value="Add Herb">
