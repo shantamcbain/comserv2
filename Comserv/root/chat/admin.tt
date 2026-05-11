@@ -36,8 +36,14 @@
   </div>
   <div id="sa-main">
     <div id="sa-chat-header">
-      <span id="sa-chat-title">Select a conversation</span>
-      <span id="sa-chat-user" style="font-size:.8em;font-weight:normal;opacity:.85;"></span>
+      <div>
+        <span id="sa-chat-title">Select a conversation</span>
+        <span id="sa-chat-user" style="font-size:.8em;font-weight:normal;opacity:.85;margin-left:10px;"></span>
+      </div>
+      <button id="sa-resolve-btn" onclick="saResolve()" title="Mark this chat as resolved and close it"
+              style="display:none;background:#28a745;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:.82em;cursor:pointer;white-space:nowrap;">
+        ✅ Close Chat
+      </button>
     </div>
     <div id="sa-messages"><div id="sa-msg-none">Select a support chat from the left panel</div></div>
     <div id="sa-reply-area">
@@ -45,7 +51,6 @@
       <div style="display:flex;flex-direction:column;gap:6px;">
         <button onclick="saSend()">Send ↵</button>
         <button onclick="saQuick()" style="background:#555;font-size:.78em;padding:5px 10px;">Quick…</button>
-        <button onclick="saResolve()" style="background:#28a745;font-size:.78em;padding:5px 10px;" title="Mark this chat as resolved">✅ Resolve</button>
       </div>
     </div>
   </div>
@@ -166,6 +171,8 @@ function _openConv(convId) {
   var conv = _convCache[convId];
   document.getElementById('sa-chat-title').textContent = conv ? (conv.title || 'Chat #' + convId) : 'Chat #' + convId;
   document.getElementById('sa-chat-user').textContent = conv ? 'User #' + conv.user_id : '';
+  var resolveBtn = document.getElementById('sa-resolve-btn');
+  if (resolveBtn) resolveBtn.style.display = '';
   var msgsEl = document.getElementById('sa-messages');
   msgsEl.innerHTML = '';
   if (conv && conv.messages) {
@@ -252,6 +259,8 @@ window.saResolve = function() {
       document.getElementById('sa-messages').innerHTML = '<div id="sa-msg-none" style="color:#888;font-size:.9em;align-self:center;margin-top:40px;">Conversation resolved.</div>';
       document.getElementById('sa-chat-title').textContent = 'Select a conversation';
       document.getElementById('sa-chat-user').textContent = '';
+      var resolveBtn = document.getElementById('sa-resolve-btn');
+      if (resolveBtn) resolveBtn.style.display = 'none';
       _loadConvList();
     } else {
       alert('Could not resolve: ' + (d.error || 'unknown error'));
