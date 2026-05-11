@@ -1734,10 +1734,14 @@ sub update_formula {
     my ($self, $c, $id, $data) = @_;
     my $record = $self->ency_schema->resultset('Ency::Formula')->find($id);
     return (0, "Formula $id not found.") unless $record;
+    my $herbs_raw = $data->{herbs_raw};
     eval { $record->update($data); } or do {
         my $error = $@ || 'Unknown error';
         return (0, "Failed to update formula $id: $error");
     };
+    if (defined $herbs_raw) {
+        $self->sync_formula_herbs($c, $id, $herbs_raw);
+    }
     return (1, "Formula $id updated.");
 }
 
@@ -1806,6 +1810,80 @@ sub get_formula_with_herbs {
         1;
     } or do {};
     return ($formula, \@herb_links, \@disease_links);
+}
+
+sub _parse_herbs_raw {
+    my ($self, $herbs_raw) = @_;
+    return () unless $herbs_raw && $herbs_raw =~ /\S/;
+    my @entries;
+    for my $line (split /\n/, $herbs_raw) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless length($line) > 2;
+        next if $line =~ /^Formula\s+#/i;
+        next if $line =~ /^\d+\s*$/;
+        next if $line =~ /^[;,\.\s]+$/;
+        my %h;
+        if ($line =~ s/^(\d+(?:\.\d+)?(?:\s*(?:tsp\.?|tbsp\.?|oz\.?|parts?|g\b|ml|drops?|cups?|ounces?|lbs?|kg|dram|dr\.?))?)\s+//i) {
+            $h{quantity} = $1;
+        }
+        $line =~ s/\s*[;]\s*$//;
+        if ($line =~ /^([A-Z][a-z]+(?:\s+[a-zA-Z]+){0,4})\s*\(\s*([^)]+?)\s*\)\s*(.*)$/) {
+            my ($first, $second, $rest) = ($1, $2, $3);
+            if ($first =~ /^[A-Z][a-z]+\s+[a-z]/) {
+                $h{botanical_name_raw} = $first;
+                $h{herb_name_raw}      = $second;
+            } else {
+                $h{herb_name_raw}      = $first;
+                $h{botanical_name_raw} = $second;
+            }
+            $h{plant_part} = $rest if $rest =~ /\S/;
+        } else {
+            if ($line =~ /^[A-Z][a-z]+\s+[a-z]/) {
+                $h{botanical_name_raw} = $line;
+            } else {
+                $h{herb_name_raw} = $line;
+            }
+        }
+        push @entries, \%h if $h{botanical_name_raw} || $h{herb_name_raw};
+    }
+    return @entries;
+}
+
+sub sync_formula_herbs {
+    my ($self, $c, $formula_id, $herbs_raw) = @_;
+    return unless $formula_id;
+    my $rs = $self->ency_schema->resultset('Ency::FormulaHerb');
+    eval { $rs->search({ formula_id => $formula_id })->delete; } or do {};
+    return unless $herbs_raw && $herbs_raw =~ /\S/;
+    my @parsed = $self->_parse_herbs_raw($herbs_raw);
+    for my $h (@parsed) {
+        my $herb_id = undef;
+        my $search_name = $h->{botanical_name_raw} || $h->{herb_name_raw} || '';
+        if ($search_name && length($search_name) > 2) {
+            my $hit;
+            eval {
+                $hit = $self->ency_schema->resultset('Ency::Herb')->search(
+                    { -or => [
+                        botanical_name => { like => '%' . $search_name . '%' },
+                        key_name       => { like => '%' . $search_name . '%' },
+                        common_names   => { like => '%' . $search_name . '%' },
+                    ]},
+                    { rows => 1 }
+                )->first;
+            } or do {};
+            $herb_id = $hit ? $hit->record_id : undef;
+        }
+        eval {
+            $rs->create({
+                formula_id         => $formula_id,
+                herb_id            => $herb_id,
+                herb_name_raw      => $h->{herb_name_raw}      || undef,
+                botanical_name_raw => $h->{botanical_name_raw} || undef,
+                quantity           => $h->{quantity}           || undef,
+                plant_part         => $h->{plant_part}         || undef,
+            });
+        } or do {};
+    }
 }
 
 sub find_herb_by_name {

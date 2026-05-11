@@ -82,8 +82,12 @@
         <td>
             [% IF h.herb_id %]
             <a href="[% c.uri_for('/ENCY/herb_detail/' _ h.herb_id) %]">View Herb</a>
+            [% ELSIF is_editor %]
+            [% SET prefill = h.botanical_name_raw || h.herb_name_raw %]
+            <a href="[% c.uri_for('/ENCY/add_herb', { botanical_name => prefill }) %]"
+               style="color:#c07000;font-size:0.85em;" title="This herb is not yet in the ENCY database">+ Add Herb</a>
             [% ELSE %]
-            <span style="color:#aaa;">not linked</span>
+            <span style="color:#aaa;font-size:0.85em;">not in database</span>
             [% END %]
         </td>
     </tr>
