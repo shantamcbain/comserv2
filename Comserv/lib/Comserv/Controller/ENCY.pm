@@ -251,14 +251,16 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         $field_html_edit{$f} = _build_glossary_popup_html($c, $val, $entities_edit) if length($val);
     }
     $field_html_edit{parts_used}         = _build_glossary_term_links_html($c, eval { $herb->parts_used }         // '');
-    $field_html_edit{sister_plants}      = _build_sister_plants_html(      $c, eval { $herb->sister_plants }      // '');
+    $field_html_edit{sister_plants}      = _build_sister_plants_html(      $c, eval { $herb->sister_plants }      // '', $is_editor);
     $field_html_edit{therapeutic_action} = _build_glossary_popup_html(     $c, eval { $herb->therapeutic_action } // '', $entities_edit);
     $field_html_edit{medical_uses}       = _build_glossary_popup_html(     $c, eval { $herb->medical_uses }       // '', $entities_edit);
 
+    my $linked_formulas_edit = $c->model('ENCYModel')->get_herb_formulas($c, $record_id);
     $c->stash(
         herb            => $herb,
         cn_list         => \@cn_list_edit,
         field_html      => \%field_html_edit,
+        linked_formulas => $linked_formulas_edit,
         edit_mode       => 1,
         is_admin        => $is_admin,
         is_editor       => $is_editor,
@@ -267,12 +269,20 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
                          . 'distribution, cultivation, harvest, '
                          . 'therapeutic_action, medical_uses, constituents, solvents, dosage, administration, '
                          . 'formulas, contra_indications, preparation, chinese, vetrinary, homiopathic, '
-                         . 'pollinator, pollennotes, nectarnotes, non_med, culinary, history, reference. '
+                         . 'apis (1=Yes/0=No: does this plant provide nectar or pollen for honeybees/pollinators?), '
+                         . 'pollinator (types of pollinators: bees; butterflies; hummingbirds; etc.), '
+                         . 'pollen (1=Yes/0=No: does it produce significant pollen?), '
+                         . 'pollennotes, nectarnotes (details about nectar production: bloom time; nectar yield; forage value; etc.), '
+                         . 'non_med, culinary, history, reference. '
                          . 'IMPORTANT for url field: use a real external URL (Wikipedia, Plants.USDA.gov, '
                          . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
                          . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
                          . 'For integrative fields (therapeutic_action, medical_uses, preparation) include '
                          . 'allopathic, herbal, TCM, Ayurvedic, naturopathic, and homeopathic perspectives where known. '
+                         . 'For dosage and administration: include typical dosage ranges (tincture, tea, capsule) '
+                         . 'and method of use (oral, topical, infusion) from traditional and clinical sources. '
+                         . 'For preparation: describe the method (infusion, decoction, tincture ratio, poultice) '
+                         . 'with specific instructions where known. '
                          . 'IMPORTANT FORMATTING — read carefully: '
                          . '(1) SEMICOLONS: all multi-value fields (therapeutic_action, constituents, parts_used, '
                          . 'sister_plants, medical_uses, solvents, formulas, contra_indications) use SEMICOLONS (;) '
@@ -348,6 +358,10 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'herb_detail', "Herb details fetched successfully for ID: $id");
     $c->session->{record_id} = $id;
 
+    my $roles    = $c->session->{roles} || [];
+    my @role_list_d = ref $roles ? @$roles : split(/\s*,\s*/, $roles);
+    my $is_editor_d = grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list_d;
+
     my $entities = _fetch_linkable_entities($c);
 
     my $constituents_html = _build_constituent_html(
@@ -357,8 +371,10 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         $c, $herb->parts_used // ''
     );
     my $sister_plants_html = _build_sister_plants_html(
-        $c, $herb->sister_plants // ''
+        $c, $herb->sister_plants // '', $is_editor_d
     );
+
+    my $linked_formulas = $c->model('ENCYModel')->get_herb_formulas($c, $id);
     my $therapeutic_action_html = _build_glossary_popup_html(
         $c, $herb->therapeutic_action // '', $entities
     );
@@ -402,6 +418,8 @@ sub herb_detail :Path('/ENCY/herb_detail') :Args(1) {
         therapeutic_action_html => $therapeutic_action_html,
         medical_uses_html       => $medical_uses_html,
         field_html              => \%field_html,
+        linked_formulas         => $linked_formulas,
+        is_editor               => $is_editor_d,
         edit_mode               => 0,
         template                => 'ENCY/HerbView.tt',
     );
@@ -604,7 +622,7 @@ sub _build_glossary_popup_html {
 }
 
 sub _build_sister_plants_html {
-    my ($c, $text) = @_;
+    my ($c, $text, $is_editor) = @_;
     return '' unless defined $text && length($text);
     my @parts;
     for my $raw (split /\s*;\s*/, $text) {
@@ -619,7 +637,7 @@ sub _build_sister_plants_html {
         my $rec = eval {
             $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->search(
                 { -or => [
-                    common_names  => { like => "%$clean%" },
+                    common_names   => { like => "%$clean%" },
                     botanical_name => { like => "%$clean%" },
                     key_name       => { like => "%$clean%" },
                 ]},
@@ -631,6 +649,13 @@ sub _build_sister_plants_html {
             my $tip = $rec->botanical_name || $clean;
             $tip =~ s/"/&quot;/g;
             push @parts, qq{<a href="/ENCY/herb_detail/$hid" class="ency-herb-link" data-hid="$hid" title="$tip">$escaped</a>};
+        } elsif ($is_editor) {
+            my $enc = $clean;
+            $enc =~ s/([^A-Za-z0-9\-\_\.\!\~\*\'\(\) ])/sprintf("%%%02X", ord($1))/ge;
+            $enc =~ s/ /+/g;
+            push @parts, $escaped
+                . qq{ <a href="/ENCY/add_herb?botanical_name=$enc" target="_blank" rel="noopener" }
+                . qq{style="color:#c07000;font-size:0.8em;" title="Not in ENCY — add this herb (opens new tab)">+ Add</a>};
         } else {
             push @parts, $escaped;
         }

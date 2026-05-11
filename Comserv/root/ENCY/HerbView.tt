@@ -482,11 +482,22 @@ Record ID:[% herb.record_id %]
     <tr>
         <td>Formulas:</td>
         <td>
-            [% IF !edit_mode %]
+            [% IF linked_formulas && linked_formulas.size %]
+            <ul style="margin:0 0 0.4em 1.2em;padding:0;">
+                [% FOREACH fh IN linked_formulas %]
+                [% SET f = fh.formula %]
+                [% IF f %]
+                <li><a href="[% c.uri_for('/ENCY/Formula/' _ f.record_id) %]">Formula #[% f.formula_number | html %][% IF f.name %]: [% f.name | html %][% END %]</a></li>
+                [% END %]
+                [% END %]
+            </ul>
+            [% ELSIF !edit_mode %]
                 [% field_html.formulas %]
-            [% ELSE %]
+            [% END %]
+            [% IF edit_mode %]
                 [% term_preview(field_html.formulas) %]
                 <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
+                <div style="font-size:0.8em;color:#777;margin-top:0.2em;">Legacy text field. Formulas above are auto-linked from the formula database.</div>
             [% END %]
         </td>
     </tr>
