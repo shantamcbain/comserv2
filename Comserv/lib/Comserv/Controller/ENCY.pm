@@ -1649,12 +1649,18 @@ sub disease_detail : Path('/ENCY/Disease') : Args(1) {
 
     $c->session->{record_id} = $id;
     my $related = $c->model('ENCYModel')->get_disease_related($c, $id);
+    my $roles_d = $c->session->{roles} || [];
+    my @role_list_d = ref $roles_d ? @$roles_d : split /\s*,\s*/, $roles_d;
+    my $is_admin_d  = grep { $_ eq 'admin' || $_ eq 'developer' } @role_list_d;
+    my $is_editor_d = $is_admin_d || grep { $_ eq 'editor' } @role_list_d;
     $c->stash(
         disease           => $disease,
         related_symptoms  => $related->{symptoms}  // [],
         related_herbs     => $related->{herbs}     // [],
         related_animals   => $related->{animals}   // [],
         related_insects   => $related->{insects}   // [],
+        is_editor         => $is_editor_d,
+        is_admin          => $is_admin_d,
         edit_mode         => 0,
         template          => 'ENCY/DiseaseDetail.tt',
     );
@@ -1851,6 +1857,53 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
         ency_ai_prompt  => 'common_name, scientific_name, disease_type, host_type, causative_agent, transmission, symptoms_description, diagnosis, treatment_conventional, treatment_herbal, prevention, prognosis, icd_code, distribution, history, reference, url. For host_type use a semicolon-separated list of one or more of: human; animal; plant; insect; bird; fish; fungal host; bacterial host',
         template        => 'ENCY/DiseaseDetail.tt',
     );
+}
+
+sub delete_disease : Path('/ENCY/Disease/delete') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->flash->{error_msg} = 'You do not have permission to delete diseases.';
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        return;
+    }
+
+    my $record_id = $c->request->body_parameters->{record_id} // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid disease record ID.';
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        return;
+    }
+
+    my $disease = $c->model('ENCYModel')->get_disease_by_id($c, $record_id);
+    unless ($disease) {
+        $c->flash->{error_msg} = 'Disease record not found.';
+        $c->response->redirect($c->uri_for('/ENCY/Disease'));
+        return;
+    }
+
+    my $name = $disease->common_name // "record #$record_id";
+    eval { $disease->delete };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_disease',
+            "Failed to delete disease $record_id: $@");
+        $c->flash->{error_msg} = "Failed to delete disease: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_disease',
+            "Deleted disease $record_id: $name");
+        $c->flash->{success_msg} = "Disease '$name' deleted successfully.";
+    }
+    $c->response->redirect($c->uri_for('/ENCY/Disease'));
 }
 
 sub symptoms_redirect : Path('/ENCY/symptoms') : Args(0) {
