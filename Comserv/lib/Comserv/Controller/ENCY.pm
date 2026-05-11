@@ -1859,7 +1859,7 @@ sub edit_disease : Path('/ENCY/Disease/edit') : Args(0) {
     );
 }
 
-sub delete_disease : Path('/ENCY/Disease/delete') : Args(0) {
+sub delete_disease : Path('/ENCY/DiseaseDelete') : Args(0) {
     my ($self, $c) = @_;
 
     unless ($c->session->{username}) {
@@ -1878,14 +1878,14 @@ sub delete_disease : Path('/ENCY/Disease/delete') : Args(0) {
         return;
     }
 
-    my $record_id = $c->request->body_parameters->{record_id} // '';
+    my $record_id = $c->request->param('record_id') // '';
     unless ($record_id =~ /^\d+$/) {
         $c->flash->{error_msg} = 'Invalid disease record ID.';
         $c->response->redirect($c->uri_for('/ENCY/Disease'));
         return;
     }
 
-    my $disease = $c->model('ENCYModel')->get_disease_by_id($c, $record_id);
+    my $disease = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Disease')->find($record_id) };
     unless ($disease) {
         $c->flash->{error_msg} = 'Disease record not found.';
         $c->response->redirect($c->uri_for('/ENCY/Disease'));
