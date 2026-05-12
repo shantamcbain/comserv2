@@ -125,7 +125,13 @@
     <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
-            [% INCLUDE 'todo/site_list.tt' %]
+            [% IF is_csc && sites && sites.size %]
+                [% INCLUDE 'todo/site_list.tt' %]
+            [% ELSE %]
+                <label for="sitename">Site Name:</label>
+                <input type="hidden" name="sitename" value="[% record.get_column('sitename') %]">
+                <input type="text" id="sitename" value="[% record.get_column('sitename') %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
+            [% END %]
         </div>
         
         <div class="form-group">

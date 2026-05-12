@@ -339,6 +339,71 @@
 [% END %]
 
 <script>
+function savePriority(sel) {
+    var recordId = sel.getAttribute('data-record-id');
+    var newPriority = sel.value;
+    var orig = sel.getAttribute('data-orig');
+    fetch('/todo/update_priority', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'record_id=' + encodeURIComponent(recordId) + '&priority=' + encodeURIComponent(newPriority)
+    }).then(function(r){ return r.json(); }).then(function(d){
+        if (d.success) {
+            sel.setAttribute('data-orig', newPriority);
+            sel.style.background = '';
+            var item = sel.closest('.todo-item-day[data-priority]');
+            if (item) {
+                item.setAttribute('data-priority', newPriority);
+                reorderTimeSlot(item.closest('.time-content'));
+            }
+        } else {
+            alert('Could not save priority: ' + (d.error || 'unknown'));
+            sel.value = orig;
+        }
+    }).catch(function(e){
+        alert('Error saving priority: ' + e);
+        sel.value = orig;
+    });
+}
+
+function reorderTimeSlot(slot) {
+    if (!slot) return;
+    var items = Array.from(slot.querySelectorAll('.todo-item-day[data-priority]'));
+    items.sort(function(a, b){
+        return parseInt(a.getAttribute('data-priority') || 99) - parseInt(b.getAttribute('data-priority') || 99);
+    });
+    var addBtn = slot.querySelector('.add-todo-inline');
+    items.forEach(function(item){ slot.insertBefore(item, addBtn || null); });
+}
+
+function applyDayFilters() {
+    var siteCbs  = document.querySelectorAll('.day-site-cb');
+    var checkedSites = new Set(Array.from(document.querySelectorAll('.day-site-cb:checked')).map(function(cb){ return cb.value; }));
+    var siteFiltered = siteCbs.length > 0 && checkedSites.size < siteCbs.length;
+
+    document.querySelectorAll('.day-schedule-grid .todo-item-day').forEach(function(item) {
+        var itemSite = item.getAttribute('data-site') || '';
+        var show = !siteFiltered || checkedSites.has(itemSite);
+        item.style.display = show ? '' : 'none';
+    });
+    _updateDaySiteSummary();
+}
+
+function clearDayFilters() {
+    document.querySelectorAll('.day-site-cb').forEach(function(cb){ cb.checked = true; });
+    applyDayFilters();
+}
+
+function _updateDaySiteSummary() {
+    var sumEl = document.getElementById('day-site-summary');
+    if (!sumEl) return;
+    var all     = document.querySelectorAll('.day-site-cb');
+    var checked = document.querySelectorAll('.day-site-cb:checked');
+    sumEl.textContent = (all.length === checked.length)
+        ? 'Site: All \u25be'
+        : 'Site: ' + Array.from(checked).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
+}
+
 // Position todo popups on hover — runs once per include; DOMContentLoaded used for standalone, immediate for component
 (function setupPopups() {
     function attachPopupListeners() {
@@ -509,6 +574,24 @@
     END;
 %]
 
+[%# ── Site filter bar (CSC only, hidden in week column include mode) ── %]
+[% IF !include_mode && (is_csc || ap_all_sitenames.size) && ap_all_sitenames.size > 1 %]
+<div id="day-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--bg-secondary,#f8f9fa);border:1px solid var(--border-color,#ddd);border-radius:6px;padding:5px 10px;margin-bottom:10px;">
+    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+        <summary id="day-site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color,#ddd);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color,#fff);color:var(--text-color,#333);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+        <div style="position:absolute;z-index:500;background:var(--bg-color,#fff);border:1px solid var(--border-color,#ddd);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+            [% FOREACH sname IN ap_all_sitenames %]
+            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                <input type="checkbox" class="day-site-cb" value="[% sname %]" checked onchange="applyDayFilters()">
+                [% sname %]
+            </label>
+            [% END %]
+        </div>
+    </details>
+    <a href="#" onclick="clearDayFilters();return false;" style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ All</a>
+</div>
+[% END %]
+
 <details class="priority-container today-container" open>
     <summary class="priority-header">
         <span>Today Schedule ([% date %])</span>
@@ -524,45 +607,46 @@
                 <div class="time-content" data-date="[% date %]" data-hour="[% display_hour %]">
                     [% IF time_slots.$display_hour %]
                         [% FOREACH todo IN time_slots.$display_hour %]
-                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]">
-                                <div style="display: flex; align-items: flex-start; gap: 5px;">
-                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
-                                    <div style="flex: 1;">
-                                        <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
-                                
-                                <div class="todo-details todo-details-shared">
-                                    <span class="todo-status todo-status-shared status-[% todo.status %]">
-                                        [% IF todo.status == 1 %] New [% ELSIF todo.status == 2 %] In Progress [% ELSIF todo.status == 3 %] Completed [% ELSE %] Unknown [% END %]
-                                    </span>
-                                    
-                                    [% IF todo.project_id %]<span>📁 [% proj_name_map.${todo.project_id} || todo.project_id %]</span>[% END %]
-                                    [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
-                                    <span>Priority: [% todo.priority %]</span>
-                                    
-                                    [% IF todo.time_of_day %]
-                                        <span class="time-duration time-duration-shared">
-                                            [% todo.time_of_day.substr(0, 5) %][% IF todo.end_time %] - [% todo.end_time %][% END %]
-                                        </span>
+                            [% SET _tp = todo.priority || 9 %]
+                            [% SET _ts = todo.sitename || '' %]
+                            <div class="todo-item-day todo-item-shared priority-[% _tp %]"
+                                 data-todo-id="[% todo.record_id %]"
+                                 data-priority="[% _tp %]"
+                                 data-site="[% _ts %]"
+                                 style="display:table;width:100%;table-layout:fixed;padding:6px 8px;margin-bottom:4px;border-radius:4px;box-sizing:border-box;background:[% IF todo.status == 2 %]color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff))[% ELSE %]var(--bg-color,#fff)[% END %];border:1px solid var(--border-color,#ddd);">
+                                <div style="display:table-cell;width:20px;vertical-align:middle;padding-right:4px;">
+                                    <span class="drag-handle" title="Drag to reschedule" style="cursor:grab;color:var(--text-muted-color,#999);font-size:1em;user-select:none;">⋮⋮</span>
+                                </div>
+                                <div style="display:table-cell;width:58px;vertical-align:middle;padding-right:6px;">
+                                    <select data-record-id="[% todo.record_id %]" data-orig="[% _tp %]"
+                                            onchange="savePriority(this)"
+                                            style="font-size:0.72em;font-weight:bold;padding:1px 3px;border-radius:3px;border:1px solid var(--border-color,#ddd);background:[% IF _tp <= 2 %]var(--danger-color,#dc3545);color:#fff[% ELSIF _tp <= 4 %]#fd7e14;color:#fff[% ELSIF _tp <= 6 %]#ffc107;color:#333[% ELSE %]var(--secondary-color,#6c757d);color:#fff[% END %];cursor:pointer;width:100%;">
+                                        [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]
+                                        <option value="[% pv %]" [% IF pv == _tp %]selected[% END %]>P[% pv %]</option>
+                                        [% END %]
+                                    </select>
+                                </div>
+                                <div style="display:table-cell;vertical-align:middle;">
+                                    <div style="font-weight:bold;font-size:0.9em;color:var(--text-color,#333);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="[% todo.subject | html %]">
+                                        [% todo.subject %]
+                                    </div>
+                                    [% IF todo.due_date || todo.project_id %]
+                                    <div style="font-size:0.75em;color:var(--text-muted-color,#888);margin-top:1px;">
+                                        [% IF todo.project_id && proj_name_map.${todo.project_id} %]<span>📁 [% proj_name_map.${todo.project_id} %]</span>[% END %]
+                                        [% IF todo.due_date %]<span style="margin-left:6px;">📅 [% todo.due_date %]</span>[% END %]
+                                    </div>
                                     [% END %]
                                 </div>
-                                
-                                        <div class="todo-actions todo-actions-shared">
-                                            <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                                <input type="hidden" name="return_to" value="">
-                                                <button type="submit" class="btn">Details</button>
-                                            </form>
-                                            <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                                <button type="submit" class="btn">Edit</button>
-                                            </form>
-                                            <form action="/log/log_form" method="GET" style="display: inline;">
-                                                <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                                                <button type="submit" class="btn btn-log">Log</button>
-                                            </form>
-                                        </div>
-                                    </div>
+                                <div style="display:table-cell;width:1%;white-space:nowrap;vertical-align:middle;padding-left:8px;text-align:right;">
+                                    [% IF is_csc && _ts && _ts != 'CSC' %]
+                                    <span style="display:inline-block;font-size:0.68em;font-weight:bold;padding:1px 5px;border-radius:3px;background:var(--primary-color,#4CAF50);color:#fff;margin-right:4px;">[% _ts %]</span>
+                                    [% END %]
+                                    <a href="/todo/details?record_id=[% todo.record_id %]"
+                                       style="display:inline-block;font-size:0.75em;padding:2px 7px;border:1px solid var(--primary-color,#4CAF50);border-radius:3px;text-decoration:none;color:var(--primary-color,#4CAF50);margin-right:3px;">View</a>
+                                    <a href="/log/log_form?todo_record_id=[% todo.record_id %]"
+                                       style="display:inline-block;font-size:0.75em;padding:2px 7px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;">Log</a>
                                 </div>
-                                
+
                                 <!-- Popup on hover -->
                                 <div class="todo-popup">
                                     <div class="popup-subject">[% todo.subject %]</div>
@@ -573,15 +657,14 @@
                                         [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
                                         [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
                                         [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
-                                        [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
-                                        <div><strong>Priority:</strong> [% todo.priority %]</div>
-                                        <div><strong>Status:</strong> 
+                                        <div><strong>Priority:</strong> [% _tp %]</div>
+                                        <div><strong>Status:</strong>
                                             [% IF todo.status == 1 %]New
                                             [% ELSIF todo.status == 2 %]In Progress
                                             [% ELSIF todo.status == 3 %]Completed
                                             [% ELSE %]Unknown[% END %]
                                         </div>
-                                        [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
+                                        [% IF _ts %]<div><strong>Site:</strong> [% _ts %]</div>[% END %]
                                         [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
                                     </div>
                                 </div>
