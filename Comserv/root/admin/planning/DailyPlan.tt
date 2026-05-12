@@ -929,7 +929,7 @@
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
-            'planningsystem-59ae'                      => 4001,
+            'planning-system-continue-from-pl-bdac'    => 4023,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
             'new-task-9cf1'                            => 4003,
@@ -953,13 +953,12 @@
             'inventory-system-104a'                    => 4021,
             '3dprinting-use-this-as-the-branc-41f3'    => 4030,
             'developer-time-logging-points-ba-542a'    => 4022,
-            'planning-system-continue-from-pl-bdac'    => 4023,
         } %]
 
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
             { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r' },
-            { name => 'planningsystem-59ae',                    port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planningsystem-59ae/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'planning-system-continue-from-pl-bdac',  port => 4023, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4023 -r' },
             { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4010 -r' },
             { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4002 -r' },
             { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
@@ -983,7 +982,6 @@
             { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4021 -r' },
             { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4030 -r' },
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4022 -r' },
-            { name => 'planning-system-continue-from-pl-bdac',  port => 4023, label => 'PlanningSystemCont',   url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4023 -r' },
         ] %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
