@@ -52,9 +52,9 @@
            # Skip completed todos everywhere in this view
            NEXT IF todo.status == 3;
            
-           IF todo.due_date AND todo.due_date < date;
+           IF todo.due_date AND todo.due_date lt date;
                temp_overdue_todos.push(todo);
-           ELSIF (todo.due_date AND todo.due_date == date) OR (todo.start_date AND todo.start_date == date);
+           ELSIF (todo.due_date AND todo.due_date eq date) OR (todo.start_date AND todo.start_date eq date);
                # Strict date match: only include if it explicitly belongs to the viewed date
                temp_today_todos.push(todo);
            # Also include todos without dates (they're active tasks)
