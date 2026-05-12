@@ -48,17 +48,16 @@
        SET temp_today_todos = [];
        SET temp_overdue_todos = [];
        
+       SET _date_num = date.replace('-', '');
        FOREACH todo IN todos;
-           # Skip completed todos everywhere in this view
            NEXT IF todo.status == 3;
-           
-           IF todo.start_date AND todo.start_date lt date;
+           SET _start = todo.start_date ? todo.start_date.substr(0, 10).replace('-', '') : 0;
+           SET _due   = todo.due_date   ? todo.due_date.substr(0, 10).replace('-', '')   : 0;
+           IF _start AND _start < _date_num;
                temp_overdue_todos.push(todo);
-           ELSIF (todo.start_date AND todo.start_date eq date) OR (!todo.start_date AND todo.due_date AND todo.due_date eq date);
-               # start_date is the calendar anchor; fall back to due_date only when no start_date
+           ELSIF (_start AND _start == _date_num) OR (!_start AND _due AND _due == _date_num);
                temp_today_todos.push(todo);
-           # Also include todos without dates (they're active tasks)
-           ELSIF !todo.start_date AND !todo.due_date;
+           ELSIF !_start AND !_due;
                temp_today_todos.push(todo);
            END;
        END;
