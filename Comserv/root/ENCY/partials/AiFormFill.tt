@@ -105,13 +105,13 @@
                 var grokProvider = null;
                 data.providers.forEach(function(p) { if (p.service === 'grok') grokProvider = p; });
                 if (!grokProvider) return;
+                var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
                 var FALLBACK = [
-                    { val: 'grok-4.3|grok',               label: 'Grok 4.3' },
-                    { val: 'grok-4.20-non-reasoning|grok', label: 'Grok 4.20 Fast' }
+                    { val: 'grok-4.3|grok', label: 'Grok 4.3' }
                 ];
                 var models = (grokProvider.models && grokProvider.models.length > 0)
                     ? grokProvider.models
-                        .filter(function(m) { return m.id && !m.id.match(/imagine|video/i); })
+                        .filter(function(m) { return m.id && !DEAD_MODELS[m.id] && !m.id.match(/imagine|video/i); })
                         .map(function(m) {
                             var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
                             return { val: m.id + '|grok', label: lbl + ' (xAI)' };
@@ -135,6 +135,23 @@
         if (pd && pd.getAttribute('data-auto-search') === '1') {
             var ws = document.getElementById('ency-ai-web-search');
             if (ws) ws.checked = true;
+        }
+        var wsCheckbox = document.getElementById('ency-ai-web-search');
+        if (wsCheckbox) {
+            var wsLabel = wsCheckbox.closest('label') || wsCheckbox.parentElement;
+            function updateWsStyle() {
+                if (wsCheckbox.checked) {
+                    wsLabel.style.color = '#1a7a1a';
+                    wsLabel.style.fontWeight = 'bold';
+                    wsLabel.title = 'Web search ACTIVE — Grok will search the web for current data';
+                } else {
+                    wsLabel.style.color = '';
+                    wsLabel.style.fontWeight = '';
+                    wsLabel.title = 'Enables Grok live web search for current data (may be unavailable on some plans)';
+                }
+            }
+            wsCheckbox.addEventListener('change', updateWsStyle);
+            updateWsStyle();
         }
     })();
     // ────────────────────────────────────────────────────────────────────────
@@ -768,6 +785,28 @@
         alternate_terms:       'Other names or spellings for this glossary term.',
         etymology:             'Origin of the word — Greek, Latin, or other language roots.',
         distribution:          'Geographic regions where this organism is naturally found or where this disease occurs.',
+        ident_character:       'Physical field identification: leaf shape, bark texture, height, habitat, distinctive features that help identify the plant in the wild.',
+        stem:                  'Stem description: height, shape (round/square/winged), texture (hairy/smooth/waxy), color, hollow or solid, branching pattern.',
+        leaves:                'Leaf description: shape, size, margin (toothed/smooth/lobed), arrangement (alternate/opposite/whorled), color, texture, petiole length.',
+        flowers:               'Flower description: color, shape, size, petal count, arrangement (solitary/cluster/spike), bloom season.',
+        fruit:                 'Fruit and seed description: type (berry/capsule/drupe/achene), size, color at maturity, seed count, ripening season.',
+        root:                  'Root description: type (taproot/fibrous/rhizome/bulb), color, odor, texture, typical depth.',
+        taste:                 'Taste of the plant parts used medicinally: bitter, sweet, astringent, pungent, salty, acrid, bland, or a combination.',
+        odour:                 'Distinctive smell of the herb: aromatic, fetid, musty, pleasant, faint, spicy — describe clearly.',
+        image:                 'Leave blank — images are linked via the organism/NCBI taxonomy system, not entered manually.',
+        dosage:                'Typical dosage ranges from traditional and clinical sources: e.g. tincture 2–4 ml 3x/day; tea 1 cup 2x/day; capsule 500 mg 2x/day. Include form.',
+        administration:        'Method and form of use: oral, topical, inhalation, poultice, suppository, enema. Include specific preparation instructions.',
+        preparation:           'How to prepare the herb: infusion (steep time/temperature), decoction (simmer time), tincture ratio (e.g. 1:5 in 60% alcohol), poultice method.',
+        formulas:              'Known traditional formulas that include this herb — formula names or numbers if known; semicolon-separated.',
+        history:               'Historical and ethnobotanical use: indigenous traditions, first documented use, cultural significance, how use has evolved.',
+        non_med:               'Non-medical uses: food ingredient, cosmetic, industrial (fiber, dye, construction material), ecological (habitat, erosion control).',
+        culinary:              'Culinary uses: flavor profile, how used in cooking (fresh, dried, as spice), regional cuisines, traditional dishes.',
+        cultivation:           'How the plant is cultivated: preferred soil, sun/shade, water needs, propagation method, companion planting, harvest cycle.',
+        harvest:               'When and how to harvest: season, plant age, time of day, part-specific timing (root in autumn, flower at opening), drying/processing method.',
+        chinese:               'TCM (Traditional Chinese Medicine) name and pinyin romanization, classical functions, organ meridians, classical formula names.',
+        homiopathic:           'Homeopathic preparation: common potencies (6C, 30C, 200C), classical indications, keynote symptoms, constitution type.',
+        vetrinary:             'Veterinary uses — Allopathic: ...; Herbal: ...; TCM: ... Include species commonly treated and dosage notes.',
+        reference:             'Key references for this herb — author, title, year, publisher or journal. Semicolon-separated. Page numbers welcome.',
     };
 
     function encyAddFieldTooltips() {
@@ -906,9 +945,30 @@
             .then(function(d) {
                 if (btn) btn.disabled = false;
                 if (d.success) {
-                    var count = d.count || (d.models && d.models.length) || '?';
-                    statusEl.textContent = '\u2713 Synced ' + count + ' models. Reloading dropdown\u2026';
-                    loadEncyModelOptions();
+                    var syncedModels = d.models || [];
+                    var sel = document.getElementById('ency-ai-model-sel');
+                    var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
+                    var added = 0;
+                    if (sel && syncedModels.length > 0) {
+                        var current = sel.value;
+                        sel.innerHTML = '';
+                        syncedModels.forEach(function(m) {
+                            if (!m.id || DEAD_MODELS[m.id] || m.id.match(/imagine|video/i)) return;
+                            var lbl = m.id.replace(/-/g, ' ').replace(/\b\w/g, function(c) { return c.toUpperCase(); });
+                            var opt = document.createElement('option');
+                            opt.value = m.id + '|grok';
+                            opt.textContent = lbl + ' (xAI)';
+                            if (m.id + '|grok' === current || added === 0) opt.selected = true;
+                            sel.appendChild(opt);
+                            added++;
+                        });
+                    }
+                    if (added > 0) {
+                        statusEl.textContent = '\u2713 Synced \u2014 ' + added + ' model' + (added === 1 ? '' : 's') + ' in dropdown.';
+                    } else {
+                        statusEl.textContent = '\u2713 Synced (no new models found \u2014 using grok-4.3)';
+                        loadEncyModelOptions();
+                    }
                 } else {
                     statusEl.textContent = 'Sync failed: ' + (d.error || 'unknown error');
                 }
