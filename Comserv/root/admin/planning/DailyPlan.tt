@@ -841,6 +841,7 @@
                 <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
                     <h4 style="margin-top: 0; color: #856404;">⚠️ Daily Schedule Not Available</h4>
                     <p>The daily time-slot view is not currently available.</p>
+                    <pre style="font-size:0.8em;background:#fff8e1;padding:8px;border-radius:3px;overflow:auto;">[% error.type %]: [% error.info %]</pre>
                 </div>
             [% END %]
         </div>
