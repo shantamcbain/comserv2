@@ -584,11 +584,14 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $current_status   = $self->normalize_status($todo->get_column('status'));
     my $current_priority = $todo->get_column('priority') // 5;
 
+    my $edit_is_csc = (uc($c->session->{SiteName} || 'CSC') eq 'CSC') ? 1 : 0;
     my $edit_sites = [];
-    eval {
-        my $site_model = $c->model('Site');
-        $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
-    };
+    if ($edit_is_csc) {
+        eval {
+            my $site_model = $c->model('Site');
+            $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
+        };
+    }
 
     $c->stash(
         record           => $todo,
@@ -601,6 +604,7 @@ sub edit :Path('/todo/edit') :Args(1) {
         build_status     => \%status_options,
         return_to        => $return_to,
         sites            => $edit_sites,
+        is_csc           => $edit_is_csc,
         form_data        => { sitename => $todo->get_column('sitename') },
         template         => 'todo/edit.tt'
     );
@@ -1095,6 +1099,46 @@ sub update_time :Path('/todo/update_time') :Args(0) {
             new_time => $time_of_day
         }
     );
+    $c->forward('View::JSON');
+}
+
+=head2 update_priority
+
+POST /todo/update_priority - Update priority for a todo item (AJAX endpoint for inline priority select)
+
+=cut
+
+sub update_priority :Path('/todo/update_priority') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id = $c->request->params->{record_id};
+    my $priority  = $c->request->params->{priority};
+
+    unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
+        $c->stash(json => { success => 0, error => 'Missing or invalid record_id/priority' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    eval { $todo->update({ priority => $priority }) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_priority',
+            "Failed to update priority for todo $record_id: $@");
+        $c->stash(json => { success => 0, error => "Failed to update: $@" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_priority',
+        "Updated priority for todo $record_id to $priority");
+    $c->stash(json => { success => 1, todo_id => $record_id, new_priority => $priority });
     $c->forward('View::JSON');
 }
 
