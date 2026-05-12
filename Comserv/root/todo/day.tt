@@ -6,7 +6,7 @@
 
 [% # Context-aware detection: Adjust behavior if included in DailyPlan or Planning documentation
    # OR when included from week.tt/month.tt (include_mode parameter)
-   IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan'));
+   IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan')) OR (c.req.path AND c.req.path.match('planning/daily'));
       is_daily_plan = 1;
       base_url = '/Documentation/DailyPlan';
       planning_hash = '#planning';
@@ -52,13 +52,13 @@
            # Skip completed todos everywhere in this view
            NEXT IF todo.status == 3;
            
-           IF todo.due_date AND todo.due_date lt date;
+           IF todo.start_date AND todo.start_date lt date;
                temp_overdue_todos.push(todo);
-           ELSIF (todo.due_date AND todo.due_date eq date) OR (todo.start_date AND todo.start_date eq date);
-               # Strict date match: only include if it explicitly belongs to the viewed date
+           ELSIF (todo.start_date AND todo.start_date eq date) OR (!todo.start_date AND todo.due_date AND todo.due_date eq date);
+               # start_date is the calendar anchor; fall back to due_date only when no start_date
                temp_today_todos.push(todo);
            # Also include todos without dates (they're active tasks)
-           ELSIF !todo.due_date AND !todo.start_date;
+           ELSIF !todo.start_date AND !todo.due_date;
                temp_today_todos.push(todo);
            END;
        END;
