@@ -157,8 +157,7 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
-                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4.3', provider => 'grok', label => 'Grok 4.3 (xAI)' };
                 }
             }
         } catch {
@@ -764,18 +763,25 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4.3' } qw(
                 grok-code-fast-1
                 grok-4-fast-non-reasoning
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-3-mini
+                grok-4.20-non-reasoning
+                grok-4.20-multi-agent-0309
+                grok-4.20-multi-agent
+                grok-4.20-0309-non-reasoning
+                grok-4.20-0309-reasoning
             );
             my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
+            $grok->model('grok-4.3');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -812,12 +818,12 @@ sub generate :Local :Args(0) {
                     if ($key_obj) {
                         my $meta       = $key_obj->get_metadata() || {};
                         my $deprecated = $meta->{deprecated_models} || {};
-                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} } && !$GROK_DEAD{ $meta->{last_working_model} }) {
                             $grok->model($meta->{last_working_model});
                         } else {
                             my $synced = $meta->{available_models} || [];
                             my ($first) = grep {
-                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} } && !$GROK_DEAD{ $_->{id} }
                             } @$synced;
                             $grok->model($first->{id}) if $first && $first->{id};
                         }
@@ -858,11 +864,22 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
+                # If web search caused the failure (non-410 error), retry without it
+                if ($use_search && $error !~ /410|404|no longer available|not found/) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "Web search failed ($error); retrying without search");
+                    $response = $grok->chat(
+                        messages   => \@grok_messages,
+                        use_search => 0,
+                    );
+                    $error = $grok->last_error || $error unless $response;
+                }
                 # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
-                if ($error =~ /410|404|no longer available|not found/) {
+                if (!$response && $error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
                     my $discovery_err = '';
+                    my @candidates;
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -873,31 +890,17 @@ sub generate :Local :Args(0) {
                         my $resp = $ua->request($req);
                         if ($resp->is_success) {
                             my $mdata = eval { decode_json($resp->content) } || {};
-                            my @live  = grep {
+                            @candidates = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer newer models: use reverse-alphabetical sort as heuristic
-                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
-                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
-                            if ($best) {
-                                $fallback = $best->{id};
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta       = $key_obj->get_metadata() || {};
-                                    my $deprecated = $meta->{deprecated_models} || {};
-                                    $deprecated->{$failed_model} = time();
-                                    $meta->{deprecated_models} = $deprecated;
-                                    $meta->{available_models}   = [ map { { id => $_->{id} } } @live ];
-                                    $meta->{models_synced_at}   = time();
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            } else {
-                                $discovery_err = "xAI returned model list but no usable models found";
+                            unless (@candidates) {
+                                $discovery_err = "xAI returned model list but no usable candidates found";
                             }
                         } else {
                             $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
@@ -908,28 +911,48 @@ sub generate :Local :Args(0) {
                         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                             'generate', "410 fallback failed — $discovery_err");
                     }
-                    if ($fallback) {
+                    my %tried = ($failed_model => 1);
+                    for my $candidate (@candidates) {
+                        next if $tried{$candidate->{id}};
+                        $tried{$candidate->{id}} = 1;
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                            'generate', "Model $failed_model unavailable; live-discovered $fallback");
-                        $grok->model($fallback);
+                            'generate', "Model $failed_model unavailable; trying $candidate->{id}");
+                        $grok->model($candidate->{id});
                         $response = $grok->chat(
                             messages   => \@grok_messages,
                             use_search => $use_search,
                         );
                         if ($response) {
-                            eval {
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta = $key_obj->get_metadata() || {};
-                                    $meta->{last_working_model} = $fallback;
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            };
+                            $fallback = $candidate->{id};
+                            last;
                         }
+                        my $candidate_err = $grok->last_error || '';
+                        last unless $candidate_err =~ /410|404|no longer available|not found/;
+                        $GROK_DEAD{$candidate->{id}} = 1;
+                    }
+                    if ($fallback) {
+                        eval {
+                            my $schema  = $c->model('DBEncy')->schema;
+                            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                { service => 'grok', is_active => '1' }
+                            )->first;
+                            if ($key_obj) {
+                                my $meta       = $key_obj->get_metadata() || {};
+                                my $deprecated = $meta->{deprecated_models} || {};
+                                for my $dead_id (keys %tried) {
+                                    next if $dead_id eq $fallback;
+                                    $deprecated->{$dead_id} = time();
+                                }
+                                my @surviving = grep { !$deprecated->{$_->{id}} && !$GROK_DEAD{$_->{id}} }
+                                                @candidates;
+                                $meta->{deprecated_models} = $deprecated;
+                                $meta->{available_models}  = [ map { { id => $_->{id} } } @surviving ];
+                                $meta->{models_synced_at}  = time();
+                                $meta->{last_working_model} = $fallback;
+                                $key_obj->set_metadata($meta);
+                                eval { $key_obj->update };
+                            }
+                        };
                     }
                 }
                 unless ($response) {
@@ -2317,18 +2340,25 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.3' } qw(
                 grok-code-fast-1
                 grok-4-fast-non-reasoning
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-3-mini
+                grok-4.20-non-reasoning
+                grok-4.20-multi-agent-0309
+                grok-4.20-multi-agent
+                grok-4.20-0309-non-reasoning
+                grok-4.20-0309-reasoning
             );
             my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
+            $grok->model('grok-4.3');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2351,11 +2381,20 @@ sub chat :Local :Args(0) {
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
+                # If web search caused the failure (non-410 error), retry without it
+                if ($use_search_chat && $error !~ /410|404|no longer available|not found/) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'chat', "Web search failed ($error); retrying without search");
+                    push @chat_trace, "\u26a0\ufe0f Web search unavailable ($error); retrying without search";
+                    $response = $grok->chat(messages => \@final_messages, use_search => 0);
+                    $error = $grok->last_error || $error unless $response;
+                }
                 # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
-                if ($error =~ /410|404|no longer available|not found/) {
+                if (!$response && $error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
                     my $discovery_err = '';
+                    my @candidates;
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -2366,26 +2405,17 @@ sub chat :Local :Args(0) {
                         my $resp = $ua->request($req);
                         if ($resp->is_success) {
                             my $mdata = eval { decode_json($resp->content) } || {};
-                            my @live  = grep {
+                            @candidates = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
-                            if ($best) {
-                                $fallback = $best->{id};
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta = $key_obj->get_metadata() || {};
-                                    $meta->{available_models} = [ map { { id => $_->{id} } } @live ];
-                                    $meta->{models_synced_at} = time();
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            } else {
-                                $discovery_err = "xAI returned model list but no usable models found";
+                            unless (@candidates) {
+                                $discovery_err = "xAI returned model list but no usable candidates found";
                             }
                         } else {
                             $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
@@ -2396,12 +2426,46 @@ sub chat :Local :Args(0) {
                         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                             'chat', "410 fallback failed — $discovery_err");
                     }
-                    if ($fallback) {
+                    my %tried_chat = ($failed_model => 1);
+                    for my $candidate (@candidates) {
+                        next if $tried_chat{$candidate->{id}};
+                        $tried_chat{$candidate->{id}} = 1;
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                            'chat', "Model $failed_model unavailable; live-discovered $fallback");
-                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); auto-switched to $fallback";
-                        $grok->model($fallback);
+                            'chat', "Model $failed_model unavailable; trying $candidate->{id}");
+                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); trying $candidate->{id}";
+                        $grok->model($candidate->{id});
                         $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+                        if ($response) {
+                            $fallback = $candidate->{id};
+                            last;
+                        }
+                        my $candidate_err = $grok->last_error || '';
+                        last unless $candidate_err =~ /410|404|no longer available|not found/;
+                        $GROK_DEAD_CHAT{$candidate->{id}} = 1;
+                    }
+                    if ($fallback) {
+                        eval {
+                            my $schema  = $c->model('DBEncy')->schema;
+                            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                { service => 'grok', is_active => '1' }
+                            )->first;
+                            if ($key_obj) {
+                                my $meta       = $key_obj->get_metadata() || {};
+                                my $deprecated = $meta->{deprecated_models} || {};
+                                for my $dead_id (keys %tried_chat) {
+                                    next if $dead_id eq $fallback;
+                                    $deprecated->{$dead_id} = time();
+                                }
+                                my @surviving = grep { !$deprecated->{$_->{id}} && !$GROK_DEAD_CHAT{$_->{id}} }
+                                                @candidates;
+                                $meta->{deprecated_models}  = $deprecated;
+                                $meta->{available_models}   = [ map { { id => $_->{id} } } @surviving ];
+                                $meta->{models_synced_at}   = time();
+                                $meta->{last_working_model} = $fallback;
+                                $key_obj->set_metadata($meta);
+                                eval { $key_obj->update };
+                            }
+                        };
                     }
                 }
                 unless ($response) {
@@ -6547,7 +6611,6 @@ sub get_user_providers :Local :Args(0) {
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
                         { id => 'grok-4.3' },
-                        { id => 'grok-4.20-non-reasoning' },
                     ];
                 }
 
@@ -6726,16 +6789,37 @@ sub sync_models :Local :Args(0) {
         }
 
         # Extract model list (OpenAI-compatible format: data[].id)
+        my %SYNC_DEAD = map { $_ => 1 } qw(
+            grok-code-fast-1
+            grok-4-fast-non-reasoning
+            grok-4-1-fast-non-reasoning
+            grok-4-0709
+            grok-3
+            grok-3-mini
+            grok-4-fast-reasoning
+            grok-4-1-fast-reasoning
+            grok-4.20-non-reasoning
+            grok-4.20-multi-agent-0309
+            grok-4.20-multi-agent
+            grok-4.20-0309-non-reasoning
+            grok-4.20-0309-reasoning
+        );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
             foreach my $m (@{$data->{data}}) {
                 next unless $m->{id};
+                next if $SYNC_DEAD{$m->{id}};
+                next if $m->{id} =~ /imagine|video/i;
                 push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
             }
         }
 
-        # Sort models alphabetically
-        @models = sort { $a->{id} cmp $b->{id} } @models;
+        # Sort models: numeric-version first (grok-4, grok-3...) then alphabetic, reverse within groups
+        @models = sort {
+            my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            $bn <=> $an || $b->{id} cmp $a->{id}
+        } @models;
 
         # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
@@ -6745,7 +6829,7 @@ sub sync_models :Local :Args(0) {
         $key_obj->update;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+            'sync_models', "Synced " . scalar(@models) . " models for service $service: " . join(', ', map { $_->{id} } @models));
 
         $c->response->body(encode_json({
             success => JSON::true,
