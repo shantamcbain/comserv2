@@ -4,6 +4,11 @@ use namespace::autoclean;
 use JSON;
 use Data::Dumper;
 use Try::Tiny;
+use File::Slurp qw(read_file);
+use LWP::UserAgent;
+use HTTP::Request;
+use MIME::Base64 qw(encode_base64);
+use Catalyst::Utils;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 
@@ -724,6 +729,72 @@ sub vm_status :Path('status') :Args(1) {
         );
     }
     
+    $c->forward('View::JSON');
+}
+
+sub available_ips :Path('available_ips') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $subnet = $c->req->param('subnet') || '192.168.1';
+
+    my %used_ips;
+
+    my $net_file = Catalyst::Utils::home('Comserv') . '/config/network/network_map.json';
+    if (-f $net_file) {
+        try {
+            my $data = decode_json(read_file($net_file));
+            for my $dev (values %{ $data->{devices} || {} }) {
+                $used_ips{ $dev->{ip} } = $dev->{type} || 'device'
+                    if $dev->{ip} && $dev->{ip} =~ /^\Q$subnet\E\./;
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'available_ips',
+                "Could not read network_map.json: $_");
+        };
+    }
+
+    my $opnsense_cfg_file = Catalyst::Utils::home('Comserv') . '/config/infrastructure/opnsense.json';
+    if (-f $opnsense_cfg_file) {
+        try {
+            my $cfg = decode_json(read_file($opnsense_cfg_file));
+            if ($cfg->{host} && $cfg->{key} && $cfg->{secret}) {
+                my $base = "https://$cfg->{host}:${\($cfg->{port}||443)}/api";
+                my $auth = 'Basic ' . encode_base64("$cfg->{key}:$cfg->{secret}", '');
+                my $ua   = LWP::UserAgent->new(timeout => 5);
+                $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+                my $req = HTTP::Request->new(GET => "$base/dhcpv4/leases/searchLease");
+                $req->header(Authorization => $auth);
+                my $res = $ua->request($req);
+                if ($res->is_success) {
+                    my $leases = decode_json($res->decoded_content);
+                    for my $lease (@{ $leases->{rows} || [] }) {
+                        my $ip = $lease->{address} || $lease->{ip} || '';
+                        $used_ips{$ip} = 'DHCP lease (' . ($lease->{hostname} || 'unknown') . ')'
+                            if $ip && $ip =~ /^\Q$subnet\E\./;
+                    }
+                }
+            }
+        } catch {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'available_ips',
+                "OPNsense DHCP query failed: $_");
+        };
+    }
+
+    my @available;
+    for my $last (10..254) {
+        my $ip = "$subnet.$last";
+        push @available, $ip unless $used_ips{$ip};
+        last if @available >= 20;
+    }
+
+    my @used_list = map { { ip => $_, reason => $used_ips{$_} } }
+                    sort keys %used_ips;
+
+    $c->stash->{json} = {
+        subnet    => "$subnet.0/24",
+        available => \@available,
+        used      => \@used_list,
+    };
     $c->forward('View::JSON');
 }
 
