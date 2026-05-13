@@ -258,7 +258,7 @@ document.addEventListener('keydown', function(e) {
 [% SET _fday_num = first_day_of_week.replace('-', '') %]
 [% FOREACH todo IN todos %]
     [% SET todo_date     = todo.start_date || todo.due_date %]
-    [% SET todo_date_str = todo_date ? todo_date.substr(0, 10) : '' %]
+    [% SET todo_date_str = todo_date ? (todo_date _ '').substr(0, 10) : '' %]
     [% IF todo_date_str %]
         [% IF todo_date_str.replace('-', '') < _fday_num AND todo.status != 3 %]
             [% all_overdue_todos.push(todo) %]
