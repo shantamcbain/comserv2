@@ -1,0 +1,180 @@
+[% WRAPPER 'wrapper.tt' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.transfer-form { max-width: 700px; }
+.transfer-form .form-group { margin-bottom: 1rem; }
+.transfer-form label { display: block; font-weight: bold; margin-bottom: 0.25rem; }
+.transfer-form select, .transfer-form input[type=text], .transfer-form input[type=date],
+.transfer-form input[type=number], .transfer-form textarea {
+    width: 100%; padding: 0.4rem 0.6rem; border: 1px solid var(--border-color,#ccc);
+    border-radius: 4px; font-size: 0.95rem; box-sizing: border-box;
+}
+.transfer-form .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.transfer-form .section-heading {
+    font-size: 1rem; font-weight: bold; margin: 1.5rem 0 0.5rem;
+    border-bottom: 1px solid var(--border-color,#ddd); padding-bottom: 0.25rem;
+}
+.transfer-type-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+.transfer-type-tabs label {
+    padding: 0.5rem 1rem; border: 2px solid var(--border-color,#ccc);
+    border-radius: 4px; cursor: pointer; font-weight: normal;
+}
+.transfer-type-tabs input[type=radio]:checked + label {
+    border-color: var(--accent-color,#4a90d9);
+    background: var(--accent-color,#4a90d9); color: white;
+}
+.transfer-type-tabs input[type=radio] { display: none; }
+.hint { font-size: 0.82rem; color: var(--text-muted,#666); margin-top: 0.2rem; }
+.btn-primary { padding: 0.6rem 1.5rem; background: var(--accent-color,#4a90d9);
+    color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+.btn-primary:hover { opacity: 0.9; }
+</style>
+
+<h1>Account Transfer / Direct Payment</h1>
+<p><a href="/Accounting">← Accounting</a> | <a href="/Accounting/gl">General Ledger</a></p>
+
+[% IF c.flash.error_msg %]
+  <div class="alert alert-danger">[% c.flash.error_msg %]</div>
+[% END %]
+
+<div class="transfer-form">
+
+  <p class="hint">
+    Use this form to record money moving between accounts — no invoice required.
+    Examples: Bank → PayPal top-up, PayPal → eNom prepaid, credit card payment, bank fee.
+  </p>
+
+  <form method="POST" action="/Accounting/transfer/create" id="transfer-form">
+
+    <div class="section-heading">Transaction Type</div>
+    <div class="transfer-type-tabs">
+      <input type="radio" name="entry_type" id="tt_transfer" value="transfer" checked>
+      <label for="tt_transfer">Account Transfer<br><small>Move money between accounts<br>(no expense)</small></label>
+
+      <input type="radio" name="entry_type" id="tt_prepaid" value="prepaid_topup">
+      <label for="tt_prepaid">Prepaid Top-Up<br><small>Fund a vendor prepaid balance<br>(eNom, HostGator…)</small></label>
+
+      <input type="radio" name="entry_type" id="tt_expense" value="direct_expense">
+      <label for="tt_expense">Direct Expense Payment<br><small>Expense already paid<br>(skips Accounts Payable)</small></label>
+
+      <input type="radio" name="entry_type" id="tt_ccpay" value="cc_payment">
+      <label for="tt_ccpay">Credit Card Payment<br><small>Pay down credit card balance<br>from bank/PayPal</small></label>
+    </div>
+
+    <div class="section-heading">From (source / credit side)</div>
+    <div class="hint" id="from-hint">Money leaves this account.</div>
+    <div class="form-group">
+      <label for="from_account_id">From Account <span style="color:red">*</span></label>
+      <select name="from_account_id" id="from_account_id" required>
+        <option value="">— select —</option>
+        <optgroup label="Assets (Bank / Payment Processors / Prepaid)">
+          [% FOREACH a IN asset_accounts %]
+            <option value="[% a.id %]">[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </optgroup>
+        <optgroup label="Liabilities (Credit Cards / AP)">
+          [% FOREACH a IN liability_accounts %]
+            <option value="[% a.id %]">[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="section-heading">To (destination / debit side)</div>
+    <div class="hint" id="to-hint">Money arrives in this account.</div>
+    <div class="form-group">
+      <label for="to_account_id">To Account <span style="color:red">*</span></label>
+      <select name="to_account_id" id="to_account_id" required>
+        <option value="">— select —</option>
+        <optgroup label="Assets (Bank / Payment Processors / Prepaid)">
+          [% FOREACH a IN asset_accounts %]
+            <option value="[% a.id %]">[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </optgroup>
+        <optgroup label="Liabilities (Credit Cards / AP)">
+          [% FOREACH a IN liability_accounts %]
+            <option value="[% a.id %]">[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </optgroup>
+        <optgroup label="Expenses (for Direct Expense Payment type)">
+          [% FOREACH a IN expense_accounts %]
+            <option value="[% a.id %]">[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </optgroup>
+      </select>
+    </div>
+
+    <div class="section-heading">Amount</div>
+    <div class="row2">
+      <div class="form-group">
+        <label for="amount">Amount <span style="color:red">*</span></label>
+        <input type="number" name="amount" id="amount" step="0.01" min="0.01" required placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label for="post_date">Date <span style="color:red">*</span></label>
+        <input type="date" name="post_date" id="post_date"
+               value="[% USE date; date.format(date.now, '%Y-%m-%d') %]" required>
+      </div>
+    </div>
+
+    <div class="section-heading">Optional: Fee / Convenience Charge</div>
+    <p class="hint">If a fee was charged (e.g. PayPal $1.50 convenience fee), enter it here.
+      It is debited from the same From account and posted to the selected fee expense account.</p>
+    <div class="row2">
+      <div class="form-group">
+        <label for="fee_amount">Fee Amount</label>
+        <input type="number" name="fee_amount" id="fee_amount" step="0.01" min="0" placeholder="0.00">
+      </div>
+      <div class="form-group">
+        <label for="fee_account_id">Fee Expense Account</label>
+        <select name="fee_account_id" id="fee_account_id">
+          <option value="">— none —</option>
+          [% FOREACH a IN expense_accounts %]
+            <option value="[% a.id %]"
+              [% IF a.accno == '6720' %]selected[% END %]
+            >[% a.accno %] — [% a.description %]</option>
+          [% END %]
+        </select>
+      </div>
+    </div>
+
+    <div class="section-heading">Reference & Notes</div>
+    <div class="row2">
+      <div class="form-group">
+        <label for="reference">Reference / Confirmation #</label>
+        <input type="text" name="reference" id="reference" placeholder="e.g. 7AV671777V5064122">
+      </div>
+      <div class="form-group">
+        <label for="notes">Description / Notes</label>
+        <input type="text" name="notes" id="notes"
+               placeholder="e.g. PayPal → eNom prepaid top-up May 2026">
+      </div>
+    </div>
+
+    <div style="margin-top: 1.5rem;">
+      <button type="submit" class="btn-primary">Record Transfer</button>
+      <a href="/Accounting" style="margin-left:1rem;">Cancel</a>
+    </div>
+  </form>
+</div>
+
+<script>
+(function() {
+    var hints = {
+        transfer:       { from: 'Source account (e.g. Bank, PayPal).', to: 'Destination account (e.g. PayPal, eNom Prepaid).', note: 'Pure transfer — no expense created.' },
+        prepaid_topup:  { from: 'Payment source (e.g. PayPal Account, Visa).', to: 'Vendor prepaid balance account (e.g. eNom Prepaid Balance).', note: 'Funds a vendor prepaid balance. Include convenience fee below if charged.' },
+        direct_expense: { from: 'Payment account (e.g. PayPal, Bank, Visa).', to: 'Expense account (e.g. 6600 Domain Renewals).', note: 'Records an expense that was already paid — skips Accounts Payable.' },
+        cc_payment:     { from: 'Source (e.g. Bank or PayPal Account).', to: 'Credit card liability account (e.g. 2300 Visa Payable).', note: 'Paying down a credit card balance reduces the liability.' },
+    };
+    document.querySelectorAll('input[name=entry_type]').forEach(function(r) {
+        r.addEventListener('change', function() {
+            var h = hints[this.value] || {};
+            document.getElementById('from-hint').textContent = h.from || '';
+            document.getElementById('to-hint').textContent = h.to || '';
+        });
+    });
+})();
+</script>
+
+[% END %]
