@@ -411,11 +411,26 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
             }
         }
     };
+    my ($retired, $updated) = (0, 0);
+    eval {
+        for my $old_accno (qw(1020 1021 1022 1023)) {
+            my $row = $schema->resultset('CoaAccount')->find({ accno => $old_accno });
+            if ($row && !$row->obsolete) {
+                $row->update({ obsolete => 1 });
+                $retired++;
+            }
+        }
+        my $p1029 = $schema->resultset('CoaAccount')->find({ accno => '1029' });
+        if ($p1029 && $p1029->description ne 'Prepaid Vendor Balances') {
+            $p1029->update({ description => 'Prepaid Vendor Balances', obsolete => 0 });
+            $updated++;
+        }
+    };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'seed_coa_merge', "Merge failed: $@");
         $c->flash->{error_msg} = "Merge failed: $@";
     } else {
-        $c->flash->{success_msg} = "Added $added new accounts, skipped $skipped existing.";
+        $c->flash->{success_msg} = "Added $added new accounts, skipped $skipped existing; retired $retired old prepaid accounts, updated $updated.";
     }
 
     $c->res->redirect($c->uri_for('/Accounting/coa'));
