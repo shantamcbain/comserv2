@@ -1,261 +1,242 @@
-[% PageVersion = 'mail/AdminDashboard.tt,v 0.01 2026/02/22 shanta Exp shanta ' %]
-[% IF c.session.debug_mode == 1 %]
- [% PageVersion %]
-[% END %]
+[% META
+   title = "Mail Admin Dashboard"
+   description = "Administrative hub for mail system and mailing lists"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "2.0"
+   last_updated = "2026-05-08"
+%]
+[% PageVersion = 'mail/AdminDashboard.tt,v 2.0 2026/05/08 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
-<h2>Mail Administration Dashboard</h2>
+<div class="app-container">
+
+<div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+    <div>
+        <h1>Mail Admin Dashboard</h1>
+        <nav aria-label="breadcrumb" style="font-size:0.9em;color:var(--text-muted-color);">
+            <a href="[% c.uri_for('/mail') %]">Mail</a> &rsaquo; Admin Dashboard
+        </nav>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ New Mailing List</a>
+        <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">&#9993; Send Mailout</a>
+        <a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">&#8592; Mail Home</a>
+    </div>
+</div>
 
 [% IF c.flash.error_msg %]
-    <p class="error">[% c.flash.error_msg %]</p>
+    <div class="alert alert-danger" style="margin-top:12px;">[% c.flash.error_msg | html %]</div>
 [% END %]
-
 [% IF c.flash.success_msg %]
-    <p class="success">[% c.flash.success_msg %]</p>
+    <div class="alert alert-success" style="margin-top:12px;">[% c.flash.success_msg | html %]</div>
 [% END %]
 
-<div class="admin-stats">
-    <h3>Mail System Statistics</h3>
-    <ul>
-        <li><strong>Total Mail Domains:</strong> [% mail_stats.total_domains %]</li>
-        <li><strong>Total Mail Accounts:</strong> [% mail_stats.total_accounts %]</li>
-        <li><strong>Configured SMTP Servers:</strong> [% mail_stats.active_servers %]</li>
-    </ul>
+<!-- ─── STATS ROW ─── -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin:18px 0;">
+    <div class="stat-card" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;font-weight:bold;color:var(--primary-color,#007bff);">[% list_stats.total || 0 %]</div>
+        <div style="font-size:0.88em;color:var(--text-muted-color);">Mailing Lists</div>
+    </div>
+    <div class="stat-card" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;font-weight:bold;color:var(--success-color,#28a745);">[% list_stats.public || 0 %]</div>
+        <div style="font-size:0.88em;color:var(--text-muted-color);">Public Lists</div>
+    </div>
+    <div class="stat-card" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;font-weight:bold;color:#6c757d;">[% list_stats.private || 0 %]</div>
+        <div style="font-size:0.88em;color:var(--text-muted-color);">Private Lists</div>
+    </div>
+    <div class="stat-card" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;font-weight:bold;color:#17a2b8;">[% list_stats.total_subscribers || 0 %]</div>
+        <div style="font-size:0.88em;color:var(--text-muted-color);">Total Subscribers</div>
+    </div>
+    <div class="stat-card" style="background:var(--bg-secondary,#f5f5f5);border-radius:6px;padding:16px;text-align:center;">
+        <div style="font-size:2em;font-weight:bold;color:#fd7e14;">[% mail_stats.active_servers || 0 %]</div>
+        <div style="font-size:0.88em;color:var(--text-muted-color);">SMTP Servers</div>
+    </div>
 </div>
 
-<hr>
+<!-- ─── QUICK NAVIGATION ─── -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:24px;">
+    <a href="[% c.uri_for('/mail/lists') %]"
+       style="display:block;padding:14px;background:#e8f4fd;border:1px solid #4a90d9;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128188;</div>
+        <strong>Manage All Lists</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">View subscribers, send emails</div>
+    </a>
+    <a href="[% c.uri_for('/mail/lists/create') %]"
+       style="display:block;padding:14px;background:#e8fde8;border:1px solid #28a745;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#43;</div>
+        <strong>Create New List</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Add a custom mailing list</div>
+    </a>
+    <a href="[% c.uri_for('/mail/mass_email') %]"
+       style="display:block;padding:14px;background:#fff8e1;border:1px solid #ffc107;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#9993;</div>
+        <strong>Send Mailout</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Email members or custom lists</div>
+    </a>
+    <a href="[% c.uri_for('/mail/subscribe') %]"
+       style="display:block;padding:14px;background:#f3e8ff;border:1px solid #9b59b6;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128100;</div>
+        <strong>Subscribe Page</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">View public subscribe page</div>
+    </a>
+    <a href="[% c.uri_for('/mail/add_mail_config_form') %]"
+       style="display:block;padding:14px;background:#fde8e8;border:1px solid #dc3545;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#9881;</div>
+        <strong>SMTP Config</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Outbound mail server settings</div>
+    </a>
+    <a href="[% c.uri_for('/user/admin_user_list') %]"
+       style="display:block;padding:14px;background:#e8f0fe;border:1px solid #4a90d9;border-radius:6px;text-decoration:none;color:inherit;">
+        <div style="font-size:1.4em;">&#128101;</div>
+        <strong>User Management</strong>
+        <div style="font-size:0.85em;color:var(--text-muted-color);">Manage accounts &amp; roles</div>
+    </a>
+</div>
 
-<div class="smtp-servers-section">
-    <h3>SMTP Mail Servers</h3>
-    
-    [% IF smtp_servers.size > 0 %]
-        <table class="smtp-servers-table">
-            <thead>
-                <tr>
-                    <th>Site</th>
-                    <th>SMTP Host</th>
-                    <th>Port</th>
-                    <th>Username</th>
-                    <th>From Email</th>
-                    <th>SSL</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                [% FOREACH server IN smtp_servers %]
-                <tr>
-                    <td>
-                        <strong>[% server.site_name || 'Unknown' %]</strong><br>
-                        <small style="color: var(--text-muted-color, #666);">ID: [% server.site_id %]</small>
-                    </td>
-                    <td>[% server.smtp_host || 'Not set' %]</td>
-                    <td>[% server.smtp_port || 'Not set' %]</td>
-                    <td>[% server.smtp_user || server.smtp_username || 'Not set' %]</td>
-                    <td>[% server.smtp_from || 'Not set' %]</td>
-                    <td>[% server.smtp_ssl ? 'Yes' : 'No' %]</td>
-                    <td>
-                        <a href="[% c.uri_for('/mail/edit_smtp_config') %]?site_id=[% server.site_id %]" class="btn-small">Edit</a>
-                        <a href="[% c.uri_for('/mail/test_smtp_config') %]?site_id=[% server.site_id %]" class="btn-small btn-test">Test</a>
-                    </td>
-                </tr>
-                [% END %]
-            </tbody>
-        </table>
+<!-- ─── MAILING LISTS TABLE ─── -->
+<div style="margin:0 0 28px;">
+    <h2 style="margin-bottom:10px;border-bottom:2px solid var(--primary-color,#007bff);padding-bottom:6px;">
+        Mailing Lists
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary"
+           style="font-size:0.75em;padding:4px 12px;margin-left:12px;vertical-align:middle;">+ New</a>
+        <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary"
+           style="font-size:0.75em;padding:4px 12px;margin-left:4px;vertical-align:middle;">Full View</a>
+    </h2>
+
+    [% IF mailing_lists.size > 0 %]
+    <table style="width:100%;border-collapse:collapse;font-size:0.93em;">
+        <thead>
+            <tr style="background:var(--primary-color,#007bff);color:#fff;">
+                <th style="padding:8px 10px;text-align:left;">List Name</th>
+                <th style="padding:8px 10px;text-align:center;">Visibility</th>
+                <th style="padding:8px 10px;text-align:center;">Backend</th>
+                <th style="padding:8px 10px;text-align:center;">Subscribers</th>
+                <th style="padding:8px 10px;text-align:center;">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH list IN mailing_lists %]
+            <tr style="border-bottom:1px solid var(--border-color,#ddd);[% loop.count % 2 == 0 ? 'background:#f9f9f9;' : '' %]">
+                <td style="padding:8px 10px;">
+                    <strong>[% list.name | html %]</strong>
+                    [% IF list.description && !list.description.match('^\[auto\]') %]
+                        <br><span style="font-size:0.85em;color:var(--text-muted-color);">[% list.description | html %]</span>
+                    [% ELSIF list.description && list.description.match('^\[auto\]') %]
+                        <br><span style="font-size:0.8em;background:#e0e7ff;color:#3730a3;border-radius:10px;padding:1px 7px;">auto-sync</span>
+                    [% END %]
+                </td>
+                <td style="padding:8px 10px;text-align:center;">
+                    [% IF list.is_public %]
+                        <span style="background:var(--success-color,#28a745);color:#fff;border-radius:10px;padding:2px 10px;font-size:0.82em;">Public</span>
+                    [% ELSE %]
+                        <span style="background:#6c757d;color:#fff;border-radius:10px;padding:2px 10px;font-size:0.82em;">Private</span>
+                    [% END %]
+                </td>
+                <td style="padding:8px 10px;text-align:center;font-size:0.85em;color:var(--text-muted-color);">
+                    [% list.list_backend || 'local' %]
+                </td>
+                <td style="padding:8px 10px;text-align:center;font-weight:bold;color:var(--primary-color,#007bff);">
+                    [% list.sub_count || 0 %]
+                </td>
+                <td style="padding:8px 10px;text-align:center;white-space:nowrap;">
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'edit') %]"
+                       style="display:inline-block;padding:3px 9px;background:var(--primary-color,#007bff);color:#fff;border-radius:3px;font-size:0.82em;text-decoration:none;margin:2px;">Edit</a>
+                    <a href="[% c.uri_for('/mail/lists') %]#box_[% list.id %]"
+                       style="display:inline-block;padding:3px 9px;background:#17a2b8;color:#fff;border-radius:3px;font-size:0.82em;text-decoration:none;margin:2px;">Members</a>
+                    <a href="[% c.uri_for('/mail/lists', list.id, 'delete') %]"
+                       onclick="return confirm('Delete [% list.name | html %]?')"
+                       style="display:inline-block;padding:3px 9px;background:var(--danger-color,#dc3545);color:#fff;border-radius:3px;font-size:0.82em;text-decoration:none;margin:2px;">Delete</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
     [% ELSE %]
-        <p class="info-message">No SMTP servers configured yet.</p>
+    <div style="padding:24px;text-align:center;color:var(--text-muted-color);border:2px dashed var(--border-color,#ddd);border-radius:6px;">
+        <p style="font-size:1.1em;">No mailing lists created yet.</p>
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create Your First List</a>
+    </div>
     [% END %]
-    
-    <p style="margin-top: 15px;">
-        <a href="[% c.uri_for('/mail/add_mail_config_form') %]" class="btn btn-primary">Add New SMTP Server</a>
+</div>
+
+<!-- ─── TEST EMAIL ─── -->
+<div style="background:#f0f8ff;border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:24px;">
+    <h3 style="margin-top:0;">&#129514; Send Test Email</h3>
+    <p style="margin:0 0 10px;font-size:0.92em;color:var(--text-muted-color);">
+        Sends a real test message through the full unified mail path using the site SMTP config.
+        Check the <a href="/health/recent_errors">application log</a> if it fails.
     </p>
+    <form method="get" action="[% c.uri_for('/mail/send_test_email') %]"
+          style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input type="hidden" name="site_id" value="[% c.session.site_id %]">
+        <input type="email" name="to" placeholder="recipient@example.com" required
+               style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.95em;min-width:240px;">
+        <button type="submit"
+                style="padding:6px 16px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+            Send Test
+        </button>
+    </form>
 </div>
 
-<hr>
+<!-- ─── SMTP SERVERS ─── -->
+<div style="margin-bottom:28px;">
+    <h2 style="margin-bottom:10px;border-bottom:2px solid var(--border-color,#ddd);padding-bottom:6px;">
+        SMTP Server Configuration
+        <a href="[% c.uri_for('/mail/add_mail_config_form') %]" class="btn btn-primary"
+           style="font-size:0.75em;padding:4px 12px;margin-left:12px;vertical-align:middle;">+ Add Server</a>
+    </h2>
 
-<div class="admin-functions">
-    <h3>Mail System Management</h3>
-
-    <div class="function-section" style="background:#f0f8ff;border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:18px;">
-        <h4 style="margin-top:0;">🧪 Send Test Email</h4>
-        <p style="margin:0 0 10px;font-size:0.92em;color: var(--text-muted-color, #555);">
-            Sends a real test message through the <strong>full unified mail path</strong> using the site SMTP config (harper.whc.ca:465).
-            Check the <a href="/health/recent_errors">application log</a> for the SMTP transcript if it fails.
-        </p>
-        <form method="get" action="[% c.uri_for('/mail/send_test_email') %]" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-            <input type="hidden" name="site_id" value="[% c.session.site_id %]">
-            <input type="email" name="to" placeholder="recipient@example.com" required
-                   style="padding:6px 10px;border:1px solid #ccc;border-radius:4px;font-size:0.95em;min-width:240px;">
-            <button type="submit" style="padding:6px 16px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
-                Send Test Email
-            </button>
-        </form>
-    </div>
-
-    <div class="function-section" style="border-left-color: var(--success-color, #28a745);">
-        <h4>Mailing Lists &amp; Mailouts</h4>
-        <ul>
-            <li><a href="[% c.uri_for('/mail/lists') %]"><strong>Manage Mailing Lists</strong></a> — Create, edit and view subscriber lists for this site</li>
-            <li><a href="[% c.uri_for('/mail/mass_email') %]"><strong>Send a Mailout</strong></a> — Email all site users, paid members, or custom addresses</li>
-        </ul>
-    </div>
-
-    <div class="function-section">
-        <h4>Server Configuration</h4>
-        <ul>
-            <li><a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure SMTP Settings</a> — Set up outbound mail server</li>
-        </ul>
-    </div>
-    
-    <div class="function-section">
-        <h4>Domain Management</h4>
-        <ul>
-            <li><strong>Manage Mail Domains</strong> - (Coming soon - Add/edit mail domains)</li>
-            <li><strong>DNS Records</strong> - (Coming soon - Manage SPF, DKIM, DMARC records)</li>
-        </ul>
-    </div>
-    
-    <div class="function-section">
-        <h4>Account Management</h4>
-        <ul>
-            <li><a href="[% c.uri_for('/mail/create_mail_account') %]">Create Mail Account</a> - Add new email accounts</li>
-            <li><strong>Manage Mail Accounts</strong> - (Coming soon - View and edit existing accounts)</li>
-        </ul>
-    </div>
-    
-    <div class="function-section">
-        <h4>System Tools</h4>
-        <ul>
-            <li><strong>Mail Logs</strong> - (Coming soon - View mail server logs)</li>
-            <li><strong>Mail Queue</strong> - (Coming soon - Monitor outbound mail queue)</li>
-        </ul>
-    </div>
+    [% IF smtp_servers.size > 0 %]
+    <table style="width:100%;border-collapse:collapse;">
+        <thead>
+            <tr style="background:var(--bg-secondary,#f5f5f5);">
+                <th style="padding:8px;text-align:left;border:1px solid var(--border-color,#ddd);">Site</th>
+                <th style="padding:8px;text-align:left;border:1px solid var(--border-color,#ddd);">SMTP Host</th>
+                <th style="padding:8px;text-align:left;border:1px solid var(--border-color,#ddd);">Port</th>
+                <th style="padding:8px;text-align:left;border:1px solid var(--border-color,#ddd);">From Email</th>
+                <th style="padding:8px;text-align:left;border:1px solid var(--border-color,#ddd);">SSL</th>
+                <th style="padding:8px;text-align:center;border:1px solid var(--border-color,#ddd);">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            [% FOREACH server IN smtp_servers %]
+            <tr style="border-bottom:1px solid var(--border-color,#ddd);">
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);">
+                    <strong>[% server.site_name || 'Unknown' %]</strong>
+                    <br><small style="color:var(--text-muted-color);">ID: [% server.site_id %]</small>
+                </td>
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);">[% server.smtp_host || 'Not set' %]</td>
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);">[% server.smtp_port || 'Not set' %]</td>
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);">[% server.smtp_from || 'Not set' %]</td>
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);">[% server.smtp_ssl ? 'Yes' : 'No' %]</td>
+                <td style="padding:8px;border:1px solid var(--border-color,#ddd);text-align:center;">
+                    <a href="[% c.uri_for('/mail/edit_smtp_config') %]?site_id=[% server.site_id %]"
+                       style="display:inline-block;padding:3px 9px;background:var(--primary-color,#007bff);color:#fff;border-radius:3px;font-size:0.82em;text-decoration:none;margin:2px;">Edit</a>
+                    <a href="[% c.uri_for('/mail/test_smtp_config') %]?site_id=[% server.site_id %]"
+                       style="display:inline-block;padding:3px 9px;background:var(--success-color,#28a745);color:#fff;border-radius:3px;font-size:0.82em;text-decoration:none;margin:2px;">Test</a>
+                </td>
+            </tr>
+            [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p style="color:var(--text-muted-color);padding:10px;background:#f5f5f5;border-radius:4px;">
+        No SMTP servers configured yet.
+        <a href="[% c.uri_for('/mail/add_mail_config_form') %]">Configure one now.</a>
+    </p>
+    [% END %]
 </div>
 
-<hr>
+<!-- ─── FOOTER NAV ─── -->
+<div style="border-top:1px solid var(--border-color,#ddd);padding-top:14px;margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+    <a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">&#8592; Mail Home</a>
+    <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-secondary">Manage Lists</a>
+    <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">Send Mailout</a>
+    <a href="[% c.uri_for('/mail/create_mail_account') %]" class="btn btn-secondary">Create Mail Account</a>
+</div>
 
-<p><a href="[% c.uri_for('/mail') %]" class="btn btn-secondary">Back to Mail</a></p>
-
-<style>
-    .admin-stats {
-        background: var(--bg-secondary, #f5f5f5);
-        padding: 15px;
-        border-radius: 5px;
-        margin: 20px 0;
-    }
-    
-    .function-section {
-        margin: 20px 0;
-        padding: 15px;
-        border-left: 3px solid var(--primary-color, #007bff);
-        background: #f9f9f9;
-    }
-    
-    .function-section h4 {
-        margin-top: 0;
-        color: var(--link-color, #007bff);
-    }
-    
-    .function-section ul {
-        list-style-type: none;
-        padding-left: 0;
-    }
-    
-    .function-section li {
-        margin: 10px 0;
-    }
-    
-    .error {
-        color: red;
-        padding: 10px;
-        background: #ffe6e6;
-        border: 1px solid red;
-        border-radius: 4px;
-    }
-    
-    .success {
-        color: green;
-        padding: 10px;
-        background: #e6ffe6;
-        border: 1px solid green;
-        border-radius: 4px;
-    }
-    
-    .btn {
-        display: inline-block;
-        padding: 10px 20px;
-        margin: 5px;
-        text-decoration: none;
-        border-radius: 4px;
-        cursor: pointer;
-    }
-    
-    .btn-primary {
-        background: var(--primary-color, #007bff);
-        color: white;
-    }
-    
-    .btn-secondary {
-        background: #6c757d;
-        color: white;
-    }
-    
-    .btn-warning {
-        background: #ffc107;
-        color: black;
-    }
-    
-    .smtp-servers-section {
-        margin: 20px 0;
-    }
-    
-    .smtp-servers-table {
-        width: 100%;
-        border-collapse: collapse;
-        margin: 15px 0;
-    }
-    
-    .smtp-servers-table th,
-    .smtp-servers-table td {
-        border: 1px solid var(--border-color, #ddd);
-        padding: 10px;
-        text-align: left;
-    }
-    
-    .smtp-servers-table th {
-        background: var(--bg-secondary, #f5f5f5);
-        font-weight: bold;
-    }
-    
-    .smtp-servers-table tr:hover {
-        background: #f9f9f9;
-    }
-    
-    .btn-small {
-        display: inline-block;
-        padding: 5px 10px;
-        margin: 2px;
-        text-decoration: none;
-        border-radius: 3px;
-        background: var(--primary-color, #007bff);
-        color: white;
-        font-size: 12px;
-    }
-    
-    .btn-small:hover {
-        background: #0056b3;
-    }
-    
-    .btn-test {
-        background: var(--success-color, #28a745);
-    }
-    
-    .btn-test:hover {
-        background: #1e7e34;
-    }
-    
-    .info-message {
-        padding: 15px;
-        background: #e7f3ff;
-        border-left: 4px solid var(--primary-color, #007bff);
-        margin: 15px 0;
-    }
-</style>
+</div>

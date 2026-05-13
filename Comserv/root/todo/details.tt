@@ -37,19 +37,54 @@
         <tr><td><label>Due Date:</label></td>
             <td><input type="date" name="due_date" value="[% record.get_column('due_date') %]"></td></tr>
         <tr><td><label>Time of Day:</label></td>
-            <td><input type="time" name="time_of_day" value="[% record.get_column('time_of_day') %]"></td></tr>
+            <td>
+                <select name="time_of_day">
+                    <option value="">-- Select Time --</option>
+                    [%
+                        USE date;
+                        SET current_time = record.get_column('time_of_day');
+                        IF current_time;
+                            SET current_time_short = current_time.substr(0, 5);
+                        ELSE;
+                            SET current_time_short = '';
+                        END;
+                        FOREACH hour IN [0..23];
+                            SET hour_24 = hour < 10 ? '0' _ hour : hour;
+                            IF hour == 0;
+                                SET hour_12 = 12; SET period = 'AM';
+                            ELSIF hour < 12;
+                                SET hour_12 = hour; SET period = 'AM';
+                            ELSIF hour == 12;
+                                SET hour_12 = 12; SET period = 'PM';
+                            ELSE;
+                                SET hour_12 = hour - 12; SET period = 'PM';
+                            END;
+                            FOREACH minute IN ['00', '30'];
+                                SET time_value_24 = hour_24 _ ':' _ minute;
+                                SET time_display  = hour_12 _ ':' _ minute _ ' ' _ period;
+                    %]
+                    <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                    [%
+                            END;
+                        END;
+                    %]
+                </select>
+            </td></tr>
         <tr><td><label>Status:</label></td>
             <td>
                 <select name="status">
-                    [% SET s = record.get_column('status') %]
-                    <option value="New"        [% IF s == 'New'        || s == 1 %]selected[% END %]>New</option>
-                    <option value="InProgress" [% IF s == 'InProgress' || s == 2 %]selected[% END %]>In Progress</option>
-                    <option value="Done"       [% IF s == 'Done'       || s == 3 %]selected[% END %]>Done</option>
-                    <option value="Cancelled"  [% IF s == 'Cancelled'             %]selected[% END %]>Cancelled</option>
+                    <option value="1" [% IF current_status == 1 %]selected[% END %]>New</option>
+                    <option value="2" [% IF current_status == 2 %]selected[% END %]>In Progress</option>
+                    <option value="3" [% IF current_status == 3 %]selected[% END %]>Done</option>
+                    <option value="4" [% IF current_status == 4 %]selected[% END %]>Cancelled</option>
                 </select>
             </td></tr>
         <tr><td><label>Priority:</label></td>
-            <td><input type="number" name="priority" value="[% record.get_column('priority') %]" size="4"></td></tr>
+            <td>
+                <select name="priority">
+                    [% INCLUDE "todo/priority_select.tt" %]
+                </select>
+            </td></tr>
         <tr><td><label>Est. Hours:</label></td>
             <td><input type="number" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" size="6"></td></tr>
         <tr><td><label>Accumulated Time:</label></td>
@@ -152,14 +187,23 @@
 [% END %]
 
 [% SET task_id = record.get_column('record_id') %]
+[% SET task_subject     = record.get_column('subject')     | html %]
+[% SET task_description = record.get_column('description') | html %]
+[% SET task_status      = record.get_column('status')          %]
+[% SET task_due_date    = record.get_column('due_date')         %]
+[% SET task_project     = record.get_column('project_code') | html %]
 <div class="ai-chat-activity-panel" style="margin-top:20px; border:1px solid var(--border-color, #ddd); border-radius:4px; padding:16px; background: var(--bg-secondary, #fafafa);">
     <h3 style="margin-top:0;">AI Chat Activity</h3>
     <div id="ai-task-conversations" data-task-id="[% task_id %]">
         <p style="color:#888; font-size:0.9em;">Loading conversations&hellip;</p>
     </div>
     <div style="margin-top:10px;">
-        <a href="/ai?task_id=[% task_id %]" class="button button-primary" style="font-size:0.9em;">Chat about this task</a>
-        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all task conversations</a>
+        <button type="button" class="button button-primary" style="font-size:0.9em;"
+            onclick="openAIChatWithTask({record_id:[% task_id %],subject:'[% task_subject | js %]',description:'[% task_description | js %]',status:[% task_status %],due_date:'[% task_due_date %]',project:'[% task_project | js %]'})">
+            💬 Chat about this task
+        </button>
+        <a href="/todo/details?edit=1&amp;record_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">✏️ Edit this task</a>
+        <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all conversations</a>
     </div>
 </div>
 

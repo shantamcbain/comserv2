@@ -103,11 +103,19 @@ details[open] .ml-chevron { transform: rotate(90deg); }
 </style>
 
 <div class="admin-content">
-    <div class="admin-header">
-        <h1>Mailing Lists</h1>
-        <div class="admin-actions">
+    <div class="admin-header" style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+        <div>
+            <h1>Mailing Lists</h1>
+            <nav aria-label="breadcrumb" style="font-size:0.9em;color:var(--text-muted-color);">
+                <a href="[% c.uri_for('/mail') %]">Mail</a> &rsaquo;
+                <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]">Admin Dashboard</a> &rsaquo;
+                Mailing Lists
+            </nav>
+        </div>
+        <div class="admin-actions" style="display:flex;gap:8px;flex-wrap:wrap;">
             <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ Create Custom List</a>
-            <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">Mail Admin</a>
+            <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">&#9993; Send Mailout</a>
+            <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">&#8592; Admin Dashboard</a>
         </div>
     </div>
 
@@ -126,6 +134,14 @@ details[open] .ml-chevron { transform: rotate(90deg); }
                     <span class="ml-chevron">▶</span>
                     <strong>[% list.name | html %]</strong>
                     <span class="ml-badge">[% list.subscriber_count %] members</span>
+                    [% IF list.is_public %]
+                        <span style="background:#28a745;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.78em;">Public</span>
+                    [% ELSE %]
+                        <span style="background:#6c757d;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.78em;">Private</span>
+                    [% END %]
+                    [% IF list.list_backend && list.list_backend != 'local' %]
+                        <span style="background:#e0e7ff;color:#3730a3;border-radius:10px;padding:1px 8px;font-size:0.78em;">[% list.list_backend | html %]</span>
+                    [% END %]
                 </span>
                 <span style="font-size:0.82em;color:#6b7280;">[% list.description.replace('^\[auto\] ', '') | html %]</span>
             </summary>
@@ -221,6 +237,14 @@ details[open] .ml-chevron { transform: rotate(90deg); }
                     <span class="ml-chevron">▶</span>
                     <strong>[% list.name | html %]</strong>
                     <span class="ml-badge">[% list.subscriber_count %] subscribers</span>
+                    [% IF list.is_public %]
+                        <span style="background:#28a745;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.78em;">Public</span>
+                    [% ELSE %]
+                        <span style="background:#6c757d;color:#fff;border-radius:10px;padding:1px 8px;font-size:0.78em;">Private</span>
+                    [% END %]
+                    [% IF list.list_backend && list.list_backend != 'local' %]
+                        <span style="background:#e0e7ff;color:#3730a3;border-radius:10px;padding:1px 8px;font-size:0.78em;">[% list.list_backend | html %]</span>
+                    [% END %]
                 </span>
                 <span>
                     <a href="[% c.uri_for('/mail/lists', list.id, 'edit') %]" class="btn-small"
@@ -306,6 +330,13 @@ details[open] .ml-chevron { transform: rotate(90deg); }
         <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">Create Your First List</a>
     </div>
     [% END %]
+
+    <div style="border-top:1px solid var(--border-color,#ddd);padding-top:14px;margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">&#8592; Admin Dashboard</a>
+        <a href="[% c.uri_for('/mail/lists/create') %]" class="btn btn-primary">+ Create List</a>
+        <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-warning">&#9993; Send Mailout</a>
+        <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-secondary">View Subscribe Page</a>
+    </div>
 </div>
 
 <script>

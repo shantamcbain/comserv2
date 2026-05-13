@@ -6,6 +6,13 @@
 <!-- Copyright footer -->
 <div style="text-align: center; padding: 20px 0; color: var(--text-muted-color, #666); font-size: 0.9em; border-top: 1px solid var(--border-color, #ddd); margin-top: 30px;">
     <p style="margin: 5px 0;">&copy; [% date.year || '2026' %] [% c.config.site_name || c.session.SiteName || 'Comserv' %]. All rights reserved.</p>
+    <p style="margin: 8px 0;">
+        [% IF c.session.user_id %]
+            <a href="/mail/my_subscriptions" style="color: var(--link-color, #0066cc); text-decoration: none;">&#9993; Manage My Email Subscriptions</a>
+        [% ELSE %]
+            <a href="/mail/subscribe" style="color: var(--link-color, #0066cc); text-decoration: none;">&#9993; Join Our Mailing List</a>
+        [% END %]
+    </p>
 </div>
 
 [% IF c.session.debug_mode == 1 %]

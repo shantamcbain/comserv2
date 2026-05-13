@@ -72,9 +72,9 @@ BEGIN {
     my $version = $Config{version};
 
     # Add all possible architecture paths to @INC
-    use lib "$FindBin::Bin/../local/lib/perl5/$archname";
-    use lib "$FindBin::Bin/../local/lib/perl5/$version/$archname";
-    use lib "$FindBin::Bin/../local/lib/perl5/$version";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname"        if $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version/$archname" if $version && $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version"          if $version;
 
     # Also add the actual installed architecture path (for systems where archname differs)
     # This handles cases where the actual installed path uses a different architecture name

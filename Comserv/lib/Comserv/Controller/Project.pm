@@ -219,6 +219,20 @@ sub _create_governance_ticket {
 
         my $ticket_number = 'CSC-GOV-' . strftime('%Y%m%d', localtime) . '-' . sprintf('%04d', $project_id);
 
+        my $existing = $ticket_rs->search(
+            { -or => [
+                { ticket_number => $ticket_number },
+                { ticket_number => { like => 'CSC-GOV-%-' . sprintf('%04d', $project_id) } },
+            ]},
+            { rows => 1 }
+        )->first;
+
+        if ($existing) {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_create_governance_ticket',
+                "Governance ticket already exists for project id=$project_id (ticket: " . $existing->ticket_number . "), skipping duplicate");
+            return;
+        }
+
         $ticket_rs->create({
             ticket_number => $ticket_number,
             site_name     => 'CSC',
@@ -455,6 +469,7 @@ sub fetch_projects_with_subprojects :Private {
 
     # Fetch top-level projects (those without a parent)
     # CSC admins see all sites; all others see only their own SiteName
+    # Sub-projects are fetched by parent_id (no sitename filter) so they appear regardless of sitename
     my @top_projects;
     eval {
         my %search_cond = (parent_id => undef);
@@ -508,12 +523,29 @@ sub fetch_projects_with_subprojects :Private {
             };
             
             foreach my $subproject1 (@level1_subprojects) {
+                my @level2_subprojects;
+                eval {
+                    @level2_subprojects = $schema->resultset('Project')->search(
+                        { parent_id => $subproject1->id },
+                        { order_by => { -asc => 'name' } }
+                    )->all;
+                };
+                my @level2_hashes;
+                foreach my $subproject2 (@level2_subprojects) {
+                    push @level2_hashes, {
+                        id           => $subproject2->id,
+                        name         => $subproject2->name,
+                        parent_id    => $subproject2->parent_id,
+                        status       => $subproject2->status || 1,
+                        sub_projects => []
+                    };
+                }
                 push @{$project_hash->{sub_projects}}, {
-                    id => $subproject1->id,
-                    name => $subproject1->name,
-                    parent_id => $subproject1->parent_id,
-                    status => $subproject1->status || 1,
-                    sub_projects => []
+                    id           => $subproject1->id,
+                    name         => $subproject1->name,
+                    parent_id    => $subproject1->parent_id,
+                    status       => $subproject1->status || 1,
+                    sub_projects => \@level2_hashes
                 };
             }
         }

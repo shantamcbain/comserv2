@@ -71,6 +71,24 @@
       </div>
 
       <div class="content-section">
+        <h2>Member Communication</h2>
+        <div class="form-row">
+          <div class="form-field">
+            <a href="[% c.uri_for('/mail/mass_email') %]" class="btn btn-primary">Send Mailout</a>
+            <p>Email all members, paid subscribers, or a custom list.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/mail/lists') %]" class="btn btn-primary">Mailing Lists</a>
+            <p>Manage subscriber lists and newsletter groups.</p>
+          </div>
+          <div class="form-field">
+            <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-secondary">Mail Dashboard</a>
+            <p>SMTP settings, mail accounts, and delivery tools.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="content-section">
         <h2>Quick Links</h2>
         <ul>
           <li><a href="[% c.uri_for('/membership') %]">View Public Membership Page</a></li>

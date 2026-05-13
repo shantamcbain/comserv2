@@ -1,0 +1,46 @@
+[%#
+  mail/subscribe_banner.tt — Mailing list CTA banner
+  Included in layout.tt above page content.
+  Shows only on home/index pages (action name = 'index', or path = '/').
+  Dismissible via localStorage once per browser per site.
+  Guests see "Join Our Mailing List", members see "Manage My Subscriptions".
+%]
+[% SET _cur_action = c.action.name %]
+[% SET _cur_path   = c.req.path %]
+[% IF _cur_action.match('^index$') OR _cur_path.match('^/?$') %]
+<div id="ml-subscribe-banner"
+     style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),#1976d2);color:#fff;
+            padding:10px 20px;text-align:center;font-size:0.95em;position:relative;z-index:100;">
+    [% IF c.session.user_id %]
+        <span style="margin-right:12px;">&#9993; <strong>Stay connected</strong> — manage which newsletters you receive.</span>
+        <a href="/mail/my_subscriptions"
+           style="background:#fff;color:var(--primary-color,#1565c0);padding:4px 16px;border-radius:14px;font-weight:bold;text-decoration:none;font-size:0.95em;">
+            My Subscriptions
+        </a>
+    [% ELSE %]
+        <span style="margin-right:12px;">&#9993; <strong>Stay in the loop</strong> — subscribe to updates from [% c.session.SiteName || 'us' %].</span>
+        <a href="/mail/subscribe"
+           style="background:#fff;color:var(--primary-color,#1565c0);padding:4px 16px;border-radius:14px;font-weight:bold;text-decoration:none;font-size:0.95em;">
+            Join Our Mailing List
+        </a>
+    [% END %]
+    <button onclick="dismissMailBanner()" aria-label="Dismiss"
+            style="position:absolute;right:14px;top:50%;transform:translateY(-50%);background:none;border:none;color:rgba(255,255,255,0.7);font-size:1.3em;cursor:pointer;line-height:1;">
+        &times;
+    </button>
+</div>
+<script>
+(function() {
+    var KEY = 'ml_banner_dismissed_[% c.session.SiteName || 'site' %]';
+    if (!localStorage.getItem(KEY)) {
+        var el = document.getElementById('ml-subscribe-banner');
+        if (el) el.style.display = 'block';
+    }
+    window.dismissMailBanner = function() {
+        localStorage.setItem(KEY, '1');
+        var el = document.getElementById('ml-subscribe-banner');
+        if (el) el.style.display = 'none';
+    };
+})();
+</script>
+[% END %]

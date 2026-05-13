@@ -220,6 +220,21 @@ sub get_site_domain {
         # If we found a domain, return it
         return $site_domain if $site_domain;
 
+        # Last attempt: strip leading www. and retry
+        if (!$site_domain && $domain =~ s/^www\.//i) {
+            eval {
+                $site_domain = $self->schema->resultset('SiteDomain')->find({ domain => $domain });
+            };
+            if (!$site_domain) {
+                my $rs = $self->schema->resultset('SiteDomain')->search(
+                    \[ 'LOWER(domain) = ?', lc($domain) ]
+                );
+                $site_domain = $rs->first if $rs && $rs->count > 0;
+            }
+        }
+
+        return $site_domain if $site_domain;
+
         # If we get here, the domain wasn't found
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'get_site_domain',

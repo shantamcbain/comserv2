@@ -57,15 +57,21 @@ sub index :Path('/admin/logging/audit') :Args(0) {
         eval {
             my %cond;
             $cond{system_identifier} = $filter_system if $filter_system;
-            $cond{level}             = $filter_level  if $filter_level;
-            # Limit to the last 30 minutes so the list stays relevant
-            my $cutoff = DateTime->now->subtract(minutes => 30)->strftime('%Y-%m-%d %H:%M:%S');
+            if ($filter_level) {
+                if ($filter_level eq 'ERROR') {
+                    $cond{level} = { -in => ['ERROR', 'CRITICAL'] };
+                } else {
+                    $cond{level} = $filter_level;
+                }
+            }
+            # Match the same 10-minute window used by the health badge count
+            my $cutoff = DateTime->now->subtract(minutes => 10)->strftime('%Y-%m-%d %H:%M:%S');
             $cond{timestamp} = { '>=' => $cutoff };
 
             $recent_alerts = [
                 $c->model('DBEncy')->resultset('SystemLog')->search(
                     \%cond,
-                    { order_by => { -desc => 'timestamp' }, rows => 20 }
+                    { order_by => { -desc => 'timestamp' }, rows => 100 }
                 )->all
             ];
         };

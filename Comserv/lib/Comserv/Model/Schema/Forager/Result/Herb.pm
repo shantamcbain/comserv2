@@ -58,37 +58,37 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('record_id');
 
 __PACKAGE__->has_many(
-    herb_constituents => 'Comserv::Model::Schema::Ency::Result::HerbConstituent',
+    herb_constituents => 'Comserv::Model::Schema::Ency::Result::Ency::HerbConstituent',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    herb_diseases => 'Comserv::Model::Schema::Ency::Result::HerbDisease',
+    herb_diseases => 'Comserv::Model::Schema::Ency::Result::Ency::HerbDisease',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    herb_symptoms => 'Comserv::Model::Schema::Ency::Result::HerbSymptom',
+    herb_symptoms => 'Comserv::Model::Schema::Ency::Result::Ency::HerbSymptom',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    disease_herbs => 'Comserv::Model::Schema::Ency::Result::DiseaseHerb',
+    disease_herbs => 'Comserv::Model::Schema::Ency::Result::Ency::DiseaseHerb',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    insect_herbs => 'Comserv::Model::Schema::Ency::Result::InsectHerb',
+    insect_herbs => 'Comserv::Model::Schema::Ency::Result::Ency::InsectHerb',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    animal_herbs => 'Comserv::Model::Schema::Ency::Result::AnimalHerb',
+    animal_herbs => 'Comserv::Model::Schema::Ency::Result::Ency::AnimalHerb',
     'herb_id',
 );
 
 __PACKAGE__->has_many(
-    herb_categories => 'Comserv::Model::Schema::Ency::Result::HerbCategory',
+    herb_categories => 'Comserv::Model::Schema::Ency::Result::Ency::HerbCategory',
     'herb_id',
 );
 

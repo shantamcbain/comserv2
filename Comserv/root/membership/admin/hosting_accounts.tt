@@ -91,14 +91,24 @@
                   [% END %]
                   <a href="[% c.uri_for('/membership/admin/hosting_account_edit/' _ acct.id) %]"
                      class="btn btn-sm btn-secondary" style="margin-left:0.3rem;">✏️ Edit</a>
-                  [% IF acct.requested_addons %]
-                  <span title="Add-ons: [% acct.requested_addons | html %]" style="cursor:help;margin-left:0.3rem;">🧩</span>
-                  [% END %]
                   [% IF acct.notes %]
                   <span title="[% acct.notes | html %]" style="cursor:help;margin-left:0.3rem;">📝</span>
                   [% END %]
                 </td>
               </tr>
+              [% IF acct.requested_addons %]
+              <tr>
+                <td colspan="8" style="background:#fffde7;padding:0.4rem 1rem;font-size:0.88rem;border-top:none;">
+                  <strong>🧩 Requested add-ons:</strong>
+                  [% FOREACH addon_name IN acct.requested_addons.split(',') %]
+                    <span style="display:inline-block;background:#fff9c4;border:1px solid #f9a825;border-radius:4px;padding:0.1rem 0.5rem;margin:0.1rem;">[% addon_name | html %]</span>
+                  [% END %]
+                  [% IF acct.status == 'pending' %]
+                    <span style="color:#c62828;font-style:italic;margin-left:0.5rem;">— awaiting CSC confirmation</span>
+                  [% END %]
+                </td>
+              </tr>
+              [% END %]
               [% END %]
             </tbody>
           </table>

@@ -112,7 +112,7 @@ sub _inventory_transaction {
     $schema->txn_do(sub {
 
         # Record the transaction in the ledger
-        $schema->resultset('InventoryTransaction')->create({
+        $schema->resultset('Accounting::InventoryTransaction')->create({
             item_id          => $p{item_id},
             location_id      => $p{location_id}  || undef,
             transaction_type => $p{transaction_type},
@@ -132,7 +132,7 @@ sub _inventory_transaction {
 
         my $stock;
         if ($p{location_id}) {
-            $stock = $schema->resultset('InventoryStockLevel')->find_or_create(
+            $stock = $schema->resultset('Accounting::InventoryStockLevel')->find_or_create(
                 { item_id => $p{item_id}, location_id => $p{location_id} },
                 { default => {
                     quantity_on_hand => 0,
@@ -142,7 +142,7 @@ sub _inventory_transaction {
             );
         } else {
             # No location — work with the first stock level row for this item
-            $stock = $schema->resultset('InventoryStockLevel')->search(
+            $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 { item_id => $p{item_id} }
             )->first;
         }
@@ -195,7 +195,7 @@ sub index :Path :Args(0) {
                 { sitename => $sitename, is_active => 1 })->count;
             $printer_count = $schema->resultset('Printing3dPrinter')->search(
                 { sitename => $sitename, status => 'idle' })->count;
-            $store_item_count = $schema->resultset('InventoryItem')->search(
+            $store_item_count = $schema->resultset('Accounting::InventoryItem')->search(
                 { sitename => $sitename, show_in_shop => 1, status => 'active' }
             )->count;
             if ($c->session->{user_id}) {
@@ -308,7 +308,7 @@ sub model_detail :Path('/3d/model') :Args(1) {
     # Load actual filament inventory items for the order form
     my @filaments;
     eval {
-        @filaments = $schema->resultset('InventoryItem')->search(
+        @filaments = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, category => '3d_filament', status => 'active' },
             { prefetch => 'stock_levels', order_by => 'name' }
         )->all;
@@ -426,7 +426,7 @@ sub order :Path('/3d/order') :Args(0) {
         # Validate filament stock if a specific filament was selected
         if ($filament_item_id) {
             my $fil;
-            eval { $fil = $schema->resultset('InventoryItem')->find($filament_item_id); };
+            eval { $fil = $schema->resultset('Accounting::InventoryItem')->find($filament_item_id); };
             if ($fil) {
                 my $avail = 0;
                 for my $sl ($fil->stock_levels->all) {
@@ -490,7 +490,7 @@ sub order :Path('/3d/order') :Args(0) {
         # Reserve filament in inventory (outside the job txn so job id is available)
         if ($filament_item_id && $job) {
             my $fil;
-            eval { $fil = $schema->resultset('InventoryItem')->find($filament_item_id); };
+            eval { $fil = $schema->resultset('Accounting::InventoryItem')->find($filament_item_id); };
             my $first_stock = eval { ($fil->stock_levels->all)[0] } if $fil;
             my $loc_id      = $first_stock ? $first_stock->location_id : undef;
 
@@ -527,7 +527,7 @@ sub order :Path('/3d/order') :Args(0) {
         $model = $schema->resultset('Printing3dModel')->find(
             { id => $model_id, sitename => $sitename }
         ) if $model_id;
-        @filaments = $schema->resultset('InventoryItem')->search(
+        @filaments = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, category => '3d_filament', status => 'active' },
             { order_by => 'name' }
         )->all;
@@ -993,7 +993,7 @@ sub printers :Path('/3d/printers') :Args(0) {
                     unless ($inv_item_id) {
                         if ($purchase_price || $depr_per_hour) {
                             my $sku = '3DPRINTER-' . uc($sitename) . '-' . time();
-                            my $inv_item = $schema->resultset('InventoryItem')->create({
+                            my $inv_item = $schema->resultset('Accounting::InventoryItem')->create({
                                 sitename        => $sitename,
                                 sku             => $sku,
                                 name            => $name . ($model_name ? " ($model_name)" : ''),
@@ -1005,7 +1005,7 @@ sub printers :Path('/3d/printers') :Args(0) {
                                 notes           => "3D Printer: $model_name. $notes",
                                 created_by      => $c->session->{username} || 'system',
                             });
-                            $schema->resultset('InventoryEquipment')->create({
+                            $schema->resultset('Accounting::InventoryEquipment')->create({
                                 item_id              => $inv_item->id,
                                 purchase_price       => $purchase_price  || undef,
                                 depreciation_per_hour => $depr_per_hour  || undef,
@@ -1029,7 +1029,7 @@ sub printers :Path('/3d/printers') :Args(0) {
                 });
             } elsif ($action eq 'import_from_inventory') {
                 my $inv_item_id = $c->req->params->{inventory_item_id};
-                my $inv_item    = $schema->resultset('InventoryItem')->find($inv_item_id)
+                my $inv_item    = $schema->resultset('Accounting::InventoryItem')->find($inv_item_id)
                     if $inv_item_id;
                 die "Inventory item not found (id=$inv_item_id)\n" unless $inv_item;
                 $schema->resultset('Printing3dPrinter')->create({
@@ -1100,7 +1100,7 @@ sub printers :Path('/3d/printers') :Args(0) {
         $inv_where{id} = { -not_in => [ keys %already_linked ] }
             if %already_linked;
 
-        @unregistered_inv_printers = $schema->resultset('InventoryItem')->search(
+        @unregistered_inv_printers = $schema->resultset('Accounting::InventoryItem')->search(
             \%inv_where,
             { order_by => 'name' }
         )->all;
@@ -1143,7 +1143,7 @@ sub admin :Path('/3d/admin') :Args(0) {
             { sitename => $sitename, status => 'queued' })->count;
         $active_jobs    = $schema->resultset('Printing3dJob')->search(
             { sitename => $sitename, status => { -in => ['assigned','printing'] } })->count;
-        $store_items    = $schema->resultset('InventoryItem')->search(
+        $store_items    = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, category => '3d_printed_item', status => 'active' })->count;
     };
 
@@ -1249,7 +1249,7 @@ sub models :Path('/3d/models') :Args(0) {
     my $dbh      = $schema->storage->dbh;
 
     my @all_items = eval {
-        $schema->resultset('InventoryItem')->search(
+        $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active',
               -or => [
                 item_origin => { -like => '%3d_print%' },
@@ -1522,7 +1522,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
             if ($src_type eq 'restock') {
                 my @safe_cols = qw(id name reorder_quantity);
                 my $item = eval {
-                    $schema->resultset('InventoryItem')->find($src_id, { columns => \@safe_cols })
+                    $schema->resultset('Accounting::InventoryItem')->find($src_id, { columns => \@safe_cols })
                 };
                 next unless $item;
                 $item_name = $item->get_column('name');
@@ -1534,11 +1534,11 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                     'SELECT reorder_quantity FROM inventory_items WHERE id = ?', undef, $src_id) } || 1;
 
             } elsif ($src_type eq 'consignment') {
-                my $line = eval { $schema->resultset('InventoryConsignmentLine')->find($src_id) };
+                my $line = eval { $schema->resultset('Accounting::InventoryConsignmentLine')->find($src_id) };
                 next unless $line;
                 my @safe_cols = qw(id name);
                 my $item = eval {
-                    $schema->resultset('InventoryItem')->find(
+                    $schema->resultset('Accounting::InventoryItem')->find(
                         $line->item_id, { columns => \@safe_cols })
                 };
                 $item_name    = $item ? $item->get_column('name') : "Item #" . $line->item_id;
@@ -1651,7 +1651,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     # 1. Restock: any 3D-printed item (by item_origin OR category) at or below reorder_point
     my @restock_needed;
     eval {
-        my @items = $schema->resultset('InventoryItem')->search(
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
             {
                 sitename      => $sitename,
                 status        => 'active',
@@ -1703,7 +1703,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
     eval {
         # Do NOT prefetch 'item' — it SELECTs all result-class columns including
         # new ones (filament_color etc.) that may not be in the DB yet
-        @cons_lines = $schema->resultset('InventoryConsignmentLine')->search(
+        @cons_lines = $schema->resultset('Accounting::InventoryConsignmentLine')->search(
             {
                 'consignment.sitename' => $sitename,
                 'consignment.status'   => { -in => [qw(open partially_settled)] },
@@ -1722,7 +1722,7 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
         # Fetch item with only safe columns so missing DB columns never error
         my $item_id = $line->item_id;
         my $item = eval {
-            $schema->resultset('InventoryItem')->find(
+            $schema->resultset('Accounting::InventoryItem')->find(
                 $item_id,
                 { columns => \@safe_item_cols }
             );

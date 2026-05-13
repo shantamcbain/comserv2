@@ -1,0 +1,6 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3><a href="/ENCY/herb_detail/[% herb.record_id %]" target="_blank">[% herb.common_names | html %]</a></h3>
+  [% IF herb.botanical_name %]<p><em>[% herb.botanical_name | html %]</em></p>[% END %]
+  [% IF herb.therapeutic_action %]<p>[% herb.therapeutic_action | html %]</p>[% END %]
+</div>

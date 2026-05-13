@@ -204,14 +204,14 @@ sub index :Path :Args(0) {
     eval {
         my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
         if (lc($site_name) eq 'csc') {
-            my @pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my @pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' },
                 { order_by => { -asc => 'sitename' } }
             )->all;
             $pending_hosting = scalar @pending;
             $pending_hosting_sites = \@pending;
         } else {
-            my @inv = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @inv = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => $site_name, status => 'outstanding' },
                 { join => 'supplier', prefetch => 'supplier', order_by => { -asc => 'me.due_date' } }
             )->all;
@@ -223,18 +223,91 @@ sub index :Path :Args(0) {
             "Outstanding invoices query error: $@");
     }
 
+    my $helpdesk_open_tickets = [];
+    my $helpdesk_open_count   = 0;
+    eval {
+        my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+        my $is_csc    = lc($site_name) eq 'csc';
+        my %hd_where  = (status => [qw(open in_progress)]);
+        $hd_where{site_name} = $site_name unless $is_csc;
+        my @hd_tickets = $c->model('DBEncy')->resultset('SupportTicket')->search(
+            \%hd_where,
+            { order_by => [{ -desc => 'me.created_at' }], rows => 10 }
+        )->all;
+        $helpdesk_open_count   = $is_csc
+            ? $c->model('DBEncy')->resultset('SupportTicket')->search({ status => [qw(open in_progress)] })->count
+            : scalar @hd_tickets;
+        $helpdesk_open_tickets = \@hd_tickets;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'index',
+            "HelpDesk ticket query error: $@");
+    }
+
+    my $software_status = $self->_get_software_status($c);
+
     $c->stash(
-        template             => 'admin/index.tt',
-        stats                => $stats,
-        recent_activity      => $recent_activity,
-        notifications        => $notifications,
-        pending_hosting       => $pending_hosting,
-        pending_hosting_sites => $pending_hosting_sites,
-        outstanding_invoices  => $outstanding_invoices,
+        template              => 'admin/index.tt',
+        stats                 => $stats,
+        recent_activity       => $recent_activity,
+        notifications         => $notifications,
+        pending_hosting        => $pending_hosting,
+        pending_hosting_sites  => $pending_hosting_sites,
+        outstanding_invoices   => $outstanding_invoices,
+        helpdesk_open_tickets  => $helpdesk_open_tickets,
+        helpdesk_open_count    => $helpdesk_open_count,
+        software_status        => $software_status,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
         "Completed Admin index action");
+}
+
+sub _get_software_status {
+    my ($self, $c) = @_;
+
+    my $repo_dir = $c->path_to('..')->stringify;
+
+    my $current_branch  = '';
+    my $last_commit     = '';
+    my $commits_behind  = 0;
+    my $has_uncommitted = 0;
+    my $has_untracked   = 0;
+    my @recommendations;
+
+    eval {
+        chomp($current_branch = `git -C "$repo_dir" rev-parse --abbrev-ref HEAD 2>/dev/null`);
+        chomp($last_commit    = `git -C "$repo_dir" log -1 --format="%h %s" 2>/dev/null`);
+
+        my $fetch_out = `git -C "$repo_dir" fetch origin 2>&1`;
+        chomp(my $behind_raw = `git -C "$repo_dir" rev-list --count HEAD..origin/main 2>/dev/null`);
+        $commits_behind = ($behind_raw =~ /^\d+$/) ? $behind_raw + 0 : 0;
+
+        my $status_out = `git -C "$repo_dir" status --porcelain 2>/dev/null`;
+        $has_uncommitted = ($status_out =~ /^[MADRCU]/m) ? 1 : 0;
+        $has_untracked   = ($status_out =~ /^\?\?/m)     ? 1 : 0;
+
+        if ($commits_behind > 0) {
+            push @recommendations, {
+                type    => 'warning',
+                icon    => 'fas fa-exclamation-triangle',
+                message => "Your branch is $commits_behind commit(s) behind origin/main.",
+                action  => 'Run Git Pull to update.',
+                link    => '/admin/git_pull',
+            };
+        }
+    };
+
+    return {
+        git_status => {
+            current_branch          => $current_branch  || 'Unknown',
+            last_commit             => $last_commit      || 'No commits',
+            commits_behind          => $commits_behind,
+            has_uncommitted_changes => $has_uncommitted,
+            has_untracked_files     => $has_untracked,
+        },
+        recommendations => \@recommendations,
+    };
 }
 
 # Get system statistics for the admin dashboard
@@ -425,7 +498,7 @@ sub get_system_notifications {
         }
 
         if ($is_csc_admin) {
-            my $pending = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            my $pending = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
                 { status => 'pending' }
             )->count;
             if ($pending > 0) {
@@ -441,7 +514,7 @@ sub get_system_notifications {
 
             # Recently paid hosting invoices (last 48h)
             my $cutoff = DateTime->now->subtract(hours => 48)->strftime('%Y-%m-%d %H:%M:%S');
-            my @paid = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search(
+            my @paid = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search(
                 { sitename => { '!=' => 'CSC' }, status => 'paid',
                   updated_at => { '>=' => $cutoff } },
                 { order_by => { -desc => 'updated_at' } }
@@ -460,7 +533,7 @@ sub get_system_notifications {
         eval {
             my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
             my $today_str = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
-            my $auto_due  = $c->model('DBEncy')->resultset('InventorySupplierInvoice')->search({
+            my $auto_due  = $c->model('DBEncy')->resultset('Accounting::InventorySupplierInvoice')->search({
                 sitename => $site_name,
                 auto_pay => 1,
                 status   => { '!=' => 'paid' },
@@ -765,7 +838,7 @@ sub create_user :Path('/admin/create_user') :Args(0) {
         @available_sites = $schema->resultset('Site')->search({ name => $sitename })->all;
     }
 
-    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'admin');
+    my @available_roles = ('normal', 'editor', 'developer', 'WorkshopLeader', 'helpdesk', 'admin');
 
     $c->stash(
         available_sites => \@available_sites,
@@ -1982,6 +2055,11 @@ sub backup :Path('/admin/backup') :Args(0) {
 }
 
 # Keeping it here for backward compatibility
+sub mail :Path('/admin/mail') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->redirect($c->uri_for('/mail/mail_admin_dashboard'));
+}
+
 sub network_devices_forward :Path('/admin/network_devices_old') :Args(0) {
     my ($self, $c) = @_;
 
@@ -2534,8 +2612,15 @@ sub find_result_file {
     my $app_root = $c->config->{home} || '/home/shanta/PycharmProjects/comserv2';
     
     if (lc($database) eq 'ency') {
+        # If the input looks like a subdirectory path (e.g., "Ency/ExternalID"),
+        # also try a direct path match before falling back to computed result_name
+        if ($table_name =~ m{/}) {
+            my $direct = "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/${table_name}.pm";
+            return $direct if -f $direct;
+        }
         @search_paths = (
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/$result_name.pm",
+            "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/Ency/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/System/$result_name.pm",
             "$app_root/Comserv/lib/Comserv/Model/Schema/Ency/Result/User/$result_name.pm"
         );
@@ -2569,7 +2654,13 @@ sub table_name_to_result_name {
     
     # Handle database-specific table name patterns
     my $clean_name = $table_name;
-    
+
+    # Strip subdirectory prefix (e.g., "Ency/ExternalID" -> "ExternalID")
+    # scan_result_directory_recursive uses "/" to denote subdirectory nesting
+    if ($clean_name =~ m{^[A-Za-z][A-Za-z0-9]*/(.+)$}) {
+        $clean_name = $1;
+    }
+
     # Remove common prefixes
     $clean_name =~ s/^ency_//i;
     $clean_name =~ s/^forager_//i;
@@ -4674,53 +4765,48 @@ sub get_result_field_info {
         my $columns_section = $1;
         
         my $field_info = {};
-        
+
+        # Helper: parse attributes from a field definition block.
+        # Handles one level of nested braces (e.g. extra => { list => [...] } for ENUM).
+        my $parse_field_def = sub {
+            my ($field_def) = @_;
+            my %info;
+            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
+                $info{data_type} = $1;
+            }
+            if ($field_def =~ /size\s*=>\s*(\d+)/) {
+                $info{size} = $1;
+            }
+            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
+                $info{is_nullable} = $1;
+            }
+            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
+                $info{is_auto_increment} = $1;
+            }
+            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
+                $info{default_value} = $1;
+            }
+            # Extract ENUM list from: extra => { list => [qw/val1 val2 .../] }
+            if ($field_def =~ /extra\s*=>\s*\{[^}]*list\s*=>\s*\[qw.([^\]\/!|]+)[\/!|>)]\]/s) {
+                $info{enum_list} = [ split /\s+/, $1 ];
+            }
+            return \%info;
+        };
+
+        # Regex that matches a brace-delimited block allowing one level of nesting.
+        # Handles: extra => { list => [...] }  inside the field definition.
+        my $block_re = qr/\{((?:[^{}]|\{[^{}]*\})*)\}/s;
+
         # Try hash format first: field_name => { ... }
-        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from hash format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /(?:^|\s|,)\s*'?$field_name'?\s*=>?\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
-        
+
         # Try array format: "field_name", { ... }
-        if ($columns_section =~ /["']$field_name["']\s*,\s*\{([^}]+)\}/s) {
-            my $field_def = $1;
-            
-            # Parse field attributes from array format
-            if ($field_def =~ /data_type\s*=>\s*["']([^"']+)["']/) {
-                $field_info->{data_type} = $1;
-            }
-            if ($field_def =~ /size\s*=>\s*(\d+)/) {
-                $field_info->{size} = $1;
-            }
-            if ($field_def =~ /is_nullable\s*=>\s*([01])/) {
-                $field_info->{is_nullable} = $1;
-            }
-            if ($field_def =~ /is_auto_increment\s*=>\s*([01])/) {
-                $field_info->{is_auto_increment} = $1;
-            }
-            if ($field_def =~ /default_value\s*=>\s*["']([^"']*)["']/) {
-                $field_info->{default_value} = $1;
-            }
-            
-            return $field_info;
+        if ($columns_section =~ /["']$field_name["']\s*,\s*$block_re/s) {
+            $field_info = $parse_field_def->($1);
+            return $field_info if %$field_info;
         }
     }
     
@@ -4934,6 +5020,13 @@ sub update_table_field_from_result {
         $col_def .= 'DATE';
     } elsif ($data_type eq 'BOOLEAN') {
         $col_def .= 'TINYINT(1)';
+    } elsif ($data_type eq 'ENUM') {
+        my $enum_list = $result_field_info->{enum_list};
+        unless ($enum_list && ref($enum_list) eq 'ARRAY' && @$enum_list) {
+            die "ENUM field '$field_name' has no list values in Result class (extra => { list => [...] } missing)";
+        }
+        my $values = join(',', map { "'$_'" } @$enum_list);
+        $col_def .= "ENUM($values)";
     } else {
         $col_def .= $data_type;
         $col_def .= "($size)" if $size;
@@ -5419,20 +5512,6 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers',
         "Docker containers management page accessed");
-
-    # Port restriction: only accessible from port 3001 (host dev server)
-    my $port = $c->req->uri->port || 0;
-    if ($port == 5000) {
-        $c->response->body('');
-        $c->response->status(403);
-        return;
-    }
-    if ($port && $port != 3001) {
-        my $redirect_uri = $c->req->uri->clone;
-        $redirect_uri->port(3001);
-        $c->response->redirect($redirect_uri);
-        return;
-    }
 
     # CSC admin only - use AdminAuth (same pattern as all other admin actions)
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -6261,6 +6340,24 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             _exit(1);
         }
         print "\n✅ Build complete\n\n";
+
+        print "--- Step 1b: Stale-build check ---\n";
+        my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
+        chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
+        chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
+        my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
+        if ($new_commits > 0) {
+            print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
+            print "   Build captured: $git_commit\n";
+            print "   main is now at: $post_build_commit\n";
+            print "   The pushed image will NOT contain these commits:\n";
+            my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
+            print "$new_log\n";
+            print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
+            print "   Continuing push anyway (image is still valid, just not latest).\n\n";
+        } else {
+            print "✅ main has not advanced — build is current ($git_commit)\n\n";
+        }
 
         print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
         my $push_exit = system('docker', 'compose',

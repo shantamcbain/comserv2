@@ -1,0 +1,5 @@
+[% META no_wrapper = 1 %]
+<div class="ency-cpop-inner">
+  <h3><a href="/ENCY/Drug/[% drug.record_id %]" target="_blank">[% drug.brand_name | html %][% IF drug.generic_name %] <small>([% drug.generic_name | html %])</small>[% END %]</a></h3>
+  [% IF drug.indications %]<p>[% drug.indications | html %]</p>[% END %]
+</div>

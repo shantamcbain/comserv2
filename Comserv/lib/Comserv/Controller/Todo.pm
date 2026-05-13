@@ -8,6 +8,7 @@ use JSON::MaybeXS;
 use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
+use Comserv::Util::Priority ();
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -22,21 +23,14 @@ sub get_status_name {
 }
 
 # Helper method to get priority name from code (1-10 scale)
+sub priority_options {
+    return Comserv::Util::Priority::priority_options();
+}
+
 sub get_priority_name {
     my ($self, $priority_code) = @_;
-    my %priority_map = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    return $priority_map{$priority_code} // "Priority $priority_code";
+    my $map = $self->priority_options;
+    return $map->{$priority_code} // "Priority $priority_code";
 }
 
 # Helper method to convert numeric status to string for database storage
@@ -48,6 +42,19 @@ sub convert_status_to_string {
         3 => 'DONE'
     );
     return $status_map{$status_code} // $status_code;
+}
+
+sub normalize_status {
+    my ($self, $val) = @_;
+    return 1 unless defined $val;
+    return $val + 0 if $val =~ /^\d+$/;
+    my $lc = lc($val);
+    $lc =~ s/[-_ ]+//g;
+    return 1 if $lc eq 'new';
+    return 2 if $lc =~ /^in?progress$|^inprog$|^inprocess$/;
+    return 3 if $lc =~ /^done$|^completed$|^complete$/;
+    return 4 if $lc =~ /^cancel/;
+    return 1;
 }
 
 # Helper method to filter todos by date range
@@ -384,9 +391,15 @@ sub details :Path('/todo/details') :Args {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'details',
             "AI conv fetch error: $@") if $@;
 
+        my $current_status   = $self->normalize_status($todo->get_column('status'));
+        my $current_priority = $todo->get_column('priority') // 5;
+
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
+            current_status    => $current_status,
+            current_priority  => $current_priority,
+            build_priority    => $self->priority_options,
             accumulative_time => $accumulative_time,
             projects          => $projects,
             todo_intervals    => \@intervals,
@@ -459,20 +472,6 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         'Fetched users to populate user_id dropdown'
     );
 
-    # Build priority and status mappings for dropdowns
-    my %priority_options = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    
     my %status_options = (
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -481,11 +480,11 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
 
     # Add the projects, sitename, and users to the stash
     $c->stash(
-        projects        => $projects,        # Parent projects with nested sub-projects
-        current_project => $current_project, # Selected project for the form (if any)
-        users           => \@users,          # List of users to populate dropdown
-        build_priority  => \%priority_options, # Priority options for dropdown
-        build_status    => \%status_options,   # Status options for dropdown
+        projects        => $projects,
+        current_project => $current_project,
+        users           => \@users,
+        build_priority  => $self->priority_options,
+        build_status    => \%status_options,
         return_to       => $return_to,       # URL to return to after action
         start_date      => $c->request->params->{start_date},
         time_of_day     => $c->request->params->{time_of_day},
@@ -575,20 +574,6 @@ sub edit :Path('/todo/edit') :Args(1) {
     # Format the total time as 'HH:MM'
     my $accumulative_time = sprintf("%02d:%02d", $hours, $minutes);
 
-    # Build priority and status mappings for dropdowns
-    my %priority_options = (
-        1  => 'Critical',
-        2  => 'When we have time', 
-        3  => 'Urgent',
-        4  => 'High',
-        5  => 'Medium',
-        6  => 'Medium-Low', 
-        7  => 'Low',
-        8  => 'Very Low',
-        9  => 'Minimal',
-        10 => 'Optional'
-    );
-    
     my %status_options = (
         1 => 'NEW',
         2 => 'IN PROGRESS',
@@ -596,14 +581,27 @@ sub edit :Path('/todo/edit') :Args(1) {
     );
 
     # Add the todo, projects, and users to the stash
+    my $current_status   = $self->normalize_status($todo->get_column('status'));
+    my $current_priority = $todo->get_column('priority') // 5;
+
+    my $edit_sites = [];
+    eval {
+        my $site_model = $c->model('Site');
+        $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
+    };
+
     $c->stash(
         record           => $todo,
+        current_status   => $current_status,
+        current_priority => $current_priority,
         projects         => $projects,
         users            => \@users,
         accumulative_time => $accumulative_time,
-        build_priority   => \%priority_options, # Priority options for dropdown
-        build_status     => \%status_options,   # Status options for dropdown
-        return_to        => $return_to,         # URL to return to after action
+        build_priority   => $self->priority_options,
+        build_status     => \%status_options,
+        return_to        => $return_to,
+        sites            => $edit_sites,
+        form_data        => { sitename => $todo->get_column('sitename') },
         template         => 'todo/edit.tt'
     );
 
@@ -724,28 +722,28 @@ sub modify :Path('/todo/modify') :Args(1) {
     eval {
         $todo->update({
             sitename             => $form_data->{sitename},
-            start_date           => $form_data->{start_date},
+            start_date           => $form_data->{start_date}      || $todo->get_column('start_date'),
             parent_todo          => $parent_todo,
             due_date             => $new_due_date,
             subject              => $form_data->{subject},
             description          => $form_data->{description},
-            estimated_man_hours  => $form_data->{estimated_man_hours},
-            comments             => $form_data->{comments},
-            accumulative_time    => $accumulative_time,
-            reporter             => $form_data->{reporter},
-            company_code         => $form_data->{company_code},
-            owner                => $form_data->{owner},
-            developer            => $form_data->{developer},
+            estimated_man_hours  => $form_data->{estimated_man_hours} // $todo->get_column('estimated_man_hours'),
+            comments             => defined($form_data->{comments}) ? $form_data->{comments} : $todo->get_column('comments'),
+            accumulative_time    => $accumulative_time || $todo->get_column('accumulative_time'),
+            reporter             => defined($form_data->{reporter}) && $form_data->{reporter} ne '' ? $form_data->{reporter} : $todo->get_column('reporter'),
+            company_code         => defined($form_data->{company_code}) && $form_data->{company_code} ne '' ? $form_data->{company_code} : $todo->get_column('company_code'),
+            owner                => defined($form_data->{owner}) && $form_data->{owner} ne '' ? $form_data->{owner} : $todo->get_column('owner'),
+            developer            => defined($form_data->{developer}) && $form_data->{developer} ne '' ? $form_data->{developer} : $todo->get_column('developer'),
             username_of_poster   => $c->session->{username},
-            status               => $form_data->{status},
-            priority             => $form_data->{priority},
-            time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : undef,
-            share                => $form_data->{share} || 0,
+            status               => $self->normalize_status($form_data->{status}),
+            priority             => ($form_data->{priority} && $form_data->{priority} =~ /^\d+$/) ? $form_data->{priority} : $todo->get_column('priority'),
+            time_of_day          => ($form_data->{time_of_day} && $form_data->{time_of_day} ne '') ? $form_data->{time_of_day} : $todo->get_column('time_of_day'),
+            share                => $form_data->{share} // $todo->get_column('share') // 0,
             last_mod_by          => $current_user,
             last_mod_date        => $today,
-            user_id              => $form_data->{user_id} || 1,
-            project_id           => $form_data->{project_id},
-            date_time_posted     => $form_data->{date_time_posted},
+            user_id              => $todo->get_column('user_id'),
+            project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
+            date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
         });
     };
     if ($@) {
@@ -840,16 +838,14 @@ sub modify :Path('/todo/modify') :Args(1) {
 
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
-    
+
     if ($form_data->{return_to}) {
         $c->response->redirect($form_data->{return_to});
         $c->detach();
     }
-    
-    $c->stash(
-        record      => $todo,             # Provide updated data
-        template    => 'todo/details.tt',  # Redirect back to the form for review
-    );
+
+    $c->response->redirect($c->uri_for('/todo/details', { record_id => $record_id }));
+    $c->detach();
 }
 
 sub create :Local {
@@ -1857,10 +1853,12 @@ sub quick_close :Path('quick_close') :Args(0) {
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
         die "Todo not found\n" unless $todo;
 
+        my $close_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
         $todo->update({
-            status       => 3,
-            last_mod_by  => $username,
+            status        => 3,
+            last_mod_by   => $username,
             last_mod_date => $today,
+            time_of_day   => $close_time,
         });
 
         my $proj_code = '';

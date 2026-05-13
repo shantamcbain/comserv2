@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::Ollama;
 use JSON;
 use Time::Piece;
 use DateTime;
@@ -235,7 +236,9 @@ sub daily :Path('/planning/daily') :Args {
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch orphan plans: $@") if $@;
 
-    my $filter_site = $c->req->param('filter_site') || '';
+    my $filter_site    = $c->req->param('filter_site')    || '';
+    my $filter_project = $c->req->param('filter_project') || '';
+
     if ($is_csc && $filter_site) {
         @planning_projects = grep { ($_->{sitename} || '') eq $filter_site } @planning_projects;
         @orphan_plans      = grep { ($_->{sitename} || '') eq $filter_site } @orphan_plans;
@@ -261,8 +264,12 @@ sub daily :Path('/planning/daily') :Args {
 
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
         my %ap_cond = (status => { -not_in => \@done_statuses });
-        $ap_cond{sitename} = $sitename unless $is_csc;
-        $ap_cond{user_id}  = $user_id  unless $can_see_all;
+        if ($is_csc && $filter_site) {
+            $ap_cond{sitename} = $filter_site;
+        } elsif (!$is_csc) {
+            $ap_cond{sitename} = $sitename;
+        }
+        $ap_cond{user_id} = $user_id unless $can_see_all;
 
         my %cross_blocker_projects;
         my %cross_blocker_names;
@@ -303,13 +310,15 @@ sub daily :Path('/planning/daily') :Args {
                     { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
-                rows => 60,
+                rows => 2000,
             }
         )->all;
 
-        my %row_by_id  = map { $_->record_id => $_ } @rows;
+        my %row_by_id       = map { $_->record_id => $_ } @rows;
         my %proj_cache;
-        my $now_epoch  = time();
+        my %ap_projects_seen;
+        my %ap_role_cats_seen;
+        my $now_epoch       = time();
 
         my @scored;
         for my $todo (@rows) {
@@ -339,7 +348,19 @@ sub daily :Path('/planning/daily') :Args {
                 $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
             }
 
-            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus) + $stale_penalty;
+            my $due_bonus = 0;
+            if (my $due = $h{due_date}) {
+                if ($due =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                    my $due_epoch = POSIX::mktime(0, 0, 23, $3, $2 - 1, $1 - 1900);
+                    my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                    $h{days_until_due} = $days_until_due;
+                    if    ($days_until_due < 0)  { $due_bonus = -5; $h{is_overdue} = 1; }
+                    elsif ($days_until_due == 0) { $due_bonus = -3; $h{due_today}  = 1; }
+                    elsif ($days_until_due <= 3) { $due_bonus = -1; }
+                }
+            }
+
+            $h{ap_score} = ($status_tier * 100) + ($priority + $block_bonus + $cross_block_bonus + $due_bonus) + $stale_penalty;
 
             if ($h{blocked_by_todo_id}) {
                 my $blocker = $row_by_id{$h{blocked_by_todo_id}}
@@ -354,18 +375,54 @@ sub daily :Path('/planning/daily') :Args {
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
-                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                    $proj_cache{$h{project_id}} = $p ? { name => $p->name, parent_id => ($p->parent_id || '') } : { name => '', parent_id => '' };
                 }
-                $h{project_name} = $proj_cache{$h{project_id}};
+                $h{project_name} = $proj_cache{$h{project_id}}{name};
+                $ap_projects_seen{$h{project_id}} //= {
+                    project_id   => $h{project_id},
+                    project_name => $proj_cache{$h{project_id}}{name} || $h{project_code} || "Project #$h{project_id}",
+                    project_code => $h{project_code} || '',
+                    sitename     => $h{sitename}     || '',
+                    parent_id    => $proj_cache{$h{project_id}}{parent_id} || '',
+                };
             }
+
+            $h{role_cats} = $self->_classify_todo_roles(
+                $h{project_name} // '', $h{project_code} // '', $h{subject} // ''
+            );
+            $ap_role_cats_seen{$_} = 1 for split ',', $h{role_cats};
 
             push @scored, \%h;
         }
 
-        @active_priorities = (sort {
+        my @all_sorted = sort {
             $a->{ap_score} <=> $b->{ap_score} || $a->{priority} <=> $b->{priority}
-        } @scored)[0..24];
-        @active_priorities = grep { defined } @active_priorities;
+        } @scored;
+
+        if ($filter_project) {
+            @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
+        }
+
+        @active_priorities = @all_sorted;
+
+        my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
+                               values %ap_projects_seen;
+        my @ap_role_cats_list = sort keys %ap_role_cats_seen;
+
+        my @ap_all_sitenames;
+        if ($is_csc) {
+            eval {
+                my $site_rows = $c->model('Site')->get_all_sites($c);
+                @ap_all_sitenames = sort map { $_->name } @$site_rows;
+            };
+        }
+
+        $c->stash(
+            ap_projects      => \@ap_projects_list,
+            ap_role_cats     => \@ap_role_cats_list,
+            ap_user_roles    => $user_roles,
+            ap_all_sitenames => \@ap_all_sitenames,
+        );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
         "Could not fetch active priorities: $@") if $@;
@@ -463,6 +520,7 @@ sub daily :Path('/planning/daily') :Args {
         orphan_plans      => \@orphan_plans,
         plan_sitenames    => \@plan_sitenames,
         filter_site       => $filter_site,
+        filter_project    => $filter_project,
         all_plans         => \@all_plans,
         is_admin          => $c->stash->{is_admin},
 
@@ -513,18 +571,107 @@ sub daily :Path('/planning/daily') :Args {
             };
             \@dp_entries;
         },
+        stale_log_count => do {
+            my $cnt = 0;
+            my $_lu = $c->session->{username} || '';
+            eval {
+                my $today_str = $current_date_str;
+                $cnt = $c->model('DBEncy')->resultset('Log')->search(
+                    { username   => $_lu,
+                      start_date => { '<' => $today_str },
+                      status     => { -in => [1, 2, 'open', 'in-progress'] } }
+                )->count || 0;
+            };
+            $cnt;
+        },
+
         open_log_entry => do {
             my $open;
+            my $_log_user = $c->session->{username} || '';
             eval {
                 my $row = $c->model('DBEncy')->resultset('Log')->search(
-                    { sitename => $sitename,
+                    { username => $_log_user,
                       abstract => { -like => "%Good Morning - Daily Log - $current_date_str%" },
                       status   => 2 },
-                    { order_by => { -desc => 'id' }, rows => 1 }
+                    { order_by => { -desc => 'record_id' }, rows => 1 }
                 )->first;
-                $open = { $row->get_columns } if $row;
+                if ($row) {
+                    my %cols = $row->get_columns;
+                    my $det = $cols{details} || '';
+                    if ($det =~ /Notes:\n(.*)$/s) {
+                        $cols{notes_only} = $1;
+                    } else {
+                        $cols{notes_only} = '';
+                    }
+                    $open = \%cols;
+                }
             };
             $open;
+        },
+
+        audit_todos => do {
+            my @at;
+            eval {
+                my $audit_cond = {
+                    -or => [
+                        { subject => { -like => '%Morning Audit%' } },
+                        { subject => { -like => '[Error]%' } },
+                    ],
+                    status  => { -in => [1, 2] },
+                };
+                $audit_cond->{sitename} = $sitename unless $is_csc;
+                my %audit_cond = %$audit_cond;
+                my @roots = $c->model('DBEncy')->resultset('Todo')->search(
+                    \%audit_cond,
+                    { order_by => { -desc => 'start_date' }, rows => 10 }
+                )->all;
+                my %proj_cache;
+                my $resolve_proj = sub {
+                    my $todo = shift;
+                    my $pid  = $todo->get_column('project_id') // '';
+                    return $proj_cache{$pid} if exists $proj_cache{$pid};
+                    my $name = '';
+                    if ($pid) {
+                        eval {
+                            my $p = $c->model('DBEncy')->resultset('Project')->find($pid);
+                            $name = $p->name if $p;
+                        };
+                    }
+                    $proj_cache{$pid} = $name;
+                    return $name;
+                };
+
+                for my $root (@roots) {
+                    my %cols = $root->get_columns;
+                    $cols{project_name} = $resolve_proj->($root);
+                    push @at, { %cols, is_root => 1 };
+                    my @children = $c->model('DBEncy')->resultset('Todo')->search(
+                        { parent_id => $root->record_id,
+                          status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                        { order_by => { -asc => 'priority' } }
+                    )->all;
+                    for my $ch (@children) {
+                        my %cc = $ch->get_columns;
+                        $cc{project_name} = $resolve_proj->($ch);
+                        push @at, { %cc, is_root => 0 };
+                    }
+                }
+            };
+            \@at;
+        },
+
+        helpdesk_tickets => do {
+            my @ht;
+            eval {
+                my %hd_cond = ( status => 'open' );
+                $hd_cond{site_name} = $sitename unless $is_csc;
+                @ht = map { { $_->get_columns } }
+                    $c->model('DBEncy')->resultset('SupportTicket')->search(
+                        \%hd_cond,
+                        { order_by => [{ -asc => 'priority' }, { -desc => 'created_at' }], rows => 50 }
+                    )->all;
+            };
+            \@ht;
         },
 
         template => 'admin/planning/DailyPlan.tt',
@@ -538,6 +685,56 @@ POST params: action=start|end
 Route: /planning/daily_log
 
 =cut
+
+sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || 'user';
+    my $user_id  = $c->session->{user_id}  || 0;
+    my $sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'DB unavailable' }));
+        return;
+    }
+
+    my $result = $self->_run_audit_scan($c, $schema, $sitename, $username, $user_id, $today);
+
+    my $hd_count = 0;
+    eval {
+        my %hd = (status => 'open');
+        my $is_csc = ($sitename eq 'CSC');
+        $hd{site_name} = $sitename unless $is_csc;
+        $hd_count = $schema->resultset('SupportTicket')->count(\%hd) || 0;
+    };
+
+    my $deploy_note = $result->{last_deploy_dt}
+        ? " (scanning since last deploy: $result->{last_deploy_dt})"
+        : " (scanning last 24h — no production deploy recorded)";
+
+    $c->response->body(encode_json({
+        success          => JSON::true,
+        created_count    => $result->{todo_created},
+        error_count      => $result->{error_count},
+        helpdesk_count   => $hd_count,
+        last_deploy_dt   => $result->{last_deploy_dt} || '',
+        message          => $result->{todo_created}
+            ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)$deploy_note"
+            : ($result->{error_count}
+                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences$deploy_note"
+                : "No errors found$deploy_note"),
+    }));
+}
 
 sub daily_log :Path('/planning/daily_log') :Args(0) {
     my ($self, $c) = @_;
@@ -561,6 +758,364 @@ sub daily_log :Path('/planning/daily_log') :Args(0) {
 
     my $result = $self->_daily_log_action($c, $action, $username, $user_id);
     $c->response->body(encode_json($result));
+}
+
+=head2 _classify_todo_roles
+
+Classify a todo into one or more role categories based on project name,
+project code, and subject keywords.  Returns a comma-separated string
+from the set: developer, editor, admin, general.
+
+=cut
+
+sub _classify_todo_roles {
+    my ($self, $project_name, $project_code, $subject) = @_;
+    my $text = lc(join(' ', grep { defined $_ && $_ ne '' }
+        $project_name // '', $project_code // '', $subject // ''));
+    my @roles;
+    push @roles, 'editor'
+        if $text =~ /\b(ency|encyclopedia|document|content|wiki|article|unresolved|constituent|glossary|editorial|text.?content|page.?content)\b/;
+    push @roles, 'admin'
+        if $text =~ /\b(helpdesk|help.desk|ticket|server.?health|health.?monitor|disk|security|backup|smtp|certificate|ssl|dns|network|deploy|docker|container|production.?server|prod.?server)\b/;
+    push @roles, 'developer'
+        if $text =~ /\b(catalyst|schema|database|db|migration|module|controller|api|script|perl|javascript|js|css|html|refactor|implement|debug|build|3d.?print|inventory|shop|workshop|membership|planning|points|comserv|infrastructure|upgrade|fix|test|code|system|json|endpoint)\b/;
+    push @roles, 'general' unless @roles;
+    return join(',', @roles);
+}
+
+=head2 _run_audit_scan
+
+Scan system_log for WARN/ERROR/CRITICAL entries in the last 24h,
+group by subroutine, and create a Morning Audit root todo + per-area
+child todos (AI-assisted). Skips areas that already have an open todo.
+Returns hashref: { error_count, todo_created, subjects => [...] }
+
+=cut
+
+sub _run_audit_scan {
+    my ($self, $c, $schema, $sitename, $username, $user_id, $today) = @_;
+
+    my (%groups, $error_count, $todo_created) = ();
+    my @subjects;
+    my $last_deploy_dt;
+
+    my $system_project_id = 1;
+    eval {
+        my $sp = $schema->resultset('Project')->search(
+            { project_code => { -in => ['PLANNING', 'Catalyst2', 'CSCDebugLog'] }, sitename => 'CSC' },
+            { order_by => { -asc => 'id' }, rows => 1 }
+        )->first;
+        $system_project_id = $sp->id if $sp;
+    };
+
+    my $admin_user_id = $user_id || 0;
+    unless ($admin_user_id) {
+        eval {
+            my $admin = $schema->resultset('User')->search(
+                { rolename => 'admin' }, { rows => 1 }
+            )->first;
+            $admin_user_id = $admin->id if $admin;
+        };
+    }
+    $admin_user_id ||= 178;
+
+    eval {
+        my $since = do {
+            my @t = localtime(time - 86400);
+            sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
+        };
+
+        eval {
+            my $deploy_log = $schema->resultset('Log')->search(
+                { abstract => { -like => '%Docker Hub Deploy%' },
+                  status   => 3 },
+                { order_by => { -desc => 'start_date', -desc => 'start_time' }, rows => 1 }
+            )->first;
+            if ($deploy_log) {
+                $last_deploy_dt = ($deploy_log->start_date || '') . ' ' . ($deploy_log->start_time || '00:00:00');
+            }
+        };
+        if ($last_deploy_dt && $last_deploy_dt gt $since) {
+            $since = $last_deploy_dt;
+        }
+
+        my @errs = $schema->resultset('SystemLog')->search(
+            { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
+              timestamp => { '>=' => $since } },
+            { order_by => { -desc => 'timestamp' }, rows => 200 }
+        )->all;
+        for my $e (@errs) {
+            my $sub = $e->subroutine || 'unknown';
+            $sub =~ s/^Comserv:://;
+            push @{ $groups{$sub} }, {
+                level   => uc($e->level),
+                ts      => $e->timestamp,
+                message => substr($e->message || '', 0, 500),
+                file    => $e->file || '',
+                line    => $e->line || '',
+            };
+        }
+    };
+    $error_count = scalar keys %groups;
+
+    if ($error_count) {
+        my $existing_audit;
+        eval {
+            $existing_audit = $schema->resultset('Todo')->search(
+                { sitename   => $sitename,
+                  subject    => { -like => "%Morning Audit%$today%" },
+                  start_date => $today },
+                { rows => 1 }
+            )->first;
+        };
+
+        if ($existing_audit) {
+            my $root_st = $existing_audit->status // 0;
+            my $root_closed = ($root_st == 3 || $root_st =~ /^(done|completed|closed)$/i);
+
+            if ($root_closed) {
+                my $close_date = $existing_audit->last_mod_date || $today;
+                my $close_tod  = $existing_audit->time_of_day   || '23:59:59';
+                my $cutoff = $close_date . ' ' . $close_tod;
+                my %new_groups;
+                for my $sub (keys %groups) {
+                    my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                    $new_groups{$sub} = \@newer if @newer;
+                }
+                if (keys %new_groups) {
+                    my $ollama;
+                    eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                    my $new_error_count = scalar keys %new_groups;
+                    my $root_desc = "=== Audit Refresh - $today ===\n\n"
+                        . "Found $new_error_count area(s) with new errors since previous audit was closed.\n"
+                        . "Each sub-todo below was created from the system error log.\n"
+                        . "Resolve each sub-todo to clear this audit.";
+                    my $root_todo;
+                    eval {
+                        $root_todo = $schema->resultset('Todo')->create({
+                            subject             => "\x{26A0}\x{FE0F} Morning Audit: $new_error_count area(s) need review ($today)",
+                            description         => $root_desc,
+                            status              => 1,
+                            priority            => 1,
+                            is_blocking         => 1,
+                            sitename            => $sitename,
+                            developer           => $username,
+                            username_of_poster  => $username,
+                            user_id             => $admin_user_id,
+                            project_id          => $system_project_id,
+                            last_mod_by         => $username,
+                            last_mod_date       => $today,
+                            date_time_posted    => $today . ' 00:00:00',
+                            start_date          => $today,
+                            due_date            => $today,
+                            parent_todo         => '',
+                            estimated_man_hours => 0,
+                            accumulative_time   => '00:00:00',
+                            group_of_poster     => 'admin',
+                            project_code        => 'PLANNING',
+                            share               => 0,
+                        });
+                    };
+                    if ($root_todo && !$@) {
+                        $todo_created = 1;
+                        my $root_id = $root_todo->record_id;
+                        for my $sub (sort keys %new_groups) {
+                            my @entries = @{ $new_groups{$sub} };
+                            my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                                $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                            push @subjects, $ai_subject if $ai_subject;
+                        }
+                    }
+                }
+            } else {
+                $todo_created = 0;
+                my $root_id = $existing_audit->record_id;
+                my $ollama;
+                eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                for my $sub (sort keys %groups) {
+                    my $safe_sub = $sub;
+                    $safe_sub =~ s/[%_]/\\$&/g;
+                    my $open_exists;
+                    eval {
+                        $open_exists = $schema->resultset('Todo')->search(
+                            { parent_id  => $root_id,
+                              subject    => { -like => "%$safe_sub%" },
+                              status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { rows => 1 }
+                        )->first;
+                    };
+                    next if $open_exists;
+                    my $closed_child;
+                    eval {
+                        $closed_child = $schema->resultset('Todo')->search(
+                            { parent_id => $root_id,
+                              subject   => { -like => "%$safe_sub%" },
+                              status    => { -in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { order_by => { -desc => 'last_mod_date' }, rows => 1 }
+                        )->first;
+                    };
+                    if ($closed_child) {
+                        my $close_date = $closed_child->last_mod_date || $today;
+                        my $close_tod  = $closed_child->time_of_day   || '23:59:59';
+                        my $cutoff = $close_date . ' ' . $close_tod;
+                        my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                        next unless @newer;
+                    }
+                    my @entries = @{ $groups{$sub} };
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                    push @subjects, $ai_subject if $ai_subject;
+                    $todo_created++ if $ai_subject;
+                }
+            }
+        } else {
+            my $ollama;
+            eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+
+            my $root_desc = "=== Morning Audit - $today ===\n\n"
+                . "Found errors in $error_count area(s).\n"
+                . "Each sub-todo below was created with AI assistance from the system error log.\n"
+                . "Resolve each sub-todo to clear this audit.";
+            my $root_todo;
+            eval {
+                $root_todo = $schema->resultset('Todo')->create({
+                    subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count area(s) need review ($today)",
+                    description         => $root_desc,
+                    status              => 1,
+                    priority            => 1,
+                    is_blocking         => 1,
+                    sitename            => $sitename,
+                    developer           => $username,
+                    username_of_poster  => $username,
+                    user_id             => $admin_user_id,
+                    project_id          => $system_project_id,
+                    last_mod_by         => $username,
+                    last_mod_date       => $today,
+                    date_time_posted    => $today . ' 00:00:00',
+                    start_date          => $today,
+                    due_date            => $today,
+                    parent_todo         => '',
+                    estimated_man_hours => 0,
+                    accumulative_time   => '00:00:00',
+                    group_of_poster     => 'admin',
+                    project_code        => 'PLANNING',
+                    share               => 0,
+                });
+            };
+
+            if ($root_todo && !$@) {
+                $todo_created = 1;
+                my $root_id = $root_todo->record_id;
+                for my $sub (sort keys %groups) {
+                    my @entries = @{ $groups{$sub} };
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                    push @subjects, $ai_subject if $ai_subject;
+                }
+            }
+        }
+    }
+
+    return { error_count => $error_count || 0, todo_created => $todo_created || 0, subjects => \@subjects,
+             last_deploy_dt => $last_deploy_dt || '' };
+}
+
+sub _build_error_todo {
+    my ($self, $schema, $sitename, $username, $user_id, $today, $sub, $entries, $root_id, $ollama, $fallback_project_id) = @_;
+    $fallback_project_id //= 1;
+    my @entries  = @$entries;
+    my $count    = scalar @entries;
+    my $shown    = $count > 3 ? 3 : $count;
+    my $raw_err  = join("\n", map {
+        "[$_->{level}] $_->{ts} $_->{file}:$_->{line}\n  $_->{message}"
+    } @entries[0..$shown-1]);
+
+    my $top_level = (grep { $_->{level} =~ /^CRITICAL$/i } @entries) ? 'CRITICAL'
+                  : (grep { $_->{level} =~ /^ERROR$/i   } @entries) ? 'ERROR'
+                  : 'WARN';
+    my $default_priority = ($top_level eq 'WARN') ? 3 : 1;
+    my ($ai_subject, $ai_desc, $ai_priority) = ("$sub — $count $top_level(s) ($today)", $raw_err, $default_priority);
+
+    if ($ollama) {
+        eval {
+            my $prompt = "You are a software triage assistant. Given this system log entry from a Catalyst Perl web app, "
+                . "create a concise bug todo.\n\n"
+                . "Error area: $sub\nHighest level: $top_level\nOccurrences: $count\nSample entries:\n$raw_err\n\n"
+                . "Priority rules:\n"
+                . "  1 = CRITICAL/ERROR — production broken, email sent\n"
+                . "  2 = functional failure — feature broken but app running\n"
+                . "  3 = WARN — degraded but non-breaking\n"
+                . "Respond with ONLY a JSON object:\n"
+                . '{"subject":"one-line bug title (max 100 chars)","description":"2-3 sentence summary and fix","priority":1}';
+            my $resp = $ollama->chat(messages => [{ role => 'user', content => $prompt }]);
+            if ($resp && $resp =~ /\{.*\}/s) {
+                my ($json_str) = ($resp =~ /(\{.*?\})/s);
+                my $parsed = eval { decode_json($json_str) };
+                if ($parsed && !$@) {
+                    $ai_subject  = substr($parsed->{subject} || $ai_subject, 0, 200);
+                    $ai_desc     = $parsed->{description} || $ai_desc;
+                    $ai_priority = $parsed->{priority} || $default_priority;
+                    $ai_priority = 1  if $ai_priority < 1;
+                    $ai_priority = 10 if $ai_priority > 10;
+                    $ai_desc .= "\n\n--- Raw errors ($count occurrence(s)) ---\n$raw_err";
+                }
+            }
+        };
+    }
+
+    my $matched_project_id = $fallback_project_id;
+    my $matched_project_code = 'PLANNING';
+    eval {
+        my $first_entry = $entries[0];
+        my $search_term;
+        if ($sub =~ /Controller::(\w+)/) {
+            $search_term = $1;
+        } elsif ($first_entry && $first_entry->{file} && $first_entry->{file} =~ m{/(\w+)\.pm$}i) {
+            $search_term = $1;
+        }
+        if ($search_term && $search_term !~ /^(unknown|Comserv)$/i) {
+            my $proj = $schema->resultset('Project')->search(
+                { -or => [
+                    { name         => { -like => "%$search_term%" } },
+                    { project_code => { -like => "%$search_term%" } },
+                ]},
+                { rows => 1 }
+            )->first;
+            if ($proj) {
+                $matched_project_id   = $proj->id;
+                $matched_project_code = $proj->project_code || 'PLANNING';
+            }
+        }
+    };
+
+    eval {
+        $schema->resultset('Todo')->create({
+            subject             => $ai_subject,
+            description         => $ai_desc,
+            status              => 1,
+            priority            => $ai_priority,
+            is_blocking         => 0,
+            blocked_by_todo_id  => $root_id,
+            parent_id           => $root_id,
+            sitename            => $sitename,
+            developer           => $username,
+            username_of_poster  => $username,
+            user_id             => $user_id || 178,
+            project_id          => $matched_project_id,
+            last_mod_by         => $username,
+            last_mod_date       => $today,
+            date_time_posted    => $today . ' 00:00:00',
+            start_date          => $today,
+            due_date            => $today,
+            parent_todo         => '',
+            estimated_man_hours => 0,
+            accumulative_time   => '00:00:00',
+            group_of_poster     => 'admin',
+            project_code        => $matched_project_code,
+            share               => 0,
+        });
+    };
+    return $@ ? undef : $ai_subject;
 }
 
 =head2 _daily_log_action
@@ -599,13 +1154,13 @@ sub _daily_log_action {
             return {
                 success  => JSON::true,
                 action   => 'start',
-                entry_id => $existing->id + 0,
-                response => "\x{1F305} Good morning, $username! You already have an open daily log for today (entry #" . $existing->id . "). Check <a href='/log'>your logs</a>.",
+                entry_id => $existing->record_id + 0,
+                response => "\x{1F305} Good morning, $username! You already have an open daily log for today (entry #" . $existing->record_id . "). Check <a href='/log'>/log</a>.",
                 message  => "Daily log already open.",
             };
         }
 
-        # Stale open logs from previous days
+        # ── Stale open logs from previous days ──
         my @stale_logs;
         eval {
             @stale_logs = $schema->resultset('Log')->search(
@@ -614,7 +1169,7 @@ sub _daily_log_action {
             )->all;
         };
 
-        # Top priorities for the day
+        # ── Top priorities for today ──
         my @top_todos;
         eval {
             @top_todos = $schema->resultset('Todo')->search(
@@ -624,107 +1179,31 @@ sub _daily_log_action {
             )->all;
         };
 
-        # ── Audit: DB SystemLog + application.log for unreported errors ──
-        my ($error_count, $todo_created) = (0, 0);
-        my @audit_lines;
+        # ── Audit: scan system_log and create todos ──
+        my $audit = $self->_run_audit_scan($c, $schema, $sitename, $username, $user_id, $today);
+        my $error_count          = $audit->{error_count};
+        my $todo_created         = $audit->{todo_created};
+        my @audit_todo_subjects  = @{ $audit->{subjects} };
 
-        # 1. DB SystemLog errors in last 24h
+        # ── Check for open HelpDesk support tickets ──
+        my $helpdesk_count = 0;
         eval {
-            my $since = do {
-                my @t = localtime(time - 86400);
-                sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
-            };
-            my @errs = $schema->resultset('SystemLog')->search(
-                { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
-                  timestamp => { '>=' => $since } },
-                { order_by => { -desc => 'timestamp' }, rows => 20 }
-            )->all;
-            for my $e (@errs) {
-                push @audit_lines, "[DB/" . uc($e->level) . "] " . $e->timestamp . " — " . substr($e->message || '', 0, 200);
-            }
+            $helpdesk_count = $schema->resultset('SupportTicket')->count(
+                { status => 'open' }
+            ) || 0;
         };
 
-        # 2. application.log file — scan last 24h for error:/critical: lines
-        eval {
-            my $log_path = $c->path_to('logs', 'application.log')->stringify;
-            if (-f $log_path) {
-                my $cutoff = time - 86400;
-                open(my $fh, '<', $log_path) or die "Cannot open $log_path: $!";
-
-                # Read last 8000 bytes to avoid scanning huge file
-                my $size = -s $log_path;
-                if ($size > 8000) {
-                    seek($fh, -8000, 2);
-                    <$fh>; # discard partial first line
-                }
-
-                my %seen_patterns;
-                while (my $line = <$fh>) {
-                    chomp $line;
-                    next unless $line =~ /^(?:error|critical):\s*\[(\d{4}-\d{2}-\d{2}[T ][\d:]+)\]/i;
-                    my $ts_str = $1;
-                    # Parse timestamp
-                    my $ts_epoch = 0;
-                    eval {
-                        (my $ts_clean = $ts_str) =~ s/T/ /;
-                        my ($y,$mo,$d,$h,$mi,$s) = $ts_clean =~ /(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/;
-                        require Time::Local;
-                        $ts_epoch = Time::Local::timelocal($s,$mi,$h,$d,$mo-1,$y-1900) if $y;
-                    };
-                    next if $ts_epoch && $ts_epoch < $cutoff;
-
-                    # Deduplicate by condensed pattern (strip timestamp/pid noise)
-                    (my $pattern = $line) =~ s/\[\d{4}-\d{2}-\d{2}[^\]]+\]//g;
-                    $pattern =~ s/\[\d+\]//g;
-                    $pattern = substr($pattern, 0, 120);
-                    next if $seen_patterns{$pattern}++;
-
-                    push @audit_lines, "[FILE/" . uc(($line =~ /^(\w+):/)[0] || 'ERROR') . "] $ts_str — " . substr($line, 0, 200);
-                }
-                close($fh);
-            }
-        };
-
-        $error_count = scalar @audit_lines;
-
-        if ($error_count) {
-            my $max_show  = $error_count > 10 ? 10 : $error_count;
-            my $todo_desc = "Errors found during Start Day audit ($today):\n\n"
-                . join("\n", @audit_lines[0..$max_show-1])
-                . ($error_count > $max_show ? "\n\n(+" . ($error_count - $max_show) . " more — check /log and application.log)" : '');
-            eval {
-                $schema->resultset('Todo')->create({
-                    subject             => "\x{26A0}\x{FE0F} Morning Audit: $error_count error(s) need review ($today)",
-                    description         => $todo_desc,
-                    status              => 2,
-                    priority            => 1,
-                    sitename            => $sitename,
-                    developer           => $username,
-                    username_of_poster  => $username,
-                    last_mod_by         => $username,
-                    last_mod_date       => $today,
-                    date_time_posted    => $today . ' 00:00:00',
-                    start_date          => $today,
-                    due_date            => $today,
-                    parent_todo         => '',
-                    estimated_man_hours => 0,
-                    accumulative_time   => '00:00:00',
-                    group_of_poster     => 'admin',
-                    project_code        => 'system',
-                    share               => 0,
-                });
-                $todo_created = 1;
-            };
-        }
-
-        # Build log details
+        # ── Build daily log details ──
         my $details = "=== Daily Log - $today ===\n\n";
         if (@stale_logs) {
             $details .= "\x{26A0}\x{FE0F} STALE OPEN LOGS (" . scalar(@stale_logs) . " unclosed from previous days):\n";
             for my $sl (@stale_logs) {
-                $details .= "  \x{2022} Log #" . $sl->id . " from " . ($sl->start_date || '?') . ": " . substr($sl->abstract || '', 0, 80) . "\n";
+                $details .= "  \x{2022} Log #" . $sl->record_id . " from " . ($sl->start_date || '?') . ": " . substr($sl->abstract || '', 0, 80) . "\n";
             }
             $details .= "\n";
+        }
+        if ($helpdesk_count) {
+            $details .= "\x{1F3AB} OPEN HELPDESK TICKETS: $helpdesk_count ticket(s) awaiting response — see <a href='/HelpDesk'>/HelpDesk</a>\n\n";
         }
         if (@top_todos) {
             $details .= "\x{1F4CB} TOP PRIORITIES FOR TODAY:\n";
@@ -732,6 +1211,13 @@ sub _daily_log_action {
             for my $t (@top_todos) {
                 $details .= "  $n. [P" . ($t->priority || 0) . "] " . substr($t->subject || '', 0, 100) . "\n";
                 $n++;
+            }
+            $details .= "\n";
+        }
+        if ($error_count) {
+            $details .= "\x{1F6A8} SYSTEM ERRORS AUDITED ($error_count area(s) in last 24h) — Todos created:\n";
+            for my $s (@audit_todo_subjects) {
+                $details .= "  \x{2022} $s\n";
             }
             $details .= "\n";
         }
@@ -770,18 +1256,20 @@ sub _daily_log_action {
         return { success => JSON::false, error => "Could not create log entry: $@" } if $@ || !$log_entry;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "Start-of-day Log #" . $log_entry->id . " created by $username");
+            "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
-        my $stale_msg    = @stale_logs  ? " \x{26A0}\x{FE0F} " . scalar(@stale_logs) . " unclosed log(s) from previous days." : '';
-        my $error_msg    = $error_count ? " \x{26A0}\x{FE0F} $error_count system error(s) found in the last 24h." . ($todo_created ? " A review todo was created." : '') : '';
-        my $priority_msg = @top_todos   ? " Your top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
+        my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
+        my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
+        my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
+        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
+        my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
 
         return {
             success  => JSON::true,
             action   => 'start',
-            entry_id => $log_entry->id + 0,
-            response => "\x{1F305} Good morning, $username! Your daily log has been started (Log #" . $log_entry->id . "). View it at <a href='/log'>/log</a>.$stale_msg$error_msg$priority_msg Have a productive day!",
-            message  => "Daily log started. Check /log.",
+            entry_id => $log_entry->record_id + 0,
+            response => "\x{1F305} Good morning, $username! Daily log started (Log #" . $log_entry->record_id . ").$stale_msg$helpdesk_msg$error_msg$priority_msg <a href='/log'>View log</a>.",
+            message  => "Daily log started.",
         };
     }
 
@@ -792,7 +1280,7 @@ sub _daily_log_action {
                 { username => $username, sitename => $sitename,
                   abstract => { -like => "%Good Morning - Daily Log - $today%" },
                   status   => 2 },
-                { order_by => { -desc => 'id' }, rows => 1 }
+                { order_by => { -desc => 'record_id' }, rows => 1 }
             )->first;
         };
         unless ($open_entry) {
@@ -807,13 +1295,13 @@ sub _daily_log_action {
         return { success => JSON::false, error => "Could not close log entry: $@" } if $@;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
-            "End-of-day Log #" . $open_entry->id . " closed by $username");
+            "End-of-day Log #" . $open_entry->record_id . " closed by $username");
 
         return {
             success  => JSON::true,
             action   => 'end',
-            entry_id => $open_entry->id + 0,
-            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->id . "). View it at <a href='/log'>/log</a>.",
+            entry_id => $open_entry->record_id + 0,
+            response => "\x{1F319} Good night, $username! Your daily log has been closed (Log #" . $open_entry->record_id . "). View it at <a href='/log'>/log</a>.",
             message  => "Daily log closed.",
         };
     }
@@ -843,6 +1331,7 @@ sub update_log_entry :Path('/planning/update_log_entry') :Args(0) {
     my $entry_id    = $c->req->param('entry_id')    || 0;
     my $title       = $c->req->param('title')       // '';
     my $description = $c->req->param('description') // '';
+    my $notes_only  = $c->req->param('notes_only')  || 0;
 
     unless ($entry_id) {
         $c->response->status(400);
@@ -866,7 +1355,21 @@ sub update_log_entry :Path('/planning/update_log_entry') :Args(0) {
         return;
     }
 
-    eval { $entry->update({ abstract => $title, details => $description }) };
+    my %update = ();
+    $update{abstract} = $title if length($title);
+
+    if ($notes_only) {
+        my $existing = $entry->details || '';
+        if ($existing =~ s/Notes:\n.*$/Notes:\n$description/s) {
+            $update{details} = $existing;
+        } else {
+            $update{details} = $existing . "\nNotes:\n$description";
+        }
+    } else {
+        $update{details} = $description;
+    }
+
+    eval { $entry->update(\%update) };
     if ($@) {
         $c->response->status(500);
         $c->response->body(encode_json({ success => JSON::false, error => "Update failed: $@" }));

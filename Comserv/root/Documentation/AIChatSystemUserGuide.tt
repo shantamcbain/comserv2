@@ -1,0 +1,425 @@
+[% META
+   title = "AI Chat System — User Guide"
+   description = "How the AI Chat system reads prompts, selects agents and models, and handles different request types"
+   roles = "user,admin,developer,helpdesk"
+   category = "AI Module"
+   page_version = "1.0"
+   last_updated = "2026-05-09"
+%]
+[% PageVersion = 'Documentation/AIChatSystemUserGuide.tt,v 1.0 2026/05/09 shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<style>
+.ai-doc-section { margin: 1.5em 0 2em; }
+.ai-doc-section h2 { border-bottom: 2px solid var(--primary-color, #0077cc); padding-bottom: 0.3em; }
+.ai-doc-section h3 { color: var(--primary-color, #0077cc); margin-top: 1.2em; }
+.flow-box {
+    background: var(--bg-secondary, #f4f8fc);
+    border-left: 4px solid var(--primary-color, #0077cc);
+    border-radius: 4px;
+    padding: 0.8em 1.2em;
+    margin: 0.7em 0;
+    font-family: inherit;
+}
+.flow-step {
+    display: flex;
+    gap: 0.8em;
+    align-items: flex-start;
+    margin: 0.5em 0;
+}
+.flow-step .step-num {
+    background: var(--primary-color, #0077cc);
+    color: #fff;
+    border-radius: 50%;
+    width: 1.6em; height: 1.6em;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: bold; font-size: 0.85em;
+    flex-shrink: 0;
+    margin-top: 0.1em;
+}
+.role-table { width: 100%; border-collapse: collapse; margin: 1em 0; }
+.role-table th { background: var(--primary-color, #0077cc); color: #fff; padding: 0.5em 0.8em; text-align: left; }
+.role-table td { border: 1px solid #ddd; padding: 0.5em 0.8em; vertical-align: top; }
+.role-table tr:nth-child(even) td { background: var(--bg-secondary, #f8f9fa); }
+.prompt-example {
+    background: var(--bg-secondary, #f4f8fc);
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    padding: 0.6em 1em;
+    margin: 0.5em 0;
+    font-style: italic;
+}
+.prompt-example strong { color: var(--primary-color, #0077cc); font-style: normal; }
+.tag {
+    display: inline-block;
+    padding: 0.15em 0.5em;
+    border-radius: 3px;
+    font-size: 0.82em;
+    font-weight: bold;
+}
+.tag-fast   { background: #d4edda; color: #155724; }
+.tag-ai     { background: #d1ecf1; color: #0c5460; }
+.tag-admin  { background: #fff3cd; color: #856404; }
+</style>
+
+<nav id="ai_guide_nav" style="margin-bottom:1.5em;">
+    <strong>Quick Navigation:</strong>
+    <a href="#how-it-works">How It Works</a> |
+    <a href="#prompt-types">Prompt Types</a> |
+    <a href="#agents">Agents</a> |
+    <a href="#models">Model Selection</a> |
+    <a href="#roles">Roles</a> |
+    <a href="#examples">Examples</a>
+</nav>
+
+<h1>AI Chat System — User Guide</h1>
+<p>This guide explains how the AI chat widget reads your prompt, picks the right agent and model, and decides what to do — for helpdesk staff and developers.</p>
+
+<hr>
+
+<div class="ai-doc-section" id="how-it-works">
+<h2>How It Works — The Full Flow</h2>
+
+<p>Every time you type a message in the chat widget, the system follows these steps:</p>
+
+<div class="flow-box">
+    <div class="flow-step">
+        <div class="step-num">1</div>
+        <div><strong>Page Detection</strong> — The widget reads the current URL and page title to understand where you are (e.g., on an ENCY herb page, a BMaster hive page, a todo task, etc.).</div>
+    </div>
+    <div class="flow-step">
+        <div class="step-num">2</div>
+        <div><strong>Agent Selection</strong> — Based on the URL, the system picks the best specialist agent (ENCY, BMaster, Accounting, HelpDesk, etc.). The agent defines what the AI knows and can do on this page.</div>
+    </div>
+    <div class="flow-step">
+        <div class="step-num">3</div>
+        <div><strong>Prompt Classification</strong> — Your message is classified by type: navigation command, form-fill request, or open question. Simple or fast requests are handled locally (no AI needed); complex questions go to the AI model.</div>
+    </div>
+    <div class="flow-step">
+        <div class="step-num">4</div>
+        <div><strong>Model Selection</strong> — If the AI is needed, the system picks the appropriate model based on complexity: a small fast model for simple questions, a larger model for complex research or multi-step tasks. Cloud models (Grok) are used for hard questions when Ollama is unavailable.</div>
+    </div>
+    <div class="flow-step">
+        <div class="step-num">5</div>
+        <div><strong>Context Injection</strong> — The server automatically adds live data (todo details, ENCY plant records, hive data, page content) to the AI's context. You do NOT need to paste data — it's already there.</div>
+    </div>
+    <div class="flow-step">
+        <div class="step-num">6</div>
+        <div><strong>Response &amp; Action</strong> — The AI responds with text, a navigation link, or a pre-filled form action. The widget then executes the action (navigating the page, filling form fields, etc.).</div>
+    </div>
+</div>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="prompt-types">
+<h2>Prompt Types — What You Can Ask</h2>
+
+<h3>1. Open Questions <span class="tag tag-ai">AI responds</span></h3>
+<p>Any question about the current page, a record, or a topic. The AI reads the live data already injected and answers.</p>
+<div class="prompt-example"><strong>Examples:</strong><br>
+    "What are the medicinal uses of Yarrow?"<br>
+    "Is this hive inspection normal for this time of year?"<br>
+    "What does naturopathic_medicine mean in the pharmacological_effects field?"<br>
+    "How do I interpret this todo description?"
+</div>
+<p><strong>What happens:</strong> The message goes to the AI model. The AI has the current page's content (herb record, hive data, todo text) already loaded. It answers using that live data.</p>
+
+<h3>2. Navigation Commands <span class="tag tag-fast">Instant — no AI needed</span></h3>
+<p>Asking the widget to open a section or page. On ENCY pages, section keywords trigger instant navigation without an AI round-trip.</p>
+<div class="prompt-example"><strong>Examples:</strong><br>
+    "Open herbs list"<br>
+    "Show me the glossary"<br>
+    "Browse diseases"<br>
+    "Go to the constituents list"<br>
+    "Open the formulas section"
+</div>
+<p><strong>What happens:</strong> The widget detects the navigation intent and section keyword (herbs, glossary, diseases, etc.) and immediately navigates the current browser window to the correct page. The page changes — the chat widget reappears on the new page, ready to continue.</p>
+
+<p><strong>ENCY section keywords that trigger instant navigation:</strong></p>
+<ul>
+    <li><strong>Herbs / Plants / Botanical</strong> → <code>/ENCY/herbs</code></li>
+    <li><strong>Constituents</strong> → <code>/ENCY/Constituent</code></li>
+    <li><strong>Glossary</strong> → <code>/ENCY/glossary</code></li>
+    <li><strong>Diseases</strong> → <code>/ENCY/diseases</code></li>
+    <li><strong>Symptoms</strong> → <code>/ENCY/symptoms</code></li>
+    <li><strong>Formula / Recipe</strong> → <code>/ENCY/formula</code></li>
+    <li><strong>Insects</strong> → <code>/ENCY/insects</code></li>
+    <li><strong>Animals</strong> → <code>/ENCY/animals</code></li>
+    <li><strong>Pollinators / Bee Pasture / Forage</strong> → <code>/ENCY/BeePastureView</code></li>
+</ul>
+
+<h3>3. Form Fill Requests <span class="tag tag-ai">AI + action</span></h3>
+<p>Asking the AI to fill in a form on the current page, or to navigate to a form and pre-populate it.</p>
+<div class="prompt-example"><strong>Examples:</strong><br>
+    "Please fill in this form with information about Yarrow"<br>
+    "Fill the herb details using what you know about Echinacea"<br>
+    "Add the constituent naturopathic_medicine using the details from todo #616"<br>
+    "Open the invoice form and fill it with this bill: [paste bill text]"
+</div>
+<p><strong>What happens:</strong> The AI reads the form fields visible on the page (or navigates to the target form page), then fills in each field using available data — herb records, todo text, or information you provide. A confirmation step shows the proposed values before they are applied.</p>
+
+<h3>4. Action Requests <span class="tag tag-ai">AI + action</span></h3>
+<p>Asking the AI to take a specific action, like adding a missing record or fixing an unresolved term.</p>
+<div class="prompt-example"><strong>Examples:</strong><br>
+    "Add the constituent naturopathic_medicine as a new glossary entry"<br>
+    "Fix the unresolved term in constituent #17"<br>
+    "Open the add constituent form for this term"
+</div>
+<p><strong>What happens:</strong> The AI reads the todo/task context already injected, identifies the term name, and opens the correct add/edit form pre-filled with the known data.</p>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="agents">
+<h2>Agents — Specialists for Each Area</h2>
+<p>Each agent has a pre-built system prompt tailored to a specific part of the application. The agent is automatically selected based on the current page URL.</p>
+
+<table class="role-table">
+    <tr>
+        <th>Agent</th>
+        <th>Activated On</th>
+        <th>What It Knows</th>
+    </tr>
+    <tr>
+        <td>🌿 <strong>ENCY</strong></td>
+        <td>Any <code>/ENCY/</code> page</td>
+        <td>Herbs, plants, constituents, diseases, symptoms, formulas, glossary, therapeutic actions, drug interactions. Has live herb and constituent data injected automatically.</td>
+    </tr>
+    <tr>
+        <td>🐝 <strong>BMaster</strong></td>
+        <td><code>/BMaster/</code>, <code>/Apiary/</code></td>
+        <td>Beekeeping, hive management, inspections, honey production, varroa mite control, forage plants, bee pasture planning.</td>
+    </tr>
+    <tr>
+        <td>💰 <strong>Accounting</strong></td>
+        <td><code>/Inventory/</code>, <code>/accounting/</code></td>
+        <td>Invoices, bills, suppliers, purchase orders. Can parse a pasted bill and pre-fill the invoice entry form.</td>
+    </tr>
+    <tr>
+        <td>🎫 <strong>HelpDesk</strong></td>
+        <td><code>/HelpDesk/</code>, <code>/support/</code></td>
+        <td>Technical support, troubleshooting, creating tickets, escalation.</td>
+    </tr>
+    <tr>
+        <td>📋 <strong>Planning</strong></td>
+        <td><code>/planning/</code>, <code>/project/</code></td>
+        <td>Projects, sub-projects, plans, todos, sprint status, blocking tasks. Live project and todo data injected automatically.</td>
+    </tr>
+    <tr>
+        <td>📚 <strong>Documentation</strong></td>
+        <td><code>/Documentation/</code>, <code>/docs/</code>, <code>/help/</code></td>
+        <td>System documentation, user guides, how-to help.</td>
+    </tr>
+    <tr>
+        <td>💻 <strong>Coding</strong> (admin only)</td>
+        <td><code>/ai/</code>, <code>/admin/</code></td>
+        <td>Perl/Catalyst backend, DBIx::Class, TT2 templates, JavaScript. Can read files, propose fixes.</td>
+    </tr>
+    <tr>
+        <td>✏️ <strong>Template Editor</strong> (admin only)</td>
+        <td>Any page (manual selection)</td>
+        <td>Reviews and rewrites TT2 template files for the current page.</td>
+    </tr>
+    <tr>
+        <td>🤖 <strong>General</strong></td>
+        <td>All other pages</td>
+        <td>General-purpose assistant — answers questions using the current page content.</td>
+    </tr>
+</table>
+
+<h3>How Agent Selection Works</h3>
+<div class="flow-box">
+    <ol>
+        <li>The widget reads <code>window.location.pathname</code> (the current URL path).</li>
+        <li>It compares the path against each agent's <code>url_patterns</code> list (from <code>/static/config/agents.json</code>).</li>
+        <li>The first matching pattern wins. More specific patterns win over shorter ones.</li>
+        <li>If no pattern matches, the <strong>General</strong> agent is used.</li>
+        <li>In popup or task-context mode, the agent is selected from the <em>originating page</em> path — not the popup URL.</li>
+    </ol>
+</div>
+
+<p>The active agent is shown in the chat header. You can also manually switch agents using the agent selector if available.</p>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="models">
+<h2>Model Selection — How the AI Picks the Right Engine</h2>
+
+<h3>Automatic Tier Classification</h3>
+<p>Every prompt is automatically classified into a complexity tier. The tier determines which AI provider and model size is used:</p>
+
+<table class="role-table">
+    <tr>
+        <th>Tier</th>
+        <th>Prompt Type</th>
+        <th>Provider</th>
+        <th>Speed</th>
+    </tr>
+    <tr>
+        <td><strong>Nav</strong></td>
+        <td>Navigation command (open page, go to section)</td>
+        <td>None — instant local fast path</td>
+        <td>Instant</td>
+    </tr>
+    <tr>
+        <td><strong>Simple</strong></td>
+        <td>Short factual question (&lt;10 words)</td>
+        <td>Ollama — small model (3–8B)</td>
+        <td>Fast (5–30 s)</td>
+    </tr>
+    <tr>
+        <td><strong>Medium</strong></td>
+        <td>Moderate question with context</td>
+        <td>Ollama — medium model (8–14B)</td>
+        <td>Standard (30–120 s)</td>
+    </tr>
+    <tr>
+        <td><strong>Complex</strong></td>
+        <td>Multi-step reasoning, code, research</td>
+        <td>Ollama large or Grok (cloud)</td>
+        <td>Advanced (60 s – 10 min)</td>
+    </tr>
+</table>
+
+<h3>Ollama vs Grok</h3>
+<ul>
+    <li><strong>Ollama</strong> — Runs locally on your own server. Private, no data leaves your network. Slower on CPU hardware; much faster if GPU is available. Has a 10-minute timeout for cold starts.</li>
+    <li><strong>Grok (xAI)</strong> — Cloud model. Fast response (seconds), supports large context windows and web search. Used automatically when Ollama is overloaded, or you can switch manually using the provider dropdown.</li>
+</ul>
+
+<h3>Manual Override</h3>
+<p>You can override the automatic selection at any time using the provider/model dropdown in the chat header. Select <em>Grok</em> for fast cloud responses, or pick a specific Ollama model if you need a particular capability.</p>
+
+<h3>Timeout and Retry</h3>
+<p>If Ollama takes too long (over 11 minutes), the widget shows a <strong>Retry Ollama</strong> button and a <strong>Switch to Grok</strong> button. Clicking "Switch to Grok" immediately resends your question to the cloud model. A <strong>✕ Cancel</strong> button is also available during any request to abort it immediately.</p>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="roles">
+<h2>Role-Based Behaviour</h2>
+
+<table class="role-table">
+    <tr>
+        <th>Feature</th>
+        <th>Guest</th>
+        <th>Logged-in User</th>
+        <th>Admin / Developer</th>
+    </tr>
+    <tr>
+        <td>Ask questions</td>
+        <td>✓</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Navigate pages via chat</td>
+        <td>✓</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Form fill (read-only preview)</td>
+        <td>✓</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Form fill (apply to page)</td>
+        <td>✗</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Select AI model/provider</td>
+        <td>✗</td>
+        <td>✗</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Web search via Grok</td>
+        <td>✗</td>
+        <td>✗</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>AI thinking trace (debug panel)</td>
+        <td>✗</td>
+        <td>✗</td>
+        <td>✓ (auto-open)</td>
+    </tr>
+    <tr>
+        <td>Coding / Template Editor agents</td>
+        <td>✗</td>
+        <td>✗</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Conversation history saved</td>
+        <td>Session only</td>
+        <td>✓ Persistent</td>
+        <td>✓ Persistent</td>
+    </tr>
+    <tr>
+        <td>Voice input (speech-to-text)</td>
+        <td>✓ (mic required)</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+    <tr>
+        <td>Image / file attachments</td>
+        <td>✗</td>
+        <td>✓</td>
+        <td>✓</td>
+    </tr>
+</table>
+</div>
+
+<hr>
+
+<div class="ai-doc-section" id="examples">
+<h2>Examples — Common Use Cases</h2>
+
+<h3>Answering a Question About a Record</h3>
+<div class="prompt-example">"What is naturopathic medicine and why is it in the pharmacological effects field?"</div>
+<p><strong>What happens:</strong> The ENCY agent is active (you're on an ENCY page). The server has already injected the constituent record into the AI's context. The AI reads it and answers directly — no need to copy/paste anything.</p>
+
+<h3>Opening a Section of ENCY</h3>
+<div class="prompt-example">"Open herbs list" &nbsp;or&nbsp; "Show me the glossary"</div>
+<p><strong>What happens:</strong> The widget instantly detects "herbs" or "glossary" as an ENCY section keyword and navigates the browser window to <code>/ENCY/herbs</code> or <code>/ENCY/glossary</code> — no AI call, no wait.</p>
+
+<h3>Filling In a Form About a Herb</h3>
+<div class="prompt-example">"Please fill in this form with information about Yarrow"</div>
+<p><strong>What happens:</strong> The AI reads the form fields on the current page, then uses its knowledge of Yarrow (common name, botanical name, medicinal uses, constituents) to suggest values for each field. The user reviews the suggestions and confirms before they are applied.</p>
+
+<h3>Adding a Missing Constituent</h3>
+<div class="prompt-example">"Add the constituent naturopathic_medicine from todo #616"</div>
+<p><strong>What happens:</strong> The ENCY agent reads the injected todo data, finds the term name and context, then opens the <em>Add Constituent</em> form (<code>/ENCY/Constituent/add</code>) with the name pre-filled. The user can then complete and save the record.</p>
+
+<h3>Filing an Invoice</h3>
+<div class="prompt-example">[Paste the text of a bill or invoice] then: "Enter this invoice"</div>
+<p><strong>What happens:</strong> The Accounting agent parses the pasted bill (supplier name, invoice number, date, total amount), then opens the invoice entry form (<code>/Inventory/invoice/new</code>) pre-filled with the extracted values. The user verifies and saves.</p>
+
+<h3>Asking for Support</h3>
+<div class="prompt-example">"The hive inspection report is not saving — what should I check?"</div>
+<p><strong>What happens:</strong> On a BMaster page, the BMaster agent responds with troubleshooting steps. On a HelpDesk page, the HelpDesk agent responds and may offer to create a support ticket. If the issue is unclear, the agent asks a clarifying question.</p>
+</div>
+
+<hr>
+
+<div class="ai-doc-section">
+<h2>Tips for Better Results</h2>
+<ul>
+    <li><strong>Be on the right page</strong> — The AI automatically reads the current page's data. If you're asking about herb #42, open that herb's page first.</li>
+    <li><strong>Use ENCY section keywords</strong> for instant navigation: "herbs", "glossary", "diseases", "symptoms", "formula", "constituents".</li>
+    <li><strong>For form fill</strong> — make sure you're on the form page before asking the AI to fill it, or say "open the add form for…" to navigate and fill in one step.</li>
+    <li><strong>If Ollama is slow</strong> — use the <em>Switch to Grok</em> button that appears on timeout, or pre-select Grok from the provider dropdown for immediate responses.</li>
+    <li><strong>Voice input</strong> — Click the microphone button to speak your prompt. The system transcribes it and sends it as text. Useful when your hands are occupied.</li>
+    <li><strong>Conversation history</strong> — The AI remembers the last few exchanges in your session. You can refer back ("the one we just discussed") and it understands.</li>
+    <li><strong>The AI does not guess URLs</strong> — It only navigates to pages it knows about from the system prompt. If you ask to open an unknown page, it will ask you to clarify.</li>
+</ul>
+</div>
