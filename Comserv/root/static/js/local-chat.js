@@ -48,6 +48,12 @@
         siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
     };
     
+    // Per-tab nonce: generated fresh each time the script runs in a new JS context.
+    // sessionStorage is tab-isolated, but tab duplication copies it.  We detect
+    // duplication by writing this nonce into sessionStorage on first use; if the
+    // stored nonce differs from ours the tab was duplicated and should start fresh.
+    const _TAB_NONCE = Math.random().toString(36).slice(2);
+
     // Load persisted state from sessionStorage (or from window.AI_RESUME_CONVERSATION
     // when the widget was opened as a popup/detached window)
     function loadPersistedState() {
@@ -58,6 +64,19 @@
                 console.debug('Restored conversation ID from popup param:', state.currentConversationId);
                 return;
             }
+
+            // Detect duplicated tabs: if the stored nonce doesn't match ours, the
+            // sessionStorage was inherited from another tab → start fresh.
+            const storedNonce = sessionStorage.getItem('ai_tab_nonce');
+            if (storedNonce && storedNonce !== _TAB_NONCE) {
+                console.debug('[AI] Duplicated tab detected — starting fresh conversation');
+                sessionStorage.removeItem('currentConversationId');
+                sessionStorage.removeItem('chatMessages');
+                sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+                return;
+            }
+            sessionStorage.setItem('ai_tab_nonce', _TAB_NONCE);
+
             const savedConvId = sessionStorage.getItem('currentConversationId');
             if (savedConvId && savedConvId !== 'null' && savedConvId !== 'undefined') {
                 state.currentConversationId = parseInt(savedConvId);
@@ -211,15 +230,21 @@
         });
         // Site-name → default agent map (when no saved preference)
         var siteAgentMap = {
-            'BMaster':    'bmaster',
+            'BMaster':    'beemaster',
             'ENCY':       'ency',
             'CSC':        'csc',
             'HelpDesk':   'helpdesk',
         };
 
-        // Restore previously saved agent selection, or auto-select by site
+        // Restore previously saved agent selection, or auto-select by site.
+        // URL-based match always wins over saved preference (so navigating to /ENCY
+        // always gets the ency agent even if the user last selected "coding").
         var saved = localStorage.getItem('ai_widget_agent');
-        if (saved && sel.querySelector('option[value="' + saved + '"]')) {
+        var urlAgent = selectAgentForPage();
+        if (urlAgent && urlAgent.id && sel.querySelector('option[value="' + urlAgent.id + '"]')) {
+            sel.value = urlAgent.id;
+            _applyAgentOverride(urlAgent.id);
+        } else if (saved && sel.querySelector('option[value="' + saved + '"]')) {
             sel.value = saved;
             if (saved !== 'auto') _applyAgentOverride(saved);
         } else if (state.siteName && siteAgentMap[state.siteName]) {
@@ -248,12 +273,14 @@
         var agent = state.agentsConfig.agents[agentKey];
         if (!agent) return;
         state.agentOverride = agentKey;
+        state.currentAgent = agent;
         var ctx = detectPageContext() || {};
         ctx.agent_id   = agent.id;
         ctx.agent_name = agent.display_name;
         if (agent.system_prompt) ctx.system_prompt = agent.system_prompt;
         state.pageContext = ctx;
         _updateAgentBanner(agentKey);
+        updatePageLabel();
     }
 
     function _updateAgentBanner(agentKey) {
@@ -377,6 +404,49 @@
         }
         
         const agents = state.agentsConfig.agents;
+
+        // On todo/project detail pages, pick the agent based on the todo subject text
+        // rather than the URL — the subject tells us which domain the work belongs to.
+        const isTodoDetail    = pathname.startsWith('/todo/details') || pathname.startsWith('/todo/view');
+        const isProjectDetail = pathname.startsWith('/project/details');
+        if (isTodoDetail || isProjectDetail) {
+            // Gather candidate text: page <h1>, <h2>, <title>, and the first .subject / .todo-subject element
+            const candidateEls = [
+                document.querySelector('h1'),
+                document.querySelector('h2'),
+                document.querySelector('.todo-subject'),
+                document.querySelector('.subject'),
+                document.querySelector('.todo-title'),
+                document.querySelector('[data-todo-subject]'),
+            ];
+            const candidateText = candidateEls
+                .filter(Boolean)
+                .map(function(el) { return el.textContent || el.getAttribute('data-todo-subject') || ''; })
+                .join(' ')
+                .toUpperCase();
+
+            if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(candidateText) && agents.ency) {
+                console.debug('Agent selected from todo content: ency');
+                return agents.ency;
+            }
+            if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.beemaster) {
+                console.debug('Agent selected from todo content: beemaster');
+                return agents.beemaster;
+            }
+            if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
+                console.debug('Agent selected from todo content: inventory');
+                return agents.inventory;
+            }
+            if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(candidateText) && agents.helpdesk) {
+                console.debug('Agent selected from todo content: helpdesk');
+                return agents.helpdesk;
+            }
+            // Todo/project detail with no domain match → use planning agent
+            if (agents.planning) {
+                console.debug('Agent selected for todo/project detail: planning');
+                return agents.planning;
+            }
+        }
         
         // Check each agent's URL patterns
         for (const [agentKey, agent] of Object.entries(agents)) {
@@ -518,7 +588,7 @@
         state.currentAgent = selectedAgent;
         
         let context = {
-            page_path: pathname,
+            page_path: pathname + (window.location.search || ''),
             page_title: pageTitle,
             page_url: window.AI_WIDGET_POPUP
                 ? (window.location.origin + pathname)
@@ -593,6 +663,7 @@
                 '<button id="toggle-history-btn" class="chat-header-icon-btn" title="Conversation history">🕐</button>' +
                 '<a id="conversations-link" class="chat-header-icon-btn" href="/ai/conversations" title="View all conversations" target="_self">📋 History</a>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
+                '<button id="voice-mode-btn" class="chat-header-icon-btn" title="Voice conversation mode — speak to AI, AI speaks back" style="display:none;">🔊</button>' +
                 '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
@@ -652,10 +723,13 @@
         chatInput.className = 'chat-input';
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
+            '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
-            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--secondary-bg,#f0f0f0);border:1px solid #ccc;border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
+            '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
             '</div></div>';
 
@@ -700,10 +774,8 @@
                                         return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                                     })
                                 : [
-                                    { val: 'grok|grok-4-fast-reasoning',     label: 'Grok 4 Fast Reasoning (xAI)' },
-                                    { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast (xAI)' },
-                                    { val: 'grok|grok-3',                    label: 'Grok 3 (xAI)' },
-                                    { val: 'grok|grok-3-mini',               label: 'Grok 3 Mini (xAI)' }
+                                    { val: 'grok|grok-4.3',               label: 'Grok 4.3 (xAI)' },
+                                    { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast (xAI)' }
                                 ];
                             grokModels.forEach(function(m) {
                                 const opt = document.createElement('option');
@@ -713,7 +785,7 @@
                             sel.appendChild(grp);
                             // Cheapest Grok for complex queries (non-guest)
                             if (!state.isGuest) {
-                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4-0709';
+                                state.modelTiers.grok = grokModels[0] ? grokModels[0].val : 'grok|grok-4.3';
                             }
                             // Show web search toggle for any user who has Grok access
                             // (toggle applies to Grok requests whether selected manually or via auto-routing)
@@ -797,6 +869,7 @@
             let dragging = false, startX, startY, origLeft, origBottom, origTop, origRight;
 
             handle.addEventListener('mousedown', function(e) {
+                if (window.innerWidth <= 600) return;
                 e.preventDefault();
                 dragging = true;
                 startX = e.clientX;
@@ -831,6 +904,7 @@
 
             // Touch support
             handle.addEventListener('touchstart', function(e) {
+                if (window.innerWidth <= 600) return;
                 const t = e.touches[0];
                 startX = t.clientX; startY = t.clientY;
                 const rect = chatPanel.getBoundingClientRect();
@@ -883,9 +957,9 @@
         (function initTextareaGrow() {
             const ta = document.getElementById('message-input');
             if (!ta) return;
+            const max = 200;
             ta.addEventListener('input', function() {
                 this.style.height = 'auto';
-                const max = 140;
                 this.style.height = Math.min(this.scrollHeight, max) + 'px';
                 this.style.overflowY = this.scrollHeight > max ? 'auto' : 'hidden';
             });
@@ -934,10 +1008,33 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        chatButton.addEventListener('click', function() { openChat(); });
+        // Chat bubble click:
+        // - Mobile devices: open the inline panel (popup windows don't work on mobile)
+        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
+        // - Desktop: open a moveable browser popup window (draggable across screens/monitors)
+        //   Falls back to the inline panel if the browser blocks popups.
+        var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
+        chatButton.addEventListener('click', function() {
+            openChat();
+        });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        document.getElementById('detach-chat').addEventListener('click', function() { detachToPopup(); });
+        // ⤢ button: focus / re-open the popup window if it was closed or hidden (desktop only)
+        var detachBtn = document.getElementById('detach-chat');
+        if (detachBtn) {
+            if (_isMobile) {
+                detachBtn.style.display = 'none';
+            } else {
+                detachBtn.addEventListener('click', function() {
+                    if (state._popupWindow && !state._popupWindow.closed) {
+                        state._popupWindow.focus();
+                    } else {
+                        detachToPopup();
+                    }
+                });
+            }
+        }
         document.getElementById('send-message').addEventListener('click', sendMessage);
         document.getElementById('message-input').addEventListener('keypress', function(e) {
             if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -958,6 +1055,337 @@
                 _setPendingImage(e.target.files[0]);
             }
         });
+
+        document.getElementById('audio-file-input').addEventListener('change', function(e) {
+            if (e.target.files && e.target.files[0]) {
+                _transcribeAudioFile(e.target.files[0]);
+                e.target.value = '';
+            }
+        });
+
+        (function _initMicRecorder() {
+            var micBtn = document.getElementById('mic-record-btn');
+            if (!micBtn) return;
+            if (!window.MediaRecorder || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                micBtn.addEventListener('click', function() {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    var msg = window.isSecureContext === false
+                        ? '⚠️ Microphone requires HTTPS. Use the 📂 button to upload a saved audio file instead.'
+                        : '⚠️ Microphone recording is not available in this browser. Use the 📂 button to upload a saved audio file instead.';
+                    if (_statusEl) { _statusEl.textContent = msg; _statusEl.style.display = ''; }
+                });
+                return;
+            }
+
+            var _mediaRec   = null;
+            var _chunks     = [];
+            var _stream     = null;
+            var _recTimer   = null;
+            var _recStart   = null;
+
+            function _fmtElapsed(ms) {
+                var s = Math.floor(ms / 1000);
+                var m = Math.floor(s / 60);
+                s = s % 60;
+                return m + ':' + (s < 10 ? '0' : '') + s;
+            }
+
+            micBtn.addEventListener('click', function() {
+                if (_mediaRec && _mediaRec.state === 'recording') {
+                    _mediaRec.stop();
+                    clearInterval(_recTimer);
+                    _recTimer = null;
+                    return;
+                }
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    _stream  = stream;
+                    _chunks  = [];
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _mediaRec = new MediaRecorder(stream, { mimeType: mimeType });
+
+                    _mediaRec.ondataavailable = function(ev) {
+                        if (ev.data && ev.data.size > 0) _chunks.push(ev.data);
+                    };
+
+                    _mediaRec.onstop = function() {
+                        clearInterval(_recTimer);
+                        _recTimer = null;
+                        stream.getTracks().forEach(function(t) { t.stop(); });
+                        var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
+                        var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                        var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
+                        var file = new File([blob], 'recording.' + ext, { type: blob.type });
+                        _transcribeAudioFile(file);
+                        micBtn.textContent = '🎤';
+                        micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
+                        micBtn.style.background = '';
+                        var _statusEl = document.getElementById('audio-transcribe-status');
+                        if (_statusEl) { _statusEl.textContent = '⏳ Recording stopped (' + elapsed + ') — uploading…'; }
+                    };
+
+                    _mediaRec.start(1000);
+                    _recStart = Date.now();
+                    micBtn.textContent = '⏹';
+                    micBtn.title = 'Stop recording';
+                    micBtn.style.background = '#ffd0d0';
+
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '🔴 Recording 0:00 — click ⏹ to stop (no time limit)'; _statusEl.style.display = ''; }
+
+                    _recTimer = setInterval(function() {
+                        var el = document.getElementById('audio-transcribe-status');
+                        if (el && _recStart) {
+                            el.textContent = '🔴 Recording ' + _fmtElapsed(Date.now() - _recStart) + ' — click ⏹ to stop (no time limit)';
+                        }
+                    }, 1000);
+                }).catch(function(err) {
+                    var _statusEl = document.getElementById('audio-transcribe-status');
+                    if (_statusEl) { _statusEl.textContent = '⚠️ Microphone access denied: ' + err.message; _statusEl.style.display = ''; }
+                });
+            });
+        })();
+
+        // ── Voice Conversation Mode ────────────────────────────────────────────
+        // Full hands-free loop: user speaks → auto-sent to AI → AI response read aloud
+        // → listening restarts.
+        //
+        // STT strategy (in priority order):
+        //   1. Web Speech API  — Chrome/Edge/Safari (streaming, instant)
+        //   2. VAD + Whisper   — Firefox and any browser without SpeechRecognition
+        //                        Uses AudioContext to detect speech, records via
+        //                        MediaRecorder, uploads to /ai/transcribe (our server).
+        //                        No audio leaves to third-party servers. 1-3s delay.
+        // TTS: speechSynthesis — all browsers.
+        (function() {
+            var _SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
+            var _hasTTS    = !!(window.speechSynthesis);
+            var _hasVAD    = !!(window.AudioContext || window.webkitAudioContext) && !!(window.MediaRecorder) && !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            var _voiceBtn  = document.getElementById('voice-mode-btn');
+            if (!_voiceBtn) return;
+
+            if (_hasTTS || _SpeechRec || _hasVAD) { _voiceBtn.style.display = ''; }
+
+            var _voiceActive = false;
+            var _recog       = null;
+            var _ttsSpeaking = false;
+            var _voiceStatus = document.getElementById('audio-transcribe-status');
+
+            var _vadStream   = null;
+            var _vadCtx      = null;
+            var _vadRec      = null;
+            var _vadChunks   = [];
+            var _vadSpeaking = false;
+            var _vadSilTimer = null;
+            var _vadRafId    = null;
+
+            var VAD_SPEAK_THRESH  = 18;
+            var VAD_SILENCE_MS    = 1400;
+            var VAD_MIN_SPEECH_MS = 300;
+            var _vadSpeakStart    = 0;
+
+            function _setVoiceStatus(msg) {
+                if (_voiceStatus) { _voiceStatus.textContent = msg; _voiceStatus.style.display = msg ? '' : 'none'; }
+            }
+
+            function _speak(text) {
+                if (!_hasTTS || !_voiceActive) return;
+                window.speechSynthesis.cancel();
+                var clean = text
+                    .replace(/\[ACTION:[^\]]*\]/gi, '')
+                    .replace(/#{1,6}\s*/g, '')
+                    .replace(/\*\*([^*]+)\*\*/g, '$1')
+                    .replace(/\*([^*]+)\*/g, '$1')
+                    .replace(/`[^`]+`/g, function(m){ return m.replace(/`/g,''); })
+                    .replace(/https?:\/\/\S+/g, '')
+                    .trim();
+                if (!clean) { _startListening(); return; }
+                _ttsSpeaking = true;
+                _setVoiceStatus('🔈 Speaking…');
+                var utter = new window.SpeechSynthesisUtterance(clean);
+                utter.lang  = 'en-US';
+                utter.rate  = 1.05;
+                utter.pitch = 1.0;
+                utter.onend  = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
+                utter.onerror = function() { _ttsSpeaking = false; if (_voiceActive) { _setVoiceStatus(''); _startListening(); } };
+                window.speechSynthesis.speak(utter);
+            }
+
+            state._speakResponse = _speak;
+
+            function _stopVAD() {
+                if (_vadRafId) { cancelAnimationFrame(_vadRafId); _vadRafId = null; }
+                if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                if (_vadRec && _vadRec.state !== 'inactive') { try { _vadRec.stop(); } catch(e){} }
+                if (_vadStream) { _vadStream.getTracks().forEach(function(t){ t.stop(); }); _vadStream = null; }
+                if (_vadCtx) { try { _vadCtx.close(); } catch(e){} _vadCtx = null; }
+                _vadRec = null; _vadChunks = []; _vadSpeaking = false;
+            }
+
+            function _uploadVADBlob(blob) {
+                if (!blob || blob.size < 1000) { _startListening(); return; }
+                _setVoiceStatus('⏳ Transcribing speech…');
+                var ext = (blob.type.indexOf('ogg') !== -1) ? 'ogg' : 'webm';
+                var file = new File([blob], 'voice.' + ext, { type: blob.type });
+                var fd = new FormData();
+                fd.append('audio', file, file.name);
+                fd.append('diarize', '0');
+                fetch('/ai/transcribe', { method: 'POST', credentials: 'include', body: fd })
+                .then(function(r){ return r.json(); })
+                .then(function(data) {
+                    if (!_voiceActive) return;
+                    var txt = (data.transcript || '').trim();
+                    if (!txt) { _setVoiceStatus('👂 Nothing heard — listening…'); _startListening(); return; }
+                    var inputEl = document.getElementById('message-input');
+                    if (inputEl) inputEl.value = txt;
+                    _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                    sendMessage();
+                })
+                .catch(function() {
+                    if (_voiceActive) { _setVoiceStatus('⚠️ Transcription failed — retrying…'); setTimeout(_startListening, 1500); }
+                });
+            }
+
+            function _startVAD() {
+                if (!_voiceActive) return;
+                _setVoiceStatus('👂 Listening… (speak now)');
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+                    if (!_voiceActive) { stream.getTracks().forEach(function(t){ t.stop(); }); return; }
+                    _vadStream  = stream;
+                    _vadChunks  = [];
+                    _vadSpeaking = false;
+                    var ACtx = window.AudioContext || window.webkitAudioContext;
+                    _vadCtx = new ACtx();
+                    var source   = _vadCtx.createMediaStreamSource(stream);
+                    var analyser = _vadCtx.createAnalyser();
+                    analyser.fftSize = 512;
+                    source.connect(analyser);
+                    var buf = new Uint8Array(analyser.fftSize);
+                    var mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+                                 : MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')  ? 'audio/ogg;codecs=opus'
+                                 : 'audio/webm';
+                    _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                    _vadRec.ondataavailable = function(ev) { if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                    _vadRec.onstop = function() {
+                        var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' });
+                        _vadChunks = [];
+                        _uploadVADBlob(blob);
+                    };
+                    function _tick() {
+                        if (!_voiceActive) { _stopVAD(); return; }
+                        analyser.getByteTimeDomainData(buf);
+                        var rms = 0;
+                        for (var i = 0; i < buf.length; i++) { var d = (buf[i] - 128); rms += d * d; }
+                        rms = Math.sqrt(rms / buf.length);
+                        if (rms > VAD_SPEAK_THRESH) {
+                            if (!_vadSpeaking) {
+                                _vadSpeaking = true;
+                                _vadSpeakStart = Date.now();
+                                _vadChunks = [];
+                                _vadRec.start(100);
+                                _setVoiceStatus('🔴 Recording…');
+                            }
+                            if (_vadSilTimer) { clearTimeout(_vadSilTimer); _vadSilTimer = null; }
+                        } else if (_vadSpeaking) {
+                            if (!_vadSilTimer) {
+                                _vadSilTimer = setTimeout(function() {
+                                    _vadSilTimer = null;
+                                    if (!_vadSpeaking) return;
+                                    _vadSpeaking = false;
+                                    var dur = Date.now() - _vadSpeakStart;
+                                    if (dur < VAD_MIN_SPEECH_MS) {
+                                        _vadRec.stop();
+                                        _vadChunks = [];
+                                        _setVoiceStatus('👂 Listening… (speak now)');
+                                        _vadRec = new MediaRecorder(stream, { mimeType: mimeType });
+                                        _vadRec.ondataavailable = function(ev){ if (ev.data && ev.data.size > 0) _vadChunks.push(ev.data); };
+                                        _vadRec.onstop = function(){ var blob = new Blob(_vadChunks, { type: _vadRec.mimeType || 'audio/webm' }); _vadChunks = []; _uploadVADBlob(blob); };
+                                    } else {
+                                        _vadRec.stop();
+                                    }
+                                }, VAD_SILENCE_MS);
+                            }
+                        }
+                        _vadRafId = requestAnimationFrame(_tick);
+                    }
+                    _vadRafId = requestAnimationFrame(_tick);
+                }).catch(function(err) {
+                    _setVoiceStatus('⚠️ Microphone access denied: ' + err.message);
+                });
+            }
+
+            function _startSpeechRec() {
+                if (!_voiceActive) return;
+                if (_recog) { try { _recog.abort(); } catch(e){} }
+                _recog = new _SpeechRec();
+                _recog.lang = 'en-US';
+                _recog.continuous = false;
+                _recog.interimResults = true;
+                _recog.maxAlternatives = 1;
+                var _inputEl = document.getElementById('message-input');
+                _setVoiceStatus('👂 Listening… (speak now)');
+                _recog.onresult = function(ev) {
+                    var interim = '', fin = '';
+                    for (var i = ev.resultIndex; i < ev.results.length; i++) {
+                        var t = ev.results[i][0].transcript;
+                        if (ev.results[i].isFinal) { fin += t; } else { interim += t; }
+                    }
+                    if (_inputEl) _inputEl.value = fin || interim;
+                };
+                _recog.onend = function() {
+                    var txt = _inputEl ? (_inputEl.value || '').trim() : '';
+                    if (txt && _voiceActive) {
+                        _setVoiceStatus('📤 Sending: "' + txt.substring(0, 50) + (txt.length > 50 ? '…' : '') + '"');
+                        sendMessage();
+                    } else if (_voiceActive) {
+                        _setVoiceStatus('👂 Listening… (nothing heard, trying again)');
+                        setTimeout(_startSpeechRec, 800);
+                    }
+                };
+                _recog.onerror = function(ev) {
+                    if (ev.error === 'no-speech' && _voiceActive) { setTimeout(_startSpeechRec, 600); }
+                    else if (ev.error !== 'aborted' && _voiceActive) {
+                        _setVoiceStatus('⚠️ Voice recognition error: ' + ev.error);
+                        setTimeout(_startSpeechRec, 2000);
+                    }
+                };
+                try { _recog.start(); } catch(e) {}
+            }
+
+            function _startListening() {
+                if (!_voiceActive) return;
+                if (_SpeechRec) { _startSpeechRec(); } else { _startVAD(); }
+            }
+
+            function _stopVoiceMode() {
+                _voiceActive = false;
+                window.speechSynthesis.cancel();
+                if (_recog) { try { _recog.abort(); } catch(e){} _recog = null; }
+                _stopVAD();
+                _voiceBtn.textContent = '🔊';
+                _voiceBtn.style.background = '';
+                _voiceBtn.title = 'Voice conversation mode — speak to AI, AI speaks back';
+                _setVoiceStatus('');
+            }
+
+            _voiceBtn.addEventListener('click', function() {
+                if (_voiceActive) { _stopVoiceMode(); return; }
+                if (!_SpeechRec && !_hasVAD) {
+                    if (!_hasTTS) { alert('Your browser does not support voice features. Please use Chrome, Edge, Safari, or Firefox.'); return; }
+                }
+                _voiceActive = true;
+                _voiceBtn.textContent = '🔇';
+                _voiceBtn.style.background = '#d0ffd0';
+                _voiceBtn.title = 'Voice mode ON — click to stop';
+                _startListening();
+            });
+
+            document.getElementById('close-chat').addEventListener('click', function() {
+                if (_voiceActive) _stopVoiceMode();
+            }, true);
+        })();
+
         document.getElementById('ai-provider').addEventListener('change', function(e) {
             const selectedVal = e.target.value;
             const parts = selectedVal.split('|');
@@ -1266,9 +1694,8 @@
                                 return { val: 'grok|' + m.id, label: label + ' (xAI)' };
                             })
                         : [
-                            { val: 'grok|grok-4-0709',               label: 'Grok 4' },
-                            { val: 'grok|grok-4-fast-non-reasoning', label: 'Grok 4 Fast' },
-                            { val: 'grok|grok-code-fast-1',          label: 'Grok Code Fast' }
+                            { val: 'grok|grok-4.3',               label: 'Grok 4.3' },
+                            { val: 'grok|grok-4.20-non-reasoning', label: 'Grok 4.20 Fast' }
                         ];
                     grokModels.forEach(function(m) {
                         const opt = document.createElement('option');
@@ -1317,28 +1744,50 @@
         });
     }
     
-    // Open chat in a separate browser window — user can drag it to another monitor.
-    // Uses /ai/widget which is a self-contained minimal HTML page (no site nav/header/
-    // footer) so the popup always stays clean regardless of link clicks or refreshes.
+    // Open chat in a separate browser popup window — the user can drag it anywhere on
+    // the screen or to a second monitor.  Uses /ai/widget (no site nav/header/footer).
+    // Falls back to the inline panel if the browser blocks popups.
     function detachToPopup() {
+        // If a popup is already open, bring it to front and return
+        if (state._popupWindow && !state._popupWindow.closed) {
+            state._popupWindow.focus();
+            return;
+        }
+
         const convId = state.currentConversationId;
         const params = [];
         if (convId) params.push('resume=' + encodeURIComponent(convId));
         params.push('from_path='  + encodeURIComponent(window.location.pathname));
         params.push('from_title=' + encodeURIComponent(document.title || ''));
         const url = '/ai/widget' + (params.length ? '?' + params.join('&') : '');
+
+        // Position popup at bottom-right of the current screen, near where the widget sits
+        const popW = 430, popH = 700;
+        const screenRight  = window.screenX + window.outerWidth;
+        const screenBottom = window.screenY + window.outerHeight;
+        const popLeft = Math.max(window.screenX, screenRight  - popW - 24);
+        const popTop  = Math.max(window.screenY, screenBottom - popH - 60);
+
         const popup = window.open(url, 'ai-chat-popup',
-            'width=720,height=860,resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+            'width=' + popW + ',height=' + popH + ',left=' + popLeft + ',top=' + popTop +
+            ',resizable=yes,menubar=no,toolbar=no,location=no,status=no');
+
         if (popup) {
-            closeChat();
-            // Hide the entire widget on the parent page while chat is in the popup
-            const widgetEl = document.querySelector('.local-chat-widget');
-            if (widgetEl) widgetEl.style.display = 'none';
+            state._popupWindow = popup;
+            // Mark the chat button as "popup active" so the user knows where the chat is
+            const chatButton = document.getElementById('chat-button');
+            if (chatButton) {
+                chatButton.classList.add('popup-active');
+                chatButton.title = 'AI chat is open in a separate window — click to bring to front';
+            }
             const _pollPopup = setInterval(function() {
                 if (popup.closed) {
                     clearInterval(_pollPopup);
-                    // Restore the widget on the parent page
-                    if (widgetEl) widgetEl.style.display = '';
+                    state._popupWindow = null;
+                    if (chatButton) {
+                        chatButton.classList.remove('popup-active');
+                        chatButton.title = 'Open AI assistant';
+                    }
                     // Resume the conversation the user had in the popup
                     try {
                         const popupConvId = localStorage.getItem('ai_popup_conv_id');
@@ -1352,25 +1801,54 @@
                 }
             }, 1000);
         } else {
+            // Popup blocked — fall back to inline panel
             const _siD = document.getElementById('chat-status');
-            if (_siD) _siD.textContent = 'Please allow popups for this site to open chat in a separate window';
+            if (_siD) _siD.textContent = 'Popups blocked — enable popups for this site to allow the moveable chat window.';
+            openChat();
         }
     }
 
-    // Update the page label in the widget header to show what page is being assisted
+    // Update the page label in the widget header to show what page is being assisted.
+    // Shows: [Site] · Page Title · agent badge  — all in one readable line.
     function updatePageLabel() {
         const labelEl = document.getElementById('chat-page-label');
         if (!labelEl) return;
+
         const ctx = state.pageContext;
         let pagePath = (ctx && ctx.page_path) || window.location.pathname;
-        // In popup mode use the originating page path
         if (window.AI_WIDGET_POPUP) {
             pagePath = window.AI_DETACHED_FROM_PATH || pagePath;
         }
-        // Show only last two segments for brevity: /Foo/Bar → Foo/Bar
-        const label = pagePath.replace(/^\//, '').replace(/\/$/, '') || '/';
-        labelEl.textContent = label;
-        labelEl.title = 'Assisting page: ' + pagePath;
+
+        // Human-readable page title: prefer document.title, fall back to last path segment
+        let pageTitle = '';
+        try {
+            pageTitle = (window.AI_WIDGET_POPUP ? (window.AI_DETACHED_FROM_TITLE || '') : document.title) || '';
+            pageTitle = pageTitle.replace(/\s*[|\-–—]\s*.*$/, '').trim(); // strip site suffix
+        } catch(e) {}
+        if (!pageTitle) {
+            pageTitle = pagePath.split('/').filter(Boolean).pop() || '/';
+        }
+        // Truncate long titles
+        if (pageTitle.length > 32) pageTitle = pageTitle.slice(0, 30) + '…';
+
+        // Site name badge
+        const site = state.siteName || '';
+
+        // Active agent label
+        const agentLabel = (state.currentAgent && (state.currentAgent.display_name || state.currentAgent.id)) || '';
+
+        // Build label HTML
+        let html = '';
+        if (site) html += '<span class="chat-ctx-badge chat-ctx-site" title="Site">' + _escH(site) + '</span> ';
+        html += '<span class="chat-ctx-page" title="' + _escH('Page: ' + pagePath) + '">' + _escH(pageTitle) + '</span>';
+        if (agentLabel) html += ' <span class="chat-ctx-badge chat-ctx-agent" title="Agent">' + _escH(agentLabel) + '</span>';
+
+        labelEl.innerHTML = html;
+    }
+
+    function _escH(s) {
+        return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     }
 
     // ── Form Fill Button ─────────────────────────────────────────────────────
@@ -1637,6 +2115,9 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
+        const _agentId = (state.pageContext && state.pageContext.agent_id) || '';
+        let _agentSys = (state.pageContext && state.pageContext.system_prompt) || '';
+
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -1667,6 +2148,267 @@
             const tierLabel = { nav: 'fast', simple: 'fast', medium: 'standard', complex: 'advanced' }[autoTier] || autoTier;
             const displayName = providerName === 'grok' ? ('Grok: ' + (providerParts[1] || 'auto')) : ('Ollama/' + tierLabel);
             if (loadingMessage) loadingMessage.innerHTML = '<span class="loading-dots">●●●</span> Thinking… <small style="opacity:0.6">(' + displayName + ')</small>';
+        }
+
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (state.pageContext.agent_id === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                state.pageContext.system_prompt = (state.pageContext.system_prompt || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
+
+        // When accounting agent is active AND the prompt looks like a pasted bill,
+        // inject the navigate_and_fill instruction so Grok emits the ACTION block.
+        const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
+            && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
+        const _looksLikeDeposit = /\$\s*[\d,]+\.\d{2}/.test(prompt)
+            && /Amount\s+Deposited|Account\s+(?:Balance|Refill)|Refill\s+Convenience|Reference\s+No|account\s+refill|funds.*account|adding.*funds/i.test(prompt);
+        const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
+        if (_agentId === 'accounting' && (_looksLikeBill || _looksLikeDeposit || _explicitFormRequest)) {
+            const _depositNote = _looksLikeDeposit && !_looksLikeBill
+                ? '\n\nNOTE: This appears to be a DEPOSIT/REFILL confirmation email (money paid TO a supplier account, e.g. PayPal reseller credit). Treat the "Amount Deposited" as unit_cost_0 (the main payment), and any "Convenience Charge" as a separate second line item (description_0 and unit_cost_1). Use "Prepaid Hosting / Account Refill" as description_0 if no clearer description is shown.'
+                : '';
+            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill, payment receipt, or deposit confirmation email. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "REFERENCE_OR_INV_NO", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER payment/deposit REFERENCE DATE", "unit_cost_0": "MAIN_AMOUNT", "quantity_0": "1", "description_0": "SERVICE DESCRIPTION"}}]\nReplace all placeholders with values parsed from the pasted text. Only add auto_pay_method if it explicitly says "Auto Pay". If a convenience/service fee is shown as a separate amount, add a second line (unit_cost_1, description_1, quantity_1). After the ACTION line, tell the user: (a) which supplier name to select in the dropdown, and (b) if that supplier does not exist yet, open /Inventory/supplier/add first.' + _depositNote;
+        }
+
+        // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
+        if (_agentId === 'ency') {
+            const _pu3 = prompt.toUpperCase();
+            const _encyCTIntent = /ADD.*CONSTITUENT|FIX.*CONSTITUENT|ADD.*TERM|FIX.*TERM|UNRESOLVED.*TERM|RESOLVE.*TERM|CREATE.*CONSTITUENT|ADD.*GLOSSARY|FIX.*GLOSSARY/.test(_pu3)
+                || /\bCONSTITUENT\b.*\bADD\b|\bTERM\b.*\bADD\b|\bFIX\b.*\bENCY\b/.test(_pu3);
+            if (_encyCTIntent) {
+                _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
+            }
+        }
+        // Client-side fast path: open invoice form when accounting agent detects a bill or explicit "enter" command.
+        // _enterIntent  → opens form and returns (skips Grok round-trip)
+        // _looksLikeBill → opens form immediately AND continues to Grok for context/explanation
+        if (_agentId === 'accounting') {
+            const _pu2 = prompt.toUpperCase();
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            if (_enterIntent || _looksLikeBill || _looksLikeDeposit) {
+                const _chatMsgs = document.getElementById('chat-messages');
+                let _billText = prompt;
+                if (_chatMsgs) {
+                    _chatMsgs.querySelectorAll('.message').forEach(function(el) {
+                        _billText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _nfFields = {};
+                // Deposit email: use "Amount Deposited" as main amount
+                const _depositAmtM = _billText.match(/Amount\s+Deposited[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
+                const _feeAmtM = _billText.match(/(?:Refill\s+Convenience\s+Charge|Convenience\s+(?:Fee|Charge)|Service\s+(?:Fee|Charge))[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
+                if (_depositAmtM) {
+                    _nfFields.unit_cost_0 = _depositAmtM[1].replace(/,/g, '');
+                    _nfFields.description_0 = 'Prepaid account refill';
+                    _nfFields.quantity_0 = '1';
+                    if (_feeAmtM) {
+                        _nfFields.unit_cost_1 = _feeAmtM[1].replace(/,/g, '');
+                        _nfFields.description_1 = 'Refill convenience charge';
+                        _nfFields.quantity_1 = '1';
+                    }
+                } else {
+                    const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
+                    if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                    _nfFields.description_0 = 'Service charge';
+                    _nfFields.quantity_0 = '1';
+                }
+                const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
+                    || _billText.match(/(\w+)\s+(\d{1,2})\s+(\d{4})\s+\d+:\d+/i)
+                    || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+                if (_dateM) {
+                    if (_dateM[0].includes('-')) {
+                        _nfFields.invoice_date = _dateM[0];
+                    } else if (/^\d{2}\//.test(_dateM[0])) {
+                        _nfFields.invoice_date = _dateM[3] + '-' + _dateM[1] + '-' + _dateM[2];
+                    } else {
+                        const _months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+                        const _mo = _months[_dateM[1]] || '01';
+                        _nfFields.invoice_date = _dateM[3] + '-' + _mo + '-' + (_dateM[2].length === 1 ? '0' : '') + _dateM[2];
+                    }
+                }
+                const _invNumM = _billText.match(/Reference\s+No[:\s]+([A-Z0-9\-]+)/i)
+                    || _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
+                    || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
+                if (_invNumM) _nfFields.invoice_number = _invNumM[1];
+                if (/Auto\s*Pay/i.test(_billText)) {
+                    const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
+                    _nfFields.auto_pay = '1';
+                    _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
+                }
+                const _supplierM = _billText.match(/HostGator|PayPal|Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio|eNom|GoDaddy|Namecheap|Hover|Tucows|WHC|Domain\.com/i);
+                const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
+                const _billedToM = _billText.match(/Billed\s+To[:\s]+([^\n\r]+)/i);
+                const _billedTo = _billedToM ? ' (' + _billedToM[1].trim() + ')' : '';
+                if (!_nfFields.notes) {
+                    _nfFields.notes = _supplierName
+                        + (_depositAmtM ? ' account refill' : ' invoice')
+                        + _billedTo
+                        + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                        + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
+                }
+                if (_nfFields.unit_cost_0) {
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    const _isDeposit = !!_depositAmtM;
+                    const _wAcc = document.createElement('div');
+                    _wAcc.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lblAcc = document.createElement('div');
+                    _lblAcc.className = 'msg-label';
+                    _lblAcc.textContent = 'Accounting Agent';
+                    const _elAcc = document.createElement('div');
+                    _elAcc.className = 'message ai-message';
+                    const _supplierHint = _supplierName !== 'Supplier'
+                        ? ' Select <strong>' + _supplierName + '</strong> as the supplier'
+                            + (_isDeposit ? ' (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).' : '.')
+                        : ' Select the supplier in the dropdown (add if missing).';
+                    _elAcc.innerHTML = '\uD83D\uDCCB '
+                        + (_isDeposit ? 'Deposit/refill' : 'Invoice')
+                        + ' form opened and pre-filled — verify the amounts, then save.'
+                        + _supplierHint
+                        + '<br><small>'
+                        + (_isDeposit ? 'Deposit: $' : 'Amount: $') + _nfFields.unit_cost_0
+                        + (_nfFields.unit_cost_1 ? ' + fee: $' + _nfFields.unit_cost_1 : '')
+                        + (_nfFields.invoice_date ? ' | Date: ' + _nfFields.invoice_date : '')
+                        + (_nfFields.invoice_number ? ' | Ref: ' + _nfFields.invoice_number : '')
+                        + '</small>';
+                    _wAcc.appendChild(_lblAcc);
+                    _wAcc.appendChild(_elAcc);
+                    if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    if (_enterIntent) {
+                        loadingMessage.remove();
+                        statusIndicator.textContent = '\uD83D\uDFE2 Invoice form opened';
+                        statusIndicator.className = 'chat-status connected';
+                        return;
+                    }
+                }
+            }
+        }
+
+        // ENCY section navigation fast path — no AI round-trip needed for common section requests
+        if (_agentId === 'ency' || (state.pageContext.page_path || '').startsWith('/ENCY')) {
+            const _pu5 = prompt.toUpperCase().replace(/['']/g, '');
+            if (/\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/.test(_pu5)) {
+                var _encyNavUrl = null;
+                var _encyNavLabel = null;
+                if (/\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL)\b/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/herbs'; _encyNavLabel = 'Herbs List';
+                } else if (/\bCONSTIT/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/Constituent'; _encyNavLabel = 'Constituent List';
+                } else if (/\bGLOSSARY\b/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/glossary'; _encyNavLabel = 'Glossary';
+                } else if (/\bDISEASE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/diseases'; _encyNavLabel = 'Diseases List';
+                } else if (/\bSYMPTOM/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/symptoms'; _encyNavLabel = 'Symptoms List';
+                } else if (/\bFORMULA|RECIPE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/formula'; _encyNavLabel = 'Formulas / Recipes';
+                } else if (/\bINSECT/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/insects'; _encyNavLabel = 'Insects';
+                } else if (/\bANIMAL/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/animals'; _encyNavLabel = 'Animals';
+                } else if (/\bPOLLINATOR|BEE\s*PASTURE|FORAGE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/BeePastureView'; _encyNavLabel = 'Bee Pasture / Pollinators';
+                }
+                if (_encyNavUrl) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening ' + _encyNavLabel + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: _encyNavUrl });
+                    const _nw = document.createElement('div');
+                    _nw.className = 'msg-wrapper msg-wrapper-ai';
+                    const _nlbl = document.createElement('div');
+                    _nlbl.className = 'msg-label';
+                    _nlbl.textContent = 'ENCY Agent';
+                    const _nel = document.createElement('div');
+                    _nel.className = 'message ai-message';
+                    _nel.innerHTML = 'Opening <strong>' + _encyNavLabel + '</strong> in a new tab.';
+                    _nw.appendChild(_nlbl);
+                    _nw.appendChild(_nel);
+                    const _ncm = document.getElementById('chat-messages');
+                    if (_ncm) { _ncm.appendChild(_nw); _ncm.scrollTop = _ncm.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY fast path: navigate to constituent#N page or add form directly.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY fast path: when ENCY agent is active and the prompt or chat history mentions
+        // "Unresolved term in constituent#N", navigate directly to that constituent's page.
+        // When adding a named constituent, navigate to the add form pre-filled.
+        if (_agentId === 'ency') {
+            const _pu4 = prompt.toUpperCase();
+            const _encyFastIntent = /FIX.*CONSTITUENT|UNRESOLVED.*TERM|RESOLVE.*TERM|ADD.*CONSTITUENT|CREATE.*CONSTITUENT|ADDING.*CONSTITUENT/.test(_pu4)
+                || /\bCONSTITUENT\b/.test(_pu4);
+            if (_encyFastIntent) {
+                const _chatMsgs2 = document.getElementById('chat-messages');
+                let _encyText = prompt;
+                if (_chatMsgs2) {
+                    _chatMsgs2.querySelectorAll('.message').forEach(function(el) {
+                        _encyText += ' ' + (el.textContent || '');
+                    });
+                }
+                const _cidM = _encyText.match(/constituent\s*#\s*(\d+)/i) || _encyText.match(/constituent\s+id\s*[:=]?\s*(\d+)/i);
+                if (_cidM) {
+                    const _cid = _cidM[1];
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening constituent #' + _cid + '…';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: '/ENCY/Constituent/' + _cid });
+                    const _w2 = document.createElement('div');
+                    _w2.className = 'msg-wrapper msg-wrapper-ai';
+                    const _lbl2 = document.createElement('div');
+                    _lbl2.className = 'msg-label';
+                    _lbl2.textContent = 'ENCY Agent';
+                    const _el2 = document.createElement('div');
+                    _el2.className = 'message ai-message';
+                    _el2.innerHTML = 'Opening <strong>Constituent #' + _cid + '</strong> so you can see which term is unresolved. '
+                        + 'Once you identify the missing term, ask me to "add constituent [name]" and I will open the add form pre-filled.';
+                    _w2.appendChild(_lbl2);
+                    _w2.appendChild(_el2);
+                    if (_chatMsgs2) { _chatMsgs2.appendChild(_w2); _chatMsgs2.scrollTop = _chatMsgs2.scrollHeight; }
+                    return;
+                }
+            }
         }
 
         // Build request payload with page context and agent info
@@ -1716,6 +2458,18 @@
             console.debug('Adding conversation_id to request:', state.currentConversationId);
         } else {
             console.debug('No conversation_id in state, starting new conversation');
+        }
+
+        // Link audio/transcript files from the most recent voice recording.
+        // These are set by _transcribeAudioFile() after a successful transcription.
+        // Sent once with the first message after a recording, then cleared.
+        if (state.lastAudioFileId) {
+            requestPayload.audio_file_id = state.lastAudioFileId;
+            state.lastAudioFileId = null;
+        }
+        if (state.lastTranscriptFileId) {
+            requestPayload.transcript_file_id = state.lastTranscriptFileId;
+            state.lastTranscriptFileId = null;
         }
 
         // Build conversation history from visible messages (exclude current user msg
@@ -1919,7 +2673,11 @@
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
             liveThinkEl.remove();
-            
+
+            if (!data) {
+                throw new Error('AI server returned an empty response. Please try again.');
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -1961,7 +2719,7 @@
                         // Re-send with Grok web search
                         const grokModel = (state.modelTiers && state.modelTiers.grok)
                                           ? state.modelTiers.grok
-                                          : 'grok|grok-4-0709';
+                                          : 'grok|grok-4.3';
                         state.userModelOverride = grokModel;
                         const webEl = document.getElementById('enable-web-search');
                         if (webEl) webEl.checked = true;
@@ -2041,8 +2799,11 @@
                 // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
                 const { cleanText: _rawClean, actions } = extractActions(data.response || '');
                 const _needsSupport = _detectSupportNeeded(_rawClean);
-                const cleanText = _stripSupportTag(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean).replace(/https?:\/\/(?:example\.com|localhost(?::\d+)?)(\/[^\s"')\]>]*)/g, '$1');
                 addMessage(cleanText, 'ai-message');
+
+                // Voice mode: read the AI response aloud, then restart listening
+                if (state._speakResponse) { state._speakResponse(cleanText); }
 
                 if (_needsSupport && !state.supportMode) {
                     _showEscalationButtons();
@@ -2163,20 +2924,20 @@
             statusIndicator.className = 'chat-status error';
 
             const isTimeout = error.name === 'AbortError';
+            const ollamaTimeout = isTimeout && isOllama;
             const msg = isTimeout
                 ? 'Request timed out after ' + (clientTimeoutMs / 1000) + 's.'
-                    + (isOllama ? ' Ollama may be loading a large model.' : ' The AI server may be busy.')
+                    + (ollamaTimeout
+                        ? ' The local Ollama model is overloaded or too large for the current hardware. Try switching to a cloud provider (Grok) for instant responses.'
+                        : ' The AI server may be busy.')
                 : 'Network error: ' + error.message + '. Please try again.';
 
-            // Convert live thinking block into a permanent error trace instead of discarding it.
-            // This preserves the pre-send context (page, history, prompt) for diagnostics.
             _liveStep('❌', (isTimeout ? 'Client timed out after ' + (clientTimeoutMs/1000) + 's' : 'Network error: ' + error.message));
             liveSum.textContent = '⚠️ AI Thinking — ' + (isTimeout ? 'Timeout' : 'Network Error')
                 + ' Trace (' + liveBody.children.length + ' steps)';
             liveThinkEl.className = 'ai-thinking';
             liveThinkEl.open = true;
 
-            // Show error with a Retry button (always — network errors are usually transient)
             const chatMessages = document.getElementById('chat-messages');
             const wrapper = document.createElement('div');
             wrapper.className = 'msg-wrapper msg-wrapper-ai';
@@ -2188,56 +2949,45 @@
             errEl.textContent = msg;
             wrapper.appendChild(label);
             wrapper.appendChild(errEl);
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'chat-retry-btn';
-            retryBtn.textContent = '↺ Retry';
-            retryBtn.onclick = function() {
-                // Remove the live thinking block (it's BEFORE wrapper in DOM, not after)
-                // and any thinking block immediately following this wrapper
-                persistMessages();    // save state (including liveThinkEl) in history first
+
+            function _doRetry(switchProvider) {
+                persistMessages();
                 liveThinkEl.remove();
                 var nextEl = wrapper.nextElementSibling;
                 if (nextEl && nextEl.classList.contains('ai-thinking')) nextEl.remove();
                 wrapper.remove();
+                if (switchProvider) {
+                    var sel = document.getElementById('provider-select');
+                    if (sel) {
+                        sel.value = switchProvider;
+                        sel.dispatchEvent(new Event('change'));
+                    }
+                }
                 queryAI(prompt);
-            };
+            }
+
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'chat-retry-btn';
+            retryBtn.textContent = '↺ Retry Ollama';
+            retryBtn.onclick = function() { _doRetry(null); };
             wrapper.appendChild(retryBtn);
+
+            if (ollamaTimeout) {
+                var switchGrokBtn = document.createElement('button');
+                switchGrokBtn.className = 'chat-retry-btn';
+                switchGrokBtn.style.cssText = 'margin-left:8px;background:#1a1a2e;color:#fff;';
+                switchGrokBtn.textContent = '⚡ Switch to Grok';
+                switchGrokBtn.onclick = function() { _doRetry('grok'); };
+                wrapper.appendChild(switchGrokBtn);
+            }
+
             chatMessages.appendChild(wrapper);
-            persistMessages();  // save network error into session history
+            persistMessages();
             chatMessages.scrollTop = chatMessages.scrollHeight;
         });
     }
     
-    // Extract visible text content of the current page to give the AI direct context.
-    // Strips the chat widget, nav, scripts and style elements, then trims whitespace.
-    // Result is capped at 4000 chars so the system prompt doesn't balloon.
-    function extractPageContent() {
-        try {
-            const clone = document.body.cloneNode(true);
-            // Remove elements that add noise or duplicate the nav guide
-            clone.querySelectorAll(
-                'script, style, noscript, ' +
-                '.local-chat-widget, #chat-panel, ' +
-                'nav, header, footer, ' +
-                '.navigation, #navigation, .nav-bar, ' +
-                '.debug-info, .page-debug'
-            ).forEach(function(el) { el.remove(); });
 
-            let text = clone.textContent || '';
-            // Collapse runs of whitespace/blank lines
-            text = text.replace(/[ \t]+/g, ' ')
-                       .replace(/\n[ \t]*/g, '\n')
-                       .replace(/\n{3,}/g, '\n\n')
-                       .trim();
-
-            if (text.length > 2000) {
-                text = text.substring(0, 2000) + '\n[... page content truncated]';
-            }
-            return text;
-        } catch(e) {
-            return '';
-        }
-    }
 
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
@@ -2298,6 +3048,69 @@
         return t.large || t.medium || state.selectedProvider;
     }
 
+    // Static FAQ fast-path — instant canned answers for common support questions.
+    // These fire BEFORE any AI call, so the user gets an immediate response.
+    // Each entry: { match: RegExp, answer: string (markdown supported) }
+    var STATIC_FAQ = [
+        {
+            match: /\b(create|make|get|open|set.?up)\b.{0,20}\baccount\b|\bsign.?up\b|\bregister\b|\bhow.{0,20}\bjoin\b|\bnew.{0,10}\buser\b/i,
+            answer: 'Account creation is managed by the site administrator.\n\nTo request access, [submit a HelpDesk ticket](/HelpDesk) and an admin will set up your account. If a self-registration page is available on your site it will be linked on the login page.',
+        },
+        {
+            match: /\b(reset|forgot|forgotten|lost|change)\b.{0,15}\bpassword\b|\bpassword.{0,15}\b(reset|forgot|change|lost)\b/i,
+            answer: 'To reset your password, click **Forgot Password** on the login page. A reset link will be emailed to your registered address.\n\nIf you no longer have access to that email, [submit a HelpDesk ticket](/HelpDesk) and an administrator can reset it for you.',
+        },
+        {
+            match: /\bhow.{0,20}\blog.{0,5}(in|out)\b|\bsign.{0,5}(in|out)\b|\bcannot.{0,10}log.{0,5}in\b|\bcan.?t.{0,10}log.{0,5}in\b/i,
+            answer: 'To log in, enter your username and password on the [login page](/login). Your username is usually your email address.\n\nIf you are having trouble logging in, try **Forgot Password** on the login page or [submit a HelpDesk ticket](/HelpDesk).',
+        },
+        {
+            match: /\bhow.{0,25}\b(report|submit|log|file).{0,15}\b(bug|error|issue|problem|ticket)\b|\bhow.{0,20}\bget.{0,10}\bhelp\b/i,
+            answer: 'To report a problem or get help:\n\n1. [Submit a HelpDesk ticket](/HelpDesk) — include what you were doing and any error message you saw.\n2. Or use this chat — describe the issue and I can help diagnose it.',
+        },
+        {
+            match: /\bwhat.{0,20}\b(this|site|system|application|app|platform)\b|\bwhat (is|does).{0,20}\b(comserv|bmaster|beemaster|ency)\b/i,
+            answer: 'This is **Comserv** — a multi-site community platform. Depending on your site it includes:\n\n- **BeeMaster** — apiary and beekeeping management\n- **ENCY** — herbal and plant encyclopedia\n- **HelpDesk** — support tickets\n- **Planning** — project and todo management\n- **Workshops** — local event listings\n\nAsk me anything about the features available on your site.',
+        },
+        {
+            match: /\bcontact.{0,20}\b(support|admin|administrator|someone|staff|team)\b|\bhow.{0,20}\b(contact|reach|talk to|speak to).{0,20}\b(support|admin|help)\b/i,
+            answer: 'To contact support, [submit a HelpDesk ticket](/HelpDesk). An administrator will respond as soon as possible.\n\nYou can also continue this chat — I can answer most questions right here.',
+        },
+    ];
+
+    // Content-based agent keyword overrides.
+    // When a prompt clearly targets a different domain than the current page agent,
+    // the agent is switched automatically — no need to navigate to the right page first.
+    // Format: { agentId, pattern }  — first match wins.
+    var AGENT_KEYWORD_OVERRIDES = [
+        {
+            agentId: 'accounting',
+            pattern: /\b(accounts payable|accounts receivable|supplier bill|purchase order)\b|open.*invoice.*form|file.*invoice|enter.*bill|record.*invoice/i,
+        },
+        {
+            agentId: 'helpdesk',
+            pattern: /\b(helpdesk|help desk|submit.*ticket|create.*ticket|report.*error|report.*bug|report.*issue)\b|how do i report/i,
+        },
+    ];
+
+    // Concept synonym groups for smarter nav resolution.
+    // When resolveNavIntent cannot match a query via STATIC_NAV label matching, it falls
+    // back to these concept groups so that "medicinal plants" → /ENCY/herbs etc.
+    // Each entry: { url, concepts[] }  — concepts are lowercase strings to match against query.
+    var NAV_CONCEPT_GROUPS = [
+        { url: '/ENCY/glossary',         concepts: ['terminology', 'dictionary', 'vocab', 'vocabulary', 'definitions', 'define', 'look up term', 'beekeeping terms', 'herbal terms'] },
+        { url: '/ENCY/herbs',            concepts: ['medicinal plants', 'herb database', 'plant database', 'botanical list', 'herbal list', 'flora', 'herb search'] },
+        { url: '/ENCY/diseases',         concepts: ['conditions', 'ailments', 'health conditions', 'bee diseases', 'hive diseases', 'disorders', 'bee conditions'] },
+        { url: '/ENCY/BeePastureView',   concepts: ['nectar plants', 'pollen plants', 'bee garden', 'foraging plants', 'bee friendly plants', 'melliferous', 'pasture plants', 'pollinator garden'] },
+        { url: '/ENCY/symptoms',         concepts: ['signs', 'hive symptoms', 'bee symptoms', 'warning signs', 'colony symptoms'] },
+        { url: '/ENCY/Constituent',      concepts: ['active compounds', 'chemical constituents', 'phytochemicals', 'active ingredients'] },
+        { url: '/ENCY/formula',          concepts: ['remedy', 'remedies', 'preparation', 'preparations', 'compound formula', 'herbal recipe'] },
+        { url: '/Inventory/invoice/new', concepts: ['new invoice', 'add invoice', 'create invoice', 'log bill', 'record bill', 'enter bill', 'new bill'] },
+        { url: '/HelpDesk',              concepts: ['get help', 'support system', 'contact support', 'tech support', 'it support'] },
+        { url: '/BMaster',              concepts: ['beekeeping home', 'bee management', 'beemaster', 'bee master home'] },
+        { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
+    ];
+
     // Static nav entries always available regardless of current page links.
     // Keyed by label (lowercase) → path. Merged into the nav map at build time.
     // The origin is prepended at runtime so they work on any host.
@@ -2353,28 +3166,75 @@
         { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
+        { label: 'bmaster',                    url: '/BMaster' },
+        { label: 'beemaster',                  url: '/BMaster' },
+        { label: 'bee master',                 url: '/BMaster' },
+        { label: 'beekeeping',                 url: '/BMaster' },
+        { label: 'apiary',                     url: '/Apiary' },
+        { label: 'apiary overview',            url: '/Apiary' },
+        { label: 'hive management',            url: '/Apiary/HiveManagement' },
+        { label: 'hives',                      url: '/Apiary/HiveManagement' },
+        { label: 'queen rearing',              url: '/Apiary/QueenRearing' },
+        { label: 'queens',                     url: '/Apiary/QueenRearing' },
+        { label: 'bee health',                 url: '/Apiary/BeeHealth' },
+        { label: 'bee forage',                 url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture',                url: '/ENCY/BeePastureView' },
+        { label: 'forage plants',              url: '/ENCY/BeePastureView' },
+        { label: 'forage',                     url: '/ENCY/BeePastureView' },
+        { label: 'pollinator plants',          url: '/ENCY/BeePastureView' },
+        { label: 'pollinators',                url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture view',           url: '/ENCY/BeePastureView' },
+        { label: 'herbs',                      url: '/ENCY/herbs' },
+        { label: 'herbs list',                 url: '/ENCY/herbs' },
+        { label: 'herb list',                  url: '/ENCY/herbs' },
+        { label: 'plant list',                 url: '/ENCY/herbs' },
+        { label: 'plants',                     url: '/ENCY/herbs' },
+        { label: 'botanical names',            url: '/ENCY/BotanicalNameView' },
+        { label: 'glossary',                   url: '/ENCY/glossary' },
+        { label: 'beekeeping glossary',        url: '/ENCY/glossary' },
+        { label: 'terms',                      url: '/ENCY/glossary' },
+        { label: 'diseases',                   url: '/ENCY/diseases' },
+        { label: 'diseases list',              url: '/ENCY/diseases' },
+        { label: 'bee diseases',               url: '/ENCY/diseases' },
+        { label: 'symptoms',                   url: '/ENCY/symptoms' },
+        { label: 'symptoms list',              url: '/ENCY/symptoms' },
+        { label: 'constituents',               url: '/ENCY/Constituent' },
+        { label: 'constituent list',           url: '/ENCY/Constituent' },
+        { label: 'formulas',                   url: '/ENCY/formula' },
+        { label: 'recipes',                    url: '/ENCY/formula' },
+        { label: 'insects',                    url: '/ENCY/insects' },
+        { label: 'animals',                    url: '/ENCY/animals' },
+        { label: 'therapeutic actions',        url: '/ENCY/therapeutic_actions' },
+        { label: 'drug herb interactions',     url: '/ENCY/drug_herb_interactions' },
+        { label: 'herb interactions',          url: '/ENCY/drug_herb_interactions' },
     ];
 
     // Build a flat {label, url} navigation map from:
     //   1. Static core routes (STATIC_NAV above)
-    //   2. Links extracted from the current page (navLinks + contentLinks in system_prompt)
-    //      The page-link format is:  "Label: https://host/path"  (no leading dash)
-    //      The agent nav-guide format is: "  - Label: https://host/path" (with dash)
-    //      The regex matches BOTH.
+    //   2. Links extracted from the agent system_prompt, matching both:
+    //      - Absolute: "  - Label: https://host/path"
+    //      - Relative: "  - Label: /path/to/page"   (agent nav-guide style)
     function buildNavigationMap() {
         const origin = window.location.origin;
         const map = STATIC_NAV.map(function(e) {
             return { label: e.label, url: origin + e.url };
         });
         const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
-        // Match both "  - Label: URL" and "  Label: URL"
-        const re = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reAbs = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reRel = /^[ \t]*-[ \t]+(.+?):\s*(\/[^\s(→,]+)/gm;
         let m;
-        while ((m = re.exec(prompt)) !== null) {
+        while ((m = reAbs.exec(prompt)) !== null) {
             const label = m[1].trim().toLowerCase();
             const url   = m[2].trim();
-            // Skip section headers and meta-lines that aren't real page links
             if (label.length > 80 || /^\[/.test(label)) continue;
+            if (!map.some(function(e) { return e.label === label; })) {
+                map.push({ label, url });
+            }
+        }
+        while ((m = reRel.exec(prompt)) !== null) {
+            const label = m[1].trim().toLowerCase();
+            const url   = origin + m[2].trim().replace(/\s.*$/, '');
+            if (label.length > 80 || /^\[/.test(label) || /^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) continue;
             if (!map.some(function(e) { return e.label === label; })) {
                 map.push({ label, url });
             }
@@ -2415,7 +3275,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -2439,13 +3299,24 @@
             return words.filter(function(w) { return w.length >= 3; })
                 .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
         });
-        return fuzzy.length ? fuzzy : null;
+        if (fuzzy.length) return fuzzy;
+        // Concept synonym fallback: match query against NAV_CONCEPT_GROUPS synonyms.
+        // Catches natural-language phrases like "medicinal plants", "nectar plants", etc.
+        const _origin3 = window.location.origin;
+        for (var _cgi = 0; _cgi < NAV_CONCEPT_GROUPS.length; _cgi++) {
+            const _cg = NAV_CONCEPT_GROUPS[_cgi];
+            const _matched = _cg.concepts.some(function(c) {
+                return q === c || q.includes(c) || c.includes(q);
+            });
+            if (_matched) return [{ label: _cg.concepts[0], url: _origin3 + _cg.url }];
+        }
+        return null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
     // NOTE: "show me" and "find" are intentionally excluded — they are question/display words
     // that should be answered by the AI, not treated as navigation commands.
-    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+(.+)/i;
+    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|take me to the|go to the)\s+(.+)/i;
 
     // Helper: handle a resolved navigation match — announce and navigate
     function _executeNavMatch(message, messageInput, matches) {
@@ -2499,24 +3370,38 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
-    function _enterSupportMode(convId, lastMsgId) {
+    function _sendUserHeartbeat() {
+        if (!state.supportConvId) return;
+        fetch('/chat/user_heartbeat', {
+            method: 'POST',
+            credentials: 'include',
+            body: new URLSearchParams({ conversation_id: state.supportConvId })
+        }).catch(function() {});
+    }
+
+    function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
+        _sendUserHeartbeat();
+        state.userHeartbeatTimer = setInterval(_sendUserHeartbeat, 30000);
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
-            header.textContent = '💬 Support Chat (live)';
+            header.textContent = '💬 Live Support Chat';
         }
-        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
         var placeholder = document.getElementById('message-input');
-        if (placeholder) placeholder.placeholder = 'Type a message to support…';
-        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        if (placeholder) placeholder.placeholder = 'Describe your issue here…';
+        var guidance = '✅ **An administrator has been notified and will join shortly.**\n\n'
+            + 'Please describe your issue below — include any error messages, what you were doing, and what you expected to happen.\n\n'
+            + 'If no admin responds within a few minutes you can [create a support ticket](/HelpDesk/ticket/new) instead.';
+        _addSupportSystemMsg(guidance);
         _startSupportPolling();
     }
 
     function _exitSupportMode() {
         if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        if (state.userHeartbeatTimer) { clearInterval(state.userHeartbeatTimer); state.userHeartbeatTimer = null; }
         state.supportMode   = false;
         state.supportConvId = null;
         state.supportLastMsgId = 0;
@@ -2529,8 +3414,14 @@
     function _addSupportSystemMsg(text) {
         var el = document.createElement('div');
         el.className = 'message system-message';
-        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
-        el.textContent = text;
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:8px 14px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;line-height:1.5;';
+        var html = text
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1a6bb5;">$1</a>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        el.innerHTML = html;
         var container = document.getElementById('chat-messages');
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
@@ -2553,54 +3444,75 @@
                         }
                     }
                 });
+                if (d.conv_status === 'archived') {
+                    clearInterval(state.supportPollTimer);
+                    state.supportPollTimer = null;
+                    _addSupportSystemMsg('🔒 This support chat has been closed by the administrator. Thank you for contacting us!');
+                    _exitSupportMode();
+                }
             })
             .catch(function() {});
         }, 5000);
     }
 
+    function _showNoAdminMessage() {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
+        el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
+            + 'You can submit a support ticket and an admin will respond when available:<br>'
+            + '<button onclick="(function(){var _s=window.__aiChatSupportFns;if(_s)_s.ticket();})()" '
+            + 'style="margin-top:8px;padding:6px 14px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.88em;">📋 Create Support Ticket</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
     function _initSupportChat(contextMsg) {
-        _addSupportSystemMsg('⏳ Connecting to support…');
-        var body = new URLSearchParams({
-            message: contextMsg || 'User requested live support',
-            agent_type: 'support',
-            title: 'Support Chat - ' + (document.title || window.location.pathname)
-        });
-        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        _addSupportSystemMsg('⏳ Checking admin availability…');
+        fetch('/chat/check_admin_online', { credentials: 'include' })
         .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success && d.conversation_id) {
-                state.supportLastMsgId = d.message_id || 0;
-                _enterSupportMode(d.conversation_id, d.message_id);
-            } else {
-                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+        .then(function(presence) {
+            console.log('[Chat] check_admin_online:', presence);
+            if (!presence.online) {
+                _showNoAdminMessage();
+                return;
             }
+            var _rawTitle = (document.title || '').replace(/https?:\/\/[^\s|:]+[:|]?\s*/g, '').replace(/\s*[:|]\s*$/, '').trim();
+            var _chatTitle = 'Support Chat — ' + (_rawTitle || window.location.pathname);
+            var body = new URLSearchParams({
+                message: contextMsg || 'User requested live support',
+                agent_type: 'support',
+                title: _chatTitle
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.conversation_id) {
+                    state.supportLastMsgId = d.message_id || 0;
+                    _enterSupportMode(d.conversation_id, d.message_id);
+                } else {
+                    _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+                }
+            })
+            .catch(function() {
+                _addSupportSystemMsg('❌ Network error. Please try again.');
+            });
         })
         .catch(function() {
-            _addSupportSystemMsg('❌ Network error. Please try again.');
+            _addSupportSystemMsg('❌ Could not check admin status. Please try again.');
         });
     }
 
     function _createTicketFromSupport() {
-        var lastAiMsg = '';
-        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
-        var body = new URLSearchParams({
-            action: 'create_helpdesk_ticket',
-            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
-            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
-            category: 'General',
-            priority: 'normal'
+        var msgs = [];
+        document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+            var role = el.classList.contains('user-message') ? 'You' : 'AI';
+            msgs.push(role + ': ' + el.textContent.trim());
         });
-        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success) {
-                var url = d.ticket_url || '/HelpDesk';
-                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
-            } else {
-                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
-            }
-        })
-        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+        var subject = 'Support request — ' + (document.title || window.location.pathname);
+        var description = 'Chat transcript from AI widget:\n\n' + msgs.slice(-10).join('\n\n').slice(0, 1000);
+        var params = new URLSearchParams({ subject: subject, description: description, category: 'support', priority: 'normal', from_chat: '1' });
+        window.location.href = '/HelpDesk/ticket/new?' + params.toString();
     }
 
     window.__aiChatSupportFns = {
@@ -2700,9 +3612,42 @@
             return;
         }
 
+        // Content-based agent override: if the prompt clearly targets a different domain
+        // (e.g. "open the invoice form" from BMaster), switch to the correct agent before
+        // any fast-path or AI call — so the right system prompt and logic apply.
+        if (state.agentsConfig && state.agentsConfig.agents && message) {
+            const _curAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            for (var _ovIdx = 0; _ovIdx < AGENT_KEYWORD_OVERRIDES.length; _ovIdx++) {
+                const _ovRule = AGENT_KEYWORD_OVERRIDES[_ovIdx];
+                if (_curAgentId !== _ovRule.agentId && _ovRule.pattern.test(message)) {
+                    const _ovAgent = state.agentsConfig.agents[_ovRule.agentId];
+                    if (_ovAgent && _ovAgent.system_prompt) {
+                        state.pageContext = Object.assign({}, state.pageContext || {}, {
+                            agent_id: _ovRule.agentId,
+                            system_prompt: _ovAgent.system_prompt,
+                            display_name: _ovAgent.display_name || _ovRule.agentId,
+                        });
+                        const _siOv = document.getElementById('chat-status');
+                        if (_siOv) {
+                            _siOv.textContent = 'Using ' + (_ovAgent.display_name || _ovRule.agentId) + ' agent\u2026';
+                            _siOv.className = 'chat-status connected';
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ENCY agent: let the ENCY fast path inside sendAIRequest handle section navigation.
+        // Skip resolveNavIntent entirely so it cannot misfire on words like "list".
+        const _smAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+        const _isEncyNav = (_smAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+            && message && /\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/i.test(message)
+            && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(message);
+
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message && message.match(NAV_RE);
+        const navMatch = !_isEncyNav && message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -2724,6 +3669,36 @@
                 const lbl = bareMatches[0].label;
                 if (lbl === normalised || lbl.startsWith(normalised) || normalised.startsWith(lbl.split(/\s+/).slice(0, 2).join(' '))) {
                     _executeNavMatch(message, messageInput, bareMatches);
+                    return;
+                }
+            }
+        }
+
+        // Direct live-chat trigger — user explicitly wants a human, skip AI entirely.
+        var DIRECT_SUPPORT_RE = /\b(chat|talk|speak|connect|transfer|escalate)\b.{0,25}\b(admin|administrator|support|agent|human|person|someone|staff|live)\b|\b(live|human|real)\s*(chat|support|agent|help)\b|\bi\s*(want|need|d like|would like).{0,20}\b(chat|talk|speak).{0,15}\b(admin|support|human|person|live)\b/i;
+        if (message && !state.pendingImage && DIRECT_SUPPORT_RE.test(message)) {
+            addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+            messageInput.value = '';
+            persistMessages();
+            var _lastCtx = '';
+            document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+                _lastCtx = el.textContent.trim();
+            });
+            _initSupportChat(_lastCtx.slice(-300) || message);
+            return;
+        }
+
+        // FAQ fast-path: instant canned answer for common support questions.
+        // Fires before queryAI so the user never waits on Ollama for trivial questions.
+        if (message && !state.pendingImage) {
+            for (var _fqi = 0; _fqi < STATIC_FAQ.length; _fqi++) {
+                if (STATIC_FAQ[_fqi].match.test(message)) {
+                    addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+                    messageInput.value = '';
+                    persistMessages();
+                    addMessage(STATIC_FAQ[_fqi].answer, 'ai-message');
+                    persistMessages();
+                    _showEscalationButtons(null);
                     return;
                 }
             }
@@ -2782,6 +3757,27 @@
 
         Object.keys(fields).forEach(function(fieldName) {
             const value = fields[fieldName];
+
+            // Multi-checkbox group: multiple checkboxes sharing this name
+            const allCheckboxes = Array.from(
+                targetDoc.querySelectorAll('input[type="checkbox"][name="' + fieldName + '"]')
+            );
+            if (allCheckboxes.length > 1) {
+                const strVal = Array.isArray(value)
+                    ? value.join('; ')
+                    : (value !== null && typeof value === 'object')
+                        ? Object.values(value).join('; ')
+                        : String(value || '');
+                const selected = strVal.split(/[;,]/).map(function(s) { return s.trim().toLowerCase(); }).filter(Boolean);
+                allCheckboxes.forEach(function(cb) {
+                    const cbVal = cb.value.toLowerCase();
+                    cb.checked = selected.some(function(s) { return cbVal === s || cbVal.indexOf(s) !== -1 || s.indexOf(cbVal) !== -1; });
+                    cb.dispatchEvent(new Event('change', { bubbles: true }));
+                });
+                filled.push(fieldName);
+                return;
+            }
+
             // Try by name first, then by id
             let el = targetDoc.querySelector('[name="' + fieldName + '"]')
                   || targetDoc.getElementById(fieldName);
@@ -2807,7 +3803,15 @@
                     });
                 }
             } else {
-                el.value = value !== null && value !== undefined ? String(value) : '';
+                var strVal;
+                if (Array.isArray(value)) {
+                    strVal = value.join('; ');
+                } else if (value !== null && typeof value === 'object') {
+                    strVal = Object.values(value).join('; ');
+                } else {
+                    strVal = value !== null && value !== undefined ? String(value) : '';
+                }
+                el.value = strVal;
             }
 
             // Fire change/input events so any JS listeners react
@@ -2832,6 +3836,384 @@
         wrapper.appendChild(el2);
         chatMessages.appendChild(wrapper);
         chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // ── _transcribeAudioFile ───────────────────────────────────────────────────
+    // Upload an audio File object to /ai/transcribe, show progress, and on success
+    // populate the chat input with the transcript so the user can review + send.
+    function _transcribeAudioFile(file) {
+        var statusEl  = document.getElementById('audio-transcribe-status');
+        var inputEl   = document.getElementById('message-input');
+        var sendBtn   = document.getElementById('send-message');
+
+        if (!file) return;
+
+        var sizeMB = (file.size / 1048576).toFixed(1);
+        if (statusEl) { statusEl.textContent = '⏳ Uploading ' + (file.name || 'recording') + ' (' + sizeMB + ' MB)…'; statusEl.style.display = ''; }
+        if (sendBtn) sendBtn.disabled = true;
+
+        var formData = new FormData();
+        formData.append('audio', file, file.name || 'recording.webm');
+        formData.append('diarize', '1');
+        formData.append('num_speakers', '2');
+
+        function _handleTranscriptResult(data) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (!data.success) {
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            var transcript = (data.transcript || '').trim();
+            if (!transcript) {
+                if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
+                return;
+            }
+            if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
+            if (data.transcript_file_id) { state.lastTranscriptFileId = data.transcript_file_id; }
+            if (data.segments && data.segments.length) { state.lastSegments = data.segments; }
+
+            var displayText = transcript;
+            if (data.diarized && data.segments && data.segments.length) {
+                var lines = [];
+                var lastSpeaker = null;
+                data.segments.forEach(function(seg) {
+                    var spk = seg.speaker || 'SPEAKER_0';
+                    var label = spk === 'SPEAKER_0' ? 'Instructor' : spk === 'SPEAKER_1' ? 'Student' : spk;
+                    var mins = Math.floor((seg.start || 0) / 60);
+                    var secs = Math.round((seg.start || 0) % 60);
+                    var ts = '[' + mins + ':' + (secs < 10 ? '0' : '') + secs + ']';
+                    if (spk !== lastSpeaker) {
+                        lines.push('\n' + label + ' ' + ts + ': ' + (seg.text || '').trim());
+                        lastSpeaker = spk;
+                    } else {
+                        lines.push((seg.text || '').trim());
+                    }
+                });
+                displayText = lines.join(' ').trim();
+            }
+
+            if (inputEl) {
+                inputEl.value = displayText;
+                inputEl.style.height = 'auto';
+                inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + 'px';
+                inputEl.style.overflowY = inputEl.scrollHeight > 200 ? 'auto' : 'hidden';
+                inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+                inputEl.focus();
+            }
+            var diarizedNote = data.diarized ? ' (speakers separated)' : '';
+            if (statusEl) {
+                statusEl.textContent = '✅ Transcript ready (model: ' + (data.model_used || 'base') + diarizedNote + ') — review and press Send';
+                setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
+            }
+            addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+        }
+
+        function _pollTranscribeStatus(jobId, attempt) {
+            attempt = attempt || 0;
+            if (attempt > 120) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
+                return;
+            }
+            var elapsed = Math.round(attempt * 5);
+            if (statusEl) { statusEl.textContent = '⏳ Transcribing… (' + elapsed + 's elapsed, checking every 5s)'; }
+            setTimeout(function() {
+                fetch('/ai/transcribe_status?job_id=' + encodeURIComponent(jobId), {
+                    credentials: 'include'
+                })
+                .then(function(r) { return r.json(); })
+                .then(function(data) {
+                    if (data.status === 'processing') {
+                        _pollTranscribeStatus(jobId, attempt + 1);
+                    } else {
+                        _handleTranscriptResult(data);
+                    }
+                })
+                .catch(function() {
+                    _pollTranscribeStatus(jobId, attempt + 1);
+                });
+            }, 5000);
+        }
+
+        fetch('/ai/transcribe', {
+            method: 'POST',
+            credentials: 'include',
+            body: formData
+        })
+        .then(function(r) {
+            if (!r.ok && r.status === 403) throw new Error('Login required — please sign in to use voice transcription.');
+            if (!r.ok && r.status === 503) throw new Error('Whisper not installed on server. Run: pip install openai-whisper in Comserv/whisper_venv');
+            return r.text().then(function(txt) {
+                try { return JSON.parse(txt); }
+                catch(e) { throw new Error('Server returned unexpected response (HTTP ' + r.status + '). The server may be restarting — please try again in a moment.'); }
+            });
+        })
+        .then(function(data) {
+            if (!data.success) {
+                if (sendBtn) sendBtn.disabled = false;
+                if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                return;
+            }
+            if (data.job_id) {
+                if (statusEl) { statusEl.textContent = '⏳ Transcription started (job ' + data.job_id + ') — checking progress…'; }
+                _pollTranscribeStatus(data.job_id, 1);
+            } else {
+                _handleTranscriptResult(data);
+            }
+        })
+        .catch(function(err) {
+            if (sendBtn) sendBtn.disabled = false;
+            if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
+        });
+    }
+
+    function _makeWizardForm(fields, onConfirm) {
+        var form = document.createElement('form');
+        form.onsubmit = function(e) { e.preventDefault(); onConfirm(form); };
+        fields.forEach(function(f) {
+            var row = document.createElement('div');
+            row.style.cssText = 'margin:4px 0;display:flex;gap:6px;align-items:center;';
+            var label = document.createElement('label');
+            label.textContent = f.label;
+            label.style.cssText = 'width:160px;font-size:12px;color:var(--text-color,#555);flex-shrink:0;';
+            var input = document.createElement('input');
+            input.name = f.name;
+            input.value = f.value !== undefined ? f.value : '';
+            input.type = f.type || 'text';
+            input.style.cssText = 'flex:1;padding:4px 6px;border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:13px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+            if (f.required) input.required = true;
+            row.appendChild(label);
+            row.appendChild(input);
+            form.appendChild(row);
+        });
+        return form;
+    }
+
+    function _postWizardAction(actionName, params, msgEl) {
+        msgEl.textContent = '⏳ Saving…';
+        fetch('/ai/action', {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: actionName, params: params })
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(result) {
+            if (result.success) {
+                msgEl.innerHTML = '✅ ' + (result.message || 'Saved') +
+                    (result.url ? ' <a href="' + result.url + '" target="_blank" style="color:#0077cc;font-weight:bold;">View →</a>' : '');
+            } else {
+                msgEl.textContent = '⚠️ ' + (result.error || 'Save failed');
+            }
+        })
+        .catch(function(e) { msgEl.textContent = '⚠️ Request failed: ' + e.message; });
+    }
+
+    function _openSimpleWizard(title, fields, actionName, extraParams) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+        var id = 'ai-' + actionName + '-wizard';
+        var existing = document.getElementById(id);
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.id = id;
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.style.cssText = 'margin:8px 0;';
+
+        var card = document.createElement('div');
+        card.className = 'message system-message';
+        card.style.cssText = 'background:var(--table-header-bg,#f9f9f9);border:1px solid var(--border-color,#ddd);border-radius:8px;padding:12px;max-width:520px;color:var(--text-color,#222);';
+
+        var heading = document.createElement('div');
+        heading.textContent = title;
+        heading.style.cssText = 'font-weight:bold;font-size:14px;margin-bottom:8px;';
+        card.appendChild(heading);
+
+        var msgEl = document.createElement('div');
+        msgEl.style.cssText = 'font-size:12px;color:#666;margin-top:6px;';
+
+        var form = _makeWizardForm(fields, function(f) {
+            var params = Object.assign({}, extraParams || {}, { wizard_confirmed: 1 });
+            fields.forEach(function(fd) {
+                var inp = f.elements[fd.name];
+                if (inp) params[fd.name] = inp.value;
+            });
+            _postWizardAction(actionName, params, msgEl);
+        });
+        card.appendChild(form);
+
+        var btnRow = document.createElement('div');
+        btnRow.style.cssText = 'margin-top:8px;display:flex;gap:8px;';
+        var saveBtn = document.createElement('button');
+        saveBtn.textContent = 'Save';
+        saveBtn.type = 'submit';
+        saveBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 16px;cursor:pointer;font-size:13px;';
+        saveBtn.onclick = function() { form.requestSubmit ? form.requestSubmit() : form.submit(); };
+        var cancelBtn = document.createElement('button');
+        cancelBtn.textContent = 'Cancel';
+        cancelBtn.type = 'button';
+        cancelBtn.style.cssText = 'background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;padding:6px 12px;cursor:pointer;font-size:13px;';
+        cancelBtn.onclick = function() { wrapper.remove(); };
+        btnRow.appendChild(saveBtn);
+        btnRow.appendChild(cancelBtn);
+        card.appendChild(btnRow);
+        card.appendChild(msgEl);
+        wrapper.appendChild(card);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function openYardWizard(prefill) {
+        _openSimpleWizard('🏡 Create Yard', [
+            { name: 'yard_name',       label: 'Yard Name *',      value: prefill.yard_name  || '', required: true },
+            { name: 'yard_code',       label: 'Yard Code *',      value: prefill.yard_code  || '', required: true },
+            { name: 'yard_size',       label: 'Capacity (hives)', value: prefill.yard_size  || 10, type: 'number' },
+            { name: 'total_yard_size', label: 'Total Size (hives)',value: prefill.total_yard_size || 10, type: 'number' },
+            { name: 'notes',           label: 'Notes',            value: prefill.notes      || '' },
+        ], 'create_yard', {});
+    }
+
+    function openHiveWizard(prefill) {
+        _openSimpleWizard('🐝 Register Hive', [
+            { name: 'hive_number', label: 'Hive Number *', value: prefill.hive_number || '', required: true },
+            { name: 'yard_id',     label: 'Yard ID *',     value: prefill.yard_id    || '', required: true, type: 'number' },
+            { name: 'queen_code',  label: 'Queen Code',    value: prefill.queen_code || '' },
+            { name: 'notes',       label: 'Notes',         value: prefill.notes      || '' },
+        ], 'create_hive', {});
+    }
+
+    function openQueenWizard(prefill) {
+        _openSimpleWizard('👑 Record Queen', [
+            { name: 'tag_number',    label: 'Tag / Number',   value: prefill.tag_number    || '' },
+            { name: 'color_marking', label: 'Colour Marking', value: prefill.color_marking || '' },
+            { name: 'birth_date',    label: 'Birth Date',     value: prefill.birth_date    || '', type: 'date' },
+            { name: 'breed',         label: 'Breed',          value: prefill.breed         || 'unknown' },
+            { name: 'mating_status', label: 'Mating Status',  value: prefill.mating_status || 'mated' },
+            { name: 'health_status', label: 'Health Status',  value: prefill.health_status || 'healthy' },
+            { name: 'notes',         label: 'Notes',          value: prefill.notes         || '' },
+        ], 'create_queen', { hive_id: prefill.hive_id || undefined });
+    }
+
+    // ── openInspectionWizard ───────────────────────────────────────────────────
+    // Renders an inline inspection review form pre-filled with AI-extracted data.
+    // User can edit all fields before confirming; on confirm sends create_inspection.
+    function openInspectionWizard(prefill) {
+        var chatMessages = document.getElementById('chat-messages');
+        if (!chatMessages) return;
+
+        var existing = document.getElementById('ai-inspection-wizard');
+        if (existing) existing.remove();
+
+        var wrapper = document.createElement('div');
+        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+        wrapper.id = 'ai-inspection-wizard';
+
+        var lbl = document.createElement('div');
+        lbl.className = 'msg-label';
+        lbl.textContent = 'Hive Inspection Review';
+
+        var box = document.createElement('div');
+        box.className = 'message system-message';
+        box.style.cssText = 'padding:12px;max-width:520px;font-size:0.88em;';
+
+        var p = prefill || {};
+        var qs_yes = p.queen_seen        ? 'checked' : '';
+        var qm_yes = p.queen_marked      ? 'checked' : '';
+        var eg_yes = p.eggs_seen         ? 'checked' : '';
+        var lv_yes = p.larvae_seen       ? 'checked' : '';
+        var cb_yes = p.capped_brood_seen ? 'checked' : '';
+        var fd_yes = p.feeding_done      ? 'checked' : '';
+        var today  = new Date().toISOString().slice(0, 10);
+
+        var popOpts = ['', 'very_strong', 'strong', 'moderate', 'weak', 'very_weak'].map(function(v) {
+            var sel = (p.population_estimate || '') === v ? ' selected' : '';
+            var lbl2 = v ? v.replace(/_/g, ' ') : '— select —';
+            return '<option value="' + v + '"' + sel + '>' + lbl2 + '</option>';
+        }).join('');
+        var tempOpts = ['calm', 'moderate', 'aggressive', 'very_aggressive'].map(function(v) {
+            var sel = (p.temperament || 'calm') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v.replace(/_/g, ' ') + '</option>';
+        }).join('');
+        var statusOpts = ['excellent', 'good', 'fair', 'poor', 'critical'].map(function(v) {
+            var sel = (p.overall_status || 'good') === v ? ' selected' : '';
+            return '<option value="' + v + '"' + sel + '>' + v + '</option>';
+        }).join('');
+
+        var inpStyle = 'width:100%;box-sizing:border-box;padding:3px 5px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var selStyle = 'width:100%;padding:3px;border:1px solid var(--button-border,#ccc);border-radius:3px;background:var(--background-color,#fff);color:var(--text-color,#222);';
+        var lblStyle = 'font-weight:600;display:block;font-size:0.85em;color:var(--text-color,#333);';
+
+        box.innerHTML =
+            '<strong style="font-size:1.05em;color:var(--text-color,#222)">🐝 Review Hive Inspection</strong>' +
+            '<p style="margin:4px 0 8px;color:var(--text-color,#555);font-size:0.9em">Review AI-extracted data below, edit any fields, then click Save.</p>' +
+            '<form id="ai-insp-form" style="display:flex;flex-direction:column;gap:5px;">' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">' +
+                    '<div><label style="' + lblStyle + '">Hive ID *</label><input name="hive_id" type="number" required value="' + (p.hive_id || '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Date *</label><input name="inspection_date" type="date" required value="' + (p.inspection_date || today) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Population</label><select name="population_estimate" style="' + selStyle + '">' + popOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Temperament</label><select name="temperament" style="' + selStyle + '">' + tempOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Overall Status</label><select name="overall_status" style="' + selStyle + '">' + statusOpts + '</select></div>' +
+                    '<div><label style="' + lblStyle + '">Weather</label><input name="weather_conditions" type="text" value="' + (p.weather_conditions || '') + '" placeholder="sunny, cloudy…" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Temperature (°C)</label><input name="temperature" type="number" step="0.5" value="' + (p.temperature != null ? p.temperature : '') + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Inspector</label><input name="inspector" type="text" value="' + (p.inspector || '') + '" style="' + inpStyle + '"></div>' +
+                '</div>' +
+                '<div style="display:flex;flex-wrap:wrap;gap:8px;margin:4px 0;color:var(--text-color,#333);">' +
+                    '<label><input type="checkbox" name="queen_seen" ' + qs_yes + '> Queen seen</label>' +
+                    '<label><input type="checkbox" name="queen_marked" ' + qm_yes + '> Queen marked</label>' +
+                    '<label><input type="checkbox" name="eggs_seen" ' + eg_yes + '> Eggs</label>' +
+                    '<label><input type="checkbox" name="larvae_seen" ' + lv_yes + '> Larvae</label>' +
+                    '<label><input type="checkbox" name="capped_brood_seen" ' + cb_yes + '> Capped brood</label>' +
+                    '<label><input type="checkbox" name="feeding_done" ' + fd_yes + '> Feeding done</label>' +
+                '</div>' +
+                '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:5px;">' +
+                    '<div><label style="' + lblStyle + '">Swarm cells</label><input name="swarm_cells" type="number" min="0" value="' + (p.swarm_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Queen cells</label><input name="queen_cells" type="number" min="0" value="' + (p.queen_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                    '<div><label style="' + lblStyle + '">Supersedure</label><input name="supersedure_cells" type="number" min="0" value="' + (p.supersedure_cells || 0) + '" style="' + inpStyle + '"></div>' +
+                '</div>' +
+                '<div><label style="' + lblStyle + '">General notes</label><textarea name="general_notes" rows="3" style="' + inpStyle + 'resize:vertical;">' + (p.general_notes || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Action required</label><textarea name="action_required" rows="2" style="' + inpStyle + 'resize:vertical;">' + (p.action_required || '') + '</textarea></div>' +
+                '<div><label style="' + lblStyle + '">Feed type</label><input name="feed_type" type="text" value="' + (p.feed_type || '') + '" placeholder="syrup, fondant…" style="' + inpStyle + '"></div>' +
+                '<div><label style="' + lblStyle + '">Feed amount</label><input name="feed_amount" type="text" value="' + (p.feed_amount || '') + '" placeholder="1L, 500g…" style="' + inpStyle + '"></div>' +
+                '<div id="ai-insp-status" style="display:none;font-style:italic;font-size:0.85em;color:var(--text-color,#555);"></div>' +
+                '<div style="display:flex;gap:8px;margin-top:4px;">' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#0077cc);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em">Save Inspection</button>' +
+                    '<button type="button" id="ai-insp-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.88em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
+                '</div>' +
+            '</form>';
+
+        wrapper.appendChild(lbl);
+        wrapper.appendChild(box);
+        chatMessages.appendChild(wrapper);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        document.getElementById('ai-insp-cancel').addEventListener('click', function() {
+            wrapper.remove();
+        });
+
+        document.getElementById('ai-insp-form').addEventListener('submit', function(e) {
+            e.preventDefault();
+            var fd = new FormData(e.target);
+            var confirmed = { box_details: p.box_details || [] };
+            fd.forEach(function(val, key) { confirmed[key] = val; });
+            confirmed.queen_seen        = e.target.queen_seen.checked        ? 1 : 0;
+            confirmed.queen_marked      = e.target.queen_marked.checked      ? 1 : 0;
+            confirmed.eggs_seen         = e.target.eggs_seen.checked         ? 1 : 0;
+            confirmed.larvae_seen       = e.target.larvae_seen.checked       ? 1 : 0;
+            confirmed.capped_brood_seen = e.target.capped_brood_seen.checked ? 1 : 0;
+            confirmed.feeding_done      = e.target.feeding_done.checked      ? 1 : 0;
+            confirmed.swarm_cells       = parseInt(confirmed.swarm_cells, 10) || 0;
+            confirmed.queen_cells       = parseInt(confirmed.queen_cells, 10) || 0;
+            confirmed.supersedure_cells = parseInt(confirmed.supersedure_cells, 10) || 0;
+
+            var statusDiv = document.getElementById('ai-insp-status');
+            if (statusDiv) { statusDiv.textContent = 'Saving…'; statusDiv.style.display = ''; }
+            e.target.querySelector('[type=submit]').disabled = true;
+
+            executeAIAction({ action: 'create_inspection', params: confirmed });
+
+            setTimeout(function() { wrapper.remove(); }, 1500);
+        });
     }
 
     // Project creation wizard — renders an inline form in the chat window.
@@ -2882,8 +4264,8 @@
                     }).join('') +
                 '</div>' +
                 '<div style="display:flex;gap:8px;margin-top:4px;">' +
-                    '<button type="submit" style="padding:5px 14px;background:#0077cc;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
-                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-size:.85em;background:#fff">Cancel</button>' +
+                    '<button type="submit" style="padding:5px 14px;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em">Create Project</button>' +
+                    '<button type="button" id="wiz-cancel" style="padding:5px 10px;border:1px solid var(--button-border,#ccc);border-radius:4px;cursor:pointer;font-size:.85em;background:var(--button-bg,#f2f2f2);color:var(--button-text,#000)">Cancel</button>' +
                 '</div>' +
             '</form>';
 
@@ -2939,6 +4321,67 @@
             return;
         }
 
+        // navigate: open a URL in a new tab without any pre-fill
+        if (actionObj.action === 'navigate') {
+            const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
+            if (navUrl) {
+                const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
+                const _navSi = document.getElementById('chat-status');
+                if (_navSi) { _navSi.textContent = '\uD83D\uDD17 Opening: ' + navUrl; _navSi.className = 'chat-status connected'; }
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.location.href = abs;
+                }
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                el.innerHTML = '\uD83D\uDD17 Navigating to: <a href="' + abs + '">' + navUrl + '</a>';
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
+        // navigate_and_fill: store field values in localStorage then open the target page.
+        // The widget init on the target page checks for a pending fill and applies it.
+        if (actionObj.action === 'navigate_and_fill') {
+            const nfUrl    = actionObj.url    || (actionObj.params && actionObj.params.url);
+            const nfFields = actionObj.fields || (actionObj.params && actionObj.params.fields) || {};
+            if (nfUrl) {
+                const abs = nfUrl.startsWith('http') ? nfUrl : (window.location.origin + (nfUrl.startsWith('/') ? nfUrl : '/' + nfUrl));
+                try {
+                    localStorage.setItem('ai_pending_fill', JSON.stringify({
+                        url:     nfUrl,
+                        fields:  nfFields,
+                        ts:      Date.now()
+                    }));
+                } catch(e) { console.warn('localStorage write failed', e); }
+                window.location.href = abs;
+                const wrapper = document.createElement('div');
+                wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                const lbl = document.createElement('div');
+                lbl.className = 'msg-label';
+                lbl.textContent = 'System';
+                const el = document.createElement('div');
+                el.className = 'message system-message';
+                const fieldCount = Object.keys(nfFields).length;
+                el.innerHTML = '🔗 Navigating to: <a href="' + abs + '">' + nfUrl + '</a>'
+                    + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
+                wrapper.appendChild(lbl);
+                wrapper.appendChild(el);
+                chatMessages.appendChild(wrapper);
+                chatMessages.scrollTop = chatMessages.scrollHeight;
+            }
+            return;
+        }
+
         fetch('/ai/action', {
             method: 'POST',
             credentials: 'include',
@@ -2947,8 +4390,30 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (!result) {
+                throw new Error('Action server returned an empty response');
+            }
             if (result.success && result.action === 'open_project_wizard') {
                 openProjectWizard(result.wizard_title || '');
+                return;
+            }
+            if (result.action === 'open_inspection_wizard' || (actionObj.action === 'create_inspection' && result.wizard_prefill)) {
+                var prefill = result.wizard_prefill || actionObj.params || {};
+                if (state.lastAudioFileId)      { prefill.audio_file_id      = state.lastAudioFileId; }
+                if (state.lastTranscriptFileId) { prefill.transcript_file_id = state.lastTranscriptFileId; }
+                openInspectionWizard(prefill);
+                return;
+            }
+            if (result.action === 'open_yard_wizard') {
+                openYardWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_hive_wizard') {
+                openHiveWizard(result.wizard_prefill || {});
+                return;
+            }
+            if (result.action === 'open_queen_wizard') {
+                openQueenWizard(result.wizard_prefill || {});
                 return;
             }
             const wrapper = document.createElement('div');
@@ -2958,9 +4423,14 @@
             lbl.textContent = 'System';
             const el = document.createElement('div');
             el.className = 'message system-message';
-            el.textContent = result.success
-                ? '✅ ' + (result.message || 'Action completed')
-                : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            if (result.success && result.inspection_id) {
+                el.innerHTML = '✅ ' + (result.message || 'Inspection saved') +
+                    ' <a href="' + (result.url || '/BMaster') + '" target="_blank" style="color:#0077cc;font-weight:bold;">View inspection →</a>';
+            } else {
+                el.textContent = result.success
+                    ? '✅ ' + (result.message || 'Action completed')
+                    : '⚠️ Action failed: ' + (result.error || 'unknown error');
+            }
             wrapper.appendChild(lbl);
             wrapper.appendChild(el);
             chatMessages.appendChild(wrapper);
@@ -3067,6 +4537,16 @@
             }
         } catch(e) {}
 
+        // When opened via task_id=N, store the todo details so every chat request
+        // sends page_path=/todo/details?record_id=N which triggers single-todo context injection.
+        if (window.AI_TASK_CONTEXT && window.AI_TASK_CONTEXT.record_id) {
+            var tc = window.AI_TASK_CONTEXT;
+            state.taskContext = tc;
+            // Override page path so server-side _get_module_data uses single-todo fast-path
+            state.taskPagePath = '/todo/details?record_id=' + tc.record_id;
+            console.debug('[AI] Task context loaded: todo #' + tc.record_id, tc.subject);
+        }
+
         // Restore messages saved from prior navigation, load persisted conversation ID
         restoreMessages();
         loadPersistedState();
@@ -3074,8 +4554,30 @@
         // Initialize agent context and user providers
         loadAgentsConfig().then(function() {
             state.pageContext = detectPageContext();
+            // Override page_path so single-todo context injection triggers for task_id links
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
+            // Auto-select agent based on task subject keywords (same logic as todo/details pages)
+            if (window.AI_TASK_CONTEXT && state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (window.AI_TASK_CONTEXT.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    console.debug('[AI] Task-context agent selected:', picked.id);
+                }
+            }
         }).catch(function() {
             state.pageContext = detectPageContext();
+            if (state.taskPagePath) {
+                state.pageContext.page_path = state.taskPagePath;
+            }
         });
         loadUserProviders().catch(function() {});
 
@@ -3092,10 +4594,17 @@
             const prompt = input.value.trim();
             if (!prompt) return;
 
-            if (!state.pageContext) state.pageContext = detectPageContext();
+            if (!state.pageContext) {
+                state.pageContext = detectPageContext();
+                if (state.taskPagePath) state.pageContext.page_path = state.taskPagePath;
+            }
 
             // Client-side navigation interception
-            const navMatch = prompt.match(NAV_RE);
+            // Skip for ENCY agent nav — handled by fast path inside sendAIRequest
+            const _pmAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            const _pmIsEncyNav = (_pmAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+                && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(prompt);
+            const navMatch = !_pmIsEncyNav && prompt.match(NAV_RE);
             if (navMatch) {
                 const matches = resolveNavIntent(prompt);
                 if (matches && matches.length === 1) {
@@ -3251,6 +4760,17 @@
                 margin-right: 8px;
                 font-size: 1.2em;
             }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+            }
             
             .chat-panel {
                 position: fixed;
@@ -3271,7 +4791,42 @@
                 z-index: 10001;
                 overflow: hidden;
             }
-            
+
+            /* In a detached popup window: fill the entire window so resize works naturally */
+            body.ai-widget-popup .chat-panel {
+                position: fixed;
+                top: 0; left: 0; right: 0; bottom: 0;
+                width: 100% !important;
+                height: 100% !important;
+                max-width: 100% !important;
+                max-height: 100% !important;
+                min-width: 0 !important;
+                min-height: 0 !important;
+                border-radius: 0;
+                box-shadow: none;
+                margin: 0;
+            }
+            body.ai-widget-popup .chat-input {
+                flex-shrink: 0;
+            }
+            body.ai-widget-popup #message-input {
+                height: auto;
+                min-height: 40px;
+                max-height: 160px;
+                resize: vertical;
+            }
+
+            /* Popup-active state: pulsing ring shows the popup window is live */
+            .chat-button.popup-active {
+                box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2);
+                animation: ai-popup-pulse 2s infinite;
+            }
+            @keyframes ai-popup-pulse {
+                0%   { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+                50%  { box-shadow: 0 0 0 7px rgba(255,153,0,0.15), 0 2px 5px rgba(0,0,0,0.2); }
+                100% { box-shadow: 0 0 0 3px rgba(255,153,0,0.6), 0 2px 5px rgba(0,0,0,0.2); }
+            }
+
             .chat-header {
                 background-color: var(--accent-color, #FF9900);
                 color: #fff;
@@ -3292,10 +4847,32 @@
             .chat-header-drag:active { cursor: grabbing; }
 
             .chat-header h3 {
-                margin: 0; font-size: 14px; flex: 1; white-space: nowrap;
-                overflow: hidden; text-overflow: ellipsis;
+                margin: 0; font-size: 14px; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex-shrink: 0;
             }
-            
+
+            .chat-header-title-group {
+                display: flex; align-items: baseline; gap: 5px;
+                flex: 1; min-width: 0; overflow: hidden;
+            }
+
+            .chat-page-label {
+                font-size: 11px; opacity: 0.88; white-space: nowrap;
+                overflow: hidden; text-overflow: ellipsis; flex: 1; min-width: 0;
+                display: flex; align-items: center; gap: 3px; flex-wrap: nowrap;
+            }
+            .chat-ctx-page {
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                flex-shrink: 1; min-width: 0;
+            }
+            .chat-ctx-badge {
+                display: inline-block; border-radius: 3px; padding: 0 4px;
+                font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
+                white-space: nowrap; flex-shrink: 0; line-height: 1.5;
+            }
+            .chat-ctx-site  { background: rgba(255,255,255,0.28); }
+            .chat-ctx-agent { background: rgba(0,0,0,0.22); }
+
             .chat-header-buttons {
                 display: flex; gap: 4px; align-items: center; flex-shrink: 0;
             }
@@ -3328,8 +4905,8 @@
                 border-radius: 5px; padding: 6px 8px; cursor: pointer; font-size: 12px;
                 color: var(--text-color); transition: background 0.15s;
             }
-            .wh-item:hover { background: var(--secondary-color); }
-            .wh-item.active { background: var(--secondary-color); border-left: 3px solid var(--link-color); }
+            .wh-item:hover { background: var(--table-header-bg); }
+            .wh-item.active { background: var(--table-header-bg); border-left: 3px solid var(--link-color); }
             .wh-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
             .wh-meta { font-size: 10px; opacity: 0.5; margin-top: 1px; }
             .wh-loading, .wh-empty { text-align: center; padding: 12px; font-size: 12px; opacity: 0.5; }
@@ -3580,8 +5157,122 @@
     }
 
     // Initialize chat when the DOM is loaded
+    // Admin: poll for pending support chats and fire browser notification from any page
+    (function() {
+        if (!window.AI_CHAT_USER_CONFIG || !window.AI_CHAT_USER_CONFIG.isAdmin) return;
+        var _adminNotifPerm = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
+        var _adminLastPending = 0;
+        var _adminTitleFlashTimer = null;
+        var _adminOrigTitle = null;
+
+        function _requestAdminNotifPerm() {
+            if (typeof Notification === 'undefined') return;
+            if (Notification.permission === 'granted') { _adminNotifPerm = 'granted'; return; }
+            if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(function(p) { _adminNotifPerm = p; });
+            }
+        }
+
+        function _adminBeep() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {}
+        }
+
+        function _adminTitleFlash(n) {
+            if (_adminTitleFlashTimer) return;
+            if (!_adminOrigTitle) _adminOrigTitle = document.title;
+            var alertTitle = '💬 ' + n + ' Support Request' + (n > 1 ? 's' : '') + '!';
+            var on = true;
+            var count = 0;
+            _adminTitleFlashTimer = setInterval(function() {
+                document.title = on ? alertTitle : _adminOrigTitle;
+                on = !on;
+                if (++count >= 20) {
+                    clearInterval(_adminTitleFlashTimer);
+                    _adminTitleFlashTimer = null;
+                    document.title = _adminOrigTitle;
+                }
+            }, 800);
+        }
+
+        function _adminShowToast(n) {
+            var existing = document.getElementById('admin-support-toast');
+            if (existing) existing.parentNode.removeChild(existing);
+            var toast = document.createElement('div');
+            toast.id = 'admin-support-toast';
+            toast.style.cssText = 'position:fixed;top:70px;right:20px;z-index:99999;background:#1a6bb5;color:#fff;'
+                + 'padding:14px 20px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);'
+                + 'font-size:.95em;font-weight:600;cursor:pointer;max-width:320px;line-height:1.4;';
+            toast.innerHTML = '💬 ' + n + ' support chat request' + (n > 1 ? 's' : '') + ' awaiting reply'
+                + '<br><small style="font-weight:normal;opacity:.85;">Click to open Support Chat Admin</small>';
+            toast.onclick = function() {
+                window.location.href = '/chat/admin';
+            };
+            document.body.appendChild(toast);
+            setTimeout(function() {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            }, 30000);
+        }
+
+        function _checkPendingSupport() {
+            fetch('/chat/pending_count', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var n = d && d.count ? parseInt(d.count, 10) : 0;
+                if (n > 0 && n > _adminLastPending) {
+                    if (_adminNotifPerm === 'granted') {
+                        new Notification('💬 Support Chat: ' + n + ' request' + (n > 1 ? 's' : '') + ' awaiting reply', {
+                            body: 'Open Support Chat Admin to respond.',
+                            icon: '/static/images/favicon.ico',
+                            tag: 'admin-support-pending',
+                            requireInteraction: true
+                        });
+                    }
+                    _adminBeep();
+                    _adminTitleFlash(n);
+                    _adminShowToast(n);
+                }
+                _adminLastPending = n;
+                var badge = document.getElementById('nav-support-badge');
+                if (badge) { badge.textContent = n || ''; badge.style.display = n > 0 ? '' : 'none'; }
+            })
+            .catch(function() {});
+        }
+        function _sendAdminHeartbeat() {
+            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (!d.success) console.warn('[Chat] admin_heartbeat rejected (not admin role?)'); })
+            .catch(function() {});
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            _requestAdminNotifPerm();
+            _sendAdminHeartbeat();
+            setTimeout(_checkPendingSupport, 2000);
+            setInterval(_checkPendingSupport, 30000);
+            setInterval(_sendAdminHeartbeat, 20000);
+        });
+    })();
+
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
+
+        // When running inside the detached popup window, mark <body> so CSS can
+        // override the chat panel to fill 100% of the window.
+        if (window.AI_WIDGET_POPUP) {
+            document.body.classList.add('ai-widget-popup');
+        }
 
         if (PAGE_MODE) {
             // /ai full-page mode: bind to existing DOM, no floating widget
@@ -3600,7 +5291,57 @@
                     }
                 }
             });
+
+            // In popup window mode: auto-open the chat panel immediately so the
+            // user sees the chat right away without having to click the bubble.
+            if (window.AI_WIDGET_POPUP) {
+                openChat();
+            }
         }
+
+        // Check for a pending navigate_and_fill stored by another tab.
+        // If the current URL matches the stored target, apply the field values and clear.
+        (function() {
+            try {
+                var pending = localStorage.getItem('ai_pending_fill');
+                if (!pending) return;
+                var pdata = JSON.parse(pending);
+                if (!pdata || !pdata.url || !pdata.fields) return;
+                // Expire after 2 minutes
+                if (Date.now() - (pdata.ts || 0) > 120000) {
+                    localStorage.removeItem('ai_pending_fill');
+                    return;
+                }
+                // Normalize both URLs to just pathname+search for comparison
+                var targetPath = pdata.url.replace(/^https?:\/\/[^\/]+/, '');
+                var currentPath = window.location.pathname + window.location.search;
+                if (targetPath !== currentPath) return;
+                // Clear immediately to avoid re-applying on refresh
+                localStorage.removeItem('ai_pending_fill');
+                // Short delay so the page form has rendered
+                setTimeout(function() {
+                    _executeFillForm({ fields: pdata.fields });
+                    // Show notification in widget if it exists
+                    var chatMessages = document.getElementById('chat-messages');
+                    if (chatMessages) {
+                        var wrapper = document.createElement('div');
+                        wrapper.className = 'msg-wrapper msg-wrapper-ai';
+                        var lbl = document.createElement('div');
+                        lbl.className = 'msg-label';
+                        lbl.textContent = 'System';
+                        var el = document.createElement('div');
+                        el.className = 'message system-message';
+                        el.textContent = '🪄 AI pre-filled form fields. Please review before saving.';
+                        wrapper.appendChild(lbl);
+                        wrapper.appendChild(el);
+                        chatMessages.appendChild(wrapper);
+                        chatMessages.scrollTop = chatMessages.scrollHeight;
+                    }
+                }, 600);
+            } catch(e) {
+                console.warn('ai_pending_fill check failed:', e);
+            }
+        })();
 
         // HelpDesk pre-screen mode: expose helper + auto-open with greeting (widget only)
         if (!PAGE_MODE && window.HELPDESK_PRESCREEN) {
@@ -3641,4 +5382,37 @@
             window.openHelpDeskChat = _hdOpenAndGreet;
         }
     });
+
+    // Global API: open the chat widget pre-loaded with a task context.
+    // Called from todo/details.tt "Chat about this task" button.
+    // taskContext: { record_id, subject, description, status, due_date, project }
+    window.openAIChatWithTask = function(taskContext) {
+        if (!taskContext || !taskContext.record_id) { openChat(); return; }
+        state.taskContext = taskContext;
+        state.taskPagePath = '/todo/details?record_id=' + taskContext.record_id;
+        if (!state.pageContext) state.pageContext = detectPageContext();
+        state.pageContext.page_path = state.taskPagePath;
+        // Auto-select agent based on task subject
+        loadAgentsConfig().then(function() {
+            if (state.agentsConfig && state.agentsConfig.agents) {
+                var subj = (taskContext.subject || '').toUpperCase();
+                var agents = state.agentsConfig.agents;
+                var picked = null;
+                if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
+                else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
+                else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
+                else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
+                else if (agents.planning) picked = agents.planning;
+                if (picked) {
+                    state.currentAgent = picked;
+                    state.pageContext.agent_id   = picked.id;
+                    state.pageContext.agent_name = picked.display_name;
+                    if (picked.system_prompt) state.pageContext.system_prompt = picked.system_prompt;
+                    populateAgentPicker();
+                }
+            }
+            openChat();
+        }).catch(function() { openChat(); });
+    };
 })();
