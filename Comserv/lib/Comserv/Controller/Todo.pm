@@ -2018,20 +2018,20 @@ sub reschedule :Path('reschedule') :Args(0) {
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
-        # Determine accessible site names
+        # Determine accessible site names.
+        # Always scope to the sites the calendar shows — based on UserSiteRole.
+        # CSC admin sees todos for all sites they have roles on; the calendar
+        # (get_all_todos_for_calendar) currently filters by session SiteName,
+        # so we must match that scope to ensure rescheduled todos appear in view.
         my @allowed_sites;
-        if ($is_csc) {
-            @allowed_sites = ();  # empty = no site filter = all sites
-        } else {
-            my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-                { user_id => $user_id, is_active => 1 },
-                { join => 'site', columns => ['site.name'], distinct => 1 }
-            )->all;
-            @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
-            @allowed_sites = ($sitename) unless @allowed_sites;
-        }
+        my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+            { user_id => $user_id, is_active => 1 },
+            { join => 'site', columns => ['site.name'], distinct => 1 }
+        )->all;
+        @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
+        @allowed_sites = ($sitename) unless @allowed_sites;
 
-        # Fetch open todos for accessible sites, with project sort_order via join
+        # Fetch open todos for accessible sites
         my %search = ( status => { -not_in => \@done_statuses } );
         $search{sitename} = { -in => \@allowed_sites } if @allowed_sites;
 
@@ -2135,7 +2135,7 @@ sub reschedule :Path('reschedule') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
         "Reschedule by $username: $count todos scheduled from $today forward");
-    $c->response->body('{"ok":1,"count":' . $count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+    $c->response->body('{"ok":1,"count":' . $count . ',"today":"' . $today . '","errors":' . (JSON::encode_json(\@errors)) . '}');
 }
 
 sub open_log :Path('open_log') :Args(0) {

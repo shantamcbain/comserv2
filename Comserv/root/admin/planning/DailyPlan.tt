@@ -643,9 +643,9 @@
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
                     if (d.ok) {
-                        var msg = 'Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated';
-                        if (d.date_count) msg += ' (' + d.date_count + ' due-dates extended)';
-                        msg += '. Reloading…';
+                        var msg = 'Rescheduled ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' from ' + (d.today || 'today') + ' forward into the calendar.';
+                        if (d.errors && d.errors.length) msg += '\n\nWarnings: ' + d.errors.join(', ');
+                        msg += '\n\nReloading page…';
                         alert(msg);
                         location.reload();
                     } else {
