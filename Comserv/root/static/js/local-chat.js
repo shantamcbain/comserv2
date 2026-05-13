@@ -2127,6 +2127,11 @@
         if (!state.userModelOverride) {
             autoTier = classifyQuery(prompt);
             effectiveProvider = autoSelectProvider(autoTier);
+            // Accounting agent always uses local Ollama — financial data stays on-device.
+            // Override only when the user has NOT manually selected a provider.
+            if (_agentId === 'accounting' && effectiveProvider && effectiveProvider.startsWith('grok')) {
+                effectiveProvider = state.modelTiers.large || state.modelTiers.medium || state.modelTiers.small || 'ollama';
+            }
             // Reflect auto-selection in the dropdown UI
             const sel = document.getElementById('ai-provider');
             if (sel && sel.querySelector('option[value="' + effectiveProvider + '"]')) {
