@@ -2188,13 +2188,15 @@
                 _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
             }
         }
-        // Client-side fast path: open invoice form when accounting agent detects a bill or explicit "enter" command.
-        // _enterIntent  → opens form and returns (skips Grok round-trip)
-        // _looksLikeBill → opens form immediately AND continues to Grok for context/explanation
-        if (_agentId === 'accounting') {
+        // Client-side fast path: open the correct accounting form without an AI round-trip.
+        // _looksLikeDeposit → always fires (any agent) — opens /Accounting/transfer/new
+        // _looksLikeBill / _enterIntent → only fires for accounting agent — opens /Inventory/invoice/new
+        const _isDepositFastPath = _looksLikeDeposit;
+        if (_isDepositFastPath || _agentId === 'accounting') {
             const _pu2 = prompt.toUpperCase();
-            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
-                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            const _enterIntent = _agentId === 'accounting'
+                && (/ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                    || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2));
             if (_enterIntent || _looksLikeBill || _looksLikeDeposit) {
                 const _chatMsgs = document.getElementById('chat-messages');
                 let _billText = prompt;
