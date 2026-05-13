@@ -167,12 +167,44 @@
         direct_expense: { from: 'Payment account (e.g. PayPal, Bank, Visa).', to: 'Expense account (e.g. 6600 Domain Renewals).', note: 'Records an expense that was already paid — skips Accounts Payable.' },
         cc_payment:     { from: 'Source (e.g. Bank or PayPal Account).', to: 'Credit card liability account (e.g. 2300 Visa Payable).', note: 'Paying down a credit card balance reduces the liability.' },
     };
+
+    function applyHint(val) {
+        var h = hints[val] || {};
+        var fh = document.getElementById('from-hint');
+        var th = document.getElementById('to-hint');
+        if (fh) fh.textContent = h.from || '';
+        if (th) th.textContent = h.to || '';
+    }
+
     document.querySelectorAll('input[name=entry_type]').forEach(function(r) {
-        r.addEventListener('change', function() {
-            var h = hints[this.value] || {};
-            document.getElementById('from-hint').textContent = h.from || '';
-            document.getElementById('to-hint').textContent = h.to || '';
-        });
+        r.addEventListener('change', function() { applyHint(this.value); });
     });
+
+    function setField(name, val) {
+        if (!val) return;
+        var el = document.querySelector('[name="' + name + '"]');
+        if (!el) return;
+        if (el.tagName === 'SELECT') {
+            for (var i = 0; i < el.options.length; i++) {
+                if (el.options[i].value == val || el.options[i].text.indexOf(val) !== -1) {
+                    el.selectedIndex = i;
+                    break;
+                }
+            }
+        } else if (el.type === 'radio' || el.type === 'checkbox') {
+            document.querySelectorAll('[name="' + name + '"]').forEach(function(r) {
+                r.checked = (r.value === val);
+            });
+        } else {
+            el.value = val;
+        }
+    }
+
+    var params = new URLSearchParams(window.location.search);
+    var fields = ['entry_type','amount','post_date','reference','notes','fee_amount'];
+    fields.forEach(function(f) { if (params.get(f)) setField(f, params.get(f)); });
+
+    var currentType = document.querySelector('input[name=entry_type]:checked');
+    if (currentType) applyHint(currentType.value);
 })();
 </script>
