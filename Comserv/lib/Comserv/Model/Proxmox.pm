@@ -14,6 +14,7 @@ use Moose;
 use namespace::autoclean;
 use LWP::UserAgent;
 use HTTP::Request;
+use URI::Escape qw(uri_escape);
 use JSON;
 use Data::Dumper;
 use Try::Tiny;
@@ -1691,28 +1692,120 @@ sub create_vm {
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
         "Creating new VM with hostname: " . $params->{hostname});
 
-    # Make sure credentials are loaded
     $self->_load_credentials() unless $self->{credentials_loaded};
 
-    # Check if we have valid credentials
     if (!$self->{api_url_base}) {
         $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'create_vm',
             "No valid API URL found for server: " . $self->{server_id});
         return { success => 0, error => "No valid API URL found" };
     }
 
-    # In a real implementation, this would create a VM using the Proxmox API
-    # For now, return a mock success response
-    my $vmid = int(rand(1000)) + 100;
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(30);
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return { success => 0, error => "No authentication credentials available" };
+    }
+
+    my $node_name;
+    my $resources = $self->_try_get_cluster_resources($ua, 'node');
+    if ($resources && @$resources) {
+        $node_name = $resources->[0]{node} || $resources->[0]{name};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my $nextid_req = HTTP::Request->new(GET => $self->{api_url_base} . '/cluster/nextid');
+    $nextid_req->header(Authorization => $auth_header);
+    my $nextid_res = $ua->request($nextid_req);
+    my $vmid;
+    if ($nextid_res->is_success) {
+        my $data = eval { decode_json($nextid_res->decoded_content) };
+        $vmid = $data->{data} if $data && $data->{data};
+    }
+    $vmid ||= int(rand(900)) + 100;
+
+    my $disk_size   = $params->{disk_size}  || 20;
+    my $memory      = $params->{memory}     || 2048;
+    my $cpu         = $params->{cpu}        || 2;
+    my $hostname    = $params->{hostname}   || "vm-$vmid";
+    my $template    = $params->{template}   || '';
+    my $network_type = $params->{network_type} || 'dhcp';
+
+    my %post_params = (
+        vmid     => $vmid,
+        name     => $hostname,
+        cores    => $cpu,
+        memory   => $memory,
+        scsihw   => 'virtio-scsi-pci',
+        ostype   => 'l26',
+        agent    => ($params->{enable_qemu_agent} ? '1' : '0'),
+        onboot   => ($params->{start_on_boot}     ? '1' : '0'),
+    );
+
+    if ($template) {
+        $post_params{scsi0} = "$template:$disk_size,format=qcow2";
+        $post_params{boot}  = 'order=scsi0';
+        $post_params{ide2}  = 'none,media=cdrom';
+    } else {
+        $post_params{scsi0} = "local-lvm:$disk_size";
+    }
+
+    if ($network_type eq 'static' && $params->{ip_address}) {
+        my $ip      = $params->{ip_address};
+        my $mask    = $params->{subnet_mask} || '255.255.255.0';
+        my $gw      = $params->{gateway}     || '';
+        my $cidr    = $mask =~ /^255\.255\.255\.0$/ ? 24 :
+                      $mask =~ /^255\.255\.0\.0$/   ? 16 : 24;
+        my $ipconfig = "ip=$ip/$cidr";
+        $ipconfig   .= ",gw=$gw" if $gw;
+        $post_params{net0}      = 'virtio,bridge=vmbr0';
+        $post_params{ipconfig0} = $ipconfig;
+    } else {
+        $post_params{net0}      = 'virtio,bridge=vmbr0';
+        $post_params{ipconfig0} = 'ip=dhcp';
+    }
+
+    my $create_url = $self->{api_url_base} . "/nodes/$node_name/qemu";
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
+        "POSTing VM creation to $create_url with vmid=$vmid, name=$hostname");
+
+    my $create_req = HTTP::Request->new(POST => $create_url);
+    $create_req->header(Authorization   => $auth_header);
+    $create_req->header('Content-Type'  => 'application/x-www-form-urlencoded');
+
+    my $body = join('&', map { uri_escape($_) . '=' . uri_escape($post_params{$_}) } keys %post_params);
+    $create_req->content($body);
+
+    my $create_res = $ua->request($create_req);
 
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
-        "VM creation simulated with VMID: $vmid");
+        "Proxmox API response: " . $create_res->status_line . " — " . substr($create_res->decoded_content, 0, 500));
 
-    return {
-        success => 1,
-        vmid => $vmid,
-        task_id => "UPID:pve:00" . $vmid . ":1234567890:1234567890:create:$vmid:root\@pam:",
-    };
+    if ($create_res->is_success) {
+        my $resp_data = eval { decode_json($create_res->decoded_content) };
+        my $task_id   = ($resp_data && $resp_data->{data}) ? $resp_data->{data} : '';
+        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
+            "VM created successfully: vmid=$vmid, task=$task_id");
+        if ($params->{start_after_creation}) {
+            my $start_req = HTTP::Request->new(POST =>
+                $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/status/start");
+            $start_req->header(Authorization  => $auth_header);
+            $start_req->content('');
+            $ua->request($start_req);
+        }
+        return { success => 1, vmid => $vmid, task_id => $task_id };
+    } else {
+        my $err = $create_res->decoded_content || $create_res->status_line;
+        $logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'create_vm',
+            "VM creation failed: $err");
+        return { success => 0, error => "Proxmox API error (${\$create_res->code}): $err" };
+    }
 }
 
 1;
