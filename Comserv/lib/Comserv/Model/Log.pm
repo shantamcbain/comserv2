@@ -26,10 +26,18 @@ sub get_logs {
     my ($self, $c, $status) = @_;
     my $schema = $c->model('DBEncy');
 
-    # Define search criteria with sitename
-    my $search_criteria = {
-        sitename => $c->session->{SiteName}
-    };
+    my $sitename = $c->session->{SiteName} || '';
+    my $roles    = $c->session->{roles}    || [];
+    my $has_admin = ref($roles) eq 'ARRAY'
+        ? (grep { $_ eq 'admin' } @$roles) > 0
+        : ($roles && $roles =~ /\badmin\b/i);
+    my $is_csc_admin = ($sitename eq 'CSC' && $has_admin)
+        || (($c->session->{username} || '') eq 'Shanta');
+
+    my $search_criteria = {};
+    unless ($is_csc_admin) {
+        $search_criteria->{sitename} = $sitename;
+    }
 
     # Add status to search criteria
     if ($status eq 'open') {

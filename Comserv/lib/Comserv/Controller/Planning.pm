@@ -573,14 +573,21 @@ sub daily :Path('/planning/daily') :Args {
         },
         stale_log_count => do {
             my $cnt = 0;
-            my $_lu = $c->session->{username} || '';
+            my $_lu  = $c->session->{username} || '';
+            my $_sn  = $c->session->{SiteName} || '';
+            my $_rls = $c->session->{roles} || [];
+            my $_has_admin = ref($_rls) eq 'ARRAY'
+                ? (grep { $_ eq 'admin' } @$_rls) > 0
+                : ($_rls && $_rls =~ /\badmin\b/i);
+            my $_is_csc = ($_sn eq 'CSC' && $_has_admin) || $_lu eq 'Shanta';
             eval {
                 my $today_str = $current_date_str;
-                $cnt = $c->model('DBEncy')->resultset('Log')->search(
-                    { username   => $_lu,
-                      start_date => { '<' => $today_str },
-                      status     => { -in => [1, 2, 'open', 'in-progress'] } }
-                )->count || 0;
+                my $_filter = {
+                    start_date => { '<' => $today_str },
+                    status     => { -in => [1, 2, 'open', 'in-progress'] },
+                };
+                $_filter->{sitename} = $_sn unless $_is_csc;
+                $cnt = $c->model('DBEncy')->resultset('Log')->search($_filter)->count || 0;
             };
             $cnt;
         },
