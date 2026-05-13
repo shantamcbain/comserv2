@@ -456,6 +456,25 @@ sub auto :Private {
                     $enabled{ $ov->module_name } = $ov->granted ? 1 : 0;
                 }
             }
+
+            # Apply per-user service grants from membership_service_access
+            # (e.g. beekeeping access granted by purchasing a BMaster membership plan)
+            if ($c->session->{user_id}) {
+                my $svc_site = $c->model('DBEncy')->resultset('Site')->search(
+                    { name => $mod_site }, { rows => 1 }
+                )->single;
+                if ($svc_site) {
+                    my @svc_grants = $c->model('DBEncy')->resultset('MembershipServiceAccess')->search({
+                        user_id   => $c->session->{user_id},
+                        site_id   => $svc_site->id,
+                        is_active => 1,
+                    })->all;
+                    for my $sg (@svc_grants) {
+                        next if $sg->is_expired;
+                        $enabled{ $sg->service_name } = 1;
+                    }
+                }
+            }
             $c->stash->{enabled_modules} = \%enabled;
         };
         if ($@) {
@@ -467,7 +486,7 @@ sub auto :Private {
         # Check if current site has active priced inventory items (for Shop nav visibility)
         eval {
             my $shop_site = $c->stash->{SiteName} || $c->session->{SiteName} || 'none';
-            my $shop_count = $c->model('DBEncy')->resultset('InventoryItem')->search({
+            my $shop_count = $c->model('DBEncy')->resultset('Accounting::InventoryItem')->search({
                 sitename     => $shop_site,
                 status       => 'active',
                 show_in_shop => 1,
@@ -1483,13 +1502,19 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            eval { $self->site_setup($c, $SiteName) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                    "site_setup('CSC') failed in domain_error handler: $@");
+            }
 
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: $error_msg";
 
-            # Send email notification to admin
-            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+            # Send email notification to admin — only for non-bot traffic
+            my $ua = $c->req->user_agent // '';
+            my $is_likely_bot = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua eq '' || $ua =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
+            if (!$is_likely_bot && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1544,9 +1569,11 @@ sub setup_site {
             # Detach to the error template and stop processing
             $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         } else {
-            # Generic error case (should not happen with our improved error handling)
+            # Generic error case — unknown domain (commonly bots/scanners hitting a raw IP)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site', $error_msg);
+            my $_ua_chk = $c->req->user_agent // '';
+            my $_log_level = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $_ua_chk eq '' || $_ua_chk =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i) ? 'warn' : 'error';
+            $self->logging->log_with_details($c, $_log_level, __FILE__, __LINE__, 'setup_site', $error_msg);
 
             # Add to debug_errors if not already there
             unless (grep { $_ eq $error_msg } @{$c->stash->{debug_errors}}) {
@@ -1563,10 +1590,16 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            eval { $self->site_setup($c, $SiteName) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                    "site_setup('CSC') failed in generic domain-missing handler: $@");
+            }
 
-            # Send email notification to admin
-            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+            # Send email notification to admin — skip for bots/scanners hitting raw IPs
+            my $ua_generic  = $c->req->user_agent // '';
+            my $is_bot_req  = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua_generic eq '' || $ua_generic =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
+            if (!$is_bot_req && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1582,12 +1615,18 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                if ($self->send_email($c, $email_params)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                        "Sent admin notification email about domain error for $domain");
-                } else {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Failed to send admin email notification about domain error for $domain");
+                eval {
+                    if ($self->send_email($c, $email_params)) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                            "Sent admin notification email about domain error for $domain");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                            "Failed to send admin email notification about domain error for $domain");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                        "Exception sending admin email for domain_missing ($domain): $@");
                 }
             }
 
@@ -1640,18 +1679,13 @@ sub site_setup {
 
     # Using Catalyst's built-in proxy configuration for URLs without port
     # This is configured in Comserv.pm with using_frontend_proxy and ignore_frontend_proxy_port
-
-    # Log the configuration for debugging
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Using Catalyst's built-in proxy configuration for URLs without port");
 
     # Test the configuration by generating a sample URL
     my $test_url = $c->uri_for('/test');
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Test URL: $test_url");
 
-    # Add to debug_msg for visibility in templates
-    # Ensure debug_msg is always an array
     $c->stash->{debug_msg} = [] unless ref $c->stash->{debug_msg} eq 'ARRAY';
-    push @{$c->stash->{debug_msg}}, "Using Catalyst's built-in proxy configuration. Test URL: $test_url";
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup', "Set default HostName: $default_hostname");
 
@@ -1905,6 +1939,17 @@ sub begin :Private {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "BEGIN INIT ERROR: $@");
     }
+
+    eval {
+        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+            { status => 'active' },
+            { order_by => 'sitename' }
+        )->all;
+        $c->stash->{nav_hosting_accounts} = \@ha;
+    };
+    if ($@) {
+        $c->stash->{nav_hosting_accounts} = [];
+    }
 }
 
 sub _port_label {
@@ -1991,6 +2036,17 @@ sub port_favicon :Path('/favicon/port') :Args(1) {
     $c->response->body($svg);
 }
 
+sub helpdesk_favicon :Path('/favicon/helpdesk') :Args(0) {
+    my ($self, $c) = @_;
+    my $svg = q{<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <rect width="32" height="32" rx="4" fill="#1a7a4a"/>
+  <text x="16" y="22" text-anchor="middle" font-family="monospace,sans-serif" font-weight="bold" font-size="13" fill="white">HD</text>
+</svg>};
+    $c->response->content_type('image/svg+xml');
+    $c->response->headers->header('Cache-Control' => 'public, max-age=86400');
+    $c->response->body($svg);
+}
+
 sub site_favicon :Path('/favicon/site') :Args(1) {
     my ($self, $c, $sitename) = @_;
 
@@ -2023,7 +2079,14 @@ sub end : ActionClass('RenderView') {
     # Intercept unhandled Catalyst errors and render a friendly error page —
     # but only in production (CATALYST_DEBUG=0). In debug mode, let Catalyst
     # show its full error page so developers can see the real stack trace.
-    if (@{$c->error || []} && !$c->response->body && !$c->debug) {
+    #
+    # NOTE: $c->debug is a class method set by the -Debug plugin flag, NOT by
+    # the 'debug' config key.  We therefore also check the config hash and the
+    # CATALYST_DEBUG env var so that CATALYST_DEBUG=1 works without recompiling.
+    my $catalyst_debug = $c->debug || $c->config->{debug} || $ENV{CATALYST_DEBUG} || 0;
+    my $app_debug      = $c->session->{debug_mode} || 0;   # session-level admin debug
+
+    if (@{$c->error || []} && !$c->response->body && !$catalyst_debug) {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
 
@@ -2041,12 +2104,19 @@ sub end : ActionClass('RenderView') {
 
         $c->clear_errors;
         $c->response->status(500);
+
+        # Show the real error text to admins who have session debug_mode on —
+        # production visitors always see the generic friendly message.
+        my $user_msg = $app_debug
+            ? "Application error: $err_text"
+            : 'We encountered an error processing your request. '
+            . 'The system administrator has been notified. '
+            . 'Please try again in a few minutes, or use the Back button.';
+
         $c->stash(
             template    => 'error.tt',
             error_title => 'Temporary Service Issue',
-            error_msg   => 'We encountered an error processing your request. '
-                         . 'The system administrator has been notified. '
-                         . 'Please try again in a few minutes, or use the Back button.',
+            error_msg   => $user_msg,
         );
     }
 

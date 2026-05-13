@@ -121,10 +121,9 @@ sub get_all_todos_for_calendar {
     # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 
-    # Fetch ALL todos for the given site (including completed ones for calendar views)
-    # No row limit, no status filter - calendar views need to see everything
+    my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     my @todos = $rs->search(
-        { sitename => $SiteName },
+        { sitename => $SiteName, status => { -not_in => \@done_statuses } },
         { order_by => { -asc => ['priority', 'start_date'] } }
     );
 

@@ -565,7 +565,7 @@ sub cost_tracking :Local :Args(0) {
     my @benefactor_contribs = ();
     my $benefactor_total_cad = 0;
     eval {
-        @benefactor_contribs = $c->model('DBEncy')->resultset('BenefactorContribution')->search(
+        @benefactor_contribs = $c->model('DBEncy')->resultset('Accounting::BenefactorContribution')->search(
             {},
             {
                 prefetch => 'user',
@@ -624,7 +624,7 @@ sub benefactor_contribution :Local :Args(0) {
 
         eval {
             $c->model('DBEncy')->schema->txn_do(sub {
-                my $contrib = $c->model('DBEncy')->resultset('BenefactorContribution')->create({
+                my $contrib = $c->model('DBEncy')->resultset('Accounting::BenefactorContribution')->create({
                     user_id           => $p->{user_id},
                     contribution_type => $p->{contribution_type},
                     description       => $p->{description},
@@ -1156,7 +1156,7 @@ sub backfill_hosting_invoices :Local :Args(0) {
     }
 
     my $schema = $c->model('DBEncy');
-    my @active = $schema->resultset('HostingAccount')->search({ status => 'active' })->all;
+    my @active = $schema->resultset('Accounting::HostingAccount')->search({ status => 'active' })->all;
 
     my ($created, $skipped) = (0, 0);
     my @log;
@@ -1166,7 +1166,7 @@ sub backfill_hosting_invoices :Local :Args(0) {
         my $monthly   = $acct->monthly_cost || 0;
 
         # Find any existing CSC customer invoice (no notes filter — cast wide)
-        my @existing_csc = $schema->resultset('InventoryCustomerInvoice')->search({
+        my @existing_csc = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
             sitename      => 'CSC',
             customer_name => $client_sn,
         })->all;
@@ -1179,7 +1179,7 @@ sub backfill_hosting_invoices :Local :Args(0) {
         }
 
         # Check if client already has a supplier invoice from CSC
-        my $cli_inv_exists = $schema->resultset('InventorySupplierInvoice')->search({
+        my $cli_inv_exists = $schema->resultset('Accounting::InventorySupplierInvoice')->search({
             sitename => $client_sn,
             notes    => { -like => "%$plan_slug%" },
         })->count;
@@ -1223,7 +1223,7 @@ sub sync_invoice_payments :Local :Args(0) {
     my ($synced, $skipped) = (0, 0);
     my @log;
 
-    my @csc_invoices = $schema->resultset('InventoryCustomerInvoice')->search({
+    my @csc_invoices = $schema->resultset('Accounting::InventoryCustomerInvoice')->search({
         sitename       => 'CSC',
         payment_status => { '!=' => 'paid' },
     })->all;
@@ -1232,7 +1232,7 @@ sub sync_invoice_payments :Local :Args(0) {
         my $inv_num = $csc_inv->invoice_number;
         next unless $inv_num;
 
-        my $client_inv = $schema->resultset('InventorySupplierInvoice')->search({
+        my $client_inv = $schema->resultset('Accounting::InventorySupplierInvoice')->search({
             invoice_number => $inv_num,
         })->single;
 
@@ -1267,13 +1267,13 @@ sub _backfill_csc_ar_only {
     my $client_sn = $acct->sitename;
     my $plan_slug = $acct->plan_slug || 'hosting-app';
 
-    my $csc_ar     = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
-    my $csc_income = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
+    my $csc_ar     = $schema->resultset('Accounting::CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
+    my $csc_income = $schema->resultset('Accounting::CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
     my $sku        = $plan_slug eq 'hosting-subdomain' ? 'CSC-HOST-SUB' : 'CSC-HOST-APP';
-    my $item       = $schema->resultset('InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
+    my $item       = $schema->resultset('Accounting::InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
 
     # Find the existing client supplier invoice to reuse its invoice number
-    my $cli_inv = $schema->resultset('InventorySupplierInvoice')->search(
+    my $cli_inv = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
         { sitename => $client_sn, notes => { -like => "%$plan_slug%" } },
         { order_by => { -desc => 'id' }, rows => 1 }
     )->single;
@@ -1286,7 +1286,7 @@ sub _backfill_csc_ar_only {
 
     my $paid = $cli_inv && $cli_inv->status eq 'paid';
 
-    my $csc_invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+    my $csc_invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->create({
         sitename          => 'CSC',
         customer_name     => $client_sn,
         customer_email    => $acct->contact_email || '',
@@ -1320,11 +1320,11 @@ sub _backfill_csc_ar_only {
 
     # Create GL entry if COA accounts exist and we don't already have one
     if ($csc_ar && $csc_income) {
-        my $existing_gl = $schema->resultset('GlEntry')->search(
+        my $existing_gl = $schema->resultset('Accounting::GlEntry')->search(
             { sitename => 'CSC', reference => $inv_num }
         )->single;
         unless ($existing_gl) {
-            my $csc_gl = $schema->resultset('GlEntry')->create({
+            my $csc_gl = $schema->resultset('Accounting::GlEntry')->create({
                 sitename    => 'CSC',
                 reference   => $inv_num . '-BF',
                 description => "Hosting invoice (backfill) $client_sn",
@@ -1332,14 +1332,14 @@ sub _backfill_csc_ar_only {
                 created_at  => \'NOW()',
                 updated_at  => \'NOW()',
             });
-            $schema->resultset('GlEntryLine')->create({
+            $schema->resultset('Accounting::GlEntryLine')->create({
                 gl_entry_id => $csc_gl->id,
                 account_id  => $csc_ar->id,
                 amount      => $monthly_cost,
                 memo        => "AR — $client_sn hosting",
                 created_at  => \'NOW()',
             });
-            $schema->resultset('GlEntryLine')->create({
+            $schema->resultset('Accounting::GlEntryLine')->create({
                 gl_entry_id => $csc_gl->id,
                 account_id  => $csc_income->id,
                 amount      => -$monthly_cost,
@@ -1366,7 +1366,7 @@ sub hosting_accounts :Local :Args(0) {
         my $id     = $c->req->body_parameters->{account_id};
         my $action = $c->req->body_parameters->{action};
         eval {
-            my $acct = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+            my $acct = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
             if ($acct) {
                 if ($action eq 'approve') {
                     my $monthly = $c->req->body_parameters->{monthly_cost} || $acct->monthly_cost || 0;
@@ -1399,7 +1399,7 @@ sub hosting_accounts :Local :Args(0) {
     }
 
     my @accounts = eval {
-        $c->model('DBEncy')->resultset('HostingAccount')->search(
+        $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             {},
             { order_by => [{ -asc => 'status' }, { -asc => 'sitename' }] }
         )->all;
@@ -1434,7 +1434,7 @@ sub hosting_account_edit :Local :Args(1) {
         return;
     }
 
-    my $acct = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    my $acct = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
     unless ($acct) {
         $c->flash->{error_msg} = 'Hosting account not found.';
         $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
@@ -1482,25 +1482,25 @@ sub _create_hosting_invoice {
     my $plan_slug = $acct->plan_slug || 'hosting-app';
 
     # --- COA lookups (CSC side) ---
-    my $csc_ar     = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
-    my $csc_income = $schema->resultset('CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
+    my $csc_ar     = $schema->resultset('Accounting::CoaAccount')->search({ sitename => 'CSC', accno => '1100' })->single;
+    my $csc_income = $schema->resultset('Accounting::CoaAccount')->search({ sitename => 'CSC', accno => '4300' })->single;
 
     # --- COA lookups (client side) ---
-    my $cli_ap      = $schema->resultset('CoaAccount')->search({ sitename => $client_sn, accno => '2000' })->single;
-    my $cli_expense = $schema->resultset('CoaAccount')->search({ sitename => $client_sn, accno => '6300' })->single;
+    my $cli_ap      = $schema->resultset('Accounting::CoaAccount')->search({ sitename => $client_sn, accno => '2000' })->single;
+    my $cli_expense = $schema->resultset('Accounting::CoaAccount')->search({ sitename => $client_sn, accno => '6300' })->single;
 
     # --- Inventory item for this plan ---
     my $sku  = $plan_slug eq 'hosting-subdomain' ? 'CSC-HOST-SUB' : 'CSC-HOST-APP';
-    my $item = $schema->resultset('InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
+    my $item = $schema->resultset('Accounting::InventoryItem')->search({ sitename => 'CSC', sku => $sku })->single;
 
     # --- Supplier on client side (CSC as supplier for client) ---
-    my $supplier = $schema->resultset('InventorySupplier')->search(
+    my $supplier = $schema->resultset('Accounting::InventorySupplier')->search(
         { sitename => $client_sn, name => { -like => '%Computer System Consulting%' } }
     )->single;
 
     # Auto-create supplier if missing
     unless ($supplier) {
-        $supplier = $schema->resultset('InventorySupplier')->create({
+        $supplier = $schema->resultset('Accounting::InventorySupplier')->create({
             sitename     => $client_sn,
             name         => 'Computer System Consulting (CSC)',
             contact_name => 'CSC Admin',
@@ -1523,12 +1523,12 @@ sub _create_hosting_invoice {
 
     # --- Link hosting item to CSC supplier on client side (for Supplier view) ---
     if ($item && $supplier) {
-        my $existing_link = $schema->resultset('InventoryItemSupplier')->search({
+        my $existing_link = $schema->resultset('Accounting::InventoryItemSupplier')->search({
             item_id     => $item->id,
             supplier_id => $supplier->id,
         })->single;
         unless ($existing_link) {
-            $schema->resultset('InventoryItemSupplier')->create({
+            $schema->resultset('Accounting::InventoryItemSupplier')->create({
                 item_id      => $item->id,
                 supplier_id  => $supplier->id,
                 unit_cost    => $monthly_cost,
@@ -1539,7 +1539,7 @@ sub _create_hosting_invoice {
     }
 
     # --- CLIENT SIDE: SupplierInvoice (bill from CSC) ---
-    my $cli_invoice = $schema->resultset('InventorySupplierInvoice')->create({
+    my $cli_invoice = $schema->resultset('Accounting::InventorySupplierInvoice')->create({
         sitename       => $client_sn,
         supplier_id    => $supplier->id,
         invoice_number => $inv_num,
@@ -1554,7 +1554,7 @@ sub _create_hosting_invoice {
         updated_at     => \'NOW()',
     });
 
-    $schema->resultset('InventorySupplierInvoiceLine')->create({
+    $schema->resultset('Accounting::InventorySupplierInvoiceLine')->create({
         invoice_id  => $cli_invoice->id,
         item_id     => ($item ? $item->id : undef),
         description => 'Monthly Hosting — ' . uc($client_sn) . ' (' . $plan_slug . ')',
@@ -1566,7 +1566,7 @@ sub _create_hosting_invoice {
 
     # --- CLIENT GL: DR Hosting Expense (+) / CR Accounts Payable (-) ---
     if ($cli_expense && $cli_ap) {
-        my $cli_gl = $schema->resultset('GlEntry')->create({
+        my $cli_gl = $schema->resultset('Accounting::GlEntry')->create({
             sitename    => $client_sn,
             reference   => $inv_num,
             description => "CSC Hosting invoice $inv_num",
@@ -1574,14 +1574,14 @@ sub _create_hosting_invoice {
             created_at  => \'NOW()',
             updated_at  => \'NOW()',
         });
-        $schema->resultset('GlEntryLine')->create({
+        $schema->resultset('Accounting::GlEntryLine')->create({
             gl_entry_id => $cli_gl->id,
             account_id  => $cli_expense->id,
             amount      => $monthly_cost,
             memo        => 'Hosting expense — CSC',
             created_at  => \'NOW()',
         });
-        $schema->resultset('GlEntryLine')->create({
+        $schema->resultset('Accounting::GlEntryLine')->create({
             gl_entry_id => $cli_gl->id,
             account_id  => $cli_ap->id,
             amount      => -$monthly_cost,
@@ -1593,7 +1593,7 @@ sub _create_hosting_invoice {
 
     # --- CSC SIDE: CustomerInvoice (AR — client owes CSC) ---
     my $csc_gl_id;
-    my $csc_invoice = $schema->resultset('InventoryCustomerInvoice')->create({
+    my $csc_invoice = $schema->resultset('Accounting::InventoryCustomerInvoice')->create({
         sitename          => 'CSC',
         customer_name     => $client_sn,
         customer_email    => $acct->contact_email || '',
@@ -1626,7 +1626,7 @@ sub _create_hosting_invoice {
 
     # --- CSC GL: DR Accounts Receivable (+) / CR Hosting Income (-) ---
     if ($csc_ar && $csc_income) {
-        my $csc_gl = $schema->resultset('GlEntry')->create({
+        my $csc_gl = $schema->resultset('Accounting::GlEntry')->create({
             sitename    => 'CSC',
             reference   => $inv_num,
             description => "Hosting invoice to $client_sn — $inv_num",
@@ -1634,14 +1634,14 @@ sub _create_hosting_invoice {
             created_at  => \'NOW()',
             updated_at  => \'NOW()',
         });
-        $schema->resultset('GlEntryLine')->create({
+        $schema->resultset('Accounting::GlEntryLine')->create({
             gl_entry_id => $csc_gl->id,
             account_id  => $csc_ar->id,
             amount      => $monthly_cost,
             memo        => "AR — $client_sn hosting",
             created_at  => \'NOW()',
         });
-        $schema->resultset('GlEntryLine')->create({
+        $schema->resultset('Accounting::GlEntryLine')->create({
             gl_entry_id => $csc_gl->id,
             account_id  => $csc_income->id,
             amount      => -$monthly_cost,

@@ -5,6 +5,12 @@
     [% END %]
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="[% c.stash.SiteName || SiteName || 'Comserv' %]">
+    <meta name="theme-color" content="[% c.stash.pwa_theme_color || '#1565c0' %]">
+    <link rel="manifest" href="/static/manifest.json">
     <meta name="REVISIT-AFTER" content="7 days">
     <meta name="ROBOTS" content="index all, follow all">
     [% # Make sure HostName is defined, use a default if not %]
@@ -32,12 +38,16 @@
     [%- SET fallback_icon = site_favicon
             ? site_favicon
             : '/favicon/site/' _ site_name_enc -%]
+    [% IF site_favicon %]
+    <link rel="icon" type="image/svg+xml" href="[% site_favicon %]">
     [% IF req_port %]
+    [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
+    <link rel="alternate icon" sizes="32x32" href="[% port_icon_url %]">
+    [% END %]
+    [% ELSIF req_port %]
     [%- SET port_icon_url = '/favicon/port/' _ req_port _ (fav_bg ? '?bg=' _ fav_bg : '') -%]
     <link rel="icon" type="image/svg+xml" href="[% port_icon_url %]">
     <link rel="alternate icon" sizes="32x32" href="[% fallback_icon %]">
-    [% ELSIF site_favicon %]
-    <link rel="shortcut icon" href="[% site_favicon %]">
     [% ELSE %]
     <link rel="icon" type="image/svg+xml" href="/favicon/site/[% site_name_enc %]">
     [% END %]
@@ -102,7 +112,10 @@
     <link rel="stylesheet" type="text/css" href="[% css_view_name %]?v=[% cv %]">
     [% END %]
 
-    <!-- Local SVG icon solution (no external dependencies) -->
+    <!-- FontAwesome for icons not covered by the SVG mask set -->
+    <link rel="stylesheet" type="text/css" href="/static/css/fontawesome/all.min.css">
+
+    <!-- Local SVG icon solution (overrides selected FA icons with themed SVGs) -->
     <link rel="stylesheet" type="text/css" href="/static/css/svg-icons.css">
 
     <!-- Fix for icons to respect theme colors -->
@@ -130,8 +143,11 @@
     <link rel="stylesheet" type="text/css" href="/static/css/back-to-top.css?v=[% cv %]">
 
     [% IF is_admin %]
-    <!-- Admin-only Health Monitoring -->
+    <!-- Admin-only styles -->
     <link rel="stylesheet" type="text/css" href="/static/css/admin.css">
+    [% END %]
+    [% IF is_admin && SiteName == 'CSC' %]
+    <!-- CSC-admin-only Health Monitoring -->
     <script src="/static/js/HealthMonitor.js"></script>
     [% END %]
 

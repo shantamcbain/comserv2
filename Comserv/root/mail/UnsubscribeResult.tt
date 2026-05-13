@@ -1,0 +1,36 @@
+[%
+   title = "Unsubscribe"
+   description = "Mailing list unsubscribe confirmation"
+   roles = ""
+   TemplateType = "Application"
+   category = "Mail"
+   page_version = "1.0"
+   last_updated = "2026-05-08"
+%]
+[% PageVersion = 'mail/UnsubscribeResult.tt,v 1.0 2026/05/08 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>Mailing List</h1>
+    </div>
+    <div class="content-container">
+        <div class="content-primary" style="text-align:center;padding:var(--spacing-large);">
+
+            [% IF success_msg %]
+                <div class="success" style="margin-bottom:var(--spacing-large);">[% success_msg | html %]</div>
+                <p>You will no longer receive emails from this list.</p>
+                <p style="margin-top:var(--spacing-large);">
+                    <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-secondary">View Other Lists</a>
+                    [% IF c.session.user_id %]
+                        <a href="[% c.uri_for('/mail/my_subscriptions') %]" class="btn btn-secondary">Manage My Subscriptions</a>
+                    [% END %]
+                </p>
+            [% ELSE %]
+                <div class="error" style="margin-bottom:var(--spacing-large);">[% error_msg | html %]</div>
+                <p><a href="[% c.uri_for('/') %]" class="btn btn-secondary">Go to Home Page</a></p>
+            [% END %]
+
+        </div>
+    </div>
+</div>

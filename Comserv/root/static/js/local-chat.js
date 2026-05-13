@@ -2127,11 +2127,6 @@
         if (!state.userModelOverride) {
             autoTier = classifyQuery(prompt);
             effectiveProvider = autoSelectProvider(autoTier);
-            // Accounting agent always uses local Ollama — financial data stays on-device.
-            // Override only when the user has NOT manually selected a provider.
-            if (_agentId === 'accounting' && effectiveProvider && effectiveProvider.startsWith('grok')) {
-                effectiveProvider = state.modelTiers.large || state.modelTiers.medium || state.modelTiers.small || 'ollama';
-            }
             // Reflect auto-selection in the dropdown UI
             const sel = document.getElementById('ai-provider');
             if (sel && sel.querySelector('option[value="' + effectiveProvider + '"]')) {
@@ -2169,14 +2164,9 @@
         // inject the navigate_and_fill instruction so Grok emits the ACTION block.
         const _looksLikeBill = /\$\s*[\d,]+\.\d{2}|[\d]+\.?\d*\s*(?:USD|CAD|EUR|GBP)/i.test(prompt)
             && /Payment|Invoice|Receipt|Bill|invoice\s+number|invoice\s+date/i.test(prompt);
-        const _looksLikeDeposit = /\$\s*[\d,]+\.\d{2}/.test(prompt)
-            && /Amount\s+Deposited|Account\s+(?:Balance|Refill)|Refill\s+Convenience|Reference\s+No|account\s+refill|funds.*account|adding.*funds/i.test(prompt);
         const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
-        if (_agentId === 'accounting' && (_looksLikeBill || _looksLikeDeposit || _explicitFormRequest)) {
-            const _depositNote = _looksLikeDeposit && !_looksLikeBill
-                ? '\n\nNOTE: This appears to be a DEPOSIT/REFILL confirmation email (money paid TO a supplier account, e.g. PayPal reseller credit). Treat the "Amount Deposited" as unit_cost_0 (the main payment), and any "Convenience Charge" as a separate second line item (description_0 and unit_cost_1). Use "Prepaid Hosting / Account Refill" as description_0 if no clearer description is shown.'
-                : '';
-            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill, payment receipt, or deposit confirmation email. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "REFERENCE_OR_INV_NO", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER payment/deposit REFERENCE DATE", "unit_cost_0": "MAIN_AMOUNT", "quantity_0": "1", "description_0": "SERVICE DESCRIPTION"}}]\nReplace all placeholders with values parsed from the pasted text. Only add auto_pay_method if it explicitly says "Auto Pay". If a convenience/service fee is shown as a separate amount, add a second line (unit_cost_1, description_1, quantity_1). After the ACTION line, tell the user: (a) which supplier name to select in the dropdown, and (b) if that supplier does not exist yet, open /Inventory/supplier/add first.' + _depositNote;
+        if (_agentId === 'accounting' && (_looksLikeBill || _explicitFormRequest)) {
+            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.';
         }
 
         // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
@@ -2188,16 +2178,13 @@
                 _agentSys = (_agentSys || '') + '\n\n## CRITICAL ENCY ACTION RULE\nThe user wants to add a missing constituent or fix an unresolved term. READ the injected todo/DB data carefully to find the term name, then emit this action on its own line:\n[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME_FROM_TODO_DATA", "found_in_herbs": "HERB_IF_KNOWN"}}]\nDo NOT ask the user what the term name is — it is in the injected data. After the ACTION line, confirm the term you are adding.';
             }
         }
-        // Client-side fast path: open the correct accounting form without an AI round-trip.
-        // _looksLikeDeposit → always fires (any agent) — opens /Accounting/transfer/new
-        // _looksLikeBill / _enterIntent → only fires for accounting agent — opens /Inventory/invoice/new
-        const _isDepositFastPath = _looksLikeDeposit;
-        if (_isDepositFastPath || _agentId === 'accounting') {
+        // Client-side fast path: "enter/open the invoice form" when accounting agent is active.
+        // Parses bill text from chat history and fires navigate_and_fill directly.
+        if (_agentId === 'accounting') {
             const _pu2 = prompt.toUpperCase();
-            const _enterIntent = _agentId === 'accounting'
-                && (/ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
-                    || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2));
-            if (_enterIntent || _looksLikeBill || _looksLikeDeposit) {
+            const _enterIntent = /ENTER.*INVOICE|ENTER.*BILL|ADD.*INVOICE|RECORD.*INVOICE|CREATE.*INVOICE|PUT.*ACCOUNT|ENTER.*IT\b|ADD.*IT\b|RECORD.*IT\b|OPEN.*INVOICE.*FORM|FILE.*FORM|OPEN.*FORM|FILE.*INVOICE/.test(_pu2)
+                || /^(ENTER|ADD|RECORD|POST|CREATE|OPEN|FILE)\s+(THE\s+)?(INVOICE|BILL|PAYMENT|IT|FORM)\b/.test(_pu2);
+            if (_enterIntent) {
                 const _chatMsgs = document.getElementById('chat-messages');
                 let _billText = prompt;
                 if (_chatMsgs) {
@@ -2206,74 +2193,36 @@
                     });
                 }
                 const _nfFields = {};
-                // Deposit email: use "Amount Deposited" as main amount
-                const _depositAmtM = _billText.match(/Amount\s+Deposited[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
-                const _feeAmtM = _billText.match(/(?:Refill\s+Convenience\s+Charge|Convenience\s+(?:Fee|Charge)|Service\s+(?:Fee|Charge))[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
-                if (_depositAmtM) {
-                    _nfFields.unit_cost_0 = _depositAmtM[1].replace(/,/g, '');
-                    _nfFields.description_0 = 'Prepaid account refill';
-                    _nfFields.quantity_0 = '1';
-                    if (_feeAmtM) {
-                        _nfFields.unit_cost_1 = _feeAmtM[1].replace(/,/g, '');
-                        _nfFields.description_1 = 'Refill convenience charge';
-                        _nfFields.quantity_1 = '1';
-                    }
-                } else {
-                    const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
-                    if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
-                    _nfFields.description_0 = 'Service charge';
-                    _nfFields.quantity_0 = '1';
-                }
+                const _amtM = _billText.match(/\$\s*([\d,]+\.?\d{0,2})/) || _billText.match(/([\d]+\.?\d{0,2})\s*(?:USD|CAD|EUR)/i);
+                if (_amtM) _nfFields.unit_cost_0 = _amtM[1].replace(/,/g, '');
+                // Date: MM/DD/YYYY or YYYY-MM-DD or DD/MM/YYYY
                 const _dateM = _billText.match(/(\d{4})-(\d{2})-(\d{2})/)
-                    || _billText.match(/(\w+)\s+(\d{1,2})\s+(\d{4})\s+\d+:\d+/i)
                     || _billText.match(/(\d{2})\/(\d{2})\/(\d{4})/);
                 if (_dateM) {
-                    if (_dateM[0].includes('-')) {
-                        _nfFields.invoice_date = _dateM[0];
-                    } else if (/^\d{2}\//.test(_dateM[0])) {
-                        _nfFields.invoice_date = _dateM[3] + '-' + _dateM[1] + '-' + _dateM[2];
-                    } else {
-                        const _months = {Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
-                        const _mo = _months[_dateM[1]] || '01';
-                        _nfFields.invoice_date = _dateM[3] + '-' + _mo + '-' + (_dateM[2].length === 1 ? '0' : '') + _dateM[2];
-                    }
+                    _nfFields.invoice_date = _dateM[0].includes('-')
+                        ? _dateM[0]
+                        : (_dateM[3] + '-' + _dateM[1] + '-' + _dateM[2]);
                 }
-                const _invNumM = _billText.match(/Reference\s+No[:\s]+([A-Z0-9\-]+)/i)
-                    || _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
+                // Invoice number: "Invoice number: XXX" or "Payment Number: XXX"
+                const _invNumM = _billText.match(/Invoice\s+[Nn]umber[:\s]+([A-Z0-9\-]+)/i)
                     || _billText.match(/Payment\s+Number[:\s]+([A-Z0-9]+)/i);
                 if (_invNumM) _nfFields.invoice_number = _invNumM[1];
                 if (/Auto\s*Pay/i.test(_billText)) {
                     const _methodM = _billText.match(/Payment\s+Method[:\s]+(\w+)/i);
-                    _nfFields.auto_pay = '1';
                     _nfFields.auto_pay_method = (_methodM ? _methodM[1] : 'Visa') + ' Auto Pay';
                 }
-                const _supplierM = _billText.match(/HostGator|PayPal|Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio|eNom|GoDaddy|Namecheap|Hover|Tucows|WHC|Domain\.com/i);
+                const _supplierM = _billText.match(/Freedom Mobile|Rogers|Bell|Telus|Shaw|Koodo|Fido|Videotron|SaskTel|MTS|Eastlink|OpenAI|Anthropic|Google|Microsoft|AWS|Azure|Cloudflare|GitHub|Stripe|Mailgun|Twilio/i);
                 const _supplierName = _supplierM ? _supplierM[0] : 'Supplier';
-                const _billedToM = _billText.match(/Billed\s+To[:\s]+([^\n\r]+)/i);
-                const _billedTo = _billedToM ? ' (' + _billedToM[1].trim() + ')' : '';
-                if (!_nfFields.notes) {
-                    _nfFields.notes = _supplierName
-                        + (_depositAmtM ? ' account refill' : ' invoice')
-                        + _billedTo
-                        + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
-                        + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
-                }
+                _nfFields.description_0 = 'Service charge';
+                _nfFields.quantity_0 = '1';
+                _nfFields.notes = _supplierName + ' invoice'
+                    + (_nfFields.invoice_number ? ' #' + _nfFields.invoice_number : '')
+                    + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
                 if (_nfFields.unit_cost_0) {
-                    const _isDeposit = !!_depositAmtM;
-                    if (_isDeposit) {
-                        const _tf = {
-                            amount:     _nfFields.unit_cost_0,
-                            post_date:  _nfFields.invoice_date || '',
-                            reference:  _nfFields.invoice_number || '',
-                            notes:      _nfFields.notes || '',
-                            fee_amount: _nfFields.unit_cost_1 || '',
-                            entry_type: 'prepaid_topup',
-                        };
-                        const _qs = Object.keys(_tf).filter(k => _tf[k]).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(_tf[k])).join('&');
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new?' + _qs, fields: _tf });
-                    } else {
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
-                    }
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening invoice form\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
                     const _wAcc = document.createElement('div');
                     _wAcc.className = 'msg-wrapper msg-wrapper-ai';
                     const _lblAcc = document.createElement('div');
@@ -2281,31 +2230,11 @@
                     _lblAcc.textContent = 'Accounting Agent';
                     const _elAcc = document.createElement('div');
                     _elAcc.className = 'message ai-message';
-                    const _supplierHint = _isDeposit
-                        ? ' Select <strong>prepaid_topup</strong> transaction type and choose the correct From/To accounts.'
-                        : (_supplierName !== 'Supplier'
-                            ? ' Select <strong>' + _supplierName + '</strong> as the supplier'
-                                + ' (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).'
-                            : ' Select the supplier in the dropdown (add if missing).');
-                    _elAcc.innerHTML = '\uD83D\uDCCB '
-                        + (_isDeposit ? 'Deposit/refill transfer' : 'Invoice')
-                        + ' form opened and pre-filled — verify the amounts, then save.'
-                        + _supplierHint
-                        + '<br><small>'
-                        + (_isDeposit ? 'Deposit: $' : 'Amount: $') + _nfFields.unit_cost_0
-                        + (_nfFields.unit_cost_1 ? ' + fee: $' + _nfFields.unit_cost_1 : '')
-                        + (_nfFields.invoice_date ? ' | Date: ' + _nfFields.invoice_date : '')
-                        + (_nfFields.invoice_number ? ' | Ref: ' + _nfFields.invoice_number : '')
-                        + '</small>';
+                    _elAcc.innerHTML = 'Opening invoice form pre-filled with the detected bill details.';
                     _wAcc.appendChild(_lblAcc);
                     _wAcc.appendChild(_elAcc);
                     if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
-                    if (_enterIntent || _looksLikeDeposit) {
-                        loadingMessage.remove();
-                        statusIndicator.textContent = _isDeposit ? '\uD83D\uDFE2 Transfer form opened' : '\uD83D\uDFE2 Invoice form opened';
-                        statusIndicator.className = 'chat-status connected';
-                        return;
-                    }
+                    return;
                 }
             }
         }
@@ -2695,11 +2624,7 @@
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
             liveThinkEl.remove();
-
-            if (!data) {
-                throw new Error('AI server returned an empty response. Please try again.');
-            }
-
+            
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -4412,9 +4337,6 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
-            if (!result) {
-                throw new Error('Action server returned an empty response');
-            }
             if (result.success && result.action === 'open_project_wizard') {
                 openProjectWizard(result.wizard_title || '');
                 return;

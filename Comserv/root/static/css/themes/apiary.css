@@ -849,4 +849,108 @@
 /* All other container styles are inherited from base-containers.css */
 /* This ensures consistency across all themes while maintaining Apiary's unique bee styling */
 
+/* Hive Diagram component (_hive_diagram.tt) */
+.hive-diagram {
+    margin: 1rem 0;
+}
+.hive-diagram-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+    padding: 0.5rem 0.75rem;
+    background: rgba(255,255,255,0.80);
+    border-radius: 6px;
+    border: 1px solid var(--border-color, #ccc);
+}
+.frame-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-size: 0.85rem;
+}
+.hive-box {
+    margin-bottom: 1rem;
+    padding: 0.75rem;
+    background: rgba(255,255,255,0.80);
+    border: 2px solid var(--border-color, #bbb);
+    border-radius: 6px;
+}
+.hive-box-label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: var(--text-color, #333);
+}
+.hive-box-frames {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+.frame-cell {
+    width: 36px;
+    height: 52px;
+    border: 1px solid rgba(0,0,0,0.25);
+    border-radius: 3px;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    cursor: default;
+    position: relative;
+}
+.frame-cell .frame-number {
+    font-size: 0.65rem;
+    color: rgba(0,0,0,0.55);
+    padding-bottom: 2px;
+}
+.frame-brood      { background-color: #FF8C00; }
+.frame-honey      { background-color: #FFD700; }
+.frame-pollen     { background-color: #4CAF50; }
+.frame-empty      { background-color: #FFFFFF; }
+.frame-foundation { background-color: #9E9E9E; }
+.frame-drone      { background-color: #4169E1; }
+.frame-comb       { background-color: #D2B48C; }
+
+/* Inspection Reports - bar chart */
+.inline-form {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+.chart-bar-group {
+    display: flex;
+    align-items: flex-end;
+    gap: 4px;
+    height: 120px;
+    margin-top: 1rem;
+    padding: 0 0.5rem;
+    border-bottom: 2px solid var(--border-color, #ccc);
+}
+.chart-bar-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    height: 100%;
+    justify-content: flex-end;
+}
+.chart-bar-fill {
+    width: 100%;
+    background-color: var(--primary-color, #F5A623);
+    border-radius: 3px 3px 0 0;
+    min-height: 2px;
+    transition: height 0.3s ease;
+}
+.chart-bar-label {
+    font-size: 0.7rem;
+    color: var(--text-color, #555);
+    margin-top: 4px;
+}
+.cell-active {
+    font-weight: bold;
+    color: var(--primary-color, #c07000);
+}
+.cell-empty {
+    color: #aaa;
+}
+
 

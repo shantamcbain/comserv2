@@ -143,20 +143,18 @@
                 <a href="/todo">Todo System</a>
             </div>
             <div style="text-align: right; color: var(--text-muted-color); font-size: 0.85em;">
-                [% IF open_log_entry %]
-                <button class="dl-btn dl-btn-start" id="dl-start-btn"
-                        style="background:#2a7a2a;color:#fff;border-color:#1a5a1a;"
-                        onclick="toggleLogPanel()"
-                        oncontextmenu="event.preventDefault();dailyLogAction('end')"
-                        title="Day log active — click to view, right-click to close">
-                  🌅 Start Day
-                </button>
+                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')"
+                        title="Audit system errors, check HelpDesk tickets, create daily log">🌅 Start Day</button>
                 <button class="dl-btn dl-btn-end" id="dl-end-btn" onclick="dailyLogAction('end')">🌙 End Day</button>
-                [% ELSE %]
-                <button class="dl-btn dl-btn-start" id="dl-start-btn" onclick="dailyLogAction('start')">🌅 Start Day</button>
-                <button class="dl-btn dl-btn-end"   id="dl-end-btn"   onclick="dailyLogAction('end')">🌙 End Day</button>
+                [% IF is_admin && (SiteName == 'CSC' || c.session.SiteName == 'CSC') %]
+                <button class="dl-btn" id="dl-deploy-btn" onclick="openDeployPopup()"
+                        style="background:#005a8e;color:#fff;"
+                        title="git pull + docker restart — opens deploy log popup">🐳 Deploy</button>
                 [% END %]
                 <span id="dl-feedback"></span>
+                [% IF stale_log_count %]
+                &nbsp;<a href="/log?status=open" style="font-size:0.82em;color:#856404;background:#fff3cd;border:1px solid #ffc107;border-radius:3px;padding:2px 7px;text-decoration:none;white-space:nowrap;" title="View unclosed logs from previous days">⚠️ [% stale_log_count %] unclosed log(s)</a>
+                [% END %]
                 &nbsp;|&nbsp;
                 <a href="/planning/daily/[% prev_date %]" class="prev-day-link">← Prev Day</a>
                 | Viewing [% display_date %] |
@@ -235,15 +233,34 @@
     <div id="today-work" class="tab-content active">
         <div id="today-work-content">
 
-            [%# ── Cross-project dependency summary (compact, collapsible) ── %]
-            [%# project_id = BLOCKED project; depends_on_id = BLOCKER (must come first) %]
-            [% IF active_blockers && active_blockers.size %]
-            <details style="margin-bottom:12px;font-size:0.83em;">
-                <summary style="cursor:pointer;color:var(--text-muted-color);padding:5px 0;list-style:none;display:flex;align-items:center;gap:6px;">
-                    <span style="padding:1px 6px;border-radius:3px;background:#6f42c1;color:#fff;font-size:0.85em;">🔗 [% active_blockers.size %]</span>
-                    <span>cross-project dependencies — priority order affected (<span style="color:#6f42c1;">purple badges ↓</span>)[% IF dep_auto_resolved %] — <span style="color:#28a745;">✓ [% dep_auto_resolved %] auto-resolved this load</span>[% END %][% IF dep_auto_detected %] — <span style="color:#17a2b8;">+ [% dep_auto_detected %] new auto-detected</span>[% END %]</span>
+            [%# ── Action bar (below tabs) ── %]
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;padding-bottom:10px;border-bottom:1px solid var(--border-color);">
+                <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
+                <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
+                <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
+                [% IF is_admin %]
+                [% IF open_log_entry %]
+                <a href="#log-panel" onclick="toggleLogPanel();return false;" style="padding:4px 12px;border:1px solid #2a7a2a;border-radius:4px;text-decoration:none;font-size:0.82em;color:#2a7a2a;" title="View today's open log entry">🌅 Today's Log</a>
+                [% ELSE %]
+                <button onclick="dailyLogAction('start')" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;background:transparent;font-size:0.82em;color:#20c997;cursor:pointer;" title="Start your day — audits application errors, checks HelpDesk, creates daily log">🌅 Start Day</button>
+                [% END %]
+                <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
+                <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                [% END %]
+            </div>
+
+            [%# ── Cross-project dependency summary (always visible, collapsible) ── %]
+            <details style="margin-bottom:8px;">
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#6f42c1 10%,var(--bg-color));border:1px solid #6f42c1;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#6f42c1;">🔗 Cross-Project Dependencies</span>
+                    [% IF active_blockers && active_blockers.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% active_blockers.size %] active — priority order affected[% IF dep_auto_resolved %] · ✓ [% dep_auto_resolved %] auto-resolved[% END %]</span>
+                    [% ELSE %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">none active</span>
+                    [% END %]
                 </summary>
-                <div style="margin-top:6px;padding:8px 10px;background:var(--bg-secondary);border-radius:4px;border-left:3px solid #6f42c1;">
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #6f42c1;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF active_blockers && active_blockers.size %]
                     [% FOREACH ab IN active_blockers %]
                     <div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:0.9em;border-bottom:1px solid var(--border-color);">
                         <a href="/project/details?project_id=[% ab.depends_on_id %]" style="color:#6f42c1;font-weight:bold;text-decoration:none;">[% ab.depends_on_name %]</a>
@@ -252,48 +269,259 @@
                         <span style="color:var(--text-muted-color);font-size:0.8em;">can proceed</span>
                     </div>
                     [% END %]
-                    <div style="margin-top:5px;text-align:right;">
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No active cross-project dependencies.</p>
+                    [% END %]
+                    <div style="margin-top:6px;text-align:right;">
                         <a href="/project/dependency_form" style="font-size:0.85em;color:#6f42c1;">+ Manage Dependencies</a>
                     </div>
                 </div>
             </details>
-            [% END %]
 
-            [%# ── CURRENT ACTIVE PRIORITIES (DB-driven, role/site/user scoped) ── %]
-            <div style="margin-bottom:24px;">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;padding-bottom:8px;border-bottom:2px solid var(--primary-color);">
-                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;">
-                        <a href="/todo/addtodo" style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">+ Add Todo</a>
-                        <a href="/todo" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">All Todos</a>
-                        <a href="/log" style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Logs</a>
-                        [% IF is_admin %]
-                        <a href="/log/log_form?todo_record_id=221&status=2&start_date=[% date.format(date.now, '%Y-%m-%d') %]" style="padding:4px 12px;border:1px solid #20c997;border-radius:4px;text-decoration:none;font-size:0.82em;color:#20c997;" title="Start a new time-tracking log entry for this session">☀ Good Morning</a>
-                        <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
-                        <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
-                        [% END %]
+            [%# ── Audit Todos (always visible, collapsible) ── %]
+            <details id="audit-panel" style="margin-bottom:8px;" open>
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#c45d00 10%,var(--bg-color));border:1px solid #c45d00;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#c45d00;">🚨 Application Error Audit</span>
+                    [% IF audit_todos && audit_todos.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% audit_todos.size %] item(s)</span>
+                    [% ELSE %]
+                    <span id="audit-status-msg" style="font-size:0.85em;color:var(--text-muted-color);">no unresolved errors</span>
+                    [% END %]
+                    <button id="btn-refresh-audit" onclick="refreshAudit(event)"
+                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #c45d00;border-radius:3px;background:transparent;color:#c45d00;cursor:pointer;" title="Re-scan system log for new errors">↻ Refresh</button>
+                </summary>
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF audit_todos && audit_todos.size %]
+                    [% SET audit_rank = 0 %]
+                    [% FOREACH at IN audit_todos %]
+                    [% SET audit_rank = audit_rank + 1 %]
+                    <div id="ap-row-[% at.record_id %]" style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
+
+                        [%# Rank badge — col 1 %]
+                        <span style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                            <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
+                        </span>
+
+                        [%# Main content — col 2 %]
+                        <div style="display:table-cell;vertical-align:top;">
+                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
+                                [%# Priority badge %]
+                                [% IF at.priority %]
+                                <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
+                                    [% IF at.priority <= 2 %]background:var(--danger-color,#dc3545);color:#fff
+                                    [% ELSIF at.priority <= 4 %]background:#fd7e14;color:#fff
+                                    [% ELSIF at.priority <= 6 %]background:#ffc107;color:var(--text-color,#333)
+                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
+                                    P[% at.priority %]
+                                </span>
+                                [% END %]
+
+                                [%# Status badge %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
+                                    [% IF at.status == 2 %]background:#17a2b8;color:#fff
+                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
+                                    [% IF at.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
+                                </span>
+
+                                [%# Root / child label %]
+                                [% IF at.is_root %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
+                                [% END %]
+
+                                [%# Site label %]
+                                [% IF is_csc && at.sitename && at.sitename != 'CSC' %]
+                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% at.sitename %]</span>
+                                [% END %]
+                            </div>
+
+                            [%# Subject link %]
+                            <a href="/todo/details?record_id=[% at.record_id %]"
+                               style="font-weight:bold;color:var(--text-color);text-decoration:none;font-size:0.95em;">
+                                [% at.subject || '(No subject)' %]
+                            </a>
+
+                            [%# Meta line %]
+                            <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
+                                [% IF at.project_name %]<span>📁 [% at.project_name %]</span>
+                                [% ELSIF at.project_code && at.project_code != 'system' %]<span>📁 [% at.project_code %]</span>[% END %]
+                                [% IF at.due_date %]<span>📅 Due: [% at.due_date %]</span>[% END %]
+                                [% IF at.start_date %]<span>🗓 [% at.start_date %]</span>[% END %]
+                                [% IF at.sitename %]<span>[% at.sitename %]</span>[% END %]
+                            </div>
+                        </div>
+
+                        [%# Quick actions — col 3 %]
+                        <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
+                            <a href="/todo/details?record_id=[% at.record_id %]"
+                               style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
+                            <a href="/log/log_form?todo_record_id=[% at.record_id %]"
+                               style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
+                            [% IF is_admin %]
+                            <button onclick="quickClose([% at.record_id %])"
+                                style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
+                            [% END %]
+                        </span>
                     </div>
+                    [% END %]
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos. Click <strong>🌅 Start Day</strong> to scan the application error log.</p>
+                    [% END %]
+                </div>
+            </details>
+
+            [%# ── Open HelpDesk Tickets (always visible, collapsible) ── %]
+            <details id="helpdesk-panel" style="margin-bottom:12px;" open>
+                <summary style="cursor:pointer;padding:7px 10px;border-radius:4px;background:color-mix(in srgb,#9b0000 10%,var(--bg-color));border:1px solid #9b0000;list-style:none;display:flex;align-items:center;gap:8px;">
+                    <span style="font-weight:bold;color:#9b0000;">🎫 Open HelpDesk Tickets</span>
+                    [% IF helpdesk_tickets && helpdesk_tickets.size %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">[% helpdesk_tickets.size %] open</span>
+                    [% ELSE %]
+                    <span style="font-size:0.85em;color:var(--text-muted-color);">none open</span>
+                    [% END %]
+                    <button onclick="refreshPage(event)"
+                        style="margin-left:auto;font-size:0.75em;padding:2px 8px;border:1px solid #9b0000;border-radius:3px;background:transparent;color:#9b0000;cursor:pointer;" title="Re-check open HelpDesk tickets">↻ Refresh</button>
+                </summary>
+                <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #9b0000;border-top:none;border-radius:0 0 4px 4px;">
+                    [% IF helpdesk_tickets && helpdesk_tickets.size %]
+                    [% FOREACH ht IN helpdesk_tickets %]
+                    <div style="padding:5px 0;border-bottom:1px solid var(--border-color);font-size:0.88em;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                        <span style="font-family:monospace;color:var(--text-muted-color);flex-shrink:0;">[% ht.ticket_number %]</span>
+                        <span style="background:#9b0000;color:#fff;border-radius:3px;padding:1px 5px;font-size:0.78em;flex-shrink:0;">[% ht.priority | upper %]</span>
+                        <span style="flex:1;">[% ht.subject | html %]</span>
+                        <span style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">[% ht.username %] · [% ht.created_at %]</span>
+                        <a href="/HelpDesk/ticket/[% ht.ticket_number %]" style="font-size:0.82em;color:#9b0000;flex-shrink:0;">View →</a>
+                    </div>
+                    [% END %]
+                    <div style="margin-top:6px;text-align:right;">
+                        <a href="/HelpDesk" style="font-size:0.82em;color:#9b0000;">View all tickets →</a>
+                    </div>
+                    [% ELSE %]
+                    <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No open support tickets.</p>
+                    [% END %]
+                </div>
+            </details>
+
+            [%# ── CURRENT ACTIVE PRIORITIES ── %]
+            <div style="margin-bottom:24px;">
+                <div style="padding-bottom:8px;margin-bottom:10px;border-bottom:2px solid var(--primary-color);display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    <h3 style="margin:0;font-size:1.1em;">🎯 Current Active Priorities</h3>
+                    [% IF active_priorities && active_priorities.size %]
+                    <span style="font-size:0.78em;color:var(--text-muted-color);margin-left:4px;"><span id="ap-visible-count">[% active_priorities.size %]</span> of [% active_priorities.size %] todo[% IF active_priorities.size != 1 %]s[% END %]</span>
+                    [% END %]
+
+                </div>
+
+                [%# ── Filter Bar — compact single row with collapsible dropdowns ── %]
+                <div id="ap-filter-bar" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:6px;padding:5px 10px;margin-bottom:12px;">
+
+                    [%# Role multi-select — uses actual user profile roles %]
+                    [% IF ap_user_roles && ap_user_roles.size > 1 %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="role-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Role: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:140px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH ur IN ap_user_roles %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="role-cb" value="[% ur %]" checked onchange="applyAllFilters()">
+                                [% ur %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
+                    [%# Site multi-select (CSC only) — all sites from site table %]
+                    [% IF is_csc && ap_all_sitenames && ap_all_sitenames.size %]
+                    <details class="ap-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [% FOREACH sname IN ap_all_sitenames %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
+                                [% sname %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
+                    [%# Focus: project multi-select with parent/child grouping %]
+                    [% IF ap_projects && ap_projects.size %]
+                    <details class="ap-dropdown" id="ap-project-dropdown" style="position:relative;display:inline-block;">
+                        <summary id="project-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Focus: All ▾</summary>
+                        <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:220px;max-height:280px;overflow-y:auto;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            [%# Parent projects first %]
+                            [% FOREACH proj IN ap_projects %]
+                            [% NEXT IF proj.parent_id %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;font-weight:bold;">
+                                <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
+                                    data-is-parent="1"
+                                    onchange="onProjectParentChange(this)">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="font-weight:normal;color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                            </label>
+                            [%# Children of this parent %]
+                            [% FOREACH child IN ap_projects %]
+                            [% NEXT UNLESS child.parent_id == proj.project_id %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.8em;padding:2px 0 2px 16px;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="project-cb" value="[% child.project_id %]" checked
+                                    data-parent-id="[% proj.project_id %]"
+                                    onchange="applyAllFilters();updateProjectSummary()">
+                                ↳ [% child.project_name %][% IF is_csc && child.sitename && child.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% child.sitename %])</span>[% END %]
+                            </label>
+                            [% END %]
+                            [% END %]
+                            [%# Standalone projects (no parent among the list) %]
+                            [% FOREACH proj IN ap_projects %]
+                            [% NEXT UNLESS proj.parent_id %]
+                            [%# Check if parent is NOT in ap_projects (orphan sub-project) %]
+                            [% SET parent_in_list = 0 %]
+                            [% FOREACH pp IN ap_projects %][% IF pp.project_id == proj.parent_id %][% SET parent_in_list = 1 %][% END %][% END %]
+                            [% NEXT IF parent_in_list %]
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="project-cb" value="[% proj.project_id %]" checked
+                                    onchange="applyAllFilters();updateProjectSummary()">
+                                [% proj.project_name %][% IF is_csc && proj.sitename && proj.sitename != plan_sitename %] <span style="color:var(--text-muted-color);">([% proj.sitename %])</span>[% END %]
+                            </label>
+                            [% END %]
+                        </div>
+                    </details>
+                    [% END %]
+
+                    [%# Sort buttons %]
+                    <span style="font-size:0.75em;color:var(--text-muted-color);font-weight:bold;">Sort:</span>
+                    <button onclick="sortTodos('priority')" id="sort-priority"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--primary-color);background:var(--primary-color);color:#fff;cursor:pointer;">Priority</button>
+                    <button onclick="sortTodos('project')" id="sort-project"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Project</button>
+                    <button onclick="sortTodos('due')" id="sort-due"
+                        style="font-size:0.75em;padding:2px 8px;border-radius:3px;border:1px solid var(--border-color);background:transparent;color:var(--text-color);cursor:pointer;">Due</button>
+                    <a href="#planning" onclick="clearAllFilters();return false;"
+                        style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
                 </div>
 
                 [% IF active_priorities && active_priorities.size %]
+                <div id="priorities-list">
                 [% SET rank = 0 %]
                 [% FOREACH ap IN active_priorities %]
                 [% SET rank = rank + 1 %]
                 [%# Determine if this todo is blocked by an incomplete blocker %]
                 [% SET is_blocked = ap.blocked_by_todo_id && !ap.blocker_done %]
-                <div id="ap-row-[% ap.record_id %]" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;margin-bottom:6px;
-                    border-radius:6px;border:1px solid [% IF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];
-                    background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];
-                    opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+                <div id="ap-row-[% ap.record_id %]"
+                    data-priority="[% ap.priority || 99 %]"
+                    data-score="[% ap.ap_score || 9999 %]"
+                    data-project="[% ap.project_name | html %]"
+                    data-project-id="[% ap.project_id || '' %]"
+                    data-due="[% ap.due_date || '9999-12-31' %]"
+                    data-site="[% ap.sitename || '' %]"
+                    data-role-cats="[% ap.role_cats || 'general' %]"
+                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_overdue %]#dc3545[% ELSIF ap.due_today %]#ffc107[% ELSIF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.is_overdue %]color-mix(in srgb,#dc3545 6%,var(--bg-color))[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
-                    [%# Rank badge %]
-                    <span style="min-width:26px;height:26px;border-radius:50%;background:var(--primary-color);color:#fff;
-                        display:flex;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;flex-shrink:0;">
-                        [% rank %]
+                    [%# Rank badge — col 1 %]
+                    <span class="rank-badge" style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
+                        <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.73em;font-weight:bold;">[% rank %]</span>
                     </span>
 
-                    [%# Main content %]
-                    <div style="flex:1;min-width:0;">
+                    [%# Main content — col 2 %]
+                    <div style="display:table-cell;vertical-align:top;">
                         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                             [%# Priority badge %]
                             [% IF ap.priority %]
@@ -323,14 +551,21 @@
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
                             [% END %]
 
-                            [%# Cross-project blocker badge %]
-                            [% IF ap.is_cross_blocker %]
+                            [%# Cross-project blocker badge — only on explicitly blocking todos %]
+                            [% IF ap.is_cross_blocker && ap.is_blocking %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#6f42c1;color:#fff;" title="[% ap.blocking_names %] [% ap.blocking_count > 1 ? 'are' : 'is' %] waiting on this project — complete first">🔗 unblocks [% ap.blocking_count %]</span>
                             [% END %]
 
                             [%# Blocked badge %]
                             [% IF is_blocked %]
                             <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color: var(--text-color, #333);" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
+                            [% END %]
+
+                            [%# Overdue / due-today badge %]
+                            [% IF ap.is_overdue %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Overdue by [% 0 - ap.days_until_due %] day(s)">🔴 OVERDUE</span>
+                            [% ELSIF ap.due_today %]
+                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#ffc107;color:#333;" title="Due today">⚡ DUE TODAY</span>
                             [% END %]
 
                             [%# Site label (CSC all-sites view) %]
@@ -348,31 +583,36 @@
                         [%# Meta line: project, due date, blocked-by %]
                         <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
                             [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
-                            [% IF ap.due_date %]<span>📅 Due: [% ap.due_date %]</span>[% END %]
+                            [% IF ap.due_date %]<span[% IF ap.is_overdue %] style="color:#dc3545;font-weight:bold;"[% ELSIF ap.due_today %] style="color:#856404;font-weight:bold;"[% END %]>📅 Due: [% ap.due_date %]</span>[% END %]
                             [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
-                            [% IF ap.is_cross_blocker && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
+                            [% IF ap.is_cross_blocker && ap.is_blocking && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
                             [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
                         </div>
                     </div>
 
-                    [%# Quick actions %]
-                    <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;padding-top:2px;">
+                    [%# Quick actions — col 3 %]
+                    <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
                         <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="font-size:0.75em;color:var(--primary-color);text-decoration:none;">View →</a>
+                           style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
                         <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                           style="font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;text-align:center;" title="Add a time log for this todo">📋 Log</a>
+                           style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
                         [% IF is_admin %]
                         <button onclick="quickClose([% ap.record_id %])"
-                            style="font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
+                            style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
                         [% END %]
-                    </div>
+                    </span>
                 </div>
                 [% END %]
+                </div>[%# end #priorities-list %]
 
                 [% ELSE %]
                 <div style="text-align:center;padding:30px;color:var(--text-muted-color);background:var(--bg-secondary);border-radius:6px;">
-                    <p style="margin:0 0 10px;">No active todos found for your role and site.</p>
+                    <p style="margin:0 0 10px;">No active todos found[% IF filter_project || filter_site %] for the selected filter[% ELSE %] for your role and site[% END %].</p>
+                    [% IF filter_project || filter_site %]
+                    <a href="/planning/daily#planning" style="color:var(--primary-color);">✕ Clear filters</a>
+                    [% ELSE %]
                     <a href="/todo/addtodo" style="color:var(--primary-color);">+ Create your first todo</a>
+                    [% END %]
                 </div>
                 [% END %]
             </div>
@@ -429,6 +669,159 @@
                     if (d.ok) { alert('Triaged ' + d.count + ' stale todos. Reloading…'); location.reload(); }
                     else { alert('Error: ' + (d.error || 'unknown')); }
                 }).catch(function(e){ alert('Error: ' + e); });
+            }
+            function refreshAudit(evt) {
+                evt.stopPropagation();
+                var btn = document.getElementById('btn-refresh-audit');
+                if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+                fetch('/planning/refresh_audit', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+                    if (d.success) {
+                        var msg = d.todo_created ? d.todo_created + ' new error todo(s) created.' : 'No new errors found.';
+                        alert('Audit scan complete. ' + msg);
+                        location.reload();
+                    } else {
+                        alert('Refresh failed: ' + (d.error || 'unknown error'));
+                    }
+                }).catch(function(e){
+                    if (btn) { btn.disabled = false; btn.textContent = '↻ Refresh'; }
+                    alert('Error: ' + e);
+                });
+            }
+            function refreshPage(evt) {
+                evt.stopPropagation();
+                location.reload();
+            }
+            function applyAllFilters() {
+                var allRoleCbs    = document.querySelectorAll('.role-cb');
+                var checkedRoles  = new Set(Array.from(document.querySelectorAll('.role-cb:checked')).map(function(cb){ return cb.value; }));
+                var allRoleVals   = new Set(Array.from(allRoleCbs).map(function(cb){ return cb.value; }));
+                var allSiteCbs    = document.querySelectorAll('.site-cb');
+                var checkedSites  = new Set(Array.from(document.querySelectorAll('.site-cb:checked')).map(function(cb){ return cb.value; }));
+                var siteFiltered  = allSiteCbs.length > 0 && checkedSites.size < allSiteCbs.length;
+                var allProjCbs    = document.querySelectorAll('.project-cb');
+                var checkedProjs  = new Set(Array.from(document.querySelectorAll('.project-cb:checked')).map(function(cb){ return String(cb.value); }));
+                var projFiltered  = allProjCbs.length > 0 && checkedProjs.size < allProjCbs.length;
+
+                var cards = document.querySelectorAll('#priorities-list > div[id^="ap-row-"]');
+                var visible = 0;
+                cards.forEach(function(card) {
+                    var cardRoles = (card.dataset.roleCats || 'general').split(',');
+                    var showRole = cardRoles.some(function(cr) {
+                        if (cr === 'general') return true;
+                        if (!allRoleVals.has(cr)) return true;
+                        return checkedRoles.has(cr);
+                    });
+                    var showSite    = !siteFiltered || checkedSites.has(card.dataset.site || '');
+                    var showProject = !projFiltered  || checkedProjs.has(String(card.dataset.projectId || ''));
+                    var show = showRole && showSite && showProject;
+                    card.style.display = show ? '' : 'none';
+                    if (show) visible++;
+                });
+                var countEl = document.getElementById('ap-visible-count');
+                if (countEl) countEl.textContent = visible;
+                _updateDropdownSummaries();
+            }
+
+            function onProjectParentChange(cb) {
+                var parentId = cb.value;
+                var checked  = cb.checked;
+                document.querySelectorAll('.project-cb[data-parent-id="' + parentId + '"]').forEach(function(child) {
+                    child.checked = checked;
+                });
+                applyAllFilters();
+                updateProjectSummary();
+            }
+
+            function updateProjectSummary() {
+                var sumEl = document.getElementById('project-summary');
+                if (!sumEl) return;
+                var all     = document.querySelectorAll('.project-cb');
+                var checked = document.querySelectorAll('.project-cb:checked');
+                if (all.length === checked.length) {
+                    sumEl.textContent = 'Focus: All \u25be';
+                } else {
+                    var names = Array.from(document.querySelectorAll('.project-cb:checked')).map(function(cb) {
+                        return cb.closest('label').textContent.replace(/[\u2192\u21b3]/g,'').trim().replace(/\s*\(.*\)\s*$/,'').trim();
+                    });
+                    var label = names.length <= 2 ? names.join(', ') : names.length + ' projects';
+                    sumEl.textContent = 'Focus: ' + label + ' \u25be';
+                }
+            }
+
+            function _updateDropdownSummaries() {
+                var roleSummary = document.getElementById('role-summary');
+                if (roleSummary) {
+                    var all = document.querySelectorAll('.role-cb');
+                    var checked = document.querySelectorAll('.role-cb:checked');
+                    roleSummary.textContent = (all.length === checked.length)
+                        ? 'Role: All \u25be'
+                        : 'Role: ' + Array.from(checked).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
+                }
+                var siteSummary = document.getElementById('site-summary');
+                if (siteSummary) {
+                    var allS = document.querySelectorAll('.site-cb');
+                    var checkedS = document.querySelectorAll('.site-cb:checked');
+                    siteSummary.textContent = (allS.length === checkedS.length)
+                        ? 'Site: All \u25be'
+                        : 'Site: ' + Array.from(checkedS).map(function(cb){ return cb.value; }).join(', ') + ' \u25be';
+                }
+                updateProjectSummary();
+            }
+
+            function clearAllFilters() {
+                document.querySelectorAll('.role-cb,.site-cb,.project-cb').forEach(function(cb){ cb.checked = true; });
+                applyAllFilters();
+            }
+
+            function initFilters() {
+                applyAllFilters();
+                document.addEventListener('click', function(e) {
+                    if (!e.target.closest('.ap-dropdown')) {
+                        document.querySelectorAll('.ap-dropdown[open]').forEach(function(d){ d.removeAttribute('open'); });
+                    }
+                });
+            }
+
+            document.addEventListener('DOMContentLoaded', initFilters);
+            function sortTodos(by) {
+                var list = document.getElementById('priorities-list');
+                if (!list) return;
+                var cards = Array.from(list.querySelectorAll('[data-priority]'));
+                cards.sort(function(a, b) {
+                    if (by === 'priority') {
+                        var pa = parseInt(a.dataset.priority || 99);
+                        var pb = parseInt(b.dataset.priority || 99);
+                        if (pa !== pb) return pa - pb;
+                        return parseInt(a.dataset.score || 9999) - parseInt(b.dataset.score || 9999);
+                    } else if (by === 'project') {
+                        var na = (a.dataset.project || '').toLowerCase();
+                        var nb = (b.dataset.project || '').toLowerCase();
+                        return na < nb ? -1 : na > nb ? 1 : 0;
+                    } else if (by === 'due') {
+                        var da = a.dataset.due || '9999-12-31';
+                        var db = b.dataset.due || '9999-12-31';
+                        return da < db ? -1 : da > db ? 1 : 0;
+                    }
+                    return 0;
+                });
+                cards.forEach(function(card, i) {
+                    var badge = card.querySelector('.rank-badge');
+                    if (badge) badge.textContent = i + 1;
+                    list.appendChild(card);
+                });
+                ['priority', 'project', 'due'].forEach(function(s) {
+                    var btn = document.getElementById('sort-' + s);
+                    if (!btn) return;
+                    var active = (s === by);
+                    btn.style.background     = active ? 'var(--primary-color)' : 'transparent';
+                    btn.style.color          = active ? '#fff' : 'var(--text-color)';
+                    btn.style.borderColor    = active ? 'var(--primary-color)' : 'var(--border-color)';
+                });
             }
             </script>
 
@@ -1316,23 +1709,51 @@ function dailyLogAction(action) {
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
+        if (startBtn) startBtn.disabled = false;
+        if (endBtn)   endBtn.disabled   = false;
+        var msg = d.response || d.message || (d.success ? (action === 'start' ? 'Day started!' : 'Day closed!') : (d.error || 'Error'));
+        var plainMsg = msg.replace(/<[^>]+>/g, '');
         if (d.success) {
-            feedback.textContent = d.message || (action === 'start' ? 'Day started!' : 'Day closed!');
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#2a7a2a';
-            setTimeout(function() { window.location.reload(); }, 800);
+            window.location.reload();
         } else {
-            feedback.textContent = d.error || 'Error';
+            alert(plainMsg);
+            feedback.innerHTML = msg;
             feedback.style.color = '#9b0000';
-            if (startBtn) startBtn.disabled = false;
-            if (endBtn)   endBtn.disabled   = false;
         }
     })
     .catch(function(e) {
-        feedback.textContent = 'Request failed';
-        feedback.style.color = '#9b0000';
         if (startBtn) startBtn.disabled = false;
         if (endBtn)   endBtn.disabled   = false;
+        alert('Request failed: ' + e);
+        feedback.textContent = 'Request failed';
+        feedback.style.color = '#9b0000';
     });
+}
+
+function openDeployPopup(todoId) {
+    var url = '/admin/docker/deploy_form';
+    if (todoId) { url += '?todo_record_id=' + encodeURIComponent(todoId); }
+    var popup = window.open(
+        url,
+        'docker_deploy',
+        'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
+    );
+    if (popup) {
+        popup.focus();
+        window.addEventListener('message', function onMsg(e) {
+            if (e.data && e.data.type === 'deploy_done') {
+                window.removeEventListener('message', onMsg);
+                var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                alert(msg);
+                location.reload();
+            }
+        });
+    } else {
+        alert('⚠ Popup blocked — allow popups for this site and try again.');
+    }
 }
 
 function toggleLogPanel() {
@@ -1341,10 +1762,18 @@ function toggleLogPanel() {
     panel.style.display = (panel.style.display === 'none' || panel.style.display === '') ? 'block' : 'none';
 }
 
+if (window.location.hash === '#log-panel-open') {
+    window.addEventListener('load', function() {
+        var panel = document.getElementById('log-panel');
+        if (panel) { panel.style.display = 'block'; panel.scrollIntoView({ behavior: 'smooth' }); }
+        history.replaceState(null, '', window.location.pathname + window.location.search);
+    });
+}
+
 function saveLogEntry(entryId) {
     var title = (document.getElementById('log-title-edit') || {}).value || '';
     var desc  = (document.getElementById('log-desc-edit')  || {}).value || '';
-    var statusEl = document.getElementById('log-save-status');
+    var statusEl  = document.getElementById('log-save-status');
     if (statusEl) statusEl.textContent = 'Saving…';
 
     fetch('/planning/update_log_entry', {
@@ -1352,17 +1781,36 @@ function saveLogEntry(entryId) {
         credentials: 'include',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'entry_id=' + encodeURIComponent(entryId)
-            + '&title='    + encodeURIComponent(title)
+            + '&title='       + encodeURIComponent(title)
             + '&description=' + encodeURIComponent(desc)
     })
     .then(function(r) { return r.json(); })
     .then(function(d) {
-        if (statusEl) {
-            statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed'));
-            statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000';
-        }
+        if (statusEl) { statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed')); statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000'; }
     })
-    .catch(function(e) {
+    .catch(function() {
+        if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
+    });
+}
+
+function saveLogNotes(entryId) {
+    var notes    = (document.getElementById('morning-notes-inline') || {}).value || '';
+    var statusEl = document.getElementById('morning-notes-status');
+    if (statusEl) statusEl.textContent = 'Saving…';
+
+    fetch('/planning/update_log_entry', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'entry_id='    + encodeURIComponent(entryId)
+            + '&description=' + encodeURIComponent(notes)
+            + '&notes_only=1'
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (statusEl) { statusEl.textContent = d.success ? '✅ Saved' : ('❌ ' + (d.error || 'Save failed')); statusEl.style.color = d.success ? '#2a7a2a' : '#9b0000'; }
+    })
+    .catch(function() {
         if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }

@@ -83,6 +83,17 @@
             </tr>
           </table>
         </div>
+        [% IF user_membership.plan %]
+        [% SET p = user_membership.plan %]
+        <div style="margin-top:0.75rem;display:flex;flex-wrap:wrap;gap:0.5rem;">
+          [% IF p.has_beekeeping %]<span class="badge badge-success">&#128027; Beekeeping Access</span>[% END %]
+          [% IF p.has_planning %]<span class="badge badge-success">&#128203; Planning Tools</span>[% END %]
+          [% IF p.has_hosting %]<span class="badge badge-success">&#127760; Hosting</span>[% END %]
+          [% IF p.has_email %]<span class="badge badge-success">&#128231; Email</span>[% END %]
+          [% IF p.has_currency %]<span class="badge badge-success">&#128176; Coins</span>[% END %]
+          [% IF p.ai_requests_per_day > 0 %]<span class="badge badge-success">&#129302; AI ([% p.ai_requests_per_day %]/day)</span>[% END %]
+        </div>
+        [% END %]
       </div>
       [% END %]
 
@@ -150,12 +161,22 @@
           <p>Your site is registered and active with CSC hosting.
           Members can now purchase hosting plans.
           Monthly cost: <strong>CAD [% hosting_account.monthly_cost %]/mo</strong>.</p>
+          <div style="margin-top:0.6rem;">
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="font-size:0.85rem;">
+              &#9998; Edit Hosting Registration
+            </a>
+          </div>
         </div>
         [% ELSIF hosting_account AND hosting_account.status == 'pending' %]
         <div class="alert alert-warning">
           <strong>&#8987; CSC Hosting Registration Pending</strong>
           <p>Your registration was submitted and is awaiting CSC approval.
           You will receive an email at <strong>[% hosting_account.contact_email | html %]</strong> when approved.</p>
+          <div style="margin-top:0.6rem;">
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary" style="font-size:0.85rem;">
+              &#9998; Edit Hosting Registration
+            </a>
+          </div>
         </div>
         [% END %]
 
@@ -179,7 +200,7 @@
           Hosting plans will be available once CSC activates your account.</p>
           [% END %]
           <div class="form-actions">
-            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary">Update Hosting Settings</a>
+            <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-secondary">&#9998; Edit Hosting Registration</a>
           </div>
         [% END %]
 

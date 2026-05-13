@@ -1,7 +1,7 @@
 [% META title = 'Support Chat Admin' %]
 
 <style>
-#sa-layout { display:flex; gap:0; height:calc(100vh - 120px); }
+#sa-layout { display:flex; gap:0; height:calc(100vh - 120px); transition:height .2s; }
 #sa-sidebar { width:280px; min-width:200px; border-right:1px solid #ddd; overflow-y:auto; background:#f8f9fa; }
 #sa-main   { flex:1; display:flex; flex-direction:column; overflow:hidden; }
 #sa-conv-list { list-style:none; margin:0; padding:0; }
@@ -36,8 +36,14 @@
   </div>
   <div id="sa-main">
     <div id="sa-chat-header">
-      <span id="sa-chat-title">Select a conversation</span>
-      <span id="sa-chat-user" style="font-size:.8em;font-weight:normal;opacity:.85;"></span>
+      <div>
+        <span id="sa-chat-title">Select a conversation</span>
+        <span id="sa-chat-user" style="font-size:.8em;font-weight:normal;opacity:.85;margin-left:10px;"></span>
+      </div>
+      <button id="sa-resolve-btn" onclick="saResolve()" title="Mark this chat as resolved and close it"
+              style="display:none;background:#28a745;color:#fff;border:none;border-radius:5px;padding:5px 14px;font-size:.82em;cursor:pointer;white-space:nowrap;">
+        ✅ Close Chat
+      </button>
     </div>
     <div id="sa-messages"><div id="sa-msg-none">Select a support chat from the left panel</div></div>
     <div id="sa-reply-area">
@@ -56,6 +62,32 @@ var _activeConvId = null;
 var _lastMsgId = 0;
 var _pollTimer = null;
 var _convCache = {};
+var _knownConvIds = {};
+var _notifPermission = 'default';
+
+function _requestNotifPermission() {
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'granted') { _notifPermission = 'granted'; return; }
+    if (Notification.permission !== 'denied') {
+        Notification.requestPermission().then(function(p) { _notifPermission = p; });
+    }
+}
+
+function _fireNotification(title, body, convId) {
+    if (_notifPermission !== 'granted') return;
+    var n = new Notification(title, {
+        body: body,
+        icon: '/static/images/favicon.ico',
+        tag: 'support-chat-' + convId,
+        requireInteraction: true
+    });
+    n.onclick = function() {
+        window.focus();
+        n.close();
+    };
+}
+
+_requestNotifPermission();
 
 var QUICK = [
   "Thank you for reaching out. I'm looking into this now.",
@@ -103,10 +135,23 @@ function _loadConvList() {
       var li = document.createElement('li');
       li.dataset.id = conv.conversation_id;
       var awaiting = conv.last_role === 'user';
-      if (awaiting) pending++;
+      if (awaiting) {
+        pending++;
+        if (!_knownConvIds[conv.conversation_id]) {
+          _fireNotification(
+            '💬 New Support Chat Request',
+            (conv.title || 'Chat #' + conv.conversation_id) + '\n' + conv.last_message.slice(0, 80),
+            conv.conversation_id
+          );
+        }
+      }
+      _knownConvIds[conv.conversation_id] = true;
       li.className = awaiting ? 'awaiting' : 'responded';
       if (_activeConvId && conv.conversation_id == _activeConvId) li.className += ' active';
-      li.innerHTML = '<div class="conv-title">' + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
+      var onlineDot = conv.user_online
+        ? '<span title="User is connected" style="display:inline-block;width:8px;height:8px;background:#28a745;border-radius:50%;margin-right:5px;"></span>'
+        : '<span title="User may have disconnected" style="display:inline-block;width:8px;height:8px;background:#aaa;border-radius:50%;margin-right:5px;"></span>';
+      li.innerHTML = '<div class="conv-title">' + onlineDot + _esc(conv.title || 'Chat #' + conv.conversation_id) + '</div>'
         + '<div class="conv-meta">'
         + (awaiting ? '<strong style="color:#c00">⏳ Awaiting reply</strong>' : '✅ Replied')
         + ' · ' + conv.message_count + ' msg(s)'
@@ -129,6 +174,8 @@ function _openConv(convId) {
   var conv = _convCache[convId];
   document.getElementById('sa-chat-title').textContent = conv ? (conv.title || 'Chat #' + convId) : 'Chat #' + convId;
   document.getElementById('sa-chat-user').textContent = conv ? 'User #' + conv.user_id : '';
+  var resolveBtn = document.getElementById('sa-resolve-btn');
+  if (resolveBtn) resolveBtn.style.display = '';
   var msgsEl = document.getElementById('sa-messages');
   msgsEl.innerHTML = '';
   if (conv && conv.messages) {
@@ -194,11 +241,65 @@ window.saQuick = function() {
   }
 };
 
+window.saResolve = function() {
+  if (!_activeConvId) { alert('Select a conversation first.'); return; }
+  if (!confirm('Mark this conversation as resolved and close it?')) return;
+  fetch('/chat/resolve', {
+    method: 'POST',
+    credentials: 'include',
+    body: new URLSearchParams({ conversation_id: _activeConvId })
+  })
+  .then(function(r) { return r.json(); })
+  .then(function(d) {
+    if (d.success) {
+      if (_pollTimer) { clearInterval(_pollTimer); _pollTimer = null; }
+      var li = document.querySelector('#sa-conv-list li[data-id="' + _activeConvId + '"]');
+      if (li) li.parentNode.removeChild(li);
+      delete _convCache[_activeConvId];
+      delete _knownConvIds[_activeConvId];
+      _activeConvId = null;
+      _lastMsgId = 0;
+      document.getElementById('sa-messages').innerHTML = '<div id="sa-msg-none" style="color:#888;font-size:.9em;align-self:center;margin-top:40px;">Conversation resolved.</div>';
+      document.getElementById('sa-chat-title').textContent = 'Select a conversation';
+      document.getElementById('sa-chat-user').textContent = '';
+      var resolveBtn = document.getElementById('sa-resolve-btn');
+      if (resolveBtn) resolveBtn.style.display = 'none';
+      _loadConvList();
+    } else {
+      alert('Could not resolve: ' + (d.error || 'unknown error'));
+    }
+  })
+  .catch(function() { alert('Network error.'); });
+};
+
 document.getElementById('sa-reply-text').addEventListener('keydown', function(e) {
   if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); saSend(); }
 });
 
 _loadConvList();
 setInterval(_loadConvList, 15000);
+
+window._fitLayout = function() {
+  var el = document.getElementById('sa-layout');
+  if (!el) return;
+  var top = el.getBoundingClientRect().top + window.pageYOffset;
+  el.style.height = (window.innerHeight - top - 10) + 'px';
+};
+document.addEventListener('DOMContentLoaded', function() {
+  setTimeout(window._fitLayout, 50);
+});
+window.addEventListener('resize', window._fitLayout);
+
+(function() {
+  var params = new URLSearchParams(window.location.search);
+  var convParam = params.get('conv');
+  if (convParam) {
+    var _waitAndOpen = setInterval(function() {
+      var li = document.querySelector('#sa-conv-list li[data-id="' + convParam + '"]');
+      if (li) { clearInterval(_waitAndOpen); li.click(); }
+    }, 500);
+    setTimeout(function() { clearInterval(_waitAndOpen); }, 5000);
+  }
+})();
 })();
 </script>

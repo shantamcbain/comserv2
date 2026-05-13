@@ -201,7 +201,8 @@ last_updated = '2026/02/08'
                     <div class="jump-line">
                         <strong><a href="#group-bmaster" class="jump-link">🐝 BMaster Beekeeping</a></strong>:
                         <a href="#anchor-bmaster-ui" class="jump-link">UI✅</a> |
-                        <a href="#anchor-bmaster-apiary" class="jump-link">Apiary⏳</a> |
+                        <a href="#anchor-bmaster-queen-log" class="jump-link">QueenLog✅</a> |
+                        <a href="#anchor-bmaster-apiary" class="jump-link">Apiary📌</a> |
                         <a href="#anchor-bmaster-beepasture" class="jump-link">BeePasture📌</a> |
                         <a href="#anchor-bmaster-health" class="jump-link">Health📌</a> |
                         <a href="#anchor-bmaster-queens" class="jump-link">Queens📌</a> |
@@ -1826,70 +1827,111 @@ last_updated = '2026/02/08'
                 </div>
             </details>
 
-            <!-- Sub-project 2: Schema, Inventory Integration, Hive Inspection -->
-            <div id="anchor-bmaster-apiary" class="nav-anchor"></div>
-            <details id="bmaster-apiary" class="priority-container" open>
-                <summary class="priority-summary">⏳ Apiary — Hive Inspection System and Schema Updates (NEXT)</summary>
+            <!-- Sub-project 2: Apiary Management System — DB Project 91 -->
+            <div id="anchor-bmaster-apiary-mgmt" class="nav-anchor"></div>
+            <details id="bmaster-apiary-mgmt" class="priority-container" open>
+                <summary class="priority-summary">⏳ Apiary Management System — DB Project 91 (IN PROGRESS)</summary>
                 <div class="priority-content">
+                    <p><strong>DB Project:</strong> <a href="/project/details?project_id=91">Apriary Management System (ID 91)</a> — sub-project of BMaster (ID 20)</p>
+                    <p><strong>Note:</strong> All schema changes go through <strong>Result class files → /admin/schema_comparison</strong>. NOT direct SQL apply.</p>
+
+                    [% TRY %]
+                        [% SET schema = c.model('DBEncy').schema %]
+                        [% SET apiary_project = schema.resultset('Project').find(91) %]
+                        [% IF apiary_project %]
+                            [% SET apiary_subs = schema.resultset('Project').search({ parent_id => 91 }, { order_by => 'sort_order' }) %]
+                            [% IF apiary_subs.count > 0 %]
+                                [% FOREACH subproj IN apiary_subs.all %]
+                                <div style="margin:10px 0;padding:10px;border:1px solid #ccc;background:#f9f9f9;border-radius:4px;">
+                                    <strong>[% subproj.name %]</strong> — <span style="color:#666;">[% subproj.status %]</span>
+                                    <a href="/project/details?project_id=[% subproj.id %]" style="margin-left:10px;font-size:0.9em;">View todos</a>
+                                    [% SET sub_todos = schema.resultset('Todo').search({ project_id => subproj.id }, { order_by => 'sort_order' }) %]
+                                    [% IF sub_todos.count > 0 %]
+                                        <ul style="margin:5px 0;padding-left:20px;">
+                                        [% FOREACH t IN sub_todos.all %]
+                                            <li style="margin:3px 0;font-size:0.9em;">
+                                                [% IF t.status == 'Completed' %]✅[% ELSIF t.status == 'In-Process' OR t.status == '2' %]⏳[% ELSE %]📌[% END %]
+                                                [% t.subject %]
+                                                <small style="color:#888;"> — [% t.status %] | Due: [% t.due_date %]</small>
+                                            </li>
+                                        [% END %]
+                                        </ul>
+                                    [% END %]
+                                </div>
+                                [% END %]
+                            [% END %]
+                        [% END %]
+                    [% CATCH %]
+                        <p style="color:#c00;">Error loading apiary sub-projects: [% error.info %]</p>
+                    [% END %]
+                </div>
+            </details>
+
+            <!-- Sub-project 2a: Queen Log Data Model — DB Project 219 -->
+            <div id="anchor-bmaster-queen-log" class="nav-anchor"></div>
+            <details id="bmaster-queen-log" class="priority-container" open>
+                <summary class="priority-summary">✅ Queen Log Data Model — DB Project 219 (COMPLETE)</summary>
+                <div class="priority-content">
+                    <div style="background:#d4edda;border:1px solid #28a745;padding:10px;border-radius:4px;margin:8px 0;">
+                        <strong>✅ COMPLETE:</strong> All Result classes implemented. Queen Log blocker resolved — Hive Inspection System (Project 220) may now proceed.
+                    </div>
+
+                    <p><strong>DB Project:</strong> <a href="/project/details?project_id=219">Queen Log Data Model (ID 219)</a> — sub-project of Apiary Management System (ID 91)</p>
+                    <p><strong>Zenflow plan step:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code> § "Queen Log Data Model — Schema and Migration" — <strong>DONE</strong></p>
+
+                    <h4>Schema Strategy</h4>
+                    <ul>
+                        <li>✅ <strong>Keep <code>queens</code> as the canonical table name.</strong> The existing <code>Queen.pm</code> (mapping <code>queens</code>) is extended — no new table name.</li>
+                        <li>✅ <strong><code>queens_enhanced</code> stays as-is</strong> (reference/staging) until migration from Forager is complete, then reviewed for deprecation. No data in either table yet — both empty.</li>
+                        <li>✅ <strong>Legacy Forager data</strong> in <code>apis_queens_tb</code> and <code>apis_queen_log_tb</code> migration scripts ready in <code>sql/migrations/009</code> and <code>010</code>.</li>
+                    </ul>
+
+                    <h4>Implementation Todos (Project 219)</h4>
+                    <ul>
+                        <li>⏳ <strong>Todo 162:</strong> Develop data model for queen log — ORIGINAL (In-Process)</li>
+                        <li>✅ <strong>Todo 793:</strong> Extended <code>queens</code> table — genetic_line, color_marking, parent_queen_id (self-ref), mating_status ENUM, laying_status ENUM, temperament_rating ENUM, location FKs, purpose ENUM, cost/date fields. <code>Queen.pm</code> updated with full lifecycle management + custom methods.</li>
+                        <li>✅ <strong>Todo 794:</strong> Created <code>queen_events</code> table + <code>QueenEvent.pm</code> — 13 event types: grafted, emerged, mated, introduced, superseded, replaced, dead, sold, treated, moved, marked, clipped, inspected.</li>
+                        <li>✅ <strong>Todo 795:</strong> Created <code>queen_hive_assignments</code> table + <code>QueenHiveAssignment.pm</code>. Added <code>current_queen</code> + <code>queen_history</code> helpers to <code>Hive.pm</code>.</li>
+                        <li>✅ <strong>Todo 796:</strong> Added <code>queen_id</code> FK to <code>inspections</code> table + <code>belongs_to 'queen'</code> relationship. Fixed <code>ApiaryModel::get_queens_for_hive()</code> — now queries via <code>QueenHiveAssignment</code> with prefetch.</li>
+                        <li>✅ <strong>Todo 797:</strong> Migration script: <code>sql/migrations/010_queen_log_forager_migration.sql</code> § ApisQueensTb → queens (field mapping, parent self-ref resolution, yard/hive FK resolution, queen_hive_assignments creation)</li>
+                        <li>✅ <strong>Todo 798:</strong> Migration script: <code>sql/migrations/010_queen_log_forager_migration.sql</code> § ApisQueenLogTb → inspections + queen_events (box data, status mapping, brood events, lifecycle events)</li>
+                        <li>✅ <strong>Todo 799:</strong> PODs updated in Queen.pm, QueenEvent.pm, QueenHiveAssignment.pm, Hive.pm, Inspection.pm. Planning.tt updated. ApplicationTtTemplate.tt queen patterns added.</li>
+                    </ul>
+
+                    <h4>Forager Legacy Tables (migration source)</h4>
+                    <ul>
+                        <li><code>apis_queens_tb</code> — queen registry: queen_code, queen_colour, queen_name, pallet_code, yard_code, parent, status, date, client_name</li>
+                        <li><code>apis_queen_log_tb</code> — inspection log: denormalized box counts (box_1/2/x bees, brood, honey, comb, empty, foundation), honey_added/removed, brood_given, start/end_time, pallet_code, queen_code</li>
+                    </ul>
+
+                    <p><strong>Billing:</strong> CSC develops, BMaster billed. Time tracked via todo log entries on todos 162, 793–799.</p>
+                </div>
+            </details>
+
+            <!-- Sub-project 2b: Hive Inspection System — DB Project 220 -->
+            <div id="anchor-bmaster-apiary" class="nav-anchor"></div>
+            <details id="bmaster-apiary" class="priority-container">
+                <summary class="priority-summary">📌 Hive Inspection System — DB Project 220 (READY — Queen Log complete)</summary>
+                <div class="priority-content">
+                    <div style="background:#d4edda;border:1px solid #28a745;padding:10px;border-radius:4px;margin:8px 0;">
+                        <strong>✅ UNBLOCKED:</strong> Queen Log Data Model (Project 219) todos 793–796 are complete. Hive Inspection schema work may now begin.
+                    </div>
+
+                    <p><strong>DB Project:</strong> <a href="/project/details?project_id=220">Hive Inspection System (ID 220)</a> — sub-project of Apiary Management System (ID 91)</p>
                     <p><strong>Full gap analysis:</strong> <code>.zenflow/tasks/bmaster-f0fd/spec.md</code> § "Hive Inspection Feature"</p>
 
-                    <h4>Schema Changes Required</h4>
+                    <h4>Implementation Todos (Project 220)</h4>
                     <ul>
-                        <li>📌 All schema changes go through <strong>Result files → SchemaComparison</strong> (NOT apiary_schema.sql direct apply)</li>
-                        <li>📌 <code>apiary_schema.sql</code> is a design reference — use <a href="/admin/schema_comparison">/admin/schema_comparison</a> to apply deltas</li>
-                        <li>⏳ <code>Inspection.pm</code> — add <code>queen_check</code> to inspection_type enum; add feeding fields (<code>feeding_done</code>, <code>feed_type</code>, <code>feed_amount</code>); add <code>boosted_from_hive</code> FK</li>
-                        <li>⏳ <code>HiveFrame.pm</code> — add <code>frame_size</code> ENUM (deep/dadant/medium/shallow), <code>frame_code</code> VARCHAR, <code>frame_type</code> enum (add: drone, comb)</li>
-                        <li>⏳ <code>Hive.pm</code> — add <code>configuration_id</code> FK → hive_configurations</li>
-                        <li>⏳ New <code>FrameMovement.pm</code> — tracks frame repositioning within/between hives and sales</li>
-                        <li>⏳ New <code>InspectionFeeding.pm</code> — multiple feeding events per inspection</li>
-                        <li>⏳ <code>InspectionDetail.pm</code> — add <code>treatment_id</code> FK → treatments alongside existing varchar</li>
-                        <li>⏳ Fix table name mismatch: HiveFrame.pm maps to <code>hive_frames</code>, SQL schema says <code>frames</code> — standardize to <code>hive_frames</code></li>
+                        <li>📌 <strong>Todo 800:</strong> Schema — Extend <code>Inspection</code>, <code>HiveFrame</code>; create <code>FrameMovement.pm</code>, <code>InspectionFeeding.pm</code>. All via Result class + schema_comparison.</li>
+                        <li>📌 <strong>Todo 801:</strong> Schema — Create missing Result classes: <code>ConfigurationBox.pm</code>, <code>ConfigurationInventory.pm</code>, <code>HiveConfigurationHistory.pm</code>, <code>HiveAssembly.pm</code>, <code>HiveMovement.pm</code></li>
+                        <li>📌 <strong>Todo 802:</strong> Controller — All inspection CRUD actions in <code>Apiary.pm</code> (list, new, create, view, edit, update, reports, calendar, AJAX endpoints)</li>
+                        <li>📌 <strong>Todo 803:</strong> Templates — Inspection form, visual hive diagram (<code>_hive_diagram.tt</code>), reports, calendar. Frame colors: brood=orange | honey=yellow | pollen=green | empty=white | foundation=grey | drone=blue | comb=tan</li>
+                        <li>📌 <strong>Todo 804:</strong> Inventory integration — link frames/boxes/equipment to inventory_items. Individual frame identity vs type/quantity decision required.</li>
+                        <li>📌 <strong>Todo 805:</strong> Documentation — all Result class POD, Planning.tt, ApplicationTtTemplate.tt, Documentation/BMaster.tt route listing</li>
                     </ul>
 
-                    <h4>Missing Result Classes (referenced by HiveConfiguration.pm)</h4>
-                    <ul>
-                        <li>⏳ <code>ConfigurationBox.pm</code> — box definitions per configuration template</li>
-                        <li>⏳ <code>ConfigurationInventory.pm</code> — bridge between configuration and InventoryItem</li>
-                        <li>⏳ <code>HiveConfigurationHistory.pm</code> — configuration change history</li>
-                        <li>⏳ <code>HiveAssembly.pm</code> — assembled hive instance from a template</li>
-                        <li>⏳ <code>HiveMovement.pm</code> — box/hive movement (SQL table <code>hive_movements</code> exists, no Result class)</li>
-                    </ul>
-
-                    <h4>Inventory Integration</h4>
-                    <div style="background:#fff3cd;border:1px solid #ffc107;padding:10px;border-radius:4px;margin:8px 0;">
-                        <strong>⚠️ Current state:</strong> Physical apiary items (frames, boxes, queen excluders) are <strong>NOT</strong> linked to the inventory system. Each is tracked as an operational entity with its own table only.
-                    </div>
-                    <ul>
-                        <li>⏳ <strong>Design needed:</strong> Should frames/boxes have an <code>inventory_item_id</code> FK so each physical item maps to an SKU in <code>inventory_items</code>? This enables cost tracking, reorder alerts, and supplier lookup.</li>
-                        <li>⏳ <code>ConfigurationInventory.pm</code> is the planned bridge — links a hive configuration template to required inventory items (e.g. "Langstroth Deep Box × 2, Wire Foundation × 20, Queen Excluder × 1")</li>
-                        <li>⏳ For individual frames as inventory: each <code>hive_frames</code> row could have <code>inventory_item_id</code> pointing to the frame SKU/type in inventory_items</li>
-                        <li>⏳ <code>InventoryAssignment.assigned_to_type</code> could be extended to include <code>'hive'</code> and <code>'yard'</code> as assignment targets</li>
-                        <li>📌 <strong>Decision required:</strong> Do we track individual frame identity (each physical frame has a unique ID / barcode) or just frame type/quantity per box? Answer determines whether <code>frame_code</code> on HiveFrame is sufficient or if a full inventory item per frame is needed.</li>
-                    </ul>
-
-                    <h4>Controller Actions Needed (Apiary.pm)</h4>
-                    <ul>
-                        <li>⏳ <code>/Apiary/inspections</code> GET — list</li>
-                        <li>⏳ <code>/Apiary/inspections/new</code> GET — form</li>
-                        <li>⏳ <code>/Apiary/inspections/create</code> POST — save + frame details</li>
-                        <li>⏳ <code>/Apiary/inspections/:id</code> GET — view with visual hive diagram</li>
-                        <li>⏳ <code>/Apiary/inspections/:id/edit</code> + update POST</li>
-                        <li>⏳ <code>/Apiary/inspections/reports</code> — seasonal summary</li>
-                        <li>⏳ <code>/Apiary/inspections/calendar</code> — schedule view</li>
-                        <li>⏳ <code>/Apiary/api/queen_search</code> — AJAX for inspection form</li>
-                        <li>⏳ <code>/Apiary/api/hive_frame_layout/:id</code> — JSON for visual diagram</li>
-                    </ul>
-
-                    <h4>Template Changes</h4>
-                    <ul>
-                        <li>⏳ Fix <code>Apiary/new_inspection.tt</code> — remove &lt;head&gt; tag, add META title</li>
-                        <li>⏳ New: <code>Apiary/inspection_view.tt</code> — with visual hive diagram</li>
-                        <li>⏳ New: <code>Apiary/_hive_diagram.tt</code> — color-coded frame layout component</li>
-                        <li>⏳ New: <code>Apiary/inspection_reports.tt</code>, <code>Apiary/inspection_calendar.tt</code></li>
-                    </ul>
-
-                    <p><strong>Frame color scheme:</strong> brood=orange | honey=yellow | pollen=green | empty=white | foundation=grey | drone=blue | comb=tan</p>
-                    <p><strong>Full spec:</strong> <code>.zenflow/tasks/bmaster-f0fd/spec.md</code> | <strong>Plan steps:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code></p>
+                    <p><strong>Billing:</strong> CSC develops, BMaster billed. Time tracked via todo log entries on todos 800–805.</p>
+                    <p><strong>Plan steps:</strong> <code>.zenflow/tasks/bmaster-f0fd/plan.md</code> § "Hive Inspection — Schema Updates / Controller Actions / Templates"</p>
                 </div>
             </details>
 

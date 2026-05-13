@@ -41,10 +41,7 @@
         [% END %]
 
         <!-- Active HostingAccounts from DB -->
-        [% SET ha_list = [] %]
-        [% TRY %]
-        [% SET ha_list = c.model('DBEncy').resultset('HostingAccount').search({ status => 'active' }, { order_by => 'sitename' }).all %]
-        [% CATCH %][% END %]
+        [% SET ha_list = c.stash.nav_hosting_accounts || [] %]
         [% IF ha_list.size %]
         <div class="dropdown-divider"></div>
         <div class="submenu-item">

@@ -1,0 +1,115 @@
+[%
+   title = "Subscribe to Mailing Lists"
+   description = "Subscribe to newsletters and updates from " _ SiteName
+   roles = ""
+   TemplateType = "Application"
+   category = "Mail"
+   page_version = "1.0"
+   last_updated = "2026-05-08"
+%]
+[% PageVersion = 'mail/Subscribe.tt,v 1.0 2026/05/08 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>Subscribe to Mailing Lists</h1>
+        <h2 class="page-subtitle">Stay informed — choose the lists that interest you</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+
+            [% IF public_lists.size > 0 %]
+
+                <form method="POST" action="[% c.uri_for('/mail/newsletter_signup') %]" class="app-form">
+
+                    <div class="form-section">
+                        <h3 style="margin-bottom:var(--spacing-medium);">Your Details</h3>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="email">Email Address <span style="color:var(--danger-color,red)">*</span></label>
+                                <input type="email" id="email" name="email"
+                                       value="[% prefill.email | html %]"
+                                       class="form-input" required
+                                       [% IF c.session.user_id %]readonly[% END %]>
+                                [% IF c.session.user_id %]
+                                    <small style="color:var(--text-muted-color);">Using your account email.</small>
+                                [% END %]
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label for="first_name">First Name</label>
+                                <input type="text" id="first_name" name="first_name"
+                                       value="[% prefill.first_name | html %]"
+                                       class="form-input">
+                            </div>
+                            <div class="form-field">
+                                <label for="last_name">Last Name</label>
+                                <input type="text" id="last_name" name="last_name"
+                                       value="[% prefill.last_name | html %]"
+                                       class="form-input">
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3 style="margin-bottom:var(--spacing-medium);">Available Lists</h3>
+                        <p style="color:var(--text-muted-color);margin-bottom:var(--spacing-medium);">
+                            Tick the lists you would like to subscribe to. You can unsubscribe at any time.
+                        </p>
+
+                        [% FOREACH list IN public_lists %]
+                        <div style="border:1px solid var(--border-color);border-radius:6px;padding:var(--spacing-medium);margin-bottom:var(--spacing-small);display:flex;align-items:flex-start;gap:var(--spacing-medium);">
+                            <input type="checkbox" name="list_ids[]" value="[% list.id %]"
+                                   id="list_[% list.id %]"
+                                   [% IF subscribed_ids.${list.id} %]checked[% END %]
+                                   style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
+                            <label for="list_[% list.id %]" style="cursor:pointer;">
+                                <strong>[% list.name | html %]</strong>
+                                [% IF list.description %]
+                                    <br><span style="color:var(--text-muted-color);font-size:var(--font-size-small);">[% list.description | html %]</span>
+                                [% END %]
+                            </label>
+                        </div>
+                        [% END %]
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Subscribe</button>
+                        [% IF c.session.user_id %]
+                            <a href="[% c.uri_for('/mail/my_subscriptions') %]" class="btn btn-secondary">Manage My Subscriptions</a>
+                        [% END %]
+                    </div>
+
+                    <p style="font-size:var(--font-size-small);color:var(--text-muted-color);margin-top:var(--spacing-medium);">
+                        You can unsubscribe at any time by clicking the unsubscribe link in any email,
+                        or by visiting <a href="[% c.uri_for('/mail/my_subscriptions') %]">My Subscriptions</a>
+                        if you have an account.
+                    </p>
+
+                </form>
+
+            [% ELSE %]
+                <div class="info-box" style="padding:var(--spacing-large);text-align:center;color:var(--text-muted-color);">
+                    <p>There are no public mailing lists available for this site at this time.</p>
+                    [% IF c.session.username %]
+                        <p><a href="[% c.uri_for('/mail/lists') %]">Manage mailing lists</a></p>
+                    [% END %]
+                </div>
+            [% END %]
+
+        </div>
+    </div>
+
+</div>

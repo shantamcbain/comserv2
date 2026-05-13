@@ -6,6 +6,7 @@
 [% END %]
 [% SET roles = c.stash.user_roles || c.session.roles || [] %]
 [% SET is_admin = c.stash.is_admin || roles.grep('admin').size > 0 ? 1 : 0 %]
+[% SET is_helpdesk_staff = is_admin || roles.grep('helpdesk').size > 0 ? 1 : 0 %]
 
 <!-- Add Font Awesome for the paint brush icon -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
@@ -192,16 +193,18 @@ header h1 {
      to admins and users in debug mode. Removing this breaks diagnostic visibility
      and admin page rendering capability. See Root.pm auto() method and SystemInfo.pm. -->
 [% IF is_admin || c.session.debug_mode == 1 %]
-<div class="server-info">
+<div class="server-info" id="server-info-bar">
     [% IF is_admin || c.session.debug_mode == 1 %]
-    <div style="text-align: right;">
+    <div style="text-align: right; display:flex; align-items:center; justify-content:flex-end; gap:8px; flex-wrap:wrap;">
+        <span id="server-info-content">
         Domain: <strong>[% c.req.uri.host %]</strong> | 
         Client IP: <strong>[% c.req.address %]</strong> | 
         Server: <strong>[% system_identifier || app_workflow %]</strong> | Workflow: [% app_workflow %] ([% c.forward('/get_server_ip') %]) |
         [% IF app_version %]Build: <strong title="Commit: [% app_version.commit %] | Branch: [% app_version.branch %] | Host: [% app_version.build_host %]" style="cursor:help;">[% app_version.build_date | replace('T',' ') | replace(':\d\dZ','') %] UTC</strong> | Git: <strong>[% app_version.branch %]</strong>@<code style="font-size:0.85em;">[% app_version.commit %]</code> | [% END %]
         Databases: [% IF db_connections && db_connections.size > 0 %][% FOREACH db IN db_connections %]<strong>[% db.type %]([% db.name %])@[% db.ip %]</strong>[% UNLESS loop.last %], [% END %][% END %][% ELSE %]<em>none configured</em>[% END %] |
         DB Env: <span class="db-env-indicator db-env-[% active_db_environment || 'production' %]">[% SET env = active_db_environment || 'production' %][% env.upper %]</span>
-        [% IF c.session.debug_mode == 1 %] | [% END %] |
+        [% IF c.session.debug_mode == 1 %] | [% END %]
+        </span>
         [% IF is_admin %]
         <button id="css-edit-toggle"
                 data-theme-name="[% theme_name || 'default' %]"
@@ -209,9 +212,31 @@ header h1 {
             <i class="fas fa-paint-brush"></i> Theme Editor
         </button>
         [% END %]
+        <button id="server-info-toggle" title="Show/hide server info"
+                style="padding:1px 7px;font-size:.75em;background:rgba(255,255,255,.15);color:inherit;border:1px solid rgba(255,255,255,.3);border-radius:3px;cursor:pointer;">▲ Hide</button>
     </div>
     [% END %]
 </div>
+<script>
+(function(){
+    var btn = document.getElementById('server-info-toggle');
+    var content = document.getElementById('server-info-content');
+    var bar = document.getElementById('server-info-bar');
+    if (!btn || !content || !bar) return;
+    var hidden = localStorage.getItem('serverInfoHidden') === '1';
+    function applyState() {
+        content.style.display = hidden ? 'none' : '';
+        btn.textContent = hidden ? '▼ Info' : '▲ Hide';
+        if (window._fitLayout) window._fitLayout();
+    }
+    applyState();
+    btn.addEventListener('click', function() {
+        hidden = !hidden;
+        localStorage.setItem('serverInfoHidden', hidden ? '1' : '0');
+        applyState();
+    });
+})();
+</script>
 [% END %]
 
 <!-- K8s Migration Warning Banner (Phase 0 - Production Readiness) -->
@@ -321,7 +346,7 @@ document.addEventListener('DOMContentLoaded', function() {
 [% SET _mem_rs = c.model('DBEncy').resultset('UserMembership') %]
 [% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
 [% IF NOT _active_mem %][% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
-[% SET _coin_acct = c.model('DBEncy').resultset('InternalCurrencyAccount').find({user_id => _uid}) %]
+[% SET _coin_acct = c.model('DBEncy').resultset('Accounting::InternalCurrencyAccount').find({user_id => _uid}) %]
 <div class="membership-status-bar">
     [% IF _active_mem AND _active_mem.plan %]
         <a href="/membership/account" class="membership-tier-badge membership-tier-[% _active_mem.plan.slug | html %]" title="Your membership plan">[% _active_mem.plan.name | html %]</a>
@@ -331,8 +356,23 @@ document.addEventListener('DOMContentLoaded', function() {
     [% IF _coin_acct AND _coin_acct.balance > 0 %]
         <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
     [% END %]
+    <a href="/mail/my_subscriptions" title="Manage your email subscriptions"
+       style="font-size:0.9em;font-weight:bold;background:#e65c00;color:#fff;text-decoration:none;padding:4px 14px;border-radius:12px;margin-left:10px;white-space:nowrap;border:2px solid #c75000;box-shadow:0 1px 3px rgba(0,0,0,0.25);">
+        &#9993; My Subscriptions
+    </a>
 </div>
 [% CATCH %][% END %]
+[% END %]
+
+[% IF !c.session.user_id %]
+<div style="background:#e65c00;color:#fff;padding:5px 18px;font-size:0.92em;text-align:right;font-weight:bold;">
+    <a href="/mail/subscribe"
+       style="color:#fff;text-decoration:none;">
+        &#9993; Join Our Mailing List
+    </a>
+    &nbsp;&middot;&nbsp;
+    <a href="/user/login" style="color:rgba(255,255,255,0.85);text-decoration:none;font-weight:normal;">Sign In</a>
+</div>
 [% END %]
 
 
@@ -363,6 +403,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% INCLUDE 'Navigation/TopDropListPlanning.tt' %]
         [% INCLUDE 'Navigation/TopDropListHelpDesk.tt' %]
         [% INCLUDE 'Navigation/TopDropListWorkshop.tt' %]
+        [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
         [% IF c.stash.enabled_modules.item('printing_3d') %]
             [% INCLUDE 'Navigation/TopDropList3d.tt' %]
         [% END %]
@@ -378,6 +419,46 @@ document.addEventListener('DOMContentLoaded', function() {
 [% IF success_msg %]
 <p class="success">Success: [% success_msg %]</p>
 [% END %]
+    [% IF is_helpdesk_staff %]
+    <div id="hd-ticket-alert" style="display:none;background:#1a7a4a;color:#fff;padding:6px 14px;border-radius:4px;margin-bottom:8px;font-size:0.9em;display:flex;align-items:center;gap:10px;">
+        <strong>&#128179; HelpDesk:</strong>
+        <span id="hd-ticket-alert-text"></span>
+        <a href="[% c.uri_for('/HelpDesk/admin/tickets/open') %]" style="color:#fff;font-weight:bold;text-decoration:underline;">View Tickets</a>
+        <button onclick="document.getElementById('hd-ticket-alert').style.display='none';" style="background:none;border:none;color:#fff;cursor:pointer;font-size:1.1em;margin-left:auto;">&#x2715;</button>
+    </div>
+    <script>
+    (function() {
+        var alertEl = document.getElementById('hd-ticket-alert');
+        var textEl  = document.getElementById('hd-ticket-alert-text');
+        var dismissed = sessionStorage.getItem('hd_alert_dismissed_at');
+        function checkTickets() {
+            fetch('[% c.uri_for('/HelpDesk/admin/tickets_alert') %]')
+                .then(function(r){ return r.json(); })
+                .then(function(d){
+                    var n = d.open_count || 0;
+                    if (n > 0 && !dismissed) {
+                        textEl.textContent = n + ' open ticket' + (n === 1 ? '' : 's') + ' awaiting response';
+                        alertEl.style.display = 'flex';
+                    } else {
+                        alertEl.style.display = 'none';
+                    }
+                }).catch(function(){});
+        }
+        document.addEventListener('DOMContentLoaded', function(){
+            checkTickets();
+            setInterval(checkTickets, 120000);
+        });
+        var closeBtn = alertEl ? alertEl.querySelector('button') : null;
+        if (closeBtn) {
+            closeBtn.addEventListener('click', function(){
+                dismissed = Date.now();
+                sessionStorage.setItem('hd_alert_dismissed_at', dismissed);
+            });
+        }
+    })();
+    </script>
+    [% END %]
+
     [% IF is_admin && c.stash.debug_msg %]
         [% FOREACH msg IN c.stash.debug_msg %]
         <p class="debug">Debug: [% msg %]</p>

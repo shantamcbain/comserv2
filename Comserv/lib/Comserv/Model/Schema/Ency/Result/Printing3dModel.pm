@@ -98,7 +98,7 @@ __PACKAGE__->has_many(
 );
 
 __PACKAGE__->belongs_to(
-    inventory_item => 'Comserv::Model::Schema::Ency::Result::InventoryItem',
+    inventory_item => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItem',
     'item_id',
     { join_type => 'LEFT', on_delete => 'SET NULL', on_update => 'CASCADE' }
 );

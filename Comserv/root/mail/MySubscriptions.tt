@@ -1,0 +1,75 @@
+[%
+   title = "My Subscriptions"
+   description = "Manage which mailing lists you are subscribed to"
+   roles = ""
+   TemplateType = "Application"
+   category = "Mail"
+   page_version = "1.0"
+   last_updated = "2026-05-08"
+%]
+[% PageVersion = 'mail/MySubscriptions.tt,v 1.0 2026/05/08 shanta Exp shanta' %]
+[% IF debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="app-container">
+
+    <div class="page-header">
+        <h1>My Subscriptions</h1>
+        <h2 class="page-subtitle">Manage your mailing list preferences</h2>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF c.flash.success_msg %]
+                <div class="success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="error">[% c.flash.error_msg | html %]</div>
+            [% END %]
+
+            [% IF public_lists.size > 0 %]
+
+                <form method="POST" action="[% c.uri_for('/mail/my_subscriptions') %]" class="app-form">
+
+                    <p style="color:var(--text-muted-color);margin-bottom:var(--spacing-large);">
+                        Tick the lists you want to be subscribed to and untick to unsubscribe.
+                        Click <strong>Save Preferences</strong> when done.
+                    </p>
+
+                    [% FOREACH list IN public_lists %]
+                    <div style="border:1px solid var(--border-color);border-radius:6px;padding:var(--spacing-medium);margin-bottom:var(--spacing-small);display:flex;align-items:flex-start;gap:var(--spacing-medium);
+                        [% IF list.is_blocked %]background:var(--light-color);opacity:0.6;[% END %]">
+                        <input type="checkbox" name="list_ids[]" value="[% list.id %]"
+                               id="mysub_[% list.id %]"
+                               [% IF list.is_subscribed %]checked[% END %]
+                               [% IF list.is_blocked   %]disabled[% END %]
+                               style="margin-top:3px;width:18px;height:18px;flex-shrink:0;">
+                        <label for="mysub_[% list.id %]" style="cursor:pointer;flex:1;">
+                            <strong>[% list.name | html %]</strong>
+                            [% IF list.is_blocked %]
+                                <span style="background:var(--danger-color,#c0392b);color:#fff;font-size:0.75em;padding:1px 6px;border-radius:3px;margin-left:6px;">Blocked</span>
+                            [% END %]
+                            [% IF list.description %]
+                                <br><span style="color:var(--text-muted-color);font-size:var(--font-size-small);">[% list.description | html %]</span>
+                            [% END %]
+                        </label>
+                    </div>
+                    [% END %]
+
+                    <div class="form-actions" style="margin-top:var(--spacing-large);">
+                        <button type="submit" class="btn btn-primary">Save Preferences</button>
+                        <a href="[% c.uri_for('/mail/subscribe') %]" class="btn btn-secondary">Back</a>
+                    </div>
+
+                </form>
+
+            [% ELSE %]
+                <div class="info-box" style="padding:var(--spacing-large);text-align:center;color:var(--text-muted-color);">
+                    <p>There are no public mailing lists available for this site.</p>
+                </div>
+            [% END %]
+
+        </div>
+    </div>
+
+</div>

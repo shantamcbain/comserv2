@@ -5,6 +5,8 @@
 
 <h3 > Hello  [% firstname%]  [% lastname%]! Welcome to VE7TIT  Shack!</h3>
 
+<p><a href="https://www.norac.bc.ca/index.php/swap-shop" target="_blank">NORAC Swap Shop</a></p>
+
 
 
 
