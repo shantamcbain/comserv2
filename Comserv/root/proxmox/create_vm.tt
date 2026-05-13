@@ -104,16 +104,16 @@
             <h2>Operating System</h2>
             
             <div class="form-group">
-                <label for="template">OS Template:</label>
-                <select id="template" name="template" required>
-                    <option value="">-- Select a template --</option>
-                    [% FOREACH template IN templates %]
-                    <option value="[% template.id %]" [% IF form_data.template == template.id %]selected[% END %]>
-                        [% template.name %]
+                <label for="template">Boot ISO (optional):</label>
+                <select id="template" name="template">
+                    <option value="">-- No ISO / blank disk --</option>
+                    [% FOREACH tmpl IN templates %]
+                    <option value="[% tmpl.id %]" [% IF form_data.template == tmpl.id %]selected[% END %]>
+                        [% tmpl.name %] ([% tmpl.storage %])
                     </option>
                     [% END %]
                 </select>
-                <span class="help-text">Operating system template to use</span>
+                <span class="help-text">ISO image to boot from for OS installation. Leave blank to create an empty disk.</span>
             </div>
         </div>
         
