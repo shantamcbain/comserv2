@@ -222,17 +222,8 @@ sub _load_credentials {
 
     # Set the credentials
     $self->{api_url_base} = $credentials->{api_url_base} || '';
-    
-    # Try to determine the correct node name
-    my $node_name = 'proxmox'; # Default to 'proxmox'
-    
-    # If credentials specify a node, log it
-    if ($credentials->{node}) {
-        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, '_load_credentials',
-            "Credentials specify node name: '" . $credentials->{node} . "'");
-    }
-    
-    # Set the node name
+
+    my $node_name = $credentials->{node} || 'proxmox';
     $self->{node} = $node_name;
     $self->{token_user} = $credentials->{token_user} || '';
     $self->{token_value} = $credentials->{token_value} || '';
@@ -1714,11 +1705,19 @@ sub create_vm {
     }
 
     my $node_name;
-    my $resources = $self->_try_get_cluster_resources($ua, 'node');
-    if ($resources && @$resources) {
-        $node_name = $resources->[0]{node} || $resources->[0]{name};
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nodes_data = eval { decode_json($nodes_res->decoded_content) };
+        if ($nodes_data && $nodes_data->{data} && @{ $nodes_data->{data} }) {
+            $node_name = $nodes_data->{data}[0]{node};
+        }
     }
     $node_name ||= $self->{node} || 'proxmox';
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
+        "Resolved node name: $node_name");
 
     my $nextid_req = HTTP::Request->new(GET => $self->{api_url_base} . '/cluster/nextid');
     $nextid_req->header(Authorization => $auth_header);

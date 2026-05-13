@@ -489,23 +489,18 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         ", vm_type=" . $vm_type .
         ", db_services=" . join(',', @db_services));
 
-    # Validate required fields
-    my @required_fields = qw(hostname template);
+    # Validate required fields (template is optional — VM is created with blank disk if omitted)
     my @missing_fields = ();
-
-    foreach my $field (@required_fields) {
-        push @missing_fields, $field unless $params->{$field};
-    }
+    push @missing_fields, 'hostname' unless $params->{hostname};
 
     if (@missing_fields) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_vm_action',
             "Missing required fields: " . join(', ', @missing_fields));
 
-        # Get templates for re-displaying the form
         my $templates = $c->model('Proxmox')->get_available_templates();
 
         $c->stash(
-            template => 'proxmox/create_vm.tt',
+            template  => 'proxmox/create_vm.tt',
             error_msg => 'Missing required fields: ' . join(', ', @missing_fields),
             templates => $templates,
             form_data => $params,
@@ -517,13 +512,18 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
     # Initialize the Proxmox model
     my $proxmox = $c->model('Proxmox');
 
-    # Get the server ID from the session or use default
-    my $server_id = $c->session->{proxmox_server_id} || 'default';
+    # Resolve the correct server ID (same logic as create_vm_form)
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all_servers = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        if ($all_servers && @$all_servers) {
+            $server_id = $all_servers->[0]{id} || $all_servers->[0]{server_id};
+        }
+        $server_id ||= 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
         "Using Proxmox server ID: $server_id");
-
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
-        "Configured Proxmox model for server: $server_id");
 
     # Authenticate with built-in credentials
     my $auth_result = $proxmox->authenticate();
@@ -541,34 +541,26 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         return;
     }
 
-    # Find the selected template
-    my $templates = $proxmox->get_available_templates();
-    my $selected_template;
-    foreach my $template (@$templates) {
-        if ($template->{id} eq $params->{template}) {
-            $selected_template = $template;
-            last;
+    # Optionally resolve a template — if the user selected one, look it up; blank disk if not
+    if ($params->{template}) {
+        my $templates = $proxmox->get_available_templates();
+        my $selected_template;
+        foreach my $tmpl (@$templates) {
+            if ($tmpl->{id} eq $params->{template}) {
+                $selected_template = $tmpl;
+                last;
+            }
+        }
+        if ($selected_template) {
+            $params->{template_url} = $selected_template->{url};
+            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
+                "Using template URL: " . $params->{template_url});
+        } else {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_vm_action',
+                "Template ID not found: " . $params->{template} . " — proceeding with blank disk");
+            delete $params->{template};
         }
     }
-
-    unless ($selected_template) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_vm_action',
-            "Invalid template selected: " . ($params->{template} || 'undef'));
-
-        $c->stash(
-            template => 'proxmox/create_vm.tt',
-            error_msg => "Invalid template selected.",
-            templates => $templates,
-            form_data => $params,
-        );
-        $c->forward($c->view('TT'));
-        return;
-    }
-
-    # Add template URL to params
-    $params->{template_url} = $selected_template->{url};
-    $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
-        "Using template URL: " . $params->{template_url});
 
     # Add network configuration if static IP is selected
     if ($params->{network_type} eq 'static' && $params->{ip_address} && $params->{subnet_mask} && $params->{gateway}) {
