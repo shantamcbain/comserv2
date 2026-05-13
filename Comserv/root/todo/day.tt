@@ -55,8 +55,10 @@
        SET _date_num = date.replace('-', '');
        FOREACH todo IN todos;
            NEXT IF todo.status == 3;
-           SET _start = todo.start_date ? (todo.start_date _ '').substr(0, 10).replace('-', '') : 0;
-           SET _due   = todo.due_date   ? (todo.due_date   _ '').substr(0, 10).replace('-', '') : 0;
+           SET _sd = todo.start_date _ '';
+           SET _dd = todo.due_date   _ '';
+           SET _start = _sd ? _sd.substr(0, 10).replace('-', '') : 0;
+           SET _due   = _dd ? _dd.substr(0, 10).replace('-', '') : 0;
            IF _start AND _start < _date_num;
                temp_overdue_todos.push(todo);
            ELSIF (_start AND _start == _date_num) OR (!_start AND _due AND _due == _date_num);
