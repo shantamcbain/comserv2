@@ -49,7 +49,7 @@
    # and extract overdue todos if not already separated. EXCLUDE COMPLETED (status 3).
    # ONLY do this filtering if coming from Documentation.pm (is_daily_plan == 1)
    # When coming from Todo.pm controller, todos is already pre-filtered
-   IF is_daily_plan;
+   IF is_daily_plan AND !include_mode;
        SET temp_today_todos = [];
        SET temp_overdue_todos = [];
        
@@ -63,8 +63,6 @@
            IF _start AND _start < _date_num;
                temp_overdue_todos.push(todo);
            ELSIF (_start AND _start == _date_num) OR (!_start AND _due AND _due == _date_num);
-               temp_today_todos.push(todo);
-           ELSIF !_start AND !_due;
                temp_today_todos.push(todo);
            END;
        END;
