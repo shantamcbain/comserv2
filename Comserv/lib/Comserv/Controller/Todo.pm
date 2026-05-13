@@ -1995,9 +1995,14 @@ sub reschedule :Path('reschedule') :Args(0) {
     $c->response->content_type('application/json');
 
     my $username = $c->session->{username} // '';
+    my $sitename = $c->session->{SiteName} // '';
+    my $user_id  = $c->session->{user_id}  // 0;
     my $roles    = $c->session->{roles} || [];
     my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+    my $is_admin = grep { /^(admin)$/i } @rl;
+    my $is_csc   = ($sitename eq 'CSC' && $is_admin) || $username eq 'Shanta';
+
+    unless ($username && $username ne 'anonymous' && $is_admin) {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
@@ -2005,79 +2010,117 @@ sub reschedule :Path('reschedule') :Args(0) {
 
     require POSIX;
     my $now_epoch  = time();
-    my $today      = DateTime->now->ymd;
+    my $today_dt   = DateTime->now;
+    my $today      = $today_dt->ymd;
     my $count      = 0;
-    my $date_count = 0;
     my @errors;
 
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+
+        # Determine accessible site names
+        my @allowed_sites;
+        if ($is_csc) {
+            @allowed_sites = ();  # empty = no site filter = all sites
+        } else {
+            my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                { user_id => $user_id, is_active => 1 },
+                { join => 'site', columns => ['site.name'], distinct => 1 }
+            )->all;
+            @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
+            @allowed_sites = ($sitename) unless @allowed_sites;
+        }
+
+        # Fetch open todos for accessible sites, with project sort_order via join
+        my %search = ( status => { -not_in => \@done_statuses } );
+        $search{sitename} = { -in => \@allowed_sites } if @allowed_sites;
+
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
-            { status => { -not_in => \@done_statuses } },
-            { columns => [qw(record_id priority status is_blocking
-                             due_date last_mod_date date_time_posted)] }
+            \%search,
+            {
+                join     => 'project',
+                columns  => [qw(me.record_id me.priority me.status me.is_blocking
+                                me.due_date me.start_date me.last_mod_date
+                                me.date_time_posted me.estimated_man_hours
+                                me.blocked_by_todo_id me.sitename me.developer
+                                me.username_of_poster)],
+                '+columns' => { proj_sort => 'project.sort_order' },
+            }
         )->all;
 
+        # Sort: blocking first, then project sort_order ASC (lower=higher prio),
+        #       then todo priority ASC (1=highest), then due_date ASC (soonest first)
+        @rows = sort {
+            ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
+            || do {
+                my $pa = eval { $a->get_column('proj_sort') } // 9999;
+                my $pb = eval { $b->get_column('proj_sort') } // 9999;
+                $pa <=> $pb
+            }
+            || (($a->priority || 9) <=> ($b->priority || 9))
+            || do {
+                my $da = $a->due_date || '9999-12-31';
+                my $db = $b->due_date || '9999-12-31';
+                $da cmp $db
+            }
+        } @rows;
+
+        # Distribute todos from today forward using start_date
+        # Capacity: HOURS_PER_DAY hours per working day; default 1h per todo if no estimate
+        my $HOURS_PER_DAY  = 8;
+        my $cur_dt         = $today_dt->clone;
+        my $hours_used     = 0;
+
         for my $todo (@rows) {
+            my $est = $todo->estimated_man_hours || 1;
+            $est    = 1 if $est < 1;
+
+            # Advance to next day if today is full
+            if ($hours_used + $est > $HOURS_PER_DAY && $hours_used > 0) {
+                $cur_dt->add(days => 1);
+                $hours_used = 0;
+            }
+
+            my $new_start = $cur_dt->ymd;
+            $hours_used  += $est;
+
+            # Recalculate priority based on staleness + due date + blocking
             my $orig_priority = $todo->priority || 5;
             my $new_priority  = $orig_priority;
-            my $new_due_date  = undef;   # only set if we need to extend
 
-            # Staleness: >180 days inactive → lower priority (push down)
             my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
-            my $days_stale   = 0;
+            my $days_stale = 0;
             if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                $days_stale    = int(($now_epoch - $act_epoch) / 86400);
-                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                $days_stale   = int(($now_epoch - $act_epoch) / 86400);
+                $new_priority = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
                     if $days_stale > 180;
             }
 
-            # Due-date handling
             if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                 my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
-
                 if ($days_until_due < 0) {
-                    # Overdue — adjust priority upward
                     $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
-
-                    # Also extend due_date so it stops showing permanently overdue:
-                    # IN-PROGRESS: extend 14 days (actively being worked)
-                    # NEW stale 30+ days: extend 30 days (date was clearly abandoned)
-                    # NEW stale < 30 days: leave as-is (genuinely overdue, keep the signal)
-                    my $st = $todo->status // '';
-                    my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process)$/i);
-                    if ($in_progress) {
-                        $new_due_date = DateTime->now->add(days => 14)->ymd;
-                    } elsif ($days_stale >= 30) {
-                        $new_due_date = DateTime->now->add(days => 30)->ymd;
-                    }
                 } elsif ($days_until_due <= 7) {
                     $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
                 }
             }
 
-            # Blocking: raises priority by 1
             if ($todo->is_blocking) {
                 $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
             }
 
-            my $priority_changed  = ($new_priority != $orig_priority);
-            my $due_date_changed  = defined $new_due_date;
-
-            next unless $priority_changed || $due_date_changed;
-
-            my %update = (last_mod_by => 'reschedule', last_mod_date => $today);
-            $update{priority} = $new_priority if $priority_changed;
-            $update{due_date} = $new_due_date if $due_date_changed;
+            my %update = (
+                start_date    => $new_start,
+                priority      => $new_priority,
+                last_mod_by   => 'reschedule',
+                last_mod_date => $today,
+            );
 
             eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
-            else {
-                $count++;
-                $date_count++ if $due_date_changed;
-            }
+            else     { $count++; }
         }
     };
     if ($@) {
@@ -2087,8 +2130,8 @@ sub reschedule :Path('reschedule') :Args(0) {
     }
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos updated ($date_count due-dates extended)");
-    $c->response->body('{"ok":1,"count":' . $count . ',"date_count":' . $date_count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+        "Reschedule by $username: $count todos scheduled from $today forward");
+    $c->response->body('{"ok":1,"count":' . $count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
 }
 
 sub open_log :Path('open_log') :Args(0) {

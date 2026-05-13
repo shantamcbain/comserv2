@@ -23,7 +23,7 @@ sub BUILD {
 }
 
 sub get_logs {
-    my ($self, $c, $status) = @_;
+    my ($self, $c, $status, $site_filter, $allowed_sites) = @_;
     my $schema = $c->model('DBEncy');
 
     my $sitename = $c->session->{SiteName} || '';
@@ -35,24 +35,30 @@ sub get_logs {
         || (($c->session->{username} || '') eq 'Shanta');
 
     my $search_criteria = {};
-    unless ($is_csc_admin) {
-        $search_criteria->{sitename} = $sitename;
+    if ($site_filter) {
+        $search_criteria->{sitename} = $site_filter;
+    } elsif ($is_csc_admin) {
+        if ($allowed_sites && @$allowed_sites) {
+            $search_criteria->{sitename} = { -in => $allowed_sites };
+        }
+    } else {
+        if ($allowed_sites && @$allowed_sites > 1) {
+            $search_criteria->{sitename} = { -in => $allowed_sites };
+        } else {
+            $search_criteria->{sitename} = $sitename;
+        }
     }
 
-    # Add status to search criteria
     if ($status eq 'open') {
-        $search_criteria->{status} = { '!=' => 3 }; # Exclude DONE logs
+        $search_criteria->{status} = { '!=' => 3 };
     } elsif ($status eq 'all') {
-        # No additional status filter needed for 'all'
     } else {
         $search_criteria->{status} = $status;
     }
 
-    # Log the search criteria for debugging
     $c->log->debug("Search criteria: " . Dumper($search_criteria));
 
-    # Retrieve all log records
-    my $logs = $schema->resultset('Log')->search($search_criteria, { order_by => 'start_date' });
+    my $logs = $schema->resultset('Log')->search($search_criteria, { order_by => { -desc => 'start_date' } });
 
     # Log the number of logs found
     $c->log->debug("Number of logs found: " . $logs->count);
