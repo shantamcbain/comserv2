@@ -1646,31 +1646,65 @@ sub get_available_templates {
     $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'get_available_templates',
         "Getting list of available VM templates");
 
-    # For now, return a static list of templates
-    # In a real implementation, this would query the Proxmox API for available templates
-    my @templates = (
-        {
-            id => 'ubuntu-2204',
-            name => 'Ubuntu 22.04 LTS',
-            description => 'Ubuntu 22.04 LTS (Jammy Jellyfish)',
-            url => 'https://cloud-images.ubuntu.com/jammy/current/jammy-server-cloudimg-amd64.img',
-        },
-        {
-            id => 'debian-11',
-            name => 'Debian 11',
-            description => 'Debian 11 (Bullseye)',
-            url => 'https://cloud.debian.org/images/cloud/bullseye/latest/debian-11-generic-amd64.qcow2',
-        },
-        {
-            id => 'centos-8',
-            name => 'CentOS 8',
-            description => 'CentOS 8 Stream',
-            url => 'https://cloud.centos.org/centos/8-stream/x86_64/images/CentOS-Stream-GenericCloud-8-latest.x86_64.qcow2',
-        },
-    );
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    my @templates;
+
+    if ($self->{api_url_base} && ($self->{token_user} || $self->{api_token})) {
+        my $ua = LWP::UserAgent->new;
+        $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+        $ua->timeout(10);
+
+        my $auth_header = '';
+        if ($self->{token_user} && $self->{token_value}) {
+            $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+        } elsif ($self->{api_token}) {
+            $auth_header = $self->{api_token};
+        }
+
+        my $node_name;
+        my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+        $nodes_req->header(Authorization => $auth_header);
+        my $nodes_res = $ua->request($nodes_req);
+        if ($nodes_res->is_success) {
+            my $nd = eval { decode_json($nodes_res->decoded_content) };
+            $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+        }
+        $node_name ||= $self->{node} || 'proxmox';
+
+        my $storage_req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
+        $storage_req->header(Authorization => $auth_header);
+        my $storage_res = $ua->request($storage_req);
+        if ($storage_res->is_success) {
+            my $sd = eval { decode_json($storage_res->decoded_content) };
+            for my $store (@{ $sd->{data} || [] }) {
+                my $sname = $store->{storage} or next;
+                my $content = $store->{content} || '';
+                next unless $content =~ /iso/;
+
+                my $content_req = HTTP::Request->new(GET =>
+                    $self->{api_url_base} . "/nodes/$node_name/storage/$sname/content?content=iso");
+                $content_req->header(Authorization => $auth_header);
+                my $content_res = $ua->request($content_req);
+                if ($content_res->is_success) {
+                    my $cd = eval { decode_json($content_res->decoded_content) };
+                    for my $item (@{ $cd->{data} || [] }) {
+                        my $volid = $item->{volid} or next;
+                        (my $fname = $volid) =~ s{.*/}{};
+                        $fname =~ s/\.iso$//i;
+                        push @templates, {
+                            id      => $volid,
+                            name    => $fname,
+                            storage => $sname,
+                        };
+                    }
+                }
+            }
+        }
+    }
 
     $logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'get_available_templates',
-        "Found " . scalar(@templates) . " VM templates");
+        "Found " . scalar(@templates) . " ISO images from Proxmox");
 
     return \@templates;
 }
@@ -1747,12 +1781,12 @@ sub create_vm {
         onboot   => ($params->{start_on_boot}     ? '1' : '0'),
     );
 
+    $post_params{scsi0} = "local-lvm:$disk_size";
     if ($template) {
-        $post_params{scsi0} = "$template:$disk_size,format=qcow2";
-        $post_params{boot}  = 'order=scsi0';
-        $post_params{ide2}  = 'none,media=cdrom';
+        $post_params{ide2} = "$template,media=cdrom";
+        $post_params{boot} = 'order=ide2;scsi0';
     } else {
-        $post_params{scsi0} = "local-lvm:$disk_size";
+        $post_params{boot} = 'order=scsi0';
     }
 
     if ($network_type eq 'static' && $params->{ip_address}) {
