@@ -297,25 +297,123 @@
 </style>
 
 <div class="infrastructure-dashboard">
-    <h1>Infrastructure Management</h1>
-    
-    <div class="info-banner">
-        <p><strong>Purpose</strong>: Manage Kubernetes clusters and deploy monitoring infrastructure from the Comserv application.</p>
-        <p><strong>Access</strong>: Admin and Developer roles only</p>
-    </div>
-    
+    <h1><i class="fas fa-server"></i> Server Room &amp; Infrastructure Management</h1>
+
     [% IF error_msg %]
     <div class="error-banner">
-        <strong>❌ Error:</strong> [% error_msg %]
+        <strong>Error:</strong> [% error_msg %]
     </div>
     [% END %]
-    
+
     [% IF success_msg %]
     <div class="success-banner">
-        <strong>✓ Success:</strong> [% success_msg %]
+        <strong>Success:</strong> [% success_msg %]
     </div>
     [% END %]
-    
+
+    <div class="cluster-grid" style="margin-bottom:30px;">
+        <div class="cluster-card" style="border-left:4px solid #2196f3;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-server"></i> Proxmox Virtualisation</div>
+            </div>
+            <div class="cluster-info">
+                <div>Manage virtual machines across all Proxmox hosts</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/proxmox') %]" class="btn btn-primary">VM Dashboard</a>
+                <a href="[% c.uri_for('/proxmox/create_vm') %]" class="btn btn-success">Create VM</a>
+                <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-secondary">Servers</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #ff9800;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-shield-alt"></i> OPNsense Gateway</div>
+            </div>
+            <div class="cluster-info">
+                <div>Firewall rules, DHCP leases, VPN tunnels, interfaces</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="btn btn-primary">Open Gateway</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #00bcd4;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-cloud"></i> Cloudflare DNS</div>
+            </div>
+            <div class="cluster-info">
+                <div>Manage DNS zones, records, and subdomains</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/cloudflare') %]" class="btn btn-primary">DNS Manager</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #9c27b0;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-globe"></i> Hosting Accounts</div>
+            </div>
+            <div class="cluster-info">
+                <div>Add hosting accounts, domains, and subdomains</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/hosting') %]" class="btn btn-primary">Hosting</a>
+                <a href="[% c.uri_for('/site') %]" class="btn btn-secondary">Sites</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #4caf50;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-envelope"></i> Mail Administration</div>
+            </div>
+            <div class="cluster-info">
+                <div>Create mail accounts, manage mailing lists</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="btn btn-primary">Mail Admin</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #607d8b;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-archive"></i> Backups</div>
+            </div>
+            <div class="cluster-info">
+                <div>Create, restore and manage system backups</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/admin/backup') %]" class="btn btn-primary">Backup Manager</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #f44336;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-database"></i> Schema Management</div>
+            </div>
+            <div class="cluster-info">
+                <div>Compare, migrate and manage database schemas</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/admin/compare_schema') %]" class="btn btn-primary">Schema Manager</a>
+            </div>
+        </div>
+
+        <div class="cluster-card" style="border-left:4px solid #795548;">
+            <div class="cluster-header">
+                <div class="cluster-name"><i class="fas fa-cubes"></i> Docker Containers</div>
+            </div>
+            <div class="cluster-info">
+                <div>Manage Docker containers and services</div>
+            </div>
+            <div class="cluster-actions">
+                <a href="[% c.uri_for('/admin/docker-containers') %]" class="btn btn-primary">Docker Dashboard</a>
+            </div>
+        </div>
+    </div>
+
+    <h2 id="k8s" style="margin-top:30px;"><i class="fas fa-dharmachakra"></i> Kubernetes Clusters</h2>
+
     [% # Show Docker management only in development environment %]
     [% IF env == 'development' || !env %]
     <div class="add-cluster-section">
@@ -326,7 +424,7 @@
         <button class="btn btn-secondary" onclick="refreshContainers()">Refresh Containers</button>
     </div>
     [% END %]
-    
+
     <div class="add-cluster-section">
         <h2>Add Kubernetes Cluster</h2>
         <form id="add-cluster-form">

@@ -28,12 +28,27 @@
     <!-- Always show the form regardless of auth status -->
     <form method="POST" action="[% c.uri_for('/proxmox/create_vm_action') %]" class="vm-creation-form">
         <div class="form-section">
+            <h2>VM Type Preset</h2>
+            <div class="form-group">
+                <label for="vm_type">VM Type:</label>
+                <select id="vm_type" name="vm_type" onchange="applyVmPreset()">
+                    <option value="generic">Generic / Custom</option>
+                    <option value="database" [% IF form_data.vm_type == 'database' %]selected[% END %]>Database Server (MySQL + PostgreSQL)</option>
+                    <option value="web" [% IF form_data.vm_type == 'web' %]selected[% END %]>Web Server</option>
+                    <option value="mail" [% IF form_data.vm_type == 'mail' %]selected[% END %]>Mail Server</option>
+                    <option value="proxy" [% IF form_data.vm_type == 'proxy' %]selected[% END %]>Reverse Proxy / Gateway</option>
+                </select>
+                <span class="help-text">Choose a preset to auto-fill recommended resources</span>
+            </div>
+        </div>
+
+        <div class="form-section">
             <h2>Basic Information</h2>
             
             <div class="form-group">
                 <label for="hostname">Hostname:</label>
                 <input type="text" id="hostname" name="hostname" required 
-                       placeholder="e.g., mailserver-vm" value="[% form_data.hostname %]">
+                       placeholder="e.g., db-server-01" value="[% form_data.hostname %]">
                 <span class="help-text">Name for your virtual machine</span>
             </div>
             
@@ -160,6 +175,34 @@
             </div>
         </div>
         
+        <div id="db_services_section" class="form-section" style="display:none;">
+            <h2>Database Services</h2>
+            <p class="help-text" style="margin-bottom:12px;">Select the database engines to document for installation on this VM.</p>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_mysql" name="db_services" value="mysql"
+                       [% IF form_data.db_services.grep('mysql').size %]checked[% END %]>
+                <label for="db_mysql">MySQL</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_postgresql" name="db_services" value="postgresql"
+                       [% IF form_data.db_services.grep('postgresql').size %]checked[% END %]>
+                <label for="db_postgresql">PostgreSQL</label>
+            </div>
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="db_redis" name="db_services" value="redis"
+                       [% IF form_data.db_services.grep('redis').size %]checked[% END %]>
+                <label for="db_redis">Redis (cache)</label>
+            </div>
+            <div class="form-group" style="margin-top:10px;">
+                <label for="db_port_mysql">MySQL Port:</label>
+                <input type="number" id="db_port_mysql" name="db_port_mysql" value="[% form_data.db_port_mysql || 3306 %]" style="width:120px;">
+            </div>
+            <div class="form-group">
+                <label for="db_port_postgresql">PostgreSQL Port:</label>
+                <input type="number" id="db_port_postgresql" name="db_port_postgresql" value="[% form_data.db_port_postgresql || 5432 %]" style="width:120px;">
+            </div>
+        </div>
+
         <div class="form-actions">
             <button type="submit" class="btn-primary">Create Virtual Machine</button>
             <button type="button" class="btn-secondary" onclick="window.location.href='[% c.uri_for('/proxmox') %]'">Cancel</button>
@@ -307,20 +350,75 @@ button {
 </style>
 
 <script>
-function toggleNetworkFields() {
-    var networkType = document.getElementById('network_type').value;
-    var staticFields = document.getElementById('static_ip_fields');
-    
-    if (networkType === 'static') {
-        staticFields.style.display = 'block';
-    } else {
-        staticFields.style.display = 'none';
+var VM_PRESETS = {
+    database: { cpu: 4, memory: 8192, disk_size: 100, hostnamePrefix: 'db-',
+                description: 'Database server running MySQL and PostgreSQL' },
+    web:      { cpu: 2, memory: 4096, disk_size: 40,  hostnamePrefix: 'web-',
+                description: 'Web application server' },
+    mail:     { cpu: 2, memory: 4096, disk_size: 80,  hostnamePrefix: 'mail-',
+                description: 'Mail server (SMTP/IMAP)' },
+    proxy:    { cpu: 2, memory: 2048, disk_size: 20,  hostnamePrefix: 'proxy-',
+                description: 'Reverse proxy / gateway' },
+    generic:  {}
+};
+
+function applyVmPreset() {
+    var type = document.getElementById('vm_type').value;
+    var preset = VM_PRESETS[type] || {};
+    var dbSection = document.getElementById('db_services_section');
+
+    if (preset.cpu) {
+        var cpuSel = document.getElementById('cpu');
+        for (var i = 0; i < cpuSel.options.length; i++) {
+            if (parseInt(cpuSel.options[i].value) === preset.cpu) {
+                cpuSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.memory) {
+        var memSel = document.getElementById('memory');
+        for (var i = 0; i < memSel.options.length; i++) {
+            if (parseInt(memSel.options[i].value) === preset.memory) {
+                memSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.disk_size) {
+        var diskSel = document.getElementById('disk_size');
+        for (var i = 0; i < diskSel.options.length; i++) {
+            if (parseInt(diskSel.options[i].value) === preset.disk_size) {
+                diskSel.selectedIndex = i; break;
+            }
+        }
+    }
+    if (preset.hostnamePrefix) {
+        var hn = document.getElementById('hostname');
+        if (!hn.value || Object.values(VM_PRESETS).some(function(p) {
+                return p.hostnamePrefix && hn.value === p.hostnamePrefix; })) {
+            hn.value = preset.hostnamePrefix;
+        }
+    }
+    if (preset.description) {
+        var desc = document.getElementById('description');
+        if (!desc.value) desc.value = preset.description;
+    }
+
+    dbSection.style.display = (type === 'database') ? 'block' : 'none';
+    if (type === 'database') {
+        document.getElementById('db_mysql').checked = true;
+        document.getElementById('db_postgresql').checked = true;
     }
 }
 
-// Initialize on page load
+function toggleNetworkFields() {
+    var networkType = document.getElementById('network_type').value;
+    var staticFields = document.getElementById('static_ip_fields');
+    staticFields.style.display = (networkType === 'static') ? 'block' : 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     toggleNetworkFields();
+    applyVmPreset();
 });
 </script>[% META title = 'Create New Virtual Machine' %]
 
