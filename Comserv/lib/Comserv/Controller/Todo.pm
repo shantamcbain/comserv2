@@ -2032,37 +2032,41 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         # Fetch open todos for accessible sites, with project sort_order via join
-        my %search = ( 'me.status' => { -not_in => \@done_statuses } );
-        $search{'me.sitename'} = { -in => \@allowed_sites } if @allowed_sites;
+        my %search = ( status => { -not_in => \@done_statuses } );
+        $search{sitename} = { -in => \@allowed_sites } if @allowed_sites;
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%search,
             {
-                join     => 'project',
-                columns  => [qw(me.record_id me.priority me.status me.is_blocking
-                                me.due_date me.start_date me.last_mod_date
-                                me.date_time_posted me.estimated_man_hours
-                                me.blocked_by_todo_id me.sitename me.developer
-                                me.username_of_poster)],
-                '+columns' => { proj_sort => 'project.sort_order' },
+                columns => [qw(record_id priority status is_blocking
+                               due_date start_date last_mod_date
+                               date_time_posted estimated_man_hours
+                               blocked_by_todo_id sitename developer
+                               username_of_poster project_id)],
             }
         )->all;
+
+        # Build project sort_order lookup (separate query — avoids INNER JOIN exclusion)
+        my %proj_sort;
+        {
+            my @pids = grep { defined $_ && $_ > 0 }
+                       map  { $_->project_id } @rows;
+            if (@pids) {
+                my @projs = $c->model('DBEncy')->resultset('Project')->search(
+                    { id => { -in => \@pids } },
+                    { columns => [qw(id sort_order)] }
+                )->all;
+                %proj_sort = map { $_->id => ($_->sort_order // 9999) } @projs;
+            }
+        }
 
         # Sort: blocking first, then project sort_order ASC (lower=higher prio),
         #       then todo priority ASC (1=highest), then due_date ASC (soonest first)
         @rows = sort {
             ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
-            || do {
-                my $pa = eval { $a->get_column('proj_sort') } // 9999;
-                my $pb = eval { $b->get_column('proj_sort') } // 9999;
-                $pa <=> $pb
-            }
+            || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
             || (($a->priority || 9) <=> ($b->priority || 9))
-            || do {
-                my $da = $a->due_date || '9999-12-31';
-                my $db = $b->due_date || '9999-12-31';
-                $da cmp $db
-            }
+            || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
         } @rows;
 
         # Distribute todos from today forward using start_date
