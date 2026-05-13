@@ -63,31 +63,36 @@ sub filter_todos_by_date_range {
     
     $include_overdue //= 1; # Default to include overdue todos
     
-    my @filtered_todos = grep { 
+    my $today = DateTime->now->ymd;
+    my @filtered_todos = grep {
         my $todo = $_;
         my $include_todo = 0;
-        
-        # Include if starting within date range
-        if ($todo->start_date && $todo->start_date ge $start_date && $todo->start_date le $end_date) {
+        my $sd = $todo->start_date || '';
+        my $dd = $todo->due_date   || '';
+
+        # Primary anchor: start_date (set by reschedule). Include if within range.
+        if ($sd && $sd ge $start_date && $sd le $end_date) {
             $include_todo = 1;
         }
-        
-        # Include if due within date range
-        if ($todo->due_date && $todo->due_date ge $start_date && $todo->due_date le $end_date) {
+
+        # If no start_date, fall back to due_date as anchor
+        if (!$sd && $dd && $dd ge $start_date && $dd le $end_date) {
             $include_todo = 1;
         }
-        
-        # Include overdue todos if requested (overdue = due before start_date and not completed)
-        if ($include_overdue && $todo->due_date && $todo->due_date lt $start_date && $todo->status != 3) {
+
+        # Overdue: anchor is before start of range and todo is open
+        if ($include_overdue && $todo->status != 3) {
+            my $anchor = $sd || $dd;
+            if ($anchor && $anchor lt $start_date) {
+                $include_todo = 1;
+            }
+        }
+
+        # Undated open todos — show only in today's single-day view
+        if (!$sd && !$dd && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
             $include_todo = 1;
         }
-        
-        # Include todos without any dates if they're not completed (for day view of today only)
-        my $today = DateTime->now->ymd;
-        if (!$todo->start_date && !$todo->due_date && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
-            $include_todo = 1;
-        }
-        
+
         $include_todo;
     } @$todos;
     
@@ -1317,16 +1322,17 @@ sub update_display_date :Path('/todo/update_display_date') :Args(0) {
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
-    # Validate the date_arg if it's defined
+    # Validate the date_arg if it's defined — always produce a plain YYYY-MM-DD string
     my $date;
     if (defined $date_arg) {
         my $iso8601 = DateTime::Format::ISO8601->new;
-        eval { $date = $iso8601->parse_datetime($date_arg) };
-        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date_arg) };
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     } else {
-        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
+        $date = DateTime->now->ymd;
     }
-    
+
     # Calculate the previous and next dates
     my $dt = DateTime::Format::ISO8601->parse_datetime($date);
     my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
@@ -1354,12 +1360,15 @@ sub day :Path('/todo/day') :Args {
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;
 
-    # Separate overdue and today's todos
+    # Separate overdue and today's todos.
+    # Use start_date as the calendar anchor (set by reschedule).
+    # Fall back to due_date only when start_date is absent.
     my @overdue_todos;
     my @today_todos;
-    
+
     foreach my $todo (@sorted_todos) {
-        if ($todo->due_date && $todo->due_date lt $date && $todo->status != 3) {
+        my $anchor = $todo->start_date || $todo->due_date || '';
+        if ($anchor && $anchor lt $date && $todo->status != 3) {
             push @overdue_todos, $todo;
         } else {
             push @today_todos, $todo;
@@ -1418,9 +1427,12 @@ sub week :Path('/todo/week') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # If no date is provided, use the current date
-    if (!defined $date) {
-        $date = DateTime->now->ymd;
+    # Always produce a plain YYYY-MM-DD string (URL may contain T00:00:00)
+    {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     }
 
     # Calculate the start and end of the week
@@ -1492,9 +1504,12 @@ sub month :Path('/todo/month') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # If no date is provided, use the current date
-    if (!defined $date) {
-        $date = DateTime->now->ymd;
+    # Always produce a plain YYYY-MM-DD string (URL may contain T00:00:00)
+    {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     }
 
     # Parse the date
