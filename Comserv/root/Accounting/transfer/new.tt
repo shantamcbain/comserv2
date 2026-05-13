@@ -1,4 +1,4 @@
-[% WRAPPER 'wrapper.tt' %]
+[% PageVersion = 'Accounting/transfer/new.tt,v 0.01 2026/05/13 shanta Exp' %]
 [% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
 
 <style>
@@ -176,5 +176,3 @@
     });
 })();
 </script>
-
-[% END %]
