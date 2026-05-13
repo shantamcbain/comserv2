@@ -2032,8 +2032,8 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         # Fetch open todos for accessible sites, with project sort_order via join
-        my %search = ( status => { -not_in => \@done_statuses } );
-        $search{sitename} = { -in => \@allowed_sites } if @allowed_sites;
+        my %search = ( 'me.status' => { -not_in => \@done_statuses } );
+        $search{'me.sitename'} = { -in => \@allowed_sites } if @allowed_sites;
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             \%search,
