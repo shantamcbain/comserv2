@@ -415,7 +415,7 @@
                         <i class="fas fa-server"></i>
                         <span>Proxmox VMs</span>
                     </a>
-                    <a href="[% c.uri_for('/proxmox/create_vm') %]" class="admin-link">
+                    <a href="[% c.uri_for('/proxmox/create') %]" class="admin-link">
                         <i class="fas fa-plus-circle"></i>
                         <span>Create VM</span>
                     </a>

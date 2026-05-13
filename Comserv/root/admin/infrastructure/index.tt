@@ -321,7 +321,7 @@
             </div>
             <div class="cluster-actions">
                 <a href="[% c.uri_for('/proxmox') %]" class="btn btn-primary">VM Dashboard</a>
-                <a href="[% c.uri_for('/proxmox/create_vm') %]" class="btn btn-success">Create VM</a>
+                <a href="[% c.uri_for('/proxmox/create') %]" class="btn btn-success">Create VM</a>
                 <a href="[% c.uri_for('/proxmox_servers') %]" class="btn btn-secondary">Servers</a>
             </div>
         </div>
