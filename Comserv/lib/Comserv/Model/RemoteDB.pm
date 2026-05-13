@@ -307,6 +307,24 @@ sub test_connection {
     
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } elsif ($db_type =~ /^postgres(ql)?$/i) {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 5432;
+        my $database = $conn_config->{database} // '';
+
+        my $sock = IO::Socket::INET->new(
+            PeerAddr => $host,
+            PeerPort => $port,
+            Proto    => 'tcp',
+            Timeout  => 1,
+        );
+        unless ($sock) {
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
+                "TCP pre-flight failed for '$conn_name' ($host:$port): $!");
+            return 0;
+        }
+        $sock->close();
+        $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
     } else {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
@@ -346,7 +364,7 @@ sub test_connection {
                 RaiseError => 1,
                 PrintError => 0,
                 AutoCommit => 1,
-                ($db_type ne 'sqlite' ? (mariadb_connect_timeout => 2) : ()),
+                ($db_type =~ /^(mysql|mariadb)$/i ? (mariadb_connect_timeout => 2) : ()),
             );
             my $dbh = DBI->connect($dsn, $username, $password, \%connect_attrs);
             $dbh->disconnect() if $dbh;
@@ -414,7 +432,7 @@ sub select_connection {
         my $skip = 0;
         my $skip_reason = '';
         
-        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb)$/i) {
+        if (!$conn->{db_type} || $conn->{db_type} !~ /^(mysql|sqlite|mariadb|postgres|postgresql)$/i) {
             $skip = 1;
             $skip_reason = "Invalid db_type";
         }
@@ -616,11 +634,15 @@ sub get_connection {
     
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=" . $conn_config->{database_path};
+    } elsif ($db_type =~ /^postgres(ql)?$/i) {
+        my $host = $conn_config->{host} // 'localhost';
+        my $port = $conn_config->{port} // 5432;
+        my $database = $conn_config->{database} // '';
+        $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
     } else {
         my $host = $conn_config->{host} // 'localhost';
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
-        # Use MariaDB driver (compatible with MySQL)
         $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
     }
     
@@ -970,9 +992,10 @@ sub _connect_to_database {
     my $dsn;
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=$database";
+    } elsif ($db_type =~ /^postgres(ql)?$/i) {
+        $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
     } else {
-        my $driver = 'mysql';
-        $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
+        $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port";
     }
     
     try {
@@ -988,6 +1011,29 @@ sub _connect_to_database {
             "Failed to connect to database $database: $_");
         return undef;
     };
+}
+
+sub get_postgres_connections {
+    my ($self) = @_;
+    $self->_load_config();
+    my $config = $self->config;
+    my @pg_conns;
+    for my $conn_name (sort keys %$config) {
+        my $conn = $config->{$conn_name};
+        next unless ($conn->{db_type} // '') =~ /^postgres(ql)?$/i;
+        next unless $conn->{host} && $conn->{database};
+        push @pg_conns, {
+            conn_name    => $conn_name,
+            host         => $conn->{host},
+            port         => $conn->{port} // 5432,
+            database     => $conn->{database},
+            username     => $conn->{username} // '',
+            password     => $conn->{password} // '',
+            description  => $conn->{description} // $conn_name,
+            db_type      => 'postgres',
+        };
+    }
+    return \@pg_conns;
 }
 
 __PACKAGE__->meta->make_immutable;

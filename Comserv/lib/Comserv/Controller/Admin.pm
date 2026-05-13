@@ -2287,13 +2287,7 @@ sub get_table_schema :Path('/admin/get_table_schema') :Args(0) {
     try {
         my $schema_info;
         
-        if ($database eq 'ency') {
-            $schema_info = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $schema_info = $self->get_forager_table_schema($c, $table_name);
-        } else {
-            die "Invalid database: $database";
-        }
+        $schema_info = $self->_get_table_schema($c, $table_name, $database);
         
         $c->stash(json => { 
             success => 1, 
@@ -2423,6 +2417,7 @@ sub get_database_comparison {
             error => undef,
             table_comparisons => []
         },
+        postgres_databases => [],
         summary => {
             total_databases => 2,
             connected_databases => 0,
@@ -2530,6 +2525,82 @@ sub get_database_comparison {
         $comparison->{forager}->{connection_status} = 'error';
         $comparison->{forager}->{error} = $error;
     };
+
+    # Discover and process PostgreSQL databases
+    try {
+        require Comserv::Model::RemoteDB;
+        my $remote_db = Comserv::Model::RemoteDB->new();
+        my @pg_conns = $remote_db->get_postgres_connections($c);
+        $comparison->{summary}->{total_databases} += scalar(@pg_conns);
+
+        for my $pg_conn (@pg_conns) {
+            my $conn_name = $pg_conn->{conn_name};
+            my $display  = $pg_conn->{description} || $conn_name;
+            my $pg_entry = {
+                name             => $conn_name,
+                display_name     => $display,
+                tables           => [],
+                table_count      => 0,
+                connection_status => 'unknown',
+                error            => undef,
+                table_comparisons => [],
+                results_without_tables => [],
+                is_postgres      => 1,
+            };
+
+            try {
+                my $dbh = $self->_get_dbh($c, $conn_name);
+                my $sth = $dbh->prepare(
+                    "SELECT table_name FROM information_schema.tables "
+                    . "WHERE table_schema = 'public' ORDER BY table_name"
+                );
+                $sth->execute();
+                my @tables = map { $_->[0] } @{ $sth->fetchall_arrayref() };
+
+                $pg_entry->{tables}    = \@tables;
+                $pg_entry->{table_count} = scalar(@tables);
+                $pg_entry->{connection_status} = 'connected';
+                $comparison->{summary}->{connected_databases}++;
+                $comparison->{summary}->{total_tables} += scalar(@tables);
+
+                my $result_table_mapping = $self->build_result_table_mapping($c, $conn_name);
+
+                my @tables_with_results    = ();
+                my @tables_without_results = ();
+
+                for my $tbl (@tables) {
+                    my $tbl_cmp = $self->compare_table_with_result_file_v2($c, $tbl, $conn_name, $result_table_mapping);
+                    if ($tbl_cmp->{has_result_file}) {
+                        push @tables_with_results, $tbl_cmp;
+                        $comparison->{summary}->{tables_with_results}++;
+                    } else {
+                        push @tables_without_results, $tbl_cmp;
+                        $comparison->{summary}->{tables_without_results}++;
+                    }
+                }
+
+                my @orphaned = sort { lc($a->{result_name}) cmp lc($b->{result_name}) }
+                    $self->find_orphaned_result_files_v2($c, $conn_name, \@tables, $result_table_mapping);
+                $comparison->{summary}->{results_without_tables} += scalar(@orphaned);
+
+                @tables_with_results    = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_with_results;
+                @tables_without_results = sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @tables_without_results;
+                $pg_entry->{table_comparisons}       = [@tables_with_results, @tables_without_results];
+                $pg_entry->{results_without_tables}  = \@orphaned;
+
+            } catch {
+                my $err = "Error connecting to postgres database '$conn_name': $_";
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $err);
+                $pg_entry->{connection_status} = 'error';
+                $pg_entry->{error} = $err;
+            };
+
+            push @{ $comparison->{postgres_databases} }, $pg_entry;
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_database_comparison',
+            "Could not load postgres connections: $_");
+    };
     
     return $comparison;
 }
@@ -2561,11 +2632,7 @@ sub compare_table_with_result_file {
         
         # Get database schema
         try {
-            if ($database eq 'ency') {
-                $comparison->{database_schema} = $self->get_ency_table_schema($c, $table_name);
-            } elsif ($database eq 'forager') {
-                $comparison->{database_schema} = $self->get_forager_table_schema($c, $table_name);
-            }
+            $comparison->{database_schema} = $self->_get_table_schema($c, $table_name, $database);
         } catch {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file', 
                 "Error getting database schema for $table_name: $_");
@@ -2629,10 +2696,10 @@ sub find_result_file {
             "$app_root/Comserv/lib/Comserv/Model/Schema/Forager/Result/$result_name.pm"
         );
     } else {
-        # Fallback for unknown databases
+        require Comserv::Controller::Admin::SchemaComparison;
+        my $ns = Comserv::Controller::Admin::SchemaComparison::_conn_name_to_schema_ns($database);
         @search_paths = (
-            "$app_root/Comserv/lib/Comserv/Model/Schema/Result/$result_name.pm",
-            "$app_root/Comserv/lib/Comserv/Schema/Result/$result_name.pm"
+            "$app_root/Comserv/lib/Comserv/Model/Schema/$ns/Result/$result_name.pm"
         );
     }
     
@@ -2825,11 +2892,7 @@ sub compare_table_with_result_file_v2 {
         
         # Get database schema
         try {
-            if ($database eq 'ency') {
-                $comparison->{database_schema} = $self->get_ency_table_schema($c, $table_name);
-            } elsif ($database eq 'forager') {
-                $comparison->{database_schema} = $self->get_forager_table_schema($c, $table_name);
-            }
+            $comparison->{database_schema} = $self->_get_table_schema($c, $table_name, $database);
         } catch {
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'compare_table_with_result_file_v2', 
                 "Error getting database schema for $table_name: $_");
@@ -2912,6 +2975,11 @@ sub get_all_result_files {
     } elsif (lc($database) eq 'forager') {
         my $result_dir = "$base_path/Forager/Result";
         @result_files = $self->scan_result_directory_recursive($result_dir, '');
+    } else {
+        require Comserv::Controller::Admin::SchemaComparison;
+        my $ns = Comserv::Controller::Admin::SchemaComparison::_conn_name_to_schema_ns($database);
+        my $result_dir = "$base_path/$ns/Result";
+        @result_files = $self->scan_result_directory_recursive($result_dir, '') if -d $result_dir;
     }
     
     return @result_files;
@@ -3015,13 +3083,7 @@ sub get_table_result_comparison {
     # Get table schema
     my $table_schema;
     eval {
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
-        } else {
-            die "Invalid database: $database";
-        }
+        $table_schema = $self->_get_table_schema($c, $table_name, $database);
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -3082,13 +3144,7 @@ sub get_table_result_comparison_v2 {
     # Get table schema
     my $table_schema;
     eval {
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
-        } else {
-            die "Invalid database: $database";
-        }
+        $table_schema = $self->_get_table_schema($c, $table_name, $database);
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -3447,6 +3503,40 @@ sub get_database_name {
     };
     
     return $database_name;
+}
+
+sub _get_dbh {
+    my ($self, $c, $database) = @_;
+    if (lc($database) eq 'ency') {
+        return $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        return $c->model('DBForager')->schema->storage->dbh;
+    } else {
+        require Comserv::Model::RemoteDB;
+        my $remote_db = Comserv::Model::RemoteDB->new();
+        return $remote_db->get_connection($c, $database);
+    }
+}
+
+sub _get_namespace {
+    my ($database) = @_;
+    return 'Ency'    if lc($database) eq 'ency';
+    return 'Forager' if lc($database) eq 'forager';
+    require Comserv::Controller::Admin::SchemaComparison;
+    return Comserv::Controller::Admin::SchemaComparison::_conn_name_to_schema_ns($database);
+}
+
+sub _get_table_schema {
+    my ($self, $c, $table_name, $database) = @_;
+    if (lc($database) eq 'ency') {
+        return $self->get_ency_table_schema($c, $table_name);
+    } elsif (lc($database) eq 'forager') {
+        return $self->get_forager_table_schema($c, $table_name);
+    } else {
+        require Comserv::Controller::Admin::SchemaComparison;
+        my $sc = Comserv::Controller::Admin::SchemaComparison->new();
+        return $sc->get_postgres_table_schema($c, $table_name, $database);
+    }
 }
 
 # Get list of database tables with their schema information
@@ -4592,11 +4682,9 @@ sub sync_result_to_table :Path('/admin/sync_result_to_table') :Args(0) {
 sub get_table_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $schema = $c->model($model_name)->schema;
+    my $dbh = $self->_get_dbh($c, $database);
     
     # Get table information from database using DESCRIBE (same as get_ency_table_schema)
-    my $dbh = $schema->storage->dbh;
     my $sth = $dbh->prepare("DESCRIBE $table_name");
     $sth->execute();
     
@@ -5124,20 +5212,11 @@ sub create_table_from_result :Path('/admin/create_table_from_result') :Args(0) {
     try {
         my $sql_statements = $self->generate_create_table_sql($c, $result_class, $database);
         
-        my $schema;
-        if (lc($database) eq 'ency') {
-            $schema = $c->model('DBEncy')->schema;
-        } elsif (lc($database) eq 'forager') {
-            $schema = $c->model('DBForager')->schema;
-        } else {
-            die "Invalid database: $database";
-        }
+        my $dbh = $self->_get_dbh($c, $database);
         
-        unless ($schema) {
-            die "Failed to get database schema for $database";
+        unless ($dbh) {
+            die "Failed to get database handle for $database";
         }
-        
-        my $dbh = $schema->storage->dbh;
         my @executed = ();
         my @errors = ();
         

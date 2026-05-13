@@ -230,12 +230,7 @@ sub sync_primary_key_to_result :Path('/schema-comparison/sync_primary_key_to_res
     my $database = $json_data->{database};
     
     try {
-        my $table_schema;
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
-        }
+        my $table_schema = $self->_get_table_schema($c, $table_name, $database);
         
         my $pks = $table_schema->{primary_keys} || [];
         my $pk_list = join(', ', map { "'$_'" } @$pks);
@@ -314,12 +309,7 @@ sub sync_primary_key_to_table :Path('/schema-comparison/sync_primary_key_to_tabl
         
         my $pk_list = join(', ', @$pks);
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->_get_dbh($c, $database);
         
         # Try to drop existing PK first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP PRIMARY KEY") };
@@ -384,12 +374,7 @@ sub sync_unique_constraint_to_table :Path('/schema-comparison/sync_unique_constr
         
         my $cols_list = join(', ', @{$constraint->{columns}});
         
-        my $dbh;
-        if ($database eq 'ency') {
-            $dbh = $c->model('DBEncy')->schema->storage->dbh;
-        } elsif ($database eq 'forager') {
-            $dbh = $c->model('DBForager')->schema->storage->dbh;
-        }
+        my $dbh = $self->_get_dbh($c, $database);
         
         # Try to drop existing index first, ignore error if none exists
         eval { $dbh->do("ALTER TABLE $table_name DROP INDEX $constraint_name") };
@@ -443,12 +428,7 @@ sub sync_unique_constraint_to_result :Path('/schema-comparison/sync_unique_const
     my $constraint_name = $json_data->{constraint_name};
     
     try {
-        my $table_schema;
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
-        }
+        my $table_schema = $self->_get_table_schema($c, $table_name, $database);
         
         # Match by name first; for 'unnamed' also match by column set (MySQL auto-naming)
         my ($constraint) = grep { ($_->{name} || 'unnamed') eq $constraint_name } @{$table_schema->{unique_constraints} || []};
@@ -727,6 +707,8 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
             $table_schema = $self->get_ency_table_schema($c, $table_name);
         } elsif ($database eq 'forager') {
             $table_schema = $self->get_forager_table_schema($c, $table_name);
+        } elsif (_is_postgres_database($database)) {
+            $table_schema = $self->get_postgres_table_schema($c, $table_name, $database);
         } else {
             die "Invalid database: $database";
         }
@@ -735,7 +717,7 @@ sub create_result_from_table :Path('/schema-comparison/create_result_from_table'
             die "Could not retrieve schema for table '$table_name' from database '$database'";
         }
         
-        my $result_content = $self->generate_result_file_content($table_name, $table_schema);
+        my $result_content = $self->generate_result_file_content($table_name, $table_schema, $database);
         my $result_file_path = $self->get_result_file_path($c, $table_name, $database);
         
         my $result_dir = dirname($result_file_path);
@@ -846,7 +828,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         # Load the Result class dynamically
         # result_name may contain '/' from scan_result_directory_recursive (subdir prefix);
         # convert to '::' so the eval'd require is valid Perl
-        my $namespace  = $database eq 'ency' ? 'Ency' : 'Forager';
+        my $namespace  = _get_namespace($database);
         (my $result_path = $result_name) =~ s{/}{::}g;
         my $class_name = "Comserv::Model::Schema::${namespace}::Result::${result_path}";
 
@@ -855,17 +837,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
             die "Could not load Result class '$class_name': $@";
         }
 
-        # Get the schema / DBH
-        my $schema;
-        if ($database eq 'ency') {
-            $schema = $c->model('DBEncy')->schema;
-        } elsif ($database eq 'forager') {
-            $schema = $c->model('DBForager')->schema;
-        } else {
-            die "Invalid database: $database";
-        }
-
-        my $dbh = $schema->storage->dbh;
+        my $dbh = $self->_get_dbh($c, $database);
 
         # Get table name from the loaded Result class
         my $table_name = $class_name->table;
@@ -1098,8 +1070,7 @@ sub remove_field_from_table :Path('/schema-comparison/remove_field_from_table') 
     }
 
     try {
-        my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-        my $dbh = $c->model($model_name)->schema->storage->dbh;
+        my $dbh = $self->_get_dbh($c, $database);
 
         my $sql = "ALTER TABLE `$table_name` DROP COLUMN `$field_name`";
         $dbh->do($sql);
@@ -1129,8 +1100,7 @@ Get database table field information
 sub get_table_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $dbh = $c->model($model_name)->schema->storage->dbh;
+    my $dbh = $self->_get_dbh($c, $database);
     
     my $sth = $dbh->prepare("DESCRIBE $table_name $field_name");
     $sth->execute();
@@ -1175,8 +1145,7 @@ Get Result file field information
 sub get_result_field_info {
     my ($self, $c, $table_name, $field_name, $database) = @_;
     
-    my $model_name = $database eq 'ency' ? 'DBEncy' : 'DBForager';
-    my $schema = $c->model($model_name)->schema;
+    my $schema = $self->_get_schema_obj($c, $database);
     
     # Find the source that matches the table name
     my $source_name;
@@ -1336,14 +1305,7 @@ sub update_table_field_from_result {
     my $extra = "";
     $extra = "AUTO_INCREMENT" if $result_field_info->{is_auto_increment};
     
-    my $dbh;
-    if ($database eq 'ency') {
-        $dbh = $c->model('DBEncy')->schema->storage->dbh;
-    } elsif ($database eq 'forager') {
-        $dbh = $c->model('DBForager')->schema->storage->dbh;
-    } else {
-        die "Invalid database: $database";
-    }
+    my $dbh = $self->_get_dbh($c, $database);
 
     # Check if column exists to determine if we should use ADD or MODIFY
     my $column_exists = 0;
@@ -1409,10 +1371,18 @@ Generate Result file Perl code content
 =cut
 
 sub generate_result_file_content {
-    my ($self, $table_name, $db_schema) = @_;
+    my ($self, $table_name, $db_schema, $database) = @_;
     
     my $class_name = _table_to_class_name($table_name);
-    my $content = "package Comserv::Model::Schema::Ency::Result::$class_name;\n";
+    my $ns;
+    if (!$database || lc($database) eq 'ency') {
+        $ns = 'Ency';
+    } elsif (lc($database) eq 'forager') {
+        $ns = 'Forager';
+    } else {
+        $ns = _conn_name_to_schema_ns($database);
+    }
+    my $content = "package Comserv::Model::Schema::${ns}::Result::$class_name;\n";
     $content .= "use base 'DBIx::Class::Core';\n\n";
     $content .= "__PACKAGE__->table('$table_name');\n";
     $content .= "__PACKAGE__->add_columns(\n";
@@ -1513,12 +1483,18 @@ sub get_all_result_files {
     my $lib_path = dirname(dirname(dirname(dirname(__FILE__))));
     my $base_path = "$lib_path/Comserv/Model/Schema";
     
+    my $ns;
     if (lc($database) eq 'ency') {
-        my $result_dir = "$base_path/Ency/Result";
-        @result_files = $self->scan_result_directory_recursive($result_dir, '');
+        $ns = 'Ency';
     } elsif (lc($database) eq 'forager') {
-        my $result_dir = "$base_path/Forager/Result";
-        @result_files = $self->scan_result_directory_recursive($result_dir, '');
+        $ns = 'Forager';
+    } elsif (_is_postgres_database($database)) {
+        $ns = _conn_name_to_schema_ns($database);
+    }
+
+    if ($ns) {
+        my $result_dir = "$base_path/$ns/Result";
+        @result_files = $self->scan_result_directory_recursive($result_dir, '') if -d $result_dir;
     }
     
     return @result_files;
@@ -1566,6 +1542,191 @@ sub extract_table_name_from_result_file {
     }
     
     return undef;
+}
+
+sub _conn_name_to_schema_ns {
+    my ($conn_name) = @_;
+    $conn_name =~ s/_(postgres|postgresql|pg|pgsql)$//i;
+    return join('', map { ucfirst(lc($_)) } split(/_/, $conn_name));
+}
+
+sub _is_postgres_database {
+    my ($database) = @_;
+    return 0 unless $database;
+    return 0 if lc($database) eq 'ency' || lc($database) eq 'forager';
+    return 1;
+}
+
+sub _get_dbh {
+    my ($self, $c, $database) = @_;
+    if (lc($database) eq 'ency') {
+        return $c->model('DBEncy')->schema->storage->dbh;
+    } elsif (lc($database) eq 'forager') {
+        return $c->model('DBForager')->schema->storage->dbh;
+    } elsif (_is_postgres_database($database)) {
+        return $self->_get_postgres_dbh($c, $database);
+    }
+    die "Unknown database: $database";
+}
+
+sub _get_namespace {
+    my ($database) = @_;
+    return 'Ency'    if lc($database) eq 'ency';
+    return 'Forager' if lc($database) eq 'forager';
+    return _conn_name_to_schema_ns($database);
+}
+
+sub _get_schema_obj {
+    my ($self, $c, $database) = @_;
+    if (lc($database) eq 'ency') {
+        return $c->model('DBEncy')->schema;
+    } elsif (lc($database) eq 'forager') {
+        return $c->model('DBForager')->schema;
+    }
+    die "No DBIx::Class schema available for postgres database '$database' - use raw DBI instead";
+}
+
+sub _get_table_schema {
+    my ($self, $c, $table_name, $database) = @_;
+    if (lc($database) eq 'ency') {
+        return $self->get_ency_table_schema($c, $table_name);
+    } elsif (lc($database) eq 'forager') {
+        return $self->get_forager_table_schema($c, $table_name);
+    } elsif (_is_postgres_database($database)) {
+        return $self->get_postgres_table_schema($c, $table_name, $database);
+    }
+    die "Invalid database: $database";
+}
+
+sub _get_postgres_dbh {
+    my ($self, $c, $conn_name) = @_;
+    require Comserv::Model::RemoteDB;
+    my $remote_db = Comserv::Model::RemoteDB->new();
+    return $remote_db->get_connection($c, $conn_name);
+}
+
+=head2 get_postgres_table_schema
+
+Get schema info from a PostgreSQL database connection
+
+=cut
+
+sub get_postgres_table_schema {
+    my ($self, $c, $table_name, $conn_name) = @_;
+
+    my $schema_info = {
+        columns => {},
+        primary_keys => [],
+        unique_constraints => [],
+        foreign_keys => [],
+        indexes => []
+    };
+
+    try {
+        my $dbh = $self->_get_postgres_dbh($c, $conn_name);
+        die "Could not connect to PostgreSQL connection '$conn_name'" unless $dbh;
+
+        my $col_sth = $dbh->prepare(q{
+            SELECT column_name, data_type, character_maximum_length,
+                   numeric_precision, numeric_scale,
+                   is_nullable, column_default, udt_name
+            FROM information_schema.columns
+            WHERE table_schema = 'public' AND table_name = ?
+            ORDER BY ordinal_position
+        });
+        $col_sth->execute($table_name);
+
+        while (my $row = $col_sth->fetchrow_hashref()) {
+            my $col_name = $row->{column_name};
+            my $data_type = $row->{udt_name} // $row->{data_type};
+            my $is_auto = (defined $row->{column_default} && $row->{column_default} =~ /^nextval\(/i) ? 1 : 0;
+
+            my $size;
+            if ($row->{character_maximum_length}) {
+                $size = $row->{character_maximum_length};
+            } elsif ($row->{numeric_precision} && $row->{data_type} =~ /numeric|decimal/i) {
+                $size = "$row->{numeric_precision},$row->{numeric_scale}";
+            }
+
+            $schema_info->{columns}->{$col_name} = {
+                data_type         => $data_type,
+                is_nullable       => ($row->{is_nullable} eq 'YES' ? 1 : 0),
+                default_value     => ($is_auto ? undef : $row->{column_default}),
+                is_auto_increment => $is_auto,
+                extra             => '',
+                size              => $size,
+            };
+        }
+
+        my $pk_sth = $dbh->prepare(q{
+            SELECT kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+            WHERE tc.constraint_type = 'PRIMARY KEY'
+              AND tc.table_schema = 'public'
+              AND tc.table_name = ?
+            ORDER BY kcu.ordinal_position
+        });
+        $pk_sth->execute($table_name);
+        while (my ($col) = $pk_sth->fetchrow_array()) {
+            push @{$schema_info->{primary_keys}}, $col;
+        }
+
+        my $uq_sth = $dbh->prepare(q{
+            SELECT tc.constraint_name, kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+            WHERE tc.constraint_type = 'UNIQUE'
+              AND tc.table_schema = 'public'
+              AND tc.table_name = ?
+            ORDER BY tc.constraint_name, kcu.ordinal_position
+        });
+        $uq_sth->execute($table_name);
+        my %uq_map;
+        while (my $row = $uq_sth->fetchrow_hashref()) {
+            push @{$uq_map{$row->{constraint_name}}}, $row->{column_name};
+        }
+        for my $cname (sort keys %uq_map) {
+            push @{$schema_info->{unique_constraints}}, {
+                name    => $cname,
+                columns => $uq_map{$cname},
+            };
+        }
+
+        my $fk_sth = $dbh->prepare(q{
+            SELECT kcu.column_name, ccu.table_name AS referenced_table,
+                   ccu.column_name AS referenced_column, tc.constraint_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+              ON tc.constraint_name = kcu.constraint_name
+             AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage ccu
+              ON ccu.constraint_name = tc.constraint_name
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+              AND tc.table_schema = 'public'
+              AND tc.table_name = ?
+        });
+        $fk_sth->execute($table_name);
+        while (my $row = $fk_sth->fetchrow_hashref()) {
+            push @{$schema_info->{foreign_keys}}, {
+                column            => $row->{column_name},
+                referenced_table  => $row->{referenced_table},
+                referenced_column => $row->{referenced_column},
+                constraint_name   => $row->{constraint_name},
+            };
+        }
+
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_postgres_table_schema',
+            "Error getting PostgreSQL schema for $table_name ($conn_name): $_");
+        die $_;
+    };
+
+    return $schema_info;
 }
 
 =head2 get_ency_table_schema
@@ -1801,13 +1962,7 @@ sub get_table_result_comparison_v2 {
     # Get table schema
     my $table_schema;
     eval {
-        if ($database eq 'ency') {
-            $table_schema = $self->get_ency_table_schema($c, $table_name);
-        } elsif ($database eq 'forager') {
-            $table_schema = $self->get_forager_table_schema($c, $table_name);
-        } else {
-            die "Invalid database: $database";
-        }
+        $table_schema = $self->_get_table_schema($c, $table_name, $database);
     };
     if ($@) {
         warn "Failed to get table schema for $table_name ($database): $@";
@@ -2373,7 +2528,8 @@ sub generate_result_file_content {
     
     # Convert table name to class name
     my $class_name = join('', map { ucfirst(lc($_)) } split(/_/, $table_name));
-    my $namespace = $database eq 'Ency' ? 'Comserv::Model::Schema::Ency::Result' : 'Comserv::Model::Schema::Forager::Result';
+    my $ns = _get_namespace($database // 'ency');
+    my $namespace = "Comserv::Model::Schema::${ns}::Result";
     
     my $content = qq{package ${namespace}::${class_name};
 
@@ -2481,7 +2637,14 @@ sub get_result_file_path {
     my ($self, $c, $table_name, $database) = @_;
 
     my $class_name = _table_to_class_name($table_name);
-    my $ns = ($database && lc($database) eq 'forager') ? 'Forager' : 'Ency';
+    my $ns;
+    if (!$database || lc($database) eq 'ency') {
+        $ns = 'Ency';
+    } elsif (lc($database) eq 'forager') {
+        $ns = 'Forager';
+    } else {
+        $ns = _conn_name_to_schema_ns($database);
+    }
 
     my $base_path = $c->path_to('lib', 'Comserv', 'Model', 'Schema', $ns, 'Result');
     return File::Spec->catfile($base_path, "$class_name.pm");
