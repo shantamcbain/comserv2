@@ -157,10 +157,8 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
-                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
-                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
-                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
+                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
+                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
                 }
             }
         } catch {
@@ -174,6 +172,47 @@ sub index :Path :Args(0) {
     # is a clean standalone chat interface.
     my $popup_mode = $c->request->param('popup') ? 1 : 0;
 
+    # task_id=N: opened from a todo "Chat about this task" link.
+    # Look up the todo and pass it to the template so the welcome screen can
+    # show what the user is supposed to be working on.
+    my $task_id  = $c->request->param('task_id') || '';
+    my $task_todo = undef;
+    if ($task_id && $task_id =~ /^\d+$/) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $t = $schema->resultset('Todo')->find($task_id);
+                if ($t) {
+                    my $s = $t->status // 0;
+                    my $status_label = $s == 1 ? 'New'
+                                     : $s == 2 ? 'In Progress'
+                                     : $s == 3 ? 'Done'
+                                     : "status=$s";
+                    # Resolve project name
+                    my $proj_name = '';
+                    eval {
+                        if ($t->project_id) {
+                            my $p = $schema->resultset('Project')->find($t->project_id);
+                            $proj_name = $p->name if $p;
+                        }
+                    };
+                    $task_todo = {
+                        record_id   => $t->record_id,
+                        subject     => $t->subject     // 'Untitled',
+                        description => $t->description // '',
+                        status      => $status_label,
+                        priority    => $t->priority    // '',
+                        due_date    => $t->due_date    // '',
+                        project     => $proj_name,
+                        edit_url    => "/todo/edit?record_id=" . $t->record_id,
+                    };
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'index', "task_todo lookup failed: $@") if $@;
+    }
+
     # Set template variables
     $c->stash(
         template => 'ai/index.tt',
@@ -186,6 +225,7 @@ sub index :Path :Args(0) {
         installed_models => $installed_models,
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
+        task_todo => $task_todo,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -522,7 +562,7 @@ sub generate :Local :Args(0) {
             'generate', "ENCY agent: injected system prompt");
     }
 
-    if (lc($normalized_agent_type) =~ /^bmaster$/ && !$system) {
+    if (lc($normalized_agent_type) =~ /^beemaster$/ && !$system) {
         $system = $self->_build_bmaster_system_prompt($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "BMaster agent: injected system prompt");
@@ -630,7 +670,7 @@ sub generate :Local :Args(0) {
     # Planning agent already injects project list via _build_planning_system_prompt;
     # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
     my $inject_prompt = $prompt;
-    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
+    if ($normalized_agent_type =~ /^(planning|ency|beemaster)$/i) {
         $inject_prompt = "project todo $prompt";
     }
     if ($normalized_agent_type =~ /^accounting$/i) {
@@ -638,6 +678,13 @@ sub generate :Local :Args(0) {
     }
     my $module_data_gen = $self->_get_module_data($c, $inject_prompt, $agent_id);
     if ($module_data_gen) {
+        # Hard cap on injected data to prevent ENCY/todo keyword explosion from bloating system prompt.
+        # planning agent gets less room because its own prompt already includes the project list.
+        my $inject_cap = ($normalized_agent_type eq 'planning') ? 8_000 : 16_000;
+        if (length($module_data_gen) > $inject_cap) {
+            $module_data_gen = substr($module_data_gen, 0, $inject_cap)
+                . "\n[... DB data truncated to ${inject_cap} chars to stay within context budget ...]";
+        }
         $system .= "\n\n" . $module_data_gen;
     }
     my $shared_hist_gen = $self->_search_shared_history($c, $prompt, $site_name_gen);
@@ -717,9 +764,20 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
+                grok-4.3
             );
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -756,12 +814,12 @@ sub generate :Local :Args(0) {
                     if ($key_obj) {
                         my $meta       = $key_obj->get_metadata() || {};
                         my $deprecated = $meta->{deprecated_models} || {};
-                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} } && !$GROK_DEAD{ $meta->{last_working_model} }) {
                             $grok->model($meta->{last_working_model});
                         } else {
                             my $synced = $meta->{available_models} || [];
                             my ($first) = grep {
-                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} } && !$GROK_DEAD{ $_->{id} }
                             } @$synced;
                             $grok->model($first->{id}) if $first && $first->{id};
                         }
@@ -819,11 +877,16 @@ sub generate :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer newer models: use reverse-alphabetical sort as heuristic
-                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
-                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
+                            # Prefer numeric-version models (grok-4, grok-3...) over
+                            # alphabetic-named ones (grok-code-*, grok-beta) then reverse-sort
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -913,7 +976,7 @@ sub generate :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $force_large = (!$is_guest && !$manual_model &&
-                $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+                $normalized_agent_type =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
             my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
@@ -945,11 +1008,25 @@ sub generate :Local :Args(0) {
                     push @trace, "💾 In-memory: " . join(', ', sort keys %in_mem);
                     if (!$in_mem{$use_model}) {
                         my @inst_names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @$installed_models;
-                        my ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
-                        if ($preferred) {
-                            push @trace, "💾 Switched tier_small '$use_model' → '$preferred' (already in memory)";
-                            $use_model = $preferred;
-                            $ollama->model($use_model);
+                        # When force_large is active (ency/planning/bmaster), only prefer an
+                        # in-memory model if it is >= the size of tier_large. Never downgrade.
+                        my ($preferred);
+                        if ($force_large) {
+                            $preferred = $in_mem{$tier_large} ? $tier_large : undef;
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            } else {
+                                push @trace, "💾 No large model in memory — keeping $use_model (cold start)";
+                            }
+                        } else {
+                            ($preferred) = grep { $in_mem{$_} } ($tier_large, @inst_names);
+                            if ($preferred) {
+                                push @trace, "💾 Switched '$use_model' → '$preferred' (already in memory)";
+                                $use_model = $preferred;
+                                $ollama->model($use_model);
+                            }
                         }
                     } else {
                         push @trace, "💾 '$use_model' already in memory — no cold-start needed";
@@ -970,6 +1047,51 @@ sub generate :Local :Args(0) {
             # Use a longer timeout when model is NOT in memory (cold start: load + generate)
             my $is_cold_start = !grep { ($_ && ref $_ ? $_->{name} : $_) eq $use_model }
                                       @{ $fast_check->get_running_models() || [] };
+
+            # For force_large agents (planning/ency/bmaster) a cold start of phi4/14b
+            # can take 5-10+ minutes and always times out. Auto-fall back to Grok when:
+            #   - force_large is active (not a manual model override)
+            #   - the selected large model is NOT in memory
+            #   - a Grok API key is configured for this user
+            if ($force_large && $is_cold_start && !$manual_model) {
+                my $fallback_key = '';
+                eval {
+                    my $fb_schema = $c->model('DBEncy')->schema;
+                    my $fb_obj = $fb_schema->resultset('UserApiKeys')->search(
+                        { user_id => $user_id, service => 'grok', is_active => '1' }
+                    )->first;
+                    $fb_obj ||= $fb_schema->resultset('UserApiKeys')->search(
+                        { service => 'grok', is_active => '1' }
+                    )->first if $can_select_model_gen;
+                    $fallback_key = $fb_obj->get_api_key() if $fb_obj && $fb_obj->api_key_encrypted;
+                };
+                if ($fallback_key) {
+                    push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
+                    my $fb_grok = $c->model('Grok');
+                    $fb_grok->api_key($fallback_key);
+                    $fb_grok->model('grok-4.20-non-reasoning');
+                    my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
+                    push @fb_msgs, { role => 'user', content => $prompt };
+                    my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
+                    if ($fb_resp) {
+                        push @trace, "✅ Grok fallback responded";
+                        my $trace_txt = join("\n", @trace);
+                        $c->res->content_type('application/json');
+                        $c->res->body(encode_json({
+                            success        => 1,
+                            response       => $fb_resp,
+                            model          => 'grok-4.20-non-reasoning (cold-start fallback)',
+                            provider       => 'grok',
+                            trace          => $trace_txt,
+                            thinking_trace => \@trace,
+                        }));
+                        $c->res->status(200);
+                        return;
+                    }
+                }
+                push @trace, sprintf("🧊 Cold start — no Grok fallback available; proceeding with %s (may be slow)", $use_model);
+            }
+
             my $timeout_secs = $is_cold_start ? 600 : 480;
             push @trace, $is_cold_start
                 ? "🧊 Cold start detected — timeout extended to ${timeout_secs}s"
@@ -1067,11 +1189,12 @@ sub generate :Local :Args(0) {
                 $_gr = [split /,/, $_gr] unless ref $_gr;
                 grep { /^(admin|developer|editor)$/i } @$_gr;
             };
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 16_000
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency beemaster 3dprint accounting)) ? 20_000
                               : $_gen_is_admin ? 14_000
                               : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
-                               : $_gen_is_admin                                        ? 10_000
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|beemaster)$/)        ? 16_000
+                               : ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
+                               : $_gen_is_admin                                         ? 10_000
                                : 6_000;
             my $raw_total_gen = 0;
             $raw_total_gen += length($_->{content} || '') for @ollama_msgs;
@@ -1144,25 +1267,46 @@ sub generate :Local :Args(0) {
             }
 
             # ── Tier 1 query ─────────────────────────────────────────────────
-            my $query_start = time();
+            # Hard wall-clock timeout via alarm() — LWP timeout only covers socket
+            # idle time, so a slowly-streaming Ollama response can block forever.
+            my $query_start  = time();
+            my $_alarm_secs  = $timeout_secs + 30;
+            my $_alarm_fired = 0;
+            my $_tier1_err   = '';
             if (@$history_items || $system) {
                 push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
                     $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
-                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->chat(messages => \@ollama_msgs);
+                eval {
+                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
+                    alarm($_alarm_secs);
+                    $response = $ollama->chat(messages => \@ollama_msgs);
+                    alarm(0);
+                };
+                alarm(0);
+                $_tier1_err = $@ if $@;
             } else {
                 push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
                     $current_host, $use_model);
-                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                $response = $ollama->query(
-                    prompt => $prompt,
-                    format => $format eq 'json' ? 'json' : undef,
-                    system => $system || undef
-                );
+                eval {
+                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
+                    alarm($_alarm_secs);
+                    $response = $ollama->query(
+                        prompt => $prompt,
+                        format => $format eq 'json' ? 'json' : undef,
+                        system => $system || undef
+                    );
+                    alarm(0);
+                };
+                alarm(0);
+                $_tier1_err = $@ if $@;
+            }
+            if ($_alarm_fired || $_tier1_err) {
+                $ollama->last_error("Wall-clock timeout after ${_alarm_secs}s") if $_alarm_fired;
+                $response = undef;
             }
             my $query_elapsed = time() - $query_start;
 
@@ -1172,8 +1316,30 @@ sub generate :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'generate', "Tier-1 FAILED host=$current_host model=$use_model elapsed=${query_elapsed}s error_class=$error_class error=$error");
                 push @trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $query_elapsed, $error);
-                $self->_flush_progress($gen_progress_file, \@trace, 1);
-                die "Ollama query failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'generate', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = (@$history_items || $system)
+                        ? $ollama->chat(messages => \@ollama_msgs)
+                        : $ollama->query(prompt => $ollama_msgs[-1]->{content});
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        $self->_flush_progress($gen_progress_file, \@trace, 1);
+                        die "Ollama query failed: $retry_err";
+                    }
+                } else {
+                    $self->_flush_progress($gen_progress_file, \@trace, 1);
+                    die "Ollama query failed: $error";
+                }
             }
 
             # Normalise response text (chat vs generate API have different keys)
@@ -1250,7 +1416,7 @@ sub generate :Local :Args(0) {
         # Log success metrics
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
-        my $ai_response = $response->{response} || '';
+        my $ai_response = $self->_sanitize_ai_urls($response->{response} || '');
         # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
         my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
             ? $response->{usage}{total_tokens}
@@ -1901,7 +2067,9 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
-    
+    my $req_audio_file_id      = $json_data->{audio_file_id}      || undef;
+    my $req_transcript_file_id = $json_data->{transcript_file_id} || undef;
+
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -1997,7 +2165,7 @@ sub chat :Local :Args(0) {
     if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_ency_system_prompt($c);
     }
-    if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
+    if (lc($chat_agent_id) =~ /^beemaster$/ && !$chat_agent_system) {
         $chat_agent_system = $self->_build_bmaster_system_prompt($c);
     }
 
@@ -2048,7 +2216,7 @@ sub chat :Local :Args(0) {
 
     # Fetch live module data — force inject for agents that always need project/todo data
     my $chat_inject_prompt = $prompt;
-    if ($chat_agent_id =~ /^(planning|ency|bmaster)$/i) {
+    if ($chat_agent_id =~ /^(planning|ency|beemaster)$/i) {
         $chat_inject_prompt = "project todo $prompt";
     }
     my $module_data = $self->_get_module_data($c, $chat_inject_prompt, $chat_agent_id);
@@ -2156,9 +2324,20 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-code-fast-1
+                grok-4-fast-non-reasoning
+                grok-4-1-fast-non-reasoning
+                grok-4-0709
+                grok-3
+                grok-4.3
             );
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
+                grok-4-fast-reasoning
+                grok-4-1-fast-reasoning
+            );
+            %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2198,9 +2377,14 @@ sub chat :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -2287,7 +2471,7 @@ sub chat :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $chat_force_large = (!$is_guest && !$manual_model &&
-                $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
+                $chat_agent_id =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
@@ -2347,7 +2531,7 @@ sub chat :Local :Args(0) {
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
             # Admin users have larger nav guides — raise limits so admin links are not truncated.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency beemaster 3dprint)) ? 16_000
                               : $can_select_model_perm ? 14_000
                               : 8_000;
             my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
@@ -2437,7 +2621,26 @@ sub chat :Local :Args(0) {
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                     'chat', "Tier-1 Ollama FAILED model=$use_model elapsed=${chat_elapsed}s error=$error");
                 push @chat_trace, sprintf("❌ Tier-1 FAILED after %ds: %s", $chat_elapsed, $error);
-                die "Ollama chat failed: $error";
+
+                if ($error =~ /timeout/i && $use_model ne $tier_small) {
+                    push @chat_trace, sprintf("⚡ Timeout on cold start — falling back to small model: %s", $tier_small);
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                        'chat', "Cold-start timeout fallback: $use_model -> $tier_small");
+                    $ollama->model($tier_small);
+                    $ollama->timeout(120);
+                    my $retry_start = time();
+                    $response = $ollama->chat(messages => \@ollama_messages);
+                    my $retry_elapsed = time() - $retry_start;
+                    if ($response) {
+                        $use_model = $tier_small;
+                        push @chat_trace, sprintf("✅ Fallback small model responded in %ds", $retry_elapsed);
+                    } else {
+                        my $retry_err = $ollama->last_error || $error;
+                        die "Ollama chat failed: $retry_err";
+                    }
+                } else {
+                    die "Ollama chat failed: $error";
+                }
             }
 
             if ($response->{message} && $response->{message}->{content}) {
@@ -2505,6 +2708,8 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
+
+        $ai_response = $self->_sanitize_ai_urls($ai_response);
 
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
@@ -2579,6 +2784,14 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
             
+            my %_user_meta = (
+                system_prompt    => '',
+                format           => 'text',
+                is_guest         => $is_guest ? 1 : 0,
+                guest_session_id => $guest_session_id,
+            );
+            $_user_meta{audio_file_id}      = $req_audio_file_id      + 0 if $req_audio_file_id;
+            $_user_meta{transcript_file_id} = $req_transcript_file_id + 0 if $req_transcript_file_id;
             $schema->resultset('AiMessage')->create({
                 conversation_id => $final_conversation_id,
                 user_id => $user_id,
@@ -2586,12 +2799,7 @@ sub chat :Local :Args(0) {
                 content => $prompt,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => encode_json({
-                    system_prompt => '',
-                    format => 'text',
-                    is_guest => $is_guest ? 1 : 0,
-                    guest_session_id => $guest_session_id
-                }),
+                metadata => encode_json(\%_user_meta),
                 ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
@@ -3793,7 +4001,7 @@ context so it automatically respects the current user's session / role.
 
   $c        - Catalyst context
   $prompt   - the user's raw query text
-  $agent_id - agent id string (e.g. 'bmaster', 'csc')
+  $agent_id - agent id string (e.g. 'beemaster', 'csc')
 
 Returns a string of data context, or empty string when nothing relevant found.
 
@@ -3849,6 +4057,66 @@ sub _get_module_data {
     my $want_todos = ($prompt =~ /todo|task|overdue|due|deadline|priority|critical|reschedul|plan|backlog|block|proceed|prevent|stuck|hold/i)
                   || ($prompt =~ /project/i && $prompt =~ /state|status|progress|what|how|summar|complet|done|remain|left|next/i);
 
+    # Fast-path: when the widget is on /todo/details?record_id=N, inject ONLY that todo
+    # plus any todos that it is blocked by. No need to load all active todos.
+    my $page_path_req = $c->req->param('page_path') || '';
+    # Also check the JSON body path (already parsed into param by Catalyst for form posts;
+    # for JSON bodies we fall back to the stash or request body — safe to do a quick regex check).
+    if (!$page_path_req) {
+        my $raw = eval { $c->req->content } // '';
+        ($page_path_req) = ($raw =~ /"page_path"\s*:\s*"([^"]+)"/) if $raw;
+    }
+    my ($single_todo_id) = ($page_path_req =~ m{/todo/(?:details|view)[?&;](?:.*&)?record_id=(\d+)}i);
+
+    if ($single_todo_id && $want_todos) {
+        eval {
+            my $schema = $c->model('DBEncy')->schema;
+            if ($schema) {
+                my $rs = $schema->resultset('Todo');
+                my $t  = $rs->find($single_todo_id);
+                if ($t) {
+                    my $stat_label = ($t->status // 0) == 1 ? 'NEW'
+                                   : ($t->status // 0) == 2 ? 'IN PROGRESS'
+                                   : ($t->status // 0) == 3 ? 'DONE'
+                                   : 'status=' . ($t->status // '?');
+                    my $block = "CURRENT TODO #$single_todo_id:\n"
+                        . "  Subject:  " . ($t->subject   // 'Untitled') . "\n"
+                        . "  Status:   $stat_label\n"
+                        . "  Priority: P" . ($t->priority // '?') . "\n"
+                        . "  Due:      " . ($t->due_date  // 'none') . "\n"
+                        . "  Project:  " . (do { my $pid = $t->project_id; $pid ? "id=$pid" : 'none' }) . "\n"
+                        . "  Notes:    " . ($t->description // '') . "\n";
+
+                    # Look up any todos this one explicitly blocks or is blocked by
+                    eval {
+                        if ($t->can('blocker_id') && $t->blocker_id) {
+                            my $blocker = $rs->find($t->blocker_id);
+                            if ($blocker) {
+                                $block .= "BLOCKING TODO #" . $t->blocker_id . ":\n"
+                                    . "  Subject: " . ($blocker->subject // '') . "\n"
+                                    . "  Status:  " . (($blocker->status // 0) == 2 ? 'IN PROGRESS' : ($blocker->status // 0) == 3 ? 'DONE' : 'NEW') . "\n";
+                            }
+                        }
+                        # Any other todos that list this one as their blocker
+                        my @blocked_by = $rs->search({ blocker_id => $single_todo_id, status => { '!=' => 3 } })->all;
+                        if (@blocked_by) {
+                            $block .= "TODOS BLOCKED BY THIS (#$single_todo_id):\n";
+                            for my $b (@blocked_by) {
+                                $block .= "  [#" . $b->record_id . "] " . ($b->subject // '') . "\n";
+                            }
+                        }
+                    };
+                    $block .= "Edit at /todo/edit?record_id=$single_todo_id | All todos: /todo";
+                    push @sections, $block;
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "Single-todo fetch error: $@") if $@;
+        # Skip the bulk todo fetch below since we already have what we need
+        $want_todos = 0;
+    }
+
     if ($want_todos) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -3873,9 +4141,11 @@ sub _get_module_data {
                     $site_filter{sitename} = $site_name;
                 }
 
+                # Cap rows: planning agent on CSC admin can otherwise inject hundreds of todos
+                my $todo_row_cap = (lc($agent_id) eq 'planning') ? 20 : 40;
                 my @todos = $rs->search(
                     \%site_filter,
-                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => 40 }
+                    { order_by => [{ -asc => 'priority' }, { -asc => 'due_date' }], rows => $todo_row_cap }
                 );
 
                 if (@todos) {
@@ -3977,25 +4247,22 @@ sub _get_module_data {
                 my $results = $forager->searchHerbs($c, $search);
                 if ($results && @$results) {
                     my @lines;
-                    my $last = $#$results < 14 ? $#$results : 14;
+                    my $last = $#$results < 7 ? $#$results : 7;
                     for my $h (@{$results}[0..$last]) {
                         my $name   = $h->botanical_name // '';
                         my $common = $h->common_names   // '';
+                        my $id     = $h->record_id      // '';
                         my $nectar = $h->nectar         // '';
                         my $pollen = $h->pollen         // '';
-                        my $apis   = $h->apis           // '';
-                        my $id     = $h->record_id      // '';
-                        push @lines, "  [#$id] $name"
+                        push @lines, "[#$id] $name"
                             . ($common ? " ($common)" : '')
-                            . ($nectar ? " | Nectar: $nectar" : '')
-                            . ($pollen ? " | Pollen: $pollen" : '')
-                            . ($apis   ? " | Bee use: $apis"  : '');
+                            . ($nectar ? " N:$nectar" : '')
+                            . ($pollen ? " P:$pollen" : '');
                     }
                     if (@lines) {
                         push @sections,
-                            "LIVE ENCY HERB/PLANT DATA (search: '$search'):\n"
-                            . join("\n", @lines)
-                            . "\nView full encyclopedia at /ENCY | Bee forage plants at /ENCY/BeePastureView";
+                            "HERBS ('$search'): " . join("; ", @lines)
+                            . " | /ENCY | /ENCY/BeePastureView";
                     }
                 }
             }
@@ -4004,15 +4271,161 @@ sub _get_module_data {
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
     }
 
+    # --- ENCY Entity verified references ---
+    # When user is on a specific ENCY entity page, fetch linked Reference records via
+    # EntityReference. Injecting these (or an explicit "none exist") prevents the AI from
+    # fabricating citations from training data.
+    if ($is_ency_agent) {
+        eval {
+            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
+            if ($ency_schema) {
+                my ($entity_type, $entity_id);
+                if    ($page_path_req =~ m{/ENCY/Formula/(\d+)}i)                          { ($entity_type,$entity_id) = ('formula',     $1) }
+                elsif ($page_path_req =~ m{/ENCY/herb_detail.*?record_id=(\d+)}i)          { ($entity_type,$entity_id) = ('herb',        $1) }
+                elsif ($page_path_req =~ m{/ENCY/Constituent/edit.*?record_id=(\d+)}i)     { ($entity_type,$entity_id) = ('constituent', $1) }
+                elsif ($page_path_req =~ m{/ENCY/Constituent/(\d+)}i)                      { ($entity_type,$entity_id) = ('constituent', $1) }
+                elsif ($page_path_req =~ m{/ENCY/InsectDetail/(\d+)}i)                     { ($entity_type,$entity_id) = ('insect',      $1) }
+                elsif ($page_path_req =~ m{/ENCY/OrganismDetail/(\d+)}i)                   { ($entity_type,$entity_id) = ('organism',    $1) }
+                elsif ($page_path_req =~ m{/ENCY/ReferenceDetail/(\d+)}i)                  { ($entity_type,$entity_id) = ('reference',   $1) }
+
+                if ($entity_type && $entity_id) {
+                    my @entity_refs = $ency_schema->resultset('Ency::EntityReference')->search(
+                        { entity_type => $entity_type, entity_id => $entity_id }
+                    )->all;
+
+                    if (@entity_refs) {
+                        my @ref_lines;
+                        for my $er (@entity_refs) {
+                            my $ref = $er->reference;
+                            next unless $ref;
+                            my $line = '';
+                            $line .= '"' . $ref->title . '"'          if $ref->title;
+                            $line .= ' — ' . $ref->author             if $ref->author;
+                            $line .= ' (' . $ref->publication_date . ')' if $ref->publication_date;
+                            $line .= ', ' . $ref->publisher           if $ref->publisher;
+                            $line .= ' [ISBN: ' . $ref->isbn . ']'    if $ref->isbn;
+                            $line .= ' URL: ' . $ref->url             if $ref->url;
+                            my $bias = $ref->source_bias_rating;
+                            $line .= ' [bias: ' . $bias . '/5]'       if defined $bias;
+                            $line .= "\n    Notes: " . $ref->notes    if $ref->notes;
+                            push @ref_lines, "• $line" if $line;
+                        }
+                        if (@ref_lines) {
+                            push @sections,
+                                "VERIFIED ENCY REFERENCES for this $entity_type (id=$entity_id) — "
+                                . "cite ONLY these, never invent additional sources:\n"
+                                . join("\n", @ref_lines);
+                        }
+                    } else {
+                        push @sections,
+                            "ENCY REFERENCE STATUS: No verified references are recorded in the ENCY "
+                            . "reference system for this $entity_type (id=$entity_id). "
+                            . "Do NOT generate, invent, or fabricate any citations, author names, "
+                            . "book titles, journal names, or URLs from training data. "
+                            . "If the user asks for sources, tell them none are yet linked in ENCY "
+                            . "and suggest adding them via the Reference section.";
+                    }
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "ENCY entity reference fetch error: $@") if $@;
+    }
+
+    # --- Constituent live data ---
+    # Inject when the ENCY agent is active and the prompt mentions constituents or a todo with constituent#N
+    my $is_ency_constituent = $is_ency_agent
+        && ($prompt =~ /constituent|compound|chemical|phytochemical|alkaloid|flavonoid|terpene|phenol/i);
+    if ($is_ency_constituent) {
+        eval {
+            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
+            if ($ency_schema) {
+                my @cons_rows;
+                my $search_label = 'top';
+
+                # Priority 1: specific record_id from "constituent#17" or "constituent #17" patterns
+                my ($const_id) = ($prompt =~ /constituent\s*#\s*(\d+)/i);
+                $const_id ||= do {
+                    # Also match a bare "#N" when preceded by "constituent" nearby
+                    my ($n) = ($prompt =~ /#(\d+)/);
+                    ($prompt =~ /constituent/i) ? $n : undef;
+                };
+
+                if ($const_id) {
+                    $search_label = "id=$const_id";
+                    my $rec = $ency_schema->resultset('Ency::Constituent')->find($const_id);
+                    if ($rec) {
+                        # Full detail for the specific record so AI can pre-fill edit form
+                        push @sections,
+                            "CONSTITUENT #$const_id DETAIL:\n"
+                            . "  name: "            . ($rec->name                    || '(empty)') . "\n"
+                            . "  common_name: "     . ($rec->common_name             || '(empty)') . "\n"
+                            . "  chemical_formula: ". ($rec->chemical_formula        || '(empty)') . "\n"
+                            . "  chemical_class: "  . ($rec->chemical_class          || '(empty)') . "\n"
+                            . "  iupac_name: "      . ($rec->iupac_name              || '(empty)') . "\n"
+                            . "  cas_number: "      . ($rec->cas_number              || '(empty)') . "\n"
+                            . "  therapeutic_action: " . ($rec->therapeutic_action   || '(empty)') . "\n"
+                            . "  pharmacological_effects: " . ($rec->pharmacological_effects || '(empty)') . "\n"
+                            . "  toxicity: "        . ($rec->toxicity                || '(empty)') . "\n"
+                            . "  found_in_herbs: "  . ($rec->found_in_herbs          || '(empty)') . "\n"
+                            . "  found_in_foods: "  . ($rec->found_in_foods          || '(empty)') . "\n"
+                            . "  url: "             . ($rec->url                     || '(empty)') . "\n"
+                            . "  reference: "       . ($rec->reference               || '(empty)') . "\n"
+                            . "Edit: /ENCY/Constituent/edit?record_id=$const_id";
+                    } else {
+                        push @sections, "CONSTITUENT #$const_id: Not found in DB. Create at /ENCY/Constituent/add";
+                    }
+                } else {
+                    # Priority 2: keyword search
+                    my ($search_term) = ($prompt =~ /\b([A-Za-z][\w\-]{3,})\b/g);
+                    $search_term ||= '';
+                    if ($search_term) {
+                        $search_label = $search_term;
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
+                            { -or => [
+                                name        => { like => "%$search_term%" },
+                                common_name => { like => "%$search_term%" },
+                            ]},
+                            { rows => 10, order_by => { -asc => 'record_id' } }
+                        )->all;
+                    }
+                    if (!@cons_rows) {
+                        @cons_rows = $ency_schema->resultset('Ency::Constituent')->search(
+                            {}, { rows => 8, order_by => { -asc => 'name' } }
+                        )->all;
+                    }
+                    if (@cons_rows) {
+                        my @lines = map {
+                            sprintf("[#%s] %s%s%s",
+                                $_->record_id,
+                                $_->name,
+                                ($_->common_name ? " (" . $_->common_name . ")" : ""),
+                                ($_->chemical_class ? " [" . $_->chemical_class . "]" : ""),
+                            )
+                        } @cons_rows;
+                        push @sections,
+                            "CONSTITUENTS ('$search_label'): "
+                            . join("; ", @lines)
+                            . " | /ENCY/Constituent | add: /ENCY/Constituent/add";
+                    } else {
+                        push @sections, "CONSTITUENTS: None found for '$search_label'. Add: /ENCY/Constituent/add";
+                    }
+                }
+            }
+        };
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            '_get_module_data', "ENCY constituent fetch error: $@") if $@;
+    }
+
     # --- BMaster / Apiary live data ---
     # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
-    my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
+    my $is_bmaster_agent = lc($agent_id) =~ /^beemaster$/;
     if ($is_bmaster_agent || $prompt =~ /hive|apiary|yard|queen|varroa|swarm|inspect|honey|harvest|brood|beekeeper|bee\s*keep/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
             if ($schema) {
                 # Fetch yards for this site
-                my @yards = $schema->resultset('Yard')->search(
+                my @yards = $schema->resultset('Beekeeping::Yard')->search(
                     { sitename => $site_name },
                     { order_by => 'yard_name' }
                 )->all;
@@ -4020,7 +4433,7 @@ sub _get_module_data {
                 if (@yards) {
                     my @yard_lines;
                     for my $y (@yards) {
-                        my $hive_count = $schema->resultset('Hive')->search({
+                        my $hive_count = $schema->resultset('Beekeeping::Hive')->search({
                             yard_id => $y->id,
                             status  => 'active',
                         })->count;
@@ -4035,12 +4448,12 @@ sub _get_module_data {
 
                         # Show hives if bmaster agent or hive keywords
                         if ($is_bmaster_agent || $prompt =~ /hive|queen|inspect|brood/i) {
-                            my @hives = $schema->resultset('Hive')->search(
+                            my @hives = $schema->resultset('Beekeeping::Hive')->search(
                                 { yard_id => $y->id },
                                 { order_by => 'hive_number', rows => 10 }
                             )->all;
                             for my $h (@hives) {
-                                my $last_insp = $schema->resultset('Inspection')->search(
+                                my $last_insp = $schema->resultset('Beekeeping::Inspection')->search(
                                     { hive_id => $h->id },
                                     { order_by => { -desc => 'inspection_date' }, rows => 1 }
                                 )->first;
@@ -4161,6 +4574,13 @@ Poor indicators:
 
 =cut
 
+sub _sanitize_ai_urls {
+    my ($self, $text) = @_;
+    return $text unless defined $text && length $text;
+    $text =~ s{https?://(?:example\.com|localhost(?::\d+)?)((?:/[^\s"')\]>]*)?)}{$1 || '/'}ge;
+    return $text;
+}
+
 sub _assess_response_quality {
     my ($self, $response, $prompt) = @_;
     $response //= '';
@@ -4196,7 +4616,7 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
+#   ency / beemaster  →  brave (if key) → searxng (if configured) → ddg
 #   all others      →  ollama-cloud (if key) → ddg → brave → searxng
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
@@ -4237,7 +4657,7 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|beemaster|bmast|usbm|accounting)$/i) ? 1 : 0;
     my @order = $is_precise_agent
         ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
         : ('ollama_cloud', 'ddg', 'brave', 'searxng');
@@ -4386,13 +4806,15 @@ sub _do_web_search {
 sub _pick_ollama_tier {
     my ($self, $installed_models, $default_model, $agent_id, $page_context) = @_;
 
-    # Filter to chat-capable models only.
-    # Exclude: embedding/reranker models, code-only models.
-    # :cloud models (Ollama-routed cloud) are allowed — they work through the same endpoint.
+    # Filter to chat-capable LOCAL models only for auto-tier.
+    # Exclude: embedding/reranker models, code-only models, and :cloud models.
+    # :cloud models require external API keys (e.g. Moonshot) — they return 401 without them.
+    # Users can still manually select :cloud models from the dropdown.
     my @chat_models = grep {
         my $n = ref($_) ? ($_->{name} || '') : ($_ || '');
         $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-           && $n !~ /starcoder|coder|codellama/i;
+           && $n !~ /starcoder|coder|codellama/i
+           && $n !~ /:cloud$/i;
     } @$installed_models;
 
     my @names = map { ref($_) ? ($_->{name} || '') : ($_ || '') } @chat_models;
@@ -4407,7 +4829,7 @@ sub _pick_ollama_tier {
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
-        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
+        'gemma4'     => 12, 'gemma3'  => 4, 'gemma2' => 9, 'gemma' => 7,
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
@@ -4512,6 +4934,12 @@ Supported actions:
 - Create a new todo:     [ACTION: {"action": "create_todo", "params": {"subject": "title", "description": "details", "project_id": N, "due_date": "YYYY-MM-DD", "priority": 3}}]
 - Create a new project:  [ACTION: {"action": "create_project", "params": {"name": "Project Name", "description": "details", "due_date": "YYYY-MM-DD", "parent_id": OPTIONAL_PARENT_ID}}]
 - Create a HelpDesk support ticket: [ACTION: {"action": "create_helpdesk_ticket", "params": {"subject": "issue title", "description": "details", "page_url": "/current/page"}}]
+- Record a hive inspection (BMaster/Apiary — use real hive_id from live data):
+    [ACTION: {"action": "create_inspection", "params": {"hive_id": N, "inspection_date": "YYYY-MM-DD", "overall_status": "good", "queen_seen": true, "eggs_seen": true, "population_estimate": "strong", "temperament": "calm", "general_notes": "narrative text", "box_details": []}}]
+  (The widget will show the user a review form pre-filled with these values before saving.)
+- Create an ENCY constituent (editor/admin on ENCY pages):
+    [ACTION: {"action": "create_constituent", "params": {"name": "Constituent Name", "common_name": "optional", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional"}}]
+  (If the constituent already exists, returns its existing ID and link. If the entry is a stub, a review todo is auto-created.)
 - Sync a schema field (admin/compare_schema page only):
     Update Result file to match DB:  [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_result", "database": "ency"}}]
     ALTER TABLE to match Result file: [ACTION: {"action": "sync_schema_field", "params": {"table": "table_name", "field": "field_name", "direction": "to_table", "database": "ency"}}]
@@ -4565,6 +4993,7 @@ ACTION
              . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
+             . "If a user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
              . "If a user asks about the admin panel or any admin feature, say: "
              . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
              . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
@@ -4589,6 +5018,7 @@ ACTION
          . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
          . "NEVER guess or invent application URLs using your training knowledge. "
          . "NEVER provide /admin URLs to users who do not have admin role. "
+         . "If the user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
          . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
          . "say: 'That section requires administrator privileges.'"
          . $no_internet
@@ -4928,78 +5358,93 @@ sub _build_page_navigation_hint {
 
 Choose the best installed Ollama model for a given agent/page context.
 
-  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
+  chat / helpdesk / ency / beemaster  → prefer llama3.1 (instruction-tuned chat)
   code / developer / docker         → prefer starcoder2 or qwen-coder
   fallback                          → first installed model, then hardcoded default
 
 =cut
 
+sub _score_ollama_model {
+    my ($name, $ctx) = @_;
+    $ctx //= 'general';
+    my $lname = lc($name);
+
+    my %fq = (
+        'gemma4'        => 90,
+        'deepseek-r1'   => 85,
+        'phi4'          => 82,
+        'qwen2.5-coder' => 80,
+        'starcoder2'    => 78,
+        'qwen2.5'       => 78,
+        'llama3.1'      => 75,
+        'llama3.2'      => 74,
+        'gemma3'        => 73,
+        'mistral-small' => 72,
+        'qwen2'         => 70,
+        'llama3'        => 68,
+        'mistral'       => 68,
+        'codellama'     => 67,
+        'phi3'          => 65,
+        'gemma2'        => 63,
+        'gemma'         => 55,
+        'llama2'        => 50,
+        'phi'           => 50,
+    );
+
+    my $score = 50;
+    for my $fam (sort { length($b) <=> length($a) } keys %fq) {
+        if (index($lname, $fam) == 0) { $score = $fq{$fam}; last; }
+    }
+
+    my $params = 0;
+    $params = $1 + 0 if $lname =~ /[:\-](\d+(?:\.\d+)?)b/i;
+    $score += $params >= 30 ? 20
+            : $params >= 20 ? 16
+            : $params >= 12 ? 12
+            : $params >=  7 ?  8
+            : $params >=  3 ?  4
+            :                  0;
+
+    $score += 15 if $lname =~ /-cloud\b/;
+
+    $score += 20 if $ctx eq 'code' && $lname =~ /coder|starcoder|codellama/i;
+
+    return $score;
+}
+
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
 
-    $agent_id    //= 'general';
-    $page_context //= 'general';
+    $agent_id         //= 'general';
+    $page_context     //= 'general';
     $installed_models //= [];
 
-    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
     my $is_chat_model = sub {
         my ($n) = @_;
         return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
     };
 
-    # Build a quick lookup: short name → full model name (chat models only)
-    my %installed;
+    my %seen;
+    my @chat_names;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-        next unless $name;
-        next unless $is_chat_model->($name);
-        $installed{$name} = $name;
-        (my $short = $name) =~ s/:.*$//;
-        $installed{$short} = $name;
+        next unless $name && !$seen{$name}++ && $is_chat_model->($name);
+        push @chat_names, $name;
     }
 
-    # Preferred models per context (ordered: first match wins).
-    # tinyllama intentionally excluded — too small for reliable answers.
-    my %context_prefs = (
-        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
-        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
-        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
-        csc         => ['llama3.1', 'llama3', 'mistral'],
-        general     => ['llama3.1', 'llama3', 'mistral'],
-        navigation  => ['llama3.1', 'llama3'],
-        simple      => ['llama3.1', 'llama3'],
-        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
-        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
-        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
-    );
+    unless (@chat_names) {
+        return $default_model if $default_model && $is_chat_model->($default_model);
+        return 'llama3.1:latest';
+    }
 
     my $ctx = lc($agent_id);
-    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
-    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
-    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
-    $ctx = 'csc'        if $ctx =~ /^csc$/;
-    $ctx = 'ency'       if $ctx =~ /^ency$/;
-    $ctx = 'docker'     if $ctx =~ /docker/;
-    $ctx = 'general'    unless exists $context_prefs{$ctx};
+    $ctx = 'code' if $ctx =~ /code|developer|starcoder|docker/;
 
-    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
+    my @ranked = sort {
+        _score_ollama_model($b, $ctx) <=> _score_ollama_model($a, $ctx)
+    } @chat_names;
 
-    for my $pref (@$prefs) {
-        for my $key (keys %installed) {
-            if ($key =~ /\Q$pref\E/i) {
-                return $installed{$key};
-            }
-        }
-    }
-
-    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
-    if ($default_model && $is_chat_model->($default_model)) {
-        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
-    }
-    my @chat_values = values %installed;
-    return $chat_values[0] if @chat_values;
-    return 'llama3.1:latest';
+    return $ranked[0];
 }
 
 =head2 _get_current_ollama_config
@@ -5053,11 +5498,12 @@ sub _get_current_ollama_config {
     # Configure the ollama model with the determined host
     try {
         $ollama->set_host($current_host);
-        $current_port = $ollama->port;
+        $ollama->port($config_port);
+        $current_port = $config_port;
         $current_model = $ollama->model;
         
         # Quick connection check (uses 3s timeout via temporary UA)
-        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => 11434, timeout => 3);
+        my $check_ollama = Comserv::Model::Ollama->new(host => $current_host, port => $config_port, timeout => 3);
         if ($check_ollama && $check_ollama->check_connection()) {
             my $models = $ollama->list_models();
             $installed_models = $models if $models && ref($models) eq 'ARRAY';
@@ -6175,10 +6621,8 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4-fast-reasoning' },
-                        { id => 'grok-4-fast-non-reasoning' },
-                        { id => 'grok-3' },
-                        { id => 'grok-3-mini' },
+                        { id => 'grok-4.3' },
+                        { id => 'grok-4.20-non-reasoning' },
                     ];
                 }
 
@@ -6357,16 +6801,32 @@ sub sync_models :Local :Args(0) {
         }
 
         # Extract model list (OpenAI-compatible format: data[].id)
+        my %SYNC_DEAD = map { $_ => 1 } qw(
+            grok-code-fast-1
+            grok-4-fast-non-reasoning
+            grok-4-1-fast-non-reasoning
+            grok-4-0709
+            grok-3
+            grok-4-fast-reasoning
+            grok-4-1-fast-reasoning
+            grok-4.3
+        );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
             foreach my $m (@{$data->{data}}) {
                 next unless $m->{id};
+                next if $SYNC_DEAD{$m->{id}};
+                next if $m->{id} =~ /imagine|video/i;
                 push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
             }
         }
 
-        # Sort models alphabetically
-        @models = sort { $a->{id} cmp $b->{id} } @models;
+        # Sort models: numeric-version first (grok-4, grok-3...) then alphabetic, reverse within groups
+        @models = sort {
+            my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            $bn <=> $an || $b->{id} cmp $a->{id}
+        } @models;
 
         # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
@@ -6389,6 +6849,133 @@ sub sync_models :Local :Args(0) {
             'sync_models', "Error syncing models: $_");
         $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
     };
+}
+
+=head2 auto_sync_models
+
+Pull all recommended Ollama models that are not yet installed and remove
+explicitly deprecated models across all configured Ollama servers.
+Admin/developer only.  Returns JSON with per-server results.
+
+=cut
+
+sub auto_sync_models :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{username}) {
+        $c->response->status(401);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
+        return;
+    }
+
+    my $user_roles = $c->session->{roles} || [];
+    $user_roles = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
+    my $is_admin = ref($user_roles) eq 'ARRAY'
+        ? grep { /^(admin|developer)$/i } @$user_roles : 0;
+
+    unless ($is_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
+        return;
+    }
+
+    my $ollama_cfg    = $c->config->{Ollama} || {};
+    my $primary_host  = $ollama_cfg->{host}          || 'localhost';
+    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
+    my $port          = $ollama_cfg->{port}           || 11434;
+
+    my @server_hosts = ($primary_host);
+    push @server_hosts, $fallback_host if $fallback_host ne $primary_host;
+
+    my $ollama = $c->model('Ollama');
+    unless ($ollama) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama model unavailable' }));
+        return;
+    }
+
+    my $catalog    = $ollama->list_available_models();
+    my @recommended = grep { $_->{recommended} } @$catalog;
+    my $deprecated  = $ollama->deprecated_models();
+
+    my @results;
+    for my $host (@server_hosts) {
+        my %sr = (
+            host    => $host,
+            port    => $port,
+            pulled  => [],
+            skipped => [],
+            removed => [],
+            errors  => [],
+        );
+
+        $ollama->host($host);
+        $ollama->port($port);
+        $ollama->clear_endpoint;
+
+        unless ($ollama->check_connection()) {
+            $sr{error} = "Cannot connect to $host:$port";
+            push @results, \%sr;
+            next;
+        }
+
+        my $installed = $ollama->list_models() || [];
+        my %inst_set;
+        for my $m (@$installed) {
+            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
+            $inst_set{$n} = 1;
+            (my $base = $n) =~ s/:.*$//;
+            $inst_set{$base} = 1;
+        }
+
+        for my $model (@recommended) {
+            my $name = $model->{name};
+            (my $base = $name) =~ s/:.*$//;
+            if ($inst_set{$name} || $inst_set{$base}) {
+                push @{ $sr{skipped} }, "$name (already installed)";
+                next;
+            }
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Pulling recommended model: $name on $host:$port");
+            my $result = $ollama->pull_model(model => $name);
+            if ($result && $result->{success}) {
+                push @{ $sr{pulled} }, $name;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "$name: $err";
+            }
+        }
+
+        for my $dep (@$deprecated) {
+            next unless $inst_set{$dep};
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+                'auto_sync_models', "Removing deprecated model: $dep on $host:$port");
+            my $result = $ollama->remove_model(model => $dep);
+            if ($result && $result->{success}) {
+                push @{ $sr{removed} }, $dep;
+            } else {
+                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
+                push @{ $sr{errors} }, "remove $dep: $err";
+            }
+        }
+
+        push @results, \%sr;
+    }
+
+    my ($total_pulled, $total_removed) = (0, 0);
+    $total_pulled  += scalar @{ $_->{pulled}  } for @results;
+    $total_removed += scalar @{ $_->{removed} } for @results;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'auto_sync_models', "Auto-sync complete: pulled=$total_pulled removed=$total_removed");
+
+    $c->response->body(encode_json({
+        success       => JSON::true,
+        servers       => \@results,
+        total_pulled  => $total_pulled,
+        total_removed => $total_removed,
+    }));
 }
 
 =head2 project_conversations
@@ -7463,6 +8050,505 @@ sub action :Local :Args(0) {
         return;
     }
 
+    # ── create_constituent ────────────────────────────────────────────────────
+    # Create a new ENCY constituent record and optionally a todo stub.
+    if ($action_name eq 'create_constituent') {
+        my $name = $params->{name} || '';
+        unless ($name) {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'name required' }));
+            return;
+        }
+
+        my $roles = $c->session->{roles} || [];
+        $roles = [split(/\s*,\s*/, $roles)] unless ref $roles;
+        my $can_edit = grep { /^(admin|editor|developer)$/i } @$roles;
+        unless ($can_edit) {
+            $c->response->status(403);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Editor or admin role required to create constituents' }));
+            return;
+        }
+
+        my $ency_model = $c->model('ENCYModel');
+        unless ($ency_model) {
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => 'ENCY model not available' }));
+            return;
+        }
+
+        my $sitename  = $c->stash->{SiteName} || $c->session->{SiteName} || 'ENCY';
+        my $username  = $c->session->{username} || 'system';
+        my $group     = ref $roles eq 'ARRAY' && @$roles ? $roles->[0] : '';
+
+        my $existing;
+        eval {
+            $existing = $ency_model->ency_schema->resultset('Ency::Constituent')->search(
+                { -or => [
+                    name        => { like => $name },
+                    common_name => { like => $name },
+                ]},
+                { rows => 1 }
+            )->first;
+        };
+
+        if ($existing) {
+            $c->response->body(encode_json({
+                success  => JSON::true,
+                message  => "Constituent '$name' already exists: " . $existing->name,
+                existing => JSON::true,
+                id       => $existing->record_id,
+                url      => '/ENCY/Constituent/' . $existing->record_id,
+            }));
+            return;
+        }
+
+        my $data = {
+            name                    => $name,
+            common_name             => $params->{common_name}            || '',
+            chemical_formula        => $params->{chemical_formula}       || '',
+            chemical_class          => $params->{chemical_class}         || '',
+            iupac_name              => $params->{iupac_name}             || '',
+            cas_number              => $params->{cas_number}             || '',
+            therapeutic_action      => $params->{therapeutic_action}     || '',
+            pharmacological_effects => $params->{pharmacological_effects}|| '',
+            toxicity                => $params->{toxicity}               || '',
+            solubility              => $params->{solubility}             || '',
+            found_in_herbs          => $params->{found_in_herbs}         || '',
+            found_in_foods          => $params->{found_in_foods}         || '',
+            found_in_drugs          => $params->{found_in_drugs}         || '',
+            research_notes          => $params->{research_notes}         || '',
+            url                     => $params->{url}                    || '',
+            reference               => $params->{reference}              || '',
+            sitename                => $sitename,
+            username_of_poster      => $username,
+            group_of_poster         => $group,
+            date_time_posted        => \'NOW()',
+            share                   => 0,
+        };
+
+        my ($ok, $new_id) = eval { $ency_model->add_constituent($c, $data) };
+        if ($@ || !$ok) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'action',
+                "create_constituent failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false,
+                error => 'Constituent creation failed: ' . ($@ || 'unknown error') }));
+            return;
+        }
+
+        my $stub_note = '';
+        unless ($data->{chemical_formula} || $data->{therapeutic_action}) {
+            eval {
+                require Comserv::Model::ENCYModel;
+                $ency_model->_create_ency_todo($c,
+                    "ENCY: New constituent stub '$name' needs review",
+                    "A stub constituent record was created for '$name' via AI. "
+                  . "Please complete the entry with: chemical formula, class, therapeutic action, "
+                  . "pharmacological effects, found_in_herbs, and references.\n"
+                  . "Edit at: /ENCY/Constituent/edit?record_id=$new_id"
+                );
+            };
+            $stub_note = ' A review todo was created.';
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'action',
+            "AI action create_constituent: id=$new_id name='$name' by=$username");
+        $c->response->body(encode_json({
+            success => JSON::true,
+            message => "Constituent '$name' created (ID $new_id).$stub_note "
+                     . "Edit at /ENCY/Constituent/edit?record_id=$new_id",
+            id      => $new_id,
+            url     => "/ENCY/Constituent/$new_id",
+        }));
+        return;
+    }
+
+    # ── create_yard ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_yard') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my %prefill = (
+            yard_code      => $params->{yard_code}      || '',
+            yard_name      => $params->{yard_name}      || '',
+            yard_size      => $params->{yard_size}      || 10,
+            total_yard_size=> $params->{total_yard_size}|| 10,
+            notes          => $params->{notes}          || '',
+            sitename       => $c->session->{SiteName}   || 'BMaster',
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_yard_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the yard details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{yard_code} && $prefill{yard_name}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'yard_code and yard_name are required' }));
+            return;
+        }
+
+        my $yard_row;
+        eval {
+            $yard_row = $schema->resultset('Beekeeping::Yard')->create({
+                %prefill,
+                current          => 0,
+                status           => 'active',
+                date_time_posted => DateTime->now->stringify,
+                comments         => $params->{comments} || '',
+                image            => '',
+            });
+        };
+        if ($@ || !$yard_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create yard: $@" }));
+            return;
+        }
+        my $yard_id = $yard_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_yard: id=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            yard_id  => $yard_id + 0,
+            url      => "/Apiary/yards/view/$yard_id",
+            message  => "Yard '$prefill{yard_name}' created (id=$yard_id). Now you can add hives to it.",
+        }));
+        return;
+    }
+
+    # ── create_hive ───────────────────────────────────────────────────────────
+    if ($action_name eq 'create_hive') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $yard_id = $params->{yard_id};
+        unless ($yard_id) {
+            my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
+            unless (@yards) {
+                $c->response->body(encode_json({
+                    success => JSON::true,
+                    action  => 'open_yard_wizard',
+                    wizard_prefill => { yard_name => $params->{yard_name} || '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                    message => 'No yards exist yet. Please create a yard first.',
+                }));
+                return;
+            }
+            if (@yards == 1) {
+                $yard_id = $yards[0]->id;
+            } else {
+                $c->response->body(encode_json({
+                    success       => JSON::true,
+                    action        => 'open_hive_wizard',
+                    wizard_prefill => {
+                        hive_number => $params->{hive_number} || '',
+                        yards       => [map { { id => $_->id, name => $_->yard_name, code => $_->yard_code } } @yards],
+                    },
+                    message => 'Multiple yards found — please select which yard this hive belongs to.',
+                }));
+                return;
+            }
+        }
+
+        my %prefill = (
+            hive_number => $params->{hive_number} || '',
+            yard_id     => $yard_id + 0,
+            queen_code  => $params->{queen_code}  || '',
+            pallet_code => $params->{pallet_code} || '',
+            status      => 'active',
+            sitename    => $sitename,
+            notes       => $params->{notes}       || '',
+            created_by  => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_hive_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the hive details before saving.',
+            }));
+            return;
+        }
+
+        unless ($prefill{hive_number}) {
+            $c->response->body(encode_json({ success => JSON::false, error => 'hive_number is required' }));
+            return;
+        }
+
+        my $hive_row;
+        eval { $hive_row = $schema->resultset('Beekeeping::Hive')->create(\%prefill) };
+        if ($@ || !$hive_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create hive: $@" }));
+            return;
+        }
+        my $hive_id = $hive_row->id;
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_hive: id=$hive_id hive_number=$prefill{hive_number} yard=$yard_id by=$current_user");
+        $c->response->body(encode_json({
+            success    => JSON::true,
+            hive_id    => $hive_id + 0,
+            hive_number=> $prefill{hive_number},
+            url        => "/Apiary/hives/view/$hive_id",
+            message    => "Hive $prefill{hive_number} created (id=$hive_id). You can now record an inspection.",
+        }));
+        return;
+    }
+
+    # ── create_queen ──────────────────────────────────────────────────────────
+    if ($action_name eq 'create_queen') {
+        my $wiz_confirmed = $params->{wizard_confirmed};
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+        my $today = DateTime->now->ymd;
+
+        my %prefill = (
+            tag_number       => $params->{tag_number}       || '',
+            color_marking    => $params->{color_marking}    || '',
+            birth_date       => $params->{birth_date}       || $today,
+            breed            => $params->{breed}            || 'unknown',
+            origin           => $params->{origin}           || 'local',
+            mating_status    => $params->{mating_status}    || 'mated',
+            introduction_date=> $params->{introduction_date}|| $today,
+            removal_date     => $params->{removal_date}     || '9999-12-31',
+            performance_rating => ($params->{performance_rating} || 0) + 0,
+            health_status    => $params->{health_status}    || 'healthy',
+            laying_status    => $params->{laying_status}    || 'laying_well',
+            temperament_rating => $params->{temperament_rating} || 'calm',
+            status           => 'active',
+            purpose          => $params->{purpose}          || 'production',
+            sitename         => $sitename,
+            notes            => $params->{notes}            || '',
+            created_by       => $current_user,
+        );
+
+        unless ($wiz_confirmed) {
+            $c->response->body(encode_json({
+                success        => JSON::true,
+                action         => 'open_queen_wizard',
+                wizard_prefill => \%prefill,
+                message        => 'Please review the queen details before saving.',
+            }));
+            return;
+        }
+
+        my $queen_row;
+        eval { $queen_row = $schema->resultset('Beekeeping::Queen')->create(\%prefill) };
+        if ($@ || !$queen_row) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to create queen: $@" }));
+            return;
+        }
+        my $queen_id = $queen_row->id;
+
+        if ($params->{hive_id}) {
+            eval {
+                $schema->resultset('Beekeeping::QueenHiveAssignment')->create({
+                    queen_id   => $queen_id,
+                    hive_id    => $params->{hive_id} + 0,
+                    start_date => $today,
+                    status     => 'active',
+                    notes      => "Assigned by AI from voice inspection",
+                });
+            };
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_queen: id=$queen_id tag=$prefill{tag_number} by=$current_user");
+        $c->response->body(encode_json({
+            success  => JSON::true,
+            queen_id => $queen_id + 0,
+            url      => "/Apiary/queens/view/$queen_id",
+            message  => "Queen recorded (id=$queen_id, tag=$prefill{tag_number}).",
+        }));
+        return;
+    }
+
+    # ── create_inspection ─────────────────────────────────────────────────────
+    if ($action_name eq 'create_inspection') {
+        my $sitename = $c->session->{SiteName} || 'BMaster';
+
+        my $hive_id = $params->{hive_id};
+        unless ($hive_id) {
+            my $hive_number = $params->{hive_number} || '';
+            if ($hive_number) {
+                my $hive_row = $schema->resultset('Beekeeping::Hive')->search(
+                    { hive_number => $hive_number, sitename => $sitename },
+                    { rows => 1 }
+                )->first;
+                if ($hive_row) {
+                    $hive_id = $hive_row->id;
+                } else {
+                    my @yards = $schema->resultset('Beekeeping::Yard')->search({ sitename => $sitename, status => 'active' })->all;
+                    unless (@yards) {
+                        $c->response->body(encode_json({
+                            success => JSON::true,
+                            action  => 'open_yard_wizard',
+                            wizard_prefill => { yard_name => '', yard_code => '', yard_size => 10, total_yard_size => 10 },
+                            message => "Hive $hive_number not found and no yards exist. Please create a yard first, then the hive.",
+                            next_action => 'create_hive',
+                            next_params => { hive_number => $hive_number },
+                        }));
+                        return;
+                    }
+                    $c->response->body(encode_json({
+                        success        => JSON::true,
+                        action         => 'open_hive_wizard',
+                        wizard_prefill => {
+                            hive_number => $hive_number,
+                            yard_id     => @yards == 1 ? $yards[0]->id + 0 : undef,
+                            yards       => [map { { id => $_->id + 0, name => $_->yard_name, code => $_->yard_code } } @yards],
+                        },
+                        message => "Hive $hive_number not found in the system. Please fill in the details to register it first.",
+                        next_action => 'create_inspection',
+                        next_params => $params,
+                    }));
+                    return;
+                }
+            } else {
+                $c->response->status(400);
+                $c->response->body(encode_json({ success => JSON::false, error => 'hive_id or hive_number required' }));
+                return;
+            }
+        };
+
+        my %POPULATION_MAP = (
+            'very strong' => 'very_strong', 'very_strong' => 'very_strong',
+            'strong'      => 'strong',      'good'        => 'strong',
+            'moderate'    => 'moderate',    'medium'      => 'moderate', 'average' => 'moderate',
+            'weak'        => 'weak',        'low'         => 'weak',
+            'very weak'   => 'very_weak',   'very_weak'   => 'very_weak', 'poor'   => 'very_weak',
+        );
+        my %TEMPERAMENT_MAP = (
+            'calm'           => 'calm',           'gentle'    => 'calm',     'docile'  => 'calm',
+            'moderate'       => 'moderate',       'normal'    => 'moderate',
+            'aggressive'     => 'aggressive',     'defensive' => 'aggressive',
+            'very aggressive'=> 'very_aggressive','very_aggressive' => 'very_aggressive', 'hot' => 'very_aggressive',
+        );
+        my %STATUS_MAP = (
+            'excellent' => 'excellent', 'great' => 'excellent',
+            'good'      => 'good',
+            'fair'      => 'fair',      'ok'    => 'fair',  'okay' => 'fair',
+            'poor'      => 'poor',
+            'critical'  => 'critical',  'bad'   => 'critical',
+        );
+        my %WEATHER_MAP = (
+            'sunny'    => 'sunny',   'clear'    => 'sunny',
+            'cloudy'   => 'cloudy',  'overcast' => 'cloudy',
+            'rainy'    => 'rainy',   'rain'     => 'rainy',   'wet' => 'rainy',
+            'windy'    => 'windy',   'breezy'   => 'windy',
+            'warm'     => 'warm',    'hot'      => 'warm',
+            'cold'     => 'cold',    'cool'     => 'cold',
+            'foggy'    => 'foggy',
+        );
+
+        my $normalise = sub {
+            my ($val, $map_ref) = @_;
+            return undef unless defined $val && $val ne '';
+            my $lc = lc($val);
+            return $map_ref->{$lc} || $map_ref->{$val} || $val;
+        };
+
+        my $inspection_date = $params->{inspection_date} || $today;
+        $inspection_date = $today unless $inspection_date =~ /^\d{4}-\d{2}-\d{2}$/;
+
+        my %insp = (
+            hive_id             => $hive_id + 0,
+            inspection_date     => $inspection_date,
+            inspector           => $params->{inspector} || $current_user,
+            inspection_type     => $params->{inspection_type} || 'routine',
+            overall_status      => $normalise->($params->{overall_status}, \%STATUS_MAP) || 'good',
+            queen_seen          => ($params->{queen_seen}  ? 1 : 0),
+            queen_marked        => ($params->{queen_marked}? 1 : 0),
+            eggs_seen           => ($params->{eggs_seen}   ? 1 : 0),
+            larvae_seen         => ($params->{larvae_seen} ? 1 : 0),
+            capped_brood_seen   => ($params->{capped_brood_seen} ? 1 : 0),
+            supersedure_cells   => ($params->{supersedure_cells}  || 0) + 0,
+            swarm_cells         => ($params->{swarm_cells}         || 0) + 0,
+            queen_cells         => ($params->{queen_cells}         || 0) + 0,
+            temperament         => $normalise->($params->{temperament}, \%TEMPERAMENT_MAP) || 'calm',
+            general_notes       => $params->{general_notes}   || '',
+            action_required     => $params->{action_required} || '',
+            feeding_done        => ($params->{feeding_done}   ? 1 : 0),
+            feed_type           => $params->{feed_type}    || undef,
+            feed_amount         => $params->{feed_amount}  || undef,
+        );
+
+        if (defined $params->{population_estimate} && $params->{population_estimate} ne '') {
+            $insp{population_estimate} = $normalise->($params->{population_estimate}, \%POPULATION_MAP);
+        }
+        if (defined $params->{weather_conditions} && $params->{weather_conditions} ne '') {
+            $insp{weather_conditions} = $normalise->($params->{weather_conditions}, \%WEATHER_MAP) // $params->{weather_conditions};
+        }
+        if (defined $params->{temperature} && $params->{temperature} =~ /^-?\d/) {
+            ($insp{temperature} = $params->{temperature}) =~ s/[^\d.\-]//g;
+        }
+        if (defined $params->{next_inspection_date} && $params->{next_inspection_date} =~ /^\d{4}-\d{2}-\d{2}$/) {
+            $insp{next_inspection_date} = $params->{next_inspection_date};
+        }
+        if (defined $params->{start_time}) { $insp{start_time} = $params->{start_time}; }
+        if (defined $params->{end_time})   { $insp{end_time}   = $params->{end_time};   }
+
+        my $inspection_row;
+        eval { $inspection_row = $schema->resultset('Beekeeping::Inspection')->create(\%insp) };
+        if ($@ || !$inspection_row) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'action', "create_inspection failed: $@");
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Inspection creation failed: $@" }));
+            return;
+        }
+
+        my $inspection_id = $inspection_row->id;
+
+        my @detail_rows_created;
+        my $box_details = $params->{box_details} || [];
+        if (ref($box_details) eq 'ARRAY') {
+            for my $bd (@$box_details) {
+                next unless ref($bd) eq 'HASH';
+                my %detail = (
+                    inspection_id   => $inspection_id,
+                    detail_type     => $bd->{detail_type}   || 'box_summary',
+                    bees_coverage   => $bd->{bees_coverage} || 'none',
+                    brood_pattern   => $bd->{brood_pattern} || 'good',
+                    brood_percentage=> ($bd->{brood_percentage} || 0) + 0,
+                    honey_percentage=> ($bd->{honey_percentage} || 0) + 0,
+                    pollen_percentage=>($bd->{pollen_percentage}|| 0) + 0,
+                    empty_percentage=> ($bd->{empty_percentage} || 0) + 0,
+                    disease_signs   => $bd->{disease_signs}   || undef,
+                    pest_signs      => $bd->{pest_signs}      || undef,
+                    treatment_applied=> $bd->{treatment_applied} || undef,
+                    notes           => $bd->{notes}           || undef,
+                    queen_cells_count=> ($bd->{queen_cells_count} || 0) + 0,
+                );
+                $detail{box_id}    = $bd->{box_id}   + 0 if defined $bd->{box_id}   && $bd->{box_id}   =~ /^\d+$/;
+                $detail{frame_id}  = $bd->{frame_id} + 0 if defined $bd->{frame_id} && $bd->{frame_id} =~ /^\d+$/;
+                $detail{comb_condition} = $bd->{comb_condition} if $bd->{comb_condition};
+                $detail{brood_type}     = $bd->{brood_type}     if $bd->{brood_type};
+
+                my $dr;
+                eval { $dr = $schema->resultset('Beekeeping::InspectionDetail')->create(\%detail) };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'action', "create_inspection_detail failed: $@");
+                } else {
+                    push @detail_rows_created, $dr->id;
+                }
+            }
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+            'action', "AI action create_inspection: id=$inspection_id hive=$hive_id by=$current_user details=" . scalar(@detail_rows_created));
+
+        $c->response->body(encode_json({
+            success       => JSON::true,
+            inspection_id => $inspection_id + 0,
+            url           => "/Apiary/inspections/view/$inspection_id",
+            detail_count  => scalar(@detail_rows_created) + 0,
+            message       => "Inspection #$inspection_id recorded for hive $hive_id.",
+        }));
+        return;
+    }
+
     # Unknown action
     $c->response->status(400);
     $c->response->body(encode_json({ success => JSON::false, error => "Unknown action: $action_name" }));
@@ -7687,7 +8773,7 @@ sub support_send :Local :Args(1) {
 
 =head2 _build_bmaster_system_prompt
 
-Builds a BMaster beekeeping-aware system prompt for the AI when agent_id is 'bmaster'.
+Builds a BeeMaster beekeeping-aware system prompt for the AI when agent_id is 'beemaster'.
 Bee-welfare philosophy: not agribiz-driven, always answers with the bees' best interests first.
 Includes full apiary schema, seasonal calendar, editor workflow, and cross-context awareness.
 
@@ -7708,7 +8794,7 @@ sub _build_bmaster_system_prompt {
 EDITOR / ADMIN WORKFLOW:
 - Add/edit a yard (apiary location): /Apiary/add_yard | /Apiary/edit_yard?id=ID
 - Add/edit a hive: /Apiary/add_hive | /Apiary/edit_hive?id=ID
-- Record a hive inspection: /Apiary/add_inspection?hive_id=ID
+- Record a hive inspection: /Apiary/add_inspection?hive_id=ID  (or use voice — see VOICE INSPECTION WORKFLOW below)
 - Record a treatment: /Apiary/add_treatment?hive_id=ID
 - Record a honey harvest: /Apiary/add_harvest?hive_id=ID
 - Manage queens: /Apiary/QueenRearing
@@ -7720,6 +8806,33 @@ EDITOR
 
     return <<END_PROMPT;
 You are the expert BMaster beekeeping assistant for $site_name.
+
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- BMaster dashboard: /BMaster
+- Apiary overview: /Apiary
+- Hive management: /Apiary/HiveManagement
+- Queen rearing: /Apiary/QueenRearing
+- Bee health: /Apiary/BeeHealth
+- Bee forage / bee pasture / forage plants: /ENCY/BeePastureView
+- Honey production: /BMaster/honey
+- Environment / habitat: /BMaster/environment
+- Education: /BMaster/education
+- ENCY herb/plant search: /ENCY/search?q=TERM
+- Herbs / plants list: /ENCY/herbs
+- Glossary (beekeeping & herbal terms): /ENCY/glossary
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
+- Insects: /ENCY/insects
+- Constituents list: /ENCY/Constituent
+- Formulas / recipes: /ENCY/formula
+- Therapeutic actions: /ENCY/therapeutic_actions
+- Workshops (local beekeeping events): /workshop
+- Membership: /membership
+
+When the user asks to "open", "show", "go to", "list", "browse", or "take me to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/BeePastureView"}]
+Do NOT just describe the page or give a link — always emit the ACTION so the browser navigates automatically.
+If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT invent or guess a URL.
 
 PHILOSOPHY — This system is NOT driven by agribusiness profits. It is designed around
 what is best for the bees and healthy, sustainable apiculture:
@@ -7766,21 +8879,17 @@ DATABASE SCHEMA — BMaster / Apiary tables:
 - HiveConfiguration: hive setup templates
 - HiveFrame: linked to Box (frame-level detail)
 
-NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
-- BMaster dashboard: /BMaster
-- Apiary overview: /Apiary
-- Hive management: /Apiary/HiveManagement
-- Queen rearing: /Apiary/QueenRearing
-- Bee health: /Apiary/BeeHealth
-- Bee pasture / forage plants: /BMaster/bee_pasture  (→ /ENCY/BeePastureView)
-- Honey production: /BMaster/honey
-- Environment / habitat: /BMaster/environment
-- Education: /BMaster/education
-- ENCY herb/plant search: /ENCY/search?q=TERM
-- ENCY bee forage view: /ENCY/BeePastureView
-- Workshops (local beekeeping events): /workshop
-- Membership: /membership
 $editor_section
+VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
+You can record a hive inspection by voice directly in this chat widget:
+1. Click the 🎤 button next to the Send button to upload a .m4a / .wav / .mp3 file, OR
+   click ⏺ to record live from your microphone (requires HTTPS or localhost).
+2. The audio is transcribed automatically. The transcript appears in the chat input — review it, then press Send.
+3. Tell me which hive and any details; I will ask follow-up questions and extract the inspection data.
+4. A pre-filled review form appears — edit any fields, then click Save Inspection.
+5. The record is saved to the database and you get a link to view it.
+You can also just type or paste a voice-style inspection note — no audio file needed.
+
 DATA ALREADY INJECTED:
 The server automatically injects LIVE APIARY DATA (yards, hive counts) below when available.
 ALWAYS use this live data — do not ask the user to describe their apiary setup.
@@ -7803,6 +8912,196 @@ COMMON ISSUES AND IPM APPROACH:
 - Swarming: Natural — manage with splits, adding space, or supering promptly
 
 The current user is: $username
+
+VOICE INSPECTION WORKFLOW:
+When the user says they want to record a hive inspection, OR when you receive a voice transcript,
+follow this multi-turn conversation workflow.
+
+A hive inspection is a detailed, multi-step process that may take 5–20 minutes of conversation.
+Record each part of the conversation progressively — do NOT rush to emit the [ACTION:] block.
+Build up the inspection data incrementally across multiple turns.
+
+MULTI-SPEAKER / DIARIZED TRANSCRIPTS:
+If the transcript contains speaker labels (SPEAKER_0, SPEAKER_1, UNKNOWN, etc.), treat the
+conversation as a dialogue between a teacher/inspector and a student/observer.
+Rules for extracting inspection data from a diarized transcript:
+- Both speakers may identify a frame type (honey, brood, foundation, etc.)
+- The teacher/instructor's identification ALWAYS takes precedence if they correct the student
+- If the student says "is that honey?" and the teacher says "yes" or "that's capped honey" — record honey
+- If the student says "that's brood" and the teacher says "no, that's capped honey" — record honey
+- If only one speaker names the frame type and the other does not correct it — record what was said
+- Combine information from BOTH speakers: student may ask the question that reveals the data;
+  teacher may give the answer that provides the value (e.g. "How many frames of brood?" "Three full frames")
+- UNKNOWN segments (very short utterances, ambient sound) may be ignored for data extraction
+- Do NOT discard the student's speech — it may contain hive numbers, counts, or corrections
+- Summarise the full dialogue in general_notes including any teaching commentary of value
+
+STEP 1 — CHECK SETUP (yards, hives, queens):
+Before recording an inspection, the system needs a yard and hive to exist.
+If no hive is found by the hive number mentioned in the transcript or conversation:
+  → Emit [ACTION: {"action": "create_hive", "params": {"hive_number": "X"}}]
+    The widget will show a form to register the hive. If no yards exist either, it will first show
+    the yard creation form, then the hive form.
+If the user mentions a queen number/tag/colour that is not yet in the system:
+  → After creating the inspection, suggest emitting [ACTION: {"action": "create_queen", "params": {...}}]
+    with hive_id set so the queen is automatically assigned to the hive.
+Example create_yard action:
+[ACTION: {"action": "create_yard", "params": {"yard_name": "Main Yard", "yard_code": "MAIN", "yard_size": 20, "total_yard_size": 20}}]
+Example create_hive action:
+[ACTION: {"action": "create_hive", "params": {"hive_number": "24", "yard_id": YARD_ID, "notes": ""}}]
+
+STEP 2 — IDENTIFY THE HIVE:
+Ask "Which hive?" if not stated. Hive can be given by number, queen code, or yard+position.
+Look up the hive_id from LIVE APIARY DATA injected above.
+If the hive is not in the live data, use hive_number in the params and the system will look it up
+or guide the user to register it first.
+For multi-hive sessions (beekeeper inspects several hives in sequence), complete each hive's
+[ACTION:] block before moving to the next hive.
+
+STEP 3 — COLLECT HIVE CONFIGURATION:
+Ask: How many boxes? (e.g. "two box hive", "single brood box with a super" → derive box_count)
+Record box order: top box = position 1 (worked first), bottom box = position 2, etc.
+
+STEP 4 — COLLECT INSPECTION DATA via conversation:
+Ask short, natural follow-up questions in this order (only ask what has not been stated):
+1. Date and time (default: today)
+2. Weather and environmental conditions (temperature, wind, humidity, time of day)
+3. Queen: seen? marked? tag number or colour? where in the hive was she found?
+4. Eggs / larvae / capped brood seen?
+5. Population overall: "lots of bees" → strong, "half full" → moderate, "sparse" → weak
+6. Temperament: calm, normal, defensive, hot?
+7. For each box (top box first, then lower boxes):
+   a. Overall bees coverage for this box
+   b. Frame-by-frame details — user may describe frames in the ORDER THEY WERE REMOVED,
+      not necessarily their position in the box. Record both removal_order and frame_position
+      if the user gives them. For each frame note:
+        - frame_number or frame_position in the box
+        - frame_type: brood / honey / pollen / foundation / empty / feeder
+        - what was observed (bees, pattern, stores, queen sighted here, etc.)
+        - any issues (disease signs, pest signs)
+   c. Feeder: present? type? level? (e.g. "feeder half full", "empty division board feeder")
+   d. Any frames moved from this box? (to top box of same hive, or to a different hive — record destination hive)
+8. Swarm cells / queen cells / supersedure cells? How many? Where in the hive?
+9. Feeding done this visit? Feed type (syrup/candy/fondant/pollen substitute) and amount?
+10. Any treatments applied? Product name, dose, method?
+11. General notes or concerns?
+12. Action required?
+13. Next inspection date?
+
+NATURAL LANGUAGE → ENUM MAPPINGS (use these when normalising user speech):
+population_estimate:
+  "lots of bees" / "full" / "packed" / "very strong" → very_strong
+  "strong" / "good population" / "good coverage" → strong
+  "half full" / "moderate" / "average" → moderate
+  "few bees" / "light" / "thin" / "weak" → weak
+  "almost empty" / "very few" / "dying out" / "very weak" → very_weak
+
+temperament:
+  "calm" / "gentle" / "docile" / "easy" → calm
+  "normal" / "ok" / "moderate" → moderate
+  "defensive" / "a bit aggressive" / "stinging" → aggressive
+  "very hot" / "boiling" / "very aggressive" / "dangerous" → very_aggressive
+
+overall_status:
+  "perfect" / "thriving" / "excellent" → excellent
+  "good" / "healthy" / "fine" → good
+  "ok" / "alright" / "fair" / "so-so" → fair
+  "not great" / "struggling" / "poor" → poor
+  "emergency" / "dying" / "failing" / "critical" → critical
+
+bees_coverage (per box):
+  "no bees" / "empty" → none
+  "few bees" / "light coverage" → light
+  "half covered" / "moderate" → moderate
+  "well covered" / "heavy" → heavy
+  "fully covered" / "packed" → full
+
+brood_pattern:
+  "solid" / "great pattern" / "excellent" → excellent
+  "good" / "mostly solid" → good
+  "some gaps" / "fair" → fair
+  "spotty" / "patchy" → spotty
+  "poor" / "scattered" → poor
+
+frame_type:
+  "brood frame" / "brood comb" / "brood" → brood
+  "honey frame" / "honey comb" / "capped honey" / "honey super frame" → honey
+  "pollen frame" / "pollen" → pollen
+  "foundation" / "new foundation" / "starter strip" / "fresh wax" → foundation
+  "empty frame" / "empty" / "drawn comb" (with nothing on it) → empty
+  "feeder frame" / "division board feeder" / "frame feeder" → feeder
+
+weather_conditions:
+  "nice" / "sunny" / "clear" / "bright" → sunny
+  "cloudy" / "overcast" / "grey" → cloudy
+  "raining" / "wet" / "rainy" / "drizzle" → rainy
+  "windy" / "breezy" / "gusty" → windy
+  "warm" / "hot" / "fine" → warm
+  "cold" / "cool" / "chilly" / "crisp" → cold
+
+AUDIO AND PHOTO ATTACHMENTS:
+- When the transcript came from a voice recording, the widget passes audio_file_id and
+  transcript_file_id in the action params. Always include these in the create_inspection params
+  so the audio and transcript are linked to the inspection record in the file management system.
+- If the user says they have photos of the hive, queen, or frames, reply:
+  "To add photos: go to the inspection record after saving, then use the File Manager to upload
+  images. You can also use the 🖼 button in the chat to discuss what a photo shows before adding it."
+- Photos are linked to the inspection via the File Manager using reference_id = inspection_id.
+
+STEP 5 — SHOW PRE-FILLED FORM:
+Once you have collected enough data (at minimum: hive_id or hive_number, inspection_date, and at
+least one box observation), emit ONE [ACTION:] block on its own line. Do NOT emit it mid-conversation —
+wait until the user signals they are done (e.g. "that's it", "save it", "done") or you have
+worked through all the standard questions above.
+
+[ACTION: {"action": "create_inspection", "params": {
+  "hive_id": REAL_HIVE_ID_OR_OMIT_IF_UNKNOWN,
+  "hive_number": "HIVE_NUMBER_AS_STRING_FALLBACK",
+  "audio_file_id": AUDIO_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "transcript_file_id": TRANSCRIPT_FILE_ID_FROM_TRANSCRIBE_RESPONSE_OR_OMIT,
+  "inspection_date": "YYYY-MM-DD",
+  "inspector": "USERNAME",
+  "overall_status": "good",
+  "queen_seen": true,
+  "queen_marked": false,
+  "queen_tag_number": "",
+  "eggs_seen": true,
+  "larvae_seen": true,
+  "capped_brood_seen": true,
+  "population_estimate": "strong",
+  "temperament": "calm",
+  "weather_conditions": "sunny",
+  "temperature": 22,
+  "feeding_done": false,
+  "feed_type": "",
+  "feed_amount": "",
+  "swarm_cells": 0,
+  "queen_cells": 0,
+  "supersedure_cells": 0,
+  "action_required": "",
+  "general_notes": "full narrative summary here — include queen tag colour/number, any frame moves, and anything not captured in structured fields",
+  "box_details": [
+    {
+      "box_position": 1,
+      "detail_type": "box_summary",
+      "bees_coverage": "heavy",
+      "brood_pattern": "good",
+      "brood_percentage": 60,
+      "honey_percentage": 20,
+      "frames": [
+        {"frame_number": 1, "frame_type": "brood", "notes": "solid brood pattern"},
+        {"frame_number": 2, "frame_type": "honey", "notes": "capped honey"}
+      ]
+    }
+  ]
+}}]
+
+Rules:
+- ONLY emit the [ACTION:] block when you have collected enough data (at least hive_id or hive_number and inspection_date).
+- The widget shows the user a review form pre-filled with your values — they can edit before saving.
+- If the user says the form is wrong, update any values they mention and emit a corrected [ACTION:] block.
+- box_details array: one entry per box, top box first. Include box_id if known from live data.
+- For the queen tag number, include it in both queen_tag_number field and general_notes.
 END_PROMPT
 }
 
@@ -7833,6 +9132,78 @@ EDITOR WORKFLOW (you have admin/editor access):
 - To link drug-herb interactions: /ENCY/drug_herb_interactions
 - When the user asks to "add", "edit", "update", or "create" an ENCY entry, provide the direct
   admin URL for that action — do not just describe what to do.
+
+TODO-DRIVEN WORKFLOW — when the user pastes a todo subject into the chat:
+When you see text like "P1 NEW BMaster ENCY: Unresolved term in constituent#17 ...", treat it
+as a work task and follow these steps automatically:
+
+STEP 1 — IDENTIFY the action:
+  "Unresolved term in constituent#N"  → fill in the stub constituent record #N
+  "Unresolved term in therapeutic_action" → review glossary entry
+  "Unresolved constituent name [name]"    → create a new constituent named [name]
+  Extract the TODO record_id from the subject text if present (e.g. "#17" after "constituent").
+
+STEP 2 — LOOKUP from injected data:
+  The server injects "CONSTITUENT #N DETAIL" when constituent#N is in the prompt.
+  Check each field — fields showing "(empty)" need to be filled in.
+
+STEP 3 — NAVIGATE AND PRE-FILL: Open the correct form and pre-fill it automatically.
+  Using your botanical/chemical knowledge, populate ALL fields you know for the constituent.
+  Emit ONE navigate_and_fill action (on its own line) — the browser will open the form and
+  fill the fields automatically. Replace N with the actual record_id number:
+
+  For an existing stub constituent:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/edit?record_id=N", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS", "iupac_name": "IUPAC", "cas_number": "CAS", "therapeutic_action": "THERAPEUTIC_USES", "pharmacological_effects": "EFFECTS", "found_in_herbs": "HERB1, HERB2", "url": "https://pubchem.ncbi.nlm.nih.gov/compound/CID"}}]
+
+  For a constituent that does not exist yet:
+  [ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "SCIENTIFIC_NAME", "common_name": "COMMON_NAME", "chemical_formula": "FORMULA", "chemical_class": "CLASS"}}]
+
+  After the navigate_and_fill line, briefly list the values you suggested so the user can verify them.
+
+STEP 4 — OPEN A LOG: Create a log entry linked to this work session:
+  [ACTION: {"action": "create_log_entry", "params": {"title": "Resolving constituent #N", "description": "Working on ENCY constituent stub — filling in chemical and therapeutic details.", "status": 2}}]
+
+STEP 5 — CONFIRM: Tell the user the form has been opened and pre-filled, and ask them to review
+  and save. Example: "I've opened the edit form for constituent #N and pre-filled the fields with
+  the information above. Please review and click Save."
+
+STEP 6 — REMIND when the user says they are done:
+  "Remember to mark the todo as done. You can click the todo link to close it, or I can close it:
+  [ACTION: {"action": "update_todo_status", "params": {"todo_id": TODO_RECORD_ID, "status": 3}}]"
+
+CONSTITUENT WORKFLOW (admin/editor only):
+The "constituents" field on herb and plant forms is a free-text comma-separated list of constituent
+names (e.g., "Quercetin, Rutin, Apigenin"). When the user mentions a constituent name in a form
+or asks about one, you should:
+
+1. CHECK if it exists: Look at the LIVE ENCY CONSTITUENT DATA injected into this prompt.
+   - If the constituent IS listed → give the user its link: /ENCY/Constituent/ID
+   - If it is NOT listed → offer to create it using the action below OR direct the user to /ENCY/Constituent/add
+
+2. CREATE a constituent when the user says "create the constituent", "add constituent [name]",
+   or similar. Use this action format on its own line in your response:
+   [ACTION: {"action": "create_constituent", "params": {"name": "CONSTITUENT_NAME", "chemical_class": "optional", "therapeutic_action": "optional", "found_in_herbs": "optional herb names comma-separated", "common_name": "optional"}}]
+
+3. After creating, a todo review stub is automatically generated if the entry is incomplete.
+   The user can then go to /ENCY/Constituent/edit?record_id=ID to fill in full details.
+
+4. CONSTITUENT FIELDS (all optional except name):
+   - name (required): scientific/IUPAC name e.g. "Quercetin"
+   - common_name: common alias e.g. "Quercetol"
+   - chemical_formula: e.g. "C15H10O7"
+   - chemical_class: e.g. "Flavonoid", "Alkaloid", "Terpene", "Phenol", "Glycoside"
+   - iupac_name: full IUPAC name
+   - cas_number: CAS registry number
+   - therapeutic_action: therapeutic uses text
+   - pharmacological_effects: known effects text
+   - toxicity: toxicity / safety notes
+   - solubility: solubility information
+   - found_in_herbs: comma-separated herb names
+   - found_in_foods: comma-separated food names
+   - found_in_drugs: comma-separated drug names
+   - research_notes: notes from research
+   - url: authoritative reference URL (PubChem, Wikipedia)
+   - reference: citation (PubChem CID, article title, etc.)
 EDITOR
 
     return <<END_PROMPT;
@@ -7844,10 +9215,13 @@ DATABASE SCHEMA — ENCY tables you can reference:
         key_name, ident_character, stem, leaves, flowers, fruit, taste, odour, root,
         distribution, dosage, administration, formulas, contra_indications, chinese, non_med, harvest
 - HerbCategory: links herbs to categories (e.g., Adaptogen, Nervine, Vulnerary)
-- HerbConstituent: links herbs to specific chemical constituents
+- HerbConstituent: links herbs to specific chemical constituents (junction table)
 - HerbDisease: links herbs to diseases/conditions they address
 - HerbSymptom: links herbs to symptoms they help with
-- Constituent: name, description, therapeutic actions
+- Constituent: record_id, name, common_name, chemical_formula, chemical_class, iupac_name,
+               cas_number, molecular_weight, therapeutic_action, toxicity, solubility,
+               found_in_herbs, found_in_foods, found_in_drugs, pharmacological_effects,
+               research_notes, image, url, reference
 - Disease: name, description, icd_code
 - Symptom: name, description, body_system
 - Formula: name, description, instructions, FormulaHerb (herb_id, amount, unit)
@@ -7857,21 +9231,46 @@ DATABASE SCHEMA — ENCY tables you can reference:
 
 NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - ENCY home: /ENCY
-- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
+- Herbs list (browse all herbs): /ENCY/herbs
+- Search herbs: /ENCY/search?q=TERM
+- Botanical name index (A-Z): /ENCY/BotanicalNameView
 - Bee pasture / forage plants: /ENCY/BeePastureView
 - View herb detail: /ENCY/herb_detail?record_id=ID
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
-- Medicinal constituents: /ENCY/constituents
+- Animals: /ENCY/animals
+- Constituent list: /ENCY/Constituent
+- Constituent detail: /ENCY/Constituent/ID
+- Add constituent: /ENCY/Constituent/add
+- Edit constituent: /ENCY/Constituent/edit?record_id=ID
+- Diseases list: /ENCY/diseases
+- Symptoms list: /ENCY/symptoms
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
-- Formulas: /ENCY/formula
-- Recipes: /ENCY/recipes
+- Formulas / Recipes: /ENCY/formula
+- Glossary: /ENCY/glossary
+
+When the user asks to "open", "show", "list", "browse", or "go to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
+[ACTION: {"action": "navigate", "url": "/ENCY/herbs"}]
+Do NOT just describe the page — always emit the ACTION so the browser navigates there automatically.
+If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT guess a URL.
 $editor_section
 DATA ALREADY INJECTED:
-The server automatically injects LIVE ENCY HERB/PLANT DATA below when relevant herb records
-are found. ALWAYS use this live data to answer questions — do not ask the user to paste records.
+The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
+when relevant records are found. ALWAYS use this live data to answer questions — do not ask the
+user to paste records.
+
+CITATION RULES — CRITICAL, NO EXCEPTIONS:
+- NEVER invent, fabricate, or guess URLs, book titles, author names, journal names, DOIs, ISBNs,
+  or any citation details from your training data.
+- The ENCY Reference system is the SOLE authority on what is verified. Only cite sources that
+  appear in the "VERIFIED ENCY REFERENCES" block injected into the context below.
+- If no verified references are injected (or the status says "No verified references"), tell
+  the user: "No references are currently recorded in the ENCY system for this topic." Do NOT
+  supplement with training-data citations.
+- You MAY summarise what the ENCY database fields say (description, notes, constituents, etc.)
+  — that is verified DB content. You may NOT add facts or sources beyond what the DB supplies.
 
 GUIDELINES:
 - For health questions, always note: "This is educational information only — consult a healthcare provider."
@@ -7879,6 +9278,23 @@ GUIDELINES:
 - When suggesting herb searches, always provide the search URL: /ENCY/search?q=TERM
 - The current user is: $username
 - For unknown terms, say so and suggest searching via /ENCY/search?q=TERM
+- When the user mentions a constituent name and asks you to check if it exists, look at the
+  LIVE ENCY CONSTITUENT DATA. If it's there, give the link. If not, offer to create it.
+
+ACTIONS YOU CAN PERFORM:
+When the user asks to add a constituent or fix an unresolved constituent term, read the injected
+todo/DB data to find the term name, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Constituent/add", "fields": {"name": "TERM_NAME", "found_in_herbs": "HERB_NAME_IF_KNOWN", "therapeutic_action": "IF_KNOWN"}}]
+
+Rules:
+- Extract the term name from the injected todo description or DB data — do NOT ask the user for it.
+- Only include fields you can actually determine from the available data.
+- After the ACTION line, confirm the term name and which herb it came from.
+- If the todo says "Unresolved term in constituent#N", look in the injected data for the actual term string.
+
+When the user asks to add a glossary term, use:
+[ACTION: {"action": "navigate_and_fill", "url": "/ENCY/Glossary/add", "fields": {"term": "TERM_NAME", "definition": "IF_KNOWN"}}]
 END_PROMPT
 }
 
@@ -7894,6 +9310,36 @@ sub _build_helpdesk_system_prompt {
     my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'our system';
     my $username  = $c->session->{username} || 'the user';
 
+    my $recent_tickets_section = '';
+    eval {
+        my $schema    = $c->model('DBEncy')->schema;
+        my $is_csc    = (lc($site_name) eq 'csc');
+        my %search    = (status => [qw(open in_progress)]);
+        $search{site_name} = $site_name unless $is_csc;
+        my @tickets = $schema->resultset('SupportTicket')->search(
+            \%search,
+            { order_by => { -desc => 'created_at' }, rows => 30 }
+        )->all;
+
+        if (@tickets) {
+            $recent_tickets_section = "\nRECENT OPEN TICKETS (use these to identify patterns and avoid duplicate advice):\n";
+            for my $t (@tickets) {
+                my $desc = $t->description || '';
+                $desc = substr($desc, 0, 120) . '…' if length($desc) > 120;
+                $desc =~ s/\n/ /g;
+                $recent_tickets_section .= sprintf(
+                    "- [%s] %s | cat:%s pri:%s | %s\n",
+                    $t->ticket_number, $t->subject,
+                    $t->category || 'other', $t->priority || 'medium',
+                    $desc
+                );
+            }
+        }
+    };
+
+    my $base_url = $c->req->base || "http://workstation.local:3001";
+    $base_url =~ s{/$}{};
+
     return <<END_PROMPT;
 You are a HelpDesk support assistant for $site_name. Your role is to help users resolve issues efficiently and professionally.
 
@@ -7907,18 +9353,26 @@ CAPABILITIES:
    - Troubleshooting (loading issues, database errors, log analysis)
    - System Administration (Linux commands, server maintenance, backup and recovery)
 
-2. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
-   action from our team, offer to create a support ticket. Tell them they can submit a ticket at:
-   /HelpDesk/ticket/new
+2. TICKET SEARCH: You can search existing tickets to find similar issues and their resolutions.
+   Call: GET $base_url/HelpDesk/api/search_tickets?q=KEYWORDS&limit=10
+   The response is JSON: { tickets: [{ ticket_number, subject, category, status, summary }] }
+   Use this to:
+   - Check if a reported issue has already been solved (reference the ticket number)
+   - Identify recurring problem patterns
+   - Find resolutions from previously closed tickets
+
+3. TICKET CREATION: If the user's issue cannot be resolved through conversation or requires
+   action from our team, offer to create a support ticket at: /HelpDesk/ticket/new
    Collect: subject, category (technical/billing/account/feature/other), priority (low/medium/high/critical),
    and a description of the issue.
 
-3. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
+4. LIVE AGENT ESCALATION: For critical issues, urgent matters, or when the user expresses
    frustration, suggest connecting with a live agent through the chat system or by visiting
    /HelpDesk/contact
-
+$recent_tickets_section
 GUIDELINES:
 - Be concise, friendly, and professional
+- Before answering, search tickets for similar issues — if found, mention the ticket number(s)
 - If you don't know the answer, say so clearly and suggest the ticket or live agent option
 - Always confirm you understood the user's issue before suggesting solutions
 - For technical issues, ask clarifying questions if needed (OS, error messages, steps to reproduce)
@@ -7965,6 +9419,13 @@ sub _build_planning_system_prompt {
 
     return <<END_PROMPT;
 You are the AI Project Planning Agent for $site_name. The current user is: $username. Today: $today
+
+## AGENT ROUTING — check first before answering:
+If the user's prompt clearly belongs to a specialist agent, say so BEFORE answering:
+- Contains "ENCY", "herb", "constituent", "botanical", "Quercetin", or similar → "💡 Tip: Switch the agent to **Encyclopedia (ENCY)** for a better answer on this topic."
+- Contains "BMaster", "hive", "apiary", "inspection", "varroa", "queen" → "💡 Tip: Switch the agent to **BMaster** for beekeeping-specific help."
+- Contains "inventory", "stock", "SKU", "BOM" → "💡 Tip: Switch to **Inventory** agent."
+Give the hint on its own line, then continue with whatever partial help you can offer.
 
 ## DAILY LOG ENTRIES — handle immediately with NO extra questions:
 When the user says "good morning", "morning log", "start of day log", "create a log entry" or similar:
@@ -8401,14 +9862,59 @@ AP (amounts owed to suppliers) → 2000 Accounts Payable (Liability)
 GST/HST paid → 2310 GST/HST Payable or 1310 Input Tax Credits (Asset)
 PST paid → 2320 PST Payable
 
-## ACTIONS YOU CAN PERFORM
-When the user asks you to create or update data, respond with a JSON action block:
+## YOUR ROLE
+You are an accounting advisor and form-fill assistant. You explain accounting concepts, advise on
+journal entries, and pre-fill data-entry forms. You do NOT post actual GL entries, modify ledger
+records, or execute any accounting transaction directly — all financial records must be created by
+a human through the appropriate form.
 
-To post a manual GL entry:
-{"action":"create_gl_entry","reference":"ADJ-2026-001","description":"Manual adjustment","post_date":"2026-04-15","lines":[{"account_id":1,"amount":100.00,"memo":"Debit inventory"},{"account_id":5,"amount":-100.00,"memo":"Credit equity"}]}
+PERMITTED ACTIONS (the ONLY actions you may emit):
+- navigate_and_fill — to open and pre-fill the supplier invoice form
 
-Only use actions when the user explicitly requests a data change.  Always confirm
-the details before executing.
+FORBIDDEN ACTIONS (never emit these, no matter what the user asks):
+- create_gl_entry — direct the user to /Accounting/gl/new instead
+- create_todo — tell the user to add it manually in /todo
+- update_todo_status, reschedule_todo, add_todo_comment, create_log_entry — not your domain
+- Any action that writes to the database directly
+
+When the user asks you to "create a todo", "add a reminder", "log this", or similar:
+Respond with plain text only — describe what todo they should add, then tell them to go to /todo
+to add it manually. Do NOT emit any ACTION block.
+
+## PRE-FILL FORM ACTIONS
+
+### Automatic form opening (NO explicit request needed)
+When the user pastes ANY financial document — a bill, invoice, receipt, payment confirmation,
+deposit notification, account refill email, or subscription renewal — you MUST immediately open
+and pre-fill the supplier invoice form WITHOUT waiting to be asked. Do NOT give step-by-step
+instructions. Do NOT ask the user to navigate manually.
+
+Parse the document, then emit ONE navigate_and_fill action on its own line:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_OR_REF_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. PayPal account refill shantahostgator May 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+
+### Deposit / account refill emails
+These are emails confirming money paid INTO a supplier account (PayPal reseller credit, HostGator
+account refill, prepaid service top-up). Record as a supplier invoice:
+- description_0: "Prepaid account refill" or "Account deposit — [supplier]"
+- unit_cost_0: the "Amount Deposited" (main deposit, e.g. $50.00)
+- If a convenience/service charge is listed separately, add a second line:
+  description_1: "Refill convenience charge", unit_cost_1: fee amount, quantity_1: "1"
+- Reference No from the email → invoice_number
+- "Billed To" account name → add to notes
+
+### Rules for all navigate_and_fill invoice entries
+- supplier_id is a dropdown — after emitting the action, tell the user which supplier name to
+  select. If the supplier does not exist in the system, instruct them to first open
+  /Inventory/supplier/add (it supports ?popup=1 for a popup), add the supplier, then return
+  to the invoice form to select it.
+- Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
+- If the bill shows a total with tax included and no breakdown, set tax_amount to 0 and put
+  the full amount in unit_cost_0.
+- auto_pay_method and auto_pay: fill both only if the document shows "Auto Pay" or similar;
+  omit both if not autopay.
+- After the action line, briefly list the values you extracted so the user can verify before
+  saving.
 
 $editor_section
 The current user is: $username
@@ -8744,6 +10250,349 @@ sub apply_fix :Local :Args(0) {
         backup  => "$rel.bak",
         message => "File updated. Original backed up as $rel.bak",
     }));
+}
+
+=head2 transcribe
+
+POST /ai/transcribe — Accept a multipart audio file upload, run it through Whisper,
+and return { success, transcript, model_used }.  The audio file is saved to /tmp,
+transcribed, then immediately deleted.
+
+Whisper is called via the Python binary in Comserv/speechfire or Comserv/venv.
+If neither is available, returns an error asking the user to install openai-whisper.
+
+=cut
+
+sub transcribe :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $username = $c->session->{username} || '';
+    my $is_guest = !$username || lc($username) eq 'guest';
+    if ($is_guest) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Login required to use voice transcription' }));
+        return;
+    }
+
+    my $upload = $c->request->upload('audio');
+    unless ($upload) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'No audio file uploaded (field name: audio)' }));
+        return;
+    }
+
+    my $orig_name = $upload->filename || 'recording.wav';
+    (my $ext = lc($orig_name)) =~ s/.*\.//;
+    $ext = 'wav' unless $ext =~ /^(wav|mp3|m4a|ogg|webm|flac|aac|mp4)$/;
+
+    my $job_id   = time() . '_' . $$;
+    my $tmp_dir  = '/tmp';
+    my $tmp_file = "$tmp_dir/whisper_job_${job_id}.${ext}";
+
+    eval { $upload->copy_to($tmp_file) };
+    if ($@ || !-f $tmp_file) {
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio file: $@" }));
+        return;
+    }
+
+    my $worktree  = $c->path_to('..')->stringify;
+    my $app_root  = $c->path_to('.')->stringify;
+    my @python_candidates = (
+        "$app_root/whisper_venv/bin/python3",
+        "$worktree/whisper_venv/bin/python3",
+        "$app_root/speechfire/bin/python3",
+        "$worktree/speechfire/bin/python3",
+        "$app_root/venv/bin/python3",
+        "$worktree/venv/bin/python3",
+        '/usr/bin/python3',
+        'python3',
+    );
+
+    my $python_bin = '';
+    for my $p (@python_candidates) {
+        next unless $p;
+        my $abs = $p;
+        if ($abs !~ m{^/}) {
+            chomp(my $found = `which $abs 2>/dev/null`);
+            $abs = $found || '';
+        }
+        if ($abs && -x $abs) {
+            my $has_whisper = `"$abs" -c "import whisper" 2>&1`;
+            if ($? == 0) {
+                $python_bin = $abs;
+                last;
+            }
+        }
+    }
+
+    unless ($python_bin) {
+        unlink $tmp_file;
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+        }));
+        return;
+    }
+
+    my $want_diarize = ($c->request->param('diarize') || $c->request->body_parameters->{diarize} || '') ? 1 : 0;
+    my $num_speakers = int($c->request->param('num_speakers') || $c->request->body_parameters->{num_speakers} || 2);
+    $num_speakers = 2 if $num_speakers < 2 || $num_speakers > 8;
+
+    my $has_diarizer = ($want_diarize && `"$python_bin" -c "import simple_diarizer" 2>&1` =~ /^\s*$/) ? 1 : 0;
+
+    my $whisper_model  = 'small';
+    my $torch_hub_dir  = $c->path_to('whisper_venv', '.torch_hub')->stringify;
+
+    my $whisper_script = <<"PYSCRIPT";
+import sys, json, os
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TORCH_DEVICE'] = 'cpu'
+import whisper, torch
+torch.hub.set_dir('$torch_hub_dir')
+audio_path = sys.argv[1]
+model_name = sys.argv[2] if len(sys.argv) > 2 else 'base'
+want_diarize = sys.argv[3] == '1' if len(sys.argv) > 3 else False
+num_speakers = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+
+model = whisper.load_model(model_name, device='cpu')
+wresult = model.transcribe(audio_path, language='en', fp16=False)
+
+segments_out = []
+if want_diarize:
+    try:
+        _real_stdout = sys.stdout
+        sys.stdout = sys.stderr
+        from simple_diarizer.diarizer import Diarizer
+        diar = Diarizer(embed_model='ecapa', cluster_method='sc')
+        spk_segs = diar.diarize(audio_path, num_speakers=num_speakers)
+        sys.stdout = _real_stdout
+        def get_speaker(start, end):
+            best = 'UNKNOWN'
+            best_overlap = 0
+            for s in spk_segs:
+                overlap = min(end, s['end']) - max(start, s['start'])
+                if overlap > best_overlap:
+                    best_overlap = overlap
+                    best = f"SPEAKER_{s['label']}"
+            return best
+        for seg in wresult['segments']:
+            segments_out.append({
+                'start': round(seg['start'], 1),
+                'end':   round(seg['end'], 1),
+                'speaker': get_speaker(seg['start'], seg['end']),
+                'text': seg['text'].strip()
+            })
+    except Exception as e:
+        try: sys.stdout = _real_stdout
+        except NameError: pass
+        segments_out = [{'start': s['start'], 'end': s['end'], 'speaker': 'SPEAKER_0', 'text': s['text'].strip()} for s in wresult['segments']]
+else:
+    for seg in wresult['segments']:
+        segments_out.append({'start': round(seg['start'],1), 'end': round(seg['end'],1), 'speaker': None, 'text': seg['text'].strip()})
+
+print(json.dumps({'transcript': wresult['text'].strip(), 'model': model_name, 'segments': segments_out}))
+PYSCRIPT
+
+    my $py_script_file = "$tmp_dir/whisper_job_${job_id}.py";
+    my $result_file    = "$tmp_dir/whisper_job_${job_id}_result.json";
+    my $status_file    = "$tmp_dir/whisper_job_${job_id}.status";
+
+    open(my $sfh, '>', $py_script_file) or do {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to write whisper script' }));
+        return;
+    };
+    print $sfh $whisper_script;
+    close $sfh;
+
+    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs      = "${nfs_base}/bmaster/audio";
+    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
+    my $timestamp      = time();
+    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
+    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
+    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size    = $upload->size;
+
+    {
+        open(my $sf, '>', $status_file) or do { };
+        print $sf encode_json({ status => 'processing', started => $timestamp });
+        close $sf;
+    }
+
+    require POSIX;
+    my $child = fork();
+    if (!defined $child) {
+        unlink $tmp_file, $py_script_file, $status_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Failed to start background transcription' }));
+        return;
+    }
+
+    if ($child == 0) {
+        my $grandchild = fork();
+        if (defined $grandchild && $grandchild == 0) {
+            POSIX::setsid();
+            open(STDIN,  '<', '/dev/null');
+            open(STDOUT, '>', '/dev/null');
+            open(STDERR, '>>', '/tmp/whisper_bg.log');
+
+            my $json_out = '';
+            eval {
+                my $py_pid = open(my $py_out, '-|', $python_bin, $py_script_file,
+                    $tmp_file, $whisper_model, ($has_diarizer ? '1' : '0'), "$num_speakers")
+                    or die "Cannot start python: $!";
+                $json_out = do { local $/; <$py_out> } // '';
+                close $py_out;
+                waitpid($py_pid, 0);
+            };
+
+            unlink $py_script_file;
+
+            if ($@ || !$json_out) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $result = eval { decode_json($json_out) };
+            unless ($result && $result->{transcript}) {
+                unlink $tmp_file;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                POSIX::_exit(0);
+            }
+
+            my $model_used = $result->{model} || $whisper_model;
+            my $segments   = $result->{segments} || [];
+
+            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
+            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
+            unlink $tmp_file;
+
+            my $nfs_ok = !$@;
+            if ($nfs_ok) {
+                my $transcript_json = encode_json({
+                    transcript => $result->{transcript},
+                    segments   => $segments,
+                    model_used => $model_used,
+                    recorded_by => $username,
+                    original_filename => $orig_name,
+                });
+                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+            }
+
+            open(my $rf, '>', $result_file);
+            print $rf encode_json({
+                success            => JSON::true,
+                transcript         => $result->{transcript},
+                model_used         => $model_used,
+                segments           => $segments,
+                diarized           => $has_diarizer ? JSON::true : JSON::false,
+                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
+                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                orig_name          => $orig_name,
+                file_size          => $upload_size,
+                sitename           => $sitename,
+                username           => $username,
+                ext                => $ext,
+            });
+            close $rf;
+
+            open(my $sf, '>', $status_file);
+            print $sf encode_json({ status => 'done' });
+            close $sf;
+
+            POSIX::_exit(0);
+        }
+        POSIX::_exit(0);
+    }
+
+    waitpid($child, 0);
+
+    $c->response->body(encode_json({
+        success => JSON::true,
+        job_id  => $job_id,
+        status  => 'processing',
+    }));
+}
+
+sub transcribe_status :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    my $job_id = $c->request->param('job_id') // '';
+    unless ($job_id =~ /^\d+_\d+$/) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Invalid job_id' }));
+        return;
+    }
+
+    my $status_file = "/tmp/whisper_job_${job_id}.status";
+    unless (-f $status_file) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Job not found or expired' }));
+        return;
+    }
+
+    my $status_json = do { local $/; open(my $f, '<', $status_file) or return; <$f> };
+    my $status = eval { decode_json($status_json) } || { status => 'processing' };
+
+    if ($status->{status} eq 'done') {
+        my $result_file = "/tmp/whisper_job_${job_id}_result.json";
+        my $result_json = do { local $/; open(my $f, '<', $result_file) or do { $c->response->body(encode_json({success=>JSON::false,error=>'Result missing'})); return; }; <$f> };
+        my $result = eval { decode_json($result_json) } || { success => JSON::false, error => 'Invalid result' };
+        unlink $status_file, $result_file;
+
+        if ($result->{success} && $result->{audio_nfs_path}) {
+            eval {
+                my $schema  = $c->model('DBEncy');
+                my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
+                my $audio_row = $schema->resultset('File')->create({
+                    file_name   => $result->{orig_name},
+                    nfs_path    => $result->{audio_nfs_path},
+                    file_type   => 'audio',
+                    file_format => 'audio/' . ($result->{ext} || 'wav'),
+                    file_size   => $result->{file_size} || 0,
+                    source_type => 'nfs',
+                    sitename    => $sitename,
+                    description => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                    user_id     => undef,
+                });
+                $result->{audio_file_id} = $audio_row->id + 0;
+
+                if ($result->{transcript_nfs_path}) {
+                    my $trans_row = $schema->resultset('File')->create({
+                        file_name   => ($result->{orig_name} || 'transcript') . '.json',
+                        nfs_path    => $result->{transcript_nfs_path},
+                        file_format => 'application/json',
+                        source_type => 'nfs',
+                        sitename    => $sitename,
+                        description => "Whisper transcript for " . ($result->{orig_name} || ''),
+                        user_id     => undef,
+                    });
+                    $result->{transcript_file_id} = $trans_row->id + 0;
+                }
+            };
+        }
+
+        delete $result->{$_} for qw(audio_nfs_path transcript_nfs_path orig_name file_size sitename username ext);
+        $c->response->body(encode_json($result));
+    } elsif ($status->{status} eq 'error') {
+        unlink $status_file;
+        $c->response->body(encode_json({ success => JSON::false, error => $status->{error} || 'Transcription failed' }));
+    } else {
+        $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
+    }
 }
 
 __PACKAGE__->meta->make_immutable;
