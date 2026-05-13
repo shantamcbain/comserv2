@@ -439,9 +439,18 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         "User roles: " . join(", ", @$roles));
 
     # Get form parameters
+    my @db_services = $c->req->param('db_services');
+    my $vm_type     = $c->req->params->{vm_type} || 'generic';
+
+    my $base_description = $c->req->params->{description} || '';
+    if ($vm_type eq 'database' && @db_services) {
+        my $svc_list = join(', ', @db_services);
+        $base_description .= $base_description ? " | Services: $svc_list" : "Services: $svc_list";
+    }
+
     my $params = {
         hostname => $c->req->params->{hostname},
-        description => $c->req->params->{description},
+        description => $base_description,
         cpu => $c->req->params->{cpu},
         memory => $c->req->params->{memory},
         disk_size => $c->req->params->{disk_size},
@@ -453,6 +462,10 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         start_after_creation => $c->req->params->{start_after_creation},
         enable_qemu_agent => $c->req->params->{enable_qemu_agent},
         start_on_boot => $c->req->params->{start_on_boot},
+        vm_type => $vm_type,
+        db_services => \@db_services,
+        db_port_mysql => $c->req->params->{db_port_mysql} || 3306,
+        db_port_postgresql => $c->req->params->{db_port_postgresql} || 5432,
     };
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
@@ -460,7 +473,9 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         ", template=" . ($params->{template} || 'undef') .
         ", cpu=" . ($params->{cpu} || 'undef') .
         ", memory=" . ($params->{memory} || 'undef') .
-        ", disk_size=" . ($params->{disk_size} || 'undef'));
+        ", disk_size=" . ($params->{disk_size} || 'undef') .
+        ", vm_type=" . $vm_type .
+        ", db_services=" . join(',', @db_services));
 
     # Validate required fields
     my @required_fields = qw(hostname template);
