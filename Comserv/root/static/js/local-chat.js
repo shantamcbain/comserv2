@@ -2261,7 +2261,7 @@
                 if (_nfFields.unit_cost_0) {
                     const _isDeposit = !!_depositAmtM;
                     if (_isDeposit) {
-                        const _transferFields = {
+                        const _tf = {
                             amount:     _nfFields.unit_cost_0,
                             post_date:  _nfFields.invoice_date || '',
                             reference:  _nfFields.invoice_number || '',
@@ -2269,7 +2269,8 @@
                             fee_amount: _nfFields.unit_cost_1 || '',
                             entry_type: 'prepaid_topup',
                         };
-                        executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new', fields: _transferFields });
+                        const _qs = Object.keys(_tf).filter(k => _tf[k]).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(_tf[k])).join('&');
+                        executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new?' + _qs, fields: _tf });
                     } else {
                         executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
                     }
