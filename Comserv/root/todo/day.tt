@@ -8,7 +8,11 @@
    # OR when included from week.tt/month.tt (include_mode parameter)
    IF template.name.match('DailyPlan.tt') OR template.name.match('Planning.tt') OR (c.req.path AND c.req.path.match('DailyPlan')) OR (c.req.path AND c.req.path.match('planning/daily'));
       is_daily_plan = 1;
-      base_url = '/Documentation/DailyPlan';
+      IF c.req.path AND c.req.path.match('planning/daily');
+         base_url = '/planning/daily';
+      ELSE;
+         base_url = '/Documentation/DailyPlan';
+      END;
       planning_hash = '#planning';
       week_hash = '#weekly-view';
       month_hash = '#month-view';
@@ -51,8 +55,8 @@
        SET _date_num = date.replace('-', '');
        FOREACH todo IN todos;
            NEXT IF todo.status == 3;
-           SET _start = todo.start_date ? todo.start_date.substr(0, 10).replace('-', '') : 0;
-           SET _due   = todo.due_date   ? todo.due_date.substr(0, 10).replace('-', '')   : 0;
+           SET _start = todo.start_date ? (todo.start_date _ '').substr(0, 10).replace('-', '') : 0;
+           SET _due   = todo.due_date   ? (todo.due_date   _ '').substr(0, 10).replace('-', '') : 0;
            IF _start AND _start < _date_num;
                temp_overdue_todos.push(todo);
            ELSIF (_start AND _start == _date_num) OR (!_start AND _due AND _due == _date_num);
@@ -636,7 +640,7 @@ function _updateDaySiteSummary() {
                                     </div>
                                     [% END %]
                                 </div>
-                                <div style="display:table-cell;width:1%;white-space:nowrap;vertical-align:middle;padding-left:8px;text-align:right;">
+                                <div style="display:table-cell;width:110px;white-space:nowrap;vertical-align:middle;padding-left:8px;text-align:right;">
                                     [% IF is_csc && _ts && _ts != 'CSC' %]
                                     <span style="display:inline-block;font-size:0.68em;font-weight:bold;padding:1px 5px;border-radius:3px;background:var(--primary-color,#4CAF50);color:#fff;margin-right:4px;">[% _ts %]</span>
                                     [% END %]
