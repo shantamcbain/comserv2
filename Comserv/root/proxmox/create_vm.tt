@@ -132,9 +132,19 @@
             <div id="static_ip_fields" style="display: none;">
                 <div class="form-group">
                     <label for="ip_address">IP Address:</label>
-                    <input type="text" id="ip_address" name="ip_address" 
-                           placeholder="e.g., 192.168.1.100" value="[% form_data.ip_address %]">
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="text" id="ip_address" name="ip_address"
+                               placeholder="e.g., 192.168.1.100" value="[% form_data.ip_address %]"
+                               style="flex:1;">
+                        <button type="button" id="suggest_ip_btn" onclick="suggestAvailableIP()"
+                                style="white-space:nowrap;padding:6px 12px;background:#17a2b8;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                            🔍 Available IPs
+                        </button>
+                    </div>
                     <span class="help-text">Static IP address for the VM</span>
+                    <div id="ip_suggestions" style="display:none;margin-top:8px;border:1px solid #17a2b8;border-radius:4px;background:#f0fafc;padding:10px;">
+                        <div id="ip_suggestions_content"></div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -420,6 +430,63 @@ document.addEventListener('DOMContentLoaded', function() {
     toggleNetworkFields();
     applyVmPreset();
 });
+
+function suggestAvailableIP() {
+    var btn = document.getElementById('suggest_ip_btn');
+    var box = document.getElementById('ip_suggestions');
+    var content = document.getElementById('ip_suggestions_content');
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Checking…';
+    box.style.display = 'block';
+    content.innerHTML = '<em style="color:#666;">Querying network map and DHCP leases…</em>';
+
+    var subnet = '192.168.1';
+    var ipVal = document.getElementById('ip_address').value.trim();
+    if (ipVal && ipVal.match(/^(\d+\.\d+\.\d+)\.\d+$/)) {
+        subnet = ipVal.match(/^(\d+\.\d+\.\d+)\.\d+$/)[1];
+    }
+
+    fetch('[% c.uri_for("/proxmox/available_ips") %]?subnet=' + encodeURIComponent(subnet))
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            btn.disabled = false;
+            btn.textContent = '🔍 Available IPs';
+
+            if (!data.available || data.available.length === 0) {
+                content.innerHTML = '<span style="color:#c0392b;">No available IPs found in ' + data.subnet + '</span>';
+                return;
+            }
+
+            var html = '<strong style="color:#17a2b8;">Available in ' + data.subnet + ':</strong><br>';
+            html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">';
+            data.available.forEach(function(ip) {
+                html += '<button type="button" onclick="selectIP(\'' + ip + '\')" ' +
+                    'style="padding:4px 10px;background:#28a745;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:0.88em;">' +
+                    ip + '</button>';
+            });
+            html += '</div>';
+
+            if (data.used && data.used.length > 0) {
+                html += '<details style="margin-top:8px;"><summary style="cursor:pointer;color:#666;font-size:0.88em;">In use (' + data.used.length + ')</summary><ul style="margin:4px 0 0 16px;font-size:0.85em;color:#555;">';
+                data.used.forEach(function(u) {
+                    html += '<li>' + u.ip + ' — ' + u.reason + '</li>';
+                });
+                html += '</ul></details>';
+            }
+            content.innerHTML = html;
+        })
+        .catch(function(err) {
+            btn.disabled = false;
+            btn.textContent = '🔍 Available IPs';
+            content.innerHTML = '<span style="color:#c0392b;">Error: ' + err.message + '</span>';
+        });
+}
+
+function selectIP(ip) {
+    document.getElementById('ip_address').value = ip;
+    document.getElementById('ip_suggestions').style.display = 'none';
+}
 </script>[% META title = 'Create New Virtual Machine' %]
 
 <div class="container">
