@@ -770,12 +770,14 @@ sub generate :Local :Args(0) {
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-4.3
             );
-            my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -812,12 +814,12 @@ sub generate :Local :Args(0) {
                     if ($key_obj) {
                         my $meta       = $key_obj->get_metadata() || {};
                         my $deprecated = $meta->{deprecated_models} || {};
-                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} } && !$GROK_DEAD{ $meta->{last_working_model} }) {
                             $grok->model($meta->{last_working_model});
                         } else {
                             my $synced = $meta->{available_models} || [];
                             my ($first) = grep {
-                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} } && !$GROK_DEAD{ $_->{id} }
                             } @$synced;
                             $grok->model($first->{id}) if $first && $first->{id};
                         }
@@ -875,11 +877,16 @@ sub generate :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer newer models: use reverse-alphabetical sort as heuristic
-                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
-                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
+                            # Prefer numeric-version models (grok-4, grok-3...) over
+                            # alphabetic-named ones (grok-code-*, grok-beta) then reverse-sort
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -2323,12 +2330,14 @@ sub chat :Local :Args(0) {
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-4.3
             );
-            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2368,9 +2377,14 @@ sub chat :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -6787,16 +6801,32 @@ sub sync_models :Local :Args(0) {
         }
 
         # Extract model list (OpenAI-compatible format: data[].id)
+        my %SYNC_DEAD = map { $_ => 1 } qw(
+            grok-code-fast-1
+            grok-4-fast-non-reasoning
+            grok-4-1-fast-non-reasoning
+            grok-4-0709
+            grok-3
+            grok-4-fast-reasoning
+            grok-4-1-fast-reasoning
+            grok-4.3
+        );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
             foreach my $m (@{$data->{data}}) {
                 next unless $m->{id};
+                next if $SYNC_DEAD{$m->{id}};
+                next if $m->{id} =~ /imagine|video/i;
                 push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
             }
         }
 
-        # Sort models alphabetically
-        @models = sort { $a->{id} cmp $b->{id} } @models;
+        # Sort models: numeric-version first (grok-4, grok-3...) then alphabetic, reverse within groups
+        @models = sort {
+            my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            $bn <=> $an || $b->{id} cmp $a->{id}
+        } @models;
 
         # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
@@ -9838,9 +9868,18 @@ journal entries, and pre-fill data-entry forms. You do NOT post actual GL entrie
 records, or execute any accounting transaction directly — all financial records must be created by
 a human through the appropriate form.
 
-Do NOT emit create_gl_entry or any action that writes directly to accounting tables. Instead,
-explain the correct journal entry (DR/CR accounts, amounts, reference) and direct the user to
-/Accounting/gl/new to enter it manually.
+PERMITTED ACTIONS (the ONLY actions you may emit):
+- navigate_and_fill — to open and pre-fill the supplier invoice form
+
+FORBIDDEN ACTIONS (never emit these, no matter what the user asks):
+- create_gl_entry — direct the user to /Accounting/gl/new instead
+- create_todo — tell the user to add it manually in /todo
+- update_todo_status, reschedule_todo, add_todo_comment, create_log_entry — not your domain
+- Any action that writes to the database directly
+
+When the user asks you to "create a todo", "add a reminder", "log this", or similar:
+Respond with plain text only — describe what todo they should add, then tell them to go to /todo
+to add it manually. Do NOT emit any ACTION block.
 
 ## PRE-FILL FORM ACTIONS
 You may open and pre-fill data-entry forms so the user can review and submit them:
