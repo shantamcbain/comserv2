@@ -358,11 +358,18 @@ sub create_vm_form :Path('create') :Args(0) {
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_form',
         "User roles: " . join(", ", @$roles));
 
-    # Get server_id from parameter or default
-    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id} || 'default';
+    my $server_id = $c->req->param('server_id') || $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all_servers = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        if ($all_servers && @$all_servers) {
+            $server_id = $all_servers->[0]{id} || $all_servers->[0]{server_id};
+        }
+        $server_id ||= 'ProxmoxDevelopment';
+    }
 
     # Configure the Proxmox model
     my $proxmox = $c->model('Proxmox');
+    $proxmox->set_server_id($server_id);
 
     # Authenticate with Proxmox
     my $auth_success = $proxmox->authenticate();
