@@ -2283,7 +2283,7 @@
                     _wAcc.appendChild(_lblAcc);
                     _wAcc.appendChild(_elAcc);
                     if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
-                    if (_enterIntent) {
+                    if (_enterIntent || _looksLikeDeposit) {
                         loadingMessage.remove();
                         statusIndicator.textContent = '\uD83D\uDFE2 Invoice form opened';
                         statusIndicator.className = 'chat-status connected';
