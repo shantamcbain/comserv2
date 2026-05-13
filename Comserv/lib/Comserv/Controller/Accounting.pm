@@ -245,7 +245,18 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
 
     my @default_accounts = (
         # Assets
-        { accno => '1000', description => 'Cash',                          category => 'A' },
+        { accno => '1000', description => 'Cash / Chequing Account',        category => 'A' },
+        { accno => '1005', description => 'Savings Account',               category => 'A' },
+        # Payment processor accounts (treated as bank accounts)
+        { accno => '1010', description => 'PayPal Account',                category => 'A' },
+        { accno => '1011', description => 'Stripe Account',                category => 'A' },
+        { accno => '1012', description => 'Square Account',                category => 'A' },
+        # Prepaid vendor balances (asset — money held at supplier until consumed)
+        { accno => '1020', description => 'eNom Prepaid Balance',          category => 'A' },
+        { accno => '1021', description => 'HostGator Prepaid Balance',      category => 'A' },
+        { accno => '1022', description => 'GoDaddy Prepaid Balance',       category => 'A' },
+        { accno => '1023', description => 'Namecheap Prepaid Balance',     category => 'A' },
+        { accno => '1029', description => 'Other Prepaid Vendor Balance',  category => 'A' },
         { accno => '1100', description => 'Accounts Receivable',           category => 'A' },
         { accno => '1200', description => 'Inventory Asset',               category => 'A' },
         { accno => '1300', description => 'Prepaid Expenses',              category => 'A' },
@@ -255,6 +266,10 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '2000', description => 'Accounts Payable',              category => 'L' },
         { accno => '2100', description => 'Sales Tax Payable',             category => 'L' },
         { accno => '2200', description => 'Accrued Liabilities',           category => 'L' },
+        # Credit card liabilities
+        { accno => '2300', description => 'Credit Card Payable — Visa',    category => 'L' },
+        { accno => '2310', description => 'Credit Card Payable — MasterCard', category => 'L' },
+        { accno => '2320', description => 'Credit Card Payable — Amex',   category => 'L' },
         # Equity
         { accno => '3000', description => "Owner's Equity",                category => 'Q' },
         { accno => '3100', description => 'Retained Earnings',             category => 'Q' },
@@ -282,6 +297,12 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
         { accno => '6400', description => 'Shipping & Postage',             category => 'E' },
         { accno => '6500', description => 'Depreciation Expense',           category => 'E' },
         { accno => '6510', description => '3D Printer Depreciation',        category => 'E' },
+        { accno => '6600', description => 'Domain Registration & Renewals', category => 'E' },
+        { accno => '6610', description => 'Web Hosting Expense',            category => 'E' },
+        { accno => '6620', description => 'SSL Certificates',               category => 'E' },
+        { accno => '6700', description => 'Software Subscriptions',         category => 'E' },
+        { accno => '6710', description => 'Bank & Payment Processing Fees', category => 'E' },
+        { accno => '6720', description => 'PayPal / Stripe Convenience Fees', category => 'E' },
         { accno => '6900', description => 'Other Expenses',                 category => 'E' },
         # Income — product lines
         { accno => '4210', description => '3D Print Sales',                 category => 'I' },
@@ -323,27 +344,39 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my $schema = $self->_schema($c);
 
     my @all_accounts = (
-        { accno => '1000', description => 'Cash',                          category => 'A' },
-        { accno => '1100', description => 'Accounts Receivable',           category => 'A' },
-        { accno => '1200', description => 'Inventory Asset',               category => 'A' },
-        { accno => '1300', description => 'Prepaid Expenses',              category => 'A' },
-        { accno => '1310', description => 'GST/HST Receivable (ITC)',      category => 'A' },
-        { accno => '1500', description => 'Fixed Assets',                  category => 'A' },
-        { accno => '2000', description => 'Accounts Payable',              category => 'L' },
-        { accno => '2100', description => 'Sales Tax Payable',             category => 'L' },
-        { accno => '2200', description => 'Accrued Liabilities',           category => 'L' },
-        { accno => '3000', description => "Owner's Equity",                category => 'Q' },
-        { accno => '3100', description => 'Retained Earnings',             category => 'Q' },
-        { accno => '4000', description => 'Sales Revenue',                 category => 'I' },
-        { accno => '4100', description => 'Sales Returns & Allowances',    category => 'I', is_contra => 1 },
-        { accno => '4200', description => 'Service Revenue',                  category => 'I' },
-        { accno => '4210', description => '3D Print Sales',                  category => 'I' },
-        { accno => '4215', description => '3D Print Service Revenue',        category => 'I' },
-        { accno => '4220', description => 'Honey & Apiary Sales',            category => 'I' },
-        { accno => '4230', description => 'Craft & Handmade Sales',          category => 'I' },
+        { accno => '1000', description => 'Cash / Chequing Account',        category => 'A' },
+        { accno => '1005', description => 'Savings Account',                category => 'A' },
+        { accno => '1010', description => 'PayPal Account',                 category => 'A' },
+        { accno => '1011', description => 'Stripe Account',                 category => 'A' },
+        { accno => '1012', description => 'Square Account',                 category => 'A' },
+        { accno => '1020', description => 'eNom Prepaid Balance',           category => 'A' },
+        { accno => '1021', description => 'HostGator Prepaid Balance',      category => 'A' },
+        { accno => '1022', description => 'GoDaddy Prepaid Balance',        category => 'A' },
+        { accno => '1023', description => 'Namecheap Prepaid Balance',      category => 'A' },
+        { accno => '1029', description => 'Other Prepaid Vendor Balance',   category => 'A' },
+        { accno => '1100', description => 'Accounts Receivable',            category => 'A' },
+        { accno => '1200', description => 'Inventory Asset',                category => 'A' },
+        { accno => '1300', description => 'Prepaid Expenses',               category => 'A' },
+        { accno => '1310', description => 'GST/HST Receivable (ITC)',       category => 'A' },
+        { accno => '1500', description => 'Fixed Assets',                   category => 'A' },
+        { accno => '2000', description => 'Accounts Payable',               category => 'L' },
+        { accno => '2100', description => 'Sales Tax Payable',              category => 'L' },
+        { accno => '2200', description => 'Accrued Liabilities',            category => 'L' },
+        { accno => '2300', description => 'Credit Card Payable — Visa',     category => 'L' },
+        { accno => '2310', description => 'Credit Card Payable — MasterCard', category => 'L' },
+        { accno => '2320', description => 'Credit Card Payable — Amex',    category => 'L' },
+        { accno => '3000', description => "Owner's Equity",                 category => 'Q' },
+        { accno => '3100', description => 'Retained Earnings',              category => 'Q' },
+        { accno => '4000', description => 'Sales Revenue',                  category => 'I' },
+        { accno => '4100', description => 'Sales Returns & Allowances',     category => 'I', is_contra => 1 },
+        { accno => '4200', description => 'Service Revenue',                category => 'I' },
+        { accno => '4210', description => '3D Print Sales',                 category => 'I' },
+        { accno => '4215', description => '3D Print Service Revenue',       category => 'I' },
+        { accno => '4220', description => 'Honey & Apiary Sales',           category => 'I' },
+        { accno => '4230', description => 'Craft & Handmade Sales',         category => 'I' },
         { accno => '4250', description => 'Developer / IT Services Revenue', category => 'I' },
         { accno => '4260', description => 'Developer Services — GST/HST Collected', category => 'L' },
-        { accno => '4900', description => 'Other Income',                    category => 'I' },
+        { accno => '4900', description => 'Other Income',                   category => 'I' },
         { accno => '5000', description => 'Cost of Goods Sold',             category => 'E' },
         { accno => '5100', description => 'Purchases',                      category => 'E' },
         { accno => '5200', description => 'Purchase Discounts',             category => 'E', is_contra => 1 },
@@ -360,6 +393,12 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
         { accno => '6400', description => 'Shipping & Postage',             category => 'E' },
         { accno => '6500', description => 'Depreciation Expense',           category => 'E' },
         { accno => '6510', description => '3D Printer Depreciation',        category => 'E' },
+        { accno => '6600', description => 'Domain Registration & Renewals', category => 'E' },
+        { accno => '6610', description => 'Web Hosting Expense',            category => 'E' },
+        { accno => '6620', description => 'SSL Certificates',               category => 'E' },
+        { accno => '6700', description => 'Software Subscriptions',         category => 'E' },
+        { accno => '6710', description => 'Bank & Payment Processing Fees', category => 'E' },
+        { accno => '6720', description => 'PayPal / Stripe Convenience Fees', category => 'E' },
         { accno => '6900', description => 'Other Expenses',                 category => 'E' },
     );
 
@@ -389,6 +428,153 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     }
 
     $c->res->redirect($c->uri_for('/Accounting/coa'));
+}
+
+# =========================================================================
+# Account Transfer / Direct Payment
+# =========================================================================
+# Covers: Bank→PayPal, PayPal→Prepaid account, credit card payments, etc.
+# A "transfer" is a GL entry that moves money between two balance-sheet
+# accounts (both Asset or Liability) without creating an expense or income.
+# A "direct expense payment" skips AP: DR Expense, CR Payment Account.
+
+sub transfer_new :Path('/Accounting/transfer/new') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my (@asset_accounts, @liability_accounts, @expense_accounts);
+    eval {
+        my @all = $schema->resultset('CoaAccount')->search(
+            { obsolete => 0 },
+            { order_by => 'accno' }
+        )->all;
+        for my $a (@all) {
+            push @asset_accounts,     $a if $a->category eq 'A';
+            push @liability_accounts, $a if $a->category eq 'L';
+            push @expense_accounts,   $a if $a->category eq 'E';
+        }
+    };
+
+    $c->stash(
+        asset_accounts     => \@asset_accounts,
+        liability_accounts => \@liability_accounts,
+        expense_accounts   => \@expense_accounts,
+        sitename           => $sitename,
+        template           => 'Accounting/transfer/new.tt',
+    );
+}
+
+sub transfer_create :Path('/Accounting/transfer/create') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{is_admin}) {
+        $c->flash->{error_msg} = 'Admin access required.';
+        $c->res->redirect($c->uri_for('/'));
+        return;
+    }
+
+    my $p        = $c->req->body_parameters;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+    my $username = $c->session->{username} || 'admin';
+    my $user_id  = $c->session->{user_id};
+    my $today    = $self->_now();
+    my $date     = substr($today, 0, 10);
+
+    my $from_id    = $p->{from_account_id} or do {
+        $c->flash->{error_msg} = 'From account is required.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    };
+    my $to_id      = $p->{to_account_id} or do {
+        $c->flash->{error_msg} = 'To account is required.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    };
+    my $amount     = $p->{amount} + 0;
+    my $fee_amount = $p->{fee_amount} ? ($p->{fee_amount} + 0) : 0;
+    my $fee_acct   = $p->{fee_account_id} || undef;
+    my $post_date  = $p->{post_date} || $date;
+    my $reference  = $p->{reference} || '';
+    my $notes      = $p->{notes} || '';
+    my $entry_type = $p->{entry_type} || 'transfer';
+
+    unless ($amount > 0) {
+        $c->flash->{error_msg} = 'Amount must be greater than zero.';
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    }
+
+    my ($gl_id, $err);
+    eval {
+        $schema->txn_do(sub {
+            my $gl = $schema->resultset('GlEntry')->create({
+                reference   => $reference,
+                description => $notes,
+                entry_type  => $entry_type,
+                post_date   => $post_date,
+                approved    => 1,
+                currency    => 'CAD',
+                sitename    => $sitename,
+                entered_by  => $user_id || undef,
+            });
+            $gl_id = $gl->id;
+
+            my $sort = 1;
+            $schema->resultset('GlEntryLine')->create({
+                gl_entry_id => $gl_id,
+                account_id  => $to_id,
+                amount      => $amount,
+                memo        => $notes,
+                sort_order  => $sort++,
+            });
+            $schema->resultset('GlEntryLine')->create({
+                gl_entry_id => $gl_id,
+                account_id  => $from_id,
+                amount      => -$amount,
+                memo        => $notes,
+                sort_order  => $sort++,
+            });
+
+            if ($fee_amount > 0 && $fee_acct) {
+                $schema->resultset('GlEntryLine')->create({
+                    gl_entry_id => $gl_id,
+                    account_id  => $fee_acct,
+                    amount      => $fee_amount,
+                    memo        => 'Fee: ' . $notes,
+                    sort_order  => $sort++,
+                });
+                $schema->resultset('GlEntryLine')->create({
+                    gl_entry_id => $gl_id,
+                    account_id  => $from_id,
+                    amount      => -$fee_amount,
+                    memo        => 'Fee debit from source: ' . $notes,
+                    sort_order  => $sort++,
+                });
+            }
+        });
+    };
+    $err = $@ if $@;
+
+    if ($err) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'transfer_create', "Transfer failed: $err");
+        $c->flash->{error_msg} = "Transfer failed: $err";
+        $c->res->redirect($c->uri_for('/Accounting/transfer/new'));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'transfer_create',
+        "Transfer GL $gl_id created: from=$from_id to=$to_id amount=$amount fee=$fee_amount");
+    $c->flash->{success_msg} = "Transfer recorded (GL #$gl_id).";
+    $c->res->redirect($c->uri_for('/Accounting/gl/view/' . $gl_id));
 }
 
 # =========================================================================
