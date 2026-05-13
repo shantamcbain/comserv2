@@ -42,7 +42,7 @@
 
   <p class="hint">
     Use this form to record money moving between accounts — no invoice required.
-    Examples: Bank → PayPal top-up, PayPal → eNom prepaid, credit card payment, bank fee.
+    Examples: Bank → PayPal top-up, PayPal → Prepaid Vendor Balances, credit card payment, bank fee.
   </p>
 
   <form method="POST" action="/Accounting/transfer/create" id="transfer-form">
@@ -53,7 +53,7 @@
       <label for="tt_transfer">Account Transfer<br><small>Move money between accounts<br>(no expense)</small></label>
 
       <input type="radio" name="entry_type" id="tt_prepaid" value="prepaid_topup">
-      <label for="tt_prepaid">Prepaid Top-Up<br><small>Fund a vendor prepaid balance<br>(eNom, HostGator…)</small></label>
+      <label for="tt_prepaid">Prepaid Top-Up<br><small>Fund a vendor prepaid balance<br>(acct 1029)</small></label>
 
       <input type="radio" name="entry_type" id="tt_expense" value="direct_expense">
       <label for="tt_expense">Direct Expense Payment<br><small>Expense already paid<br>(skips Accounts Payable)</small></label>
@@ -163,7 +163,7 @@
 (function() {
     var hints = {
         transfer:       { from: 'Source account (e.g. Bank, PayPal).', to: 'Destination account (e.g. PayPal, eNom Prepaid).', note: 'Pure transfer — no expense created.' },
-        prepaid_topup:  { from: 'Payment source (e.g. PayPal Account, Visa).', to: 'Vendor prepaid balance account (e.g. eNom Prepaid Balance).', note: 'Funds a vendor prepaid balance. Include convenience fee below if charged.' },
+        prepaid_topup:  { from: 'Payment source (e.g. PayPal Account, Visa).', to: '1029 Prepaid Vendor Balances — all vendors tracked via AP/Supplier records.', note: 'Funds a vendor prepaid balance. Include convenience fee below if charged.' },
         direct_expense: { from: 'Payment account (e.g. PayPal, Bank, Visa).', to: 'Expense account (e.g. 6600 Domain Renewals).', note: 'Records an expense that was already paid — skips Accounts Payable.' },
         cc_payment:     { from: 'Source (e.g. Bank or PayPal Account).', to: 'Credit card liability account (e.g. 2300 Visa Payable).', note: 'Paying down a credit card balance reduces the liability.' },
     };
