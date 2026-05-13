@@ -2257,8 +2257,20 @@
                         + (_nfFields.invoice_date ? ' ' + _nfFields.invoice_date : '');
                 }
                 if (_nfFields.unit_cost_0) {
-                    executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
                     const _isDeposit = !!_depositAmtM;
+                    if (_isDeposit) {
+                        const _transferFields = {
+                            amount:     _nfFields.unit_cost_0,
+                            post_date:  _nfFields.invoice_date || '',
+                            reference:  _nfFields.invoice_number || '',
+                            notes:      _nfFields.notes || '',
+                            fee_amount: _nfFields.unit_cost_1 || '',
+                            entry_type: 'prepaid_topup',
+                        };
+                        executeAIAction({ action: 'navigate_and_fill', url: '/Accounting/transfer/new', fields: _transferFields });
+                    } else {
+                        executeAIAction({ action: 'navigate_and_fill', url: '/Inventory/invoice/new', fields: _nfFields });
+                    }
                     const _wAcc = document.createElement('div');
                     _wAcc.className = 'msg-wrapper msg-wrapper-ai';
                     const _lblAcc = document.createElement('div');
@@ -2266,12 +2278,14 @@
                     _lblAcc.textContent = 'Accounting Agent';
                     const _elAcc = document.createElement('div');
                     _elAcc.className = 'message ai-message';
-                    const _supplierHint = _supplierName !== 'Supplier'
-                        ? ' Select <strong>' + _supplierName + '</strong> as the supplier'
-                            + (_isDeposit ? ' (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).' : '.')
-                        : ' Select the supplier in the dropdown (add if missing).';
+                    const _supplierHint = _isDeposit
+                        ? ' Select <strong>prepaid_topup</strong> transaction type and choose the correct From/To accounts.'
+                        : (_supplierName !== 'Supplier'
+                            ? ' Select <strong>' + _supplierName + '</strong> as the supplier'
+                                + ' (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).'
+                            : ' Select the supplier in the dropdown (add if missing).');
                     _elAcc.innerHTML = '\uD83D\uDCCB '
-                        + (_isDeposit ? 'Deposit/refill' : 'Invoice')
+                        + (_isDeposit ? 'Deposit/refill transfer' : 'Invoice')
                         + ' form opened and pre-filled — verify the amounts, then save.'
                         + _supplierHint
                         + '<br><small>'
@@ -2285,7 +2299,7 @@
                     if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
                     if (_enterIntent || _looksLikeDeposit) {
                         loadingMessage.remove();
-                        statusIndicator.textContent = '\uD83D\uDFE2 Invoice form opened';
+                        statusIndicator.textContent = _isDeposit ? '\uD83D\uDFE2 Transfer form opened' : '\uD83D\uDFE2 Invoice form opened';
                         statusIndicator.className = 'chat-status connected';
                         return;
                     }

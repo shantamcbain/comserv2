@@ -9869,7 +9869,7 @@ records, or execute any accounting transaction directly — all financial record
 a human through the appropriate form.
 
 PERMITTED ACTIONS (the ONLY actions you may emit):
-- navigate_and_fill — to open and pre-fill the supplier invoice form
+- navigate_and_fill — to open and pre-fill a form (supplier invoice OR account transfer)
 
 FORBIDDEN ACTIONS (never emit these, no matter what the user asks):
 - create_gl_entry — direct the user to /Accounting/gl/new instead
@@ -9886,35 +9886,37 @@ to add it manually. Do NOT emit any ACTION block.
 ### Automatic form opening (NO explicit request needed)
 When the user pastes ANY financial document — a bill, invoice, receipt, payment confirmation,
 deposit notification, account refill email, or subscription renewal — you MUST immediately open
-and pre-fill the supplier invoice form WITHOUT waiting to be asked. Do NOT give step-by-step
-instructions. Do NOT ask the user to navigate manually.
+and pre-fill the correct form WITHOUT waiting to be asked. Do NOT give step-by-step instructions.
+Do NOT ask the user to navigate manually.
 
-Parse the document, then emit ONE navigate_and_fill action on its own line:
+### Supplier invoices / bills (goods or services received, pay later)
+Use the supplier invoice form. Parse the document then emit ONE navigate_and_fill action:
 
-[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_OR_REF_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. PayPal account refill shantahostgator May 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_OR_REF_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT"}}]
 
-### Deposit / account refill emails
-These are emails confirming money paid INTO a supplier account (PayPal reseller credit, HostGator
-account refill, prepaid service top-up). Record as a supplier invoice:
-- description_0: "Prepaid account refill" or "Account deposit — [supplier]"
-- unit_cost_0: the "Amount Deposited" (main deposit, e.g. $50.00)
-- If a convenience/service charge is listed separately, add a second line:
-  description_1: "Refill convenience charge", unit_cost_1: fee amount, quantity_1: "1"
-- Reference No from the email → invoice_number
-- "Billed To" account name → add to notes
-
-### Rules for all navigate_and_fill invoice entries
-- supplier_id is a dropdown — after emitting the action, tell the user which supplier name to
-  select. If the supplier does not exist in the system, instruct them to first open
-  /Inventory/supplier/add (it supports ?popup=1 for a popup), add the supplier, then return
-  to the invoice form to select it.
+Rules for invoice entries:
+- supplier_id is a dropdown — tell the user which supplier to select. If missing, open
+  /Inventory/supplier/add?popup=1, add the supplier, then return to select it.
 - Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
-- If the bill shows a total with tax included and no breakdown, set tax_amount to 0 and put
-  the full amount in unit_cost_0.
-- auto_pay_method and auto_pay: fill both only if the document shows "Auto Pay" or similar;
-  omit both if not autopay.
-- After the action line, briefly list the values you extracted so the user can verify before
-  saving.
+- auto_pay / auto_pay_method: fill only if the document shows "Auto Pay".
+- After the action, list the extracted values so the user can verify before saving.
+
+### Deposit / account refill / prepaid top-up emails
+These are confirmations that money was transferred FROM one of your payment accounts INTO a
+prepaid vendor balance (PayPal reseller credit, HostGator prepaid, eNom prepaid, etc.).
+This is NOT a supplier invoice — it is an asset transfer. Use the Transfer form:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Accounting/transfer/new", "fields": {"entry_type": "prepaid_topup", "amount": "DEPOSIT_AMOUNT", "post_date": "YYYY-MM-DD", "reference": "REFERENCE_NO", "notes": "e.g. PayPal → eNom prepaid top-up shantahostgator May 2026", "fee_amount": "CONVENIENCE_FEE_IF_ANY"}}]
+
+After the action, tell the user:
+- Which "From" account to select (e.g. "1010 PayPal Account" if paid via PayPal)
+- Which "To" account to select (e.g. "1021 HostGator Prepaid Balance")
+- If a fee was charged, the fee account (default: "6720 PayPal / Stripe Convenience Fees")
+- Transaction type: select "Prepaid Top-Up" tab
+
+Signals this is a deposit/refill (not an invoice):
+"Amount Deposited", "Account Balance", "Account Refill", "Refill Convenience Charge",
+"adding funds", "Reference No" with no line-item products.
 
 $editor_section
 The current user is: $username
