@@ -2018,18 +2018,10 @@ sub reschedule :Path('reschedule') :Args(0) {
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
-        # Determine accessible site names.
-        # Always scope to the sites the calendar shows — based on UserSiteRole.
-        # CSC admin sees todos for all sites they have roles on; the calendar
-        # (get_all_todos_for_calendar) currently filters by session SiteName,
-        # so we must match that scope to ensure rescheduled todos appear in view.
-        my @allowed_sites;
-        my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-            { user_id => $user_id, is_active => 1 },
-            { join => 'site', columns => ['site.name'], distinct => 1 }
-        )->all;
-        @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
-        @allowed_sites = ($sitename) unless @allowed_sites;
+        # Scope reschedule to the same site the calendar shows (session SiteName).
+        # This ensures rescheduled todos appear in the day/week/month calendar views.
+        # The calendar (get_all_todos_for_calendar) always filters by session SiteName.
+        my @allowed_sites = ($sitename);
 
         # Fetch open todos for accessible sites
         my %search = ( status => { -not_in => \@done_statuses } );
