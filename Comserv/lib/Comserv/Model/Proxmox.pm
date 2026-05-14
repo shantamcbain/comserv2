@@ -1783,7 +1783,27 @@ sub create_vm {
 
     $post_params{scsi0} = "local-lvm:$disk_size";
     if ($template) {
-        $post_params{ide2} = "$template,media=cdrom";
+        my $ide2_val = "$template,media=cdrom";
+        if ($template =~ m{^([^:]+):iso/(.+)$}) {
+            my ($storage_name, $iso_file) = ($1, $2);
+            my $content_url = $self->{api_url_base} . "/nodes/$node_name/storage/$storage_name/content?content=iso";
+            my $sz_req = HTTP::Request->new(GET => $content_url);
+            $sz_req->header(Authorization => $auth_header);
+            my $sz_res = $ua->request($sz_req);
+            if ($sz_res->is_success) {
+                my $sz_data = eval { decode_json($sz_res->decoded_content) };
+                for my $item (@{ $sz_data->{data} || [] }) {
+                    if (($item->{volid} || '') eq $template && $item->{size}) {
+                        my $size_kb = int($item->{size} / 1024);
+                        $ide2_val = "$template,media=cdrom,size=${size_kb}K";
+                        $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
+                            "Found ISO size: ${size_kb}K for $template");
+                        last;
+                    }
+                }
+            }
+        }
+        $post_params{ide2} = $ide2_val;
         $post_params{boot} = 'order=ide2;scsi0';
     } else {
         $post_params{boot} = 'order=scsi0';
