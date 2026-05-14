@@ -51,6 +51,19 @@ The main Proxmox management page
 
 =cut
 
+sub _init_proxmox {
+    my ($self, $c) = @_;
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    my $proxmox = $c->model('Proxmox');
+    $proxmox->set_server_id($server_id);
+    $c->session->{proxmox_server_id} = $server_id;
+    return $proxmox;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
@@ -727,15 +740,9 @@ sub vm_isos :Path('vm_isos') :Args(1) {
         $c->forward('View::JSON'); return;
     }
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
         $c->forward('View::JSON'); return;
     }
 
@@ -778,15 +785,9 @@ sub attach_iso :Path('attach_iso') :Args(0) {
         $c->forward('View::JSON'); return;
     };
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
         $c->forward('View::JSON'); return;
     }
 
@@ -810,15 +811,9 @@ sub eject_iso :Path('eject_iso') :Args(0) {
         $c->forward('View::JSON'); return;
     };
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
         $c->forward('View::JSON'); return;
     }
 
@@ -837,21 +832,10 @@ sub edit_vm_form :Path('edit_vm') :Args(1) {
         return;
     }
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
-
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash(
-            template  => 'proxmox/edit_vm.tt',
-            error_msg => 'Proxmox authentication failed.',
-            vmid      => $vmid,
-        );
-        $c->forward($c->view('TT'));
+        $c->flash->{error_msg} = 'Proxmox authentication failed.';
+        $c->response->redirect($c->uri_for('/proxmox'));
         return;
     }
 
@@ -897,17 +881,10 @@ sub edit_vm_action :Path('edit_vm_action') :Args(0) {
         return;
     }
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
-
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
         $c->flash->{error_msg} = 'Proxmox authentication failed.';
-        $c->response->redirect($c->uri_for("/proxmox/edit_vm/$vmid"));
+        $c->response->redirect($c->uri_for('/proxmox'));
         return;
     }
 
@@ -949,15 +926,9 @@ sub vm_power :Path('vm_power') :Args(0) {
         $c->forward('View::JSON'); return;
     };
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
         $c->forward('View::JSON'); return;
     }
 
@@ -976,13 +947,7 @@ sub upload_iso :Path('upload_iso') :Args(0) {
     }
 
     if ($c->req->method eq 'GET') {
-        my $proxmox = $c->model('Proxmox');
-        my $server_id = $c->session->{proxmox_server_id};
-        unless ($server_id) {
-            my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-            $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-        }
-        $proxmox->set_server_id($server_id);
+        my $proxmox = $self->_init_proxmox($c);
         $proxmox->authenticate();
 
         my $storages = $proxmox->get_storages_for_iso() || [];
@@ -1014,15 +979,9 @@ sub upload_iso :Path('upload_iso') :Args(0) {
         $c->forward('View::JSON'); return;
     }
 
-    my $proxmox = $c->model('Proxmox');
-    my $server_id = $c->session->{proxmox_server_id};
-    unless ($server_id) {
-        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
-        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
-    }
-    $proxmox->set_server_id($server_id);
+    my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
-        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
         $c->forward('View::JSON'); return;
     }
 
