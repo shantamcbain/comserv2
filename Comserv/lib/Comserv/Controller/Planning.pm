@@ -103,10 +103,14 @@ sub daily :Path('/planning/daily') :Args {
     my @week_dates;
     for my $day_offset (0..6) {
         my $cur = $start_dt->clone->add(days => $day_offset);
+        my $d_str = $cur->strftime('%Y-%m-%d');
         push @week_dates, {
-            date_str => $cur->strftime('%Y-%m-%d'),
-            day_num  => $cur->day,
-            is_today => ($cur->strftime('%Y-%m-%d') eq $current_date_str),
+            date_str  => $d_str,
+            day_num   => $cur->day,
+            day_name  => $cur->strftime('%A'),
+            is_today  => ($d_str eq $current_date_str),
+            prev_date => $cur->clone->subtract(days => 1)->ymd,
+            next_date => $cur->clone->add(days => 1)->ymd,
         };
     }
 

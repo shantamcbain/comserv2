@@ -453,25 +453,25 @@ function _updateDaySiteSummary() {
 [% UNLESS include_mode %]
 [% IF is_daily_plan %]
     <div class="day-navigation view-navigation">
-        <a href="[% base_url %]/[% previous_date %][% day_hash %]">◀ Previous Day</a>
+        <a class="prev-day-link" href="[% base_url %]/[% previous_date %][% day_hash %]">◀ Previous Day</a>
         <a href="/todo[% url_hash %]">List View</a>
         <a href="[% base_url %]/[% date %][% week_hash %]">Week View</a>
         <a href="[% base_url %]/[% date %][% month_hash %]">Month View</a>
         <a href="/todo/addtodo">Add New Todo</a>
         <a href="[% base_url %]/[% date %][% planning_hash %]">Back to Planning</a>
-        <a href="[% base_url %]/[% next_date %][% day_hash %]">Next Day ▶</a>
+        <a class="next-day-link" href="[% base_url %]/[% next_date %][% day_hash %]">Next Day ▶</a>
     </div>
 [% ELSE %]
     <h1>[% sitename %] Todos for [% date %]</h1>
 
     <div class="day-navigation view-navigation">
-        <a href="/todo/day/[% previous_date %][% url_hash %]">◀ Previous Day</a>
+        <a class="prev-day-link" href="/todo/day/[% previous_date %][% url_hash %]">◀ Previous Day</a>
         <a href="/todo[% url_hash %]">List View</a>
         <a href="/todo/week[% IF date %]/[% date %][% END %][% url_hash %]">Week View</a>
         <a href="/todo/month[% IF date %]/[% date %][% END %][% url_hash %]">Month View</a>
         <a href="/todo/addtodo">Add New Todo</a>
         <a href="/todo[% url_hash %]">Back to Todo List</a>
-        <a href="/todo/day/[% next_date %][% url_hash %]">Next Day ▶</a>
+        <a class="next-day-link" href="/todo/day/[% next_date %][% url_hash %]">Next Day ▶</a>
     </div>
 [% END %]
 [% END %]
