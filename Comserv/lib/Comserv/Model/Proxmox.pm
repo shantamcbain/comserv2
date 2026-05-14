@@ -14,6 +14,7 @@ use Moose;
 use namespace::autoclean;
 use LWP::UserAgent;
 use HTTP::Request;
+use HTTP::Request::Common qw(POST);
 use URI::Escape qw(uri_escape);
 use JSON;
 use Data::Dumper;
@@ -2061,6 +2062,119 @@ sub vm_power_action {
         return { success => 1, message => "VM $action initiated", task_id => $task_id };
     } else {
         return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
+sub get_storages_for_iso {
+    my ($self) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return [] unless $self->{api_url_base};
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return [];
+    }
+
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(10);
+
+    my $node_name;
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nd = eval { decode_json($nodes_res->decoded_content) };
+        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return [] unless $res->is_success;
+
+    my $data = eval { decode_json($res->decoded_content) };
+    return [] unless $data && $data->{data};
+
+    my @storages;
+    for my $s (@{ $data->{data} }) {
+        my $content = $s->{content} || '';
+        push @storages, { id => $s->{storage}, type => $s->{type} }
+            if $content =~ /\biso\b/;
+    }
+    return \@storages;
+}
+
+sub upload_iso_to_proxmox {
+    my ($self, $local_path, $storage) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+    return { success => 0, error => "File not found: $local_path" } unless -f $local_path;
+
+    $storage ||= 'local';
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return { success => 0, error => 'No credentials' };
+    }
+
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(300);
+
+    my $node_name;
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nd = eval { decode_json($nodes_res->decoded_content) };
+        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my $filename = $local_path;
+    $filename =~ s{.*/}{};
+
+    my $upload_url = $self->{api_url_base} . "/nodes/$node_name/storage/$storage/upload";
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upload_iso_to_proxmox',
+        "Uploading $filename to $upload_url");
+
+    my $req = POST($upload_url,
+        Content_Type => 'form-data',
+        Content => [
+            content  => 'iso',
+            filename => [ $local_path, $filename, 'Content-Type' => 'application/octet-stream' ],
+        ],
+    );
+    $req->header(Authorization => $auth_header);
+
+    my $res = $ua->request($req);
+
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'upload_iso_to_proxmox',
+        "Upload response: " . $res->status_line . " " . substr($res->decoded_content, 0, 300));
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, message => "ISO '$filename' uploaded to Proxmox $storage storage",
+                 task_id => ($data && $data->{data}) ? $data->{data} : '' };
+    } else {
+        return { success => 0, error => "Upload failed (${\$res->code}): " . $res->decoded_content };
     }
 }
 

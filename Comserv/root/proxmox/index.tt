@@ -60,6 +60,9 @@
             <i class="icon-refresh"></i>
             Refresh VM List
         </a>
+        <a href="[% c.uri_for('/proxmox/upload_iso') %]" class="btn-action" style="background:#17a2b8;">
+            &#128190; Upload ISO
+        </a>
         [% IF proxmox_host %]
         <a href="[% proxmox_host %]" target="_blank" class="btn-action" style="background:#e47000;">
             Open Proxmox Web UI
