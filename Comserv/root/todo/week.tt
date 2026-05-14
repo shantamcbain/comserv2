@@ -271,6 +271,13 @@ document.addEventListener('keydown', function(e) {
     [% END %]
 [% END %]
 
+<div style="background:#e8f4fd;border:1px solid #90c0e0;border-radius:4px;padding:6px 10px;margin-bottom:8px;font-size:0.8em;">
+  <strong>DEBUG week:</strong> total todos=[% todos.size %] | overdue=[% all_overdue_todos.size %] | week=[% first_day_of_week %] to [% week_dates.last.date_str %]
+  [% FOREACH day_info IN week_dates %][% SET _dc = day_info.date_str %]
+    | [% _dc %]:[% todos_by_date.$_dc.size || 0 %]
+  [% END %]
+</div>
+
 <div class="week-grid-container">
     [% FOREACH day_info IN week_dates %]
         [% SET d_str = day_info.date_str %]
