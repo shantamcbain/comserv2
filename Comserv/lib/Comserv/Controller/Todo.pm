@@ -70,8 +70,12 @@ sub filter_todos_by_date_range {
     my @filtered_todos = grep {
         my $todo = $_;
         my $include_todo = 0;
-        my $sd = $todo->start_date || '';
-        my $dd = $todo->due_date   || '';
+        my $sd_raw = $todo->start_date // '';
+        my $dd_raw = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
         my $is_done = exists $done_set{ $todo->status // '' };
 
         # Primary anchor: start_date. Include if within range.
@@ -1373,7 +1377,13 @@ sub day :Path('/todo/day') :Args {
     my %_done_set = map { $_ => 1 } (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     foreach my $todo (@sorted_todos) {
         my $is_done  = exists $_done_set{ $todo->status // '' };
-        my $anchor   = $todo->start_date || $todo->due_date || '';
+        my $sd_raw   = $todo->start_date // '';
+        my $dd_raw   = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
+        my $anchor = $sd || $dd || '';
         if (!$is_done && $anchor && $anchor lt $date) {
             push @overdue_todos, $todo;
         } else {
@@ -1458,12 +1468,17 @@ sub week :Path('/todo/week') :Args {
     
     # Generate array of dates for the week (7 days starting from Sunday)
     my @week_dates = ();
+    my $today_str = DateTime->now->ymd;
     for my $day_offset (0..6) {
         my $current_date = $start_dt->clone->add(days => $day_offset);
+        my $d_str = $current_date->strftime('%Y-%m-%d');
         push @week_dates, {
-            date_str => $current_date->strftime('%Y-%m-%d'),
-            day_num => $current_date->day,
-            is_today => ($current_date->strftime('%Y-%m-%d') eq DateTime->now->strftime('%Y-%m-%d')),
+            date_str => $d_str,
+            day_num  => $current_date->day,
+            day_name => $current_date->strftime('%A'),
+            is_today => ($d_str eq $today_str),
+            prev_date => $current_date->clone->subtract(days => 1)->ymd,
+            next_date => $current_date->clone->add(days => 1)->ymd,
         };
     }
 
@@ -2011,15 +2026,15 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
-sub _estimate_hours_heuristic {
+sub _estimate_mins_heuristic {
     my ($subject) = @_;
     my $s = lc($subject // '');
-    return 0.25 if $s =~ /audit|morning audit|check|verify|review|standup|daily standup/;
-    return 0.5  if $s =~ /lunch|break|meeting|call|discuss|triage/;
-    return 1    if $s =~ /fix|debug|investigate|diagnose|resolve|test|patch/;
-    return 2    if $s =~ /design|plan|spec|document|write|research|analyse|analyze/;
-    return 4    if $s =~ /implement|build|create|develop|integrate|refactor|migration/;
-    return 1;
+    return 15  if $s =~ /audit|morning audit|check|verify|review|standup|daily standup/;
+    return 30  if $s =~ /lunch|break|meeting|call|discuss|triage/;
+    return 60  if $s =~ /fix|debug|investigate|diagnose|resolve|test|patch/;
+    return 120 if $s =~ /design|plan|spec|document|write|research|analyse|analyze/;
+    return 240 if $s =~ /implement|build|create|develop|integrate|refactor|migration/;
+    return 60;
 }
 
 sub reschedule :Path('reschedule') :Args(0) {
@@ -2066,7 +2081,8 @@ sub reschedule :Path('reschedule') :Args(0) {
                                due_date start_date last_mod_date
                                date_time_posted estimated_man_hours
                                blocked_by_todo_id sitename developer
-                               username_of_poster project_id)],
+                               username_of_poster project_id subject
+                               time_of_day)],
             }
         )->all;
 
@@ -2093,8 +2109,8 @@ sub reschedule :Path('reschedule') :Args(0) {
             || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
         } @rows;
 
-        # Pre-fetch log durations: compute average actual hours spent per todo_record_id
-        my %log_duration_hrs;
+        # Pre-fetch log durations in MINUTES per todo_record_id
+        my %log_duration_mins;
         {
             my @todo_ids = map { $_->record_id } @rows;
             if (@todo_ids) {
@@ -2111,14 +2127,14 @@ sub reschedule :Path('reschedule') :Args(0) {
                         next unless $st =~ /^(\d+):(\d+)/ && $et =~ /^(\d+):(\d+)/;
                         my ($sh, $sm) = ($st =~ /^(\d+):(\d+)/);
                         my ($eh, $em) = ($et =~ /^(\d+):(\d+)/);
-                        my $dur = ($eh * 60 + $em - $sh * 60 - $sm) / 60.0;
-                        push @{ $durations{ $lr->todo_record_id } }, $dur if $dur > 0;
+                        my $dur_mins = $eh * 60 + $em - $sh * 60 - $sm;
+                        push @{ $durations{ $lr->todo_record_id } }, $dur_mins if $dur_mins > 0;
                     }
                     for my $tid (keys %durations) {
                         my @d = @{ $durations{$tid} };
                         my $sum = 0; $sum += $_ for @d;
                         my $avg = $sum / scalar(@d);
-                        $log_duration_hrs{$tid} = $avg if $avg >= 0.25;
+                        $log_duration_mins{$tid} = $avg if $avg >= 5;
                     }
                 };
             }
@@ -2139,20 +2155,21 @@ sub reschedule :Path('reschedule') :Args(0) {
             : ($now_total_min >= $WORK_END_MIN ? $WORK_DAY_MINS : 0);
 
         for my $todo (@rows) {
-            # Determine duration estimate (hours)
-            my $est = $todo->estimated_man_hours;
+            # estimated_man_hours is stored as MINUTES (integer).
+            # Values < 15 are suspicious (likely old "hours" data stored as 1).
+            # Use log actuals or heuristic in that case.
+            my $est_mins = $todo->estimated_man_hours // 0;
             my $est_from_log = 0;
-            if (!$est || $est <= 0) {
-                if (exists $log_duration_hrs{ $todo->record_id }) {
-                    $est = $log_duration_hrs{ $todo->record_id };
+            if (!$est_mins || $est_mins < 15) {
+                if (exists $log_duration_mins{ $todo->record_id }) {
+                    $est_mins    = $log_duration_mins{ $todo->record_id };
                     $est_from_log = 1;
                 } else {
-                    $est = _estimate_hours_heuristic($todo->subject // '');
+                    $est_mins    = _estimate_mins_heuristic($todo->subject // '');
                     $est_from_log = 1;
                 }
             }
-            $est = 0.25 if $est < 0.25;
-            my $est_mins = $est * 60;
+            $est_mins = 15 if $est_mins < 15;   # minimum 15 minutes per task
 
             # Advance to next day if current day can't fit this todo
             if ($cur_slot_min > 0 && $cur_slot_min + $est_mins > $WORK_DAY_MINS) {
@@ -2203,8 +2220,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                 last_mod_date => $today,
             );
             if ($est_from_log) {
-                my $rounded = int($est + 0.5) || 1;
-                $update{estimated_man_hours} = $rounded;
+                $update{estimated_man_hours} = int($est_mins + 0.5) || 5;
             }
 
             eval { $todo->update(\%update) };
@@ -2218,9 +2234,10 @@ sub reschedule :Path('reschedule') :Args(0) {
         return;
     }
 
+    my $error_count = scalar(@errors);
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos scheduled from $today forward");
-    $c->response->body('{"ok":1,"count":' . $count . ',"today":"' . $today . '","errors":' . (JSON::encode_json(\@errors)) . '}');
+        "Reschedule by $username: $count todos scheduled, $error_count errors, from $today forward");
+    $c->response->body('{"ok":1,"count":' . $count . ',"error_count":' . $error_count . ',"today":"' . $today . '","errors":' . (JSON::encode_json(\@errors)) . '}');
 }
 
 sub open_log :Path('open_log') :Args(0) {

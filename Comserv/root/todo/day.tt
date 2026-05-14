@@ -615,9 +615,9 @@ function _updateDaySiteSummary() {
                             [% SET _tp = todo.priority || 9 %]
                             [% SET _ts = todo.sitename || '' %]
                             [% SET _done = (todo.status == 3 OR todo.status == 4 OR todo.status == 'DONE' OR todo.status == 'Completed' OR todo.status == 'completed' OR todo.status == 'Closed' OR todo.status == 'closed' OR todo.status == 'Done') %]
-                            [% SET _est_h = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 1 %]
-                            [% SET _min_h = _est_h * 40 %]
-                            [% IF _min_h < 40 %][% SET _min_h = 40 %][% END %]
+                            [% SET _est_mins = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 60 %]
+                            [% SET _min_h = (_est_mins / 60) * 40 %]
+                            [% IF _min_h < 30 %][% SET _min_h = 30 %][% END %]
                             [% IF _min_h > 320 %][% SET _min_h = 320 %][% END %]
                             <div class="todo-item-day todo-item-shared priority-[% _tp %]"
                                  data-todo-id="[% todo.record_id %]"
@@ -643,7 +643,16 @@ function _updateDaySiteSummary() {
                                     <div style="font-size:0.75em;color:var(--text-muted-color,#888);margin-top:1px;">
                                         [% IF todo.project_id && proj_name_map.${todo.project_id} %]<span>📁 [% proj_name_map.${todo.project_id} %]</span>[% END %]
                                         [% IF todo.due_date %]<span style="margin-left:6px;">📅 [% todo.due_date %]</span>[% END %]
-                                        [% IF todo.estimated_man_hours > 0 %]<span style="margin-left:6px;">⏱ [% todo.estimated_man_hours %]h</span>[% END %]
+                                        [% IF todo.estimated_man_hours > 0 %]
+                                          [% SET _dm = todo.estimated_man_hours %]
+                                          [% IF _dm >= 60 %]
+                                            [% SET _dh = sprintf('%d', _dm / 60) %]
+                                            [% SET _drem = _dm - (_dh * 60) %]
+                                            <span style="margin-left:6px;">⏱ [% _dh %]h[% IF _drem > 0 %][% _drem %]m[% END %]</span>
+                                          [% ELSE %]
+                                            <span style="margin-left:6px;">⏱ [% _dm %]m</span>
+                                          [% END %]
+                                        [% END %]
                                         [% SET _subj_l = todo.subject.lower %]
                                         [% IF _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup') %]<span style="margin-left:4px;" title="Recurring">🔁</span>[% END %]
                                     </div>

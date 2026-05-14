@@ -644,7 +644,8 @@
                 }).then(function(r){ return r.json(); }).then(function(d){
                     if (d.ok) {
                         var msg = 'Rescheduled ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' from ' + (d.today || 'today') + ' forward into the calendar.';
-                        if (d.errors && d.errors.length) msg += '\n\nWarnings: ' + d.errors.join(', ');
+                        if (d.error_count) msg += '\n' + d.error_count + ' update(s) failed.';
+                        if (d.errors && d.errors.length) msg += '\nFirst error: ' + d.errors[0].substr(0, 200);
                         msg += '\n\nReloading page…';
                         alert(msg);
                         location.reload();
