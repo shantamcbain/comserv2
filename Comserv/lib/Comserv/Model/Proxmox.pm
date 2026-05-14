@@ -1828,6 +1828,50 @@ sub create_vm {
     }
 }
 
+sub get_vm_config {
+    my ($self, $vmid) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return undef unless $self->{api_url_base};
+
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(10);
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return undef;
+    }
+
+    my $node_name;
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nd = eval { decode_json($nodes_res->decoded_content) };
+        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/config");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return ($data && $data->{data}) ? $data->{data} : undef;
+    }
+    $logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'get_vm_config',
+        "Failed to get config for VM $vmid: " . $res->status_line);
+    return undef;
+}
+
 sub set_vm_cdrom {
     my ($self, $vmid, $iso_volid) = @_;
 

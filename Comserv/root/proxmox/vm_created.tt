@@ -50,14 +50,15 @@
 
             <div style="border:1px solid #ccc;border-radius:4px;padding:14px;margin:16px 0;background:#f8f9fa;">
                 <strong>Attach / Change Boot ISO</strong>
-                <p style="margin:6px 0 10px;font-size:0.9em;color:#555;">If you need to attach or swap the boot ISO for VM [% vm_id %], use this form:</p>
-                <form id="isoForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                    <input type="text" id="iso_volid" name="iso_volid" placeholder="e.g. SunfireBacup:iso/ubuntu-24.04.3-live-server-amd64.iso"
-                           style="flex:1;min-width:300px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
-                    <button type="button" onclick="attachISO()" style="padding:7px 14px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">Attach ISO</button>
-                    <button type="button" onclick="ejectISO()" style="padding:7px 14px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject ISO</button>
-                </form>
-                <div id="isoResult" style="margin-top:8px;font-size:0.9em;"></div>
+                <div id="iso-current-created" style="font-size:0.88em;color:#555;margin:4px 0 10px;">Loading current ISO…</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <select id="iso_volid" style="flex:1;min-width:280px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="">Loading ISOs from Proxmox…</option>
+                    </select>
+                    <button type="button" onclick="attachISO()" style="padding:7px 14px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">Apply</button>
+                    <button type="button" onclick="ejectISO()" style="padding:7px 14px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject</button>
+                </div>
+                <div id="isoResult" style="margin-top:8px;font-size:0.9em;font-weight:bold;"></div>
             </div>
 
             <ul>
@@ -66,9 +67,30 @@
             </ul>
 
 <script>
+(function loadISOs() {
+    fetch('[% c.uri_for("/proxmox/vm_isos") %]/[% vm_id %]')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            var sel = document.getElementById('iso_volid');
+            var cur = document.getElementById('iso-current-created');
+            sel.innerHTML = '<option value="">(no ISO / eject)</option>';
+            if (d.success && d.isos && d.isos.length) {
+                d.isos.forEach(function(iso){
+                    var opt = document.createElement('option');
+                    opt.value = iso.id;
+                    opt.textContent = iso.name + ' (' + iso.storage + ')';
+                    if (d.current_ide2 && iso.id === d.current_ide2) opt.selected = true;
+                    sel.appendChild(opt);
+                });
+            }
+            cur.textContent = d.current_ide2 ? 'Currently attached: ' + d.current_ide2 : 'No ISO currently attached';
+        })
+        .catch(function(){ document.getElementById('iso-current-created').textContent = 'Could not load ISOs'; });
+})();
+
 function attachISO() {
-    var vol = document.getElementById('iso_volid').value.trim();
-    if (!vol) { alert('Enter an ISO volid first'); return; }
+    var vol = document.getElementById('iso_volid').value;
+    if (!vol) { ejectISO(); return; }
     isoRequest('[% c.uri_for("/proxmox/attach_iso") %]', { vmid: '[% vm_id %]', iso_volid: vol });
 }
 function ejectISO() {
@@ -77,12 +99,17 @@ function ejectISO() {
 function isoRequest(url, params) {
     var res = document.getElementById('isoResult');
     res.textContent = 'Working…';
+    res.style.color = '#555';
     var body = Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
     fetch(url, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body })
         .then(function(r){ return r.json(); })
         .then(function(d){
             res.style.color = d.success ? '#155724' : '#721c24';
             res.textContent = d.success ? (d.message || 'Done') : ('Error: ' + (d.error || 'Unknown'));
+            if (d.success) {
+                document.getElementById('iso-current-created').textContent =
+                    params.iso_volid ? 'Currently attached: ' + params.iso_volid : 'No ISO currently attached';
+            }
         })
         .catch(function(e){ res.style.color='#721c24'; res.textContent='Request failed: '+e.message; });
 }
