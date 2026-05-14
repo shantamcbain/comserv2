@@ -192,6 +192,9 @@
             <p><strong>Ency Tables:</strong> [% database_comparison.ency.table_count %]</p>
             <p><strong>Forager Status:</strong> [% database_comparison.forager.connection_status %]</p>
             <p><strong>Forager Tables:</strong> [% database_comparison.forager.table_count %]</p>
+            [% FOREACH pg_db IN database_comparison.postgres_databases %]
+            <p><strong>[% pg_db.display_name | html %] (PG) Status:</strong> [% pg_db.connection_status %] ([% pg_db.table_count %] tables)</p>
+            [% END %]
             <p><strong>Tables with Results:</strong> [% database_comparison.summary.tables_with_results %]</p>
             <p><strong>Tables without Results:</strong> [% database_comparison.summary.tables_without_results %]</p>
         </div>
@@ -534,6 +537,160 @@
                     [% END %]
                     </div>
                 </div>
+                [% END %]
+            </div>
+        </div>
+        [% END %]
+
+        <!-- PostgreSQL Database Sections -->
+        [% FOREACH pg_db IN database_comparison.postgres_databases %]
+        <div class="schema-section" data-section-id="[% pg_db.name | html %]">
+            <button class="section-toggle" onclick="toggleSection(this)">
+                <span>
+                    <i class="fas fa-database"></i> [% pg_db.display_name | html %]
+                    [% IF pg_db.is_postgres %]<span class="env-badge env-badge-staging" style="margin-left:6px;font-size:0.75rem;">PostgreSQL</span>[% END %]
+                    [% IF pg_db.connection_status == 'connected' %]
+                    <span class="status-badge connected">Connected</span>
+                    [% ELSE %]
+                    <span class="status-badge" style="background-color: var(--danger-color, #dc3545);">Not Connected</span>
+                    [% END %]
+                    <span class="table-count">[% pg_db.table_count %] tables</span>
+                </span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="section-content">
+                [% IF pg_db.connection_status != 'connected' %]
+                <div class="error-message">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <p>[% pg_db.error | html %]</p>
+                </div>
+                [% ELSE %]
+                [% pg_tables_with    = [] %]
+                [% pg_tables_without = [] %]
+                [% FOREACH tc IN pg_db.table_comparisons %]
+                    [% IF tc.has_result_file %]
+                        [% pg_tables_with.push(tc) %]
+                    [% ELSE %]
+                        [% pg_tables_without.push(tc) %]
+                    [% END %]
+                [% END %]
+
+                [% IF pg_tables_with.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-check-circle"></i> Tables with Result Files
+                            <span class="group-count">[% pg_tables_with.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH tc IN pg_tables_with %]
+                        <div class="table-comparison-card" data-table="[% tc.table_name | html %]" data-database="[% pg_db.name | html %]">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% tc.table_name | html %]</h4>
+                                    [% IF tc.sync_status == 'synchronized' %]
+                                        <span class="difference-indicator same" title="Synchronized"></span>
+                                    [% ELSE %]
+                                        <span class="difference-indicator different" title="Needs sync"></span>
+                                    [% END %]
+                                </div>
+                                <div class="table-comparison-actions">
+                                    [% IF tc.sync_status == 'needs_sync' %]
+                                        <button class="sync-btn" onclick="syncTable('[% tc.table_name | html %]', '[% pg_db.name | html %]'); event.stopPropagation();">
+                                            <i class="fas fa-sync"></i> Sync
+                                        </button>
+                                    [% END %]
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading field comparison...</span>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+
+                [% IF pg_db.results_without_tables.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-file-alt"></i> Result Files without Tables
+                            <span class="group-count">[% pg_db.results_without_tables.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH rf IN pg_db.results_without_tables %]
+                        <div class="table-comparison-card" data-table="[% rf.actual_table_name | html %]" data-database="[% pg_db.name | html %]">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-file-alt"></i>
+                                    <h4>[% rf.result_name | html %] (Result only)</h4>
+                                    <span class="difference-indicator missing" title="No corresponding table"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createTableFromResult('[% rf.result_name | html %]', '[% pg_db.name | html %]'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Table
+                                    </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading result schema...</span>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
+
+                [% IF pg_tables_without.size > 0 %]
+                <div class="table-group">
+                    <div class="table-group-header" onclick="toggleTableGroup(this)">
+                        <span>
+                            <i class="fas fa-plus-square"></i> Tables without Result Files
+                            <span class="group-count">[% pg_tables_without.size %]</span>
+                        </span>
+                        <i class="fas fa-chevron-right group-toggle-icon"></i>
+                    </div>
+                    <div class="table-group-content">
+                    [% FOREACH tc IN pg_tables_without %]
+                        <div class="table-comparison-card" data-table="[% tc.table_name | html %]" data-database="[% pg_db.name | html %]">
+                            <div class="table-comparison-header" onclick="toggleTableComparison(this)">
+                                <div class="table-comparison-title">
+                                    <i class="fas fa-table"></i>
+                                    <h4>[% tc.table_name | html %] (Table only)</h4>
+                                    <span class="difference-indicator missing" title="No result file"></span>
+                                </div>
+                                <div class="table-comparison-actions">
+                                    <button class="create-btn" onclick="createResultFromTable('[% tc.table_name | html %]', '[% pg_db.name | html %]'); event.stopPropagation();">
+                                        <i class="fas fa-plus"></i> Create Result
+                                    </button>
+                                    <i class="fas fa-chevron-right expand-icon"></i>
+                                </div>
+                            </div>
+                            <div class="field-comparison-content">
+                                <div class="loading-indicator">
+                                    <i class="fas fa-spinner fa-spin"></i>
+                                    <span>Loading table schema...</span>
+                                </div>
+                            </div>
+                        </div>
+                    [% END %]
+                    </div>
+                </div>
+                [% END %]
                 [% END %]
             </div>
         </div>

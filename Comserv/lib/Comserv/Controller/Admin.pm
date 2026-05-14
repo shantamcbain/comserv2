@@ -2530,7 +2530,7 @@ sub get_database_comparison {
     try {
         require Comserv::Model::RemoteDB;
         my $remote_db = Comserv::Model::RemoteDB->new();
-        my @pg_conns = $remote_db->get_postgres_connections($c);
+        my @pg_conns = @{ $remote_db->get_postgres_connections() };
         $comparison->{summary}->{total_databases} += scalar(@pg_conns);
 
         for my $pg_conn (@pg_conns) {

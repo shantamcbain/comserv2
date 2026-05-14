@@ -838,6 +838,7 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         }
 
         my $dbh = $self->_get_dbh($c, $database);
+        my $schema = _is_postgres_database($database) ? undef : $self->_get_schema_obj($c, $database);
 
         # Get table name from the loaded Result class
         my $table_name = $class_name->table;
@@ -866,33 +867,36 @@ sub create_table_from_result :Path('/schema-comparison/create_table_from_result'
         }
 
         if (!$table_exists) {
-            # Create the table using deployment_statements
             try {
-                my $source = $schema->source($result_path);
-                unless ($source) {
-                    die "Could not find source '$result_path' in schema";
-                }
-
-                my @statements = $schema->deployment_statements('MySQL');
-                my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
-
-                if (@table_statements) {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    foreach my $statement (@table_statements) {
-                        ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
-                        next unless $statement;
-                        my $safe_statement = _strip_fk_constraints($statement);
-                        $dbh->do($safe_statement);
+                if ($schema) {
+                    my $source = $schema->source($result_path);
+                    unless ($source) {
+                        die "Could not find source '$result_path' in schema";
                     }
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Successfully created table '$table_name' from Result class '$class_name'");
+
+                    my @statements = $schema->deployment_statements('MySQL');
+                    my @table_statements = grep { /CREATE TABLE\s+`?\Q$table_name\E`?/i } @statements;
+
+                    if (@table_statements) {
+                        $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                        foreach my $statement (@table_statements) {
+                            ($statement) = ($statement =~ /(CREATE\s+TABLE\b.*)/si);
+                            next unless $statement;
+                            my $safe_statement = _strip_fk_constraints($statement);
+                            $dbh->do($safe_statement);
+                        }
+                        $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                            "Successfully created table '$table_name' from Result class '$class_name'");
+                    } else {
+                        $dbh->do('SET FOREIGN_KEY_CHECKS=0');
+                        $schema->deploy();
+                        $dbh->do('SET FOREIGN_KEY_CHECKS=1');
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
+                            "Deployed table '$table_name' via schema->deploy()");
+                    }
                 } else {
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=0');
-                    $schema->deploy();
-                    $dbh->do('SET FOREIGN_KEY_CHECKS=1');
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_table_from_result',
-                        "Deployed table '$table_name' via schema->deploy()");
+                    die "Cannot auto-create PostgreSQL tables via this method — use psql or a migration tool";
                 }
             } catch {
                 my $deploy_error = $_;
