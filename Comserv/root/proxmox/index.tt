@@ -92,8 +92,8 @@
                     <td>[% vm.vmid %]</td>
                     <td>[% vm.name %]</td>
                     <td><span class="vm-status [% vm.status %]">[% vm.status %]</span></td>
-                    <td>[% vm.maxmem ? (vm.maxmem / (1024*1024*1024)).chunk(-3).join('').replace('(\.\d{1}).*','$1') _ ' GB' : 'N/A' %]</td>
-                    <td>[% vm.cpu ? (vm.cpu * 100).chunk(-3).join('').replace('(\.\d{1}).*','$1') _ '%' : (vm.status == 'running' ? '0%' : 'N/A') %]</td>
+                    <td>[% vm.maxmem ? (vm.maxmem / 1073741824) FILTER format('%.1f') _ ' GB' : 'N/A' %]</td>
+                    <td>[% vm.cpu ? (vm.cpu * 100) FILTER format('%.1f') _ '%' : (vm.status == 'running' ? '0%' : 'N/A') %]</td>
                     <td>[% vm.uptime ? formatUptime(vm.uptime) : '—' %]</td>
                     <td class="vm-actions" style="white-space:nowrap;">
                         [% IF vm.status == 'stopped' %]
