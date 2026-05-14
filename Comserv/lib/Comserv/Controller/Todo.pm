@@ -61,27 +61,31 @@ sub normalize_status {
 sub filter_todos_by_date_range {
     my ($self, $c, $todos, $start_date, $end_date, $include_overdue) = @_;
     
-    $include_overdue //= 1; # Default to include overdue todos
-    
+    $include_overdue //= 1;
+
+    my @done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %done_set  = map { $_ => 1 } @done_vals;
+
     my $today = DateTime->now->ymd;
     my @filtered_todos = grep {
         my $todo = $_;
         my $include_todo = 0;
         my $sd = $todo->start_date || '';
         my $dd = $todo->due_date   || '';
+        my $is_done = exists $done_set{ $todo->status // '' };
 
-        # Primary anchor: start_date (set by reschedule). Include if within range.
+        # Primary anchor: start_date. Include if within range.
         if ($sd && $sd ge $start_date && $sd le $end_date) {
             $include_todo = 1;
         }
 
-        # If no start_date, fall back to due_date as anchor
+        # No start_date: fall back to due_date as anchor
         if (!$sd && $dd && $dd ge $start_date && $dd le $end_date) {
             $include_todo = 1;
         }
 
-        # Overdue: anchor is before start of range and todo is open
-        if ($include_overdue && $todo->status != 3) {
+        # Overdue: only for non-done todos; anchor before range start
+        if ($include_overdue && !$is_done) {
             my $anchor = $sd || $dd;
             if ($anchor && $anchor lt $start_date) {
                 $include_todo = 1;
@@ -89,7 +93,7 @@ sub filter_todos_by_date_range {
         }
 
         # Undated open todos — show only in today's single-day view
-        if (!$sd && !$dd && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
+        if (!$sd && !$dd && !$is_done && $start_date eq $end_date && $start_date eq $today) {
             $include_todo = 1;
         }
 
@@ -1366,9 +1370,11 @@ sub day :Path('/todo/day') :Args {
     my @overdue_todos;
     my @today_todos;
 
+    my %_done_set = map { $_ => 1 } (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     foreach my $todo (@sorted_todos) {
-        my $anchor = $todo->start_date || $todo->due_date || '';
-        if ($anchor && $anchor lt $date && $todo->status != 3) {
+        my $is_done  = exists $_done_set{ $todo->status // '' };
+        my $anchor   = $todo->start_date || $todo->due_date || '';
+        if (!$is_done && $anchor && $anchor lt $date) {
             push @overdue_todos, $todo;
         } else {
             push @today_todos, $todo;
@@ -2005,6 +2011,17 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
+sub _estimate_hours_heuristic {
+    my ($subject) = @_;
+    my $s = lc($subject // '');
+    return 0.25 if $s =~ /audit|morning audit|check|verify|review|standup|daily standup/;
+    return 0.5  if $s =~ /lunch|break|meeting|call|discuss|triage/;
+    return 1    if $s =~ /fix|debug|investigate|diagnose|resolve|test|patch/;
+    return 2    if $s =~ /design|plan|spec|document|write|research|analyse|analyze/;
+    return 4    if $s =~ /implement|build|create|develop|integrate|refactor|migration/;
+    return 1;
+}
+
 sub reschedule :Path('reschedule') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -2114,7 +2131,12 @@ sub reschedule :Path('reschedule') :Args(0) {
         my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
 
         my $cur_dt       = $today_dt->clone;
-        my $cur_slot_min = 0;   # minutes elapsed since work start on cur_dt
+
+        # For today, start scheduling from the current time (not 9am if it's already later)
+        my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
+        my $cur_slot_min  = ($now_total_min > $WORK_START_MIN && $now_total_min < $WORK_END_MIN)
+            ? ($now_total_min - $WORK_START_MIN)
+            : ($now_total_min >= $WORK_END_MIN ? $WORK_DAY_MINS : 0);
 
         for my $todo (@rows) {
             # Determine duration estimate (hours)
@@ -2125,7 +2147,8 @@ sub reschedule :Path('reschedule') :Args(0) {
                     $est = $log_duration_hrs{ $todo->record_id };
                     $est_from_log = 1;
                 } else {
-                    $est = 1;
+                    $est = _estimate_hours_heuristic($todo->subject // '');
+                    $est_from_log = 1;
                 }
             }
             $est = 0.25 if $est < 0.25;
