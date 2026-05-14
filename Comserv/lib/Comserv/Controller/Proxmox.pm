@@ -851,7 +851,7 @@ sub edit_vm_form :Path('edit_vm') :Args(1) {
     }
 
     my $proxmox_host = '';
-    my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
+    my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($c->session->{proxmox_server_id});
     if ($creds && $creds->{api_url_base}) {
         ($proxmox_host = $creds->{api_url_base}) =~ s|/api2/json||;
     }
