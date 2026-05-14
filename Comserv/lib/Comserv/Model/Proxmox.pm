@@ -1912,10 +1912,8 @@ sub set_vm_cdrom {
     my $body;
     if ($iso_volid) {
         $body = uri_escape('ide2') . '=' . uri_escape("$iso_volid,media=cdrom");
-        $body .= '&' . uri_escape('boot') . '=' . uri_escape('order=ide2;scsi0');
     } else {
         $body = uri_escape('ide2') . '=' . uri_escape('none,media=cdrom');
-        $body .= '&' . uri_escape('boot') . '=' . uri_escape('order=scsi0');
     }
     $req->content($body);
 
@@ -1924,7 +1922,63 @@ sub set_vm_cdrom {
         "set_vm_cdrom vmid=$vmid iso=" . ($iso_volid||'(eject)') . " => " . $res->status_line);
 
     if ($res->is_success) {
-        return { success => 1, message => $iso_volid ? "ISO attached: $iso_volid" : "ISO ejected" };
+        my $msg = $iso_volid ? "ISO attached: $iso_volid. Reboot or stop/start the VM to boot from it." : "ISO ejected";
+        return { success => 1, message => $msg };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
+sub vm_power_action {
+    my ($self, $vmid, $action) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(15);
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return { success => 0, error => 'No credentials' };
+    }
+
+    my $node_name;
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nd = eval { decode_json($nodes_res->decoded_content) };
+        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my %valid_actions = (start => 1, stop => 1, shutdown => 1, reboot => 1, reset => 1);
+    unless ($valid_actions{$action}) {
+        return { success => 0, error => "Invalid action: $action" };
+    }
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/status/$action";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+    $req->content('');
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'vm_power_action',
+        "vm_power_action vmid=$vmid action=$action => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        my $task_id = ($data && $data->{data}) ? $data->{data} : '';
+        return { success => 1, message => "VM $action initiated", task_id => $task_id };
     } else {
         return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
     }
