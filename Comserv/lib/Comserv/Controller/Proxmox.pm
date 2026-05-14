@@ -908,6 +908,36 @@ sub edit_vm_action :Path('edit_vm_action') :Args(0) {
     }
 }
 
+sub resize_disk :Path('resize_disk') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid     = $c->req->params->{vmid} or do {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON'); return;
+    };
+    my $disk     = $c->req->params->{disk} || 'scsi0';
+    my $new_size = $c->req->params->{new_size_gb} or do {
+        $c->stash->{json} = { success => 0, error => 'new_size_gb required' };
+        $c->forward('View::JSON'); return;
+    };
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->resize_disk($vmid, $disk, $new_size);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
 sub vm_power :Path('vm_power') :Args(0) {
     my ($self, $c) = @_;
 

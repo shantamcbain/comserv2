@@ -75,12 +75,42 @@
             </div>
         </div>
 
-        <div class="form-section read-only-section">
-            <h2>Current Hardware (read-only)</h2>
-            <table class="config-table">
-                [% IF vm_config.scsi0 %]
-                <tr><th>Hard Disk (scsi0):</th><td>[% vm_config.scsi0 | html %]</td></tr>
+        [% IF vm_config.scsi0 %]
+        [% current_gb = 0 %]
+        [% IF vm_config.scsi0.match('size=(\d+)G') %]
+            [% current_gb = vm_config.scsi0.match('size=(\d+)G').0 %]
+        [% END %]
+        <div class="form-section">
+            <h2>Disk Resize</h2>
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:0.9em;">
+                <strong>Note:</strong> Proxmox can only <strong>grow</strong> a disk, never shrink it.
+                After resizing you must also resize the partition inside the OS
+                (e.g. <code>growpart /dev/sda 1 &amp;&amp; resize2fs /dev/sda1</code>).
+            </div>
+            <table class="config-table" style="margin-bottom:12px;">
+                <tr><th>Hard Disk (scsi0):</th><td><code>[% vm_config.scsi0 | html %]</code></td></tr>
+                [% IF current_gb %]<tr><th>Current size:</th><td><strong>[% current_gb %] GB</strong></td></tr>[% END %]
+            </table>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <label for="new_disk_gb" style="font-weight:bold;white-space:nowrap;">New size (GB):</label>
+                <input type="number" id="new_disk_gb" min="[% current_gb + 1 %]" max="4000" step="1"
+                       value="[% current_gb ? current_gb + 20 : 40 %]"
+                       style="width:110px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+                <button type="button" onclick="resizeDisk()"
+                        style="padding:8px 18px;background:#e47000;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+                    Resize Disk
+                </button>
+                [% IF current_gb %]
+                <span style="font-size:0.85em;color:#666;">Minimum: [% current_gb + 1 %] GB</span>
                 [% END %]
+            </div>
+            <div id="resizeResult" style="margin-top:10px;font-weight:bold;font-size:0.92em;"></div>
+        </div>
+        [% END %]
+
+        <div class="form-section read-only-section">
+            <h2>Other Hardware (read-only)</h2>
+            <table class="config-table">
                 [% IF vm_config.ide2 %]
                 <tr><th>CD/DVD Drive (ide2):</th><td>[% vm_config.ide2 | html %]</td></tr>
                 [% END %]
@@ -94,7 +124,7 @@
                 <tr><th>OS type:</th><td>[% vm_config.ostype %]</td></tr>
                 [% END %]
             </table>
-            <p class="help-text">To change disks, network or boot order use the <a href="[% proxmox_host %]" target="_blank">Proxmox Web UI</a>.</p>
+            <p class="help-text">To change network or boot order use the <a href="[% proxmox_host %]" target="_blank">Proxmox Web UI</a>.</p>
         </div>
 
         <div class="form-actions">
@@ -136,3 +166,42 @@ h2 { color: #555; margin-top: 0; margin-bottom: 14px; border-bottom: 1px solid #
 .btn-cancel { background: #6c757d; color: #fff; padding: 10px 18px; border-radius: 4px; text-decoration: none; font-size: 1em; }
 .btn-cancel:hover { background: #5a6268; }
 </style>
+
+<script>
+function resizeDisk() {
+    var newSize = parseInt(document.getElementById('new_disk_gb').value, 10);
+    var minSize = parseInt(document.getElementById('new_disk_gb').getAttribute('min'), 10) || 1;
+    var res     = document.getElementById('resizeResult');
+
+    if (!newSize || newSize < minSize) {
+        res.style.color = '#721c24';
+        res.textContent = 'New size must be at least ' + minSize + ' GB.';
+        return;
+    }
+
+    if (!confirm('Resize disk scsi0 to ' + newSize + ' GB? This cannot be undone.')) return;
+
+    res.style.color = '#555';
+    res.textContent = 'Resizing…';
+
+    fetch('[% c.uri_for("/proxmox/resize_disk") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'vmid=[% vmid %]&disk=scsi0&new_size_gb=' + newSize
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            res.style.color = '#155724';
+            res.textContent = d.message || 'Disk resized successfully.';
+        } else {
+            res.style.color = '#721c24';
+            res.textContent = 'Error: ' + (d.error || 'Unknown error');
+        }
+    })
+    .catch(function(e) {
+        res.style.color = '#721c24';
+        res.textContent = 'Request failed: ' + e.message;
+    });
+}
+</script>
