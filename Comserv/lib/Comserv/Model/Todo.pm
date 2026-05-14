@@ -104,10 +104,10 @@ sub get_all_todos_for_calendar {
         $c->detach;
     }
 
-    # Check if user has admin or developer role
-    unless (grep { lc($_) eq 'admin' || lc($_) eq 'developer' } @$roles) {
+    # Check if user has a role that allows calendar access
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
-            'Unauthorized access attempt by user without admin/developer role');
+            'Unauthorized access attempt by user without sufficient role');
         return [];
     }
 
