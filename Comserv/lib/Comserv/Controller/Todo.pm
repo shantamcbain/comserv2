@@ -2076,24 +2076,74 @@ sub reschedule :Path('reschedule') :Args(0) {
             || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
         } @rows;
 
-        # Distribute todos from today forward using start_date
-        # Capacity: HOURS_PER_DAY hours per working day; default 1h per todo if no estimate
-        my $HOURS_PER_DAY  = 8;
-        my $cur_dt         = $today_dt->clone;
-        my $hours_used     = 0;
+        # Pre-fetch log durations: compute average actual hours spent per todo_record_id
+        my %log_duration_hrs;
+        {
+            my @todo_ids = map { $_->record_id } @rows;
+            if (@todo_ids) {
+                eval {
+                    my @log_rows = $c->model('DBEncy')->resultset('Log')->search(
+                        { todo_record_id => { -in => \@todo_ids } },
+                        { columns => [qw(todo_record_id start_time end_time)] }
+                    )->all;
+                    my %durations;
+                    for my $lr (@log_rows) {
+                        my $st = $lr->start_time // '';
+                        my $et = $lr->end_time   // '';
+                        next unless $st && $et;
+                        next unless $st =~ /^(\d+):(\d+)/ && $et =~ /^(\d+):(\d+)/;
+                        my ($sh, $sm) = ($st =~ /^(\d+):(\d+)/);
+                        my ($eh, $em) = ($et =~ /^(\d+):(\d+)/);
+                        my $dur = ($eh * 60 + $em - $sh * 60 - $sm) / 60.0;
+                        push @{ $durations{ $lr->todo_record_id } }, $dur if $dur > 0;
+                    }
+                    for my $tid (keys %durations) {
+                        my @d = @{ $durations{$tid} };
+                        my $sum = 0; $sum += $_ for @d;
+                        my $avg = $sum / scalar(@d);
+                        $log_duration_hrs{$tid} = $avg if $avg >= 0.25;
+                    }
+                };
+            }
+        }
+
+        # Distribute todos from today forward using start_date and time_of_day
+        # Work window: 09:00 – 17:00 (8 hours per day)
+        my $WORK_START_MIN = 9 * 60;   # 540 minutes from midnight
+        my $WORK_END_MIN   = 17 * 60;  # 1020 minutes from midnight
+        my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
+
+        my $cur_dt       = $today_dt->clone;
+        my $cur_slot_min = 0;   # minutes elapsed since work start on cur_dt
 
         for my $todo (@rows) {
-            my $est = $todo->estimated_man_hours || 1;
-            $est    = 1 if $est < 1;
+            # Determine duration estimate (hours)
+            my $est = $todo->estimated_man_hours;
+            my $est_from_log = 0;
+            if (!$est || $est <= 0) {
+                if (exists $log_duration_hrs{ $todo->record_id }) {
+                    $est = $log_duration_hrs{ $todo->record_id };
+                    $est_from_log = 1;
+                } else {
+                    $est = 1;
+                }
+            }
+            $est = 0.25 if $est < 0.25;
+            my $est_mins = $est * 60;
 
-            # Advance to next day if today is full
-            if ($hours_used + $est > $HOURS_PER_DAY && $hours_used > 0) {
+            # Advance to next day if current day can't fit this todo
+            if ($cur_slot_min > 0 && $cur_slot_min + $est_mins > $WORK_DAY_MINS) {
                 $cur_dt->add(days => 1);
-                $hours_used = 0;
+                $cur_slot_min = 0;
             }
 
-            my $new_start = $cur_dt->ymd;
-            $hours_used  += $est;
+            my $new_start     = $cur_dt->ymd;
+            my $slot_abs_min  = $WORK_START_MIN + $cur_slot_min;
+            my $new_time_str  = sprintf('%02d:%02d:00',
+                                    int($slot_abs_min / 60),
+                                    $slot_abs_min % 60);
+
+            $cur_slot_min += $est_mins;
 
             # Recalculate priority based on staleness + due date + blocking
             my $orig_priority = $todo->priority || 5;
@@ -2124,10 +2174,15 @@ sub reschedule :Path('reschedule') :Args(0) {
 
             my %update = (
                 start_date    => $new_start,
+                time_of_day   => $new_time_str,
                 priority      => $new_priority,
                 last_mod_by   => 'reschedule',
                 last_mod_date => $today,
             );
+            if ($est_from_log) {
+                my $rounded = int($est + 0.5) || 1;
+                $update{estimated_man_hours} = $rounded;
+            }
 
             eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
