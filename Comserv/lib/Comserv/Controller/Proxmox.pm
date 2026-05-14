@@ -712,6 +712,47 @@ sub vm_status :Path('status') :Args(1) {
     $c->forward('View::JSON');
 }
 
+sub vm_isos :Path('vm_isos') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $isos      = $proxmox->get_available_templates();
+    my $vm_config = $proxmox->get_vm_config($vmid);
+
+    my $current_ide2 = '';
+    if ($vm_config && $vm_config->{ide2}) {
+        my $raw = $vm_config->{ide2};
+        if ($raw =~ /^([^,]+)/) {
+            my $volid = $1;
+            $current_ide2 = $volid unless $volid eq 'none';
+        }
+    }
+
+    $c->stash->{json} = {
+        success      => 1,
+        isos         => $isos,
+        current_ide2 => $current_ide2,
+    };
+    $c->forward('View::JSON');
+}
+
 sub attach_iso :Path('attach_iso') :Args(0) {
     my ($self, $c) = @_;
 

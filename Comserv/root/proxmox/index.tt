@@ -366,11 +366,39 @@
     }
 
     function showIsoPanel(vmid, vmname) {
-        document.getElementById('iso-vmid').value   = vmid;
+        document.getElementById('iso-vmid').value = vmid;
         document.getElementById('iso-vmname').textContent = vmname + ' (VM ' + vmid + ')';
         document.getElementById('iso-panel').style.display = 'block';
         document.getElementById('iso-result').textContent = '';
-        document.getElementById('iso-volid-input').value = '';
+
+        var sel = document.getElementById('iso-select');
+        sel.innerHTML = '<option value="">Loading ISOs from Proxmox…</option>';
+        document.getElementById('iso-current').textContent = '';
+
+        fetch('[% c.uri_for("/proxmox/vm_isos") %]/' + vmid)
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                sel.innerHTML = '<option value="">(no ISO / eject)</option>';
+                if (d.success && d.isos && d.isos.length) {
+                    d.isos.forEach(function(iso){
+                        var opt = document.createElement('option');
+                        opt.value = iso.id;
+                        opt.textContent = iso.name + ' (' + iso.storage + ')';
+                        if (d.current_ide2 && iso.id === d.current_ide2) opt.selected = true;
+                        sel.appendChild(opt);
+                    });
+                } else if (!d.success) {
+                    sel.innerHTML = '<option value="">Error loading ISOs</option>';
+                }
+                if (d.current_ide2) {
+                    document.getElementById('iso-current').textContent = 'Currently attached: ' + d.current_ide2;
+                } else {
+                    document.getElementById('iso-current').textContent = 'No ISO currently attached';
+                }
+            })
+            .catch(function(e){
+                sel.innerHTML = '<option value="">Failed to load ISOs</option>';
+            });
     }
 
     function hideIsoPanel() {
@@ -379,8 +407,11 @@
 
     function doAttachISO() {
         var vmid = document.getElementById('iso-vmid').value;
-        var vol  = document.getElementById('iso-volid-input').value.trim();
-        if (!vol) { alert('Enter the ISO volid'); return; }
+        var vol  = document.getElementById('iso-select').value;
+        if (!vol) {
+            doEjectISO();
+            return;
+        }
         isoApiCall('[% c.uri_for("/proxmox/attach_iso") %]', { vmid: vmid, iso_volid: vol });
     }
 
@@ -392,27 +423,34 @@
     function isoApiCall(url, params) {
         var res = document.getElementById('iso-result');
         res.textContent = 'Working…';
+        res.style.color = '#555';
         var body = Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
         fetch(url, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body })
             .then(function(r){ return r.json(); })
             .then(function(d){
                 res.style.color = d.success ? '#155724' : '#721c24';
                 res.textContent = d.success ? (d.message || 'Done') : ('Error: ' + (d.error || 'Unknown'));
+                if (d.success) {
+                    var cur = document.getElementById('iso-current');
+                    cur.textContent = params.iso_volid ? 'Currently attached: ' + params.iso_volid : 'No ISO currently attached';
+                }
             })
             .catch(function(e){ res.style.color='#721c24'; res.textContent='Request failed: '+e.message; });
     }
 </script>
 
-<div id="iso-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid #aaa;border-radius:6px;padding:20px;min-width:420px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
-    <h3 style="margin:0 0 12px;">CD/DVD Drive — <span id="iso-vmname"></span></h3>
+<div id="iso-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid #aaa;border-radius:6px;padding:20px;min-width:460px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+    <h3 style="margin:0 0 4px;">CD/DVD Drive — <span id="iso-vmname"></span></h3>
+    <div id="iso-current" style="font-size:0.88em;color:#555;margin-bottom:12px;"></div>
     <input type="hidden" id="iso-vmid">
-    <label style="display:block;margin-bottom:6px;font-weight:bold;">ISO Volid:</label>
-    <input type="text" id="iso-volid-input" placeholder="e.g. SunfireBacup:iso/ubuntu-24.04.3-live-server-amd64.iso"
-           style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;margin-bottom:10px;">
+    <label style="display:block;margin-bottom:6px;font-weight:bold;">Select ISO:</label>
+    <select id="iso-select" style="width:100%;padding:8px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;margin-bottom:12px;font-size:0.95em;">
+        <option value="">Loading…</option>
+    </select>
     <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button type="button" onclick="doAttachISO()" style="padding:7px 14px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">Attach ISO</button>
-        <button type="button" onclick="doEjectISO()" style="padding:7px 14px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject ISO</button>
-        <button type="button" onclick="hideIsoPanel()" style="padding:7px 14px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto;">Close</button>
+        <button type="button" onclick="doAttachISO()" style="padding:7px 16px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">Apply</button>
+        <button type="button" onclick="doEjectISO()" style="padding:7px 16px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject</button>
+        <button type="button" onclick="hideIsoPanel()" style="padding:7px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto;">Close</button>
     </div>
-    <div id="iso-result" style="margin-top:10px;font-size:0.9em;font-weight:bold;"></div>
+    <div id="iso-result" style="margin-top:10px;font-size:0.9em;font-weight:bold;min-height:1.2em;"></div>
 </div>
