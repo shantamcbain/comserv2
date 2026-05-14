@@ -246,6 +246,37 @@ sub _load_credentials {
     return 1;
 }
 
+sub _make_ua {
+    my ($self, $timeout) = @_;
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout($timeout || 15);
+    return $ua;
+}
+
+sub _auth_header {
+    my ($self) = @_;
+    if ($self->{token_user} && $self->{token_value}) {
+        return "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        return $self->{api_token};
+    }
+    return '';
+}
+
+sub _resolve_node {
+    my ($self, $ua, $auth_header) = @_;
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    if ($res->is_success) {
+        my $nd = eval { decode_json($res->decoded_content) };
+        return $nd->{data}[0]{node}
+            if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    return $self->{node} || 'proxmox';
+}
+
 # Get credentials for a specific server
 sub get_credentials {
     my ($self, $server_id) = @_;
@@ -1651,54 +1682,36 @@ sub get_available_templates {
 
     my @templates;
 
-    if ($self->{api_url_base} && ($self->{token_user} || $self->{api_token})) {
-        my $ua = LWP::UserAgent->new;
-        $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-        $ua->timeout(10);
+    return \@templates unless $self->{api_url_base};
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return \@templates;
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
 
-        my $auth_header = '';
-        if ($self->{token_user} && $self->{token_value}) {
-            $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-        } elsif ($self->{api_token}) {
-            $auth_header = $self->{api_token};
-        }
+    my $storage_req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
+    $storage_req->header(Authorization => $auth_header);
+    my $storage_res = $ua->request($storage_req);
+    if ($storage_res->is_success) {
+        my $sd = eval { decode_json($storage_res->decoded_content) };
+        for my $store (@{ $sd->{data} || [] }) {
+            my $sname = $store->{storage} or next;
+            my $content = $store->{content} || '';
+            next unless $content =~ /iso/;
 
-        my $node_name;
-        my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-        $nodes_req->header(Authorization => $auth_header);
-        my $nodes_res = $ua->request($nodes_req);
-        if ($nodes_res->is_success) {
-            my $nd = eval { decode_json($nodes_res->decoded_content) };
-            $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-        }
-        $node_name ||= $self->{node} || 'proxmox';
-
-        my $storage_req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
-        $storage_req->header(Authorization => $auth_header);
-        my $storage_res = $ua->request($storage_req);
-        if ($storage_res->is_success) {
-            my $sd = eval { decode_json($storage_res->decoded_content) };
-            for my $store (@{ $sd->{data} || [] }) {
-                my $sname = $store->{storage} or next;
-                my $content = $store->{content} || '';
-                next unless $content =~ /iso/;
-
-                my $content_req = HTTP::Request->new(GET =>
-                    $self->{api_url_base} . "/nodes/$node_name/storage/$sname/content?content=iso");
-                $content_req->header(Authorization => $auth_header);
-                my $content_res = $ua->request($content_req);
-                if ($content_res->is_success) {
-                    my $cd = eval { decode_json($content_res->decoded_content) };
-                    for my $item (@{ $cd->{data} || [] }) {
-                        my $volid = $item->{volid} or next;
-                        (my $fname = $volid) =~ s{.*/}{};
-                        $fname =~ s/\.iso$//i;
-                        push @templates, {
-                            id      => $volid,
-                            name    => $fname,
-                            storage => $sname,
-                        };
-                    }
+            my $content_req = HTTP::Request->new(GET =>
+                $self->{api_url_base} . "/nodes/$node_name/storage/$sname/content?content=iso");
+            $content_req->header(Authorization => $auth_header);
+            my $content_res = $ua->request($content_req);
+            if ($content_res->is_success) {
+                my $cd = eval { decode_json($content_res->decoded_content) };
+                for my $item (@{ $cd->{data} || [] }) {
+                    my $volid = $item->{volid} or next;
+                    (my $fname = $volid) =~ s{.*/}{};
+                    $fname =~ s/\.iso$//i;
+                    push @templates, {
+                        id      => $volid,
+                        name    => $fname,
+                        storage => $sname,
+                    };
                 }
             }
         }
@@ -1726,30 +1739,10 @@ sub create_vm {
         return { success => 0, error => "No valid API URL found" };
     }
 
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(30);
-
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return { success => 0, error => "No authentication credentials available" };
-    }
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nodes_data = eval { decode_json($nodes_res->decoded_content) };
-        if ($nodes_data && $nodes_data->{data} && @{ $nodes_data->{data} }) {
-            $node_name = $nodes_data->{data}[0]{node};
-        }
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(30);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => "No authentication credentials available" };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
 
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',
         "Resolved node name: $node_name");
@@ -1857,28 +1850,9 @@ sub get_vm_config {
 
     return undef unless $self->{api_url_base};
 
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(10);
-
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return undef;
-    }
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return undef;
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
 
     my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/config");
     $req->header(Authorization => $auth_header);
@@ -1901,28 +1875,10 @@ sub set_vm_cdrom {
 
     return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
 
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(15);
-
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return { success => 0, error => 'No credentials' };
-    }
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
 
     my $config_url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/config";
 
@@ -1958,28 +1914,10 @@ sub update_vm_config {
 
     return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
 
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(15);
-
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return { success => 0, error => 'No credentials' };
-    }
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
 
     my %allowed = (name => 1, memory => 1, cores => 1, sockets => 1, description => 1,
                    onboot => 1, agent => 1, cpu => 1);
@@ -2018,28 +1956,10 @@ sub vm_power_action {
 
     return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
 
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(15);
-
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return { success => 0, error => 'No credentials' };
-    }
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
 
     my %valid_actions = (start => 1, stop => 1, shutdown => 1, reboot => 1, reset => 1);
     unless ($valid_actions{$action}) {
@@ -2073,28 +1993,9 @@ sub get_storages_for_iso {
 
     return [] unless $self->{api_url_base};
 
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return [];
-    }
-
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(10);
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
 
     my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
     $req->header(Authorization => $auth_header);
@@ -2124,28 +2025,10 @@ sub upload_iso_to_proxmox {
 
     $storage ||= 'local';
 
-    my $auth_header = '';
-    if ($self->{token_user} && $self->{token_value}) {
-        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
-    } elsif ($self->{api_token}) {
-        $auth_header = $self->{api_token};
-    } else {
-        return { success => 0, error => 'No credentials' };
-    }
-
-    my $ua = LWP::UserAgent->new;
-    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
-    $ua->timeout(300);
-
-    my $node_name;
-    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
-    $nodes_req->header(Authorization => $auth_header);
-    my $nodes_res = $ua->request($nodes_req);
-    if ($nodes_res->is_success) {
-        my $nd = eval { decode_json($nodes_res->decoded_content) };
-        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
-    }
-    $node_name ||= $self->{node} || 'proxmox';
+    my $ua          = $self->_make_ua(300);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
 
     my $filename = $local_path;
     $filename =~ s{.*/}{};
