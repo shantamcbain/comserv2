@@ -966,6 +966,71 @@ sub vm_power :Path('vm_power') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub upload_iso :Path('upload_iso') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    if ($c->req->method eq 'GET') {
+        my $proxmox = $c->model('Proxmox');
+        my $server_id = $c->session->{proxmox_server_id};
+        unless ($server_id) {
+            my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+            $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+        }
+        $proxmox->set_server_id($server_id);
+        $proxmox->authenticate();
+
+        my $storages = $proxmox->get_storages_for_iso() || [];
+        my $local_isos = [];
+        my $kvm_dir = '/home/shanta/kvm-images';
+        if (opendir(my $dh, $kvm_dir)) {
+            while (my $f = readdir($dh)) {
+                push @$local_isos, { name => $f, path => "$kvm_dir/$f" }
+                    if $f =~ /\.iso$/i;
+            }
+            closedir($dh);
+        }
+        @$local_isos = sort { $a->{name} cmp $b->{name} } @$local_isos;
+
+        $c->stash(
+            template   => 'proxmox/upload_iso.tt',
+            storages   => $storages,
+            local_isos => $local_isos,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $iso_path = $c->req->params->{iso_path};
+    my $storage  = $c->req->params->{storage} || 'local';
+
+    unless ($iso_path && -f $iso_path) {
+        $c->stash->{json} = { success => 0, error => "Invalid file path: $iso_path" };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->upload_iso_to_proxmox($iso_path, $storage);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
 sub available_ips :Path('available_ips') :Args(0) {
     my ($self, $c) = @_;
 
