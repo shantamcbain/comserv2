@@ -101,6 +101,11 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
 
+        # Recurring events (break/lunch/standup) always appear in any single-day view
+        if (!$is_done && $start_date eq $end_date && _is_recurring($todo->subject // '')) {
+            $include_todo = 1;
+        }
+
         $include_todo;
     } @$todos;
     
@@ -1384,7 +1389,7 @@ sub day :Path('/todo/day') :Args {
         my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
         my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
         my $anchor = $sd || $dd || '';
-        if (!$is_done && $anchor && $anchor lt $date) {
+        if (!$is_done && $anchor && $anchor lt $date && !_is_recurring($todo->subject // '')) {
             push @overdue_todos, $todo;
         } else {
             push @today_todos, $todo;
@@ -2026,6 +2031,11 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
+sub _is_recurring {
+    my ($subject) = @_;
+    return ($subject // '') =~ /\b(lunch|break|standup|daily.standup|morning.break|afternoon.break|morning break|afternoon break)\b/i;
+}
+
 sub _estimate_mins_heuristic {
     my ($subject) = @_;
     my $s = lc($subject // '');
@@ -2155,6 +2165,9 @@ sub reschedule :Path('reschedule') :Args(0) {
             : ($now_total_min >= $WORK_END_MIN ? $WORK_DAY_MINS : 0);
 
         for my $todo (@rows) {
+            # Skip recurring events — they are fixed appointments, never rescheduled.
+            next if _is_recurring($todo->subject // '');
+
             # estimated_man_hours is stored as MINUTES (integer).
             # Values < 15 are suspicious (likely old "hours" data stored as 1).
             # Use log actuals or heuristic in that case.

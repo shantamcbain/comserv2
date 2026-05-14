@@ -36,7 +36,11 @@
       date = c.request.params.date || today || '2026-02-01'; # Fallback to today
    END;
    
-   IF !todos AND todos_for_today;
+   # When todos_for_today is pre-computed (Planning.pm path), use it directly.
+   # This ensures recurring events always appear and filtering is done in Perl, not TT2.
+   IF todos_for_today.size > 0;
+      todos = todos_for_today;
+   ELSIF !todos AND todos_for_today;
       todos = todos_for_today;
    END;
 
@@ -45,11 +49,8 @@
       overdue_todos = [];
    END;
 
-   # If todos contains all todos (like in Documentation.pm), filter it for today
-   # and extract overdue todos if not already separated. EXCLUDE COMPLETED (status 3).
-   # ONLY do this filtering if coming from Documentation.pm (is_daily_plan == 1)
-   # When coming from Todo.pm controller, todos is already pre-filtered
-   IF is_daily_plan AND !include_mode;
+   # If todos_for_today was NOT pre-computed (old Documentation.pm path), do TT2 filtering.
+   IF is_daily_plan AND !include_mode AND !(todos_for_today.size > 0);
        SET temp_today_todos = [];
        SET temp_overdue_todos = [];
        
@@ -67,10 +68,8 @@
            END;
        END;
 
-       # Apply the filter to 'todos' to ensure Today Schedule is accurate
        todos = temp_today_todos;
        
-       # Update overdue_todos if we found some in the bulk list
        IF temp_overdue_todos.size > 0;
            overdue_todos = temp_overdue_todos;
        END;

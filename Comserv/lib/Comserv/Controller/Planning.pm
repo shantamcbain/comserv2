@@ -116,21 +116,39 @@ sub daily :Path('/planning/daily') :Args {
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
     # Todos for calendar views
-    my $todos_for_today   = [];
+    my $todos_for_today    = [];
+    my $overdue_todos      = [];
     my $all_todos_calendar = [];
     my %todos_by_day;
+
+    my @_done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %_done_set  = map { $_ => 1 } @_done_vals;
 
     if (my $todo_model = $c->model('Todo')) {
         eval {
             $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, $sitename);
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 for my $todo (@$all_todos_calendar) {
-                    my $start = $todo->start_date || '';
-                    my $due   = $todo->due_date   || '';
-                    $start = $start->ymd if ref $start && eval { $start->can('ymd') };
-                    $due   = $due->ymd   if ref $due   && eval { $due->can('ymd')   };
-                    push @$todos_for_today, $todo if $start eq $selected_date || $due eq $selected_date;
-                    my $display = $due || $start;
+                    my $start_raw = $todo->start_date || '';
+                    my $due_raw   = $todo->due_date   || '';
+                    $start_raw = $start_raw->ymd if ref $start_raw && eval { $start_raw->can('ymd') };
+                    $due_raw   = $due_raw->ymd   if ref $due_raw   && eval { $due_raw->can('ymd')   };
+                    my $start = length($start_raw) >= 10 ? substr($start_raw, 0, 10) : '';
+                    my $due   = length($due_raw)   >= 10 ? substr($due_raw,   0, 10) : '';
+
+                    my $is_done    = exists $_done_set{ $todo->status // '' };
+                    my $is_recurr  = ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+                    my $anchor     = $start || $due || '';
+
+                    if ($is_recurr && !$is_done) {
+                        push @$todos_for_today, $todo;
+                    } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
+                        push @$overdue_todos, $todo;
+                    }
+
+                    my $display = $start || $due;
                     if ($display =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
                         my ($y, $m, $d) = ($1, $2, $3);
                         push @{$todos_by_day{int($d)}}, $todo
@@ -547,6 +565,7 @@ sub daily :Path('/planning/daily') :Args {
         today             => $current_date_str,
 
         todos             => $all_todos_calendar,
+        overdue_todos     => $overdue_todos,
         todos_for_today   => $todos_for_today,
         active_priorities => \@active_priorities,
         project_deps      => \@project_deps,
