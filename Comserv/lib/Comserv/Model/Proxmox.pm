@@ -1906,6 +1906,44 @@ sub set_vm_cdrom {
     }
 }
 
+sub resize_disk {
+    my ($self, $vmid, $disk, $new_size_gb) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return { success => 0, error => 'No API URL' }    unless $self->{api_url_base};
+    return { success => 0, error => 'vmid required' } unless $vmid;
+    return { success => 0, error => 'disk required' } unless $disk;
+    return { success => 0, error => 'size must be a positive integer GB value' }
+        unless $new_size_gb && $new_size_gb =~ /^\d+$/ && $new_size_gb > 0;
+
+    my $ua          = $self->_make_ua(30);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/resize";
+
+    my $req = HTTP::Request->new(PUT => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+    $req->content(uri_escape('disk') . '=' . uri_escape($disk) . '&'
+                . uri_escape('size') . '=' . uri_escape("${new_size_gb}G"));
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'resize_disk',
+        "resize_disk vmid=$vmid disk=$disk size=${new_size_gb}G => " . $res->status_line);
+
+    if ($res->is_success) {
+        return { success => 1, message => "Disk $disk resized to ${new_size_gb} GB. "
+                                        . "The virtual disk is larger — resize the partition inside the OS to use the new space." };
+    } else {
+        my $err = $res->decoded_content || $res->status_line;
+        return { success => 0, error => "Proxmox API error (${\$res->code}): $err" };
+    }
+}
+
 sub update_vm_config {
     my ($self, $vmid, $params) = @_;
 
