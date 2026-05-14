@@ -586,12 +586,16 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_vm_action',
             "VM creation successful. VM ID: " . $result->{vmid});
 
-        # VM creation successful
+        my $proxmox_host = $proxmox->{api_url_base} || '';
+        $proxmox_host =~ s|/api2/json||;
         $c->stash(
-            template => 'proxmox/vm_created.tt',
-            success_msg => "Virtual machine creation started successfully. VM ID: " . $result->{vmid},
-            vm_id => $result->{vmid},
-            task_id => $result->{task_id},
+            template      => 'proxmox/vm_created.tt',
+            success_msg   => "Virtual machine creation started successfully. VM ID: " . $result->{vmid},
+            vm_id         => $result->{vmid},
+            task_id       => $result->{task_id},
+            proxmox_host  => $proxmox_host,
+            used_iso      => $params->{template} ? 1 : 0,
+            vm_hostname   => $params->{hostname},
         );
         $c->forward($c->view('TT'));
     } else {
