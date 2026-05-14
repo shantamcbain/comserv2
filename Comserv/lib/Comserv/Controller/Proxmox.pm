@@ -827,6 +827,110 @@ sub eject_iso :Path('eject_iso') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub edit_vm_form :Path('edit_vm') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+
+    unless ($proxmox->authenticate()) {
+        $c->stash(
+            template  => 'proxmox/edit_vm.tt',
+            error_msg => 'Proxmox authentication failed.',
+            vmid      => $vmid,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $config = $proxmox->get_vm_config($vmid);
+    unless ($config) {
+        $c->stash(
+            template  => 'proxmox/edit_vm.tt',
+            error_msg => "Could not retrieve configuration for VM $vmid.",
+            vmid      => $vmid,
+        );
+        $c->forward($c->view('TT'));
+        return;
+    }
+
+    my $proxmox_host = '';
+    my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($server_id);
+    if ($creds && $creds->{api_url_base}) {
+        ($proxmox_host = $creds->{api_url_base}) =~ s|/api2/json||;
+    }
+
+    $c->stash(
+        template     => 'proxmox/edit_vm.tt',
+        vmid         => $vmid,
+        vm_config    => $config,
+        proxmox_host => $proxmox_host,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub edit_vm_action :Path('edit_vm_action') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $vmid = $c->req->params->{vmid};
+    unless ($vmid) {
+        $c->response->redirect($c->uri_for('/proxmox'));
+        return;
+    }
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+
+    unless ($proxmox->authenticate()) {
+        $c->flash->{error_msg} = 'Proxmox authentication failed.';
+        $c->response->redirect($c->uri_for("/proxmox/edit_vm/$vmid"));
+        return;
+    }
+
+    my $params = {
+        name        => $c->req->params->{name},
+        cores       => $c->req->params->{cores},
+        memory      => $c->req->params->{memory},
+        description => $c->req->params->{description},
+        onboot      => $c->req->params->{onboot} ? '1' : '0',
+        agent       => $c->req->params->{agent}  ? '1' : '0',
+    };
+
+    my $result = $proxmox->update_vm_config($vmid, $params);
+
+    if ($result->{success}) {
+        $c->flash->{success_msg} = $result->{message} || "VM $vmid updated successfully.";
+        $c->response->redirect($c->uri_for('/proxmox'));
+    } else {
+        $c->flash->{error_msg} = $result->{error} || "Failed to update VM $vmid.";
+        $c->response->redirect($c->uri_for("/proxmox/edit_vm/$vmid"));
+    }
+}
+
 sub vm_power :Path('vm_power') :Args(0) {
     my ($self, $c) = @_;
 
