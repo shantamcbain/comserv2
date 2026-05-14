@@ -1789,20 +1789,7 @@ sub create_vm {
         $post_params{boot} = 'order=scsi0';
     }
 
-    if ($network_type eq 'static' && $params->{ip_address}) {
-        my $ip      = $params->{ip_address};
-        my $mask    = $params->{subnet_mask} || '255.255.255.0';
-        my $gw      = $params->{gateway}     || '';
-        my $cidr    = $mask =~ /^255\.255\.255\.0$/ ? 24 :
-                      $mask =~ /^255\.255\.0\.0$/   ? 16 : 24;
-        my $ipconfig = "ip=$ip/$cidr";
-        $ipconfig   .= ",gw=$gw" if $gw;
-        $post_params{net0}      = 'virtio,bridge=vmbr0';
-        $post_params{ipconfig0} = $ipconfig;
-    } else {
-        $post_params{net0}      = 'virtio,bridge=vmbr0';
-        $post_params{ipconfig0} = 'ip=dhcp';
-    }
+    $post_params{net0} = 'virtio,bridge=vmbr0';
 
     my $create_url = $self->{api_url_base} . "/nodes/$node_name/qemu";
     $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_vm',

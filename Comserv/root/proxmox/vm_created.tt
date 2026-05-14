@@ -24,10 +24,31 @@
         
         <div class="next-steps">
             <h2>Next Steps</h2>
-            <p>Your virtual machine is being created. This process may take several minutes to complete.</p>
-            <p>You can:</p>
+
+            [% IF used_iso %]
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:14px;margin-bottom:16px;">
+                <strong>ISO Installation Required</strong><br>
+                This VM was created with a boot ISO attached. You need to complete the OS installation manually:
+                <ol style="margin-top:8px;">
+                    <li>Open the <strong>Proxmox Console</strong> for VM [% vm_id %] using the link below</li>
+                    <li>Follow the on-screen installer (select language, disk, network settings, etc.)</li>
+                    <li>After installation completes the VM will reboot from its disk automatically</li>
+                    <li>Once the OS is running, note the IP address assigned by DHCP (check your router or OPNsense DHCP leases)</li>
+                </ol>
+            </div>
+            [% END %]
+
+            [% IF proxmox_host %]
+            <p>
+                <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vm_id %]:4::::" target="_blank"
+                   style="display:inline-block;padding:10px 18px;background:#e47000;color:#fff;border-radius:4px;text-decoration:none;font-weight:bold;">
+                    Open Proxmox Console for VM [% vm_id %]
+                </a>
+                <small style="display:block;margin-top:4px;color:#666;">Opens the Proxmox web UI — log in as root@pam and select the Console tab for VM [% vm_id %]</small>
+            </p>
+            [% END %]
+
             <ul>
-                <li><a href="[% c.uri_for('/proxmox/vm_status', vm_id) %]">Check VM Status</a></li>
                 <li><a href="[% c.uri_for('/proxmox') %]">Return to Proxmox Dashboard</a></li>
                 <li><a href="[% c.uri_for('/proxmox/create') %]">Create Another VM</a></li>
             </ul>
