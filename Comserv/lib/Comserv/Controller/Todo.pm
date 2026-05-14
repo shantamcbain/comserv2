@@ -2169,11 +2169,11 @@ sub reschedule :Path('reschedule') :Args(0) {
             next if _is_recurring($todo->subject // '');
 
             # estimated_man_hours is stored as MINUTES (integer).
-            # Values < 15 are suspicious (likely old "hours" data stored as 1).
-            # Use log actuals or heuristic in that case.
+            # When 0 or not set, use log actuals or subject-based heuristic.
+            # A todo with estimated_man_hours = 5 gets 5 minutes in the schedule.
             my $est_mins = $todo->estimated_man_hours // 0;
             my $est_from_log = 0;
-            if (!$est_mins || $est_mins < 15) {
+            if (!$est_mins) {
                 if (exists $log_duration_mins{ $todo->record_id }) {
                     $est_mins    = $log_duration_mins{ $todo->record_id };
                     $est_from_log = 1;
@@ -2182,7 +2182,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                     $est_from_log = 1;
                 }
             }
-            $est_mins = 15 if $est_mins < 15;   # minimum 15 minutes per task
+            $est_mins = 1 if $est_mins < 1;   # minimum 1 minute per task
 
             # Advance to next day if current day can't fit this todo
             if ($cur_slot_min > 0 && $cur_slot_min + $est_mins > $WORK_DAY_MINS) {
