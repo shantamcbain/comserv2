@@ -596,12 +596,7 @@ function _updateDaySiteSummary() {
 </div>
 [% END %]
 
-[% UNLESS include_mode %]
-<div style="background:#e8f4fd;border:1px solid #90c0e0;border-radius:4px;padding:5px 10px;margin-bottom:6px;font-size:0.78em;">
-  <strong>DEBUG day:</strong> date=[% date %] | todos=[% todos.size %] | overdue=[% overdue_todos.size %] | is_daily_plan=[% is_daily_plan %]
-  [% IF todos.size > 0 %]| first start=[% todos.0.start_date %][% END %]
-</div>
-[% END %]
+
 <details class="priority-container today-container" open>
     <summary class="priority-header">
         <span>Today Schedule ([% date %])</span>
