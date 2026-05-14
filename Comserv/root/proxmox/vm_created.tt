@@ -48,10 +48,45 @@
             </p>
             [% END %]
 
+            <div style="border:1px solid #ccc;border-radius:4px;padding:14px;margin:16px 0;background:#f8f9fa;">
+                <strong>Attach / Change Boot ISO</strong>
+                <p style="margin:6px 0 10px;font-size:0.9em;color:#555;">If you need to attach or swap the boot ISO for VM [% vm_id %], use this form:</p>
+                <form id="isoForm" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                    <input type="text" id="iso_volid" name="iso_volid" placeholder="e.g. SunfireBacup:iso/ubuntu-24.04.3-live-server-amd64.iso"
+                           style="flex:1;min-width:300px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+                    <button type="button" onclick="attachISO()" style="padding:7px 14px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">Attach ISO</button>
+                    <button type="button" onclick="ejectISO()" style="padding:7px 14px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject ISO</button>
+                </form>
+                <div id="isoResult" style="margin-top:8px;font-size:0.9em;"></div>
+            </div>
+
             <ul>
                 <li><a href="[% c.uri_for('/proxmox') %]">Return to Proxmox Dashboard</a></li>
                 <li><a href="[% c.uri_for('/proxmox/create') %]">Create Another VM</a></li>
             </ul>
+
+<script>
+function attachISO() {
+    var vol = document.getElementById('iso_volid').value.trim();
+    if (!vol) { alert('Enter an ISO volid first'); return; }
+    isoRequest('[% c.uri_for("/proxmox/attach_iso") %]', { vmid: '[% vm_id %]', iso_volid: vol });
+}
+function ejectISO() {
+    isoRequest('[% c.uri_for("/proxmox/eject_iso") %]', { vmid: '[% vm_id %]' });
+}
+function isoRequest(url, params) {
+    var res = document.getElementById('isoResult');
+    res.textContent = 'Working…';
+    var body = Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+    fetch(url, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            res.style.color = d.success ? '#155724' : '#721c24';
+            res.textContent = d.success ? (d.message || 'Done') : ('Error: ' + (d.error || 'Unknown'));
+        })
+        .catch(function(e){ res.style.color='#721c24'; res.textContent='Request failed: '+e.message; });
+}
+</script>
         </div>
         
         [% IF debug_msg && debug_msg.size %]

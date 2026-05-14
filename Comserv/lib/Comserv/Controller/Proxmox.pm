@@ -541,25 +541,9 @@ sub create_vm_action :Path('create_vm_action') :Args(0) {
         return;
     }
 
-    # Optionally resolve a template — if the user selected one, look it up; blank disk if not
     if ($params->{template}) {
-        my $templates = $proxmox->get_available_templates();
-        my $selected_template;
-        foreach my $tmpl (@$templates) {
-            if ($tmpl->{id} eq $params->{template}) {
-                $selected_template = $tmpl;
-                last;
-            }
-        }
-        if ($selected_template) {
-            $params->{template_url} = $selected_template->{url};
-            $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create_vm_action',
-                "Using template URL: " . $params->{template_url});
-        } else {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_vm_action',
-                "Template ID not found: " . $params->{template} . " — proceeding with blank disk");
-            delete $params->{template};
-        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_vm_action',
+            "Using ISO volid for CD-ROM: " . $params->{template});
     }
 
     # Add network configuration if static IP is selected
@@ -725,6 +709,74 @@ sub vm_status :Path('status') :Args(1) {
         );
     }
     
+    $c->forward('View::JSON');
+}
+
+sub attach_iso :Path('attach_iso') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $vmid    = $c->req->params->{vmid}   or do {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON'); return;
+    };
+    my $iso_volid = $c->req->params->{iso_volid} or do {
+        $c->stash->{json} = { success => 0, error => 'iso_volid required' };
+        $c->forward('View::JSON'); return;
+    };
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->set_vm_cdrom($vmid, $iso_volid);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub eject_iso :Path('eject_iso') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $vmid = $c->req->params->{vmid} or do {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON'); return;
+    };
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->set_vm_cdrom($vmid, '');
+    $c->stash->{json} = $result;
     $c->forward('View::JSON');
 }
 

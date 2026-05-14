@@ -86,7 +86,7 @@
                     <td>[% vm.cpus || vm.cpu || 'N/A' %]</td>
                     <td>[% vm.uptime ? formatUptime(vm.uptime) : 'Not running' %]</td>
                     <td class="actions">
-                        <a href="[% c.uri_for('/proxmox/vm_status', vm.vmid) %]" class="btn-small">Details</a>
+                        <button type="button" class="btn-small" onclick="showIsoPanel('[% vm.vmid %]', '[% vm.name | html %]')" title="Attach or eject ISO">ISO</button>
                     </td>
                 </tr>
                 [% END %]
@@ -361,8 +361,58 @@
         return result;
     }
     
-    // Function to refresh the VM list
     function refreshVMList() {
         window.location.reload();
     }
+
+    function showIsoPanel(vmid, vmname) {
+        document.getElementById('iso-vmid').value   = vmid;
+        document.getElementById('iso-vmname').textContent = vmname + ' (VM ' + vmid + ')';
+        document.getElementById('iso-panel').style.display = 'block';
+        document.getElementById('iso-result').textContent = '';
+        document.getElementById('iso-volid-input').value = '';
+    }
+
+    function hideIsoPanel() {
+        document.getElementById('iso-panel').style.display = 'none';
+    }
+
+    function doAttachISO() {
+        var vmid = document.getElementById('iso-vmid').value;
+        var vol  = document.getElementById('iso-volid-input').value.trim();
+        if (!vol) { alert('Enter the ISO volid'); return; }
+        isoApiCall('[% c.uri_for("/proxmox/attach_iso") %]', { vmid: vmid, iso_volid: vol });
+    }
+
+    function doEjectISO() {
+        var vmid = document.getElementById('iso-vmid').value;
+        isoApiCall('[% c.uri_for("/proxmox/eject_iso") %]', { vmid: vmid });
+    }
+
+    function isoApiCall(url, params) {
+        var res = document.getElementById('iso-result');
+        res.textContent = 'Working…';
+        var body = Object.keys(params).map(function(k){ return encodeURIComponent(k)+'='+encodeURIComponent(params[k]); }).join('&');
+        fetch(url, { method: 'POST', headers: {'Content-Type':'application/x-www-form-urlencoded'}, body: body })
+            .then(function(r){ return r.json(); })
+            .then(function(d){
+                res.style.color = d.success ? '#155724' : '#721c24';
+                res.textContent = d.success ? (d.message || 'Done') : ('Error: ' + (d.error || 'Unknown'));
+            })
+            .catch(function(e){ res.style.color='#721c24'; res.textContent='Request failed: '+e.message; });
+    }
 </script>
+
+<div id="iso-panel" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:1px solid #aaa;border-radius:6px;padding:20px;min-width:420px;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,0.3);">
+    <h3 style="margin:0 0 12px;">CD/DVD Drive — <span id="iso-vmname"></span></h3>
+    <input type="hidden" id="iso-vmid">
+    <label style="display:block;margin-bottom:6px;font-weight:bold;">ISO Volid:</label>
+    <input type="text" id="iso-volid-input" placeholder="e.g. SunfireBacup:iso/ubuntu-24.04.3-live-server-amd64.iso"
+           style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;margin-bottom:10px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button type="button" onclick="doAttachISO()" style="padding:7px 14px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;">Attach ISO</button>
+        <button type="button" onclick="doEjectISO()" style="padding:7px 14px;background:#dc3545;color:#fff;border:none;border-radius:4px;cursor:pointer;">Eject ISO</button>
+        <button type="button" onclick="hideIsoPanel()" style="padding:7px 14px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;margin-left:auto;">Close</button>
+    </div>
+    <div id="iso-result" style="margin-top:10px;font-size:0.9em;font-weight:bold;"></div>
+</div>
