@@ -54,6 +54,11 @@
             <i class="icon-refresh"></i>
             Refresh VM List
         </a>
+        [% IF proxmox_host %]
+        <a href="[% proxmox_host %]" target="_blank" class="btn-action" style="background:#e47000;">
+            Open Proxmox Web UI
+        </a>
+        [% END %]
     </div>
 </div>
 
@@ -86,7 +91,16 @@
                     <td>[% vm.cpus || vm.cpu || 'N/A' %]</td>
                     <td>[% vm.uptime ? formatUptime(vm.uptime) : 'Not running' %]</td>
                     <td class="actions">
+                        [% IF vm.status == 'stopped' %]
+                        <button type="button" class="btn-small btn-start" onclick="vmPower('[% vm.vmid %]','start','[% vm.name | html %]')" title="Start VM">▶ Start</button>
+                        [% ELSE %]
+                        <button type="button" class="btn-small btn-stop"    onclick="vmPower('[% vm.vmid %]','shutdown','[% vm.name | html %]')" title="Graceful shutdown">■ Stop</button>
+                        <button type="button" class="btn-small btn-reboot"  onclick="vmPower('[% vm.vmid %]','reboot','[% vm.name | html %]')"   title="Reboot VM">↺ Reboot</button>
+                        [% END %]
                         <button type="button" class="btn-small" onclick="showIsoPanel('[% vm.vmid %]', '[% vm.name | html %]')" title="Attach or eject ISO">ISO</button>
+                        [% IF proxmox_host %]
+                        <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vm.vmid %]:4::::" target="_blank" class="btn-small btn-console" title="Open console in Proxmox">Console</a>
+                        [% END %]
                     </td>
                 </tr>
                 [% END %]
@@ -264,12 +278,21 @@
         padding: 5px 10px;
         border-radius: 3px;
         text-decoration: none;
-        font-size: 0.9em;
+        font-size: 0.85em;
+        border: none;
+        cursor: pointer;
+        display: inline-block;
     }
 
-    .btn-small:hover {
-        background-color: #0069d9;
-    }
+    .btn-small:hover { background-color: #0069d9; }
+    .btn-start  { background-color: #28a745; }
+    .btn-start:hover  { background-color: #218838; }
+    .btn-stop   { background-color: #dc3545; }
+    .btn-stop:hover   { background-color: #c82333; }
+    .btn-reboot { background-color: #fd7e14; }
+    .btn-reboot:hover { background-color: #e8690b; }
+    .btn-console { background-color: #6c757d; }
+    .btn-console:hover { background-color: #5a6268; }
 
     .no-vms {
         text-align: center;
@@ -363,6 +386,27 @@
     
     function refreshVMList() {
         window.location.reload();
+    }
+
+    function vmPower(vmid, action, vmname) {
+        var labels = { start: 'Start', stop: 'Stop', shutdown: 'Shut down', reboot: 'Reboot', reset: 'Reset' };
+        if (!confirm('Are you sure you want to ' + (labels[action] || action) + ' VM ' + vmname + ' (' + vmid + ')?')) return;
+        var body = 'vmid=' + encodeURIComponent(vmid) + '&action=' + encodeURIComponent(action);
+        fetch('[% c.uri_for("/proxmox/vm_power") %]', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: body
+        })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (d.success) {
+                alert((labels[action] || action) + ' initiated for VM ' + vmname + '. Refreshing…');
+                setTimeout(function(){ window.location.reload(); }, 3000);
+            } else {
+                alert('Error: ' + (d.error || 'Unknown error'));
+            }
+        })
+        .catch(function(e){ alert('Request failed: ' + e.message); });
     }
 
     function showIsoPanel(vmid, vmname) {

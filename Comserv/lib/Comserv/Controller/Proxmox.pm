@@ -326,6 +326,11 @@ sub index :Path :Args(0) {
     # CHANGED HERE: Pre-encode debug_info as JSON
     my $debug_info_json = encode_json($debug_info); # Add this line
 
+    my $proxmox_host = '';
+    if ($credentials && $credentials->{api_url_base}) {
+        ($proxmox_host = $credentials->{api_url_base}) =~ s|/api2/json||;
+    }
+
     $c->stash(
         template => 'proxmox/index.tt',
         vms => $vms,
@@ -334,8 +339,9 @@ sub index :Path :Args(0) {
         server_id => $server_id,
         servers => $servers,
         current_server_name => $current_server_name,
+        proxmox_host => $proxmox_host,
         debug_info => $debug_info,
-        debug_info_json => $debug_info_json # CHANGED HERE: Add this to the stash
+        debug_info_json => $debug_info_json
     );
     $c->forward($c->view('TT'));
 }
@@ -817,6 +823,41 @@ sub eject_iso :Path('eject_iso') :Args(0) {
     }
 
     my $result = $proxmox->set_vm_cdrom($vmid, '');
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub vm_power :Path('vm_power') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid   = $c->req->params->{vmid}   or do {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON'); return;
+    };
+    my $action = $c->req->params->{action} or do {
+        $c->stash->{json} = { success => 0, error => 'action required (start|stop|shutdown|reboot|reset)' };
+        $c->forward('View::JSON'); return;
+    };
+
+    my $proxmox = $c->model('Proxmox');
+    my $server_id = $c->session->{proxmox_server_id};
+    unless ($server_id) {
+        my $all = Comserv::Util::ProxmoxCredentials::get_all_servers();
+        $server_id = ($all && @$all) ? ($all->[0]{id} || $all->[0]{server_id}) : 'ProxmoxDevelopment';
+    }
+    $proxmox->set_server_id($server_id);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox auth failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->vm_power_action($vmid, $action);
     $c->stash->{json} = $result;
     $c->forward('View::JSON');
 }
