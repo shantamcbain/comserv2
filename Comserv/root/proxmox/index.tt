@@ -36,9 +36,15 @@
 </p>
 [% END %]
 
-[% IF success_msg %]
+[% IF success_msg || c.flash.success_msg %]
 <div class="success-message">
-    [% success_msg %]
+    [% success_msg || c.flash.success_msg %]
+</div>
+[% END %]
+
+[% IF c.flash.error_msg %]
+<div class="error-message">
+    [% c.flash.error_msg %]
 </div>
 [% END %]
 
@@ -97,6 +103,7 @@
                         <button type="button" class="btn-small btn-stop"    onclick="vmPower('[% vm.vmid %]','shutdown','[% vm.name | html %]')" title="Graceful shutdown">■ Stop</button>
                         <button type="button" class="btn-small btn-reboot"  onclick="vmPower('[% vm.vmid %]','reboot','[% vm.name | html %]')"   title="Reboot VM">↺ Reboot</button>
                         [% END %]
+                        <a href="[% c.uri_for('/proxmox/edit_vm') %]/[% vm.vmid %]" class="btn-small btn-edit" title="Edit VM settings">Edit</a>
                         <button type="button" class="btn-small" onclick="showIsoPanel('[% vm.vmid %]', '[% vm.name | html %]')" title="Attach or eject ISO">ISO</button>
                         [% IF proxmox_host %]
                         <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vm.vmid %]:4::::" target="_blank" class="btn-small btn-console" title="Open console in Proxmox">Console</a>
@@ -293,6 +300,8 @@
     .btn-reboot:hover { background-color: #e8690b; }
     .btn-console { background-color: #6c757d; }
     .btn-console:hover { background-color: #5a6268; }
+    .btn-edit { background-color: #17a2b8; }
+    .btn-edit:hover { background-color: #138496; }
 
     .no-vms {
         text-align: center;

@@ -1929,6 +1929,66 @@ sub set_vm_cdrom {
     }
 }
 
+sub update_vm_config {
+    my ($self, $vmid, $params) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua = LWP::UserAgent->new;
+    $ua->ssl_opts(verify_hostname => 0, SSL_verify_mode => 0);
+    $ua->timeout(15);
+
+    my $auth_header = '';
+    if ($self->{token_user} && $self->{token_value}) {
+        $auth_header = "PVEAPIToken=" . $self->{token_user} . "=" . $self->{token_value};
+    } elsif ($self->{api_token}) {
+        $auth_header = $self->{api_token};
+    } else {
+        return { success => 0, error => 'No credentials' };
+    }
+
+    my $node_name;
+    my $nodes_req = HTTP::Request->new(GET => $self->{api_url_base} . '/nodes');
+    $nodes_req->header(Authorization => $auth_header);
+    my $nodes_res = $ua->request($nodes_req);
+    if ($nodes_res->is_success) {
+        my $nd = eval { decode_json($nodes_res->decoded_content) };
+        $node_name = $nd->{data}[0]{node} if $nd && $nd->{data} && @{$nd->{data}};
+    }
+    $node_name ||= $self->{node} || 'proxmox';
+
+    my %allowed = (name => 1, memory => 1, cores => 1, sockets => 1, description => 1,
+                   onboot => 1, agent => 1, cpu => 1);
+    my %put_params;
+    for my $key (keys %$params) {
+        next unless $allowed{$key};
+        $put_params{$key} = $params->{$key} if defined $params->{$key} && $params->{$key} ne '';
+    }
+
+    return { success => 0, error => 'No valid fields to update' } unless %put_params;
+
+    my $config_url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/config";
+    my $req = HTTP::Request->new(PUT => $config_url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+
+    my $body = join('&', map { uri_escape($_) . '=' . uri_escape($put_params{$_}) } keys %put_params);
+    $req->content($body);
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'update_vm_config',
+        "update_vm_config vmid=$vmid => " . $res->status_line);
+
+    if ($res->is_success) {
+        return { success => 1, message => "VM $vmid configuration updated" };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
 sub vm_power_action {
     my ($self, $vmid, $action) = @_;
 
