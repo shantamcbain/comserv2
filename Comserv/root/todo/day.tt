@@ -614,11 +614,16 @@ function _updateDaySiteSummary() {
                         [% FOREACH todo IN time_slots.$display_hour %]
                             [% SET _tp = todo.priority || 9 %]
                             [% SET _ts = todo.sitename || '' %]
+                            [% SET _done = (todo.status == 3 OR todo.status == 4 OR todo.status == 'DONE' OR todo.status == 'Completed' OR todo.status == 'completed' OR todo.status == 'Closed' OR todo.status == 'closed' OR todo.status == 'Done') %]
+                            [% SET _est_h = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 1 %]
+                            [% SET _min_h = _est_h * 40 %]
+                            [% IF _min_h < 40 %][% SET _min_h = 40 %][% END %]
+                            [% IF _min_h > 320 %][% SET _min_h = 320 %][% END %]
                             <div class="todo-item-day todo-item-shared priority-[% _tp %]"
                                  data-todo-id="[% todo.record_id %]"
                                  data-priority="[% _tp %]"
                                  data-site="[% _ts %]"
-                                 style="display:table;width:100%;table-layout:fixed;padding:6px 8px;margin-bottom:4px;border-radius:4px;box-sizing:border-box;background:[% IF todo.status == 2 %]color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff))[% ELSE %]var(--bg-color,#fff)[% END %];border:1px solid var(--border-color,#ddd);">
+                                 style="display:table;width:100%;table-layout:fixed;padding:6px 8px;margin-bottom:4px;border-radius:4px;box-sizing:border-box;min-height:[% _min_h %]px;[% IF _done %]opacity:0.55;background:var(--bg-secondary,#f0f0f0);border:1px dashed var(--border-color,#bbb);[% ELSIF todo.status == 2 %]background:color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff));border:1px solid var(--border-color,#ddd);[% ELSE %]background:var(--bg-color,#fff);border:1px solid var(--border-color,#ddd);[% END %]">
                                 <div style="display:table-cell;width:20px;vertical-align:middle;padding-right:4px;">
                                     <span class="drag-handle" title="Drag to reschedule" style="cursor:grab;color:var(--text-muted-color,#999);font-size:1em;user-select:none;">⋮⋮</span>
                                 </div>
@@ -632,15 +637,16 @@ function _updateDaySiteSummary() {
                                     </select>
                                 </div>
                                 <div style="display:table-cell;vertical-align:middle;">
-                                    <div style="font-weight:bold;font-size:0.9em;color:var(--text-color,#333);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="[% todo.subject | html %]">
-                                        [% todo.subject %]
+                                    <div style="font-weight:bold;font-size:0.9em;color:var(--text-color,#333);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;[% IF _done %]text-decoration:line-through;color:var(--text-muted-color,#888);[% END %]" title="[% todo.subject | html %]">
+                                        [% IF _done %]<span style="font-size:0.72em;background:#28a745;color:#fff;border-radius:3px;padding:1px 4px;margin-right:4px;font-weight:normal;text-decoration:none;">✓ Done</span>[% END %][% todo.subject %]
                                     </div>
-                                    [% IF todo.due_date || todo.project_id %]
                                     <div style="font-size:0.75em;color:var(--text-muted-color,#888);margin-top:1px;">
                                         [% IF todo.project_id && proj_name_map.${todo.project_id} %]<span>📁 [% proj_name_map.${todo.project_id} %]</span>[% END %]
                                         [% IF todo.due_date %]<span style="margin-left:6px;">📅 [% todo.due_date %]</span>[% END %]
+                                        [% IF todo.estimated_man_hours > 0 %]<span style="margin-left:6px;">⏱ [% todo.estimated_man_hours %]h</span>[% END %]
+                                        [% SET _subj_l = todo.subject.lower %]
+                                        [% IF _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup') %]<span style="margin-left:4px;" title="Recurring">🔁</span>[% END %]
                                     </div>
-                                    [% END %]
                                 </div>
                                 <div style="display:table-cell;width:110px;white-space:nowrap;vertical-align:middle;padding-left:8px;text-align:right;">
                                     [% IF is_csc && _ts && _ts != 'CSC' %]

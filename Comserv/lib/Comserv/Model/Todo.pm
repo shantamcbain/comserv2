@@ -122,8 +122,19 @@ sub get_all_todos_for_calendar {
     my $rs = $schema->resultset('Todo');
 
     my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    require DateTime;
+    my $cutoff_date = DateTime->now->subtract(days => 30)->ymd;
     my @todos = $rs->search(
-        { sitename => $SiteName, status => { -not_in => \@done_statuses } },
+        {
+            sitename => $SiteName,
+            -or => [
+                { status => { -not_in => \@done_statuses } },
+                {
+                    status        => { -in => \@done_statuses },
+                    last_mod_date => { '>=' => $cutoff_date },
+                },
+            ],
+        },
         { order_by => { -asc => ['priority', 'start_date'] } }
     );
 
