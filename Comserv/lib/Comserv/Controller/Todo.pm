@@ -104,11 +104,12 @@ sub filter_todos_by_date_range {
 
         # Recurring events: inject into any single-day view where recurrence rule matches.
         # DB flag is authoritative; keyword is fallback for un-migrated rows.
-        # Respect start_date: only inject if start_date <= view date.
+        # Use start_date as lower bound; fall back to today so new recurring todos
+        # don't appear in the past when start_date is not set.
         if (!$is_done && $start_date eq $end_date
             && ($todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // ''))) {
-            my $rec_start = $sd;
-            if (!$rec_start || $rec_start le $start_date) {
+            my $effective_start = $sd || $today;
+            if ($effective_start le $start_date) {
                 if (recurring_matches_date($todo, $start_date)) {
                     $include_todo = 1;
                 }
@@ -1687,9 +1688,10 @@ sub week :Path('/todo/week') :Args {
                       || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
 
         if ($is_rec && !$is_done) {
+            my $effective_start = $sd || DateTime->now->ymd;
             for my $day_info (@week_dates) {
                 my $d_str = $day_info->{date_str};
-                next if $sd && $sd gt $d_str;
+                next if $effective_start gt $d_str;
                 next unless recurring_matches_date($todo, $d_str);
                 my $already = grep { $_->record_id == $todo->record_id }
                               @{ $week_todos_by_date{$d_str} // [] };

@@ -129,10 +129,16 @@ sub daily :Path('/planning/daily') :Args {
     my @_done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     my %_done_set  = map { $_ => 1 } @_done_vals;
 
+    my %week_todos_by_date;
+    my @week_overdue_todos;
+
     if (my $todo_model = $c->model('Todo')) {
         eval {
             $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, $sitename);
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
+                my $week_first_day = $week_dates[0]{date_str};
+                my $today_str = $current_date_str;
+
                 for my $todo (@$all_todos_calendar) {
                     my $start_raw = $todo->start_date || '';
                     my $due_raw   = $todo->due_date   || '';
@@ -151,10 +157,33 @@ sub daily :Path('/planning/daily') :Args {
                         push @$todos_for_today, $todo
                             if (!$rec_sd || $rec_sd le $selected_date)
                             && recurring_matches_date($todo, $selected_date);
+
+                        for my $day_info (@week_dates) {
+                            my $d_str = $day_info->{date_str};
+                            my $effective_start = $rec_sd || $today_str;
+                            next if $effective_start gt $d_str;
+                            next unless recurring_matches_date($todo, $d_str);
+                            my $already = grep { $_->record_id == $todo->record_id }
+                                          @{ $week_todos_by_date{$d_str} // [] };
+                            push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
+                        }
                     } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
                         push @$overdue_todos, $todo;
+                    }
+
+                    unless ($is_recurr) {
+                        my $anchor_key = $start || $due;
+                        if ($anchor_key) {
+                            if ($anchor_key lt $week_first_day) {
+                                push @week_overdue_todos, $todo unless $is_done;
+                            } else {
+                                my $already = grep { $_->record_id == $todo->record_id }
+                                              @{ $week_todos_by_date{$anchor_key} // [] };
+                                push @{ $week_todos_by_date{$anchor_key} }, $todo unless $already;
+                            }
+                        }
                     }
 
                     my $display = $start || $due;
@@ -557,6 +586,9 @@ sub daily :Path('/planning/daily') :Args {
         display_date      => $display_date,
         prev_date         => $prev_date,
         next_date         => $next_date,
+
+        week_todos_by_date => \%week_todos_by_date,
+        week_overdue_todos => \@week_overdue_todos,
 
         week_dates        => \@week_dates,
         start_of_week     => $start_of_week,
