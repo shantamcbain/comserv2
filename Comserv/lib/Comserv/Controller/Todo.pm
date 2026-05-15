@@ -9,6 +9,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
+use Comserv::Util::TodoTypes qw(recurring_matches_date);
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -101,15 +102,16 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
 
-        # Recurring events always appear in any single-day view (DB flag is authoritative;
-        # fall back to keyword match for rows that pre-date the migration).
-        # Respect start_date: only inject if the recurring todo has no start_date
-        # OR its start_date <= the view date (so exceptions pushed to "tomorrow" stop appearing today).
+        # Recurring events: inject into any single-day view where recurrence rule matches.
+        # DB flag is authoritative; keyword is fallback for un-migrated rows.
+        # Respect start_date: only inject if start_date <= view date.
         if (!$is_done && $start_date eq $end_date
             && ($todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // ''))) {
             my $rec_start = $sd;
             if (!$rec_start || $rec_start le $start_date) {
-                $include_todo = 1;
+                if (recurring_matches_date($todo, $start_date)) {
+                    $include_todo = 1;
+                }
             }
         }
 
@@ -1664,9 +1666,53 @@ sub week :Path('/todo/week') :Args {
         %week_proj_map = map { $_->id => $_->name } @prows;
     };
 
+    # Pre-build todos_by_date and overdue list in Perl so recurrence rules are applied correctly.
+    # TT2 cannot compute day-of-week, so weekly/biweekly injection must happen here.
+    my %week_todos_by_date;
+    my @week_overdue_todos;
+    my $first_day = $week_dates[0]{date_str};
+    my @done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %done_set  = map { $_ => 1 } @done_vals;
+
+    for my $todo (@sorted_todos) {
+        my $sd_raw = $todo->start_date // '';
+        my $dd_raw = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
+
+        my $is_done = exists $done_set{ $todo->status // '' };
+        my $is_rec  = ($todo->can('is_recurring') ? $todo->is_recurring : 0)
+                      || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+
+        if ($is_rec && !$is_done) {
+            for my $day_info (@week_dates) {
+                my $d_str = $day_info->{date_str};
+                next if $sd && $sd gt $d_str;
+                next unless recurring_matches_date($todo, $d_str);
+                my $already = grep { $_->record_id == $todo->record_id }
+                              @{ $week_todos_by_date{$d_str} // [] };
+                push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
+            }
+        } else {
+            my $anchor = $sd || $dd;
+            next unless $anchor;
+            if ($anchor lt $first_day) {
+                push @week_overdue_todos, $todo unless $is_done;
+            } else {
+                my $already = grep { $_->record_id == $todo->record_id }
+                              @{ $week_todos_by_date{$anchor} // [] };
+                push @{ $week_todos_by_date{$anchor} }, $todo unless $already;
+            }
+        }
+    }
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
+        week_todos_by_date => \%week_todos_by_date,
+        week_overdue_todos => \@week_overdue_todos,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
