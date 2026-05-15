@@ -307,9 +307,13 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    <a href="[% c.uri_for('/admin/schema_compare') %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Schema Compare &amp; Migration</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/compare_schema') %]" class="admin-link">
                         <i class="fas fa-database"></i>
-                        <span>Schema Manager</span>
+                        <span>Schema Manager (legacy)</span>
                     </a>
                     <a href="[% c.uri_for('/admin/migrate_schema') %]" class="admin-link">
                         <i class="fas fa-exchange-alt"></i>
@@ -318,6 +322,14 @@
                     <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
                         <i class="fas fa-file-export"></i>
                         <span>Migrate Pages (Forager → Ency)</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>DB Connection Passwords</span>
+                    </a>
+                    <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" class="admin-link">
+                        <i class="fas fa-book"></i>
+                        <span>Migration Server Setup Guide</span>
                     </a>
                 </div>
             </div>
