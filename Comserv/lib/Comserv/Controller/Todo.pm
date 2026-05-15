@@ -511,7 +511,7 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
         build_priority  => $self->priority_options,
         build_status    => \%status_options,
         return_to       => $return_to,       # URL to return to after action
-        start_date      => $c->request->params->{start_date},
+        start_date      => $c->request->params->{start_date} || DateTime->now->ymd,
         time_of_day     => $c->request->params->{time_of_day},
         template        => 'todo/addtodo.tt' # Template for rendering
     );
