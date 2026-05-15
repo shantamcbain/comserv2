@@ -2624,7 +2624,11 @@
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
             liveThinkEl.remove();
-            
+
+            if (!data) {
+                throw new Error('AI server returned an empty response. Please try again.');
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -4337,6 +4341,9 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (!result) {
+                throw new Error('Action server returned an empty response');
+            }
             if (result.success && result.action === 'open_project_wizard') {
                 openProjectWizard(result.wizard_title || '');
                 return;
