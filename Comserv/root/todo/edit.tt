@@ -205,7 +205,7 @@ function onRecurringChange(cb) {
                             SET time_value_24 = hour_24 _ ':' _ minute;
                             SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
                 %]
-                <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                <option value="[% time_value_24 %]:00" [% IF current_time_short eq time_value_24 %]selected[% END %]>[% time_display %]</option>
                 [%
                         END;
                     END;
