@@ -587,9 +587,14 @@
                 <div class="error-message" style="margin:12px;">
                     <i class="fas fa-exclamation-triangle"></i>
                     <strong>Connection Error:</strong> [% database_comparison.migration_mysql.error | html %]
-                    [% IF database_comparison.migration_mysql.error.match('not configured') %]
-                    <br><small>Set the password in <code>db_config.json</code> → <code>migration_target_mysql.password</code>, or add <code>MYSQL_ROOT_PASSWORD=...</code> to <code>/opt/csc-db/.env</code>.</small>
-                    [% END %]
+                    <br><small>
+                        Set <code>MIGRATION_MYSQL_PASSWORD</code> in
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
+                            Admin → Database Management → DB Connection Passwords
+                        </a>
+                        (copy <code>MYSQL_ROOT_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
+                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    </small>
                 </div>
                 [% END %]
             </div>
@@ -642,9 +647,14 @@
                 <div class="error-message" style="margin:12px;">
                     <i class="fas fa-exclamation-triangle"></i>
                     <strong>Connection Error:</strong> [% database_comparison.migration_postgres.error | html %]
-                    [% IF database_comparison.migration_postgres.error.match('not configured') %]
-                    <br><small>Set the password in <code>db_config.json</code> → <code>migration_target_postgres.password</code>, or add <code>POSTGRES_PASSWORD=...</code> to <code>/opt/csc-db/.env</code>.</small>
-                    [% END %]
+                    <br><small>
+                        Set <code>MIGRATION_POSTGRES_PASSWORD</code> in
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
+                            Admin → Database Management → DB Connection Passwords
+                        </a>
+                        (copy <code>POSTGRES_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
+                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    </small>
                 </div>
                 [% END %]
             </div>
