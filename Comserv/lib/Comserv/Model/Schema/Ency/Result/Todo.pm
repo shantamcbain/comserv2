@@ -3,8 +3,7 @@ use base 'DBIx::Class::Core';
 use warnings FATAL => 'all';
 
 __PACKAGE__->table('todo');
-__PACKAGE__->add_columns(
-    record_id => {
+__PACKAGE__->add_columns(record_id => {
         data_type => 'integer',
         is_auto_increment => 1,
     },
@@ -139,32 +138,12 @@ __PACKAGE__->add_columns(
         data_type => 'time',
         is_nullable => 1,
     },
-    "date_time_posted",
-    { data_type => "varchar", default_value => "", is_nullable => 1, size => 30 },
-    plan_id => {
-        data_type => 'integer',
+    scheduled_start => {
+        data_type   => 'datetime',
         is_nullable => 1,
     },
-    blocked_by_todo_id => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    parent_id => {
-        data_type => 'integer',
-        is_nullable => 1,
-    },
-    sort_order => {
-        data_type => 'integer',
-        default_value => 0,
-        is_nullable => 0,
-    },
-    is_blocking => {
-        data_type => 'boolean',
-        default_value => 0,
-        is_nullable => 0,
-    },
-    scheduled_date => {
-        data_type => 'date',
+    scheduled_end => {
+        data_type   => 'datetime',
         is_nullable => 1,
     },
     billable => {
@@ -200,6 +179,11 @@ __PACKAGE__->add_columns(
         size        => 50,
         is_nullable => 1,
     },
+    is_fixed => {
+        data_type => 'tinyint(1)',
+        size => 1,
+        default_value => 0,
+    }
 );
 
 __PACKAGE__->set_primary_key('record_id');
