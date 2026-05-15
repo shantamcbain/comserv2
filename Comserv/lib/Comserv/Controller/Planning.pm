@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Model::Ollama;
 use JSON;
 use Time::Piece;
@@ -148,7 +149,8 @@ sub daily :Path('/planning/daily') :Args {
                     if ($is_recurr && !$is_done) {
                         my $rec_sd = $start || '';
                         push @$todos_for_today, $todo
-                            if !$rec_sd || $rec_sd le $selected_date;
+                            if (!$rec_sd || $rec_sd le $selected_date)
+                            && recurring_matches_date($todo, $selected_date);
                     } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
