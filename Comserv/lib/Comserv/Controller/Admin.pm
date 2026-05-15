@@ -21,6 +21,7 @@ use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
 use POSIX qw(_exit);
+use DBI;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -2423,8 +2424,22 @@ sub get_database_comparison {
             error => undef,
             table_comparisons => []
         },
+        migration_mysql => {
+            name => 'migration_mysql',
+            display_name => 'New Server — MySQL Docker (192.168.1.20:3307)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
+        migration_postgres => {
+            name => 'migration_postgres',
+            display_name => 'New Server — PostgreSQL Docker (192.168.1.20:5433)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
         summary => {
-            total_databases => 2,
+            total_databases => 4,
             connected_databases => 0,
             total_tables => 0,
             tables_with_results => 0,
@@ -2530,7 +2545,27 @@ sub get_database_comparison {
         $comparison->{forager}->{connection_status} = 'error';
         $comparison->{forager}->{error} = $error;
     };
-    
+
+    # Get migration target MySQL server info
+    my $mysql_info = $self->get_migration_mysql_info($c);
+    $comparison->{migration_mysql}->{connection_status} = $mysql_info->{connection_status};
+    $comparison->{migration_mysql}->{error}             = $mysql_info->{error};
+    $comparison->{migration_mysql}->{databases}         = $mysql_info->{databases} // [];
+    $comparison->{migration_mysql}->{host}              = $mysql_info->{host};
+    if ($mysql_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
+    # Get migration target PostgreSQL server info
+    my $pg_info = $self->get_migration_postgres_info($c);
+    $comparison->{migration_postgres}->{connection_status} = $pg_info->{connection_status};
+    $comparison->{migration_postgres}->{error}             = $pg_info->{error};
+    $comparison->{migration_postgres}->{databases}         = $pg_info->{databases} // [];
+    $comparison->{migration_postgres}->{host}              = $pg_info->{host};
+    if ($pg_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
     return $comparison;
 }
 
@@ -6748,6 +6783,105 @@ sub table_name_to_class_name {
     my $class_name = join '', map { ucfirst(lc($_)) } @words;
     
     return $class_name;
+}
+
+# Connect to the new MySQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_mysql_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+    my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'root';
+    my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env (value from MYSQL_ROOT_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:mysql:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 5,
+        });
+
+        my $sth = $dbh->prepare("SHOW DATABASES");
+        $sth->execute();
+        my @databases;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name =~ /^(information_schema|performance_schema|sys|mysql)$/i;
+            my $tbl_sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?");
+            $tbl_sth->execute($db_name);
+            my ($table_count) = $tbl_sth->fetchrow_array();
+            push @databases, { name => $db_name, table_count => $table_count };
+        }
+        $dbh->disconnect();
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        $result->{error} = "MySQL connection failed: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_mysql_info', $result->{error});
+    };
+
+    return $result;
+}
+
+# Connect to the new PostgreSQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_postgres_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+    my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
+    my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env (value from POSTGRES_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:Pg:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+        });
+
+        my $sth = $dbh->prepare("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname");
+        $sth->execute();
+        my @databases;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name eq 'postgres';
+            push @databases, { name => $db_name, table_count => undef };
+        }
+        $dbh->disconnect();
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        $result->{error} = "PostgreSQL connection failed: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_postgres_info', $result->{error});
+    };
+
+    return $result;
 }
 
 # Helper method to determine Result file path
