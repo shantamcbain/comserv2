@@ -6785,56 +6785,29 @@ sub table_name_to_class_name {
     return $class_name;
 }
 
-# Read migration server config from db_config.json, with .env fallback for passwords
-sub get_migration_server_config {
-    my ($self, $c, $server_key) = @_;
-
-    my $config_file = $c->path_to('db_config.json')->stringify;
-    return undef unless -f $config_file;
-
-    my $json_text = eval { read_file($config_file) };
-    return undef if $@;
-
-    my $config = eval { decode_json($json_text) };
-    return undef if $@ || !$config->{$server_key};
-
-    my $entry = $config->{$server_key};
-
-    if ($entry->{password} && $entry->{password} =~ /^REPLACE_WITH_(.+)_FROM_ENV$/) {
-        my $env_key = $1;
-        my $env_file = '/opt/csc-db/.env';
-        if (-f $env_file) {
-            my $env_text = eval { read_file($env_file) };
-            unless ($@) {
-                if ($env_text =~ /^\Q$env_key\E\s*=\s*(.+)$/m) {
-                    $entry->{password} = $1;
-                    $entry->{password} =~ s/\s+$//;
-                }
-            }
-        }
-    }
-
-    return $entry;
-}
-
-# Connect to the new MySQL Docker server and return database/table information
+# Connect to the new MySQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
 sub get_migration_mysql_info {
     my ($self, $c) = @_;
 
-    my $cfg = $self->get_migration_server_config($c, 'migration_target_mysql');
-    unless ($cfg) {
-        return { connection_status => 'error', error => 'No migration_target_mysql config found in db_config.json', databases => [] };
-    }
+    my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+    my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'root';
+    my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
 
-    if ($cfg->{password} =~ /^REPLACE_WITH_/) {
-        return { connection_status => 'error', error => 'Password not configured — update migration_target_mysql.password in db_config.json or place credentials in /opt/csc-db/.env', databases => [] };
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env (value from MYSQL_ROOT_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
     }
 
     my $result = { connection_status => 'unknown', databases => [] };
 
     try {
-        my $dsn = "DBI:mysql:host=$cfg->{host};port=$cfg->{port}";
-        my $dbh = DBI->connect($dsn, $cfg->{username}, $cfg->{password}, {
+        my $dsn = "DBI:mysql:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
             RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 5,
         });
 
@@ -6852,7 +6825,7 @@ sub get_migration_mysql_info {
 
         $result->{connection_status} = 'connected';
         $result->{databases} = \@databases;
-        $result->{host} = "$cfg->{host}:$cfg->{port}";
+        $result->{host} = "$host:$port";
 
     } catch {
         $result->{connection_status} = 'error';
@@ -6863,24 +6836,29 @@ sub get_migration_mysql_info {
     return $result;
 }
 
-# Connect to the new PostgreSQL Docker server and return database/table information
+# Connect to the new PostgreSQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
 sub get_migration_postgres_info {
     my ($self, $c) = @_;
 
-    my $cfg = $self->get_migration_server_config($c, 'migration_target_postgres');
-    unless ($cfg) {
-        return { connection_status => 'error', error => 'No migration_target_postgres config found in db_config.json', databases => [] };
-    }
+    my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+    my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
+    my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
 
-    if ($cfg->{password} =~ /^REPLACE_WITH_/) {
-        return { connection_status => 'error', error => 'Password not configured — update migration_target_postgres.password in db_config.json or place credentials in /opt/csc-db/.env', databases => [] };
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env (value from POSTGRES_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
     }
 
     my $result = { connection_status => 'unknown', databases => [] };
 
     try {
-        my $dsn = "DBI:Pg:host=$cfg->{host};port=$cfg->{port}";
-        my $dbh = DBI->connect($dsn, $cfg->{username}, $cfg->{password}, {
+        my $dsn = "DBI:Pg:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
             RaiseError => 1, PrintError => 0, AutoCommit => 1,
         });
 
@@ -6895,7 +6873,7 @@ sub get_migration_postgres_info {
 
         $result->{connection_status} = 'connected';
         $result->{databases} = \@databases;
-        $result->{host} = "$cfg->{host}:$cfg->{port}";
+        $result->{host} = "$host:$port";
 
     } catch {
         $result->{connection_status} = 'error';
