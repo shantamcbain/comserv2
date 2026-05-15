@@ -1,0 +1,25 @@
+[Unit]
+Description=Comserv Health Monitor (workstation)
+After=network-online.target comserv-workstation.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=shanta
+WorkingDirectory=/home/shanta/PycharmProjects/comserv2/Comserv
+Environment=SYSTEM_IDENTIFIER=workstation:3001
+Environment=HEALTH_CHECK_INTERVAL=60
+Environment=HEALTH_DISK_THRESHOLD=90
+Environment=DB_HOST=192.168.1.198
+Environment=DB_NAME=ency
+Environment=COMSERV_LOG_DIR=/home/shanta/PycharmProjects/comserv2/Comserv/logs
+ExecStart=/home/shanta/perl5/perlbrew/perls/perl-5.40.0/bin/perl script/ContainerHealthMonitor.pl
+Restart=on-failure
+RestartSec=30
+StandardOutput=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/health-monitor.log
+StandardError=append:/home/shanta/PycharmProjects/comserv2/Comserv/logs/health-monitor.log
+TimeoutStartSec=60
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
