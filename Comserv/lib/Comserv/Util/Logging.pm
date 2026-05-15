@@ -581,9 +581,15 @@ sub log_error {
 # Send an error notification via email
 sub send_error_notification {
     my ($self, $c, $subject, $error_details) = @_;
-    
+
     my $system_id = __PACKAGE__->get_system_identifier();
     $subject = "[$system_id] $subject";
+
+    if ($ENV{EMAIL_NOTIFICATIONS_DISABLED}) {
+        _print_log("[EMAIL-DISABLED] notifications suppressed by EMAIL_NOTIFICATIONS_DISABLED: $subject");
+        return;
+    }
+
     return if $self->{_sending_email};
     local $self->{_sending_email} = 1;
 
