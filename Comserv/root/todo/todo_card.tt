@@ -103,6 +103,24 @@
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
       [% END %]
 
+      [%# Todo type badge (appointment / meeting / event / reminder) %]
+      [% SET _tc_type = tc.todo_type || 'task' %]
+      [% IF _tc_type == 'appointment' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#0d6efd;color:#fff;" title="Appointment">📌</span>
+      [% ELSIF _tc_type == 'meeting' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#6610f2;color:#fff;" title="Meeting">🤝</span>
+      [% ELSIF _tc_type == 'event' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#d63384;color:#fff;" title="Event">🎂</span>
+      [% ELSIF _tc_type == 'reminder' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#fd7e14;color:#fff;" title="Reminder">🔔</span>
+      [% END %]
+
+      [%# Recurring badge — DB flag authoritative, fall back to subject keyword %]
+      [% SET _tc_subj_l = tc.subject.lower %]
+      [% IF tc.is_recurring OR _tc_subj_l.match('lunch') OR _tc_subj_l.match('break') OR _tc_subj_l.match('standup') %]
+      <span style="flex-shrink:0;font-size:0.72em;" title="[% tc.recurrence_rule || 'recurring' %]">🔁</span>
+      [% END %]
+
       [%# Stale badge %]
       [% IF tc_is_stale %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#fd7e14;color:#fff;" title="No activity for [% tc_stale_days %] days">⏳ [% tc_stale_days %]d</span>

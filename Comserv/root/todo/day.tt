@@ -342,6 +342,24 @@
 [% END %]
 
 <script>
+function convertMeetingTimes() {
+    var viewerTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    document.querySelectorAll('.todo-item-day[data-creator-tz][data-time]').forEach(function(el) {
+        var creatorTZ = el.getAttribute('data-creator-tz');
+        var timeStr   = el.getAttribute('data-time');
+        var dateStr   = el.getAttribute('data-date') || '[% date %]';
+        if (!creatorTZ || creatorTZ === viewerTZ) return;
+        try {
+            var dt = new Date(dateStr + 'T' + timeStr);
+            var localTime = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: viewerTZ });
+            var creatorTime = dt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', timeZone: creatorTZ });
+            var badge = el.querySelector('.tz-badge');
+            if (badge) badge.textContent = localTime + ' (your time)';
+        } catch(e) {}
+    });
+}
+document.addEventListener('DOMContentLoaded', convertMeetingTimes);
+
 function savePriority(sel) {
     var recordId = sel.getAttribute('data-record-id');
     var newPriority = sel.value;
@@ -641,10 +659,14 @@ function _updateDaySiteSummary() {
                             [% SET _min_h = (_est_mins / 60) * 40 %]
                             [% IF _min_h < 28 %][% SET _min_h = 28 %][% END %]
                             [% IF _min_h > 320 %][% SET _min_h = 320 %][% END %]
+                            [% SET _subj_l2 = todo.subject.lower %]
+                            [% SET _is_rec = (todo.is_recurring OR _subj_l2.match('lunch') OR _subj_l2.match('break') OR _subj_l2.match('standup')) ? '1' : '0' %]
                             <div class="todo-item-day todo-item-shared priority-[% _tp %]"
                                  data-todo-id="[% todo.record_id %]"
                                  data-priority="[% _tp %]"
                                  data-site="[% _ts %]"
+                                 data-is-recurring="[% _is_rec %]"
+                                 [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]" data-time="[% todo.time_of_day || '00:00:00' %]" data-date="[% date %]"[% END %]
                                  style="display:flex;align-items:flex-start;gap:5px;padding:5px 7px;margin-bottom:4px;border-radius:4px;box-sizing:border-box;min-height:[% _min_h %]px;min-width:0;position:relative;[% IF _done %]opacity:0.55;background:var(--bg-secondary,#f0f0f0);border:1px dashed var(--border-color,#bbb);[% ELSIF todo.status == 2 %]background:color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff));border:1px solid var(--border-color,#ddd);[% ELSE %]background:var(--bg-color,#fff);border:1px solid var(--border-color,#ddd);[% END %]">
 
                                 [%# Col 1: drag handle + priority select %]
@@ -667,8 +689,14 @@ function _updateDaySiteSummary() {
                                         <span style="flex-shrink:0;font-size:0.65em;font-weight:bold;padding:1px 4px;border-radius:3px;background:var(--primary-color,#4CAF50);color:#fff;">[% _ts %]</span>
                                         [% END %]
                                         [% SET _subj_l = todo.subject.lower %]
-                                        [% IF _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup') %]
-                                        <span style="flex-shrink:0;font-size:0.72em;" title="Recurring">🔁</span>
+                                        [% IF todo.is_recurring OR _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup') %]
+                                        <span style="flex-shrink:0;font-size:0.72em;" title="[% todo.recurrence_rule || 'recurring' %]">🔁</span>
+                                        [% END %]
+                                        [% SET _ttype = todo.todo_type || 'task' %]
+                                        [% IF _ttype == 'appointment' %]<span style="flex-shrink:0;font-size:0.68em;" title="Appointment">📌</span>
+                                        [% ELSIF _ttype == 'meeting' %]<span style="flex-shrink:0;font-size:0.68em;" title="Meeting">🤝</span>
+                                        [% ELSIF _ttype == 'event' %]<span style="flex-shrink:0;font-size:0.68em;" title="Event">🎂</span>
+                                        [% ELSIF _ttype == 'reminder' %]<span style="flex-shrink:0;font-size:0.68em;" title="Reminder">🔔</span>
                                         [% END %]
                                         <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:bold;font-size:0.87em;color:var(--text-color,#333);[% IF _done %]text-decoration:line-through;color:var(--text-muted-color,#888);[% END %]"
                                               title="[% todo.subject | html %]">

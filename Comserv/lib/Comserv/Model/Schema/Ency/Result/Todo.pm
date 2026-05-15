@@ -178,6 +178,28 @@ __PACKAGE__->add_columns(
         size        => [10, 4],
         is_nullable => 1,
     },
+    todo_type => {
+        data_type     => 'varchar',
+        size          => 20,
+        is_nullable   => 0,
+        default_value => 'task',
+    },
+    is_recurring => {
+        data_type     => 'tinyint',
+        size          => 1,
+        is_nullable   => 0,
+        default_value => 0,
+    },
+    recurrence_rule => {
+        data_type   => 'varchar',
+        size        => 100,
+        is_nullable => 1,
+    },
+    creator_timezone => {
+        data_type   => 'varchar',
+        size        => 50,
+        is_nullable => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('record_id');

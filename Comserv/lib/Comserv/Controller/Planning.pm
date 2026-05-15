@@ -141,11 +141,14 @@ sub daily :Path('/planning/daily') :Args {
                     my $due   = length($due_raw)   >= 10 ? substr($due_raw,   0, 10) : '';
 
                     my $is_done    = exists $_done_set{ $todo->status // '' };
-                    my $is_recurr  = ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+                    my $is_recurr  = ($todo->can('is_recurring') && $todo->is_recurring)
+                        || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
                     my $anchor     = $start || $due || '';
 
                     if ($is_recurr && !$is_done) {
-                        push @$todos_for_today, $todo;
+                        my $rec_sd = $start || '';
+                        push @$todos_for_today, $todo
+                            if !$rec_sd || $rec_sd le $selected_date;
                     } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
