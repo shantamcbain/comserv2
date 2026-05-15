@@ -1126,6 +1126,40 @@ POST /todo/update_priority - Update priority for a todo item (AJAX endpoint for 
 
 =cut
 
+sub update_status :Path('/todo/update_status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id = $c->request->params->{record_id};
+    my $status    = $c->request->params->{status};
+
+    unless ($record_id && defined $status) {
+        $c->stash(json => { success => 0, error => 'Missing record_id or status' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    eval { $todo->update({ status => $status }) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_status',
+            "Failed to update status for todo $record_id: $@");
+        $c->stash(json => { success => 0, error => "Failed to update: $@" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+        "Updated status for todo $record_id to $status");
+    $c->stash(json => { success => 1, todo_id => $record_id, new_status => $status });
+    $c->forward('View::JSON');
+}
+
 sub update_priority :Path('/todo/update_priority') :Args(0) {
     my ($self, $c) = @_;
 
