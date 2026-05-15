@@ -9601,7 +9601,7 @@
          "description": "How to connect Schema Compare to the new MySQL and PostgreSQL servers on 192.168.1.20 for migration planning. Covers navigation, setting passwords via the Admin UI, verifying connections, and troubleshooting.",
          "format": "template",
          "last_scanned": "Thu May 15 14:00:00 2026",
-         "path": "Documentation/admin/migration-server-database-setup.tt",
+         "path": "Documentation/migration-server-database-setup.tt",
          "roles": [
             "admin",
             "developer"
