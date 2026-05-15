@@ -101,9 +101,16 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
 
-        # Recurring events (break/lunch/standup) always appear in any single-day view
-        if (!$is_done && $start_date eq $end_date && _is_recurring($todo->subject // '')) {
-            $include_todo = 1;
+        # Recurring events always appear in any single-day view (DB flag is authoritative;
+        # fall back to keyword match for rows that pre-date the migration).
+        # Respect start_date: only inject if the recurring todo has no start_date
+        # OR its start_date <= the view date (so exceptions pushed to "tomorrow" stop appearing today).
+        if (!$is_done && $start_date eq $end_date
+            && ($todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // ''))) {
+            my $rec_start = $sd;
+            if (!$rec_start || $rec_start le $start_date) {
+                $include_todo = 1;
+            }
         }
 
         $include_todo;
@@ -766,6 +773,10 @@ sub modify :Path('/todo/modify') :Args(1) {
             user_id              => $todo->get_column('user_id'),
             project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
             date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
+            todo_type        => $form_data->{todo_type}        || $todo->get_column('todo_type')        || 'task',
+            is_recurring     => defined($form_data->{is_recurring}) ? ($form_data->{is_recurring} ? 1 : 0) : $todo->get_column('is_recurring'),
+            recurrence_rule  => $form_data->{recurrence_rule}  || $todo->get_column('recurrence_rule')  || undef,
+            creator_timezone => $form_data->{creator_timezone} || $todo->get_column('creator_timezone') || undef,
         });
     };
     if ($@) {
@@ -1016,6 +1027,10 @@ sub create :Local {
         date_time_posted => $params->{date_time_posted} || $current_date,
         billable   => defined($params->{billable})   ? ($params->{billable}   ? 1 : 0) : 1,
         point_rate => ($params->{point_rate} && $params->{point_rate} =~ /^\d+(\.\d+)?$/) ? $params->{point_rate} : undef,
+        todo_type        => $params->{todo_type}        || 'task',
+        is_recurring     => $params->{is_recurring}     ? 1 : 0,
+        recurrence_rule  => $params->{recurrence_rule}  || undef,
+        creator_timezone => $params->{creator_timezone} || undef,
     };
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
@@ -1117,6 +1132,112 @@ sub update_time :Path('/todo/update_time') :Args(0) {
             new_time => $time_of_day
         }
     );
+    $c->forward('View::JSON');
+}
+
+=head2 update_recurring_time
+
+POST /todo/update_recurring_time - Move a recurring event to a new time slot.
+mode=today  : Creates a non-recurring exception clone for exception_date/time_of_day;
+              shifts original's start_date to the day after exception_date so the
+              original no longer appears on that date.
+mode=all    : Updates time_of_day (and optionally start_date) on the original record.
+
+=cut
+
+sub update_recurring_time :Path('/todo/update_recurring_time') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id      = $c->request->params->{record_id};
+    my $time_of_day    = $c->request->params->{time_of_day};
+    my $mode           = $c->request->params->{mode} // 'all';
+    my $exception_date = $c->request->params->{exception_date};
+
+    unless ($record_id && $time_of_day) {
+        $c->stash(json => { success => 0, error => 'Missing record_id or time_of_day' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $today = DateTime->now->ymd;
+    my $target_date = $exception_date || $today;
+
+    if ($mode eq 'today') {
+        eval {
+            $schema->txn_do(sub {
+                my $next_day_dt = DateTime->new(
+                    year  => substr($target_date, 0, 4),
+                    month => substr($target_date, 5, 2),
+                    day   => substr($target_date, 8, 2),
+                )->add(days => 1);
+                my $next_day = $next_day_dt->ymd;
+
+                $schema->resultset('Todo')->create({
+                    sitename            => $todo->sitename,
+                    subject             => $todo->subject,
+                    description         => $todo->description // '',
+                    status              => $todo->status,
+                    priority            => $todo->priority // 5,
+                    start_date          => $target_date,
+                    time_of_day         => $time_of_day,
+                    due_date            => $todo->due_date,
+                    estimated_man_hours => $todo->estimated_man_hours // 0,
+                    project_id          => $todo->project_id,
+                    project_code        => $todo->project_code // '',
+                    developer           => $todo->developer // '',
+                    owner               => $todo->owner // '',
+                    reporter            => $todo->reporter // '',
+                    username_of_poster  => $todo->username_of_poster // '',
+                    user_id             => $todo->user_id,
+                    group_of_poster     => $todo->group_of_poster // 'user',
+                    accumulative_time   => 0,
+                    billable            => $todo->billable // 1,
+                    is_blocking         => 0,
+                    todo_type           => $todo->todo_type // 'appointment',
+                    is_recurring        => 0,
+                    recurrence_rule     => undef,
+                    creator_timezone    => $todo->creator_timezone,
+                    last_mod_by         => 'recurring_exception',
+                    last_mod_date       => $today,
+                    date_time_posted    => $today,
+                    company_code        => $todo->company_code // 'default',
+                    share               => $todo->share // 0,
+                    parent_todo         => $todo->record_id,
+                    comments            => 'Exception from recurring event ' . $record_id,
+                });
+
+                $todo->update({ start_date => $next_day, last_mod_date => $today });
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'update_recurring_time', "today-mode error: $@");
+            $c->stash(json => { success => 0, error => "$@" });
+            $c->forward('View::JSON');
+            return;
+        }
+    } else {
+        my %upd = (time_of_day => $time_of_day, last_mod_date => $today);
+        $upd{start_date} = $target_date if $exception_date;
+        eval { $todo->update(\%upd) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'update_recurring_time', "all-mode error: $@");
+            $c->stash(json => { success => 0, error => "$@" });
+            $c->forward('View::JSON');
+            return;
+        }
+    }
+
+    $c->stash(json => { success => 1, mode => $mode, todo_id => $record_id });
     $c->forward('View::JSON');
 }
 
@@ -1423,7 +1544,8 @@ sub day :Path('/todo/day') :Args {
         my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
         my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
         my $anchor = $sd || $dd || '';
-        if (!$is_done && $anchor && $anchor lt $date && !_is_recurring($todo->subject // '')) {
+        my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+        if (!$is_done && $anchor && $anchor lt $date && !$is_rec) {
             push @overdue_todos, $todo;
         } else {
             push @today_todos, $todo;
@@ -2199,8 +2321,11 @@ sub reschedule :Path('reschedule') :Args(0) {
             : ($now_total_min >= $WORK_END_MIN ? $WORK_DAY_MINS : 0);
 
         for my $todo (@rows) {
-            # Skip recurring events — they are fixed appointments, never rescheduled.
-            next if _is_recurring($todo->subject // '');
+            # Skip recurring events and appointments — fixed in time, never rescheduled.
+            # DB flag is authoritative; keyword match is a fallback for un-migrated rows.
+            my $skip_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+            my $skip_appt = $todo->can('todo_type') && ($todo->todo_type // 'task') eq 'appointment';
+            next if $skip_rec || $skip_appt;
 
             # estimated_man_hours is stored as MINUTES (integer).
             # When 0 or not set, use log actuals or subject-based heuristic.
