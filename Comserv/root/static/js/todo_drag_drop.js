@@ -317,23 +317,25 @@ function initMonthViewDragAndDrop() {
 function updateTodoTime(todoId, newTime) {
     fetch('/todo/update_time', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: 'record_id=' + encodeURIComponent(todoId) + '&time_of_day=' + encodeURIComponent(newTime)
     })
-    .then(response => response.json())
+    .then(function(r) {
+        if (!r.ok) { console.error('update_time HTTP error:', r.status); throw new Error('HTTP ' + r.status); }
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
-            // Reload the page to show updated position
             window.location.reload();
         } else {
+            console.error('update_time failed:', data.error);
             alert('Failed to update todo time: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
         console.error('Error updating todo time:', error);
-        alert('Failed to update todo time');
+        alert('Failed to update todo time: ' + error);
     });
 }
 
@@ -343,25 +345,27 @@ function updateTodoTime(todoId, newTime) {
 function updateTodoTimeAndDate(todoId, newTime, newDate) {
     fetch('/todo/update_time_and_date', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'record_id=' + encodeURIComponent(todoId) + 
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'record_id=' + encodeURIComponent(todoId) +
               '&time_of_day=' + encodeURIComponent(newTime) +
               '&start_date=' + encodeURIComponent(newDate)
     })
-    .then(response => response.json())
+    .then(function(r) {
+        if (!r.ok) { console.error('update_time_and_date HTTP error:', r.status); throw new Error('HTTP ' + r.status); }
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
-            // Reload the page to show updated position
             window.location.reload();
         } else {
+            console.error('update_time_and_date failed:', data.error);
             alert('Failed to update todo: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
         console.error('Error updating todo:', error);
-        alert('Failed to update todo');
+        alert('Failed to update todo: ' + error);
     });
 }
 
@@ -371,25 +375,27 @@ function updateTodoTimeAndDate(todoId, newTime, newDate) {
 function updateTodoTimeAndDateBoth(todoId, newTime, newDate) {
     fetch('/todo/update_display_date', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: 'record_id=' + encodeURIComponent(todoId) + 
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'record_id=' + encodeURIComponent(todoId) +
               '&time_of_day=' + encodeURIComponent(newTime) +
               '&display_date=' + encodeURIComponent(newDate)
     })
-    .then(response => response.json())
+    .then(function(r) {
+        if (!r.ok) { console.error('update_display_date HTTP error:', r.status); throw new Error('HTTP ' + r.status); }
+        return r.json();
+    })
     .then(data => {
         if (data.success) {
-            // Reload the page to show updated position
             window.location.reload();
         } else {
+            console.error('update_display_date failed:', data.error);
             alert('Failed to update todo: ' + (data.error || 'Unknown error'));
         }
     })
     .catch(error => {
         console.error('Error updating todo:', error);
-        alert('Failed to update todo');
+        alert('Failed to update todo: ' + error);
     });
 }
 
