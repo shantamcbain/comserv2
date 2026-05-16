@@ -111,22 +111,34 @@ sub get_all_todos_for_calendar {
         return [];
     }
 
-    $SiteName = $c->session->{'SiteName'};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
-        "Fetching all todos for calendar views. Site name: $SiteName");
+    my $session_site = $c->session->{'SiteName'};
 
-    # Get a DBIx::Class::Schema object
+    my @site_names;
+    if (ref $SiteName eq 'ARRAY' && scalar @$SiteName) {
+        @site_names = @$SiteName;
+    } elsif ($SiteName && !ref $SiteName) {
+        @site_names = ($SiteName);
+    } else {
+        @site_names = ($session_site);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar',
+        "Fetching todos for calendar views. Sites: " . join(', ', @site_names));
+
     my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 
     my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     require DateTime;
     my $cutoff_date = DateTime->now->subtract(days => 30)->ymd;
+
+    my %site_cond = @site_names == 1
+        ? (sitename => $site_names[0])
+        : (sitename => { -in => \@site_names });
+
     my @todos = $rs->search(
         {
-            sitename => $SiteName,
+            %site_cond,
             -or => [
                 { status => { -not_in => \@done_statuses } },
                 {
