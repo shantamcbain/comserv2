@@ -440,6 +440,9 @@ sub daily :Path('/planning/daily') :Args {
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
+            next if ($h{todo_type} // '') =~ /^(appointment|event)$/i;
+            next if ($h{is_recurring} // 0);
+
             my $st          = $h{status} // '';
             my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
             my $status_tier = $in_progress ? 0 : 1;
