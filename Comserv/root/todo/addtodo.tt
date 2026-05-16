@@ -91,6 +91,19 @@ function onRecurringChange(cb) {
     var wrap = document.getElementById('recurrence-rule-wrap');
     if (wrap) wrap.style.display = cb.checked ? '' : 'none';
 }
+function syncDur() {
+    var h = parseInt(document.getElementById('est_h').value) || 0;
+    var m = parseInt(document.getElementById('est_m').value) || 0;
+    document.getElementById('estimated_man_hours').value = h * 60 + m;
+}
+(function initDur() {
+    var raw = parseInt('[% todo.estimated_man_hours || 30 %]') || 30;
+    var hEl = document.getElementById('est_h');
+    var mEl = document.getElementById('est_m');
+    if (hEl) hEl.value = Math.floor(raw / 60);
+    if (mEl) mEl.value = raw % 60;
+    syncDur();
+})();
 (function populateTimezones() {
     var sel = document.getElementById('creator_timezone');
     if (!sel || !Intl || !Intl.supportedValuesOf) return;
@@ -110,7 +123,7 @@ function onRecurringChange(cb) {
 
 <h1>Add a New To-do Item</h1>
 
-<form action="/todo/create" method="post">
+<form action="/todo/create" method="post" onsubmit="syncDur()">
     <input type="hidden" name="return_to" value="[% return_to %]">
     <!-- record_id is auto-increment, no need for manual input -->
     <div>
@@ -188,12 +201,15 @@ function onRecurringChange(cb) {
         <textarea id="description" name="description">[% todo.description OR '' %]</textarea>
     </div>
     <div>
-        <label for="estimated_man_hours">Estimated Man Hours:</label>
-        <select id="estimated_man_hours" name="estimated_man_hours">
-        [% FOREACH hour IN [1..24] %]
-        <option value="[% hour %]" [% IF hour == todo.estimated_man_hours %]selected[% END %]>[% hour %]</option>
-        [% END %]
-        </select>
+        <label>Duration:</label>
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <input type="number" id="est_h" min="0" max="99" value="0"
+                   style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> h
+            <input type="number" id="est_m" min="0" max="59" value="30"
+                   style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> min
+            <input type="hidden" id="estimated_man_hours" name="estimated_man_hours" value="30">
+            <small style="color:var(--text-muted-color,#888);margin-left:4px;">stored as minutes</small>
+        </span>
     </div>
     <div>
         <label for="accumulative_time">Accumulative Time:</label>
