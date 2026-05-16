@@ -2243,12 +2243,14 @@ sub _is_recurring {
 sub _estimate_mins_heuristic {
     my ($subject) = @_;
     my $s = lc($subject // '');
+    return 15  if $s =~ /morning.break|afternoon.break|\bbreak\b/;
+    return 60  if $s =~ /\blunch\b/;
     return 15  if $s =~ /audit|morning audit|check|verify|review|standup|daily standup/;
-    return 30  if $s =~ /lunch|break|meeting|call|discuss|triage/;
+    return 30  if $s =~ /meeting|call|discuss|triage/;
     return 60  if $s =~ /fix|debug|investigate|diagnose|resolve|test|patch/;
     return 120 if $s =~ /design|plan|spec|document|write|research|analyse|analyze/;
     return 240 if $s =~ /implement|build|create|develop|integrate|refactor|migration/;
-    return 60;
+    return 30;
 }
 
 sub reschedule :Path('reschedule') :Args(0) {
@@ -2444,7 +2446,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                     $est_from_log = 1;
                 }
             }
-            $est_mins = 1 if $est_mins < 1;   # minimum 1 minute per task
+            $est_mins = 5 if $est_mins < 5;   # minimum 5 minutes per task (read + evaluate + log overhead)
 
             # Advance to next day if current day can't fit this todo
             if ($cur_slot_min > 0 && $cur_slot_min + $est_mins > $WORK_DAY_MINS) {
