@@ -546,7 +546,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             <div class="calendar-cell month-day-cell [% IF is_today %]today[% END %]" data-day-name="[% day_name %]" data-date="[% cell.date %]" [% IF is_today %]id="today-cell"[% END %]>
                 <div class="day-number">
-                    <a href="[% IF is_daily_plan %][% base_url %]/[% cell.date %][% planning_hash %][% ELSE %]/todo/day/[% cell.date %][% url_hash %][% END %]" title="View day details for [% cell.date %]">[% cell.day %]</a>
+                    <a href="#" onclick="showMonthDayModal('[% cell.date %]',event)" title="View day schedule for [% cell.date %]">[% cell.day %]</a>
                 </div>
                 
                 <div class="todos-container" style="max-height: 120px; overflow-y: auto;" data-date="[% cell.date %]">
@@ -644,3 +644,32 @@ document.addEventListener('DOMContentLoaded', function() {
     <a href="/todo/month/[% next_month_date %][% url_hash %]">Next Month</a>
 </div>
 [% END %]
+
+<div id="month-day-modal" onclick="if(event.target===this)closeMonthDayModal()" style="display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(960px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:2px solid #4CAF50;background:#f8f9fa;flex-shrink:0;">
+            <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
+            <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
+        </div>
+        <div id="month-day-modal-body" style="flex:1;overflow:auto;padding:8px;"></div>
+    </div>
+</div>
+<script>
+function showMonthDayModal(dateStr, event) {
+    event.preventDefault();
+    document.getElementById('month-day-modal-title').textContent = dateStr;
+    var body = document.getElementById('month-day-modal-body');
+    body.innerHTML = '<p style="padding:20px;color:#888;">Loading day schedule for ' + dateStr + '...</p>';
+    fetch('/todo/day/' + dateStr + '?embed=1', { credentials: 'same-origin' })
+        .then(function(r) { return r.text(); })
+        .then(function(html) { body.innerHTML = html; })
+        .catch(function() { body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view.</p>'; });
+    document.getElementById('month-day-modal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeMonthDayModal() {
+    document.getElementById('month-day-modal').style.display = 'none';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeMonthDayModal(); });
+</script>

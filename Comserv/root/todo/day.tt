@@ -1032,13 +1032,13 @@ document.addEventListener('DOMContentLoaded', function() {
 <div class="gcal-wrapper" id="daily-schedule">
 
 [% UNLESS include_mode %]
-<div class="gcal-day-nav">
+<div class="gcal-day-nav" style="flex-wrap:nowrap;overflow-x:auto;">
     [% IF is_daily_plan %]
     <a class="gcal-today-btn" href="[% base_url %]/[% today || date %][% day_hash %]">Today</a>
     <a class="gcal-nav-btn" href="[% base_url %]/[% previous_date %][% day_hash %]">&#8249;</a>
     <span class="gcal-date-label">[% date %]</span>
     <a class="gcal-nav-btn" href="[% base_url %]/[% next_date %][% day_hash %]">&#8250;</a>
-    <select class="gcal-view-select" onchange="window.location=this.value">
+    <select class="gcal-view-select" onchange="window.location=this.value" style="margin-left:0;">
         <option value="[% base_url %]/[% date %][% day_hash %]" selected>Day</option>
         <option value="[% base_url %]/[% date %][% week_hash %]">Week</option>
         <option value="[% base_url %]/[% date %][% month_hash %]">Month</option>
@@ -1049,20 +1049,15 @@ document.addEventListener('DOMContentLoaded', function() {
     <span class="gcal-date-label">[% date %]</span>
     <a class="gcal-nav-btn" href="/todo/day/[% next_date %]">&#8250;</a>
     <a class="gcal-nav-btn" href="/todo/addtodo" style="margin-left:4px;">+ New</a>
-    <select class="gcal-view-select" onchange="window.location=this.value">
+    <select class="gcal-view-select" onchange="window.location=this.value" style="margin-left:0;">
         <option value="/todo/day/[% date %]" selected>Day</option>
         <option value="/todo/week/[% date %]">Week</option>
         <option value="/todo/month/[% date %]">Month</option>
         <option value="/todo">List</option>
     </select>
     [% END %]
-</div>
-[% END %]
-
-[% UNLESS include_mode %]
-<div style="display:flex;flex-direction:row;align-items:center;gap:8px;padding:4px 8px;background:var(--bg-secondary,#f1f3f4);border-bottom:1px solid var(--border-color,#ddd);flex-wrap:nowrap;overflow-x:auto;">
     [% IF ap_all_sitenames.size > 0 %]
-    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;flex-shrink:0;">Site:</label>
+    <span style="font-size:0.82em;color:#70757a;white-space:nowrap;margin-left:8px;flex-shrink:0;">Site:</span>
     <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH sname IN ap_all_sitenames %]
@@ -1070,7 +1065,7 @@ document.addEventListener('DOMContentLoaded', function() {
         [% END %]
     </select>
     [% END %]
-    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;flex-shrink:0;">User:</label>
+    <span style="font-size:0.82em;color:#70757a;white-space:nowrap;flex-shrink:0;">User:</span>
     <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH uname IN ap_all_usernames %]
