@@ -657,8 +657,10 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $edit_sites = [];
     if ($edit_is_csc) {
         eval {
-            my $site_model = $c->model('Site');
-            $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
+            my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $edit_sites = \@site_rows;
         };
     }
 
@@ -2684,6 +2686,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                     if $days_stale > 180;
             }
 
+            my $new_due_date;
             if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                 my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
@@ -2718,6 +2721,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                 last_mod_by      => 'reschedule',
                 last_mod_date    => $today,
             );
+            $update{due_date} = $new_due_date if $new_due_date;
 
             eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
