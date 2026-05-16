@@ -201,39 +201,39 @@ sub daily :Path('/planning/daily') :Args {
         }
     }
 
-    # Precompute pixel positions for day-view grid (1px per minute, grid starts at 5 AM = 300 min)
-    my $GRID_START_MIN = 5 * 60;  # 300
-    my %todo_meta;
+    # Convert todos_for_today to plain hashrefs with precomputed display fields.
+    # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
+    # column access, and lets us embed top_px/height/start_min/time_lbl directly.
+    my $GRID_START_MIN = 5 * 60;  # 300 — grid starts at 5 AM
+    my @todos_display;
     for my $todo (@$todos_for_today) {
-        my $rid = $todo->record_id;
-        my $tod = $todo->time_of_day;
-        $tod = ref($tod) ? sprintf('%02d:%02d:00', $tod->hours // 0, $tod->minutes // 0)
-                         : ("$tod" || '09:00:00');
-        my ($h, $m) = (0, 0);
+        my %row = $todo->get_columns;
+
+        my $tod = $row{time_of_day} // '';
+        $tod = ref($tod) ? sprintf('%02d:%02d:00', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+        my ($h, $m) = (9, 0);
         if ($tod =~ /^(\d{1,2}):(\d{2})/) { $h = int($1); $m = int($2); }
-        else { $h = 9; $m = 0; }
+
         my $start_min = $h * 60 + $m;
-        my $est_mins  = $todo->estimated_man_hours // 0;
+        my $est_mins  = $row{estimated_man_hours} // 0;
         $est_mins = 30 unless $est_mins > 0;
+
         my $top_px = $start_min - $GRID_START_MIN;
         $top_px = 0    if $top_px < 0;
         $top_px = 1000 if $top_px > 1000;
         my $height = $est_mins < 30 ? 30 : $est_mins;
         $height = 900 if $height > 900;
         my $end_min = $start_min + $est_mins;
-        $todo_meta{$rid} = {
-            top_px    => $top_px,
-            height    => $height,
-            start_min => $start_min,
-            est_mins  => $est_mins,
-            sh        => $h,
-            sm        => $m,
-            eh        => int($end_min / 60) % 24,
-            em        => $end_min % 60,
-            time_lbl  => sprintf('%02d:%02d-%02d:%02d', $h, $m, int($end_min/60)%24, $end_min%60),
-        };
+
+        $row{top_px}    = $top_px;
+        $row{height}    = $height;
+        $row{start_min} = $start_min;
+        $row{est_mins}  = $est_mins;
+        $row{time_lbl}  = sprintf('%02d:%02d-%02d:%02d', $h, $m,
+                              int($end_min/60) % 24, $end_min % 60);
+        push @todos_display, \%row;
     }
-    $c->stash->{todo_meta} = \%todo_meta;
+    $todos_for_today = \@todos_display;
 
     # Month calendar grid
     my @calendar;
