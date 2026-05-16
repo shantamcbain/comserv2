@@ -2433,19 +2433,17 @@ sub reschedule :Path('reschedule') :Args(0) {
             next if $skip_rec || $skip_appt;
 
             # estimated_man_hours is stored as MINUTES (integer).
-            # When 0 or not set, use log actuals or subject-based heuristic.
-            # A todo with estimated_man_hours = 5 gets 5 minutes in the schedule.
-            my $est_mins = $todo->estimated_man_hours // 0;
-            my $est_from_log = 0;
-            if (!$est_mins) {
-                if (exists $log_duration_mins{ $todo->record_id }) {
-                    $est_mins    = $log_duration_mins{ $todo->record_id };
-                    $est_from_log = 1;
-                } else {
-                    $est_mins    = _estimate_mins_heuristic($todo->subject // '');
-                    $est_from_log = 1;
-                }
+            # Always compute heuristic from logs + subject keyword to get a realistic estimate.
+            # Use max(stored, heuristic) so user-set values above heuristic are respected,
+            # but previously auto-set minimums (e.g. 5 min) get bumped to realistic values.
+            my $stored_mins   = $todo->estimated_man_hours // 0;
+            my $heuristic_mins;
+            if (exists $log_duration_mins{ $todo->record_id }) {
+                $heuristic_mins = int($log_duration_mins{ $todo->record_id } + 0.5);
+            } else {
+                $heuristic_mins = _estimate_mins_heuristic($todo->subject // '');
             }
+            my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
             $est_mins = 5 if $est_mins < 5;   # minimum 5 minutes per task (read + evaluate + log overhead)
 
             # Advance to next day if current day can't fit this todo
