@@ -184,16 +184,24 @@
 function showDayModal(dateStr, dayLabel, event) {
     event.preventDefault();
     document.getElementById('day-modal-title').textContent = dayLabel;
-    var iframe = document.getElementById('day-modal-iframe');
-    iframe.src = '/todo/day/' + dateStr + '?embed=1';
+    var body = document.getElementById('day-modal-body');
+    if (!body) return;
+    body.innerHTML = '';
+    var col = document.querySelector('.week-day-column[data-date="' + dateStr + '"] .week-day-content');
+    if (col) {
+        var clone = col.cloneNode(true);
+        clone.style.maxHeight = '';
+        clone.style.overflowY = '';
+        body.appendChild(clone);
+    } else {
+        body.innerHTML = '<p style="padding:20px;color:#888;">No data found for ' + dateStr + '.</p>';
+    }
     document.getElementById('day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
 function closeDayModal() {
     document.getElementById('day-modal').style.display = 'none';
     document.body.style.overflow = '';
-    var iframe = document.getElementById('day-modal-iframe');
-    iframe.src = 'about:blank';
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDayModal(); });
 
@@ -378,6 +386,6 @@ document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
             <span id="day-modal-title" style="font-weight:bold;font-size:1em;"></span>
             <button onclick="closeDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
         </div>
-        <iframe id="day-modal-iframe" src="about:blank" style="border:none;flex:1;width:100%;"></iframe>
+        <div id="day-modal-body" style="flex:1;overflow:auto;padding:0;"></div>
     </div>
 </div>
