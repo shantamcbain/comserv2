@@ -451,7 +451,20 @@
         margin-bottom: 4px;
     }
 
-    /* Navigation styles removed - using shared todo_shared.css styles */
+    .gcal-ev .todo-popup {
+        display: none;
+        position: fixed;
+        background: var(--background-color, #fff);
+        border: 2px solid var(--primary-color, #4CAF50);
+        border-radius: 8px;
+        padding: 12px;
+        box-shadow: 0 6px 20px rgba(0,0,0,0.35);
+        z-index: 10000;
+        min-width: 300px;
+        max-width: 420px;
+        white-space: normal;
+        pointer-events: none;
+    }
 
     /* Responsive design */
     @media (max-width: 768px) {
@@ -1010,7 +1023,8 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="gcal-now-line" id="gcal-now-line" style="display:none;"><div class="gcal-now-dot"></div></div>
         <div class="gcal-drop-target-line" id="gcal-drop-line"></div>
 
-        [% FOREACH todo IN todos %]
+        [% SET gcal_todos = todos_for_today.size > 0 ? todos_for_today : todos %]
+        [% FOREACH todo IN gcal_todos %]
             [% SET tp       = todo.priority || 9 %]
             [% SET ts       = todo.sitename || '' %]
             [% SET tdev     = todo.developer || todo.username_of_poster || '' %]
