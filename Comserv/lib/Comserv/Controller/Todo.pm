@@ -2370,7 +2370,7 @@ sub reschedule :Path('reschedule') :Args(0) {
 
     require POSIX;
     my $now_epoch  = time();
-    my $today_dt   = DateTime->now;
+    my $today_dt   = DateTime->now(time_zone => 'local');
     my $today      = $today_dt->ymd;
     my $count      = 0;
     my @errors;

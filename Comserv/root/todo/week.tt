@@ -198,6 +198,61 @@ function closeDayModal() {
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') closeDayModal();
 });
+
+function initWeekColDragDrop() {
+    var GRID_START = 5 * 60;
+    document.querySelectorAll('.gcal-events-area-col').forEach(function(area) {
+        var colDate = area.getAttribute('data-date') || '';
+        var dropLine = area.querySelector('.gcal-drop-target-line');
+        var dragged = null;
+
+        area.querySelectorAll('.gcal-ev').forEach(function(el) {
+            el.setAttribute('draggable', 'true');
+            el.addEventListener('dragstart', function(e) {
+                if (e.target.closest('.gcal-ev-actions')) { e.preventDefault(); return; }
+                dragged = this;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            el.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                if (dropLine) dropLine.style.display = 'none';
+                dragged = null;
+            });
+        });
+
+        area.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (!dragged) return;
+            var relY = e.clientY - area.getBoundingClientRect().top;
+            var snapped = Math.round(relY / 15) * 15;
+            if (dropLine) { dropLine.style.top = snapped + 'px'; dropLine.style.display = 'block'; }
+        });
+        area.addEventListener('dragleave', function() {
+            if (dropLine) dropLine.style.display = 'none';
+        });
+        area.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (dropLine) dropLine.style.display = 'none';
+            if (!dragged) return;
+            var relY = e.clientY - area.getBoundingClientRect().top;
+            var snapped = Math.round(relY / 15) * 15;
+            var totalMin = GRID_START + Math.max(0, snapped);
+            var nh = Math.min(23, Math.floor(totalMin / 60));
+            var nm = totalMin % 60;
+            var newTime = String(nh).padStart(2,'0') + ':' + String(nm).padStart(2,'0') + ':00';
+            var todoId = dragged.getAttribute('data-todo-id');
+            var isRec  = dragged.getAttribute('data-is-recurring') === '1';
+            if (isRec) {
+                showRecurringDropDialog(todoId, newTime, colDate, true);
+            } else {
+                updateTodoTimeAndDate(todoId, newTime, colDate);
+                dragged.style.top = Math.max(0, snapped) + 'px';
+            }
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
 </script>
 
 <a id="week-view-anchor"></a>
