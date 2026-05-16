@@ -747,6 +747,7 @@ function initGcalDragDrop() {
     area.querySelectorAll('.gcal-ev').forEach(function(el) {
         el.setAttribute('draggable', 'true');
         el.addEventListener('dragstart', function(e) {
+            if (e.target.closest('.gcal-ev-actions')) { e.preventDefault(); return; }
             _gcalDragged = this;
             _gcalDragStartY = e.clientY;
             _gcalDragStartTop = parseInt(this.style.top) || 0;
@@ -757,6 +758,9 @@ function initGcalDragDrop() {
             this.classList.remove('dragging');
             if (dropLine) dropLine.style.display = 'none';
             _gcalDragged = null;
+        });
+        el.querySelectorAll('.gcal-ev-actions').forEach(function(acts) {
+            acts.addEventListener('dragstart', function(e) { e.stopPropagation(); e.preventDefault(); });
         });
     });
 
@@ -797,12 +801,10 @@ function initGcalDragDrop() {
             var durMin = parseInt(_gcalDragged.getAttribute('data-dur-min')) || 30;
             var eH = Math.floor((GRID_START + snapped + durMin) / 60);
             var eM = (GRID_START + snapped + durMin) % 60;
-            var metaEl = _gcalDragged.querySelector('.gcal-ev-meta');
-            if (metaEl) {
-                var tl = String(nh).padStart(2,'0') + ':' + String(nm).padStart(2,'0') +
-                         '–' + String(eH).padStart(2,'0') + ':' + String(eM).padStart(2,'0');
-                var old = metaEl.textContent.replace(/^\d{2}:\d{2}[^·]*/, '');
-                metaEl.textContent = tl + (old || '');
+            var timeEl = _gcalDragged.querySelector('.gcal-ev-time');
+            if (timeEl) {
+                timeEl.textContent = String(nh).padStart(2,'0') + ':' + String(nm).padStart(2,'0') +
+                                     '-' + String(eH).padStart(2,'0') + ':' + String(eM).padStart(2,'0');
             }
         }
     });
@@ -1087,13 +1089,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     <span class="gcal-ev-title">[% IF tdone %]&#10003; [% END %][% IF isrec %]&#x1F501; [% END %][% IF ttype == 'appointment' %]&#x1F4CC; [% ELSIF ttype == 'meeting' %]&#x1F91D; [% ELSIF ttype == 'event' %]&#x1F382; [% ELSIF ttype == 'reminder' %]&#x1F514; [% END %][% todo.subject %]</span>
                     [% IF ts %]<span class="gcal-ev-site">[% ts %]</span>[% END %]
                     [% IF tdev %]<span class="gcal-ev-user">[% tdev %]</span>[% END %]
-                    <div class="gcal-ev-actions">
-                        <select class="gcal-priority-sel" data-record-id="[% todo.record_id %]" data-orig="[% tp %]" onchange="savePriority(this)">
+                    <div class="gcal-ev-actions" draggable="false">
+                        <select class="gcal-priority-sel" draggable="false" data-record-id="[% todo.record_id %]" data-orig="[% tp %]" onchange="savePriority(this)">
                             [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]<option value="[% pv %]" [% IF pv == tp %]selected[% END %]>P[% pv %]</option>[% END %]
                         </select>
-                        <a class="gcal-ev-btn" href="/todo/details?record_id=[% todo.record_id %]">View</a>
-                        <a class="gcal-ev-btn" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS tdone %]<button class="gcal-ev-btn" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
+                        <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]">View</a>
+                        <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
+                        [% UNLESS tdone %]<button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
                     </div>
                 </div>
                 <div class="todo-popup">
