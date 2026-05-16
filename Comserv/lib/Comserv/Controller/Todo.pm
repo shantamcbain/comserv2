@@ -2296,9 +2296,64 @@ sub reschedule :Path('reschedule') :Args(0) {
                                date_time_posted estimated_man_hours
                                blocked_by_todo_id sitename developer
                                username_of_poster project_id subject
-                               time_of_day)],
+                               time_of_day is_recurring todo_type
+                               recurrence_rule is_fixed)],
             }
         )->all;
+
+        # Load ALL fixed events (recurring + appointments/meetings) so we can
+        # block their time slots during scheduling.  Fetched separately so that
+        # the skip logic in the main loop can still use @rows for non-fixed todos.
+        my @fixed_events;
+        eval {
+            @fixed_events = $c->model('DBEncy')->resultset('Todo')->search(
+                {
+                    sitename => { -in => \@allowed_sites },
+                    -or => [
+                        { is_recurring => 1 },
+                        { todo_type    => 'appointment' },
+                        { todo_type    => 'meeting' },
+                        { is_fixed     => 1 },
+                    ],
+                },
+                {
+                    columns => [qw(record_id start_date time_of_day
+                                   estimated_man_hours is_recurring
+                                   todo_type recurrence_rule subject)],
+                }
+            )->all;
+        };
+        my %blocked_cache;  # date_str => sorted [[abs_start, abs_end], ...]
+        my $get_blocked = sub {
+            my ($date_str) = @_;
+            return $blocked_cache{$date_str} if exists $blocked_cache{$date_str};
+            my @intervals;
+            for my $fe (@fixed_events) {
+                my $fe_sd_raw = $fe->start_date // '';
+                $fe_sd_raw = ref($fe_sd_raw) ? $fe_sd_raw->ymd : "$fe_sd_raw";
+                my $fe_sd = length($fe_sd_raw) >= 10 ? substr($fe_sd_raw, 0, 10) : '';
+                my $effective_start = $fe_sd || $today;
+                next if $effective_start gt $date_str;
+
+                my $is_rec = $fe->is_recurring // 0;
+                my $matches;
+                if ($is_rec) {
+                    $matches = recurring_matches_date($fe, $date_str);
+                } elsif ($fe_sd eq $date_str) {
+                    $matches = 1;
+                }
+                next unless $matches;
+
+                my $tod = $fe->time_of_day // '';
+                next unless $tod =~ /^(\d+):(\d+)/;
+                my $abs_start = $1 * 60 + $2;
+                my $dur = ($fe->estimated_man_hours // 0);
+                $dur = 30 unless $dur > 0;
+                push @intervals, [$abs_start, $abs_start + $dur];
+            }
+            $blocked_cache{$date_str} = [sort { $a->[0] <=> $b->[0] } @intervals];
+            return $blocked_cache{$date_str};
+        };
 
         # Build project sort_order lookup (separate query — avoids INNER JOIN exclusion)
         my %proj_sort;
@@ -2397,7 +2452,48 @@ sub reschedule :Path('reschedule') :Args(0) {
                 $cur_slot_min = 0;
             }
 
-            my $new_start     = $cur_dt->ymd;
+            my $new_start    = $cur_dt->ymd;
+
+            # Advance $cur_slot_min past any fixed-event conflicts for this day.
+            # Loops until the [slot_abs, slot_abs+est] range is clear.
+            {
+                my $blocked = $get_blocked->($new_start);
+                my $changed = 1;
+                while ($changed) {
+                    $changed = 0;
+                    for my $b (@$blocked) {
+                        my ($bs, $be) = @$b;
+                        my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                        if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                            # Conflict: push slot_abs to end of this block
+                            $cur_slot_min = $be - $WORK_START_MIN;
+                            $changed = 1;
+                        }
+                    }
+                }
+                # If pushing past blocks overflows the work day, roll to next day
+                if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                    $cur_dt->add(days => 1);
+                    $cur_slot_min = 0;
+                    $new_start    = $cur_dt->ymd;
+                    # Re-run conflict check for new day (recurse via redo is tricky;
+                    # a second pass handles any fixed events on the new day)
+                    my $blocked2 = $get_blocked->($new_start);
+                    my $c2 = 1;
+                    while ($c2) {
+                        $c2 = 0;
+                        for my $b (@$blocked2) {
+                            my ($bs, $be) = @$b;
+                            my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                            if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                                $cur_slot_min = $be - $WORK_START_MIN;
+                                $c2 = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
             my $slot_abs_min  = $WORK_START_MIN + $cur_slot_min;
             my $new_time_str  = sprintf('%02d:%02d:00',
                                     int($slot_abs_min / 60),

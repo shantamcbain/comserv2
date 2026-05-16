@@ -100,6 +100,19 @@ function onRecurringChange(cb) {
     var wrap = document.getElementById('recurrence-rule-wrap');
     if (wrap) wrap.style.display = cb.checked ? '' : 'none';
 }
+function syncDur() {
+    var h = parseInt(document.getElementById('est_h').value) || 0;
+    var m = parseInt(document.getElementById('est_m').value) || 0;
+    document.getElementById('estimated_man_hours').value = h * 60 + m;
+}
+(function initDur() {
+    var raw = parseInt('[% record.get_column("estimated_man_hours") || 30 %]') || 30;
+    var hEl = document.getElementById('est_h');
+    var mEl = document.getElementById('est_m');
+    if (hEl) hEl.value = Math.floor(raw / 60);
+    if (mEl) mEl.value = raw % 60;
+    syncDur();
+})();
 (function populateTimezones() {
     var sel = document.getElementById('creator_timezone');
     if (!sel || !Intl || !Intl.supportedValuesOf) return;
@@ -151,7 +164,7 @@ function onRecurringChange(cb) {
         <span id="accumulative_time_display">[% accumulative_time %]</span>
     </div>
     
-    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
+    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post" onsubmit="syncDur()">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
             [% IF is_csc && sites && sites.size %]
@@ -229,8 +242,15 @@ function onRecurringChange(cb) {
         </div>
         
         <div class="form-group">
-            <label for="estimated_man_hours">Estimated Man Hours:</label>
-            <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" required>
+            <label>Duration:</label>
+            <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <input type="number" id="est_h" min="0" max="99" value="0"
+                       style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> h
+                <input type="number" id="est_m" min="0" max="59" value="30"
+                       style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> min
+                <input type="hidden" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') || 30 %]">
+                <small style="color:var(--text-muted-color,#888);margin-left:4px;">stored as minutes</small>
+            </span>
         </div>
         
         <div class="form-group">
