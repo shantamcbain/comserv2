@@ -1201,7 +1201,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 </div>
 
-[% IF ai_daily_conversations && ai_daily_conversations.size > 0 %]
+[% SET is_embed = c.req.params.embed ? 1 : 0 %]
+[% IF !is_embed AND ai_daily_conversations && ai_daily_conversations.size > 0 %]
 <div style="margin-top:30px; padding:15px; background:rgba(0,100,200,0.05); border-left:3px solid #0064c8; border-radius:4px; max-width:100%;">
     <h3 style="margin-top:0; color:#0064c8;">AI Activity for [% date %]</h3>
     <table style="width:100%; border-collapse:collapse;">
