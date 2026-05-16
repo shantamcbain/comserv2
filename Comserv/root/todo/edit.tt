@@ -168,7 +168,7 @@ function syncDur() {
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
             [% IF is_csc && sites && sites.size %]
-                [% INCLUDE 'todo/site_list.tt' %]
+                [% INCLUDE 'todo/site_list.tt' selected_sitename=todo_sitename %]
             [% ELSE %]
                 <label for="sitename">Site Name:</label>
                 <input type="hidden" name="sitename" value="[% record.get_column('sitename') %]">
