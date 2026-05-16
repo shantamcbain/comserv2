@@ -136,6 +136,16 @@ sub begin :Private {
     # API paths handle their own auth — skip session-based checks
     return 1 if $c->req->path =~ m{^api/};
 
+    # AJAX update endpoints require only a valid session, not admin/developer
+    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single)\b}) {
+        unless ($c->session->{user_id}) {
+            $c->stash(json => { success => 0, error => 'Not authenticated' });
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+        return 1;
+    }
+
     # Fetch the user's roles from the session
     my $roles = $c->session->{roles} || [];
 
