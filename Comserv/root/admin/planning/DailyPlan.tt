@@ -295,15 +295,15 @@
                     [% SET audit_rank = 0 %]
                     [% FOREACH at IN audit_todos %]
                     [% SET audit_rank = audit_rank + 1 %]
-                    <div id="ap-row-[% at.record_id %]" style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
+                    <div id="ap-row-[% at.record_id %]" style="display:grid;grid-template-columns:28px 1fr;align-items:start;gap:8px;width:100%;padding:8px 10px;margin-bottom:4px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
 
-                        [%# Rank badge — col 1 %]
-                        <span style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
-                            <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.75em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
+                        [%# Icon badge — col 1 %]
+                        <span style="padding-top:3px;">
+                            <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.72em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
                         </span>
 
                         [%# Main content — col 2 %]
-                        <div style="display:table-cell;vertical-align:top;">
+                        <div style="min-width:0;">
                             <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                                 [%# Priority badge %]
                                 [% IF at.priority %]
@@ -348,19 +348,19 @@
                                 [% IF at.start_date %]<span>🗓 [% at.start_date %]</span>[% END %]
                                 [% IF at.sitename %]<span>[% at.sitename %]</span>[% END %]
                             </div>
-                        </div>
 
-                        [%# Quick actions — col 3 %]
-                        <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
-                            <a href="/todo/details?record_id=[% at.record_id %]"
-                               style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
-                            <a href="/log/log_form?todo_record_id=[% at.record_id %]"
-                               style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
-                            [% IF is_admin %]
-                            <button onclick="quickClose([% at.record_id %])"
-                                style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">✓ Done</button>
-                            [% END %]
-                        </span>
+                            [%# Quick actions — inline bottom-left %]
+                            <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+                                <a href="/todo/details?record_id=[% at.record_id %]"
+                                   style="font-size:0.78em;color:var(--primary-color);text-decoration:none;">View →</a>
+                                <a href="/log/log_form?todo_record_id=[% at.record_id %]"
+                                   style="font-size:0.75em;padding:1px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;" title="Add a time log for this todo">Log</a>
+                                [% IF is_admin %]
+                                <button onclick="quickClose([% at.record_id %])"
+                                    style="font-size:0.75em;padding:1px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">Done</button>
+                                [% END %]
+                            </div>
+                        </div>
                     </div>
                     [% END %]
                     [% ELSE %]
@@ -513,15 +513,15 @@
                     data-due="[% ap.due_date || '9999-12-31' %]"
                     data-site="[% ap.sitename || '' %]"
                     data-role-cats="[% ap.role_cats || 'general' %]"
-                    style="display:table;width:100%;table-layout:fixed;padding:10px 12px;margin-bottom:6px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_overdue %]#dc3545[% ELSIF ap.due_today %]#ffc107[% ELSIF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.is_overdue %]color-mix(in srgb,#dc3545 6%,var(--bg-color))[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
+                    style="display:grid;grid-template-columns:28px 1fr;align-items:start;gap:8px;width:100%;padding:8px 10px;margin-bottom:4px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_overdue %]#dc3545[% ELSIF ap.due_today %]#ffc107[% ELSIF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.is_overdue %]color-mix(in srgb,#dc3545 6%,var(--bg-color))[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
 
                     [%# Rank badge — col 1 %]
-                    <span class="rank-badge" style="display:table-cell;width:32px;vertical-align:top;padding-right:8px;">
-                        <span style="display:inline-flex;width:24px;height:24px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.73em;font-weight:bold;">[% rank %]</span>
+                    <span class="rank-badge" style="padding-top:3px;">
+                        <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.7em;font-weight:bold;">[% rank %]</span>
                     </span>
 
                     [%# Main content — col 2 %]
-                    <div style="display:table-cell;vertical-align:top;">
+                    <div style="min-width:0;">
                         <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
                             [%# Priority badge %]
                             [% IF ap.priority %]
@@ -588,19 +588,19 @@
                             [% IF ap.is_cross_blocker && ap.is_blocking && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
                             [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
                         </div>
-                    </div>
 
-                    [%# Quick actions — col 3 %]
-                    <span style="display:table-cell;width:1%;white-space:nowrap;vertical-align:top;padding-left:10px;">
-                        <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="display:block;font-size:0.75em;color:var(--primary-color);text-decoration:none;margin-bottom:4px;">View →</a>
-                        <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                           style="display:block;font-size:0.7em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;margin-bottom:4px;" title="Add a time log for this todo">📋 Log</a>
-                        [% IF is_admin %]
-                        <button onclick="quickClose([% ap.record_id %])"
-                            style="display:block;width:100%;font-size:0.7em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">✓ Done</button>
-                        [% END %]
-                    </span>
+                        [%# Quick actions — inline bottom-left %]
+                        <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
+                            <a href="/todo/details?record_id=[% ap.record_id %]"
+                               style="font-size:0.78em;color:var(--primary-color);text-decoration:none;">View →</a>
+                            <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
+                               style="font-size:0.75em;padding:1px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;" title="Add a time log for this todo">Log</a>
+                            [% IF is_admin %]
+                            <button onclick="quickClose([% ap.record_id %])"
+                                style="font-size:0.75em;padding:1px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">Done</button>
+                            [% END %]
+                        </div>
+                    </div>
                 </div>
                 [% END %]
                 </div>[%# end #priorities-list %]
@@ -656,6 +656,28 @@
                 }).catch(function(e){
                     btn.disabled = false;
                     btn.textContent = '♻ Reschedule';
+                    alert('Error: ' + e);
+                });
+            }
+            function scheduleMyDay(btn) {
+                btn.disabled = true;
+                btn.textContent = '⏳ Scheduling…';
+                fetch('/planning/schedule_day', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
+                    body: JSON.stringify({})
+                }).then(function(r){ return r.json(); }).then(function(d){
+                    if (d.ok) {
+                        alert('Scheduled ' + d.count + ' todo(s) for today. Reloading…');
+                        location.reload();
+                    } else {
+                        btn.disabled = false;
+                        btn.textContent = '🗓 Schedule My Day';
+                        alert('Error: ' + (d.error || 'unknown'));
+                    }
+                }).catch(function(e){
+                    btn.disabled = false;
+                    btn.textContent = '🗓 Schedule My Day';
                     alert('Error: ' + e);
                 });
             }
@@ -833,17 +855,76 @@
     <!-- TAB: DAILY SCHEDULE (hourly time-slot view) -->
     <div id="daily-schedule" class="tab-content">
         <div id="anchor-dynamic-daily" class="nav-anchor"></div>
-        <h2>Daily Schedule</h2>
-        <div class="dynamic-container">
+        <script src="/static/js/todo_drag_drop.js"></script>
+
+        [%# ── Toolbar: single compact row ── %]
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;white-space:nowrap;flex-wrap:nowrap;overflow-x:auto;">
+            <button onclick="scheduleMyDay(this)"
+                style="flex-shrink:0;padding:2px 9px;border:1px solid #0d6efd;border-radius:4px;background:transparent;font-size:0.8em;color:#0d6efd;cursor:pointer;white-space:nowrap;"
+                title="Re-run the time-block scheduler for today (also creates today's breaks)">🗓 Schedule My Day</button>
+            <span style="color:var(--border-color);flex-shrink:0;">|</span>
+            <label style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">Role:</label>
+            <select id="sched-role-filter" onchange="filterDayView()"
+                style="font-size:0.78em;padding:1px 4px;border:1px solid var(--border-color);border-radius:3px;background:var(--bg-color);color:var(--text-color);max-width:130px;">
+                <option value="">All</option>
+                [% IF ap_user_roles %][% FOREACH r IN ap_user_roles %]
+                <option value="[% r | lower %]">[% r %]</option>
+                [% END %][% END %]
+            </select>
+            <label style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">Sites:</label>
+            <select id="sched-site-filter" multiple onchange="filterDayView()"
+                title="Hold Ctrl/Cmd to select multiple sites"
+                style="font-size:0.78em;padding:1px 3px;border:1px solid var(--border-color);border-radius:3px;background:var(--bg-color);color:var(--text-color);max-width:160px;max-height:52px;">
+                [% IF ap_all_sitenames %][% FOREACH sn IN ap_all_sitenames %]
+                <option value="[% sn %]" [% IF sn == SiteName %]selected[% END %]>[% sn %]</option>
+                [% END %][% END %]
+            </select>
+        </div>
+
+        [%# ── hint when nothing scheduled yet ── %]
+        [% UNLESS scheduled_todos && scheduled_todos.size %]
+        <div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-secondary);border-radius:4px;font-size:0.82em;color:var(--text-muted-color);">
+            No schedule assigned for today yet — click <strong>🗓 Schedule My Day</strong> to auto-assign time slots to your todos.
+        </div>
+        [% END %]
+
+        [%# ── Day hour-slot grid (original day.tt) ── %]
+        <div id="daily-schedule-body">
             [% TRY %]
-                [% INCLUDE 'todo/day.tt' %]
+                [% IF scheduled_todos && scheduled_todos.size %]
+                    [% INCLUDE 'todo/day.tt'
+                        todos         = scheduled_todos
+                        overdue_todos = []
+                        date          = today
+                        pre_filtered  = 1 %]
+                [% ELSE %]
+                    [% INCLUDE 'todo/day.tt' %]
+                [% END %]
             [% CATCH %]
-                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
-                    <h4 style="margin-top: 0; color: #856404;">⚠️ Daily Schedule Not Available</h4>
+                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:15px;margin:15px 0;">
+                    <h4 style="margin-top:0;color:#856404;">⚠️ Daily Schedule Not Available</h4>
                     <p>The daily time-slot view is not currently available.</p>
                 </div>
             [% END %]
         </div>
+
+        <script>
+        function filterDayView() {
+            var roleVal = (document.getElementById('sched-role-filter').value || '').toLowerCase();
+            var siteEl  = document.getElementById('sched-site-filter');
+            var sites   = [];
+            for (var i = 0; i < siteEl.options.length; i++) {
+                if (siteEl.options[i].selected) sites.push(siteEl.options[i].value.toLowerCase());
+            }
+            document.querySelectorAll('#daily-schedule-body .todo-item-day').forEach(function(el) {
+                var elSite  = (el.dataset.sitename || '').toLowerCase();
+                var elGroup = (el.dataset.group    || '').toLowerCase();
+                var roleOk = !roleVal || elGroup === roleVal || elGroup.indexOf(roleVal) >= 0;
+                var siteOk = (sites.length === 0) || sites.indexOf(elSite) >= 0;
+                el.style.display = (roleOk && siteOk) ? '' : 'none';
+            });
+        }
+        </script>
     </div>
 
     <!-- TAB 2: WEEKLY VIEW -->
@@ -929,7 +1010,7 @@
 
         [%# Static branch → port map (matches Planning.tt overview) %]
         [% SET bp = {
-            'planningsystem-59ae'                      => 4001,
+            'planning-system-continue-from-pl-bdac'    => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
             'new-task-9cf1'                            => 4003,
@@ -958,7 +1039,7 @@
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
             { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r' },
-            { name => 'planningsystem-59ae',                    port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planningsystem-59ae/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
             { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4010 -r' },
             { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4002 -r' },
             { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },

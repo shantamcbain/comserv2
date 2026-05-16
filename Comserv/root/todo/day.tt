@@ -44,7 +44,7 @@
    # and extract overdue todos if not already separated. EXCLUDE COMPLETED (status 3).
    # ONLY do this filtering if coming from Documentation.pm (is_daily_plan == 1)
    # When coming from Todo.pm controller, todos is already pre-filtered
-   IF is_daily_plan;
+   IF is_daily_plan AND !pre_filtered;
        SET temp_today_todos = [];
        SET temp_overdue_todos = [];
        
@@ -138,61 +138,68 @@
     }
 
     .todo-item-day {
-        padding: 5px 10px;
+        padding: 2px 6px;
         border-bottom: 1px solid var(--border-color, #eee);
         display: flex;
-        flex-direction: column;
-        gap: 2px;
-        margin-bottom: 4px;
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 2px;
         background-color: var(--background-color, white);
-        border-radius: 4px;
+        border-radius: 3px;
+        min-height: 26px;
         transition: background-color 0.3s ease;
     }
 
     .todo-item-day.overdue {
-        border-left: 4px solid var(--warning-color, #ff9800);
-        background-color: var(--warning-color, #fff3cd);
+        border-left: 3px solid var(--warning-color, #ff9800);
+        background-color: rgba(255,152,0,0.07);
     }
 
     .todo-subject {
-        font-size: 1.1em;
-        font-weight: bold;
+        font-size: 0.88em;
+        font-weight: 600;
         color: var(--text-color, #333);
-        line-height: 1.4;
+        flex: 1;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
     }
 
     .todo-details {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
-        font-size: 0.8em;
+        gap: 4px;
+        font-size: 0.78em;
         color: var(--secondary-text, #666);
     }
 
     .todo-details span {
         background-color: var(--secondary-color, #f5f5f5);
-        padding: 2px 6px;
-        border-radius: 3px;
+        padding: 1px 4px;
+        border-radius: 2px;
     }
 
     .todo-actions {
         display: flex;
-        gap: 5px;
-        margin-top: 5px;
+        gap: 3px;
+        flex-shrink: 0;
     }
 
     .todo-actions button, .todo-actions .btn {
-        font-size: 0.8em;
-        padding: 4px 8px;
-        border: none;
-        border-radius: 3px;
+        font-size: 0.75em;
+        padding: 1px 5px;
+        border: 1px solid var(--border-color, #ccc);
+        border-radius: 2px;
         cursor: pointer;
-        transition: background-color 0.3s ease;
+        background: transparent;
+        color: var(--text-color, #333);
+        white-space: nowrap;
     }
 
     .todo-actions .btn-log {
-        background-color: var(--info-color, #17a2b8);
-        color: white;
+        border-color: var(--info-color, #17a2b8);
+        color: var(--info-color, #17a2b8);
     }
 
     .todo-actions .btn-log:hover {
@@ -431,7 +438,7 @@
         </summary>
         <div class="priority-content">
             [% FOREACH todo IN overdue_todos %]
-                <div class="todo-item-day todo-item-shared overdue priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" draggable="true">
+                <div class="todo-item-day todo-item-shared overdue priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-todo-date="[% todo.start_date || todo.due_date %]" data-sitename="[% todo.sitename %]" data-group="[% todo.group_of_poster %]" draggable="true">
                     <div style="display: flex; align-items: flex-start; gap: 5px;">
                         <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
                         <div style="flex: 1;">
@@ -495,7 +502,13 @@
     SET end_hour = 17;
     
     FOREACH todo IN todos;
-        SET t_time = todo.time_of_day || '09:00:00';
+        SET t_time = todo.time_of_day;
+        UNLESS t_time;
+            IF todo.scheduled_start;
+                t_time = todo.scheduled_start.substr(11, 8);
+            END;
+        END;
+        t_time = t_time || '09:00:00';
         SET hour_key = t_time.substr(0, 2);
         SET h_num = hour_key * 1;
         
@@ -524,45 +537,20 @@
                 <div class="time-content" data-date="[% date %]" data-hour="[% display_hour %]">
                     [% IF time_slots.$display_hour %]
                         [% FOREACH todo IN time_slots.$display_hour %]
-                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]">
-                                <div style="display: flex; align-items: flex-start; gap: 5px;">
-                                    <span class="drag-handle" title="Drag to reschedule">⋮⋮</span>
-                                    <div style="flex: 1;">
-                                        <div class="todo-subject todo-subject-shared">[% todo.subject %]</div>
-                                
-                                <div class="todo-details todo-details-shared">
-                                    <span class="todo-status todo-status-shared status-[% todo.status %]">
-                                        [% IF todo.status == 1 %] New [% ELSIF todo.status == 2 %] In Progress [% ELSIF todo.status == 3 %] Completed [% ELSE %] Unknown [% END %]
-                                    </span>
-                                    
-                                    [% IF todo.project_id %]<span>📁 [% proj_name_map.${todo.project_id} || todo.project_id %]</span>[% END %]
-                                    [% IF todo.due_date %]<span>Due: [% todo.due_date %]</span>[% END %]
-                                    <span>Priority: [% todo.priority %]</span>
-                                    
-                                    [% IF todo.time_of_day %]
-                                        <span class="time-duration time-duration-shared">
-                                            [% todo.time_of_day.substr(0, 5) %][% IF todo.end_time %] - [% todo.end_time %][% END %]
-                                        </span>
+                            <div class="todo-item-day todo-item-shared priority-[% todo.priority %]" data-todo-id="[% todo.record_id %]" data-sitename="[% todo.sitename %]" data-group="[% todo.group_of_poster %]">
+                                <span class="drag-handle" title="Drag to reschedule" style="flex-shrink:0;cursor:grab;color:var(--secondary-text,#999);font-size:0.9em;">⋮⋮</span>
+                                <select title="Change priority" style="flex-shrink:0;font-size:0.72em;padding:0 2px;border:1px solid var(--border-color,#ccc);border-radius:2px;background:var(--background-color,#fff);color:var(--text-color,#333);width:42px;"
+                                    onchange="quickPriority([% todo.record_id %], this.value, this)">
+                                    [% FOREACH p IN [1,2,3,4,5,6,7,8,9,10] %]
+                                    <option value="[% p %]" [% IF todo.priority == p %]selected[% END %]>P[% p %]</option>
                                     [% END %]
+                                </select>
+                                <span class="todo-subject todo-subject-shared">[% todo.subject %]</span>
+                                [% IF todo.sitename %]<span style="flex-shrink:0;font-size:0.72em;color:var(--text-muted-color,#888);padding:0 2px;">[% todo.sitename %]</span>[% END %]
+                                <div class="todo-actions todo-actions-shared" style="flex-shrink:0;">
+                                    <a href="/todo/details?record_id=[% todo.record_id %]" class="btn" style="font-size:0.75em;padding:1px 5px;text-decoration:none;border:1px solid var(--border-color,#ccc);border-radius:2px;color:var(--text-color,#333);">View</a>
+                                    <a href="/log/log_form?todo_record_id=[% todo.record_id %]" class="btn btn-log" style="font-size:0.75em;padding:1px 5px;text-decoration:none;border:1px solid var(--info-color,#17a2b8);border-radius:2px;color:var(--info-color,#17a2b8);">Log</a>
                                 </div>
-                                
-                                        <div class="todo-actions todo-actions-shared">
-                                            <form action="/todo/details" method="POST" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                                <input type="hidden" name="record_id" value="[% todo.record_id %]">
-                                                <input type="hidden" name="return_to" value="">
-                                                <button type="submit" class="btn">Details</button>
-                                            </form>
-                                            <form action="/todo/edit/[% todo.record_id %]" method="GET" style="display: inline;" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                                                <button type="submit" class="btn">Edit</button>
-                                            </form>
-                                            <form action="/log/log_form" method="GET" style="display: inline;">
-                                                <input type="hidden" name="todo_record_id" value="[% todo.record_id %]">
-                                                <button type="submit" class="btn btn-log">Log</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
-                                
                                 <!-- Popup on hover -->
                                 <div class="todo-popup">
                                     <div class="popup-subject">[% todo.subject %]</div>
@@ -573,14 +561,8 @@
                                         [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
                                         [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %] [% IF todo.time_of_day %][% todo.time_of_day.substr(0, 5) %][% END %]</div>[% END %]
                                         [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
-                                        [% IF todo.end_time %]<div><strong>End Time:</strong> [% todo.end_time %]</div>[% END %]
                                         <div><strong>Priority:</strong> [% todo.priority %]</div>
-                                        <div><strong>Status:</strong> 
-                                            [% IF todo.status == 1 %]New
-                                            [% ELSIF todo.status == 2 %]In Progress
-                                            [% ELSIF todo.status == 3 %]Completed
-                                            [% ELSE %]Unknown[% END %]
-                                        </div>
+                                        <div><strong>Status:</strong> [% IF todo.status == 1 %]New[% ELSIF todo.status == 2 %]In Progress[% ELSIF todo.status == 3 %]Completed[% ELSE %]Unknown[% END %]</div>
                                         [% IF todo.sitename %]<div><strong>Site:</strong> [% todo.sitename %]</div>[% END %]
                                         [% IF todo.developer %]<div><strong>Developer:</strong> [% todo.developer %]</div>[% END %]
                                     </div>

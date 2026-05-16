@@ -77,9 +77,20 @@ __PACKAGE__->add_columns(
         set_on_create => 1,
         set_on_update => 1,
     },
+    prepaid_accno_id => {
+        data_type   => 'integer',
+        is_nullable => 1,
+        is_foreign_key => 1,
+    },
 );
 
 __PACKAGE__->set_primary_key('id');
+
+__PACKAGE__->belongs_to(
+    'prepaid_account' => 'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
+    { 'foreign.id' => 'self.prepaid_accno_id' },
+    { join_type => 'LEFT', on_delete => 'SET NULL', on_update => 'CASCADE' }
+);
 
 __PACKAGE__->has_many(
     'item_suppliers' => 'Comserv::Model::Schema::Ency::Result::Accounting::InventoryItemSupplier',

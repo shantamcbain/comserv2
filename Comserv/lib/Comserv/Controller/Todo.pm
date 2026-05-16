@@ -1899,6 +1899,41 @@ sub quick_close :Path('quick_close') :Args(0) {
     $c->response->body('{"ok":1}');
 }
 
+sub quick_priority :Path('quick_priority') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $body_fh = $c->req->body;
+    my $body = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    my $priority  = $data->{priority}  if $data;
+    unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id or priority"}');
+        return;
+    }
+    $priority = int($priority);
+    $priority = 1 if $priority < 1;
+    $priority = 10 if $priority > 10;
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+        $todo->update({ priority => $priority, last_mod_by => $username });
+    };
+    if ($@) {
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+    $c->response->body('{"ok":1}');
+}
+
 sub triage_stale :Path('triage_stale') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -1995,20 +2030,9 @@ sub reschedule :Path('reschedule') :Args(0) {
                 my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
 
                 if ($days_until_due < 0) {
-                    # Overdue — adjust priority upward
+                    # Overdue — adjust priority upward and reschedule to today
                     $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
-
-                    # Also extend due_date so it stops showing permanently overdue:
-                    # IN-PROGRESS: extend 14 days (actively being worked)
-                    # NEW stale 30+ days: extend 30 days (date was clearly abandoned)
-                    # NEW stale < 30 days: leave as-is (genuinely overdue, keep the signal)
-                    my $st = $todo->status // '';
-                    my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process)$/i);
-                    if ($in_progress) {
-                        $new_due_date = DateTime->now->add(days => 14)->ymd;
-                    } elsif ($days_stale >= 30) {
-                        $new_due_date = DateTime->now->add(days => 30)->ymd;
-                    }
+                    $new_due_date = $today;
                 } elsif ($days_until_due <= 7) {
                     $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
                 }
