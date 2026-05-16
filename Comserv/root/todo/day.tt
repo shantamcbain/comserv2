@@ -789,8 +789,7 @@ function initGcalDragDrop() {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'move';
         if (!_gcalDragged) return;
-        var rect = area.getBoundingClientRect();
-        var relY = e.clientY - rect.top + area.closest('.gcal-grid-outer').scrollTop;
+        var relY = e.clientY - area.getBoundingClientRect().top;
         var snapped = Math.round(relY / 15) * 15;
         if (dropLine) { dropLine.style.top = snapped + 'px'; dropLine.style.display = 'block'; }
     });
@@ -803,8 +802,7 @@ function initGcalDragDrop() {
         e.preventDefault();
         if (dropLine) dropLine.style.display = 'none';
         if (!_gcalDragged) return;
-        var rect = area.getBoundingClientRect();
-        var relY = e.clientY - rect.top + area.closest('.gcal-grid-outer').scrollTop;
+        var relY = e.clientY - area.getBoundingClientRect().top;
         var snapped = Math.round(relY / 15) * 15;
         var totalMin = GRID_START + Math.max(0, snapped);
         var nh = Math.min(23, Math.floor(totalMin / 60));

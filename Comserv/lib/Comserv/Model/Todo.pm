@@ -132,22 +132,31 @@ sub get_all_todos_for_calendar {
     require DateTime;
     my $cutoff_date = DateTime->now->subtract(days => 30)->ymd;
 
-    my %site_cond = @site_names == 1
-        ? (sitename => $site_names[0])
-        : (sitename => { -in => \@site_names });
+    my $username = $c->session->{username} || '';
+
+    my $site_cond = @site_names == 1
+        ? { 'me.sitename' => $site_names[0] }
+        : { 'me.sitename' => { -in => \@site_names } };
+
+    my $status_cond = { -or => [
+        { 'me.status' => { -not_in => \@done_statuses } },
+        {
+            'me.status'        => { -in => \@done_statuses },
+            'me.last_mod_date' => { '>=' => $cutoff_date },
+        },
+    ] };
 
     my @todos = $rs->search(
         {
-            %site_cond,
-            -or => [
-                { status => { -not_in => \@done_statuses } },
-                {
-                    status        => { -in => \@done_statuses },
-                    last_mod_date => { '>=' => $cutoff_date },
-                },
+            -and => [
+                $status_cond,
+                { -or => [
+                    $site_cond,
+                    ($username ? { 'me.developer' => $username } : ()),
+                ] },
             ],
         },
-        { order_by => { -asc => ['priority', 'start_date'] } }
+        { order_by => { -asc => ['me.priority', 'me.start_date'] } }
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar',
