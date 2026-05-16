@@ -72,8 +72,9 @@ function initDayViewDragAndDrop() {
 
                 const dropSlot = this.previousElementSibling;
                 if (dropSlot && dropSlot.classList.contains('time-slot')) {
-                    const timeText = dropSlot.textContent.trim();
-                    const newTime = timeText + ':00';
+                    const timeAttr = dropSlot.getAttribute('data-time');
+                    const timeText = timeAttr || dropSlot.textContent.trim().split('\n')[0].trim();
+                    const newTime = timeText.length === 5 ? timeText + ':00' : timeText;
 
                     if (todoId && newTime) {
                         const isCrossDate = (targetDate && sourceDate && targetDate !== sourceDate)

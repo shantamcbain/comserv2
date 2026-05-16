@@ -597,25 +597,8 @@ function _updateDaySiteSummary() {
     </details>
 [% END %]
 
-[% 
-    # Process todos to organize by time slots
-    SET time_slots = {};
-    SET start_hour = 5;
-    SET end_hour = 17;
-    
-    FOREACH todo IN todos;
-        SET t_time = todo.time_of_day || '09:00:00';
-        SET hour_key = t_time.substr(0, 2);
-        SET h_num = hour_key * 1;
-        
-        IF h_num < start_hour; SET start_hour = h_num; END;
-        IF h_num > end_hour; SET end_hour = h_num; END;
-        
-        UNLESS time_slots.$hour_key;
-            time_slots.$hour_key = [];
-        END;
-        time_slots.$hour_key.push(todo);
-    END;
+[%
+    SET sorted_todos = todos.sort('time_of_day');
 %]
 
 [%# ── Site filter bar (CSC only, hidden in week column include mode) ── %]
@@ -644,30 +627,43 @@ function _updateDaySiteSummary() {
     </summary>
     <div class="priority-content">
         <div class="day-schedule-grid">
-            [% FOREACH hour IN [start_hour .. end_hour] %]
-                [% SET display_hour = hour < 10 ? '0' _ hour : hour %]
-                <div class="time-slot" onclick="document.getElementById('add-todo-[% display_hour %]').submit();" style="cursor: pointer;" title="Click to add todo at [% display_hour %]:00">
-                    [% display_hour %]:00
-                </div>
-                <div class="time-content" data-date="[% date %]" data-hour="[% display_hour %]">
-                    [% IF time_slots.$display_hour %]
-                        [% FOREACH todo IN time_slots.$display_hour %]
-                            [% SET _tp = todo.priority || 9 %]
-                            [% SET _ts = todo.sitename || '' %]
-                            [% SET _done = (todo.status == 3 OR todo.status == 4 OR todo.status == 'DONE' OR todo.status == 'Completed' OR todo.status == 'completed' OR todo.status == 'Closed' OR todo.status == 'closed' OR todo.status == 'Done') %]
-                            [% SET _est_mins = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 30 %]
-                            [% SET _min_h = (_est_mins / 60) * 40 %]
-                            [% IF _min_h < 28 %][% SET _min_h = 28 %][% END %]
-                            [% IF _min_h > 320 %][% SET _min_h = 320 %][% END %]
-                            [% SET _subj_l2 = todo.subject.lower %]
-                            [% SET _is_rec = (todo.is_recurring OR _subj_l2.match('lunch') OR _subj_l2.match('break') OR _subj_l2.match('standup')) ? '1' : '0' %]
+            [% IF sorted_todos && sorted_todos.size %]
+                [% FOREACH todo IN sorted_todos %]
+                    [% SET _tp = todo.priority || 9 %]
+                    [% SET _ts = todo.sitename || '' %]
+                    [% SET _done = (todo.status == 3 OR todo.status == 4 OR todo.status == 'DONE' OR todo.status == 'Completed' OR todo.status == 'completed' OR todo.status == 'Closed' OR todo.status == 'closed' OR todo.status == 'Done') %]
+                    [% SET _est_mins = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 30 %]
+                    [% SET _subj_l2 = todo.subject.lower %]
+                    [% SET _is_rec = (todo.is_recurring OR _subj_l2.match('lunch') OR _subj_l2.match('break') OR _subj_l2.match('standup')) ? '1' : '0' %]
+                    [% SET _tod = todo.time_of_day || '09:00:00' %]
+                    [% SET _sh = _tod.substr(0, 2) * 1 %]
+                    [% SET _sm = _tod.substr(3, 2) * 1 %]
+                    [% SET _start_min = _sh * 60 + _sm %]
+                    [% SET _end_min = _start_min + _est_mins %]
+                    [% SET _eh = int(_end_min / 60) %]
+                    [% SET _em = _end_min - _eh * 60 %]
+                    [% SET _sh_str = _sh < 10 ? '0' _ _sh : '' _ _sh %]
+                    [% SET _sm_str = _sm < 10 ? '0' _ _sm : '' _ _sm %]
+                    [% SET _eh_str = _eh < 10 ? '0' _ _eh : '' _ _eh %]
+                    [% SET _em_str = _em < 10 ? '0' _ _em : '' _ _em %]
+                    [% SET _time_label = _sh_str _ ':' _ _sm_str %]
+                    [% SET _min_h = (_est_mins / 60) * 40 %]
+                    [% IF _min_h < 32 %][% SET _min_h = 32 %][% END %]
+                    [% IF _min_h > 320 %][% SET _min_h = 320 %][% END %]
+                    <div class="time-slot" data-time="[% _time_label %]" style="flex-direction:column;align-items:flex-end;gap:0;height:auto;min-height:[% _min_h %]px;justify-content:flex-start;padding-top:6px;">
+                        <span style="font-weight:bold;color:var(--text-color,#333);font-size:0.8em;">[% _time_label %]</span>
+                        <span style="font-size:0.72em;color:var(--text-muted-color,#aaa);">–[% _eh_str %]:[% _em_str %]</span>
+                    </div>
+                    <div class="time-content" data-date="[% date %]" data-hour="[% _time_label %]" style="min-height:[% _min_h %]px;">
+                            [% SET _min_h2 = _min_h - 8 %]
+                            [% IF _min_h2 < 24 %][% SET _min_h2 = 24 %][% END %]
                             <div class="todo-item-day todo-item-shared priority-[% _tp %]"
                                  data-todo-id="[% todo.record_id %]"
                                  data-priority="[% _tp %]"
                                  data-site="[% _ts %]"
                                  data-is-recurring="[% _is_rec %]"
-                                 [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]" data-time="[% todo.time_of_day || '00:00:00' %]" data-date="[% date %]"[% END %]
-                                 style="display:flex;align-items:flex-start;gap:5px;padding:5px 7px;margin-bottom:4px;border-radius:4px;box-sizing:border-box;min-height:[% _min_h %]px;min-width:0;position:relative;[% IF _done %]opacity:0.55;background:var(--bg-secondary,#f0f0f0);border:1px dashed var(--border-color,#bbb);[% ELSIF todo.status == 2 %]background:color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff));border:1px solid var(--border-color,#ddd);[% ELSE %]background:var(--bg-color,#fff);border:1px solid var(--border-color,#ddd);[% END %]">
+                                 [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]" data-time="[% _tod %]" data-date="[% date %]"[% END %]
+                                 style="display:flex;align-items:flex-start;gap:5px;padding:5px 7px;border-radius:4px;box-sizing:border-box;min-height:[% _min_h2 %]px;min-width:0;position:relative;[% IF _done %]opacity:0.65;background:var(--bg-secondary,#f0f0f0);border:1px dashed var(--border-color,#bbb);[% ELSIF todo.status == 2 %]background:color-mix(in srgb,var(--primary-color,#4CAF50) 8%,var(--bg-color,#fff));border:1px solid var(--border-color,#ddd);[% ELSE %]background:var(--bg-color,#fff);border:1px solid var(--border-color,#ddd);[% END %]">
 
                                 [%# Col 1: drag handle + priority select %]
                                 <div style="flex-shrink:0;display:flex;flex-direction:column;align-items:center;gap:3px;padding-top:1px;">
@@ -749,19 +745,21 @@ function _updateDaySiteSummary() {
                                     </div>
                                 </div>
                             </div>
-                        [% END %]
-                    [% END %]
-                    
-                    <div class="add-todo-inline">
-                        <form id="add-todo-[% display_hour %]" action="/todo/addtodo" method="post" onsubmit="this.return_to.value = window.location.href + window.location.hash;">
-                            <input type="hidden" name="start_date" value="[% date %]">
-                            <input type="hidden" name="time_of_day" value="[% display_hour %]:00">
-                            <input type="hidden" name="return_to" value="">
-                            <button type="submit">+ Add Todo at [% display_hour %]:00</button>
-                        </form>
                     </div>
+                [% END %]
+            [% ELSE %]
+                <div class="time-slot" style="background:none;border-right:2px solid transparent;"></div>
+                <div class="time-content" data-date="[% date %]">
+                    <p style="color:var(--text-muted-color,#888);padding:10px;">No todos scheduled for today.</p>
                 </div>
             [% END %]
+        </div>
+        <div class="add-todo-inline" style="padding:5px 10px 8px;">
+            <form action="/todo/addtodo" method="post" onsubmit="this.return_to.value=window.location.href;">
+                <input type="hidden" name="start_date" value="[% date %]">
+                <input type="hidden" name="return_to" value="">
+                <button type="submit">+ Add Todo for [% date %]</button>
+            </form>
         </div>
     </div>
 </details>
