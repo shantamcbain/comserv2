@@ -183,46 +183,82 @@
 <script>
 function showDayModal(dateStr, dayLabel, event) {
     event.preventDefault();
-    var col = document.querySelector('.week-day-column[data-date="' + dateStr + '"] .week-day-content');
-    if (!col) return;
-    var clone = col.cloneNode(true);
-    clone.style.maxHeight = '';
-    clone.style.overflowY = '';
-    clone.style.padding = '10px 0';
     document.getElementById('day-modal-title').textContent = dayLabel;
     var body = document.getElementById('day-modal-body');
+    if (!body) return;
     body.innerHTML = '';
-    body.appendChild(clone);
+    var col = document.querySelector('.week-day-column[data-date="' + dateStr + '"] .week-day-content');
+    if (col) {
+        var clone = col.cloneNode(true);
+        clone.style.maxHeight = '';
+        clone.style.overflowY = '';
+        body.appendChild(clone);
+    } else {
+        body.innerHTML = '<p style="padding:20px;color:#888;">No data found for ' + dateStr + '.</p>';
+    }
     document.getElementById('day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    clone.querySelectorAll('.todo-item-day:not([data-popup-init])').forEach(function(item) {
-        item.setAttribute('data-popup-init', '1');
-        item.addEventListener('mouseenter', function() {
-            var popup = this.querySelector('.todo-popup');
-            if (!popup) return;
-            var rect = this.getBoundingClientRect();
-            var vw = window.innerWidth, vh = window.innerHeight, pw = 360, ph = 220;
-            var left = (rect.right + pw + 10 < vw) ? rect.right + 10
-                     : (rect.left - pw - 10 > 0)   ? rect.left - pw - 10
-                     : Math.max(10, (vw - pw) / 2);
-            var top = (rect.top + ph > vh) ? Math.max(10, vh - ph - 10) : rect.top;
-            popup.style.left = left + 'px';
-            popup.style.top  = top  + 'px';
-            popup.style.display = 'block';
-        });
-        item.addEventListener('mouseleave', function() {
-            var popup = this.querySelector('.todo-popup');
-            if (popup) popup.style.display = 'none';
-        });
-    });
 }
 function closeDayModal() {
     document.getElementById('day-modal').style.display = 'none';
     document.body.style.overflow = '';
 }
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeDayModal();
-});
+document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDayModal(); });
+
+function initWeekColDragDrop() {
+    var GRID_START = 5 * 60;
+    document.querySelectorAll('.gcal-events-area-col').forEach(function(area) {
+        var colDate = area.getAttribute('data-date') || '';
+        var dropLine = area.querySelector('.gcal-drop-target-line');
+        var dragged = null;
+
+        area.querySelectorAll('.gcal-ev').forEach(function(el) {
+            el.setAttribute('draggable', 'true');
+            el.addEventListener('dragstart', function(e) {
+                if (e.target.closest('.gcal-ev-actions')) { e.preventDefault(); return; }
+                dragged = this;
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+            });
+            el.addEventListener('dragend', function() {
+                this.classList.remove('dragging');
+                if (dropLine) dropLine.style.display = 'none';
+                dragged = null;
+            });
+        });
+
+        area.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            if (!dragged) return;
+            var relY = e.clientY - area.getBoundingClientRect().top;
+            var snapped = Math.round(relY / 15) * 15;
+            if (dropLine) { dropLine.style.top = snapped + 'px'; dropLine.style.display = 'block'; }
+        });
+        area.addEventListener('dragleave', function() {
+            if (dropLine) dropLine.style.display = 'none';
+        });
+        area.addEventListener('drop', function(e) {
+            e.preventDefault();
+            if (dropLine) dropLine.style.display = 'none';
+            if (!dragged) return;
+            var relY = e.clientY - area.getBoundingClientRect().top;
+            var snapped = Math.round(relY / 15) * 15;
+            var totalMin = GRID_START + Math.max(0, snapped);
+            var nh = Math.min(23, Math.floor(totalMin / 60));
+            var nm = totalMin % 60;
+            var newTime = String(nh).padStart(2,'0') + ':' + String(nm).padStart(2,'0') + ':00';
+            var todoId = dragged.getAttribute('data-todo-id');
+            var isRec  = dragged.getAttribute('data-is-recurring') === '1';
+            if (isRec) {
+                showRecurringDropDialog(todoId, newTime, colDate, true);
+            } else {
+                updateTodoTimeAndDate(todoId, newTime, colDate);
+                dragged.style.top = Math.max(0, snapped) + 'px';
+            }
+        });
+    });
+}
+document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
 </script>
 
 <a id="week-view-anchor"></a>
@@ -231,10 +267,10 @@ document.addEventListener('keydown', function(e) {
     <div class="week-navigation view-navigation">
         <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">◀ Previous Week</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Daily Schedule</a>
         <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]">Month View</a>
         <a href="/todo/addtodo">Add New Todo</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Back to Planning</a>
         <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week ▶</a>
     </div>
 [% ELSE %]
@@ -251,21 +287,56 @@ document.addEventListener('keydown', function(e) {
     </div>
 [% END %]
 
-[% # Process todos by date for each day column and collect overdue %]
-[% SET todos_by_date = {} %]
-[% SET all_overdue_todos = [] %]
-[% SET first_day_of_week = week_dates.0.date_str %]
-[% FOREACH todo IN todos %]
-    [% SET todo_date = todo.start_date || todo.due_date %]
-    [% IF todo_date %]
-        [% # Check if todo is overdue (before the start of this week) and not completed %]
-        [% IF todo_date < first_day_of_week AND todo.status != 3 %]
-            [% all_overdue_todos.push(todo) %]
+[%# Use pre-built todos_by_date from Perl controller if available (recurrence rules applied).
+    Perl correctly handles weekly/biweekly/monthly/yearly recurrence — TT2 cannot compute day-of-week.
+    Fall back to TT2 bucketing for Documentation.pm / DailyPlan contexts that don't supply it. %]
+[% IF week_todos_by_date %]
+    [% SET todos_by_date    = week_todos_by_date %]
+    [% SET all_overdue_todos = week_overdue_todos || [] %]
+[% ELSE %]
+    [% SET todos_by_date = {} %]
+    [% SET all_overdue_todos = [] %]
+    [% SET recurring_todos = [] %]
+    [% SET first_day_of_week = week_dates.0.date_str %]
+    [% SET wfdn = first_day_of_week.replace('-', '') %]
+    [% FOREACH todo IN todos %]
+        [% SET wsubj = todo.subject.lower %]
+        [% IF todo.is_recurring OR wsubj.match('lunch') OR wsubj.match('break') OR wsubj.match('standup') OR wsubj.match('daily standup') %]
+            [% recurring_todos.push(todo) %]
         [% END %]
-        [% UNLESS todos_by_date.$todo_date %]
-            [% todos_by_date.$todo_date = [] %]
+        [% SET todo_date     = todo.start_date || todo.due_date %]
+        [% SET wtd = todo_date _ '' %]
+        [% SET todo_date_str = wtd ? wtd.substr(0, 10) : '' %]
+        [% IF todo_date_str %]
+            [% IF todo_date_str.replace('-', '') < wfdn AND todo.status != 3 %]
+                [% all_overdue_todos.push(todo) %]
+            [% END %]
+            [% UNLESS todos_by_date.$todo_date_str %]
+                [% todos_by_date.$todo_date_str = [] %]
+            [% END %]
+            [% todos_by_date.$todo_date_str.push(todo) %]
         [% END %]
-        [% todos_by_date.$todo_date.push(todo) %]
+    [% END %]
+    [% FOREACH day_info IN week_dates %]
+        [% SET d_str = day_info.date_str %]
+        [% SET d_num = d_str.replace('-', '') %]
+        [% UNLESS todos_by_date.$d_str %]
+            [% todos_by_date.$d_str = [] %]
+        [% END %]
+        [% FOREACH rt IN recurring_todos %]
+            [% SET already = 0 %]
+            [% FOREACH existing IN todos_by_date.$d_str %]
+                [% IF existing.record_id == rt.record_id %][% SET already = 1 %][% END %]
+            [% END %]
+            [% UNLESS already %]
+                [% SET wrtraw = rt.start_date ? (rt.start_date _ '') : '' %]
+                [% SET wrtsd  = wrtraw ? wrtraw.substr(0, 10) : '' %]
+                [% SET wrtsdn = wrtsd ? wrtsd.replace('-', '') : 0 %]
+                [% IF !wrtsd OR wrtsdn <= d_num %]
+                    [% todos_by_date.$d_str.push(rt) %]
+                [% END %]
+            [% END %]
+        [% END %]
     [% END %]
 [% END %]
 
@@ -310,11 +381,11 @@ document.addEventListener('keydown', function(e) {
 [% END %]
 
 <div id="day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
-    <div style="background:var(--bg-color,#fff);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(680px,95vw);max-height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:2px solid var(--primary-color,#4CAF50);background:var(--bg-secondary,#f8f9fa);flex-shrink:0;">
-            <span id="day-modal-title" style="font-weight:bold;font-size:1.1em;"></span>
-            <button onclick="closeDayModal()" style="border:none;background:transparent;font-size:1.4em;cursor:pointer;color:var(--text-muted-color,#6c757d);line-height:1;" title="Close (Esc)">✕</button>
+    <div style="background:#fff;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(960px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-bottom:2px solid #4CAF50;background:#f8f9fa;flex-shrink:0;">
+            <span id="day-modal-title" style="font-weight:bold;font-size:1em;"></span>
+            <button onclick="closeDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
         </div>
-        <div id="day-modal-body" style="overflow-y:auto;padding:12px 16px;flex:1;"></div>
+        <div id="day-modal-body" style="flex:1;overflow:auto;padding:0;"></div>
     </div>
 </div>

@@ -104,27 +104,59 @@ sub get_all_todos_for_calendar {
         $c->detach;
     }
 
-    # Check if user has admin or developer role
-    unless (grep { $_ eq 'admin' || $_ eq 'developer' } @$roles) {
+    # Check if user has a role that allows calendar access
+    unless (grep { lc($_) =~ /^(admin|developer|devops|editor|user|normal)$/ } @$roles) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
-            'Unauthorized access attempt by user without admin/developer role');
+            'Unauthorized access attempt by user without sufficient role');
         return [];
     }
 
-    $SiteName = $c->session->{'SiteName'};
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar', 
-        "Fetching all todos for calendar views. Site name: $SiteName");
+    my $session_site = $c->session->{'SiteName'};
 
-    # Get a DBIx::Class::Schema object
+    my @site_names;
+    if (ref $SiteName eq 'ARRAY' && scalar @$SiteName) {
+        @site_names = @$SiteName;
+    } elsif ($SiteName && !ref $SiteName) {
+        @site_names = ($SiteName);
+    } else {
+        @site_names = ($session_site);
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar',
+        "Fetching todos for calendar views. Sites: " . join(', ', @site_names));
+
     my $schema = $c->model('DBEncy');
-
-    # Get a DBIx::Class::ResultSet object for the 'Todo' table
     my $rs = $schema->resultset('Todo');
 
     my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    require DateTime;
+    my $cutoff_date = DateTime->now->subtract(days => 30)->ymd;
+
+    my $username = $c->session->{username} || '';
+
+    my $site_cond = @site_names == 1
+        ? { 'me.sitename' => $site_names[0] }
+        : { 'me.sitename' => { -in => \@site_names } };
+
+    my $status_cond = { -or => [
+        { 'me.status' => { -not_in => \@done_statuses } },
+        {
+            'me.status'        => { -in => \@done_statuses },
+            'me.last_mod_date' => { '>=' => $cutoff_date },
+        },
+    ] };
+
     my @todos = $rs->search(
-        { sitename => $SiteName, status => { -not_in => \@done_statuses } },
-        { order_by => { -asc => ['priority', 'start_date'] } }
+        {
+            -and => [
+                $status_cond,
+                { -or => [
+                    $site_cond,
+                    ($username ? { 'me.developer' => $username } : ()),
+                ] },
+            ],
+        },
+        { order_by => { -asc => ['me.priority', 'me.start_date'] } }
     );
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'get_all_todos_for_calendar',

@@ -53,31 +53,47 @@ sub index :Path('/log') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
-    # Retrieve the status from the query parameters, default to 'open'
-    my $status = $c->request->params->{status} // 'open';
 
-    # Create a new instance of the Log model
-    my $log_model = Comserv::Model::Log->new();
+    my $status      = $c->request->params->{status} // 'open';
+    my $site_filter = $c->request->params->{site}   // '';
 
-    # Fetch logs based on the status
-    my $rs;
-    if ($status eq 'all') {
-        $rs = $log_model->get_logs($c, 'all');  # Fetch all logs without status filter
-    } elsif ($status eq 'open') {
-        $rs = $log_model->get_logs($c, 'open');  # Fetch open logs (status not equal to 3)
+    my $username = $c->session->{username} || '';
+    my $sitename = $c->session->{SiteName} || '';
+    my $roles    = $c->session->{roles}    || [];
+    my $has_admin = ref($roles) eq 'ARRAY'
+        ? (grep { $_ eq 'admin' } @$roles) > 0
+        : ($roles && $roles =~ /\badmin\b/i);
+    my $is_csc_admin = ($sitename eq 'CSC' && $has_admin) || $username eq 'Shanta';
+
+    my @allowed_sites;
+    if ($is_csc_admin) {
+        my @all = $c->model('DBEncy')->resultset('Site')->search({}, { columns => ['name'], order_by => 'name' })->all;
+        @allowed_sites = map { $_->name } @all;
     } else {
-        $rs = $log_model->get_logs($c, $status);  # Fetch logs with specific status
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                { user_id => $user_id, is_active => 1 },
+                { join => 'site', columns => [qw(site.name)], distinct => 1 }
+            )->all;
+            @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
+        }
+        @allowed_sites = ($sitename) unless @allowed_sites;
     }
 
-    # Debug: Print all logs
-    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
+    my $effective_site = ($site_filter && grep { $_ eq $site_filter } @allowed_sites)
+        ? $site_filter : '';
 
-    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
-    # Pass the logs and status to the template
+    my $log_model = Comserv::Model::Log->new();
+    my $rs = $log_model->get_logs($c, $status, $effective_site, \@allowed_sites);
+
+    $c->stash->{debug_errors} //= [];
     $c->stash(
-        logs     => [ $rs->all ],
-        status   => $status, # Pass the current status to the template
-        template => 'log/index.tt'
+        logs          => [ $rs->all ],
+        status        => $status,
+        allowed_sites => \@allowed_sites,
+        site_filter   => $effective_site,
+        template      => 'log/index.tt'
     );
 }
 
