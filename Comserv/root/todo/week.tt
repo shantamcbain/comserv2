@@ -183,21 +183,9 @@
 <script>
 function showDayModal(dateStr, dayLabel, event) {
     event.preventDefault();
-    document.getElementById('day-modal-title').textContent = dayLabel;
-    var iframe = document.getElementById('day-modal-iframe');
-    iframe.src = '/todo/day/' + dateStr;
-    document.getElementById('day-modal').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
+    var base = window.location.pathname.match(/^\/planning\//) ? '/planning/daily' : '/todo/day';
+    window.location.href = base + '/' + dateStr;
 }
-function closeDayModal() {
-    document.getElementById('day-modal').style.display = 'none';
-    document.body.style.overflow = '';
-    var iframe = document.getElementById('day-modal-iframe');
-    iframe.src = 'about:blank';
-}
-document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') closeDayModal();
-});
 
 function initWeekColDragDrop() {
     var GRID_START = 5 * 60;
@@ -374,12 +362,4 @@ document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
     </div>
 [% END %]
 
-<div id="day-modal" onclick="if(event.target===this)closeDayModal()" style="display:none;position:fixed;inset:0;z-index:50000;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;">
-    <div style="background:var(--bg-color,#fff);border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.4);width:min(900px,96vw);height:88vh;display:flex;flex-direction:column;overflow:hidden;">
-        <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:2px solid var(--primary-color,#4CAF50);background:var(--bg-secondary,#f8f9fa);flex-shrink:0;">
-            <span id="day-modal-title" style="font-weight:bold;font-size:1.1em;"></span>
-            <button onclick="closeDayModal()" style="border:none;background:transparent;font-size:1.4em;cursor:pointer;color:var(--text-muted-color,#6c757d);line-height:1;" title="Close (Esc)">✕</button>
-        </div>
-        <iframe id="day-modal-iframe" src="about:blank" style="border:none;flex:1;width:100%;"></iframe>
-    </div>
-</div>
+

@@ -555,11 +555,34 @@ sub daily :Path('/planning/daily') :Args {
             };
         }
 
+        my @ap_all_usernames;
+        eval {
+            if ($is_csc) {
+                my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                    {},
+                    { columns => ['username'], order_by => 'username', rows => 200 }
+                )->all;
+                my %seen;
+                for my $r (@urows) {
+                    my $u = eval { $r->username } // '';
+                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
+                }
+            } else {
+                my %seen;
+                for my $todo (@all_sorted) {
+                    my $u = $todo->{developer} || $todo->{username_of_poster} || '';
+                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
+                }
+                @ap_all_usernames = sort @ap_all_usernames;
+            }
+        };
+
         $c->stash(
             ap_projects      => \@ap_projects_list,
             ap_role_cats     => \@ap_role_cats_list,
             ap_user_roles    => $user_roles,
             ap_all_sitenames => \@ap_all_sitenames,
+            ap_all_usernames => \@ap_all_usernames,
         );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',

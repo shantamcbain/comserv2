@@ -1073,6 +1073,9 @@ document.addEventListener('DOMContentLoaded', function() {
     <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;">User:</label>
     <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--bg-primary,#fff);color:var(--text-primary,#333);">
         <option value="">All</option>
+        [% FOREACH uname IN ap_all_usernames %]
+        <option value="[% uname %]">[% uname %]</option>
+        [% END %]
     </select>
 </div>
 [% END %]
