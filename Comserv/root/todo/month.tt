@@ -470,10 +470,10 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="month-navigation view-navigation">
         <a href="[% base_url %]/[% prev_month_date %][% month_hash %]">◀ Previous Month</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Daily Schedule</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Daily Schedule</a>
         <a href="[% base_url %]/[% date || current_date_str %][% week_hash %]">Week View</a>
         <a href="/todo/addtodo">Add New Todo</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Back to Planning</a>
         <a href="[% base_url %]/[% next_month_date %][% month_hash %]">Next Month ▶</a>
     </div>
 [% ELSE %]
@@ -659,7 +659,7 @@ function showMonthDayModal(dateStr, event) {
     event.preventDefault();
     document.getElementById('month-day-modal-title').textContent = dateStr;
     var body = document.getElementById('month-day-modal-body');
-    body.innerHTML = '<iframe src="/todo/day/' + encodeURIComponent(dateStr) + '?embed=1" style="width:100%;height:100%;border:none;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
+    body.innerHTML = '<iframe src="/todo/day/' + encodeURIComponent(dateStr) + '?embed=1" style="width:100%;height:100%;border:none;"></iframe>';
     document.getElementById('month-day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
