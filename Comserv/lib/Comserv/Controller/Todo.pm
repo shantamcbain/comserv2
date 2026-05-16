@@ -676,6 +676,7 @@ sub edit :Path('/todo/edit') :Args(1) {
         return_to        => $return_to,
         sites            => $edit_sites,
         is_csc           => $edit_is_csc,
+        todo_sitename    => $todo->get_column('sitename'),
         form_data        => { sitename => $todo->get_column('sitename') },
         template         => 'todo/edit.tt'
     );
