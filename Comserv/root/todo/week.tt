@@ -267,10 +267,10 @@ document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
     <div class="week-navigation view-navigation">
         <a href="[% base_url %]/[% prev_week_date %][% week_hash %]">◀ Previous Week</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Daily Schedule</a>
         <a href="[% base_url %]/[% date || current_date_str %][% month_hash %]">Month View</a>
         <a href="/todo/addtodo">Add New Todo</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
+        <a href="[% base_url %]/[% date || current_date_str %]#daily-schedule">Back to Planning</a>
         <a href="[% base_url %]/[% next_week_date %][% week_hash %]">Next Week ▶</a>
     </div>
 [% ELSE %]
