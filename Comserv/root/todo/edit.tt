@@ -254,7 +254,44 @@ function onRecurringChange(cb) {
                 [% INCLUDE 'todo/priority_select.tt' %]
             </select>
         </div>
-        
+
+        <div class="form-group">
+            <label for="todo_type">Type:</label>
+            <select id="todo_type" name="todo_type" class="form-select" onchange="onTodoTypeChange(this)">
+                [% SET _tt = record.get_column('todo_type') || 'task' %]
+                <option value="task"        [% IF _tt == 'task'        %]selected[% END %]>Task</option>
+                <option value="appointment" [% IF _tt == 'appointment' %]selected[% END %]>📌 Appointment</option>
+                <option value="meeting"     [% IF _tt == 'meeting'     %]selected[% END %]>🤝 Meeting</option>
+                <option value="event"       [% IF _tt == 'event'       %]selected[% END %]>🎂 Event</option>
+                <option value="reminder"    [% IF _tt == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
+            </select>
+        </div>
+        <div class="form-group" id="recurring-row">
+            <label>Repeats:</label>
+            <input type="checkbox" id="is_recurring" name="is_recurring" value="1"
+                   [% IF record.get_column('is_recurring') %]checked[% END %]
+                   onchange="onRecurringChange(this)">
+            <span id="recurrence-rule-wrap" style="[% UNLESS record.get_column('is_recurring') %]display:none[% END %]">
+                [% SET _rr = record.get_column('recurrence_rule') || '' %]
+                <select id="recurrence_rule" name="recurrence_rule" class="form-select" style="display:inline-block;width:auto;margin-left:8px;">
+                    <option value="">— Select cadence —</option>
+                    <option value="daily"    [% IF _rr == 'daily'    %]selected[% END %]>Every Day</option>
+                    <option value="weekdays" [% IF _rr == 'weekdays' %]selected[% END %]>Weekdays (Mon–Fri)</option>
+                    <option value="weekly"   [% IF _rr == 'weekly'   %]selected[% END %]>Every Week</option>
+                    <option value="biweekly" [% IF _rr == 'biweekly' %]selected[% END %]>Every Two Weeks</option>
+                    <option value="monthly"  [% IF _rr == 'monthly'  %]selected[% END %]>Every Month</option>
+                    <option value="yearly"   [% IF _rr == 'yearly'   %]selected[% END %]>Every Year</option>
+                </select>
+            </span>
+        </div>
+        <div class="form-group" id="timezone-row" style="[% UNLESS (_tt == 'meeting' OR _tt == 'appointment') %]display:none[% END %]">
+            <label for="creator_timezone">Time Zone:</label>
+            <select id="creator_timezone" name="creator_timezone" class="form-select" data-current="[% record.get_column('creator_timezone') || '' %]">
+                <option value="">— Use local time —</option>
+            </select>
+            <small>Set your timezone so attendees see the correct local time.</small>
+        </div>
+
         <div class="form-group">
             <label for="developer">Developer:</label>
             <input type="text" id="developer" name="developer" value="[% record.get_column('developer') %]">
@@ -303,43 +340,6 @@ function onRecurringChange(cb) {
                     <option value="[% user.id %]" [% IF record.get_column('user_id') == user.id %]selected[% END %]>[% user.username %]</option>
                 [% END %]
             </select>
-        </div>
-        
-        <div class="form-group">
-            <label for="todo_type">Type:</label>
-            <select id="todo_type" name="todo_type" class="form-select" onchange="onTodoTypeChange(this)">
-                [% SET _tt = record.get_column('todo_type') || 'task' %]
-                <option value="task"        [% IF _tt == 'task'        %]selected[% END %]>Task</option>
-                <option value="appointment" [% IF _tt == 'appointment' %]selected[% END %]>📌 Appointment</option>
-                <option value="meeting"     [% IF _tt == 'meeting'     %]selected[% END %]>🤝 Meeting</option>
-                <option value="event"       [% IF _tt == 'event'       %]selected[% END %]>🎂 Event</option>
-                <option value="reminder"    [% IF _tt == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
-            </select>
-        </div>
-        <div class="form-group" id="recurring-row">
-            <label>Repeats:</label>
-            <input type="checkbox" id="is_recurring" name="is_recurring" value="1"
-                   [% IF record.get_column('is_recurring') %]checked[% END %]
-                   onchange="onRecurringChange(this)">
-            <span id="recurrence-rule-wrap" style="[% UNLESS record.get_column('is_recurring') %]display:none[% END %]">
-                [% SET _rr = record.get_column('recurrence_rule') || '' %]
-                <select id="recurrence_rule" name="recurrence_rule" class="form-select" style="display:inline-block;width:auto;margin-left:8px;">
-                    <option value="">— Select cadence —</option>
-                    <option value="daily"    [% IF _rr == 'daily'    %]selected[% END %]>Every Day</option>
-                    <option value="weekdays" [% IF _rr == 'weekdays' OR (!_rr && record.get_column('is_recurring')) %]selected[% END %]>Weekdays (Mon–Fri)</option>
-                    <option value="weekly"   [% IF _rr == 'weekly'   %]selected[% END %]>Every Week</option>
-                    <option value="biweekly" [% IF _rr == 'biweekly' %]selected[% END %]>Every Two Weeks</option>
-                    <option value="monthly"  [% IF _rr == 'monthly'  %]selected[% END %]>Every Month</option>
-                    <option value="yearly"   [% IF _rr == 'yearly'   %]selected[% END %]>Every Year</option>
-                </select>
-            </span>
-        </div>
-        <div class="form-group" id="timezone-row" style="[% UNLESS (_tt == 'meeting' OR _tt == 'appointment') %]display:none[% END %]">
-            <label for="creator_timezone">Time Zone:</label>
-            <select id="creator_timezone" name="creator_timezone" class="form-select" data-current="[% record.get_column('creator_timezone') || '' %]">
-                <option value="">— Use local time —</option>
-            </select>
-            <small>Set your timezone so attendees see the correct local time.</small>
         </div>
 
         <!-- Hidden fields to preserve data -->
