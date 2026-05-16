@@ -651,7 +651,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
             <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
         </div>
-        <div id="month-day-modal-body" style="flex:1;overflow:hidden;padding:0;"></div>
+        <div id="month-day-modal-body" style="flex:1;overflow:auto;padding:8px;"></div>
     </div>
 </div>
 <script>
@@ -659,9 +659,22 @@ function showMonthDayModal(dateStr, event) {
     event.preventDefault();
     document.getElementById('month-day-modal-title').textContent = dateStr;
     var body = document.getElementById('month-day-modal-body');
-    body.innerHTML = '<iframe src="/todo/day/' + encodeURIComponent(dateStr) + '?embed=1" style="width:100%;height:100%;border:none;"></iframe>';
+    body.innerHTML = '<p style="padding:20px;color:#888;">Loading day schedule for ' + dateStr + '...</p>';
     document.getElementById('month-day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
+    fetch('/todo/day/' + encodeURIComponent(dateStr) + '?embed=1', { credentials: 'same-origin' })
+        .then(function(r) {
+            if (!r.ok) { throw new Error('HTTP ' + r.status); }
+            return r.text();
+        })
+        .then(function(html) {
+            var parser = new DOMParser();
+            var doc = parser.parseFromString(html, 'text/html');
+            var src = doc.body || doc.documentElement;
+            src.querySelectorAll('link[rel="stylesheet"]').forEach(function(el) { el.remove(); });
+            body.innerHTML = src.innerHTML;
+        })
+        .catch(function(err) { body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view: ' + err + '</p>'; });
 }
 function closeMonthDayModal() {
     document.getElementById('month-day-modal').style.display = 'none';
