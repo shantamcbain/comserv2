@@ -718,25 +718,27 @@ function gcalUpdateNowLine() {
     line.style.top = (totalMin - gridStart) + 'px';
 }
 
-function gcalToggleSite(site, chip) {
-    if (site === '__ALL__') {
-        var allActive = chip.classList.contains('gcal-site-active');
-        if (allActive) {
-            document.querySelectorAll('.gcal-site-chip:not(.gcal-site-chip-all)').forEach(function(c) { c.classList.add('hidden-site'); });
-            chip.classList.remove('gcal-site-active');
-        } else {
-            document.querySelectorAll('.gcal-site-chip').forEach(function(c) { c.classList.remove('hidden-site'); });
-            chip.classList.add('gcal-site-active');
-        }
-    } else {
-        chip.classList.toggle('hidden-site');
-        var allChip = document.querySelector('.gcal-site-chip-all');
-        var anyHidden = document.querySelectorAll('.gcal-site-chip:not(.gcal-site-chip-all).hidden-site').length > 0;
-        if (allChip) { anyHidden ? allChip.classList.remove('gcal-site-active') : allChip.classList.add('gcal-site-active'); }
-    }
-    var hidden = new Set(Array.from(document.querySelectorAll('.gcal-site-chip.hidden-site')).map(function(c){ return c.getAttribute('data-site'); }));
-    document.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
-        el.style.display = hidden.has(el.getAttribute('data-site')) ? 'none' : '';
+function gcalPopulateUserFilter() {
+    var sel = document.getElementById('gcal-user-filter');
+    if (!sel) return;
+    var seen = {};
+    document.querySelectorAll('.gcal-ev[data-user]').forEach(function(el) {
+        var u = el.getAttribute('data-user') || '';
+        if (u && !seen[u]) { seen[u] = 1; var o = document.createElement('option'); o.value = u; o.textContent = u; sel.appendChild(o); }
+    });
+}
+
+function gcalApplyFilters() {
+    var siteSel = document.getElementById('gcal-site-filter');
+    var userSel = document.getElementById('gcal-user-filter');
+    var filterSite = siteSel ? siteSel.value : '';
+    var filterUser = userSel ? userSel.value : '';
+    document.querySelectorAll('.gcal-ev').forEach(function(el) {
+        var site = el.getAttribute('data-site') || '';
+        var user = el.getAttribute('data-user') || '';
+        var siteOk = !filterSite || site === filterSite;
+        var userOk = !filterUser || user === filterUser;
+        el.style.display = (siteOk && userOk) ? '' : 'none';
     });
 }
 
@@ -890,6 +892,7 @@ document.addEventListener('DOMContentLoaded', function() {
     gcalUpdateNowLine();
     setInterval(gcalUpdateNowLine, 60000);
     initGcalDragDrop();
+    gcalPopulateUserFilter();
     if (typeof initDayViewDragAndDrop === 'function') {
         initDayViewDragAndDrop();
     }
@@ -1056,15 +1059,21 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 [% END %]
 
-[% IF ap_all_sitenames.size > 0 %]
-<div class="gcal-sites-bar">
-    <span style="font-size:0.75em;color:#70757a;margin-right:4px;">Sites:</span>
-    <span class="gcal-site-chip gcal-site-chip-all gcal-site-active" data-site="__ALL__" onclick="gcalToggleSite('__ALL__',this)" title="Show all sites">All</span>
-    [% FOREACH sname IN ap_all_sitenames %]
-    <span class="gcal-site-chip" data-site="[% sname %]" onclick="gcalToggleSite('[% sname %]',this)" title="Toggle [% sname %]">
-        <span class="gcal-site-dot" data-site="[% sname %]"></span>[% sname %]
-    </span>
+[% UNLESS include_mode %]
+<div class="gcal-filter-bar" style="display:flex;align-items:center;gap:10px;padding:4px 8px;background:var(--bg-secondary,#f1f3f4);border-bottom:1px solid var(--border-color,#ddd);flex-wrap:wrap;">
+    [% IF ap_all_sitenames.size > 0 %]
+    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;">Site:</label>
+    <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--bg-primary,#fff);color:var(--text-primary,#333);">
+        <option value="">All</option>
+        [% FOREACH sname IN ap_all_sitenames %]
+        <option value="[% sname %]">[% sname %]</option>
+        [% END %]
+    </select>
     [% END %]
+    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;">User:</label>
+    <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--bg-primary,#fff);color:var(--text-primary,#333);">
+        <option value="">All</option>
+    </select>
 </div>
 [% END %]
 
@@ -1138,6 +1147,7 @@ document.addEventListener('DOMContentLoaded', function() {
                  data-todo-id="[% todo.record_id %]"
                  data-priority="[% tp %]"
                  data-site="[% ts %]"
+                 data-user="[% tdev %]"
                  data-is-recurring="[% isrec %]"
                  data-start-min="[% stm %]"
                  data-dur-min="[% test %]"
