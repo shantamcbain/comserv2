@@ -168,7 +168,7 @@ sub begin :Private {
     return 1 if $c->req->path =~ m{^api/};
 
     # AJAX update endpoints require only a valid session, not admin/developer
-    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single)\b}) {
+    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single|quick_close|quick_priority|reschedule|day_drop)\b}) {
         unless ($c->session->{user_id}) {
             $c->stash(json => { success => 0, error => 'Not authenticated' });
             $c->forward('View::JSON');
@@ -2323,6 +2323,41 @@ sub quick_close :Path('quick_close') :Args(0) {
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
         "Todo $record_id quick-closed by $username");
+    $c->response->body('{"ok":1}');
+}
+
+sub quick_priority :Path('quick_priority') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $body_fh = $c->req->body;
+    my $body = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    my $priority  = $data->{priority}  if $data;
+    unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id or priority"}');
+        return;
+    }
+    $priority = int($priority);
+    $priority = 1 if $priority < 1;
+    $priority = 10 if $priority > 10;
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+        $todo->update({ priority => $priority, last_mod_by => $username });
+    };
+    if ($@) {
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
     $c->response->body('{"ok":1}');
 }
 
