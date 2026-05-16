@@ -509,13 +509,13 @@ sub daily :Path('/planning/daily') :Args {
             eval {
                 my $user_id = $c->session->{user_id};
                 if ($user_id) {
-                    my @us_rows = $c->model('DBEncy')->resultset('UserSite')->search(
-                        { user_id => $user_id }
+                    my @usr_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                        { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
                     )->all;
                     my %seen;
-                    for my $us (@us_rows) {
+                    for my $usr (@usr_rows) {
                         eval {
-                            my $site = $c->model('DBEncy')->resultset('Site')->find($us->site_id);
+                            my $site = $c->model('DBEncy')->resultset('Site')->find($usr->site_id);
                             if ($site && $site->name && !$seen{$site->name}++) {
                                 push @ap_all_sitenames, $site->name;
                             }

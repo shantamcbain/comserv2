@@ -1647,15 +1647,13 @@ sub day :Path('/todo/day') :Args {
             my $all_sites  = $site_model->get_all_sites($c) || [];
             @day_all_sitenames = sort map { $_->name } @$all_sites;
         } elsif ($user_id) {
-            my @us_rows = $c->model('DBEncy')->resultset('UserSite')->search(
-                { user_id => $user_id },
-                { prefetch => 'site' }
+            my @usr_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
             )->all;
             my %seen;
-            for my $us (@us_rows) {
+            for my $usr (@usr_rows) {
                 eval {
-                    my $site_id = $us->site_id;
-                    my $site    = $c->model('DBEncy')->resultset('Site')->find($site_id);
+                    my $site = $c->model('DBEncy')->resultset('Site')->find($usr->site_id);
                     if ($site && $site->name && !$seen{$site->name}++) {
                         push @day_all_sitenames, $site->name;
                     }
