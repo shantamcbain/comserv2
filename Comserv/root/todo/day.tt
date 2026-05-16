@@ -54,16 +54,16 @@
        SET temp_today_todos = [];
        SET temp_overdue_todos = [];
        
-       SET _date_num = date.replace('-', '');
+       SET fdn = date.replace('-', '');
        FOREACH todo IN todos;
            NEXT IF todo.status == 3;
-           SET _sd = todo.start_date _ '';
-           SET _dd = todo.due_date   _ '';
-           SET _start = _sd ? _sd.substr(0, 10).replace('-', '') : 0;
-           SET _due   = _dd ? _dd.substr(0, 10).replace('-', '') : 0;
-           IF _start AND _start < _date_num;
+           SET fsd = todo.start_date _ '';
+           SET fdd = todo.due_date   _ '';
+           SET fst = fsd ? fsd.substr(0, 10).replace('-', '') : 0;
+           SET fdu = fdd ? fdd.substr(0, 10).replace('-', '') : 0;
+           IF fst AND fst < fdn;
                temp_overdue_todos.push(todo);
-           ELSIF (_start AND _start == _date_num) OR (!_start AND _due AND _due == _date_num);
+           ELSIF (fst AND fst == fdn) OR (!fst AND fdu AND fdu == fdn);
                temp_today_todos.push(todo);
            END;
        END;
@@ -911,8 +911,8 @@ document.addEventListener('DOMContentLoaded', function() {
                     <!-- Popup on hover -->
                     <div class="todo-popup">
                         <div class="popup-subject">[% todo.subject %]</div>
-                        [% SET _pd = todo.description | trim %][% IF _pd %]
-                            <div class="popup-description">[% _pd %]</div>
+                        [% SET opd = todo.description | trim %][% IF opd %]
+                            <div class="popup-description">[% opd %]</div>
                         [% END %]
                         <div class="popup-details">
                             [% IF todo.project_id %]<div><strong>Project:</strong> [% proj_name_map.${todo.project_id} || todo.project_id %]</div>[% END %]
@@ -1011,88 +1011,85 @@ document.addEventListener('DOMContentLoaded', function() {
         <div class="gcal-drop-target-line" id="gcal-drop-line"></div>
 
         [% FOREACH todo IN todos %]
-            [% SET _tp       = todo.priority || 9 %]
-            [% SET _ts       = todo.sitename || '' %]
-            [% SET _dev      = todo.developer || todo.username_of_poster || '' %]
-            [% SET _proj     = proj_name_map.${todo.project_id} || '' %]
-            [% SET _done     = (todo.status == 3 OR todo.status == 4
+            [% SET tp       = todo.priority || 9 %]
+            [% SET ts       = todo.sitename || '' %]
+            [% SET tdev     = todo.developer || todo.username_of_poster || '' %]
+            [% SET tproj    = proj_name_map.${todo.project_id} || '' %]
+            [% SET tdone    = (todo.status == 3 OR todo.status == 4
                                 OR todo.status == 'DONE' OR todo.status == 'Completed'
                                 OR todo.status == 'completed' OR todo.status == 'Closed'
                                 OR todo.status == 'closed' OR todo.status == 'Done') %]
-            [% SET _est_mins = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 30 %]
-            [% SET _subj_l   = todo.subject.lower %]
-            [% SET _is_rec   = (todo.is_recurring OR _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup')) ? '1' : '0' %]
-            [% SET _ttype    = todo.todo_type || 'task' %]
-            [%# Use precomputed fields embedded in the todo hashref by Planning.pm.
-                Fallback to parsing time_of_day string for non-Planning routes. %]
+            [% SET test     = todo.estimated_man_hours > 0 ? todo.estimated_man_hours : 30 %]
+            [% SET subjl    = todo.subject.lower %]
+            [% SET isrec    = (todo.is_recurring OR subjl.match('lunch') OR subjl.match('break') OR subjl.match('standup')) ? '1' : '0' %]
+            [% SET ttype    = todo.todo_type || 'task' %]
             [% IF todo.top_px.defined %]
-            [% SET _top_px      = todo.top_px %]
-            [% SET _height      = todo.height %]
-            [% SET _start_total = todo.start_min %]
-            [% SET _est_mins    = todo.est_mins %]
-            [% SET _time_lbl    = todo.time_lbl %]
+            [% SET tpx      = todo.top_px %]
+            [% SET tht      = todo.height %]
+            [% SET stm      = todo.start_min %]
+            [% SET test     = todo.est_mins %]
+            [% SET tlbl     = todo.time_lbl %]
             [% ELSE %]
-            [%# Fallback: parse time_of_day string (direct /todo/day route) %]
-            [% SET _tod_str     = todo.time_of_day _ '' %]
-            [% SET _tod_parts   = _tod_str.split(':') %]
-            [% SET _sh          = _tod_parts.0 * 1 OR 9 %]
-            [% SET _sm          = _tod_parts.1 * 1 %]
-            [% SET _start_total = _sh * 60 + _sm %]
-            [% SET _top_px      = _start_total - 300 %]
-            [% IF _top_px < 0 %][% SET _top_px = 0 %][% END %]
-            [% IF _top_px > 1000 %][% SET _top_px = 1000 %][% END %]
-            [% SET _height      = _est_mins < 30 ? 30 : _est_mins %]
-            [% IF _height > 900 %][% SET _height = 900 %][% END %]
-            [% SET _time_lbl    = _tod_str.substr(0, 5) %]
+            [% SET todstr   = todo.time_of_day _ '' %]
+            [% SET todp     = todstr.split(':') %]
+            [% SET tsh      = todp.0 * 1 OR 9 %]
+            [% SET tsm      = todp.1 * 1 %]
+            [% SET stm      = tsh * 60 + tsm %]
+            [% SET tpx      = stm - 300 %]
+            [% IF tpx < 0 %][% SET tpx = 0 %][% END %]
+            [% IF tpx > 1000 %][% SET tpx = 1000 %][% END %]
+            [% SET tht      = test < 30 ? 30 : test %]
+            [% IF tht > 900 %][% SET tht = 900 %][% END %]
+            [% SET tlbl     = todstr.substr(0, 5) %]
             [% END %]
-            [% SET _stat_s   = _done ? 'Done' :
+            [% SET tstat    = tdone ? 'Done' :
                                (todo.status == 2 OR todo.status == 'IN PROGRESS' OR todo.status == 'In Progress') ? 'In Progress' :
                                (todo.status == 1 OR todo.status == 'NEW' OR todo.status == 'New') ? 'New' :
                                todo.status %]
-            <div class="gcal-ev[% IF _done %] is-done[% END %]"
+            <div class="gcal-ev[% IF tdone %] is-done[% END %]"
                  data-todo-id="[% todo.record_id %]"
-                 data-priority="[% _tp %]"
-                 data-site="[% _ts %]"
-                 data-is-recurring="[% _is_rec %]"
-                 data-start-min="[% _start_total %]"
-                 data-dur-min="[% _est_mins %]"
+                 data-priority="[% tp %]"
+                 data-site="[% ts %]"
+                 data-is-recurring="[% isrec %]"
+                 data-start-min="[% stm %]"
+                 data-dur-min="[% test %]"
                  data-date="[% date %]"
                  [% IF todo.creator_timezone %]data-creator-tz="[% todo.creator_timezone %]"[% END %]
-                 style="top:[% _top_px %]px; height:[% _height %]px; left:0.3%; width:99.4%;">
+                 style="top:[% tpx %]px; height:[% tht %]px; left:0.3%; width:99.4%;">
                 <div style="height:100%;display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden;">
                     <div class="gcal-ev-title">
-                        [% IF _done %]&#10003; [% END %][% IF _is_rec %]&#x1F501; [% END %][% IF _ttype == 'appointment' %]&#x1F4CC; [% ELSIF _ttype == 'meeting' %]&#x1F91D; [% ELSIF _ttype == 'event' %]&#x1F382; [% ELSIF _ttype == 'reminder' %]&#x1F514; [% END %][% todo.subject %]
+                        [% IF tdone %]&#10003; [% END %][% IF isrec %]&#x1F501; [% END %][% IF ttype == 'appointment' %]&#x1F4CC; [% ELSIF ttype == 'meeting' %]&#x1F91D; [% ELSIF ttype == 'event' %]&#x1F382; [% ELSIF ttype == 'reminder' %]&#x1F514; [% END %][% todo.subject %]
                     </div>
-                    [% IF _height > 25 %]
-                    <div class="gcal-ev-meta">[% _time_lbl %][% IF _ts %] &middot; [% _ts %][% END %][% IF _proj %] &middot; [% _proj %][% END %][% IF _dev %] &middot; [% _dev %][% END %]</div>
+                    [% IF tht > 25 %]
+                    <div class="gcal-ev-meta">[% tlbl %][% IF ts %] &middot; [% ts %][% END %][% IF tproj %] &middot; [% tproj %][% END %][% IF tdev %] &middot; [% tdev %][% END %]</div>
                     [% END %]
-                    [% IF _height > 55 %]
+                    [% IF tht > 55 %]
                     <div class="gcal-ev-actions">
-                        <select class="gcal-priority-sel" data-record-id="[% todo.record_id %]" data-orig="[% _tp %]" onchange="savePriority(this)">
-                            [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]<option value="[% pv %]" [% IF pv == _tp %]selected[% END %]>P[% pv %]</option>[% END %]
+                        <select class="gcal-priority-sel" data-record-id="[% todo.record_id %]" data-orig="[% tp %]" onchange="savePriority(this)">
+                            [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]<option value="[% pv %]" [% IF pv == tp %]selected[% END %]>P[% pv %]</option>[% END %]
                         </select>
                         <a class="gcal-ev-btn" href="/todo/details?record_id=[% todo.record_id %]">View</a>
                         <a class="gcal-ev-btn" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS _done %]<button class="gcal-ev-btn" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
+                        [% UNLESS tdone %]<button class="gcal-ev-btn" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
                     </div>
                     [% END %]
                 </div>
                 <div class="todo-popup">
                     <div class="popup-subject">[% todo.subject | html %]</div>
-                    [% SET _pd = todo.description | trim %]
-                    [% IF _pd %]<div class="popup-description" style="margin:4px 0;font-size:0.88em;color:#555;max-height:120px;overflow-y:auto;">[% _pd | html %]</div>[% END %]
+                    [% SET pd = todo.description | trim %]
+                    [% IF pd %]<div class="popup-description" style="margin:4px 0;font-size:0.88em;color:#555;max-height:120px;overflow-y:auto;">[% pd | html %]</div>[% END %]
                     <div class="popup-details">
-                        <div><strong>Time:</strong> [% _time_lbl %]</div>
-                        [% IF _ts %]<div><strong>Site:</strong> [% _ts %]</div>[% END %]
-                        [% IF _proj %]<div><strong>Project:</strong> [% _proj %]</div>[% END %]
-                        [% IF _dev %]<div><strong>Assigned:</strong> [% _dev %]</div>[% END %]
+                        <div><strong>Time:</strong> [% tlbl %]</div>
+                        [% IF ts %]<div><strong>Site:</strong> [% ts %]</div>[% END %]
+                        [% IF tproj %]<div><strong>Project:</strong> [% tproj %]</div>[% END %]
+                        [% IF tdev %]<div><strong>Assigned:</strong> [% tdev %]</div>[% END %]
                         [% IF todo.start_date %]<div><strong>Start:</strong> [% todo.start_date %]</div>[% END %]
                         [% IF todo.due_date %]<div><strong>Due:</strong> [% todo.due_date %]</div>[% END %]
                         <div><strong>Priority:</strong> P[% todo.priority || 9 %]</div>
-                        <div><strong>Status:</strong> [% _stat_s %]</div>
-                        [% IF _est_mins > 0 %]<div><strong>Est:</strong> [% _est_mins %] min</div>[% END %]
-                        [% IF _is_rec %]<div><strong>Recurring:</strong> [% todo.recurrence_rule || 'yes' %]</div>[% END %]
-                        [% IF _ttype AND _ttype != 'task' %]<div><strong>Type:</strong> [% _ttype %]</div>[% END %]
+                        <div><strong>Status:</strong> [% tstat %]</div>
+                        [% IF test > 0 %]<div><strong>Est:</strong> [% test %] min</div>[% END %]
+                        [% IF isrec %]<div><strong>Recurring:</strong> [% todo.recurrence_rule || 'yes' %]</div>[% END %]
+                        [% IF ttype AND ttype != 'task' %]<div><strong>Type:</strong> [% ttype %]</div>[% END %]
                     </div>
                 </div>
             </div>
