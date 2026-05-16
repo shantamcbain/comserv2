@@ -983,28 +983,28 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <div class="gcal-grid-outer">
     <div class="gcal-time-col">
-        [% FOREACH _hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
+        [% FOREACH hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
         <div class="gcal-hour-label">
-            [% IF _hr == 12 %]12 PM[% ELSIF _hr > 12 %][% _hr - 12 %] PM[% ELSE %][% _hr %] AM[% END %]
+            [% IF hr == 12 %]12 PM[% ELSIF hr > 12 %][% hr - 12 %] PM[% ELSE %][% hr %] AM[% END %]
         </div>
         [% END %]
     </div>
 
     <div class="gcal-events-area" id="gcal-events-area" style="height:1020px;">
 
-        [% FOREACH _hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
-        [% SET _rule_top = (_hr - 5) * 60 %]
-        <div class="gcal-hour-rule" style="top:[% _rule_top %]px;"></div>
-        <div class="gcal-half-rule" style="top:[% _rule_top + 30 %]px;"></div>
+        [% FOREACH hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
+        [% SET rule_top = (hr - 5) * 60 %]
+        <div class="gcal-hour-rule" style="top:[% rule_top %]px;"></div>
+        <div class="gcal-half-rule" style="top:[% rule_top + 30 %]px;"></div>
         [% END %]
 
-        [% SET _add_idx = 0 %]
-        [% FOREACH _hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
-        [% SET _dh = _hr < 10 ? '0' _ _hr : '' _ _hr %]
-        [% SET _click_top = _add_idx * 60 %]
-        [% SET _add_idx = _add_idx + 1 %]
-        <div class="gcal-add-click" data-hour="[% _dh %]" data-min="00" data-date="[% date %]"
-             style="top:[% _click_top %]px;" title="Click to add at [% _dh %]:00"></div>
+        [% SET add_idx = 0 %]
+        [% FOREACH hr IN [5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22] %]
+        [% SET dh = hr < 10 ? '0' _ hr : '' _ hr %]
+        [% SET click_top = add_idx * 60 %]
+        [% SET add_idx = add_idx + 1 %]
+        <div class="gcal-add-click" data-hour="[% dh %]" data-min="00" data-date="[% date %]"
+             style="top:[% click_top %]px;" title="Click to add at [% dh %]:00"></div>
         [% END %]
 
         <div class="gcal-now-line" id="gcal-now-line" style="display:none;"><div class="gcal-now-dot"></div></div>
@@ -1023,23 +1023,27 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET _subj_l   = todo.subject.lower %]
             [% SET _is_rec   = (todo.is_recurring OR _subj_l.match('lunch') OR _subj_l.match('break') OR _subj_l.match('standup')) ? '1' : '0' %]
             [% SET _ttype    = todo.todo_type || 'task' %]
-            [% SET _tod      = todo.time_of_day || '09:00:00' %]
-            [% SET _sh       = _tod.substr(0, 2) * 1 %]
-            [% SET _sm       = _tod.substr(3, 2) * 1 %]
+            [%# Use Perl-precomputed positions from todo_meta hash (keyed by record_id) %]
+            [% SET _m        = todo_meta.${todo.record_id} %]
+            [% IF _m %]
+            [% SET _top_px     = _m.top_px %]
+            [% SET _height     = _m.height %]
+            [% SET _start_total = _m.start_min %]
+            [% SET _est_mins   = _m.est_mins %]
+            [% SET _time_lbl   = _m.time_lbl %]
+            [% ELSE %]
+            [%# Fallback: parse time_of_day string directly %]
+            [% SET _tod_str   = todo.time_of_day _ '' %]
+            [% SET _tod_parts = _tod_str.split(':') %]
+            [% SET _sh        = (_tod_parts.0 OR 9) + 0 %]
+            [% SET _sm        = (_tod_parts.1 OR 0)  + 0 %]
             [% SET _start_total = _sh * 60 + _sm %]
-            [% SET _top_px   = _start_total - GRID_START %]
-            [% IF _top_px < 0 %][% SET _top_px = 0 %][% END %]
-            [% IF _top_px > 1000 %][% SET _top_px = 1000 %][% END %]
-            [% SET _height   = _est_mins < 30 ? 30 : _est_mins %]
-            [% IF _height > 900 %][% SET _height = 900 %][% END %]
-            [% SET _end_min  = _start_total + _est_mins %]
-            [% SET _eh       = int(_end_min / 60) %]
-            [% SET _em       = _end_min - _eh * 60 %]
-            [% SET _sh_str   = _sh < 10 ? '0' _ _sh : '' _ _sh %]
-            [% SET _sm_str   = _sm < 10 ? '0' _ _sm : '' _ _sm %]
-            [% SET _eh_str   = _eh < 10 ? '0' _ _eh : '' _ _eh %]
-            [% SET _em_str   = _em < 10 ? '0' _ _em : '' _ _em %]
-            [% SET _time_lbl = _sh_str _ ':' _ _sm_str _ '-' _ _eh_str _ ':' _ _em_str %]
+            [% SET _top_px    = _start_total - 300 %]
+            [% SET _top_px    = _top_px < 0 ? 0 : (_top_px > 1000 ? 1000 : _top_px) %]
+            [% SET _height    = _est_mins < 30 ? 30 : (_est_mins > 900 ? 900 : _est_mins) %]
+            [% SET _end_min   = _start_total + _est_mins %]
+            [% SET _time_lbl  = _sh _ ':' _ _sm _ '-' _ int(_end_min/60) _ ':' _ (_end_min MOD 60) %]
+            [% END %]
             [% SET _stat_s   = _done ? 'Done' :
                                (todo.status == 2 OR todo.status == 'IN PROGRESS' OR todo.status == 'In Progress') ? 'In Progress' :
                                (todo.status == 1 OR todo.status == 'NEW' OR todo.status == 'New') ? 'New' :

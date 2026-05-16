@@ -2529,9 +2529,11 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
 
             my $end_abs_min   = $slot_abs_min + $est_mins;
-            my $end_time_str  = sprintf('%02d:%02d:00',
-                                    int($end_abs_min / 60),
-                                    $end_abs_min % 60);
+            # Cap end at 23:59:59 to prevent invalid datetime values (DATETIME column rejects >23:xx)
+            my $end_h = int($end_abs_min / 60);
+            my $end_m = $end_abs_min % 60;
+            if ($end_h >= 24) { $end_h = 23; $end_m = 59; }
+            my $end_time_str  = sprintf('%02d:%02d:00', $end_h, $end_m);
             my $sched_start_str = $new_start . ' ' . $new_time_str;
             my $sched_end_str   = $new_start . ' ' . $end_time_str;
 
