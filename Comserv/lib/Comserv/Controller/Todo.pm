@@ -1638,7 +1638,33 @@ sub day :Path('/todo/day') :Args {
             "AI daily conv fetch error: $@") if $@;
     }
 
-    # Add the todos to the stash
+    my $day_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @day_all_sitenames;
+    eval {
+        my $user_id = $c->session->{user_id};
+        if ($day_is_csc) {
+            my $site_model = $c->model('Site');
+            my $all_sites  = $site_model->get_all_sites($c) || [];
+            @day_all_sitenames = sort map { $_->name } @$all_sites;
+        } elsif ($user_id) {
+            my @us_rows = $c->model('DBEncy')->resultset('UserSite')->search(
+                { user_id => $user_id },
+                { prefetch => 'site' }
+            )->all;
+            my %seen;
+            for my $us (@us_rows) {
+                eval {
+                    my $site_id = $us->site_id;
+                    my $site    = $c->model('DBEncy')->resultset('Site')->find($site_id);
+                    if ($site && $site->name && !$seen{$site->name}++) {
+                        push @day_all_sitenames, $site->name;
+                    }
+                };
+            }
+            @day_all_sitenames = sort @day_all_sitenames;
+        }
+    };
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -1648,6 +1674,8 @@ sub day :Path('/todo/day') :Args {
         next_date              => $next_date,
         proj_name_map          => \%proj_name_map,
         ai_daily_conversations => \@ai_daily_conversations,
+        is_csc                 => $day_is_csc,
+        ap_all_sitenames       => \@day_all_sitenames,
         template               => 'todo/day.tt',
     );
 
