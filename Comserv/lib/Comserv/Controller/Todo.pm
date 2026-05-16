@@ -653,14 +653,16 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $current_status   = $self->normalize_status($todo->get_column('status'));
     my $current_priority = $todo->get_column('priority') // 5;
 
-    my $edit_is_csc = (uc($c->session->{SiteName} || 'CSC') eq 'CSC') ? 1 : 0;
+    my $edit_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my $edit_sites = [];
-    if ($edit_is_csc) {
-        eval {
-            my $site_model = $c->model('Site');
-            $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
-        };
-    }
+    eval {
+        my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+            {}, { order_by => 'name' }
+        )->all;
+        $edit_sites = \@site_rows;
+    };
+
+    my $todo_sitename = eval { $todo->get_column('sitename') } // '';
 
     $c->stash(
         record           => $todo,
@@ -674,7 +676,8 @@ sub edit :Path('/todo/edit') :Args(1) {
         return_to        => $return_to,
         sites            => $edit_sites,
         is_csc           => $edit_is_csc,
-        form_data        => { sitename => $todo->get_column('sitename') },
+        todo_sitename    => $todo_sitename,
+        form_data        => { sitename => $todo_sitename },
         template         => 'todo/edit.tt'
     );
 
