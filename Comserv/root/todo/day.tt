@@ -630,7 +630,7 @@ function gcalLayoutEvents() {
     var evs = Array.from(area.querySelectorAll('.gcal-ev'));
     if (!evs.length) return;
 
-    var MIN_VISUAL_MINS = 15;
+    var MIN_VISUAL_MINS = 30;
     var parsed = evs.map(function(el) {
         var startMin = parseInt(el.getAttribute('data-start-min')) || 300;
         var durMin   = Math.max(MIN_VISUAL_MINS, parseInt(el.getAttribute('data-dur-min')) || 30);
@@ -1031,7 +1031,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET _top_px   = _start_total - GRID_START %]
             [% IF _top_px < 0 %][% SET _top_px = 0 %][% END %]
             [% IF _top_px > 1000 %][% SET _top_px = 1000 %][% END %]
-            [% SET _height   = _est_mins < 15 ? 15 : _est_mins %]
+            [% SET _height   = _est_mins < 30 ? 30 : _est_mins %]
             [% IF _height > 900 %][% SET _height = 900 %][% END %]
             [% SET _end_min  = _start_total + _est_mins %]
             [% SET _eh       = int(_end_min / 60) %]
