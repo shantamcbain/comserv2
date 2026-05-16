@@ -516,22 +516,29 @@ function savePriority(sel) {
     var orig = sel.getAttribute('data-orig');
     fetch('/todo/update_priority', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {'Content-Type': 'application/x-www-form-urlencoded'},
         body: 'record_id=' + encodeURIComponent(recordId) + '&priority=' + encodeURIComponent(newPriority)
-    }).then(function(r){ return r.json(); }).then(function(d){
+    }).then(function(r){
+        if (!r.ok) {
+            console.error('Priority save HTTP error:', r.status, r.url);
+            throw new Error('HTTP ' + r.status);
+        }
+        return r.json();
+    }).then(function(d){
         if (d.success) {
             sel.setAttribute('data-orig', newPriority);
             sel.style.background = '';
-            var item = sel.closest('.todo-item-day[data-priority]');
-            if (item) {
-                item.setAttribute('data-priority', newPriority);
-                reorderTimeSlot(item.closest('.time-content'));
-            }
+            var item = sel.closest('.gcal-event[data-priority]');
+            if (!item) item = sel.closest('[data-priority]');
+            if (item) { item.setAttribute('data-priority', newPriority); }
         } else {
+            console.error('Priority save failed:', d.error);
             alert('Could not save priority: ' + (d.error || 'unknown'));
             sel.value = orig;
         }
     }).catch(function(e){
+        console.error('Priority save error:', e);
         alert('Error saving priority: ' + e);
         sel.value = orig;
     });
@@ -712,7 +719,21 @@ function gcalUpdateNowLine() {
 }
 
 function gcalToggleSite(site, chip) {
-    chip.classList.toggle('hidden-site');
+    if (site === '__ALL__') {
+        var allActive = chip.classList.contains('gcal-site-active');
+        if (allActive) {
+            document.querySelectorAll('.gcal-site-chip:not(.gcal-site-chip-all)').forEach(function(c) { c.classList.add('hidden-site'); });
+            chip.classList.remove('gcal-site-active');
+        } else {
+            document.querySelectorAll('.gcal-site-chip').forEach(function(c) { c.classList.remove('hidden-site'); });
+            chip.classList.add('gcal-site-active');
+        }
+    } else {
+        chip.classList.toggle('hidden-site');
+        var allChip = document.querySelector('.gcal-site-chip-all');
+        var anyHidden = document.querySelectorAll('.gcal-site-chip:not(.gcal-site-chip-all).hidden-site').length > 0;
+        if (allChip) { anyHidden ? allChip.classList.remove('gcal-site-active') : allChip.classList.add('gcal-site-active'); }
+    }
     var hidden = new Set(Array.from(document.querySelectorAll('.gcal-site-chip.hidden-site')).map(function(c){ return c.getAttribute('data-site'); }));
     document.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
         el.style.display = hidden.has(el.getAttribute('data-site')) ? 'none' : '';
@@ -997,9 +1018,10 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 [% END %]
 
-[% IF (is_csc OR ap_all_sitenames.size) AND ap_all_sitenames.size > 0 %]
+[% IF ap_all_sitenames.size > 0 %]
 <div class="gcal-sites-bar">
     <span style="font-size:0.75em;color:#70757a;margin-right:4px;">Sites:</span>
+    <span class="gcal-site-chip gcal-site-chip-all gcal-site-active" data-site="__ALL__" onclick="gcalToggleSite('__ALL__',this)" title="Show all sites">All</span>
     [% FOREACH sname IN ap_all_sitenames %]
     <span class="gcal-site-chip" data-site="[% sname %]" onclick="gcalToggleSite('[% sname %]',this)" title="Toggle [% sname %]">
         <span class="gcal-site-dot" data-site="[% sname %]"></span>[% sname %]

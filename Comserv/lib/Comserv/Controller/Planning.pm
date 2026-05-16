@@ -505,6 +505,25 @@ sub daily :Path('/planning/daily') :Args {
                 my $site_rows = $c->model('Site')->get_all_sites($c);
                 @ap_all_sitenames = sort map { $_->name } @$site_rows;
             };
+        } else {
+            eval {
+                my $user_id = $c->session->{user_id};
+                if ($user_id) {
+                    my @us_rows = $c->model('DBEncy')->resultset('UserSite')->search(
+                        { user_id => $user_id }
+                    )->all;
+                    my %seen;
+                    for my $us (@us_rows) {
+                        eval {
+                            my $site = $c->model('DBEncy')->resultset('Site')->find($us->site_id);
+                            if ($site && $site->name && !$seen{$site->name}++) {
+                                push @ap_all_sitenames, $site->name;
+                            }
+                        };
+                    }
+                    @ap_all_sitenames = sort @ap_all_sitenames;
+                }
+            };
         }
 
         $c->stash(
