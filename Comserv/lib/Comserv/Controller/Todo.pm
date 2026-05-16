@@ -963,7 +963,7 @@ sub create :Local {
             # Try to find a default project
             my $default_project = $schema->resultset('Project')->search({
                 -or => [
-                    { project_name => 'Default' },
+                    { name => 'Default' },
                     { project_code => 'default_code' }
                 ]
             })->first;
