@@ -2530,16 +2530,23 @@ sub reschedule :Path('reschedule') :Args(0) {
                 $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
             }
 
+            my $end_abs_min   = $slot_abs_min + $est_mins;
+            my $end_time_str  = sprintf('%02d:%02d:00',
+                                    int($end_abs_min / 60),
+                                    $end_abs_min % 60);
+            my $sched_start_str = $new_start . ' ' . $new_time_str;
+            my $sched_end_str   = $new_start . ' ' . $end_time_str;
+
             my %update = (
-                start_date    => $new_start,
-                time_of_day   => $new_time_str,
-                priority      => $new_priority,
-                last_mod_by   => 'reschedule',
-                last_mod_date => $today,
+                start_date       => $new_start,
+                time_of_day      => $new_time_str,
+                scheduled_start  => $sched_start_str,
+                scheduled_end    => $sched_end_str,
+                estimated_man_hours => int($est_mins + 0.5) || 5,
+                priority         => $new_priority,
+                last_mod_by      => 'reschedule',
+                last_mod_date    => $today,
             );
-            if ($est_from_log) {
-                $update{estimated_man_hours} = int($est_mins + 0.5) || 5;
-            }
 
             eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
