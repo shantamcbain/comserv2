@@ -1060,18 +1060,18 @@ document.addEventListener('DOMContentLoaded', function() {
 [% END %]
 
 [% UNLESS include_mode %]
-<div class="gcal-filter-bar" style="display:flex;align-items:center;gap:10px;padding:4px 8px;background:var(--bg-secondary,#f1f3f4);border-bottom:1px solid var(--border-color,#ddd);flex-wrap:wrap;">
+<div style="display:flex;flex-direction:row;align-items:center;gap:8px;padding:4px 8px;background:var(--bg-secondary,#f1f3f4);border-bottom:1px solid var(--border-color,#ddd);flex-wrap:nowrap;overflow-x:auto;">
     [% IF ap_all_sitenames.size > 0 %]
-    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;">Site:</label>
-    <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--bg-primary,#fff);color:var(--text-primary,#333);">
+    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;flex-shrink:0;">Site:</label>
+    <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH sname IN ap_all_sitenames %]
         <option value="[% sname %]">[% sname %]</option>
         [% END %]
     </select>
     [% END %]
-    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;">User:</label>
-    <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--bg-primary,#fff);color:var(--text-primary,#333);">
+    <label style="font-size:0.82em;color:var(--text-secondary,#70757a);white-space:nowrap;flex-shrink:0;">User:</label>
+    <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH uname IN ap_all_usernames %]
         <option value="[% uname %]">[% uname %]</option>

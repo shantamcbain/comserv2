@@ -1679,6 +1679,10 @@ sub day :Path('/todo/day') :Args {
             "AI daily conv fetch error: $@") if $@;
     }
 
+    if ($c->req->param('embed')) {
+        $c->stash(no_wrapper => 1);
+    }
+
     my $day_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my @day_all_sitenames = sort @{ $calendar_sites };
 
