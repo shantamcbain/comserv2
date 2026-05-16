@@ -292,76 +292,16 @@
                 </summary>
                 <div style="margin-top:4px;padding:8px 10px;background:var(--bg-secondary);border:1px solid #c45d00;border-top:none;border-radius:0 0 4px 4px;">
                     [% IF audit_todos && audit_todos.size %]
-                    [% SET audit_rank = 0 %]
                     [% FOREACH at IN audit_todos %]
-                    [% SET audit_rank = audit_rank + 1 %]
-                    <div id="ap-row-[% at.record_id %]" style="display:grid;grid-template-columns:28px 1fr;align-items:start;gap:8px;width:100%;padding:8px 10px;margin-bottom:4px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF at.is_root %]#c45d00[% ELSE %]var(--border-color)[% END %];background:[% IF at.is_root %]color-mix(in srgb,#c45d00 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];">
-
-                        [%# Icon badge — col 1 %]
-                        <span style="padding-top:3px;">
-                            <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:#c45d00;color:#fff;align-items:center;justify-content:center;font-size:0.72em;font-weight:bold;">[% IF at.is_root %]⚠[% ELSE %]↳[% END %]</span>
-                        </span>
-
-                        [%# Main content — col 2 %]
-                        <div style="min-width:0;">
-                            <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-                                [%# Priority badge %]
-                                [% IF at.priority %]
-                                <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
-                                    [% IF at.priority <= 2 %]background:var(--danger-color,#dc3545);color:#fff
-                                    [% ELSIF at.priority <= 4 %]background:#fd7e14;color:#fff
-                                    [% ELSIF at.priority <= 6 %]background:#ffc107;color:var(--text-color,#333)
-                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
-                                    P[% at.priority %]
-                                </span>
-                                [% END %]
-
-                                [%# Status badge %]
-                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
-                                    [% IF at.status == 2 %]background:#17a2b8;color:#fff
-                                    [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
-                                    [% IF at.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
-                                </span>
-
-                                [%# Root / child label %]
-                                [% IF at.is_root %]
-                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
-                                [% END %]
-
-                                [%# Site label %]
-                                [% IF is_csc && at.sitename && at.sitename != 'CSC' %]
-                                <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% at.sitename %]</span>
-                                [% END %]
-                            </div>
-
-                            [%# Subject link %]
-                            <a href="/todo/details?record_id=[% at.record_id %]"
-                               style="font-weight:bold;color:var(--text-color);text-decoration:none;font-size:0.95em;">
-                                [% at.subject || '(No subject)' %]
-                            </a>
-
-                            [%# Meta line %]
-                            <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
-                                [% IF at.project_name %]<span>📁 [% at.project_name %]</span>
-                                [% ELSIF at.project_code && at.project_code != 'system' %]<span>📁 [% at.project_code %]</span>[% END %]
-                                [% IF at.due_date %]<span>📅 Due: [% at.due_date %]</span>[% END %]
-                                [% IF at.start_date %]<span>🗓 [% at.start_date %]</span>[% END %]
-                                [% IF at.sitename %]<span>[% at.sitename %]</span>[% END %]
-                            </div>
-
-                            [%# Quick actions — inline bottom-left %]
-                            <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
-                                <a href="/todo/details?record_id=[% at.record_id %]"
-                                   style="font-size:0.78em;color:var(--primary-color);text-decoration:none;">View →</a>
-                                <a href="/log/log_form?todo_record_id=[% at.record_id %]"
-                                   style="font-size:0.75em;padding:1px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;" title="Add a time log for this todo">Log</a>
-                                [% IF is_admin %]
-                                <button onclick="quickClose([% at.record_id %])"
-                                    style="font-size:0.75em;padding:1px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and clear from audit">Done</button>
-                                [% END %]
-                            </div>
-                        </div>
-                    </div>
+                    [% INCLUDE 'todo/todo_card.tt'
+                        tc               = at
+                        tc_wrapper_id    = 'ap-row-' _ at.record_id
+                        tc_icon_char     = at.is_root ? '⚠' : '↳'
+                        tc_icon_color    = '#c45d00'
+                        tc_is_audit_root = at.is_root
+                        tc_show_done     = 1
+                        tc_done_fn       = 'quickClose'
+                    %]
                     [% END %]
                     [% ELSE %]
                     <p style="margin:0;font-size:0.88em;color:var(--text-muted-color);">No audit todos. Click <strong>🌅 Start Day</strong> to scan the application error log.</p>
@@ -503,105 +443,25 @@
                 [% SET rank = 0 %]
                 [% FOREACH ap IN active_priorities %]
                 [% SET rank = rank + 1 %]
-                [%# Determine if this todo is blocked by an incomplete blocker %]
                 [% SET is_blocked = ap.blocked_by_todo_id && !ap.blocker_done %]
-                <div id="ap-row-[% ap.record_id %]"
-                    data-priority="[% ap.priority || 99 %]"
-                    data-score="[% ap.ap_score || 9999 %]"
-                    data-project="[% ap.project_name | html %]"
-                    data-project-id="[% ap.project_id || '' %]"
-                    data-due="[% ap.due_date || '9999-12-31' %]"
-                    data-site="[% ap.sitename || '' %]"
-                    data-role-cats="[% ap.role_cats || 'general' %]"
-                    style="display:grid;grid-template-columns:28px 1fr;align-items:start;gap:8px;width:100%;padding:8px 10px;margin-bottom:4px;border-radius:6px;box-sizing:border-box;border:1px solid [% IF ap.is_overdue %]#dc3545[% ELSIF ap.due_today %]#ffc107[% ELSIF ap.is_stale %]#fd7e14[% ELSE %]var(--border-color)[% END %];background:[% IF is_blocked %]var(--bg-secondary)[% ELSIF ap.is_overdue %]color-mix(in srgb,#dc3545 6%,var(--bg-color))[% ELSIF ap.status == 2 %]color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))[% ELSE %]var(--bg-color)[% END %];opacity:[% IF is_blocked %]0.65[% ELSE %]1[% END %];">
-
-                    [%# Rank badge — col 1 %]
-                    <span class="rank-badge" style="padding-top:3px;">
-                        <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.7em;font-weight:bold;">[% rank %]</span>
-                    </span>
-
-                    [%# Main content — col 2 %]
-                    <div style="min-width:0;">
-                        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:3px;">
-                            [%# Priority badge %]
-                            [% IF ap.priority %]
-                            <span style="font-size:0.7em;font-weight:bold;padding:1px 5px;border-radius:3px;
-                                [% IF ap.priority <= 2 %]background: var(--danger-color, #dc3545);color:#fff
-                                [% ELSIF ap.priority <= 4 %]background:#fd7e14;color:#fff
-                                [% ELSIF ap.priority <= 6 %]background:#ffc107;color: var(--text-color, #333)
-                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
-                                P[% ap.priority %]
-                            </span>
-                            [% END %]
-
-                            [%# Status badge %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;
-                                [% IF ap.status == 2 %]background:#17a2b8;color:#fff
-                                [% ELSE %]background: var(--secondary-color, #6c757d);color:#fff[% END %]">
-                                [% IF ap.status == 2 %]IN PROGRESS[% ELSE %]NEW[% END %]
-                            </span>
-
-                            [%# Stale badge %]
-                            [% IF ap.is_stale %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#fd7e14;color:#fff;" title="No activity for [% ap.stale_days %] days — may be outdated or already done">⏳ STALE [% ap.stale_days %]d</span>
-                            [% END %]
-
-                            [%# Blocking badge %]
-                            [% IF ap.is_blocking %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background: var(--danger-color, #dc3545);color:#fff;" title="Other tasks depend on this">🔒 BLOCKING</span>
-                            [% END %]
-
-                            [%# Cross-project blocker badge — only on explicitly blocking todos %]
-                            [% IF ap.is_cross_blocker && ap.is_blocking %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#6f42c1;color:#fff;" title="[% ap.blocking_names %] [% ap.blocking_count > 1 ? 'are' : 'is' %] waiting on this project — complete first">🔗 unblocks [% ap.blocking_count %]</span>
-                            [% END %]
-
-                            [%# Blocked badge %]
-                            [% IF is_blocked %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#adb5bd;color: var(--text-color, #333);" title="Waiting on: [% ap.blocker_subject %]">⏸ BLOCKED</span>
-                            [% END %]
-
-                            [%# Overdue / due-today badge %]
-                            [% IF ap.is_overdue %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#dc3545;color:#fff;" title="Overdue by [% 0 - ap.days_until_due %] day(s)">🔴 OVERDUE</span>
-                            [% ELSIF ap.due_today %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:#ffc107;color:#333;" title="Due today">⚡ DUE TODAY</span>
-                            [% END %]
-
-                            [%# Site label (CSC all-sites view) %]
-                            [% IF is_csc && ap.sitename && ap.sitename != 'CSC' %]
-                            <span style="font-size:0.7em;padding:1px 5px;border-radius:3px;background:var(--primary-color);color:#fff;">[% ap.sitename %]</span>
-                            [% END %]
-                        </div>
-
-                        [%# Subject link %]
-                        <a href="/todo/details?record_id=[% ap.record_id %]"
-                           style="font-weight:bold;color:var(--text-color);text-decoration:none;font-size:0.95em;[% IF is_blocked %]color:var(--text-muted-color)[% END %]">
-                            [% ap.subject || '(No subject)' %]
-                        </a>
-
-                        [%# Meta line: project, due date, blocked-by %]
-                        <div style="font-size:0.78em;color:var(--text-muted-color);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap;">
-                            [% IF ap.project_name %]<span>📁 [% ap.project_name %]</span>[% END %]
-                            [% IF ap.due_date %]<span[% IF ap.is_overdue %] style="color:#dc3545;font-weight:bold;"[% ELSIF ap.due_today %] style="color:#856404;font-weight:bold;"[% END %]>📅 Due: [% ap.due_date %]</span>[% END %]
-                            [% IF is_blocked %]<span>⏸ Waiting on: <em>[% ap.blocker_subject %]</em></span>[% END %]
-                            [% IF ap.is_cross_blocker && ap.is_blocking && ap.blocking_names %]<span style="color:#6f42c1;">🔗 unblocks: [% ap.blocking_names %]</span>[% END %]
-                            [% IF ap.sitename && !(is_csc && ap.sitename != 'CSC') %]<span>[% ap.sitename %]</span>[% END %]
-                        </div>
-
-                        [%# Quick actions — inline bottom-left %]
-                        <div style="display:flex;align-items:center;gap:8px;margin-top:5px;flex-wrap:wrap;">
-                            <a href="/todo/details?record_id=[% ap.record_id %]"
-                               style="font-size:0.78em;color:var(--primary-color);text-decoration:none;">View →</a>
-                            <a href="/log/log_form?todo_record_id=[% ap.record_id %]"
-                               style="font-size:0.75em;padding:1px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;" title="Add a time log for this todo">Log</a>
-                            [% IF is_admin %]
-                            <button onclick="quickClose([% ap.record_id %])"
-                                style="font-size:0.75em;padding:1px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;" title="Mark done and create log">Done</button>
-                            [% END %]
-                        </div>
-                    </div>
-                </div>
+                [% INCLUDE 'todo/todo_card.tt'
+                    tc                   = ap
+                    tc_wrapper_id        = 'ap-row-' _ ap.record_id
+                    tc_wrapper_extra_data = 'data-priority="' _ (ap.priority || 99) _ '" data-score="' _ (ap.ap_score || 9999) _ '" data-project="' _ (ap.project_name || '') _ '" data-project-id="' _ (ap.project_id || '') _ '" data-due="' _ (ap.due_date || '9999-12-31') _ '" data-site="' _ (ap.sitename || '') _ '" data-role-cats="' _ (ap.role_cats || 'general') _ '"'
+                    tc_rank              = rank
+                    tc_is_stale          = ap.is_stale
+                    tc_stale_days        = ap.stale_days
+                    tc_is_blocking       = ap.is_blocking
+                    tc_is_cross_blocker  = ap.is_cross_blocker
+                    tc_blocking_count    = ap.blocking_count
+                    tc_blocking_names    = ap.blocking_names
+                    tc_is_overdue        = ap.is_overdue
+                    tc_due_today         = ap.due_today
+                    tc_is_blocked        = is_blocked
+                    tc_blocker_subject   = ap.blocker_subject
+                    tc_show_done         = 1
+                    tc_done_fn           = 'quickClose'
+                %]
                 [% END %]
                 </div>[%# end #priorities-list %]
 
@@ -643,9 +503,10 @@
                     body: JSON.stringify({})
                 }).then(function(r){ return r.json(); }).then(function(d){
                     if (d.ok) {
-                        var msg = 'Rescheduled: ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' updated';
-                        if (d.date_count) msg += ' (' + d.date_count + ' due-dates extended)';
-                        msg += '. Reloading…';
+                        var msg = 'Rescheduled ' + d.count + ' todo' + (d.count !== 1 ? 's' : '') + ' from ' + (d.today || 'today') + ' forward into the calendar.';
+                        if (d.error_count) msg += '\n' + d.error_count + ' update(s) failed.';
+                        if (d.errors && d.errors.length) msg += '\nFirst error: ' + d.errors[0].substr(0, 200);
+                        msg += '\n\nReloading page…';
                         alert(msg);
                         location.reload();
                     } else {
@@ -656,28 +517,6 @@
                 }).catch(function(e){
                     btn.disabled = false;
                     btn.textContent = '♻ Reschedule';
-                    alert('Error: ' + e);
-                });
-            }
-            function scheduleMyDay(btn) {
-                btn.disabled = true;
-                btn.textContent = '⏳ Scheduling…';
-                fetch('/planning/schedule_day', {
-                    method: 'POST',
-                    headers: {'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest'},
-                    body: JSON.stringify({})
-                }).then(function(r){ return r.json(); }).then(function(d){
-                    if (d.ok) {
-                        alert('Scheduled ' + d.count + ' todo(s) for today. Reloading…');
-                        location.reload();
-                    } else {
-                        btn.disabled = false;
-                        btn.textContent = '🗓 Schedule My Day';
-                        alert('Error: ' + (d.error || 'unknown'));
-                    }
-                }).catch(function(e){
-                    btn.disabled = false;
-                    btn.textContent = '🗓 Schedule My Day';
                     alert('Error: ' + e);
                 });
             }
@@ -855,76 +694,18 @@
     <!-- TAB: DAILY SCHEDULE (hourly time-slot view) -->
     <div id="daily-schedule" class="tab-content">
         <div id="anchor-dynamic-daily" class="nav-anchor"></div>
-        <script src="/static/js/todo_drag_drop.js"></script>
-
-        [%# ── Toolbar: single compact row ── %]
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;white-space:nowrap;flex-wrap:nowrap;overflow-x:auto;">
-            <button onclick="scheduleMyDay(this)"
-                style="flex-shrink:0;padding:2px 9px;border:1px solid #0d6efd;border-radius:4px;background:transparent;font-size:0.8em;color:#0d6efd;cursor:pointer;white-space:nowrap;"
-                title="Re-run the time-block scheduler for today (also creates today's breaks)">🗓 Schedule My Day</button>
-            <span style="color:var(--border-color);flex-shrink:0;">|</span>
-            <label style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">Role:</label>
-            <select id="sched-role-filter" onchange="filterDayView()"
-                style="font-size:0.78em;padding:1px 4px;border:1px solid var(--border-color);border-radius:3px;background:var(--bg-color);color:var(--text-color);max-width:130px;">
-                <option value="">All</option>
-                [% IF ap_user_roles %][% FOREACH r IN ap_user_roles %]
-                <option value="[% r | lower %]">[% r %]</option>
-                [% END %][% END %]
-            </select>
-            <label style="font-size:0.78em;color:var(--text-muted-color);flex-shrink:0;">Sites:</label>
-            <select id="sched-site-filter" multiple onchange="filterDayView()"
-                title="Hold Ctrl/Cmd to select multiple sites"
-                style="font-size:0.78em;padding:1px 3px;border:1px solid var(--border-color);border-radius:3px;background:var(--bg-color);color:var(--text-color);max-width:160px;max-height:52px;">
-                [% IF ap_all_sitenames %][% FOREACH sn IN ap_all_sitenames %]
-                <option value="[% sn %]" [% IF sn == SiteName %]selected[% END %]>[% sn %]</option>
-                [% END %][% END %]
-            </select>
-        </div>
-
-        [%# ── hint when nothing scheduled yet ── %]
-        [% UNLESS scheduled_todos && scheduled_todos.size %]
-        <div style="margin-bottom:8px;padding:8px 12px;background:var(--bg-secondary);border-radius:4px;font-size:0.82em;color:var(--text-muted-color);">
-            No schedule assigned for today yet — click <strong>🗓 Schedule My Day</strong> to auto-assign time slots to your todos.
-        </div>
-        [% END %]
-
-        [%# ── Day hour-slot grid (original day.tt) ── %]
-        <div id="daily-schedule-body">
+        <h2>Daily Schedule</h2>
+        <div class="dynamic-container">
             [% TRY %]
-                [% IF scheduled_todos && scheduled_todos.size %]
-                    [% INCLUDE 'todo/day.tt'
-                        todos         = scheduled_todos
-                        overdue_todos = []
-                        date          = today
-                        pre_filtered  = 1 %]
-                [% ELSE %]
-                    [% INCLUDE 'todo/day.tt' %]
-                [% END %]
+                [% INCLUDE 'todo/day.tt' %]
             [% CATCH %]
-                <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:15px;margin:15px 0;">
-                    <h4 style="margin-top:0;color:#856404;">⚠️ Daily Schedule Not Available</h4>
+                <div style="background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin: 15px 0;">
+                    <h4 style="margin-top: 0; color: #856404;">⚠️ Daily Schedule Not Available</h4>
                     <p>The daily time-slot view is not currently available.</p>
+                    <pre style="font-size:0.8em;background:#fff8e1;padding:8px;border-radius:3px;overflow:auto;">[% error.type %]: [% error.info %]</pre>
                 </div>
             [% END %]
         </div>
-
-        <script>
-        function filterDayView() {
-            var roleVal = (document.getElementById('sched-role-filter').value || '').toLowerCase();
-            var siteEl  = document.getElementById('sched-site-filter');
-            var sites   = [];
-            for (var i = 0; i < siteEl.options.length; i++) {
-                if (siteEl.options[i].selected) sites.push(siteEl.options[i].value.toLowerCase());
-            }
-            document.querySelectorAll('#daily-schedule-body .todo-item-day').forEach(function(el) {
-                var elSite  = (el.dataset.sitename || '').toLowerCase();
-                var elGroup = (el.dataset.group    || '').toLowerCase();
-                var roleOk = !roleVal || elGroup === roleVal || elGroup.indexOf(roleVal) >= 0;
-                var siteOk = (sites.length === 0) || sites.indexOf(elSite) >= 0;
-                el.style.display = (roleOk && siteOk) ? '' : 'none';
-            });
-        }
-        </script>
     </div>
 
     <!-- TAB 2: WEEKLY VIEW -->
@@ -1039,7 +820,7 @@
         [%# All known branch servers for the overview panel %]
         [% SET all_branches = [
             { name => 'main',                                   port => 3001, label => 'MAIN',                url => '/planning/daily', cmd => 'cd /home/shanta/PycharmProjects/comserv2/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3001 -r' },
-            { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
+            { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
             { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4010 -r' },
             { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4002 -r' },
             { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
