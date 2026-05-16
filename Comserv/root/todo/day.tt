@@ -630,48 +630,48 @@ function gcalLayoutEvents() {
     var evs = Array.from(area.querySelectorAll('.gcal-ev'));
     if (!evs.length) return;
 
+    var MIN_VISUAL_MINS = 15;
     var parsed = evs.map(function(el) {
         var startMin = parseInt(el.getAttribute('data-start-min')) || 300;
-        var durMin   = Math.max(5, parseInt(el.getAttribute('data-dur-min')) || 30);
-        return { el: el, start: startMin, dur: durMin, end: startMin + durMin, col: 0, numCols: 1 };
+        var durMin   = Math.max(MIN_VISUAL_MINS, parseInt(el.getAttribute('data-dur-min')) || 30);
+        return { el: el, start: startMin, end: startMin + durMin, col: 0, numCols: 1 };
     });
 
-    parsed.sort(function(a,b){ return a.start - b.start; });
+    parsed.sort(function(a,b){ return a.start - b.start || a.end - b.end; });
 
-    var groups = [];
+    var colEnds = [];
     parsed.forEach(function(ev) {
         var placed = false;
-        for (var g = 0; g < groups.length; g++) {
-            var grp = groups[g];
-            var maxEnd = Math.max.apply(null, grp.map(function(e){ return e.end; }));
-            if (ev.start < maxEnd) {
-                ev.col = grp.length;
-                grp.forEach(function(e){ e.numCols = Math.max(e.numCols, ev.col + 1); });
-                ev.numCols = ev.col + 1;
-                grp.push(ev);
+        for (var c = 0; c < colEnds.length; c++) {
+            if (colEnds[c] <= ev.start) {
+                ev.col = c;
+                colEnds[c] = ev.end;
                 placed = true;
                 break;
             }
         }
-        if (!placed) { ev.col = 0; ev.numCols = 1; groups.push([ev]); }
+        if (!placed) {
+            ev.col = colEnds.length;
+            colEnds.push(ev.end);
+        }
     });
 
-    groups.forEach(function(grp) {
-        var n = Math.max.apply(null, grp.map(function(e){ return e.numCols; }));
-        grp.forEach(function(e) {
-            e.numCols = n;
-            var pct = 100 / n;
-            e.el.style.left  = (e.col * pct + 0.3) + '%';
-            e.el.style.width = (pct - 0.6) + '%';
-            e.el.style.right = '';
-        });
+    parsed.forEach(function(ev) {
+        var maxCol = ev.col;
+        for (var i = 0; i < parsed.length; i++) {
+            var other = parsed[i];
+            if (other !== ev && other.start < ev.end && other.end > ev.start) {
+                if (other.col > maxCol) maxCol = other.col;
+            }
+        }
+        ev.numCols = maxCol + 1;
     });
 
-    evs.forEach(function(el) {
-        if (!el.closest('.gcal-events-area')) return;
-        if (el.style.left !== '') return;
-        el.style.left  = '0.3%';
-        el.style.width = '99.4%';
+    parsed.forEach(function(ev) {
+        var pct = 100 / ev.numCols;
+        ev.el.style.left  = (ev.col * pct + 0.3) + '%';
+        ev.el.style.width = (pct - 0.6) + '%';
+        ev.el.style.right = '';
     });
 }
 
