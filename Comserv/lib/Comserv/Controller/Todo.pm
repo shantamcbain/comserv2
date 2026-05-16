@@ -1269,7 +1269,10 @@ sub update_status :Path('/todo/update_status') :Args(0) {
         return;
     }
 
-    eval { $todo->update({ status => $status }) };
+    my $today   = DateTime->now->ymd;
+    my $now_hms = DateTime->now->strftime('%H:%M:%S');
+
+    eval { $todo->update({ status => $status, last_mod_date => $today }) };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_status',
             "Failed to update status for todo $record_id: $@");
@@ -1278,9 +1281,58 @@ sub update_status :Path('/todo/update_status') :Args(0) {
         return;
     }
 
+    my $log_id;
+    if ($status == 3 || $status eq 'DONE' || $status eq 'Done' || $status eq 'done') {
+        eval {
+            my $username  = $c->session->{username}  || 'system';
+            my $sitename  = $c->session->{SiteName}  || $todo->sitename || 'CSC';
+            my $group     = $c->session->{group}     || $c->session->{roles}[0] || 'user';
+
+            my $start_raw = $todo->time_of_day // '';
+            $start_raw = ref($start_raw) ? sprintf('%02d:%02d:%02d', $start_raw->hours//0, $start_raw->minutes//0, 0) : "$start_raw";
+            my $start_hms = ($start_raw =~ /^\d{2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
+
+            my ($sh, $sm) = ($start_hms =~ /^(\d{2}):(\d{2})/);
+            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+            $dur_mins = $todo->estimated_man_hours || 30 if $dur_mins <= 0;
+            my $dur_hms   = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+            my $start_date = $today;
+            if ($todo->start_date) {
+                my $sd = ref($todo->start_date) ? $todo->start_date->ymd : "${\$todo->start_date}";
+                $start_date = substr($sd, 0, 10) if length($sd) >= 10;
+            }
+
+            my $log_entry = $c->model('DBEncy')->resultset('Log')->create({
+                todo_record_id => $record_id,
+                username       => $username,
+                sitename       => $sitename,
+                start_date     => $start_date,
+                project_code   => $todo->project_id || 0,
+                due_date       => $today,
+                abstract       => ($todo->subject // 'Completed todo'),
+                details        => '',
+                start_time     => $start_hms,
+                end_time       => $now_hms,
+                time           => $dur_hms,
+                group_of_poster => $group,
+                status         => 'closed',
+                priority       => $todo->priority || 5,
+                last_mod_by    => $username,
+                last_mod_date  => $today,
+                comments       => '',
+                points_processed => 0,
+            });
+            $log_id = $log_entry->record_id;
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_status',
+            "Auto-log error for todo $record_id: $@") if $@;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
         "Updated status for todo $record_id to $status");
-    $c->stash(json => { success => 1, todo_id => $record_id, new_status => $status });
+    $c->stash(json => { success => 1, todo_id => $record_id, new_status => $status, log_id => $log_id });
     $c->forward('View::JSON');
 }
 
