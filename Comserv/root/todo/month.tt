@@ -470,7 +470,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <div class="month-navigation view-navigation">
         <a href="[% base_url %]/[% prev_month_date %][% month_hash %]">◀ Previous Month</a>
         <a href="/todo[% url_hash %]">List View</a>
-        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Planning (Day)</a>
+        <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Daily Schedule</a>
         <a href="[% base_url %]/[% date || current_date_str %][% week_hash %]">Week View</a>
         <a href="/todo/addtodo">Add New Todo</a>
         <a href="[% base_url %]/[% date || current_date_str %][% planning_hash %]">Back to Planning</a>
@@ -651,7 +651,7 @@ document.addEventListener('DOMContentLoaded', function() {
             <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
             <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
         </div>
-        <div id="month-day-modal-body" style="flex:1;overflow:auto;padding:8px;"></div>
+        <div id="month-day-modal-body" style="flex:1;overflow:hidden;padding:0;"></div>
     </div>
 </div>
 <script>
@@ -659,11 +659,7 @@ function showMonthDayModal(dateStr, event) {
     event.preventDefault();
     document.getElementById('month-day-modal-title').textContent = dateStr;
     var body = document.getElementById('month-day-modal-body');
-    body.innerHTML = '<p style="padding:20px;color:#888;">Loading day schedule for ' + dateStr + '...</p>';
-    fetch('/todo/day/' + dateStr + '?embed=1', { credentials: 'same-origin' })
-        .then(function(r) { return r.text(); })
-        .then(function(html) { body.innerHTML = html; })
-        .catch(function() { body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view.</p>'; });
+    body.innerHTML = '<iframe src="/todo/day/' + encodeURIComponent(dateStr) + '?embed=1" style="width:100%;height:100%;border:none;" sandbox="allow-same-origin allow-scripts allow-forms allow-popups"></iframe>';
     document.getElementById('month-day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
