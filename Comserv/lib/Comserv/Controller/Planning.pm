@@ -134,7 +134,33 @@ sub daily :Path('/planning/daily') :Args {
 
     if (my $todo_model = $c->model('Todo')) {
         eval {
-            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, $sitename);
+            my @_cal_sites;
+            if ($is_csc) {
+                eval {
+                    my $site_model = $c->model('Site');
+                    my $all_s = $site_model->get_all_sites($c) || [];
+                    @_cal_sites = map { $_->name } @$all_s;
+                };
+                @_cal_sites = ($sitename) unless @_cal_sites;
+            } else {
+                eval {
+                    my $uid = $c->session->{user_id};
+                    if ($uid) {
+                        my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                            { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                        )->all;
+                        my %seen;
+                        for my $r (@rows) {
+                            eval {
+                                my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                                push @_cal_sites, $s->name if $s && $s->name && !$seen{$s->name}++;
+                            };
+                        }
+                    }
+                };
+                push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
+            }
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_cal_sites);
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 my $week_first_day = $week_dates[0]{date_str};
                 my $today_str = $current_date_str;

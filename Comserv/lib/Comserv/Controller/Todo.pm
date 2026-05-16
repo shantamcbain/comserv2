@@ -126,6 +126,37 @@ has 'logging' => (
     default => sub { Comserv::Util::Logging->instance }
 );
 
+sub _get_user_accessible_sites {
+    my ($self, $c) = @_;
+    my $is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @sites;
+    eval {
+        if ($is_csc) {
+            my $site_model = $c->model('Site');
+            my $all = $site_model->get_all_sites($c) || [];
+            @sites = map { $_->name } @$all;
+        } else {
+            my $user_id = $c->session->{user_id};
+            if ($user_id) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @sites, $site->name;
+                        }
+                    };
+                }
+            }
+        }
+    };
+    push @sites, $c->session->{SiteName} unless grep { $_ eq ($c->session->{SiteName} || '') } @sites;
+    return @sites ? \@sites : [$c->session->{SiteName}];
+}
+
 # Apply restrictions to the entire controller
 sub begin :Private {
     my ($self, $c) = @_;
@@ -1574,11 +1605,11 @@ sub day :Path('/todo/day') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
-        "Fetched " . scalar(@$todos) . " total todos for site " . $c->session->{SiteName});
+        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$calendar_sites));
 
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
@@ -1649,29 +1680,7 @@ sub day :Path('/todo/day') :Args {
     }
 
     my $day_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
-    my @day_all_sitenames;
-    eval {
-        my $user_id = $c->session->{user_id};
-        if ($day_is_csc) {
-            my $site_model = $c->model('Site');
-            my $all_sites  = $site_model->get_all_sites($c) || [];
-            @day_all_sitenames = sort map { $_->name } @$all_sites;
-        } elsif ($user_id) {
-            my @usr_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-                { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
-            )->all;
-            my %seen;
-            for my $usr (@usr_rows) {
-                eval {
-                    my $site = $c->model('DBEncy')->resultset('Site')->find($usr->site_id);
-                    if ($site && $site->name && !$seen{$site->name}++) {
-                        push @day_all_sitenames, $site->name;
-                    }
-                };
-            }
-            @day_all_sitenames = sort @day_all_sitenames;
-        }
-    };
+    my @day_all_sitenames = sort @{ $calendar_sites };
 
     $c->stash(
         todos                  => \@today_todos,
@@ -1734,8 +1743,8 @@ sub week :Path('/todo/week') :Args {
         };
     }
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites_w = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_w);
 
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
@@ -1841,8 +1850,8 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites_m = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_m);
 
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
