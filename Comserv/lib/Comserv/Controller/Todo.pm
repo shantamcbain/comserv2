@@ -1682,6 +1682,39 @@ sub day :Path('/todo/day') :Args {
     my $day_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my @day_all_sitenames = sort @{ $calendar_sites };
 
+    my @day_all_usernames;
+    eval {
+        if ($day_is_csc) {
+            my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                { roles => { -like => '%admin%' } },
+                { columns => ['username'], order_by => 'username' }
+            )->all;
+            my %seen;
+            for my $r (@urows) {
+                my $u = eval { $r->username } // '';
+                push @day_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            unless (@day_all_usernames) {
+                my @all_urows = $c->model('DBEncy')->resultset('Users')->search(
+                    {},
+                    { columns => ['username'], order_by => 'username', rows => 200 }
+                )->all;
+                %seen = ();
+                for my $r (@all_urows) {
+                    my $u = eval { $r->username } // '';
+                    push @day_all_usernames, $u if $u && !$seen{$u}++;
+                }
+            }
+        } else {
+            my %seen;
+            for my $t (@today_todos, @overdue_todos) {
+                my $u = eval { $t->developer || $t->username_of_poster || '' };
+                push @day_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            @day_all_usernames = sort @day_all_usernames;
+        }
+    };
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -1693,6 +1726,7 @@ sub day :Path('/todo/day') :Args {
         ai_daily_conversations => \@ai_daily_conversations,
         is_csc                 => $day_is_csc,
         ap_all_sitenames       => \@day_all_sitenames,
+        ap_all_usernames       => \@day_all_usernames,
         template               => 'todo/day.tt',
     );
 
