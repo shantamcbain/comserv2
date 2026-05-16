@@ -630,10 +630,9 @@ function gcalLayoutEvents() {
     var evs = Array.from(area.querySelectorAll('.gcal-ev'));
     if (!evs.length) return;
 
-    var MIN_VISUAL_MINS = 30;
     var parsed = evs.map(function(el) {
         var startMin = parseInt(el.getAttribute('data-start-min')) || 300;
-        var durMin   = Math.max(MIN_VISUAL_MINS, parseInt(el.getAttribute('data-dur-min')) || 30);
+        var durMin   = Math.max(1, parseInt(el.getAttribute('data-dur-min')) || 30);
         return { el: el, start: startMin, end: startMin + durMin, col: 0, numCols: 1 };
     });
 
