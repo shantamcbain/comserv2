@@ -1286,6 +1286,31 @@ sub backup_restore :Path('backup_restore') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub restore_as_new :Path('restore_as_new') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $new_vmid = $c->req->params->{new_vmid} or do { $c->stash->{json} = { success => 0, error => 'new_vmid required' }; $c->forward('View::JSON'); return; };
+    my $volid    = $c->req->params->{volid}    or do { $c->stash->{json} = { success => 0, error => 'volid required' };    $c->forward('View::JSON'); return; };
+    my $storage  = $c->req->params->{storage}  || '';
+    my $name     = $c->req->params->{name}     || '';
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->restore_as_new_vm($new_vmid, $volid, $storage, $name);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
 sub vm_unlock :Path('vm_unlock') :Args(0) {
     my ($self, $c) = @_;
 
