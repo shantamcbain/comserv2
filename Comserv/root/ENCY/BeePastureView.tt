@@ -69,15 +69,15 @@
                         [% FOREACH link IN herbal_data %]
                             <tr>
                                 <td>
-                                    <strong>Botanical Name:</strong> [% link.botanical_name | html %]<br>
-                                    <strong>Common Name:</strong> [% link.common_names %]<br>
+                                    [% IF link.display_name %]<strong>Botanical Name:</strong> <em>[% link.display_name | html %]</em><br>[% END %]
+                                    [% IF link.common_names %]<strong>Common Name:</strong> [% link.common_names | html %]<br>[% END %]
                                     <strong>Forage:</strong> [% link.apis | html %]<br>
                                     <strong>Nectar:</strong> [% link.nectar | html %]<br>
                                     <strong>Pollen:</strong> [% link.pollen | html %]<br>
                                     <a href="/ENCY/herb_detail/[% link.record_id %]" class="btn btn-primary" title="View details">Details</a>
                                 </td>
                                 <td>
-                                    [% ency_img_tag(link.image, 300, 325) %]
+                                    [% ency_img_tag(link.display_image, 300, 325) %]
                                 </td>
                             </tr>
                         [% END %]

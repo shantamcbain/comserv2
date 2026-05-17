@@ -310,7 +310,7 @@ sub daily :Path('/planning/daily') :Args {
                     { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
-                rows => 100,
+                rows => 2000,
             }
         )->all;
 
@@ -375,14 +375,15 @@ sub daily :Path('/planning/daily') :Args {
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
-                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                    $proj_cache{$h{project_id}} = $p ? { name => $p->name, parent_id => ($p->parent_id || '') } : { name => '', parent_id => '' };
                 }
-                $h{project_name} = $proj_cache{$h{project_id}};
+                $h{project_name} = $proj_cache{$h{project_id}}{name};
                 $ap_projects_seen{$h{project_id}} //= {
                     project_id   => $h{project_id},
-                    project_name => $proj_cache{$h{project_id}} || $h{project_code} || "Project #$h{project_id}",
+                    project_name => $proj_cache{$h{project_id}}{name} || $h{project_code} || "Project #$h{project_id}",
                     project_code => $h{project_code} || '',
                     sitename     => $h{sitename}     || '',
+                    parent_id    => $proj_cache{$h{project_id}}{parent_id} || '',
                 };
             }
 
@@ -402,7 +403,7 @@ sub daily :Path('/planning/daily') :Args {
             @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
         }
 
-        @active_priorities = grep { defined } @all_sorted[0..24];
+        @active_priorities = @all_sorted;
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
@@ -616,7 +617,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                    status  => { -in => [1, 2] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
@@ -717,16 +718,21 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
         $hd_count = $schema->resultset('SupportTicket')->count(\%hd) || 0;
     };
 
+    my $deploy_note = $result->{last_deploy_dt}
+        ? " (scanning since last deploy: $result->{last_deploy_dt})"
+        : " (scanning last 24h — no production deploy recorded)";
+
     $c->response->body(encode_json({
         success          => JSON::true,
         created_count    => $result->{todo_created},
         error_count      => $result->{error_count},
         helpdesk_count   => $hd_count,
+        last_deploy_dt   => $result->{last_deploy_dt} || '',
         message          => $result->{todo_created}
-            ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)"
+            ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)$deploy_note"
             : ($result->{error_count}
-                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences"
-                : "No errors found in the last 24h"),
+                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences$deploy_note"
+                : "No errors found$deploy_note"),
     }));
 }
 
@@ -791,6 +797,7 @@ sub _run_audit_scan {
 
     my (%groups, $error_count, $todo_created) = ();
     my @subjects;
+    my $last_deploy_dt;
 
     my $system_project_id = 1;
     eval {
@@ -817,6 +824,21 @@ sub _run_audit_scan {
             my @t = localtime(time - 86400);
             sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
         };
+
+        eval {
+            my $deploy_log = $schema->resultset('Log')->search(
+                { abstract => { -like => '%Docker Hub Deploy%' },
+                  status   => 3 },
+                { order_by => { -desc => 'start_date', -desc => 'start_time' }, rows => 1 }
+            )->first;
+            if ($deploy_log) {
+                $last_deploy_dt = ($deploy_log->start_date || '') . ' ' . ($deploy_log->start_time || '00:00:00');
+            }
+        };
+        if ($last_deploy_dt && $last_deploy_dt gt $since) {
+            $since = $last_deploy_dt;
+        }
+
         my @errs = $schema->resultset('SystemLog')->search(
             { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
               timestamp => { '>=' => $since } },
@@ -994,7 +1016,8 @@ sub _run_audit_scan {
         }
     }
 
-    return { error_count => $error_count || 0, todo_created => $todo_created || 0, subjects => \@subjects };
+    return { error_count => $error_count || 0, todo_created => $todo_created || 0, subjects => \@subjects,
+             last_deploy_dt => $last_deploy_dt || '' };
 }
 
 sub _build_error_todo {
@@ -1237,7 +1260,8 @@ sub _daily_log_action {
 
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
         my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
-        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
+        my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
+        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
 
         return {

@@ -230,7 +230,7 @@
         });
         // Site-name → default agent map (when no saved preference)
         var siteAgentMap = {
-            'BMaster':    'bmaster',
+            'BMaster':    'beemaster',
             'ENCY':       'ency',
             'CSC':        'csc',
             'HelpDesk':   'helpdesk',
@@ -429,9 +429,9 @@
                 console.debug('Agent selected from todo content: ency');
                 return agents.ency;
             }
-            if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.bmaster) {
-                console.debug('Agent selected from todo content: bmaster');
-                return agents.bmaster;
+            if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(candidateText) && agents.beemaster) {
+                console.debug('Agent selected from todo content: beemaster');
+                return agents.beemaster;
             }
             if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(candidateText) && agents.inventory) {
                 console.debug('Agent selected from todo content: inventory');
@@ -1016,7 +1016,7 @@
         var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            if (_isMobile || window.AI_WIDGET_POPUP) { openChat(); } else { detachToPopup(); }
+            openChat();
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
@@ -2115,6 +2115,9 @@
     
     // Helper function to send AI request after context is ready
     function sendAIRequest(prompt, statusIndicator, loadingMessage, imageData) {
+        const _agentId = (state.pageContext && state.pageContext.agent_id) || '';
+        let _agentSys = (state.pageContext && state.pageContext.system_prompt) || '';
+
         // Classify query complexity to decide PROVIDER (ollama vs grok).
         // For Ollama, we do NOT override the model — the server's _select_model_for_context
         // already picks the best installed model per agent context.
@@ -2231,6 +2234,53 @@
                     _wAcc.appendChild(_lblAcc);
                     _wAcc.appendChild(_elAcc);
                     if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
+                    return;
+                }
+            }
+        }
+
+        // ENCY section navigation fast path — no AI round-trip needed for common section requests
+        if (_agentId === 'ency' || (state.pageContext.page_path || '').startsWith('/ENCY')) {
+            const _pu5 = prompt.toUpperCase().replace(/['']/g, '');
+            if (/\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/.test(_pu5)) {
+                var _encyNavUrl = null;
+                var _encyNavLabel = null;
+                if (/\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL)\b/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/herbs'; _encyNavLabel = 'Herbs List';
+                } else if (/\bCONSTIT/.test(_pu5) && !/DETAIL|EDIT|ADD|CREATE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/Constituent'; _encyNavLabel = 'Constituent List';
+                } else if (/\bGLOSSARY\b/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/glossary'; _encyNavLabel = 'Glossary';
+                } else if (/\bDISEASE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/diseases'; _encyNavLabel = 'Diseases List';
+                } else if (/\bSYMPTOM/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/symptoms'; _encyNavLabel = 'Symptoms List';
+                } else if (/\bFORMULA|RECIPE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/formula'; _encyNavLabel = 'Formulas / Recipes';
+                } else if (/\bINSECT/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/insects'; _encyNavLabel = 'Insects';
+                } else if (/\bANIMAL/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/animals'; _encyNavLabel = 'Animals';
+                } else if (/\bPOLLINATOR|BEE\s*PASTURE|FORAGE/.test(_pu5)) {
+                    _encyNavUrl = '/ENCY/BeePastureView'; _encyNavLabel = 'Bee Pasture / Pollinators';
+                }
+                if (_encyNavUrl) {
+                    loadingMessage.remove();
+                    statusIndicator.textContent = 'Opening ' + _encyNavLabel + '\u2026';
+                    statusIndicator.className = 'chat-status connected';
+                    executeAIAction({ action: 'navigate', url: _encyNavUrl });
+                    const _nw = document.createElement('div');
+                    _nw.className = 'msg-wrapper msg-wrapper-ai';
+                    const _nlbl = document.createElement('div');
+                    _nlbl.className = 'msg-label';
+                    _nlbl.textContent = 'ENCY Agent';
+                    const _nel = document.createElement('div');
+                    _nel.className = 'message ai-message';
+                    _nel.innerHTML = 'Opening <strong>' + _encyNavLabel + '</strong> in a new tab.';
+                    _nw.appendChild(_nlbl);
+                    _nw.appendChild(_nel);
+                    const _ncm = document.getElementById('chat-messages');
+                    if (_ncm) { _ncm.appendChild(_nw); _ncm.scrollTop = _ncm.scrollHeight; }
                     return;
                 }
             }
@@ -2574,7 +2624,11 @@
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
             liveThinkEl.remove();
-            
+
+            if (!data) {
+                throw new Error('AI server returned an empty response. Please try again.');
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -2696,7 +2750,7 @@
                 // Add AI response — strip any embedded [ACTION: ...] and [SUPPORT_NEEDED] before display
                 const { cleanText: _rawClean, actions } = extractActions(data.response || '');
                 const _needsSupport = _detectSupportNeeded(_rawClean);
-                const cleanText = _stripSupportTag(_rawClean);
+                const cleanText = _stripSupportTag(_rawClean).replace(/https?:\/\/(?:example\.com|localhost(?::\d+)?)(\/[^\s"')\]>]*)/g, '$1');
                 addMessage(cleanText, 'ai-message');
 
                 // Voice mode: read the AI response aloud, then restart listening
@@ -2884,36 +2938,7 @@
         });
     }
     
-    // Extract visible text content of the current page to give the AI direct context.
-    // Strips the chat widget, nav, scripts and style elements, then trims whitespace.
-    // Result is capped at 4000 chars so the system prompt doesn't balloon.
-    function extractPageContent() {
-        try {
-            const clone = document.body.cloneNode(true);
-            // Remove elements that add noise or duplicate the nav guide
-            clone.querySelectorAll(
-                'script, style, noscript, ' +
-                '.local-chat-widget, #chat-panel, ' +
-                'nav, header, footer, ' +
-                '.navigation, #navigation, .nav-bar, ' +
-                '.debug-info, .page-debug'
-            ).forEach(function(el) { el.remove(); });
 
-            let text = clone.textContent || '';
-            // Collapse runs of whitespace/blank lines
-            text = text.replace(/[ \t]+/g, ' ')
-                       .replace(/\n[ \t]*/g, '\n')
-                       .replace(/\n{3,}/g, '\n\n')
-                       .trim();
-
-            if (text.length > 2000) {
-                text = text.substring(0, 2000) + '\n[... page content truncated]';
-            }
-            return text;
-        } catch(e) {
-            return '';
-        }
-    }
 
     // Returns true for models that support chat/generate (excludes embeddings, rerankers, etc.)
     function isChatModel(id) {
@@ -2974,6 +2999,69 @@
         return t.large || t.medium || state.selectedProvider;
     }
 
+    // Static FAQ fast-path — instant canned answers for common support questions.
+    // These fire BEFORE any AI call, so the user gets an immediate response.
+    // Each entry: { match: RegExp, answer: string (markdown supported) }
+    var STATIC_FAQ = [
+        {
+            match: /\b(create|make|get|open|set.?up)\b.{0,20}\baccount\b|\bsign.?up\b|\bregister\b|\bhow.{0,20}\bjoin\b|\bnew.{0,10}\buser\b/i,
+            answer: 'Account creation is managed by the site administrator.\n\nTo request access, [submit a HelpDesk ticket](/HelpDesk) and an admin will set up your account. If a self-registration page is available on your site it will be linked on the login page.',
+        },
+        {
+            match: /\b(reset|forgot|forgotten|lost|change)\b.{0,15}\bpassword\b|\bpassword.{0,15}\b(reset|forgot|change|lost)\b/i,
+            answer: 'To reset your password, click **Forgot Password** on the login page. A reset link will be emailed to your registered address.\n\nIf you no longer have access to that email, [submit a HelpDesk ticket](/HelpDesk) and an administrator can reset it for you.',
+        },
+        {
+            match: /\bhow.{0,20}\blog.{0,5}(in|out)\b|\bsign.{0,5}(in|out)\b|\bcannot.{0,10}log.{0,5}in\b|\bcan.?t.{0,10}log.{0,5}in\b/i,
+            answer: 'To log in, enter your username and password on the [login page](/login). Your username is usually your email address.\n\nIf you are having trouble logging in, try **Forgot Password** on the login page or [submit a HelpDesk ticket](/HelpDesk).',
+        },
+        {
+            match: /\bhow.{0,25}\b(report|submit|log|file).{0,15}\b(bug|error|issue|problem|ticket)\b|\bhow.{0,20}\bget.{0,10}\bhelp\b/i,
+            answer: 'To report a problem or get help:\n\n1. [Submit a HelpDesk ticket](/HelpDesk) — include what you were doing and any error message you saw.\n2. Or use this chat — describe the issue and I can help diagnose it.',
+        },
+        {
+            match: /\bwhat.{0,20}\b(this|site|system|application|app|platform)\b|\bwhat (is|does).{0,20}\b(comserv|bmaster|beemaster|ency)\b/i,
+            answer: 'This is **Comserv** — a multi-site community platform. Depending on your site it includes:\n\n- **BeeMaster** — apiary and beekeeping management\n- **ENCY** — herbal and plant encyclopedia\n- **HelpDesk** — support tickets\n- **Planning** — project and todo management\n- **Workshops** — local event listings\n\nAsk me anything about the features available on your site.',
+        },
+        {
+            match: /\bcontact.{0,20}\b(support|admin|administrator|someone|staff|team)\b|\bhow.{0,20}\b(contact|reach|talk to|speak to).{0,20}\b(support|admin|help)\b/i,
+            answer: 'To contact support, [submit a HelpDesk ticket](/HelpDesk). An administrator will respond as soon as possible.\n\nYou can also continue this chat — I can answer most questions right here.',
+        },
+    ];
+
+    // Content-based agent keyword overrides.
+    // When a prompt clearly targets a different domain than the current page agent,
+    // the agent is switched automatically — no need to navigate to the right page first.
+    // Format: { agentId, pattern }  — first match wins.
+    var AGENT_KEYWORD_OVERRIDES = [
+        {
+            agentId: 'accounting',
+            pattern: /\b(accounts payable|accounts receivable|supplier bill|purchase order)\b|open.*invoice.*form|file.*invoice|enter.*bill|record.*invoice/i,
+        },
+        {
+            agentId: 'helpdesk',
+            pattern: /\b(helpdesk|help desk|submit.*ticket|create.*ticket|report.*error|report.*bug|report.*issue)\b|how do i report/i,
+        },
+    ];
+
+    // Concept synonym groups for smarter nav resolution.
+    // When resolveNavIntent cannot match a query via STATIC_NAV label matching, it falls
+    // back to these concept groups so that "medicinal plants" → /ENCY/herbs etc.
+    // Each entry: { url, concepts[] }  — concepts are lowercase strings to match against query.
+    var NAV_CONCEPT_GROUPS = [
+        { url: '/ENCY/glossary',         concepts: ['terminology', 'dictionary', 'vocab', 'vocabulary', 'definitions', 'define', 'look up term', 'beekeeping terms', 'herbal terms'] },
+        { url: '/ENCY/herbs',            concepts: ['medicinal plants', 'herb database', 'plant database', 'botanical list', 'herbal list', 'flora', 'herb search'] },
+        { url: '/ENCY/diseases',         concepts: ['conditions', 'ailments', 'health conditions', 'bee diseases', 'hive diseases', 'disorders', 'bee conditions'] },
+        { url: '/ENCY/BeePastureView',   concepts: ['nectar plants', 'pollen plants', 'bee garden', 'foraging plants', 'bee friendly plants', 'melliferous', 'pasture plants', 'pollinator garden'] },
+        { url: '/ENCY/symptoms',         concepts: ['signs', 'hive symptoms', 'bee symptoms', 'warning signs', 'colony symptoms'] },
+        { url: '/ENCY/Constituent',      concepts: ['active compounds', 'chemical constituents', 'phytochemicals', 'active ingredients'] },
+        { url: '/ENCY/formula',          concepts: ['remedy', 'remedies', 'preparation', 'preparations', 'compound formula', 'herbal recipe'] },
+        { url: '/Inventory/invoice/new', concepts: ['new invoice', 'add invoice', 'create invoice', 'log bill', 'record bill', 'enter bill', 'new bill'] },
+        { url: '/HelpDesk',              concepts: ['get help', 'support system', 'contact support', 'tech support', 'it support'] },
+        { url: '/BMaster',              concepts: ['beekeeping home', 'bee management', 'beemaster', 'bee master home'] },
+        { url: '/Apiary/HiveManagement', concepts: ['manage hives', 'my hives', 'hive list', 'hive overview'] },
+    ];
+
     // Static nav entries always available regardless of current page links.
     // Keyed by label (lowercase) → path. Merged into the nav map at build time.
     // The origin is prepended at runtime so they work on any host.
@@ -3029,28 +3117,75 @@
         { label: 'manage links',               url: '/navigation/manage_links' },
         { label: 'home',                       url: '/' },
         { label: 'main menu',                  url: '/' },
+        { label: 'bmaster',                    url: '/BMaster' },
+        { label: 'beemaster',                  url: '/BMaster' },
+        { label: 'bee master',                 url: '/BMaster' },
+        { label: 'beekeeping',                 url: '/BMaster' },
+        { label: 'apiary',                     url: '/Apiary' },
+        { label: 'apiary overview',            url: '/Apiary' },
+        { label: 'hive management',            url: '/Apiary/HiveManagement' },
+        { label: 'hives',                      url: '/Apiary/HiveManagement' },
+        { label: 'queen rearing',              url: '/Apiary/QueenRearing' },
+        { label: 'queens',                     url: '/Apiary/QueenRearing' },
+        { label: 'bee health',                 url: '/Apiary/BeeHealth' },
+        { label: 'bee forage',                 url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture',                url: '/ENCY/BeePastureView' },
+        { label: 'forage plants',              url: '/ENCY/BeePastureView' },
+        { label: 'forage',                     url: '/ENCY/BeePastureView' },
+        { label: 'pollinator plants',          url: '/ENCY/BeePastureView' },
+        { label: 'pollinators',                url: '/ENCY/BeePastureView' },
+        { label: 'bee pasture view',           url: '/ENCY/BeePastureView' },
+        { label: 'herbs',                      url: '/ENCY/herbs' },
+        { label: 'herbs list',                 url: '/ENCY/herbs' },
+        { label: 'herb list',                  url: '/ENCY/herbs' },
+        { label: 'plant list',                 url: '/ENCY/herbs' },
+        { label: 'plants',                     url: '/ENCY/herbs' },
+        { label: 'botanical names',            url: '/ENCY/BotanicalNameView' },
+        { label: 'glossary',                   url: '/ENCY/glossary' },
+        { label: 'beekeeping glossary',        url: '/ENCY/glossary' },
+        { label: 'terms',                      url: '/ENCY/glossary' },
+        { label: 'diseases',                   url: '/ENCY/diseases' },
+        { label: 'diseases list',              url: '/ENCY/diseases' },
+        { label: 'bee diseases',               url: '/ENCY/diseases' },
+        { label: 'symptoms',                   url: '/ENCY/symptoms' },
+        { label: 'symptoms list',              url: '/ENCY/symptoms' },
+        { label: 'constituents',               url: '/ENCY/Constituent' },
+        { label: 'constituent list',           url: '/ENCY/Constituent' },
+        { label: 'formulas',                   url: '/ENCY/formula' },
+        { label: 'recipes',                    url: '/ENCY/formula' },
+        { label: 'insects',                    url: '/ENCY/insects' },
+        { label: 'animals',                    url: '/ENCY/animals' },
+        { label: 'therapeutic actions',        url: '/ENCY/therapeutic_actions' },
+        { label: 'drug herb interactions',     url: '/ENCY/drug_herb_interactions' },
+        { label: 'herb interactions',          url: '/ENCY/drug_herb_interactions' },
     ];
 
     // Build a flat {label, url} navigation map from:
     //   1. Static core routes (STATIC_NAV above)
-    //   2. Links extracted from the current page (navLinks + contentLinks in system_prompt)
-    //      The page-link format is:  "Label: https://host/path"  (no leading dash)
-    //      The agent nav-guide format is: "  - Label: https://host/path" (with dash)
-    //      The regex matches BOTH.
+    //   2. Links extracted from the agent system_prompt, matching both:
+    //      - Absolute: "  - Label: https://host/path"
+    //      - Relative: "  - Label: /path/to/page"   (agent nav-guide style)
     function buildNavigationMap() {
         const origin = window.location.origin;
         const map = STATIC_NAV.map(function(e) {
             return { label: e.label, url: origin + e.url };
         });
         const prompt = (state.pageContext && state.pageContext.system_prompt) || '';
-        // Match both "  - Label: URL" and "  Label: URL"
-        const re = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reAbs = /^[ \t]*(?:-[ \t]+)?(.+?):\s*(https?:\/\/[^\s]+)$/gm;
+        const reRel = /^[ \t]*-[ \t]+(.+?):\s*(\/[^\s(→,]+)/gm;
         let m;
-        while ((m = re.exec(prompt)) !== null) {
+        while ((m = reAbs.exec(prompt)) !== null) {
             const label = m[1].trim().toLowerCase();
             const url   = m[2].trim();
-            // Skip section headers and meta-lines that aren't real page links
             if (label.length > 80 || /^\[/.test(label)) continue;
+            if (!map.some(function(e) { return e.label === label; })) {
+                map.push({ label, url });
+            }
+        }
+        while ((m = reRel.exec(prompt)) !== null) {
+            const label = m[1].trim().toLowerCase();
+            const url   = origin + m[2].trim().replace(/\s.*$/, '');
+            if (label.length > 80 || /^\[/.test(label) || /^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) continue;
             if (!map.some(function(e) { return e.label === label; })) {
                 map.push({ label, url });
             }
@@ -3091,7 +3226,7 @@
     // Try to resolve a navigation intent query to a list of {label,url} matches
     function resolveNavIntent(rawQuery) {
         const q = rawQuery
-            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load)\s*/i, '')
+            .replace(/^(goto|go to|open|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|show me|take me to the|go to the)\s*/i, '')
             .replace(/^(the|a|an)\s+/i, '')
             .replace(/[^\w\s]/g, ' ')
             .replace(/\s+/g, ' ')
@@ -3115,13 +3250,24 @@
             return words.filter(function(w) { return w.length >= 3; })
                 .some(function(w) { return _fuzzyWordMatch(w, labelWords); });
         });
-        return fuzzy.length ? fuzzy : null;
+        if (fuzzy.length) return fuzzy;
+        // Concept synonym fallback: match query against NAV_CONCEPT_GROUPS synonyms.
+        // Catches natural-language phrases like "medicinal plants", "nectar plants", etc.
+        const _origin3 = window.location.origin;
+        for (var _cgi = 0; _cgi < NAV_CONCEPT_GROUPS.length; _cgi++) {
+            const _cg = NAV_CONCEPT_GROUPS[_cgi];
+            const _matched = _cg.concepts.some(function(c) {
+                return q === c || q.includes(c) || c.includes(q);
+            });
+            if (_matched) return [{ label: _cg.concepts[0], url: _origin3 + _cg.url }];
+        }
+        return null;
     }
 
     // Navigation command regex — explicit nav keywords (voice-friendly: "open X", "go to X", etc.)
     // NOTE: "show me" and "find" are intentionally excluded — they are question/display words
     // that should be answered by the AI, not treated as navigation commands.
-    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load)\s+(.+)/i;
+    const NAV_RE = /^(open|go to|take me to|navigate to|visit|switch to|switch|bring me to|load|browse|display|show me the|take me to the|go to the)\s+(.+)/i;
 
     // Helper: handle a resolved navigation match — announce and navigate
     function _executeNavMatch(message, messageInput, matches) {
@@ -3175,24 +3321,38 @@
         return text.replace(/\[SUPPORT_NEEDED\]\s*/gi, '').trim();
     }
 
-    function _enterSupportMode(convId, lastMsgId) {
+    function _sendUserHeartbeat() {
+        if (!state.supportConvId) return;
+        fetch('/chat/user_heartbeat', {
+            method: 'POST',
+            credentials: 'include',
+            body: new URLSearchParams({ conversation_id: state.supportConvId })
+        }).catch(function() {});
+    }
+
+    function _enterSupportMode(convId, lastMsgId, ticketNumber) {
         state.supportMode   = true;
         state.supportConvId = convId;
         state.supportLastMsgId = lastMsgId || 0;
+        _sendUserHeartbeat();
+        state.userHeartbeatTimer = setInterval(_sendUserHeartbeat, 30000);
         var header = document.getElementById('chat-header');
         if (header) {
             header.style.background = '#1a6bb5';
-            header.textContent = '💬 Support Chat (live)';
+            header.textContent = '💬 Live Support Chat';
         }
-        var inputRow = document.querySelector('#chat-input-row, .chat-input-area, .input-area');
         var placeholder = document.getElementById('message-input');
-        if (placeholder) placeholder.placeholder = 'Type a message to support…';
-        _addSupportSystemMsg('✅ You are now connected to a support agent. They will respond as soon as possible.');
+        if (placeholder) placeholder.placeholder = 'Describe your issue here…';
+        var guidance = '✅ **An administrator has been notified and will join shortly.**\n\n'
+            + 'Please describe your issue below — include any error messages, what you were doing, and what you expected to happen.\n\n'
+            + 'If no admin responds within a few minutes you can [create a support ticket](/HelpDesk/ticket/new) instead.';
+        _addSupportSystemMsg(guidance);
         _startSupportPolling();
     }
 
     function _exitSupportMode() {
         if (state.supportPollTimer) { clearInterval(state.supportPollTimer); state.supportPollTimer = null; }
+        if (state.userHeartbeatTimer) { clearInterval(state.userHeartbeatTimer); state.userHeartbeatTimer = null; }
         state.supportMode   = false;
         state.supportConvId = null;
         state.supportLastMsgId = 0;
@@ -3205,8 +3365,14 @@
     function _addSupportSystemMsg(text) {
         var el = document.createElement('div');
         el.className = 'message system-message';
-        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:6px 12px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;';
-        el.textContent = text;
+        el.style.cssText = 'background:#e8f0fe;border:1px solid #acc;padding:8px 14px;border-radius:6px;font-size:.85em;color:#1a3a6b;margin:4px 0;line-height:1.5;';
+        var html = text
+            .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" style="color:#1a6bb5;">$1</a>')
+            .replace(/\n\n/g, '<br><br>')
+            .replace(/\n/g, '<br>');
+        el.innerHTML = html;
         var container = document.getElementById('chat-messages');
         if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
     }
@@ -3229,54 +3395,75 @@
                         }
                     }
                 });
+                if (d.conv_status === 'archived') {
+                    clearInterval(state.supportPollTimer);
+                    state.supportPollTimer = null;
+                    _addSupportSystemMsg('🔒 This support chat has been closed by the administrator. Thank you for contacting us!');
+                    _exitSupportMode();
+                }
             })
             .catch(function() {});
         }, 5000);
     }
 
+    function _showNoAdminMessage() {
+        var el = document.createElement('div');
+        el.className = 'message system-message';
+        el.style.cssText = 'background:#fff3cd;border:1px solid #ffc107;padding:10px 14px;border-radius:6px;font-size:.85em;color:#664d03;margin:4px 0;line-height:1.6;';
+        el.innerHTML = '⚠️ <strong>No administrator is currently logged in.</strong><br>'
+            + 'You can submit a support ticket and an admin will respond when available:<br>'
+            + '<button onclick="(function(){var _s=window.__aiChatSupportFns;if(_s)_s.ticket();})()" '
+            + 'style="margin-top:8px;padding:6px 14px;background:#1a6bb5;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:.88em;">📋 Create Support Ticket</button>';
+        var container = document.getElementById('chat-messages');
+        if (container) { container.appendChild(el); container.scrollTop = container.scrollHeight; }
+    }
+
     function _initSupportChat(contextMsg) {
-        _addSupportSystemMsg('⏳ Connecting to support…');
-        var body = new URLSearchParams({
-            message: contextMsg || 'User requested live support',
-            agent_type: 'support',
-            title: 'Support Chat - ' + (document.title || window.location.pathname)
-        });
-        fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+        _addSupportSystemMsg('⏳ Checking admin availability…');
+        fetch('/chat/check_admin_online', { credentials: 'include' })
         .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success && d.conversation_id) {
-                state.supportLastMsgId = d.message_id || 0;
-                _enterSupportMode(d.conversation_id, d.message_id);
-            } else {
-                _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+        .then(function(presence) {
+            console.log('[Chat] check_admin_online:', presence);
+            if (!presence.online) {
+                _showNoAdminMessage();
+                return;
             }
+            var _rawTitle = (document.title || '').replace(/https?:\/\/[^\s|:]+[:|]?\s*/g, '').replace(/\s*[:|]\s*$/, '').trim();
+            var _chatTitle = 'Support Chat — ' + (_rawTitle || window.location.pathname);
+            var body = new URLSearchParams({
+                message: contextMsg || 'User requested live support',
+                agent_type: 'support',
+                title: _chatTitle
+            });
+            fetch('/chat/send_message', { method: 'POST', credentials: 'include', body: body })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                if (d.success && d.conversation_id) {
+                    state.supportLastMsgId = d.message_id || 0;
+                    _enterSupportMode(d.conversation_id, d.message_id);
+                } else {
+                    _addSupportSystemMsg('❌ Could not connect to support. Please try creating a ticket.');
+                }
+            })
+            .catch(function() {
+                _addSupportSystemMsg('❌ Network error. Please try again.');
+            });
         })
         .catch(function() {
-            _addSupportSystemMsg('❌ Network error. Please try again.');
+            _addSupportSystemMsg('❌ Could not check admin status. Please try again.');
         });
     }
 
     function _createTicketFromSupport() {
-        var lastAiMsg = '';
-        document.querySelectorAll('#chat-messages .ai-message').forEach(function(el) { lastAiMsg = el.textContent; });
-        var body = new URLSearchParams({
-            action: 'create_helpdesk_ticket',
-            subject: 'Support request from AI chat - ' + (document.title || window.location.pathname),
-            description: 'User requested support via AI chat widget.\n\nLast AI response:\n' + lastAiMsg.slice(0, 500),
-            category: 'General',
-            priority: 'normal'
+        var msgs = [];
+        document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+            var role = el.classList.contains('user-message') ? 'You' : 'AI';
+            msgs.push(role + ': ' + el.textContent.trim());
         });
-        fetch('/ai/action', { method: 'POST', credentials: 'include', body: body })
-        .then(function(r) { return r.json(); })
-        .then(function(d) {
-            if (d.success) {
-                var url = d.ticket_url || '/HelpDesk';
-                addMessage('✅ Support ticket created! View it at: ' + url, 'system-message');
-            } else {
-                addMessage('❌ Could not create ticket: ' + (d.error || 'unknown error'), 'system-message');
-            }
-        })
-        .catch(function() { addMessage('❌ Network error creating ticket.', 'system-message'); });
+        var subject = 'Support request — ' + (document.title || window.location.pathname);
+        var description = 'Chat transcript from AI widget:\n\n' + msgs.slice(-10).join('\n\n').slice(0, 1000);
+        var params = new URLSearchParams({ subject: subject, description: description, category: 'support', priority: 'normal', from_chat: '1' });
+        window.location.href = '/HelpDesk/ticket/new?' + params.toString();
     }
 
     window.__aiChatSupportFns = {
@@ -3376,9 +3563,42 @@
             return;
         }
 
+        // Content-based agent override: if the prompt clearly targets a different domain
+        // (e.g. "open the invoice form" from BMaster), switch to the correct agent before
+        // any fast-path or AI call — so the right system prompt and logic apply.
+        if (state.agentsConfig && state.agentsConfig.agents && message) {
+            const _curAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            for (var _ovIdx = 0; _ovIdx < AGENT_KEYWORD_OVERRIDES.length; _ovIdx++) {
+                const _ovRule = AGENT_KEYWORD_OVERRIDES[_ovIdx];
+                if (_curAgentId !== _ovRule.agentId && _ovRule.pattern.test(message)) {
+                    const _ovAgent = state.agentsConfig.agents[_ovRule.agentId];
+                    if (_ovAgent && _ovAgent.system_prompt) {
+                        state.pageContext = Object.assign({}, state.pageContext || {}, {
+                            agent_id: _ovRule.agentId,
+                            system_prompt: _ovAgent.system_prompt,
+                            display_name: _ovAgent.display_name || _ovRule.agentId,
+                        });
+                        const _siOv = document.getElementById('chat-status');
+                        if (_siOv) {
+                            _siOv.textContent = 'Using ' + (_ovAgent.display_name || _ovRule.agentId) + ' agent\u2026';
+                            _siOv.className = 'chat-status connected';
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ENCY agent: let the ENCY fast path inside sendAIRequest handle section navigation.
+        // Skip resolveNavIntent entirely so it cannot misfire on words like "list".
+        const _smAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+        const _isEncyNav = (_smAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+            && message && /\b(OPEN|SHOW|LIST|BROWSE|GO TO|TAKE ME TO|DISPLAY|VIEW)\b/i.test(message)
+            && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(message);
+
         // Client-side navigation interception — no AI round-trip needed (skip if image-only)
         // 1. Explicit nav keyword: "open X", "go to X", "switch to X", etc.
-        const navMatch = message && message.match(NAV_RE);
+        const navMatch = !_isEncyNav && message && message.match(NAV_RE);
         if (navMatch) {
             const matches = resolveNavIntent(message);
             if (matches && matches.length >= 1) {
@@ -3400,6 +3620,36 @@
                 const lbl = bareMatches[0].label;
                 if (lbl === normalised || lbl.startsWith(normalised) || normalised.startsWith(lbl.split(/\s+/).slice(0, 2).join(' '))) {
                     _executeNavMatch(message, messageInput, bareMatches);
+                    return;
+                }
+            }
+        }
+
+        // Direct live-chat trigger — user explicitly wants a human, skip AI entirely.
+        var DIRECT_SUPPORT_RE = /\b(chat|talk|speak|connect|transfer|escalate)\b.{0,25}\b(admin|administrator|support|agent|human|person|someone|staff|live)\b|\b(live|human|real)\s*(chat|support|agent|help)\b|\bi\s*(want|need|d like|would like).{0,20}\b(chat|talk|speak).{0,15}\b(admin|support|human|person|live)\b/i;
+        if (message && !state.pendingImage && DIRECT_SUPPORT_RE.test(message)) {
+            addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+            messageInput.value = '';
+            persistMessages();
+            var _lastCtx = '';
+            document.querySelectorAll('#chat-messages .user-message, #chat-messages .ai-message').forEach(function(el) {
+                _lastCtx = el.textContent.trim();
+            });
+            _initSupportChat(_lastCtx.slice(-300) || message);
+            return;
+        }
+
+        // FAQ fast-path: instant canned answer for common support questions.
+        // Fires before queryAI so the user never waits on Ollama for trivial questions.
+        if (message && !state.pendingImage) {
+            for (var _fqi = 0; _fqi < STATIC_FAQ.length; _fqi++) {
+                if (STATIC_FAQ[_fqi].match.test(message)) {
+                    addMessage(message ? _escapeHtml(message) : '', 'user-message', true);
+                    messageInput.value = '';
+                    persistMessages();
+                    addMessage(STATIC_FAQ[_fqi].answer, 'ai-message');
+                    persistMessages();
+                    _showEscalationButtons(null);
                     return;
                 }
             }
@@ -4027,7 +4277,13 @@
             const navUrl = actionObj.url || (actionObj.params && actionObj.params.url);
             if (navUrl) {
                 const abs = navUrl.startsWith('http') ? navUrl : (window.location.origin + (navUrl.startsWith('/') ? navUrl : '/' + navUrl));
-                window.open(abs, '_blank');
+                const _navSi = document.getElementById('chat-status');
+                if (_navSi) { _navSi.textContent = '\uD83D\uDD17 Opening: ' + navUrl; _navSi.className = 'chat-status connected'; }
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.location.href = abs;
+                }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -4035,7 +4291,7 @@
                 lbl.textContent = 'System';
                 const el = document.createElement('div');
                 el.className = 'message system-message';
-                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + navUrl + '</a>';
+                el.innerHTML = '\uD83D\uDD17 Navigating to: <a href="' + abs + '">' + navUrl + '</a>';
                 wrapper.appendChild(lbl);
                 wrapper.appendChild(el);
                 chatMessages.appendChild(wrapper);
@@ -4058,7 +4314,7 @@
                         ts:      Date.now()
                     }));
                 } catch(e) { console.warn('localStorage write failed', e); }
-                window.open(abs, '_blank');
+                window.location.href = abs;
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -4067,7 +4323,7 @@
                 const el = document.createElement('div');
                 el.className = 'message system-message';
                 const fieldCount = Object.keys(nfFields).length;
-                el.innerHTML = '🔗 Opened: <a href="' + abs + '" target="_blank">' + nfUrl + '</a>'
+                el.innerHTML = '🔗 Navigating to: <a href="' + abs + '">' + nfUrl + '</a>'
                     + (fieldCount ? ' — <em>' + fieldCount + ' field(s) will be pre-filled when the page loads.</em>' : '');
                 wrapper.appendChild(lbl);
                 wrapper.appendChild(el);
@@ -4085,6 +4341,9 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (!result) {
+                throw new Error('Action server returned an empty response');
+            }
             if (result.success && result.action === 'open_project_wizard') {
                 openProjectWizard(result.wizard_title || '');
                 return;
@@ -4256,7 +4515,7 @@
                 var agents = state.agentsConfig.agents;
                 var picked = null;
                 if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)      picked = agents.ency;
-                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b|\bBOM\b/.test(subj) && agents.inventory) picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)        picked = agents.helpdesk;
                 else if (agents.planning) picked = agents.planning;
@@ -4292,7 +4551,11 @@
             }
 
             // Client-side navigation interception
-            const navMatch = prompt.match(NAV_RE);
+            // Skip for ENCY agent nav — handled by fast path inside sendAIRequest
+            const _pmAgentId = (state.pageContext && state.pageContext.agent_id) || '';
+            const _pmIsEncyNav = (_pmAgentId === 'ency' || (state.pageContext && (state.pageContext.page_path || '').startsWith('/ENCY')))
+                && /\b(HERB|HERBS|PLANT|PLANTS|BOTANICAL|CONSTIT|GLOSSARY|DISEASE|SYMPTOM|FORMULA|RECIPE|INSECT|ANIMAL|POLLINATOR|FORAGE|BEE)\b/i.test(prompt);
+            const navMatch = !_pmIsEncyNav && prompt.match(NAV_RE);
             if (navMatch) {
                 const matches = resolveNavIntent(prompt);
                 if (matches && matches.length === 1) {
@@ -4845,6 +5108,114 @@
     }
 
     // Initialize chat when the DOM is loaded
+    // Admin: poll for pending support chats and fire browser notification from any page
+    (function() {
+        if (!window.AI_CHAT_USER_CONFIG || !window.AI_CHAT_USER_CONFIG.isAdmin) return;
+        var _adminNotifPerm = (typeof Notification !== 'undefined') ? Notification.permission : 'denied';
+        var _adminLastPending = 0;
+        var _adminTitleFlashTimer = null;
+        var _adminOrigTitle = null;
+
+        function _requestAdminNotifPerm() {
+            if (typeof Notification === 'undefined') return;
+            if (Notification.permission === 'granted') { _adminNotifPerm = 'granted'; return; }
+            if (Notification.permission !== 'denied') {
+                Notification.requestPermission().then(function(p) { _adminNotifPerm = p; });
+            }
+        }
+
+        function _adminBeep() {
+            try {
+                var ctx = new (window.AudioContext || window.webkitAudioContext)();
+                var osc = ctx.createOscillator();
+                var gain = ctx.createGain();
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+                osc.type = 'sine';
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.3, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+                osc.start(ctx.currentTime);
+                osc.stop(ctx.currentTime + 0.5);
+            } catch (e) {}
+        }
+
+        function _adminTitleFlash(n) {
+            if (_adminTitleFlashTimer) return;
+            if (!_adminOrigTitle) _adminOrigTitle = document.title;
+            var alertTitle = '💬 ' + n + ' Support Request' + (n > 1 ? 's' : '') + '!';
+            var on = true;
+            var count = 0;
+            _adminTitleFlashTimer = setInterval(function() {
+                document.title = on ? alertTitle : _adminOrigTitle;
+                on = !on;
+                if (++count >= 20) {
+                    clearInterval(_adminTitleFlashTimer);
+                    _adminTitleFlashTimer = null;
+                    document.title = _adminOrigTitle;
+                }
+            }, 800);
+        }
+
+        function _adminShowToast(n) {
+            var existing = document.getElementById('admin-support-toast');
+            if (existing) existing.parentNode.removeChild(existing);
+            var toast = document.createElement('div');
+            toast.id = 'admin-support-toast';
+            toast.style.cssText = 'position:fixed;top:70px;right:20px;z-index:99999;background:#1a6bb5;color:#fff;'
+                + 'padding:14px 20px;border-radius:8px;box-shadow:0 4px 20px rgba(0,0,0,0.3);'
+                + 'font-size:.95em;font-weight:600;cursor:pointer;max-width:320px;line-height:1.4;';
+            toast.innerHTML = '💬 ' + n + ' support chat request' + (n > 1 ? 's' : '') + ' awaiting reply'
+                + '<br><small style="font-weight:normal;opacity:.85;">Click to open Support Chat Admin</small>';
+            toast.onclick = function() {
+                window.location.href = '/chat/admin';
+            };
+            document.body.appendChild(toast);
+            setTimeout(function() {
+                if (toast.parentNode) toast.parentNode.removeChild(toast);
+            }, 30000);
+        }
+
+        function _checkPendingSupport() {
+            fetch('/chat/pending_count', { credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) {
+                var n = d && d.count ? parseInt(d.count, 10) : 0;
+                if (n > 0 && n > _adminLastPending) {
+                    if (_adminNotifPerm === 'granted') {
+                        new Notification('💬 Support Chat: ' + n + ' request' + (n > 1 ? 's' : '') + ' awaiting reply', {
+                            body: 'Open Support Chat Admin to respond.',
+                            icon: '/static/images/favicon.ico',
+                            tag: 'admin-support-pending',
+                            requireInteraction: true
+                        });
+                    }
+                    _adminBeep();
+                    _adminTitleFlash(n);
+                    _adminShowToast(n);
+                }
+                _adminLastPending = n;
+                var badge = document.getElementById('nav-support-badge');
+                if (badge) { badge.textContent = n || ''; badge.style.display = n > 0 ? '' : 'none'; }
+            })
+            .catch(function() {});
+        }
+        function _sendAdminHeartbeat() {
+            fetch('/chat/admin_heartbeat', { method: 'POST', credentials: 'include' })
+            .then(function(r) { return r.json(); })
+            .then(function(d) { if (!d.success) console.warn('[Chat] admin_heartbeat rejected (not admin role?)'); })
+            .catch(function() {});
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            _requestAdminNotifPerm();
+            _sendAdminHeartbeat();
+            setTimeout(_checkPendingSupport, 2000);
+            setInterval(_checkPendingSupport, 30000);
+            setInterval(_sendAdminHeartbeat, 20000);
+        });
+    })();
+
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
@@ -4979,7 +5350,7 @@
                 var agents = state.agentsConfig.agents;
                 var picked = null;
                 if (/\bENCY\b|HERB|BOTANICAL|CONSTITUENT|PLANT\b/.test(subj) && agents.ency)           picked = agents.ency;
-                else if (/\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.bmaster) picked = agents.bmaster;
+                else if (/\bBEEMASTER\b|\bBMASTER\b|HIVE|APIARY|VARROA|QUEEN\b|INSPECTION/.test(subj) && agents.beemaster) picked = agents.beemaster;
                 else if (/\bACCOUNTING\b|\bINVOICE\b|\bCOA\b|\bGL\b/.test(subj) && agents.accounting)  picked = agents.accounting;
                 else if (/\bINVENTORY\b|STOCK\b|\bSKU\b/.test(subj) && agents.inventory)               picked = agents.inventory;
                 else if (/\bHELPDESK\b|SUPPORT\b|TICKET\b/.test(subj) && agents.helpdesk)              picked = agents.helpdesk;
