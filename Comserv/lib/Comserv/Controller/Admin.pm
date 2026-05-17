@@ -7554,6 +7554,161 @@ sub database_switch_env :Path('/admin/database-switch-env') :Args(0) {
     $c->response->body(JSON::encode_json({ success => 1, active_environment => $env }));
 }
 
+sub database_table_sync :Path('/admin/database-table-sync') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('{"error":"Method not allowed"}');
+        return;
+    }
+
+    my $fh  = $c->req->body;
+    my $raw = ref($fh) ? do { local $/; <$fh> } : ($fh // '{}');
+    my $body = eval { JSON::decode_json($raw) } // {};
+
+    my $source_key  = $body->{source_env}  // '';
+    my $target_key  = $body->{target_env}  // '';
+    my $dry_run     = $body->{dry_run}     ? 1 : 0;
+    my $schema_only = $body->{schema_only} ? 1 : 0;
+    my $incremental = $body->{incremental} ? 1 : 0;
+    my $since       = $body->{since}       // '';
+    my $database    = $body->{database}    // '';
+    my $tables_str  = $body->{tables}      // '';
+    my @tables      = $tables_str ? split(/\s*,\s*/, $tables_str) : ();
+
+    if ($source_key eq $target_key) {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => 'Source and target must be different' }));
+        return;
+    }
+
+    my $envs    = $self->_get_sync_environments($c);
+    my %env_map = map { $_->{environment} => $_ } @$envs;
+    my $src = $env_map{$source_key};
+    my $tgt = $env_map{$target_key};
+
+    unless ($src && $tgt) {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => "Unknown environment(s)" }));
+        return;
+    }
+
+    require DBI;
+    require Comserv::Util::TableSync;
+
+    my $output = '';
+    my $result_data;
+
+    if ($dry_run) {
+        $output  = "=== DRY RUN — No data will be moved ===\n";
+        $output .= "Source: $src->{metadata}{display_name} ($src->{db_type})\n";
+        $output .= "Target: $tgt->{metadata}{display_name} ($tgt->{db_type})\n";
+        $output .= "Database: " . ($database || 'ALL') . "\n";
+        $output .= "Tables: "   . ($tables_str || 'ALL') . "\n";
+        $output .= "Mode: "     . ($schema_only ? 'SCHEMA ONLY' : ($incremental ? "INCREMENTAL (since: $since)" : 'FULL')) . "\n";
+
+        my $src_dbh = eval { $self->_open_dbi($src) };
+        if ($@) { $output .= "Cannot connect to source: $@\n"; }
+        else {
+            my $syncer = Comserv::Util::TableSync->new(on_progress => sub { $output .= $_[0] });
+            my @tbl_list = $syncer->_list_tables($src_dbh, $src->{db_type}, $database);
+            $output .= "Tables found on source: " . scalar(@tbl_list) . "\n";
+            $src_dbh->disconnect();
+        }
+        $result_data = { success => 1, output => $output };
+    } else {
+        my ($src_dbh, $tgt_dbh);
+        eval { $src_dbh = $self->_open_dbi($src) };
+        if ($@) {
+            $c->response->body(JSON::encode_json({ success => 0, output => "Cannot connect to source: $@" }));
+            return;
+        }
+        eval { $tgt_dbh = $self->_open_dbi($tgt) };
+        if ($@) {
+            $src_dbh->disconnect();
+            $c->response->body(JSON::encode_json({ success => 0, output => "Cannot connect to target: $@" }));
+            return;
+        }
+
+        my $syncer = Comserv::Util::TableSync->new(
+            on_progress => sub { $output .= $_[0] }
+        );
+
+        my $sync_result = eval {
+            $syncer->sync(
+                src_dbh     => $src_dbh,
+                tgt_dbh     => $tgt_dbh,
+                src_type    => $src->{db_type},
+                tgt_type    => $tgt->{db_type},
+                database    => $database,
+                tables      => \@tables,
+                schema_only => $schema_only,
+                incremental => $incremental,
+                since       => $since,
+            );
+        };
+        my $err = $@;
+        $src_dbh->disconnect();
+        $tgt_dbh->disconnect();
+
+        if ($err) {
+            $output .= "\nFATAL: $err";
+            $result_data = { success => 0, output => $output };
+        } else {
+            $result_data = {
+                success      => ($sync_result->{total_errors} == 0 ? 1 : 0),
+                output       => $output,
+                total_rows   => $sync_result->{total_rows},
+                total_errors => $sync_result->{total_errors},
+                table_count  => $sync_result->{table_count},
+                tables       => $sync_result->{tables},
+            };
+        }
+
+        my $ts   = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
+        my $last = {
+            timestamp  => $ts,
+            source_env => $source_key,
+            target_env => $target_key,
+            success    => $result_data->{success},
+            dry_run    => 0,
+            rows       => $result_data->{total_rows} || 0,
+        };
+        eval { open my $fh2, '>', '/tmp/db_last_sync.json'; print $fh2 JSON::encode_json($last); close $fh2; };
+
+        $self->logging->log_with_details($c, $result_data->{success} ? 'info' : 'error',
+            __FILE__, __LINE__, 'database_table_sync',
+            "TableSync $source_key($src->{db_type})→$target_key($tgt->{db_type}) rows=${\($result_data->{total_rows}||0)} errors=${\($result_data->{total_errors}||0)}");
+    }
+
+    $c->response->body(JSON::encode_json($result_data));
+}
+
+sub _open_dbi {
+    my ($self, $env) = @_;
+    my $db_type = lc($env->{db_type} || 'mysql');
+    my $host    = $env->{host}     || '127.0.0.1';
+    my $port    = $env->{port}     || ($db_type eq 'postgres' ? 5432 : 3306);
+    my $user    = $env->{username} || ($db_type eq 'postgres' ? 'postgres' : 'root');
+    my $pass    = $env->{password} || '';
+    my $db      = $env->{database} || '';
+
+    if ($db_type eq 'postgres') {
+        my $dsn = "DBI:Pg:host=$host;port=$port" . ($db ? ";dbname=$db" : '');
+        return DBI->connect($dsn, $user, $pass, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+        });
+    } else {
+        my $dsn = "DBI:mysql:host=$host;port=$port" . ($db ? ";database=$db" : '');
+        return DBI->connect($dsn, $user, $pass, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+            mysql_connect_timeout => 10,
+        });
+    }
+}
+
 =head1 AUTHOR
 
 Shanta McBain
