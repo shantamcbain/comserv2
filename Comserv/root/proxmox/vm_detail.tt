@@ -243,13 +243,9 @@ function doClone() {
         var el = document.getElementById('clone-result');
         if (d.success) {
             var msg = 'Clone started — new VM ID: ' + d.vmid;
-            if (d.ip_config) {
-                msg += ' | IP config: ' + d.ip_config;
-                if (d.ip_config.indexOf('failed') !== -1) {
-                    msg += ' <br><small style="color:#b37700;">Note: VM may not have a cloud-init drive — change IP manually after boot via netplan or run the setup ISO.</small>';
-                }
-            }
-            el.innerHTML = '<span style="color:green;">' + msg + '</span>';
+            if (d.ip_config) { msg += ' | IP: ' + d.ip_config; }
+            var note = d.ip_note ? '<br><small style="color:#b37700;">⚠ ' + d.ip_note + '</small>' : '';
+            el.innerHTML = '<span style="color:green;">' + msg + '</span>' + note;
         } else {
             el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
         }
