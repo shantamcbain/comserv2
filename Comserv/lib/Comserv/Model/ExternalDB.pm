@@ -269,17 +269,15 @@ sub save_external_id {
     try {
         $ency_schema->resultset('Ency::ExternalID')->update_or_create(
             {
-                entity_type => $entity_type,
-                entity_id   => $entity_id,
-                db_name     => $ext->{db_name},
-            },
-            {
-                key         => 'unique_entity_db',
-                external_id => "$ext_id_val",
-                source_url  => $ext->{source_url} // '',
+                entity_type  => $entity_type,
+                entity_id    => $entity_id,
+                db_name      => $ext->{db_name},
+                external_id  => "$ext_id_val",
+                source_url   => $ext->{source_url} // '',
                 retrieved_at => \'NOW()',
-                notes       => $ext->{notes} // '',
+                notes        => $ext->{notes} // '',
             },
+            { key => 'unique_entity_db' },
         );
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'save_external_id',
             "Saved $ext->{db_name} ID $ext_id_val for $entity_type/$entity_id");

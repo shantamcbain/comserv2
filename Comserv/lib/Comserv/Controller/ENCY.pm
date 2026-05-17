@@ -260,12 +260,24 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
         edit_mode       => 1,
         is_admin        => $is_admin,
         is_editor       => $is_editor,
-        ency_ai_prompt  => 'botanical_name, common_names, key_name, parts_used, sister_plants, comments, '
-                         . 'ident_character, stem, leaves, flowers, fruit, taste, odour, root, image, url, '
+        ency_ai_prompt  => 'botanical_name, common_names, key_name (short search-key version of common name), parts_used (which plant parts are used medicinally), '
+                         . 'sister_plants (botanically related species from the same genus or family with similar uses — use botanical names only; do NOT put therapeutic actions here), '
+                         . 'comments, ident_character, stem, leaves, flowers, fruit, taste, odour, root, image, url, '
                          . 'distribution, cultivation, harvest, '
-                         . 'therapeutic_action, medical_uses, constituents, solvents, dosage, administration, '
-                         . 'formulas, contra_indications, preparation, chinese, vetrinary, homiopathic, '
-                         . 'pollinator, pollennotes, nectarnotes, non_med, culinary, history, reference. '
+                         . 'therapeutic_action (medical actions and properties of this herb ONLY — do NOT put this content in sister_plants or contra_indications), '
+                         . 'medical_uses, constituents, solvents, dosage, administration, '
+                         . 'formulas (names of traditional herbal formulas that include this herb), '
+                         . 'contra_indications (specific conditions drug interactions or circumstances when this herb must NOT be used — do NOT list therapeutic actions here), '
+                         . 'preparation, chinese, vetrinary, homiopathic, '
+                         . 'apis (1=Yes/0=No: does Apis mellifera honeybee visit this plant for any purpose — nectar OR pollen OR propolis), '
+                         . 'nectar (1=Yes/0=No: does this plant produce nectar that honeybees collect), '
+                         . 'nectarnotes (text description of nectar quality, season, volume, or beekeeper relevance), '
+                         . 'pollen (1=Yes/0=No: does this plant produce pollen that honeybees collect), '
+                         . 'pollennotes (text description of pollen quantity, quality, colour, season, or beekeeper value), '
+                         . 'pollinator (text: list all known pollinators — bees, butterflies, moths, beetles, hummingbirds, wind, etc.), '
+                         . 'non_med, culinary, history, reference. '
+                         . 'APIS FIELDS ARE CRITICAL FOR BEEKEEPERS — a primary revenue source. Use only confirmed botanical or apicultural sources. '
+                         . 'For apis/nectar/pollen return exactly 1 (yes) or 0 (no). '
                          . 'IMPORTANT for url field: use a real external URL (Wikipedia, Plants.USDA.gov, '
                          . 'Botanical.com, etc.) — NEVER generate internal application URLs like '
                          . 'workstation.local, localhost, or /ENCY/entry/... — leave url blank if unknown. '
@@ -1088,7 +1100,21 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
-            $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
+            my $ncbi_msg = '';
+            my $ncbi_tax_id = $form_data->{ncbi_tax_id} // '';
+            if ($ncbi_tax_id =~ /^\d+$/) {
+                eval {
+                    my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id);
+                    if ($ncbi_data) {
+                        my $organism = $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data);
+                        if ($organism) {
+                            $c->model('ENCYModel')->link_herb_to_organism($c, $new_id, $organism->record_id);
+                            $ncbi_msg = " Taxonomy linked (NCBI ID $ncbi_tax_id).";
+                        }
+                    }
+                };
+            }
+            $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg$ncbi_msg";
             my $caller_return_to = $form_data->{return_to} // '';
             my $herb_detail      = $c->uri_for('/ENCY/herb_detail/' . $new_id);
             my $return_to        = ($caller_return_to && $caller_return_to =~ m{^/}) ? $caller_return_to : $herb_detail;
@@ -1097,10 +1123,36 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             }
         } else {
             $c->stash(
-                error_msg      => "Failed to add herb: $result",
-                template       => 'ENCY/add_herb_form.tt',
-                user_role      => $c->session->{roles},
-                ency_ai_prompt => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "Mucilage (polysaccharides), vitamins (A, C, K), minerals (potassium, magnesium)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K; potassium; magnesium"',
+                error_msg           => "Failed to add herb: $result",
+                template            => 'ENCY/add_herb_form.tt',
+                user_role           => $c->session->{roles},
+                ency_ai_entity_name => $form_data->{botanical_name} || $form_data->{common_names} || '',
+                ency_ai_prompt => 'botanical_name, common_names, key_name (short single search-key version of the most common name), '
+                         . 'therapeutic_action (medical actions and properties — use practitioner prefixes), '
+                         . 'parts_used (which plant parts are used medicinally e.g. inner bark; leaves; root), '
+                         . 'comments, '
+                         . 'medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, '
+                         . 'image (Wikipedia Commons or USDA PLANTS direct image URL if reliably known — leave blank if uncertain), '
+                         . 'distribution, url, '
+                         . 'sister_plants (related species from same genus or family — botanical names only; do NOT put therapeutic actions here), '
+                         . 'dosage, administration, '
+                         . 'formulas (names of traditional herbal formulas that include this herb), '
+                         . 'preparation, '
+                         . 'contra_indications (when NOT to use — conditions drug interactions pregnancy warnings; do NOT list therapeutic actions here), '
+                         . 'constituents, solvents, cultivation, harvest, culinary, chinese, homiopathic, vetrinary, non_med, history, reference, '
+                         . 'apis (1=Yes/0=No: does Apis mellifera honeybee visit for nectar OR pollen OR propolis), '
+                         . 'nectar (1=Yes/0=No: plant produces nectar honeybees collect), '
+                         . 'nectarnotes (nectar quality season volume beekeeper relevance), '
+                         . 'pollen (1=Yes/0=No: plant produces pollen honeybees collect), '
+                         . 'pollennotes (pollen quantity quality colour season beekeeper value), '
+                         . 'pollinator (all known pollinators). '
+                         . 'APIS FIELDS CRITICAL FOR BEEKEEPERS — use only confirmed botanical or apicultural sources; return exactly 1 or 0 for apis/nectar/pollen. '
+                         . 'IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as separator — NOT commas. Noun phrases only. '
+                         . '(2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". '
+                         . 'Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both prefix groups and terms within groups are semicolon-separated. '
+                         . 'Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" '
+                         . '(3) CONSTITUENTS: flatten parenthetical groups so every item stands alone. '
+                         . 'Example: "Mucilage (polysaccharides), vitamins (A, C, K)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K"',
                 form_data      => $form_data,
             );
             $self->_stash_image_files($c);
@@ -1114,10 +1166,36 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
         $c->stash(
             template              => 'ENCY/add_herb_form.tt',
             user_role             => $c->session->{roles},
-            ency_ai_prompt        => 'botanical_name, common_names, therapeutic_action, parts_used, comments, medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, distribution, constituents, solvents, cultivation, harvest, history, reference, url, sister_plants, dosage, administration, contra_indications, culinary, chinese, homiopathic, vetrinary, non_med, pollinator. IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as the only separator — NOT commas. Noun phrases only. (2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Prefix groups and terms within groups are both semicolon-separated. Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" (3) CONSTITUENTS: flatten parenthetical groups — every item stands alone so it can be individually linked. Example: "Mucilage (polysaccharides), vitamins (A, C, K), minerals (potassium, magnesium)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K; potassium; magnesium"',
+            ency_ai_prompt        => 'botanical_name, common_names, key_name (short single search-key version of the most common name), '
+                         . 'therapeutic_action (medical actions and properties — use practitioner prefixes), '
+                         . 'parts_used (which plant parts are used medicinally e.g. inner bark; leaves; root), '
+                         . 'comments, '
+                         . 'medical_uses, ident_character, stem, leaves, flowers, fruit, root, taste, odour, '
+                         . 'image (Wikipedia Commons or USDA PLANTS direct image URL if reliably known — leave blank if uncertain), '
+                         . 'distribution, url, '
+                         . 'sister_plants (related species from same genus or family — botanical names only; do NOT put therapeutic actions here), '
+                         . 'dosage, administration, '
+                         . 'formulas (names of traditional herbal formulas that include this herb), '
+                         . 'preparation, '
+                         . 'contra_indications (when NOT to use — conditions drug interactions pregnancy warnings; do NOT list therapeutic actions here), '
+                         . 'constituents, solvents, cultivation, harvest, culinary, chinese, homiopathic, vetrinary, non_med, history, reference, '
+                         . 'apis (1=Yes/0=No: does Apis mellifera honeybee visit for nectar OR pollen OR propolis), '
+                         . 'nectar (1=Yes/0=No: plant produces nectar honeybees collect), '
+                         . 'nectarnotes (nectar quality season volume beekeeper relevance), '
+                         . 'pollen (1=Yes/0=No: plant produces pollen honeybees collect), '
+                         . 'pollennotes (pollen quantity quality colour season beekeeper value), '
+                         . 'pollinator (all known pollinators). '
+                         . 'APIS FIELDS CRITICAL FOR BEEKEEPERS — use only confirmed botanical or apicultural sources; return exactly 1 or 0 for apis/nectar/pollen. '
+                         . 'IMPORTANT FORMATTING: (1) SEMICOLONS: all multi-value fields use SEMICOLONS (;) as separator — NOT commas. Noun phrases only. '
+                         . '(2) PRACTITIONER PREFIXES (therapeutic_action, medical_uses, preparation, vetrinary): use "Allopathic:" NOT "Conventional:". '
+                         . 'Recognised prefixes: Allopathic, Herbal, TCM, Ayurvedic, Naturopathic, Homeopathic. Both prefix groups and terms within groups are semicolon-separated. '
+                         . 'Example: "Allopathic: demulcent; diuretic; Herbal: anti-inflammatory; TCM: clears heat" '
+                         . '(3) CONSTITUENTS: flatten parenthetical groups so every item stands alone. '
+                         . 'Example: "Mucilage (polysaccharides), vitamins (A, C, K)" → "mucilage; polysaccharides; vitamin A; vitamin C; vitamin K"',
             prefill_botanical     => $prefill_botanical,
             prefill_common        => $prefill_common,
             return_to             => $return_to,
+            ency_ai_entity_name   => $prefill_botanical || $prefill_common || '',
         );
     }
 }
@@ -3527,10 +3605,11 @@ sub api_resolve : Path('/ENCY/api/resolve') : Args(0) {
                 url       => '/ENCY/Constituent/' . $_->record_id,
             } } @rows;
         }
-    } or do {
-        my $err = $@ || 'unknown';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
     };
+    if ($@) {
+        my $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'api_resolve', "Resolve error: $err");
+    }
     require JSON;
     $c->response->body(JSON::encode_json({ results => \@results }));
 }
@@ -3741,12 +3820,12 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
     }
 
     my $herb_id = $c->request->param('record_id') // '';
-    unless ($herb_id =~ /^\d+$/) {
-        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
-        return;
-    }
 
     if ($c->request->method eq 'POST') {
+        unless ($herb_id =~ /^\d+$/) {
+            $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
+            return;
+        }
         my $p      = $c->request->body_parameters;
         my $action = $p->{action} // '';
 
@@ -3802,7 +3881,23 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
         return;
     }
 
-    my ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    my $form_botanical = $c->request->param('botanical_name') // '';
+    $form_botanical =~ s/^\s+|\s+$//g;
+
+    my ($ok, $data);
+    if ($form_botanical) {
+        my $ncbi_data = $c->model('ExternalDB')->ncbi_search_taxonomy($c, $form_botanical);
+        if ($ncbi_data) {
+            $ncbi_data->{herb_id}        = $herb_id;
+            $ncbi_data->{botanical_name} = $form_botanical;
+            ($ok, $data) = (1, $ncbi_data);
+        } else {
+            ($ok, $data) = (0, "No NCBI record found for '$form_botanical'");
+        }
+    } else {
+        ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    }
+
     unless ($ok) {
         $c->response->body(JSON::encode_json({ ok => 0, error => $data }));
         return;

@@ -736,7 +736,9 @@ function ncbiLookupHerb(herbId) {
   body.innerHTML = 'Searching NCBI\u2026';
   actions.style.display = 'none';
   panel.style.display = 'block';
-  fetch('/ENCY/herb_ncbi_lookup?record_id=' + herbId)
+  var botNameEl = document.querySelector('[name="botanical_name"]');
+  var nameParam = (botNameEl && botNameEl.value.trim()) ? '&botanical_name=' + encodeURIComponent(botNameEl.value.trim()) : '';
+  fetch('/ENCY/herb_ncbi_lookup?record_id=' + herbId + nameParam)
     .then(function(r){ return r.json(); })
     .then(function(d){
       if (!d.ok) { body.innerHTML = '<span style="color:red;">'+d.error+'</span>'; return; }

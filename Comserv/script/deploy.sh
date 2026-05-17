@@ -104,7 +104,20 @@ docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "3. Starting new container..."
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
+NFS_LOCAL_DIR=""
+for candidate in $NFS_MOUNT_CANDIDATES; do
+    if mount | grep -q " on ${candidate} type nfs"; then
+        NFS_LOCAL_DIR="$candidate"
+        echo "   NFS detected at $candidate — using as /data/nfs"
+        break
+    fi
+done
+if [ -z "$NFS_LOCAL_DIR" ]; then
+    NFS_LOCAL_DIR="/home/ubuntu/comserv-workshop"
+    echo "   NFS not mounted — using local fallback $NFS_LOCAL_DIR"
+fi
+WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 
 echo "3b. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"

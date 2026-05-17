@@ -52,8 +52,15 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
     apt-get install -y --no-install-recommends \
       bash default-mysql-client libmariadb3 libssl3 libxml2 curl locales \
-      ca-certificates supervisor logrotate cron && \
+      ca-certificates supervisor logrotate cron \
+      python3 python3-venv python3-pip ffmpeg && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+RUN python3 -m venv /opt/comserv/whisper_venv && \
+    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir \
+      torch --index-url https://download.pytorch.org/whl/cpu && \
+    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir openai-whisper && \
+    chown -R comserv:comserv /opt/comserv/whisper_venv 2>/dev/null || true
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8
 ENV LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8

@@ -696,6 +696,127 @@
         </div>
         [% END %]
 
+        <!-- Migration Target: MySQL Docker (192.168.1.20:3307) -->
+        <div class="schema-section" data-section-id="migration_mysql">
+            <button class="section-toggle" onclick="toggleSection(this)">
+                <span>
+                    <i class="fas fa-server"></i> [% database_comparison.migration_mysql.display_name %]
+                    [% IF database_comparison.migration_mysql.connection_status == 'connected' %]
+                    <span class="status-badge connected">Connected</span>
+                    [% ELSIF database_comparison.migration_mysql.connection_status == 'error' %]
+                    <span class="status-badge" style="background-color: var(--danger-color, #dc3545);">Not Connected</span>
+                    [% ELSE %]
+                    <span class="status-badge" style="background-color:#6c757d;">Unknown</span>
+                    [% END %]
+                    <span class="table-count" style="font-size:11px;color:#6c757d;">Migration Target (read-only)</span>
+                </span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="section-content">
+                [% IF database_comparison.migration_mysql.connection_status == 'connected' %]
+                    [% IF database_comparison.migration_mysql.databases.size > 0 %]
+                    <div class="table-group">
+                        <div class="table-group-header" onclick="toggleTableGroup(this)">
+                            <span>
+                                <i class="fas fa-database"></i> Databases on [% database_comparison.migration_mysql.host | html %]
+                                <span class="group-count">[% database_comparison.migration_mysql.databases.size %]</span>
+                            </span>
+                            <i class="fas fa-chevron-right group-toggle-icon"></i>
+                        </div>
+                        <div class="table-group-content">
+                        [% FOREACH db IN database_comparison.migration_mysql.databases %]
+                            <div class="table-comparison-card">
+                                <div class="table-comparison-header">
+                                    <div class="table-comparison-title">
+                                        <i class="fas fa-database"></i>
+                                        <h4>[% db.name | html %]</h4>
+                                        <span style="font-size:12px;color:#6c757d;margin-left:8px;">[% db.table_count %] tables</span>
+                                    </div>
+                                </div>
+                            </div>
+                        [% END %]
+                        </div>
+                    </div>
+                    [% ELSE %]
+                    <p style="padding:12px;color:#6c757d;"><i class="fas fa-info-circle"></i> No user databases found on this server yet.</p>
+                    [% END %]
+                [% ELSE %]
+                <div class="error-message" style="margin:12px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Connection Error:</strong> [% database_comparison.migration_mysql.error | html %]
+                    <br><small>
+                        Set <code>MIGRATION_MYSQL_PASSWORD</code> in
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
+                            Admin → Database Management → DB Connection Passwords
+                        </a>
+                        (copy <code>MYSQL_ROOT_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
+                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    </small>
+                </div>
+                [% END %]
+            </div>
+        </div>
+
+        <!-- Migration Target: PostgreSQL Docker (192.168.1.20:5433) -->
+        <div class="schema-section" data-section-id="migration_postgres">
+            <button class="section-toggle" onclick="toggleSection(this)">
+                <span>
+                    <i class="fas fa-server"></i> [% database_comparison.migration_postgres.display_name %]
+                    [% IF database_comparison.migration_postgres.connection_status == 'connected' %]
+                    <span class="status-badge connected">Connected</span>
+                    [% ELSIF database_comparison.migration_postgres.connection_status == 'error' %]
+                    <span class="status-badge" style="background-color: var(--danger-color, #dc3545);">Not Connected</span>
+                    [% ELSE %]
+                    <span class="status-badge" style="background-color:#6c757d;">Unknown</span>
+                    [% END %]
+                    <span class="table-count" style="font-size:11px;color:#6c757d;">Migration Target (read-only)</span>
+                </span>
+                <i class="fas fa-chevron-right"></i>
+            </button>
+            <div class="section-content">
+                [% IF database_comparison.migration_postgres.connection_status == 'connected' %]
+                    [% IF database_comparison.migration_postgres.databases.size > 0 %]
+                    <div class="table-group">
+                        <div class="table-group-header" onclick="toggleTableGroup(this)">
+                            <span>
+                                <i class="fas fa-database"></i> Databases on [% database_comparison.migration_postgres.host | html %]
+                                <span class="group-count">[% database_comparison.migration_postgres.databases.size %]</span>
+                            </span>
+                            <i class="fas fa-chevron-right group-toggle-icon"></i>
+                        </div>
+                        <div class="table-group-content">
+                        [% FOREACH db IN database_comparison.migration_postgres.databases %]
+                            <div class="table-comparison-card">
+                                <div class="table-comparison-header">
+                                    <div class="table-comparison-title">
+                                        <i class="fas fa-database"></i>
+                                        <h4>[% db.name | html %]</h4>
+                                    </div>
+                                </div>
+                            </div>
+                        [% END %]
+                        </div>
+                    </div>
+                    [% ELSE %]
+                    <p style="padding:12px;color:#6c757d;"><i class="fas fa-info-circle"></i> No user databases found on this server yet.</p>
+                    [% END %]
+                [% ELSE %]
+                <div class="error-message" style="margin:12px;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <strong>Connection Error:</strong> [% database_comparison.migration_postgres.error | html %]
+                    <br><small>
+                        Set <code>MIGRATION_POSTGRES_PASSWORD</code> in
+                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
+                            Admin → Database Management → DB Connection Passwords
+                        </a>
+                        (copy <code>POSTGRES_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
+                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    </small>
+                </div>
+                [% END %]
+            </div>
+        </div>
+
     [% ELSE %]
         <!-- Connection Error Display -->
         <div class="error-message">

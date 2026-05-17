@@ -79,9 +79,51 @@
     }
 </style>
 
+<script>
+function onTodoTypeChange(sel) {
+    var type = sel.value;
+    var tzRow  = document.getElementById('timezone-row');
+    var recRow = document.getElementById('recurring-row');
+    if (tzRow)  tzRow.style.display  = (type === 'meeting' || type === 'appointment') ? '' : 'none';
+    if (recRow) recRow.style.display = (type === 'task') ? 'none' : '';
+}
+function onRecurringChange(cb) {
+    var wrap = document.getElementById('recurrence-rule-wrap');
+    if (wrap) wrap.style.display = cb.checked ? '' : 'none';
+}
+function syncDur() {
+    var h = parseInt(document.getElementById('est_h').value) || 0;
+    var m = parseInt(document.getElementById('est_m').value) || 0;
+    document.getElementById('estimated_man_hours').value = h * 60 + m;
+}
+(function initDur() {
+    var raw = parseInt('[% todo.estimated_man_hours || 30 %]') || 30;
+    var hEl = document.getElementById('est_h');
+    var mEl = document.getElementById('est_m');
+    if (hEl) hEl.value = Math.floor(raw / 60);
+    if (mEl) mEl.value = raw % 60;
+    syncDur();
+})();
+(function populateTimezones() {
+    var sel = document.getElementById('creator_timezone');
+    if (!sel || !Intl || !Intl.supportedValuesOf) return;
+    var current = sel.dataset.current || '[% todo.creator_timezone || "" %]';
+    var zones = Intl.supportedValuesOf('timeZone');
+    var localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    zones.forEach(function(tz) {
+        var opt = document.createElement('option');
+        opt.value = tz;
+        opt.textContent = tz;
+        if (tz === (current || localTZ)) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    if (!current && localTZ) sel.value = localTZ;
+})();
+</script>
+
 <h1>Add a New To-do Item</h1>
 
-<form action="/todo/create" method="post">
+<form action="/todo/create" method="post" onsubmit="syncDur()">
     <input type="hidden" name="return_to" value="[% return_to %]">
     <!-- record_id is auto-increment, no need for manual input -->
     <div>
@@ -143,7 +185,7 @@
                         SET time_value_24 = hour_24 _ ':' _ minute;
                         SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
             %]
-            <option value="[% time_value_24 %]:00" [% IF default_time == time_value_24 %]selected[% END %]>[% time_display %]</option>
+            <option value="[% time_value_24 %]:00" [% IF default_time.substr(0,2) == hour_24 AND default_time.substr(3,2) == minute %]selected[% END %]>[% time_display %]</option>
             [%
                     END;
                 END;
@@ -159,12 +201,15 @@
         <textarea id="description" name="description">[% todo.description OR '' %]</textarea>
     </div>
     <div>
-        <label for="estimated_man_hours">Estimated Man Hours:</label>
-        <select id="estimated_man_hours" name="estimated_man_hours">
-        [% FOREACH hour IN [1..24] %]
-        <option value="[% hour %]" [% IF hour == todo.estimated_man_hours %]selected[% END %]>[% hour %]</option>
-        [% END %]
-        </select>
+        <label>Duration:</label>
+        <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+            <input type="number" id="est_h" min="0" max="99" value="0"
+                   style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> h
+            <input type="number" id="est_m" min="0" max="59" value="30"
+                   style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> min
+            <input type="hidden" id="estimated_man_hours" name="estimated_man_hours" value="30">
+            <small style="color:var(--text-muted-color,#888);margin-left:4px;">stored as minutes</small>
+        </span>
     </div>
     <div>
         <label for="accumulative_time">Accumulative Time:</label>
@@ -185,6 +230,40 @@
             [% SET current_priority = todo.priority %]
             [% INCLUDE 'todo/priority_select.tt' %]
         </select>
+    </div>
+    <div>
+        <label for="todo_type">Type:</label>
+        <select id="todo_type" name="todo_type" class="form-select" onchange="onTodoTypeChange(this)">
+            <option value="task"        [% IF (todo.todo_type || 'task') == 'task'        %]selected[% END %]>Task</option>
+            <option value="appointment" [% IF todo.todo_type == 'appointment' %]selected[% END %]>📌 Appointment</option>
+            <option value="meeting"     [% IF todo.todo_type == 'meeting'     %]selected[% END %]>🤝 Meeting</option>
+            <option value="event"       [% IF todo.todo_type == 'event'       %]selected[% END %]>🎂 Event (birthday/anniversary)</option>
+            <option value="reminder"    [% IF todo.todo_type == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
+        </select>
+    </div>
+    <div id="recurring-row">
+        <label for="is_recurring">Repeats:</label>
+        <input type="checkbox" id="is_recurring" name="is_recurring" value="1"
+               [% IF todo.is_recurring %]checked[% END %]
+               onchange="onRecurringChange(this)">
+        <span id="recurrence-rule-wrap" style="[% UNLESS todo.is_recurring %]display:none[% END %]">
+            <select id="recurrence_rule" name="recurrence_rule" class="form-select" style="display:inline-block;width:auto;margin-left:8px;">
+                <option value="">— Select cadence —</option>
+                <option value="daily"    [% IF todo.recurrence_rule == 'daily'    %]selected[% END %]>Every Day</option>
+                <option value="weekdays" [% IF (todo.recurrence_rule || 'weekdays') == 'weekdays' && todo.is_recurring %]selected[% END %]>Weekdays (Mon–Fri)</option>
+                <option value="weekly"   [% IF todo.recurrence_rule == 'weekly'   %]selected[% END %]>Every Week</option>
+                <option value="biweekly" [% IF todo.recurrence_rule == 'biweekly' %]selected[% END %]>Every Two Weeks</option>
+                <option value="monthly"  [% IF todo.recurrence_rule == 'monthly'  %]selected[% END %]>Every Month</option>
+                <option value="yearly"   [% IF todo.recurrence_rule == 'yearly'   %]selected[% END %]>Every Year</option>
+            </select>
+        </span>
+    </div>
+    <div id="timezone-row" style="[% UNLESS (todo.todo_type == 'meeting' OR todo.todo_type == 'appointment') %]display:none[% END %]">
+        <label for="creator_timezone">Time Zone:</label>
+        <select id="creator_timezone" name="creator_timezone" class="form-select">
+            <option value="">— Use local time —</option>
+        </select>
+        <small style="color:var(--text-muted-color);">Set your timezone so attendees see the correct local time.</small>
     </div>
     <div>
         <label for="share">Share:</label>
