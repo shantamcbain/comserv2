@@ -2600,6 +2600,7 @@ function openSetPasswordModal(varName, serverDesc, hint) {
     document.getElementById('spModalPassword').value = '';
     document.getElementById('spModalStatus').style.display = 'none';
     document.getElementById('setPasswordModal').style.display = 'flex';
+    if (window._pwToggleInit) window._pwToggleInit();
     setTimeout(() => document.getElementById('spModalPassword').focus(), 80);
 }
 

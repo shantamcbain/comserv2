@@ -104,3 +104,31 @@ nav {
 .horizontal-dropdown:hover .dropdown-content {
     display: block;
 }
+.pw-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.pw-wrapper input[type=password],
+.pw-wrapper input[type=text] {
+    flex: 1;
+    padding-right: 36px !important;
+}
+
+.pw-toggle-btn {
+    position: absolute;
+    right: 6px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #6c757d;
+    padding: 2px 4px;
+    font-size: 14px;
+    line-height: 1;
+    flex-shrink: 0;
+}
+
+.pw-toggle-btn:hover {
+    color: #343a40;
+}

@@ -174,6 +174,39 @@
     </script>
 [% END %]
 
+<script>
+(function() {
+    function wrapPasswordInputs() {
+        document.querySelectorAll('input[type=password]').forEach(function(inp) {
+            if (inp.closest('.pw-wrapper')) return;
+            var wrapper = document.createElement('div');
+            wrapper.className = 'pw-wrapper';
+            wrapper.style.cssText = inp.style.cssText;
+            inp.style.cssText = '';
+            inp.parentNode.insertBefore(wrapper, inp);
+            wrapper.appendChild(inp);
+            var btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'pw-toggle-btn';
+            btn.title = 'Show / hide password';
+            btn.innerHTML = '<i class="fas fa-eye"></i>';
+            btn.addEventListener('click', function() {
+                var show = inp.type === 'password';
+                inp.type = show ? 'text' : 'password';
+                btn.innerHTML = show ? '<i class="fas fa-eye-slash"></i>' : '<i class="fas fa-eye"></i>';
+            });
+            wrapper.appendChild(btn);
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', wrapPasswordInputs);
+    } else {
+        wrapPasswordInputs();
+    }
+    window._pwToggleInit = wrapPasswordInputs;
+})();
+</script>
+
 </body>
 
 </html>
