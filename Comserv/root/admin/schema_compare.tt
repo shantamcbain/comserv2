@@ -739,7 +739,7 @@
                     [% ELSE %]
                     <span class="status-badge" style="background-color:#6c757d;">Unknown</span>
                     [% END %]
-                    <span class="table-count" style="font-size:11px;color:#6c757d;">Migration Target (read-only)</span>
+                    <span class="table-count" style="font-size:11px;color:#6c757d;">New Production Server</span>
                 </span>
                 <i class="fas fa-chevron-right"></i>
             </button>
@@ -799,7 +799,7 @@
                     [% ELSE %]
                     <span class="status-badge" style="background-color:#6c757d;">Unknown</span>
                     [% END %]
-                    <span class="table-count" style="font-size:11px;color:#6c757d;">Migration Target (read-only)</span>
+                    <span class="table-count" style="font-size:11px;color:#6c757d;">New Production Server</span>
                 </span>
                 <i class="fas fa-chevron-right"></i>
             </button>
