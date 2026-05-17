@@ -108,7 +108,14 @@
         </tr>
         <tr>
             <th>Storage</th>
-            <td><input type="text" name="storage" placeholder="leave blank for same storage" style="width:220px;"></td>
+            <td>
+                <select name="storage" style="width:220px;">
+                    <option value="">— same as source —</option>
+                    [% IF storages %][% FOREACH s IN storages %]
+                    <option value="[% s.storage | html %]">[% s.storage | html %] ([% s.type | html %])</option>
+                    [% END %][% END %]
+                </select>
+            </td>
         </tr>
         <tr><td colspan="2"><hr style="margin:0.5em 0;border-color:#ddd;"></td></tr>
         <tr>
@@ -214,7 +221,15 @@
         </tr>
         <tr>
             <th>Target Storage</th>
-            <td><input type="text" id="restore-target-storage" placeholder="leave blank for same storage" style="width:180px;"></td>
+            <td>
+                <select id="restore-target-storage" style="width:220px;">
+                    <option value="">— same as backup source —</option>
+                    [% IF storages %][% FOREACH s IN storages %]
+                    <option value="[% s.storage | html %]">[% s.storage | html %] ([% s.type | html %])</option>
+                    [% END %][% END %]
+                </select>
+                <br><small style="color:#888;">Choose where the new VM's disk will be created</small>
+            </td>
         </tr>
     </table>
     <div style="margin-top:0.75em;display:flex;gap:0.5em;">

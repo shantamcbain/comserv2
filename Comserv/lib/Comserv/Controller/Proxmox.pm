@@ -1107,6 +1107,8 @@ sub vm_detail :Path('vm_detail') :Args(1) {
     my $status    = $proxmox->get_vm_status($vmid);
     my $snapshots = $proxmox->list_snapshots($vmid);
     my $backups   = $proxmox->list_backups($vmid);
+    my $next_id   = $proxmox->get_next_vmid();
+    my $storages  = $proxmox->list_storages('images');
 
     my $proxmox_host = '';
     my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($c->session->{proxmox_server_id});
@@ -1121,6 +1123,8 @@ sub vm_detail :Path('vm_detail') :Args(1) {
         vm_status    => $status,
         snapshots    => $snapshots,
         backups      => $backups,
+        next_vmid    => $next_id,
+        storages     => $storages,
         proxmox_host => $proxmox_host,
     );
     $c->forward($c->view('TT'));
@@ -1146,6 +1150,7 @@ sub clone_vm_form :Path('clone_vm') :Args(1) {
     my $config   = $proxmox->get_vm_config($vmid);
     my $status   = $proxmox->get_vm_status($vmid);
     my $next_id  = $proxmox->get_next_vmid();
+    my $storages = $proxmox->list_storages('images');
 
     my $proxmox_host = '';
     my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($c->session->{proxmox_server_id});
@@ -1159,6 +1164,7 @@ sub clone_vm_form :Path('clone_vm') :Args(1) {
         vm_config       => $config,
         vm_status       => $status,
         next_vmid       => $next_id,
+        storages        => $storages,
         proxmox_host    => $proxmox_host,
         show_clone_form => 1,
     );
