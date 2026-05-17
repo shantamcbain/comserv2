@@ -415,25 +415,45 @@
 
         <div id="section-infrastructure" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-cloud"></i> Infrastructure</h3>
+                <h3><i class="fas fa-server"></i> Infrastructure &amp; Server Room</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
                     <a href="[% c.uri_for('/admin/infrastructure') %]" class="admin-link">
-                        <i class="fas fa-dharmachakra"></i>
-                        <span>Kubernetes Clusters</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
-                        <i class="fas fa-docker"></i>
-                        <span>Docker Containers</span>
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Infrastructure Dashboard</span>
                     </a>
                     <a href="[% c.uri_for('/proxmox') %]" class="admin-link">
                         <i class="fas fa-server"></i>
-                        <span>Proxmox VM Management</span>
+                        <span>Proxmox VMs</span>
+                    </a>
+                    <a href="[% c.uri_for('/proxmox/create') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Create VM</span>
                     </a>
                     <a href="[% c.uri_for('/proxmox_servers') %]" class="admin-link">
                         <i class="fas fa-hdd"></i>
-                        <span>Proxmox Server Management</span>
+                        <span>Proxmox Servers</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="admin-link">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>OPNsense Gateway</span>
+                    </a>
+                    <a href="[% c.uri_for('/cloudflare') %]" class="admin-link">
+                        <i class="fas fa-cloud"></i>
+                        <span>Cloudflare DNS</span>
+                    </a>
+                    <a href="[% c.uri_for('/hosting') %]" class="admin-link">
+                        <i class="fas fa-globe"></i>
+                        <span>Hosting Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-cubes"></i>
+                        <span>Docker Containers</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/infrastructure') %]#k8s" class="admin-link">
+                        <i class="fas fa-dharmachakra"></i>
+                        <span>Kubernetes Clusters</span>
                     </a>
                 </div>
             </div>

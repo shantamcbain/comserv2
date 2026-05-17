@@ -1,0 +1,303 @@
+[% PageVersion = '/proxmox/vm_detail.tt,v 0.01.00 2026/05/17 shanta Exp shanta ' %]
+[% PROCESS 'macros.tt' IF 0 %]
+<div class="container">
+
+[% IF error_msg %]
+<div class="alert alert-danger">[% error_msg | html %]</div>
+[% END %]
+[% IF success_msg %]
+<div class="alert alert-success">[% success_msg | html %]</div>
+[% END %]
+
+<div style="display:flex; align-items:center; gap:1em; flex-wrap:wrap; margin-bottom:1em;">
+    <h1 style="margin:0;">VM [% vmid | html %][% IF vm_config.name %] — [% vm_config.name | html %][% END %]</h1>
+    [% IF vm_status.status == 'running' %]
+    <span style="background:#4CAF50;color:#fff;padding:3px 10px;border-radius:12px;font-weight:bold;">Running</span>
+    [% ELSIF vm_status.status == 'stopped' %]
+    <span style="background:#f44336;color:#fff;padding:3px 10px;border-radius:12px;font-weight:bold;">Stopped</span>
+    [% ELSIF vm_status %]
+    <span style="background:#888;color:#fff;padding:3px 10px;border-radius:12px;">[% vm_status.status | html %]</span>
+    [% END %]
+</div>
+
+<div style="display:flex;gap:0.5em;flex-wrap:wrap;margin-bottom:1.5em;">
+    [% IF vm_status.status == 'stopped' %]
+    <button class="vm-btn vm-btn-start" onclick="vmAction('start')">▶ Start</button>
+    [% ELSE %]
+    <button class="vm-btn vm-btn-stop"   onclick="vmAction('shutdown')">■ Shut Down</button>
+    <button class="vm-btn vm-btn-reboot" onclick="vmAction('reboot')">↺ Reboot</button>
+    [% END %]
+    <a href="[% c.uri_for('/proxmox/edit_vm') %]/[% vmid | html %]" class="vm-btn vm-btn-edit">✎ Edit</a>
+    <button class="vm-btn" onclick="document.getElementById('clone-panel').style.display='block';">⎘ Clone</button>
+    <button class="vm-btn" onclick="document.getElementById('snapshot-panel').style.display='block';">📷 Snapshot</button>
+    [% IF proxmox_host %]
+    <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vmid | html %]:4::::" target="_blank" class="vm-btn vm-btn-console">⊡ Console</a>
+    [% END %]
+    <a href="[% c.uri_for('/proxmox') %]" class="vm-btn" style="background:#888;color:#fff;">← Back</a>
+</div>
+
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.5em;margin-bottom:1.5em;">
+
+<div class="detail-card">
+    <h3>Configuration</h3>
+    <table class="detail-table">
+        <tr><th>VM ID</th><td>[% vmid | html %]</td></tr>
+        <tr><th>Name</th><td>[% vm_config.name | html %]</td></tr>
+        <tr><th>OS Type</th><td>[% vm_config.ostype | html %]</td></tr>
+        <tr><th>CPU Cores</th><td>[% vm_config.cores || vm_config.sockets | html %]</td></tr>
+        <tr><th>Memory</th><td>[% vm_config.memory ? vm_config.memory _ ' MB' : 'N/A' %]</td></tr>
+        <tr><th>BIOS</th><td>[% vm_config.bios || 'seabios' | html %]</td></tr>
+        <tr><th>Machine</th><td>[% vm_config.machine || 'default' | html %]</td></tr>
+        <tr><th>Boot Order</th><td>[% vm_config.boot | html %]</td></tr>
+        [% IF vm_config.ide2 %]
+        <tr><th>CD/DVD</th><td>[% vm_config.ide2 | html %]</td></tr>
+        [% END %]
+        [% IF vm_config.net0 %]
+        <tr><th>Network</th><td>[% vm_config.net0 | html %]</td></tr>
+        [% END %]
+    </table>
+</div>
+
+<div class="detail-card">
+    <h3>Live Status</h3>
+    [% IF vm_status %]
+    <table class="detail-table">
+        <tr><th>Status</th><td>[% vm_status.status | html %]</td></tr>
+        [% IF vm_status.uptime %]
+        <tr><th>Uptime</th><td id="uptime-val">[% vm_status.uptime | html %]s</td></tr>
+        [% END %]
+        [% IF vm_status.maxmem %]
+        <tr><th>Memory</th>
+            <td>[% (vm_status.mem / 1048576) | format('%.0f') %] MB
+                / [% (vm_status.maxmem / 1073741824) | format('%.1f') %] GB</td></tr>
+        [% END %]
+        [% IF vm_status.cpu %]
+        <tr><th>CPU Usage</th><td>[% (vm_status.cpu * 100) | format('%.1f') %]%</td></tr>
+        [% END %]
+        [% IF vm_status.maxdisk %]
+        <tr><th>Disk</th><td>[% (vm_status.maxdisk / 1073741824) | format('%.0f') %] GB</td></tr>
+        [% END %]
+        <tr><th>Node</th><td>[% vm_status.node | html %]</td></tr>
+    </table>
+    [% ELSE %]
+    <p class="text-muted">Status unavailable.</p>
+    [% END %]
+</div>
+
+</div>
+
+<div id="clone-panel" style="display:[% show_clone_form ? 'block' : 'none' %];background:#f9f9f9;border:1px solid #ddd;border-radius:5px;padding:1.2em;margin-bottom:1.5em;">
+    <h3 style="margin-top:0;">Clone VM [% vmid | html %]</h3>
+    <form id="clone-form">
+    <input type="hidden" name="vmid" value="[% vmid | html %]">
+    <table class="detail-table">
+        <tr>
+            <th>New VM ID</th>
+            <td><input type="number" name="newid" value="[% next_vmid | html %]" min="100" max="999999" required style="width:100px;"></td>
+        </tr>
+        <tr>
+            <th>New Name</th>
+            <td><input type="text" name="name" value="[% vm_config.name ? 'clone-' _ vm_config.name : '' | html %]" placeholder="clone-name" style="width:220px;"></td>
+        </tr>
+        <tr>
+            <th>Clone Type</th>
+            <td>
+                <label><input type="radio" name="full" value="1" checked> Full clone (independent copy)</label><br>
+                <label><input type="radio" name="full" value="0"> Linked clone (shares base disk)</label>
+            </td>
+        </tr>
+        <tr>
+            <th>Storage</th>
+            <td><input type="text" name="storage" placeholder="leave blank for same storage" style="width:220px;"></td>
+        </tr>
+        <tr><td colspan="2"><hr style="margin:0.5em 0;border-color:#ddd;"></td></tr>
+        <tr>
+            <th>New IP Address</th>
+            <td><input type="text" name="new_ip" placeholder="e.g. 192.168.1.21/24" style="width:180px;">
+                <span style="font-size:0.8em;color:#888;"> (CIDR, optional)</span></td>
+        </tr>
+        <tr>
+            <th>Gateway</th>
+            <td><input type="text" name="gateway" placeholder="e.g. 192.168.1.1" style="width:180px;"></td>
+        </tr>
+        <tr>
+            <th>DNS Server</th>
+            <td><input type="text" name="dns" placeholder="e.g. 192.168.1.1" style="width:180px;"></td>
+        </tr>
+        <tr>
+            <th>Hostname</th>
+            <td><input type="text" name="hostname" placeholder="e.g. db-dev" style="width:180px;"></td>
+        </tr>
+    </table>
+    <p style="font-size:0.82em;color:#888;margin:0.4em 0;">IP settings use cloud-init. If the VM has no cloud-init drive they will be ignored — see note below.</p>
+    <div style="margin-top:0.75em;display:flex;gap:0.5em;">
+        <button type="button" class="vm-btn" style="background:#4CAF50;" onclick="doClone()">⎘ Start Clone</button>
+        <button type="button" class="vm-btn" style="background:#888;" onclick="document.getElementById('clone-panel').style.display='none';">Cancel</button>
+    </div>
+    <div id="clone-result" style="margin-top:0.5em;"></div>
+    </form>
+</div>
+
+<div id="snapshot-panel" style="display:none;background:#f9f9f9;border:1px solid #ddd;border-radius:5px;padding:1.2em;margin-bottom:1.5em;">
+    <h3 style="margin-top:0;">Snapshots</h3>
+    [% IF snapshots && snapshots.size > 0 %]
+    <table class="detail-table" style="margin-bottom:1em;">
+        <thead><tr><th>Name</th><th>Description</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody>
+        [% FOREACH snap IN snapshots %]
+        [% NEXT IF snap.name == 'current' %]
+        <tr>
+            <td>[% snap.name | html %]</td>
+            <td>[% snap.description | html %]</td>
+            <td>[% snap.snaptime ? snap.snaptime : '' %]</td>
+            <td>
+                <button class="vm-btn" style="font-size:0.8em;padding:3px 8px;background:#FF9900;"
+                    onclick="doRollback('[% snap.name | html %]')">↩ Restore</button>
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+    [% ELSE %]
+    <p class="text-muted">No snapshots found.</p>
+    [% END %]
+    <h4>Create Snapshot</h4>
+    <table class="detail-table">
+        <tr><th>Name</th><td><input type="text" id="snap-name" placeholder="snap-name (no spaces)" style="width:180px;"></td></tr>
+        <tr><th>Description</th><td><input type="text" id="snap-desc" placeholder="optional description" style="width:220px;"></td></tr>
+    </table>
+    <div style="margin-top:0.5em;display:flex;gap:0.5em;">
+        <button class="vm-btn" style="background:#4CAF50;" onclick="doSnapshot()">📷 Take Snapshot</button>
+        <button class="vm-btn" style="background:#888;" onclick="document.getElementById('snapshot-panel').style.display='none';">Close</button>
+    </div>
+    <div id="snap-result" style="margin-top:0.5em;"></div>
+</div>
+
+[% IF backups && backups.size > 0 %]
+<div class="detail-card" style="margin-bottom:1.5em;">
+    <h3>Backups</h3>
+    <table class="detail-table">
+        <thead><tr><th>File</th><th>Size</th><th>Date</th><th>Storage</th><th>Actions</th></tr></thead>
+        <tbody>
+        [% FOREACH bk IN backups %]
+        <tr>
+            <td style="font-size:0.85em;">[% bk.volid | html %]</td>
+            <td>[% bk.size ? (bk.size / 1073741824) | format('%.1f') _ ' GB' : 'N/A' %]</td>
+            <td>[% bk.ctime ? bk.ctime : '' %]</td>
+            <td>[% bk.storage | html %]</td>
+            <td>
+                <button class="vm-btn" style="font-size:0.8em;padding:3px 8px;background:#f44336;color:#fff;"
+                    onclick="doRestore('[% bk.volid | html %]','[% bk.storage | html %]')">↩ Restore to VM</button>
+            </td>
+        </tr>
+        [% END %]
+        </tbody>
+    </table>
+</div>
+[% END %]
+
+</div>
+
+<style>
+.detail-card { background:#f9f9f9; border:1px solid #ddd; border-radius:5px; padding:1.2em; }
+.detail-table { width:100%; border-collapse:collapse; }
+.detail-table th { text-align:left; padding:5px 10px 5px 0; color:#555; width:35%; vertical-align:top; }
+.detail-table td { padding:5px 0; }
+.vm-btn { display:inline-block; padding:7px 14px; border-radius:4px; font-weight:bold; cursor:pointer; border:none; text-decoration:none; font-size:0.95em; background:#4a90d9; color:#fff; }
+.vm-btn:hover { opacity:0.85; }
+.vm-btn-start  { background:#4CAF50; }
+.vm-btn-stop   { background:#f44336; }
+.vm-btn-reboot { background:#FF9900; }
+.vm-btn-edit   { background:#4a90d9; }
+.vm-btn-console { background:#555; }
+.alert-danger  { background:#fde; border:1px solid #f88; border-radius:4px; padding:0.7em 1em; margin-bottom:1em; }
+.alert-success { background:#dfd; border:1px solid #8c8; border-radius:4px; padding:0.7em 1em; margin-bottom:1em; }
+</style>
+
+<script>
+var VMID = '[% vmid | html %]';
+
+function vmAction(action) {
+    if (!confirm('Are you sure you want to ' + action + ' VM ' + VMID + '?')) return;
+    fetch('[% c.uri_for('/proxmox/vm_power') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'vmid=' + VMID + '&action=' + action
+    })
+    .then(r => r.json())
+    .then(d => { alert(d.success ? 'Done: ' + (d.message||action) : 'Error: ' + d.error); location.reload(); })
+    .catch(e => alert('Request failed: ' + e));
+}
+
+function doClone() {
+    var form = document.getElementById('clone-form');
+    var data = new URLSearchParams(new FormData(form)).toString();
+    document.getElementById('clone-result').innerHTML = 'Starting clone…';
+    fetch('[% c.uri_for('/proxmox/clone_vm_action') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: data
+    })
+    .then(r => r.json())
+    .then(d => {
+        var el = document.getElementById('clone-result');
+        if (d.success) {
+            var msg = 'Clone started — new VM ID: ' + d.vmid;
+            if (d.ip_config) {
+                msg += ' | IP config: ' + d.ip_config;
+                if (d.ip_config.indexOf('failed') !== -1) {
+                    msg += ' <br><small style="color:#b37700;">Note: VM may not have a cloud-init drive — change IP manually after boot via netplan or run the setup ISO.</small>';
+                }
+            }
+            el.innerHTML = '<span style="color:green;">' + msg + '</span>';
+        } else {
+            el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
+        }
+    })
+    .catch(e => { document.getElementById('clone-result').innerHTML = '<span style="color:red;">Request failed: ' + e + '</span>'; });
+}
+
+function doSnapshot() {
+    var name = document.getElementById('snap-name').value.trim();
+    var desc = document.getElementById('snap-desc').value.trim();
+    if (!name) { alert('Snapshot name is required'); return; }
+    document.getElementById('snap-result').innerHTML = 'Creating snapshot…';
+    fetch('[% c.uri_for('/proxmox/snapshot_create') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'vmid=' + VMID + '&snapname=' + encodeURIComponent(name) + '&description=' + encodeURIComponent(desc)
+    })
+    .then(r => r.json())
+    .then(d => {
+        var el = document.getElementById('snap-result');
+        if (d.success) {
+            el.innerHTML = '<span style="color:green;">Snapshot created.</span>';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
+        }
+    });
+}
+
+function doRollback(snapname) {
+    if (!confirm('Rollback VM ' + VMID + ' to snapshot "' + snapname + '"? The VM will be reverted and any unsaved data lost.')) return;
+    fetch('[% c.uri_for('/proxmox/snapshot_rollback') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'vmid=' + VMID + '&snapname=' + encodeURIComponent(snapname)
+    })
+    .then(r => r.json())
+    .then(d => { alert(d.success ? 'Rollback started.' : 'Error: ' + d.error); });
+}
+
+function doRestore(volid, storage) {
+    if (!confirm('Restore VM ' + VMID + ' from backup?\n' + volid + '\n\nThis will OVERWRITE the current VM. Continue?')) return;
+    fetch('[% c.uri_for('/proxmox/backup_restore') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'vmid=' + VMID + '&volid=' + encodeURIComponent(volid) + '&storage=' + encodeURIComponent(storage)
+    })
+    .then(r => r.json())
+    .then(d => { alert(d.success ? 'Restore started.' : 'Error: ' + d.error); });
+}
+</script>
