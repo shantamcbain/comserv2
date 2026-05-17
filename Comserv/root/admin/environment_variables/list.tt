@@ -38,63 +38,113 @@
             </div>
             [% END %]
             
-            <div class="action-bar" style="margin-bottom: var(--spacing-medium);">
-                <a href="[% c.uri_for('/admin/environment_variables/create') %]" class="btn btn-primary">Add New Variable</a>
-                <a href="[% c.uri_for('/admin/environment_variables/audit_log') %]" class="btn btn-secondary">View Audit Log</a>
+            <div class="action-bar" style="margin-bottom: var(--spacing-medium); display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                <a href="[% c.uri_for('/admin/environment_variables/create') %]" class="btn btn-primary"><i class="fas fa-plus"></i> Add New Variable</a>
+                <a href="[% c.uri_for('/admin/compare_schema') %]" class="btn btn-secondary"><i class="fas fa-database"></i> Schema Compare</a>
+                <span style="font-size:12px;color:var(--text-muted-color);margin-left:auto;">File: <code>[% env_file_path | html %]</code></span>
             </div>
-            
-            [% IF env_variables.size %]
-            <div class="table-container">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Variable Name</th>
-                            <th>Value Preview</th>
-                            <th>Is Secret</th>
-                            <th>Last Modified</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH var IN env_variables %]
-                        <tr>
-                            <td style="color: var(--text-color);">
-                                <code>[% var.key | html %]</code>
-                            </td>
-                            <td style="color: var(--text-color);">
-                                [% IF var.is_secret %]
-                                    <span style="color: var(--text-muted-color);">&lt;secret&gt;</span>
-                                [% ELSE %]
-                                    <code style="word-break: break-all;">[% var.value | truncate(50) | html %]</code>
-                                [% END %]
-                            </td>
-                            <td style="color: var(--text-color);">
-                                [% IF var.is_secret %]
-                                    <span class="badge badge-warning">Yes</span>
-                                [% ELSE %]
-                                    <span class="badge badge-info">No</span>
-                                [% END %]
-                            </td>
-                            <td style="color: var(--text-muted-color); font-size: var(--font-size-small);">
-                                [% var.updated_at %]
-                            </td>
-                            <td class="action-cell">
-                                <a href="[% c.uri_for('/admin/environment_variables/edit', var.id) %]" class="btn btn-sm btn-edit">Edit</a>
-                                <form method="post" action="[% c.uri_for('/admin/environment_variables/delete', var.id) %]" style="display: inline;">
-                                    <button type="submit" class="btn btn-sm btn-delete" onclick="return confirm('Are you sure you want to delete this variable?')">Delete</button>
-                                </form>
-                            </td>
-                        </tr>
+
+            <p style="font-size:13px;color:var(--text-muted-color);margin-bottom:16px;">
+                Variables are grouped by purpose. <strong>Legacy DB_* variables</strong> are being phased out — use <code>COMSERV_DB_*</code> instead.
+                <strong>Secrets</strong> (passwords, tokens) show as <code>&lt;secret&gt;</code> for security.
+            </p>
+
+            [% IF grouped_vars.size %]
+                [% FOREACH grp IN grouped_vars %]
+                <div style="margin-bottom:24px;">
+                    <div style="display:flex; align-items:center; gap:8px; padding:10px 14px;
+                                background:var(--card-bg, rgba(255,255,255,0.88));
+                                border-left:4px solid var(--primary-color,#007bff);
+                                border-radius:4px 4px 0 0; cursor:pointer;"
+                         onclick="toggleVarGroup('[% grp.group_key | html %]')">
+                        <i class="fas [% grp.icon | html %]" style="color:var(--primary-color,#007bff);width:16px;"></i>
+                        <strong>[% grp.label | html %]</strong>
+                        <span style="background:#6c757d;color:#fff;font-size:11px;padding:1px 7px;border-radius:10px;margin-left:4px;">[% grp.variables.size %]</span>
+                        [% IF grp.group_key == 'DB' %]
+                        <span style="background:#ffc107;color:#333;font-size:11px;padding:1px 7px;border-radius:10px;">LEGACY — consider removing</span>
                         [% END %]
-                    </tbody>
-                </table>
-            </div>
+                        <i class="fas fa-chevron-down" style="margin-left:auto;" id="icon_[% grp.group_key | html %]"></i>
+                    </div>
+                    <div id="grp_[% grp.group_key | html %]" style="border:1px solid #dee2e6; border-top:none; border-radius:0 0 4px 4px; overflow:hidden;">
+                        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                            <thead>
+                                <tr style="background:rgba(0,0,0,0.04);">
+                                    <th style="padding:8px 12px; text-align:left; width:28%;">Variable</th>
+                                    <th style="padding:8px 12px; text-align:left; width:22%;">Value</th>
+                                    <th style="padding:8px 12px; text-align:left;">Description</th>
+                                    <th style="padding:8px 12px; text-align:center; width:130px;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                            [% FOREACH var IN grp.variables %]
+                                <tr style="border-top:1px solid #f0f0f0; [% IF loop.count % 2 == 0 %]background:rgba(0,0,0,0.02);[% END %]">
+                                    <td style="padding:8px 12px; vertical-align:top;">
+                                        <code style="font-size:12px;">[% var.key | html %]</code>
+                                        [% IF var.is_secret %]<br><span style="font-size:10px;color:#dc3545;"><i class="fas fa-lock"></i> secret</span>[% END %]
+                                    </td>
+                                    <td style="padding:8px 12px; vertical-align:top; word-break:break-all;">
+                                        [% IF var.is_secret %]
+                                            <span style="color:var(--text-muted-color);font-style:italic;">&lt;hidden&gt;</span>
+                                        [% ELSIF var.value %]
+                                            <code style="font-size:12px;">[% var.value | truncate(45) | html %]</code>
+                                        [% ELSE %]
+                                            <span style="color:#dc3545;font-style:italic;">— not set —</span>
+                                        [% END %]
+                                    </td>
+                                    <td style="padding:8px 12px; vertical-align:top; color:var(--text-muted-color); font-size:12px;">
+                                        [% IF var.description %][% var.description | html %][% ELSE %]<em>No description</em>[% END %]
+                                    </td>
+                                    <td style="padding:8px 12px; text-align:center; vertical-align:top; white-space:nowrap;">
+                                        <a href="[% c.uri_for('/admin/environment_variables/edit', var.id) %]" class="btn btn-sm btn-edit" style="font-size:11px;padding:3px 8px;">Edit</a>
+                                        <form method="post" action="[% c.uri_for('/admin/environment_variables/delete', var.id) %]" style="display:inline;">
+                                            <button type="submit" class="btn btn-sm btn-delete" style="font-size:11px;padding:3px 8px;"
+                                                    onclick="return confirm('Delete [% var.key | html %]?')">Del</button>
+                                        </form>
+                                    </td>
+                                </tr>
+                            [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                [% END %]
             [% ELSE %]
             <div class="empty-state" style="text-align: center; padding: var(--spacing-large);">
                 <p style="color: var(--text-muted-color);">No environment variables defined.</p>
                 <a href="[% c.uri_for('/admin/environment_variables/create') %]" class="btn btn-primary">Create First Variable</a>
             </div>
             [% END %]
+
+            <script>
+            function toggleVarGroup(key) {
+                const body = document.getElementById('grp_' + key);
+                const icon = document.getElementById('icon_' + key);
+                if (!body) return;
+                const hidden = body.style.display === 'none';
+                body.style.display = hidden ? '' : 'none';
+                if (icon) {
+                    icon.className = hidden ? 'fas fa-chevron-down' : 'fas fa-chevron-right';
+                }
+                try {
+                    const state = JSON.parse(localStorage.getItem('ev_open') || '{}');
+                    state[key] = hidden;
+                    localStorage.setItem('ev_open', JSON.stringify(state));
+                } catch(e) {}
+            }
+            document.addEventListener('DOMContentLoaded', function() {
+                try {
+                    const state = JSON.parse(localStorage.getItem('ev_open') || '{}');
+                    document.querySelectorAll('[id^="grp_"]').forEach(function(el) {
+                        const key = el.id.replace('grp_', '');
+                        if (state[key] === false) {
+                            el.style.display = 'none';
+                            const icon = document.getElementById('icon_' + key);
+                            if (icon) icon.className = 'fas fa-chevron-right';
+                        }
+                    });
+                } catch(e) {}
+            });
+            </script>
             
         </div>
         

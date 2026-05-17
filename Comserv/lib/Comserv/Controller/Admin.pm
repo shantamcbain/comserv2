@@ -2541,6 +2541,103 @@ sub get_database_comparison {
         $comparison->{forager}->{error} = $error;
     };
 
+    # Discover custom DB environments from COMSERV_DB_* env vars (written by add_database_env)
+    my @custom_envs = @{ $self->get_custom_db_environments($c) };
+    $comparison->{summary}->{total_databases} += scalar(@custom_envs);
+
+    for my $cenv (@custom_envs) {
+        my $conn_key   = $cenv->{conn_key};
+        my $db_type    = $cenv->{db_type};
+        my $host       = $cenv->{host};
+        my $port       = $cenv->{port};
+        my $db_name    = $cenv->{database};
+        my $username   = $cenv->{username};
+        my $password   = $cenv->{password};
+
+        my $entry = {
+            name              => $conn_key,
+            display_name      => $cenv->{display_name},
+            tables            => [],
+            table_count       => 0,
+            connection_status => 'unknown',
+            error             => undef,
+            table_comparisons => [],
+            results_without_tables => [],
+            is_postgres       => ($db_type eq 'postgres') ? 1 : 0,
+            is_custom         => 1,
+            db_type           => $db_type,
+        };
+
+        unless ($password) {
+            $entry->{connection_status} = 'error';
+            $entry->{error} = "No password stored for '$conn_key'. Edit via Admin → Environment Variables.";
+            push @{ $comparison->{postgres_databases} }, $entry;
+            next;
+        }
+
+        try {
+            my $dsn;
+            if ($db_type eq 'postgres') {
+                $dsn = "DBI:Pg:host=$host;port=$port;dbname=$db_name";
+            } else {
+                $dsn = "DBI:mysql:host=$host;port=$port;database=$db_name";
+            }
+            my $dbh = DBI->connect($dsn, $username, $password, {
+                RaiseError => 1, PrintError => 0, AutoCommit => 1,
+                $db_type eq 'mysql' ? (mysql_connect_timeout => 5) : (),
+            });
+
+            my @tables;
+            if ($db_type eq 'postgres') {
+                my $sth = $dbh->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY table_name");
+                $sth->execute();
+                @tables = map { $_->[0] } @{ $sth->fetchall_arrayref() };
+            } else {
+                my $sth = $dbh->prepare("SHOW TABLES");
+                $sth->execute();
+                @tables = map { $_->[0] } @{ $sth->fetchall_arrayref() };
+            }
+            $dbh->disconnect();
+
+            $entry->{tables}    = \@tables;
+            $entry->{table_count} = scalar(@tables);
+            $entry->{connection_status} = 'connected';
+            $comparison->{summary}->{connected_databases}++;
+            $comparison->{summary}->{total_tables} += scalar(@tables);
+
+            my $ns = $self->_get_namespace($conn_key);
+            my $result_table_mapping = $self->build_result_table_mapping($c, $conn_key);
+
+            my (@twr, @twor);
+            for my $tbl (@tables) {
+                my $tbl_cmp = $self->compare_table_with_result_file_v2($c, $tbl, $conn_key, $result_table_mapping);
+                if ($tbl_cmp->{has_result_file}) {
+                    push @twr, $tbl_cmp;
+                    $comparison->{summary}->{tables_with_results}++;
+                } else {
+                    push @twor, $tbl_cmp;
+                    $comparison->{summary}->{tables_without_results}++;
+                }
+            }
+
+            my @orphaned = sort { lc($a->{result_name}) cmp lc($b->{result_name}) }
+                $self->find_orphaned_result_files_v2($c, $conn_key, \@tables, $result_table_mapping);
+            $comparison->{summary}->{results_without_tables} += scalar(@orphaned);
+
+            $entry->{table_comparisons}      = [ sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @twr,
+                                                  sort { lc($a->{table_name}) cmp lc($b->{table_name}) } @twor ];
+            $entry->{results_without_tables} = \@orphaned;
+
+        } catch {
+            my $err = "Connection failed for '$conn_key': $_";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_database_comparison', $err);
+            $entry->{connection_status} = 'error';
+            $entry->{error} = $err;
+        };
+
+        push @{ $comparison->{postgres_databases} }, $entry;
+    }
+
     # Discover and process PostgreSQL databases from db_config.json
     try {
         require Comserv::Model::RemoteDB;
@@ -6961,6 +7058,134 @@ sub get_migration_postgres_info {
     };
 
     return $result;
+}
+
+sub add_database_env :Path('/admin/database-env/add') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('{"error":"Method not allowed"}');
+        return;
+    }
+
+    my $body = eval { JSON::decode_json($c->req->body // '{}') } // {};
+    my $env_name     = $body->{env_name}      // '';
+    my $display_name = $body->{display_name}  // $env_name;
+    my $db_host      = $body->{db_host}       // '';
+    my $db_name      = $body->{db_name}       // '';
+    my $port         = $body->{port}          // 3306;
+    my $db_type      = lc($body->{db_type}    // 'mysql');
+    my $username     = $body->{username}       // '';
+    my $cur_password = $body->{current_password} // '';
+    my $new_password = $body->{new_password}   // '';
+
+    unless ($env_name =~ /^[A-Za-z][A-Za-z0-9_]*$/) {
+        $c->response->status(400);
+        $c->response->body('{"error":"Invalid environment name. Use letters, numbers, underscores only (must start with a letter)."}');
+        return;
+    }
+    unless ($db_host && $db_name && $username) {
+        $c->response->status(400);
+        $c->response->body('{"error":"host, database name, and username are required."}');
+        return;
+    }
+
+    my $prefix = 'COMSERV_DB_' . uc($env_name);
+
+    if ($new_password && $cur_password) {
+        my $ok = eval {
+            my $dsn;
+            if ($db_type eq 'postgres') {
+                $dsn = "DBI:Pg:host=$db_host;port=$port;dbname=$db_name";
+            } else {
+                $dsn = "DBI:mysql:host=$db_host;port=$port";
+            }
+            my $dbh = DBI->connect($dsn, $username, $cur_password, {
+                RaiseError => 1, PrintError => 0, AutoCommit => 1,
+            });
+            if ($db_type eq 'postgres') {
+                my $safe = $new_password;
+                $safe =~ s/'/''/g;
+                $dbh->do("ALTER USER $username PASSWORD '$safe'");
+            } else {
+                $dbh->do("ALTER USER '$username'\@'%' IDENTIFIED BY ?", undef, $new_password);
+            }
+            $dbh->disconnect();
+            1;
+        };
+        if ($@) {
+            $c->response->status(400);
+            my $err = "$@";
+            $err =~ s/\n/ /g;
+            $c->response->body(JSON::encode_json({ error => "Password change failed: $err" }));
+            return;
+        }
+    }
+
+    my $store_password = $new_password || $cur_password;
+
+    require Comserv::Util::EnvFileManager;
+    my $env_mgr = Comserv::Util::EnvFileManager->new(
+        env_path => $c->path_to('.env')->stringify
+    );
+
+    my $result = eval {
+        my $env_vars = $env_mgr->read_env_file();
+        $env_vars->{"${prefix}_HOST"}         = $db_host;
+        $env_vars->{"${prefix}_PORT"}         = $port;
+        $env_vars->{"${prefix}_DATABASE"}     = $db_name;
+        $env_vars->{"${prefix}_USERNAME"}     = $username;
+        $env_vars->{"${prefix}_PASSWORD"}     = $store_password;
+        $env_vars->{"${prefix}_DB_TYPE"}      = $db_type;
+        $env_vars->{"${prefix}_DISPLAY_NAME"} = $display_name;
+        $env_mgr->write_env_file($env_vars);
+        1;
+    };
+
+    if ($@ || !$result) {
+        $c->response->status(500);
+        my $err = "$@";
+        $err =~ s/\n/ /g;
+        $c->response->body(JSON::encode_json({ error => "Failed to save to .env: $err" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_database_env',
+        "Added new database environment '$env_name' ($db_type $db_host:$port/$db_name)");
+
+    $c->response->status(200);
+    $c->response->body(JSON::encode_json({
+        success      => 1,
+        message      => "Environment '$env_name' saved to .env. Restart the server for it to take effect.",
+        env_prefix   => $prefix,
+        password_changed => ($new_password && $cur_password) ? 1 : 0,
+    }));
+}
+
+sub get_custom_db_environments {
+    my ($self, $c) = @_;
+    my @envs;
+    for my $key (sort keys %ENV) {
+        next unless $key =~ /^COMSERV_DB_([A-Z0-9_]+)_HOST$/;
+        my $env_name = $1;
+        my $prefix   = "COMSERV_DB_${env_name}";
+        next if $env_name =~ /^(PRODUCTION_SERVER|PRODUCTION_FORAGER)$/;
+        push @envs, {
+            env_name     => $env_name,
+            display_name => $ENV{"${prefix}_DISPLAY_NAME"} || $env_name,
+            host         => $ENV{"${prefix}_HOST"}         || '',
+            port         => $ENV{"${prefix}_PORT"}         || 3306,
+            database     => $ENV{"${prefix}_DATABASE"}     || '',
+            username     => $ENV{"${prefix}_USERNAME"}     || '',
+            password     => $ENV{"${prefix}_PASSWORD"}     || '',
+            db_type      => lc($ENV{"${prefix}_DB_TYPE"}  || 'mysql'),
+            conn_key     => lc($env_name),
+        };
+    }
+    return \@envs;
 }
 
 # Helper method to determine Result file path

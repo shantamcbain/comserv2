@@ -101,45 +101,76 @@
         
         <!-- Add New Environment Form (hidden by default) -->
         <div id="addEnvForm" style="display: none; margin-top: 15px; padding: 15px; background: var(--card-bg, rgba(255,255,255,0.88)); border: 1px solid #dee2e6; border-radius: 4px;">
-            <h4 style="margin-top: 0;">Add New Database Environment</h4>
+            <h4 style="margin-top: 0;"><i class="fas fa-plus-circle"></i> Add New Database Environment</h4>
+            <p style="font-size:13px;color:#6c757d;margin-bottom:12px;">Credentials are saved to <code>Comserv/.env</code> as <code>COMSERV_DB_{NAME}_*</code> variables. Nothing is written to db_config.json.</p>
             <form id="newEnvForm" onsubmit="submitNewEnvironment(event)">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Environment Name:</label>
-                        <input type="text" id="newEnvName" name="env_name" placeholder="e.g., staging, test" required 
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Environment Name <span style="color:#dc3545">*</span></label>
+                        <input type="text" id="newEnvName" name="env_name" placeholder="e.g., vm_prod, staging" required
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;"
+                               oninput="updateEnvNameHint(this.value)">
+                        <small style="color:#6c757d;">Used as env var prefix: <code id="envNamePreview">COMSERV_DB_...</code></small>
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Display Name <span style="color:#dc3545">*</span></label>
+                        <input type="text" id="newEnvDisplayName" name="display_name" placeholder="e.g., New Production (VM)"
                                style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
                     </div>
                     <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Display Name:</label>
-                        <input type="text" id="newEnvDisplayName" name="display_name" placeholder="e.g., Staging" required 
-                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Host:</label>
-                        <input type="text" id="newEnvHost" name="db_host" placeholder="e.g., 192.168.1.100" required 
-                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Name:</label>
-                        <input type="text" id="newEnvDbName" name="db_name" placeholder="e.g., ency_staging" required 
-                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Port:</label>
-                        <input type="number" id="newEnvPort" name="port" value="3306" required 
-                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                    </div>
-                    <div>
-                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Warning Level:</label>
-                        <select id="newEnvWarning" name="warning_level" style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
-                            <option value="low">Low (Green)</option>
-                            <option value="medium" selected>Medium (Yellow)</option>
-                            <option value="high">High (Red)</option>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Type <span style="color:#dc3545">*</span></label>
+                        <select id="newEnvDbType" name="db_type"
+                                style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;"
+                                onchange="updatePortDefault(this.value)">
+                            <option value="mysql">MySQL / MariaDB</option>
+                            <option value="postgres">PostgreSQL</option>
                         </select>
                     </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Host <span style="color:#dc3545">*</span></label>
+                        <input type="text" id="newEnvHost" name="db_host" placeholder="e.g., 192.168.1.20" required
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Port <span style="color:#dc3545">*</span></label>
+                        <input type="number" id="newEnvPort" name="port" value="3306" required
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Database Name <span style="color:#dc3545">*</span></label>
+                        <input type="text" id="newEnvDbName" name="db_name" placeholder="e.g., ency" required
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Username <span style="color:#dc3545">*</span></label>
+                        <input type="text" id="newEnvUsername" name="username" placeholder="e.g., root, postgres" required
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 5px; font-weight: bold;">Current Password</label>
+                        <input type="password" id="newEnvCurrentPassword" name="current_password" placeholder="Current password (e.g., CHANGE_ME)"
+                               style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                        <small style="color:#6c757d;">Enter existing root password to authenticate</small>
+                    </div>
                 </div>
+                <div style="margin-bottom:15px; padding:12px; background:#fff8e1; border:1px solid #ffc107; border-radius:4px;">
+                    <label style="display:block; margin-bottom:5px; font-weight:bold;"><i class="fas fa-key"></i> New Password (optional)</label>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:15px;">
+                        <div>
+                            <input type="password" id="newEnvNewPassword" name="new_password" placeholder="Leave blank to keep current"
+                                   style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                            <small style="color:#6c757d;">If provided, the server root password will be changed AND the new value saved to .env</small>
+                        </div>
+                        <div>
+                            <input type="password" id="newEnvConfirmPassword" placeholder="Confirm new password"
+                                   style="width: 100%; padding: 8px; border: 1px solid #ced4da; border-radius: 4px;">
+                            <small id="pwMatchMsg" style="color:#dc3545; display:none;">Passwords do not match</small>
+                        </div>
+                    </div>
+                </div>
+                <div id="addEnvStatus" style="display:none; margin-bottom:10px; padding:10px; border-radius:4px;"></div>
                 <div style="display: flex; gap: 10px;">
-                    <button type="submit" style="padding: 8px 16px; background: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                    <button type="submit" id="addEnvSubmitBtn" style="padding: 8px 16px; background: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer;">
                         <i class="fas fa-save"></i> Save Environment
                     </button>
                     <button type="button" onclick="toggleAddForm()" style="padding: 8px 16px; background: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
@@ -548,7 +579,7 @@
             <button class="section-toggle" onclick="toggleSection(this)">
                 <span>
                     <i class="fas fa-database"></i> [% pg_db.display_name | html %]
-                    [% IF pg_db.is_postgres %]<span class="env-badge env-badge-staging" style="margin-left:6px;font-size:0.75rem;">PostgreSQL</span>[% END %]
+                    [% IF pg_db.is_postgres %]<span class="env-badge env-badge-staging" style="margin-left:6px;font-size:0.75rem;">PostgreSQL</span>[% ELSIF pg_db.is_custom %]<span class="env-badge" style="margin-left:6px;font-size:0.75rem;background:#17a2b8;color:#fff;padding:2px 6px;border-radius:3px;">MySQL</span>[% END %]
                     [% IF pg_db.connection_status == 'connected' %]
                     <span class="status-badge connected">Connected</span>
                     [% ELSE %]
@@ -2406,42 +2437,83 @@ function toggleAddForm() {
     }
 }
 
-// Submit new environment form
+function updateEnvNameHint(val) {
+    const preview = document.getElementById('envNamePreview');
+    if (preview) {
+        preview.textContent = val ? 'COMSERV_DB_' + val.toUpperCase().replace(/[^A-Z0-9]/g, '_') + '_*' : 'COMSERV_DB_..._*';
+    }
+}
+
+function updatePortDefault(dbType) {
+    const portInput = document.getElementById('newEnvPort');
+    if (portInput) {
+        portInput.value = dbType === 'postgres' ? '5432' : '3306';
+    }
+}
+
+function showAddEnvStatus(msg, isError) {
+    const el = document.getElementById('addEnvStatus');
+    if (!el) return;
+    el.style.display = 'block';
+    el.style.background = isError ? '#f8d7da' : '#d4edda';
+    el.style.border = '1px solid ' + (isError ? '#f5c6cb' : '#c3e6cb');
+    el.style.color = isError ? '#721c24' : '#155724';
+    el.innerHTML = (isError ? '<i class="fas fa-exclamation-circle"></i> ' : '<i class="fas fa-check-circle"></i> ') + msg;
+}
+
 function submitNewEnvironment(event) {
     event.preventDefault();
-    
+
+    const newPw   = document.getElementById('newEnvNewPassword').value;
+    const confPw  = document.getElementById('newEnvConfirmPassword').value;
+    const matchMsg = document.getElementById('pwMatchMsg');
+
+    if (newPw && newPw !== confPw) {
+        matchMsg.style.display = 'inline';
+        return;
+    }
+    matchMsg.style.display = 'none';
+
+    const btn = document.getElementById('addEnvSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
     const formData = {
-        env_name: document.getElementById('newEnvName').value,
-        display_name: document.getElementById('newEnvDisplayName').value,
-        db_host: document.getElementById('newEnvHost').value,
-        db_name: document.getElementById('newEnvDbName').value,
-        port: document.getElementById('newEnvPort').value,
-        warning_level: document.getElementById('newEnvWarning').value
+        env_name:         document.getElementById('newEnvName').value,
+        display_name:     document.getElementById('newEnvDisplayName').value,
+        db_type:          document.getElementById('newEnvDbType').value,
+        db_host:          document.getElementById('newEnvHost').value,
+        port:             parseInt(document.getElementById('newEnvPort').value, 10),
+        db_name:          document.getElementById('newEnvDbName').value,
+        username:         document.getElementById('newEnvUsername').value,
+        current_password: document.getElementById('newEnvCurrentPassword').value,
+        new_password:     newPw,
     };
-    
-    // TODO: Submit to backend endpoint
+
     fetch('[% c.uri_for("/admin/database-env/add") %]', {
         method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
     })
-    .then(response => response.json())
+    .then(handleFetchResponse)
     .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save Environment';
         if (data.success) {
-            alert('Environment added successfully!');
-            toggleAddForm();
+            showAddEnvStatus(data.message + (data.password_changed ? ' Password changed on server.' : ''), false);
             document.getElementById('newEnvForm').reset();
-            // Reload page to show new environment
-            window.location.reload();
+            updateEnvNameHint('');
+            setTimeout(() => window.location.reload(), 2000);
         } else {
-            alert('Error adding environment: ' + (data.error || 'Unknown error'));
+            showAddEnvStatus(data.error || 'Unknown error', true);
         }
     })
     .catch(error => {
-        alert('Failed to add environment: ' + error);
-        console.error('Error:', error);
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save Environment';
+        if (error.message !== 'auth') {
+            showAddEnvStatus('Request failed: ' + error, true);
+        }
     });
 }
 

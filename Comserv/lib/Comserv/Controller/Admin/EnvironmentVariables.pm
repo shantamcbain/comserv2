@@ -43,6 +43,88 @@ sub _require_admin {
     return 1;
 }
 
+my %VAR_DESCRIPTIONS = (
+    APP_MOUNT                              => 'Docker bind-mount path for the application source code',
+    CATALYST_DEBUG                         => 'Enable Catalyst framework debug mode (1=on, 0=off)',
+    CATALYST_ENV                           => 'Catalyst environment name (development, production, test)',
+    CATALYST_HOME                          => 'Absolute path to the Catalyst application home directory inside the container',
+    COMSERV_BACKUPS_PATH                   => 'Host path where database backups are stored',
+    COMSERV_LOGS_PATH                      => 'Host path where application log files are written',
+    COMSERV_SESSIONS_PATH                  => 'Host path where user session files are stored',
+    COMSERV_DB_PRODUCTION_SERVER_HOST      => 'Production ENCY (ency) database server hostname/IP',
+    COMSERV_DB_PRODUCTION_SERVER_PORT      => 'Production ENCY database server port',
+    COMSERV_DB_PRODUCTION_SERVER_DATABASE  => 'Production ENCY database name',
+    COMSERV_DB_PRODUCTION_SERVER_USERNAME  => 'Production ENCY database login username',
+    COMSERV_DB_PRODUCTION_SERVER_PASSWORD  => 'Production ENCY database login password (secret)',
+    COMSERV_DB_PRODUCTION_FORAGER_HOST     => 'Production Forager database server hostname/IP',
+    COMSERV_DB_PRODUCTION_FORAGER_PORT     => 'Production Forager database server port',
+    COMSERV_DB_PRODUCTION_FORAGER_DATABASE => 'Production Forager database name',
+    COMSERV_DB_PRODUCTION_FORAGER_USERNAME => 'Production Forager database login username',
+    COMSERV_DB_PRODUCTION_FORAGER_PASSWORD => 'Production Forager database login password (secret)',
+    DB_HOST                                => 'Legacy: primary database host (use COMSERV_DB_* instead)',
+    DB_HOST_PORT                           => 'Legacy: database host:port binding (use COMSERV_DB_* instead)',
+    DB_HOST_PROD                           => 'Legacy: production database host (use COMSERV_DB_* instead)',
+    DB_NAME                                => 'Legacy: primary database name (use COMSERV_DB_* instead)',
+    DB_NAME_PROD                           => 'Legacy: production database name (use COMSERV_DB_* instead)',
+    DB_PASS                                => 'Legacy: primary database password — SECRET (use COMSERV_DB_* instead)',
+    DB_PASS_PROD                           => 'Legacy: production database password — SECRET (use COMSERV_DB_* instead)',
+    DB_PORT                                => 'Legacy: primary database port (use COMSERV_DB_* instead)',
+    DB_PORT_PROD                           => 'Legacy: production database port (use COMSERV_DB_* instead)',
+    DB_USER                                => 'Legacy: primary database username (use COMSERV_DB_* instead)',
+    DB_USER_PROD                           => 'Legacy: production database username (use COMSERV_DB_* instead)',
+    MIGRATION_MYSQL_HOST                   => 'New MySQL Docker server host (192.168.1.20) — migration target',
+    MIGRATION_MYSQL_PORT                   => 'New MySQL Docker server port (3307) — migration target',
+    MIGRATION_MYSQL_USER                   => 'Root username for the new MySQL Docker server',
+    MIGRATION_MYSQL_PASSWORD               => 'Root password for the new MySQL Docker server — SECRET',
+    MIGRATION_POSTGRES_HOST                => 'New PostgreSQL Docker server host (192.168.1.20) — migration target',
+    MIGRATION_POSTGRES_PORT                => 'New PostgreSQL Docker server port (5433) — migration target',
+    MIGRATION_POSTGRES_USER                => 'Root username for the new PostgreSQL Docker server',
+    MIGRATION_POSTGRES_PASSWORD            => 'Root password for the new PostgreSQL Docker server — SECRET',
+    MYSQL_DATA_PATH                        => 'Host path for MySQL Docker data volume',
+    NGINX_CACHE_PATH                       => 'Host path for Nginx cache files',
+    NGINX_PORT                             => 'Nginx HTTP port exposed on the host',
+    NGINX_SSL_PORT                         => 'Nginx HTTPS port exposed on the host',
+    REDIS_DATA_PATH                        => 'Host path for Redis data persistence',
+    REDIS_HOST                             => 'Redis cache server hostname (within Docker network)',
+    REDIS_PASSWORD                         => 'Redis cache server authentication password — SECRET',
+    REDIS_PORT                             => 'Redis cache server port',
+    TZ                                     => 'Timezone for the container (e.g., UTC, America/Vancouver)',
+    WEB_CPU_LIMIT                          => 'Docker: max CPU cores allocated to the web container',
+    WEB_CPU_REQUEST                        => 'Docker: min CPU cores reserved for the web container',
+    WEB_MEMORY_LIMIT                       => 'Docker: max memory allocated to the web container',
+    WEB_MEMORY_REQUEST                     => 'Docker: min memory reserved for the web container',
+    WEB_PORT                               => 'Port exposed by the Catalyst web container (not Nginx)',
+);
+
+my %GROUP_LABELS = (
+    'COMSERV_DB_PRODUCTION'  => { label => 'Production DB Connections',        icon => 'fa-database',  order => 1 },
+    'COMSERV_DB'             => { label => 'Custom DB Environments',            icon => 'fa-plus-circle', order => 2 },
+    'MIGRATION'              => { label => 'Migration Target Servers',          icon => 'fa-server',    order => 3 },
+    'DB'                     => { label => 'Legacy DB Variables (phase-out)',   icon => 'fa-exclamation-triangle', order => 4 },
+    'REDIS'                  => { label => 'Redis Cache',                       icon => 'fa-memory',    order => 5 },
+    'NGINX'                  => { label => 'Nginx Proxy',                       icon => 'fa-shield-alt', order => 6 },
+    'CATALYST'               => { label => 'Catalyst Framework',                icon => 'fa-cog',       order => 7 },
+    'COMSERV'                => { label => 'Application Paths & Config',        icon => 'fa-folder',    order => 8 },
+    'WEB'                    => { label => 'Container Resource Limits',         icon => 'fa-microchip', order => 9 },
+    'APP'                    => { label => 'Application Mount',                 icon => 'fa-hdd',       order => 10 },
+    'OTHER'                  => { label => 'Other Variables',                   icon => 'fa-ellipsis-h', order => 99 },
+);
+
+sub _classify_var {
+    my ($key) = @_;
+    return 'COMSERV_DB_PRODUCTION' if $key =~ /^COMSERV_DB_PRODUCTION/;
+    return 'COMSERV_DB'            if $key =~ /^COMSERV_DB_/;
+    return 'MIGRATION'             if $key =~ /^MIGRATION_/;
+    return 'DB'                    if $key =~ /^DB_/;
+    return 'REDIS'                 if $key =~ /^REDIS_/;
+    return 'NGINX'                 if $key =~ /^NGINX_/;
+    return 'CATALYST'              if $key =~ /^CATALYST_/;
+    return 'COMSERV'               if $key =~ /^COMSERV_/;
+    return 'WEB'                   if $key =~ /^WEB_/;
+    return 'APP'                   if $key =~ /^APP_/;
+    return 'OTHER';
+}
+
 sub list : Path('/admin/environment_variables') : Args(0) {
     my ($self, $c) = @_;
 
@@ -54,7 +136,31 @@ sub list : Path('/admin/environment_variables') : Args(0) {
     my $env_vars = {};
     try { $env_vars = $self->env_manager->read_env_file() };
 
-    my @variables = map {
+    my %groups;
+    for my $key (sort keys %$env_vars) {
+        my $group = _classify_var($key);
+        push @{ $groups{$group} }, {
+            key         => $key,
+            value       => $env_vars->{$key},
+            is_secret   => _is_secret($key),
+            description => $VAR_DESCRIPTIONS{$key} // '',
+            updated_at  => '',
+            id          => $key,
+        };
+    }
+
+    my @grouped = map {
+        my $g = $_;
+        {
+            group_key  => $g,
+            label      => $GROUP_LABELS{$g}{label},
+            icon       => $GROUP_LABELS{$g}{icon},
+            order      => $GROUP_LABELS{$g}{order},
+            variables  => $groups{$g},
+        }
+    } sort { ($GROUP_LABELS{$a}{order}//99) <=> ($GROUP_LABELS{$b}{order}//99) } keys %groups;
+
+    my @all_variables = map {
         {
             key        => $_,
             value      => $env_vars->{$_},
@@ -65,11 +171,12 @@ sub list : Path('/admin/environment_variables') : Args(0) {
     } sort keys %$env_vars;
 
     $c->stash(
-        env_variables => \@variables,
-        env_file_path => $self->env_manager->env_path,
-        success_msg   => $c->flash->{success_msg},
-        error_msg     => $c->flash->{error_msg},
-        template      => 'admin/environment_variables/list.tt',
+        env_variables  => \@all_variables,
+        grouped_vars   => \@grouped,
+        env_file_path  => $self->env_manager->env_path,
+        success_msg    => $c->flash->{success_msg},
+        error_msg      => $c->flash->{error_msg},
+        template       => 'admin/environment_variables/list.tt',
     );
 }
 
