@@ -2170,6 +2170,35 @@ sub clone_vm {
     }
 }
 
+sub unlock_vm {
+    my ($self, $vmid) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/unlock";
+    my $req = HTTP::Request->new(PUT => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+    $req->content('');
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'unlock_vm',
+        "unlock_vm vmid=$vmid => " . $res->status_line);
+
+    if ($res->is_success) {
+        return { success => 1 };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
 sub set_vm_config {
     my ($self, $vmid, %params) = @_;
 
