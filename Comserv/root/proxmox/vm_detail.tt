@@ -185,14 +185,43 @@
             <td>[% IF bk.size %][% (bk.size / 1073741824) | format('%.1f') %] GB[% ELSE %]N/A[% END %]</td>
             <td>[% bk.ctime ? bk.ctime : '' %]</td>
             <td>[% bk.storage | html %]</td>
-            <td>
+            <td style="white-space:nowrap;">
                 <button class="vm-btn" style="font-size:0.8em;padding:3px 8px;background:#f44336;color:#fff;"
-                    onclick="doRestore('[% bk.volid | html %]','[% bk.storage | html %]')">↩ Restore to VM</button>
+                    onclick="doRestore('[% bk.volid | html %]','[% bk.storage | html %]')">↩ Overwrite VM</button>
+                <button class="vm-btn" style="font-size:0.8em;padding:3px 8px;background:#4a90d9;"
+                    onclick="showRestoreNew('[% bk.volid | html %]','[% bk.storage | html %]')">📋 Restore as New VM</button>
             </td>
         </tr>
         [% END %]
         </tbody>
     </table>
+</div>
+
+<div id="restore-new-panel" style="display:none;background:#f9f9f9;border:1px solid #ddd;border-radius:5px;padding:1.2em;margin-bottom:1.5em;">
+    <h3 style="margin-top:0;">Restore Backup as New VM</h3>
+    <p style="font-size:0.85em;color:#555;margin:0 0 0.8em;">This creates a brand-new VM from the backup — no cloning, no locking issues.</p>
+    <input type="hidden" id="restore-volid" value="">
+    <input type="hidden" id="restore-storage" value="">
+    <table class="detail-table">
+        <tr><th>Selected Backup</th><td><span id="restore-volid-label" style="font-size:0.85em;color:#555;"></span></td></tr>
+        <tr>
+            <th>New VM ID</th>
+            <td><input type="number" id="restore-newid" placeholder="e.g. 110" min="100" max="999999" style="width:100px;" value="[% next_vmid | html %]"></td>
+        </tr>
+        <tr>
+            <th>New Name</th>
+            <td><input type="text" id="restore-name" placeholder="e.g. db-dev" style="width:180px;"></td>
+        </tr>
+        <tr>
+            <th>Target Storage</th>
+            <td><input type="text" id="restore-target-storage" placeholder="leave blank for same storage" style="width:180px;"></td>
+        </tr>
+    </table>
+    <div style="margin-top:0.75em;display:flex;gap:0.5em;">
+        <button class="vm-btn" style="background:#4CAF50;" onclick="doRestoreNew()">📋 Create New VM from Backup</button>
+        <button class="vm-btn" style="background:#888;" onclick="document.getElementById('restore-new-panel').style.display='none';">Cancel</button>
+    </div>
+    <div id="restore-new-result" style="margin-top:0.5em;"></div>
 </div>
 [% END %]
 
@@ -318,5 +347,42 @@ function doRestore(volid, storage) {
     })
     .then(r => r.json())
     .then(d => { alert(d.success ? 'Restore started.' : 'Error: ' + d.error); });
+}
+
+function showRestoreNew(volid, storage) {
+    document.getElementById('restore-volid').value = volid;
+    document.getElementById('restore-storage').value = storage;
+    document.getElementById('restore-volid-label').textContent = volid;
+    document.getElementById('restore-new-panel').style.display = 'block';
+    document.getElementById('restore-new-panel').scrollIntoView({behavior:'smooth'});
+}
+
+function doRestoreNew() {
+    var newid   = document.getElementById('restore-newid').value.trim();
+    var name    = document.getElementById('restore-name').value.trim();
+    var volid   = document.getElementById('restore-volid').value;
+    var storage = document.getElementById('restore-target-storage').value.trim()
+                  || document.getElementById('restore-storage').value;
+    if (!newid) { alert('New VM ID is required'); return; }
+    if (!volid) { alert('No backup selected'); return; }
+    document.getElementById('restore-new-result').innerHTML = 'Restoring backup as new VM ' + newid + '…';
+    fetch('[% c.uri_for('/proxmox/restore_as_new') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'new_vmid=' + encodeURIComponent(newid)
+            + '&volid=' + encodeURIComponent(volid)
+            + '&storage=' + encodeURIComponent(storage)
+            + '&name=' + encodeURIComponent(name)
+    })
+    .then(r => r.json())
+    .then(d => {
+        var el = document.getElementById('restore-new-result');
+        if (d.success) {
+            el.innerHTML = '<span style="color:green;">New VM ' + d.vmid + ' is being created from backup. Task: ' + (d.task_id||'') + '</span>';
+        } else {
+            el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
+        }
+    })
+    .catch(e => { document.getElementById('restore-new-result').innerHTML = '<span style="color:red;">Request failed: ' + e + '</span>'; });
 }
 </script>
