@@ -7111,9 +7111,9 @@ sub add_database_env :Path('/admin/database-env/add') :Args(0) {
             if ($db_type eq 'postgres') {
                 my $safe = $new_password;
                 $safe =~ s/'/''/g;
-                $dbh->do("ALTER USER $username PASSWORD '$safe'");
+                $dbh->do("ALTER USER CURRENT_USER PASSWORD '$safe'");
             } else {
-                $dbh->do("ALTER USER '$username'\@'%' IDENTIFIED BY ?", undef, $new_password);
+                $dbh->do("ALTER USER CURRENT_USER() IDENTIFIED BY ?", undef, $new_password);
             }
             $dbh->disconnect();
             1;
