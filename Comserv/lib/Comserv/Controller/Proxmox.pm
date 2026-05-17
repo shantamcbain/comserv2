@@ -1143,14 +1143,23 @@ sub clone_vm_form :Path('clone_vm') :Args(1) {
         return;
     }
 
-    my $config  = $proxmox->get_vm_config($vmid);
-    my $next_id = $proxmox->get_next_vmid();
+    my $config   = $proxmox->get_vm_config($vmid);
+    my $status   = $proxmox->get_vm_status($vmid);
+    my $next_id  = $proxmox->get_next_vmid();
+
+    my $proxmox_host = '';
+    my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($c->session->{proxmox_server_id});
+    if ($creds && $creds->{api_url_base}) {
+        ($proxmox_host = $creds->{api_url_base}) =~ s|/api2/json||;
+    }
 
     $c->stash(
-        template  => 'proxmox/vm_detail.tt',
-        vmid      => $vmid,
-        vm_config => $config,
-        next_vmid => $next_id,
+        template        => 'proxmox/vm_detail.tt',
+        vmid            => $vmid,
+        vm_config       => $config,
+        vm_status       => $status,
+        next_vmid       => $next_id,
+        proxmox_host    => $proxmox_host,
         show_clone_form => 1,
     );
     $c->forward($c->view('TT'));
