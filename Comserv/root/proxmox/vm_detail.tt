@@ -247,10 +247,33 @@ function doClone() {
             var note = d.ip_note ? '<br><small style="color:#b37700;">⚠ ' + d.ip_note + '</small>' : '';
             el.innerHTML = '<span style="color:green;">' + msg + '</span>' + note;
         } else {
-            el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
+            var err = d.error || 'unknown';
+            var extra = '';
+            if (err.toLowerCase().indexOf('lock') !== -1 || err.toLowerCase().indexOf('block') !== -1) {
+                extra = ' <button class="vm-btn" style="font-size:0.8em;padding:3px 8px;background:#FF9900;" onclick="doUnlock()">🔓 Unlock VM</button>';
+            }
+            el.innerHTML = '<span style="color:red;">Error: ' + err + '</span>' + extra;
         }
     })
     .catch(e => { document.getElementById('clone-result').innerHTML = '<span style="color:red;">Request failed: ' + e + '</span>'; });
+}
+
+function doUnlock() {
+    if (!confirm('Unlock VM ' + VMID + '? Only do this if no backup/migration/clone is actively running.')) return;
+    fetch('[% c.uri_for('/proxmox/vm_unlock') %]', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+        body: 'vmid=' + VMID
+    })
+    .then(r => r.json())
+    .then(d => {
+        var el = document.getElementById('clone-result');
+        if (d.success) {
+            el.innerHTML = '<span style="color:green;">VM unlocked. You can now try cloning again.</span>';
+        } else {
+            el.innerHTML = '<span style="color:red;">Unlock failed: ' + (d.error||'unknown') + '</span>';
+        }
+    });
 }
 
 function doSnapshot() {

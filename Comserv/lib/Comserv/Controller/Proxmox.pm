@@ -1286,6 +1286,31 @@ sub backup_restore :Path('backup_restore') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub vm_unlock :Path('vm_unlock') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid = $c->req->params->{vmid} or do {
+        $c->stash->{json} = { success => 0, error => 'vmid required' };
+        $c->forward('View::JSON'); return;
+    };
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->unlock_vm($vmid);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
 =head1 AUTHOR
 
 Comserv
