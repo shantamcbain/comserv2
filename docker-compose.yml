@@ -80,6 +80,7 @@ services:
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${WORKSHOP_LOCAL_DIR:-/home/shanta/nfs}:/data/nfs:rw
+      - whisper-venv:/opt/comserv/whisper_venv:rw
       - comserv-logs:/opt/comserv/root/log:rw
       - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
       - ./Comserv/startup-wrapper.sh:/opt/comserv/startup-wrapper.sh:ro
@@ -148,6 +149,7 @@ services:
       # - ./Comserv/db_config.json:/opt/comserv/db_config.json:ro  # Disabled - using secrets instead
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${WORKSHOP_LOCAL_DIR:-/home/shanta/nfs}:/data/nfs:rw
+      - whisper-venv:/opt/comserv/whisper_venv:rw
       - comserv-logs:/opt/comserv/root/log:rw
       - comserv-sessions:/tmp/comserv/session:rw
       - ./Comserv/docker-entrypoint.sh:/opt/comserv/docker-entrypoint.sh:ro
@@ -176,6 +178,8 @@ volumes:
   comserv-logs:
     driver: local
   comserv-sessions:
+    driver: local
+  whisper-venv:
     driver: local
 
 # Shared bridge network for all services

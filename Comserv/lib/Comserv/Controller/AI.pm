@@ -10306,6 +10306,28 @@ sub transcribe :Local :Args(0) {
         return;
     }
 
+    my $safe_user_early = $username; $safe_user_early =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base_early       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs_early      = "${nfs_base_early}/bmaster/audio";
+    my $transcript_nfs_early = "${nfs_base_early}/bmaster/transcripts";
+    my $timestamp_early      = time();
+    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
+    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+    my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size_early = $upload->size;
+
+    eval {
+        require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
+        require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
+            or die "copy to NFS failed: $!";
+    };
+    if ($@) {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS: $@" }));
+        return;
+    }
+
     my $worktree  = $c->path_to('..')->stringify;
     my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
@@ -10338,10 +10360,17 @@ sub transcribe :Local :Args(0) {
 
     unless ($python_bin) {
         unlink $tmp_file;
-        $c->response->status(503);
         $c->response->body(encode_json({
-            success => JSON::false,
-            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+            success              => JSON::true,
+            audio_saved          => JSON::true,
+            transcription_status => 'whisper_unavailable',
+            audio_nfs_path       => $nfs_audio_file_early,
+            message              => 'Audio saved. Whisper not available — install openai-whisper to enable transcription.',
+            orig_name            => $orig_name,
+            file_size            => $upload_size_early,
+            sitename             => $sitename_early,
+            username             => $username,
+            ext                  => $ext,
         }));
         return;
     }
@@ -10418,15 +10447,14 @@ PYSCRIPT
     print $sfh $whisper_script;
     close $sfh;
 
-    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
-    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
-    my $audio_nfs      = "${nfs_base}/bmaster/audio";
-    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
-    my $timestamp      = time();
-    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
-    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
-    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
-    my $upload_size    = $upload->size;
+    my $safe_user           = $safe_user_early;
+    my $audio_nfs           = $audio_nfs_early;
+    my $transcript_nfs      = $transcript_nfs_early;
+    my $timestamp           = $timestamp_early;
+    my $nfs_audio_file      = $nfs_audio_file_early;
+    my $nfs_transcript_file = $nfs_transcript_file_early;
+    my $sitename            = $sitename_early;
+    my $upload_size         = $upload_size_early;
 
     {
         open(my $sf, '>', $status_file) or do { };
@@ -10465,26 +10493,24 @@ PYSCRIPT
 
             if ($@ || !$json_out) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@", audio_nfs_path => $nfs_audio_file }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $result = eval { decode_json($json_out) };
             unless ($result && $result->{transcript}) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript', audio_nfs_path => $nfs_audio_file }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $model_used = $result->{model} || $whisper_model;
             my $segments   = $result->{segments} || [];
 
-            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
-            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
             unlink $tmp_file;
 
-            my $nfs_ok = !$@;
-            if ($nfs_ok) {
+            my $transcript_ok = 1;
+            {
                 my $transcript_json = encode_json({
                     transcript => $result->{transcript},
                     segments   => $segments,
@@ -10492,7 +10518,9 @@ PYSCRIPT
                     recorded_by => $username,
                     original_filename => $orig_name,
                 });
-                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+                open(my $tfh, '>:utf8', $nfs_transcript_file) or ($transcript_ok = 0);
+                print $tfh $transcript_json if $transcript_ok;
+                close $tfh if $transcript_ok;
             }
 
             open(my $rf, '>', $result_file);
@@ -10502,8 +10530,8 @@ PYSCRIPT
                 model_used         => $model_used,
                 segments           => $segments,
                 diarized           => $has_diarizer ? JSON::true : JSON::false,
-                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
-                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                audio_nfs_path     => $nfs_audio_file,
+                transcript_nfs_path=> $transcript_ok ? $nfs_transcript_file : undef,
                 orig_name          => $orig_name,
                 file_size          => $upload_size,
                 sitename           => $sitename,
