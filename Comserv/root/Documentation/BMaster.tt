@@ -1,66 +1,303 @@
-[% PageVersion = 'Documentation/BMaster.tt,v 0.05 2024/06/01 shanta Exp shanta ' %]
+[% META
+   title = "BMaster — Site and Beekeeping System Documentation"
+   description = "Architecture overview for the BMaster site, the Beekeeping controller hierarchy, and the Apiary management system"
+   roles = "admin developer"
+   TemplateType = "Documentation"
+   category = "Beekeeping"
+   page_version = "0.06"
+   last_updated = "2026-05-17"
+%]
+[% PageVersion = 'Documentation/BMaster.tt,v 0.06 2026/05/17 shanta Exp shanta' %]
 [% IF c.session.debug_mode == 1 %]
     [% PageVersion %]
 [% END %]
 
-<h1 id="BMaster_top"><a href="#top">BMaster Application </a></h1>
-    <a href="#BMaster_overview">Overview</a> |
-    <a href="#BMaster_features">Features</a> |
-     <a href="#BMaster_future">Future Improvements</a> |
-    <a href="#BMaster_Controller">Controller</a> |
-    <a href="#BMaster_Model">Model</a> |
-    <a href="#BMaster_Queens">Queens</a> |
-    <a href="#BMaster_Routes">Routes</a> |
-    <a href="#BMaster_api-integration">API Integration</a> |
-    <a href="#BMaster_instructions">Instructions for Developers</a>
+<div class="app-container">
 
+<div class="page-header">
+    <h1 id="BMaster_top">BMaster — Site and Beekeeping System</h1>
+    <p class="page-subtitle">Architecture overview for the BMaster site, the Beekeeping controller, and the Apiary management system.</p>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<nav class="app-section">
+    <ul class="inline-nav">
+        <li><a href="#bmaster-sitename">BMaster SiteName</a></li>
+        <li><a href="#beekeeping-feature">Beekeeping Feature</a></li>
+        <li><a href="#controller-hierarchy">Controller Hierarchy</a></li>
+        <li><a href="#routes">All Routes</a></li>
+        <li><a href="#templates">Templates</a></li>
+        <li><a href="#model">Models</a></li>
+        <li><a href="#schema">Schema / Result Classes</a></li>
+        <li><a href="#navigation">Navigation</a></li>
+        <li><a href="#dev-notes">Developer Notes</a></li>
+    </ul>
 </nav>
-<h2 id="BMaster_overview"><a href="#BMaster_top">Overview</a></h2>
-<p>This application is intended to both educate and provide a platform for beekeepers to manage their hives and apiaries. It allows beekeepers to log various details about their hives, and then use this data to generate a graph showing changes over the season.</p>
 
-<h2 id="BMaster_features"><a href="#BMaster_top">Features</a></h2>
-<p>The BMaster application includes several features designed to assist beekeepers in managing their hives:</p>
-<ul>
-    <li>Data Collection: Beekeepers can input data about their hives, such as the number of frames of bees, brood, comb, honey, pollen, and empty in each box, the queen and her heritage, and the location of the hive.</li>
-    <li>Data Visualization: The application can generate a graph showing changes in the hive over the season.</li>
-    <li>API Integration: The application includes an API that allows other systems to retrieve the data.</li>
-</ul>
+<div class="app-section">
+    <h2 id="bmaster-sitename">BMaster SiteName</h2>
+    <div class="content-section">
+        <p><strong>BMaster</strong> is the <em>SiteName</em> of the beekeeping education and management site hosted on this Comserv installation. As a Comserv site, it behaves identically to any other hosted site (MCoop, HelpDesk, etc.) — it is identified by the <code>SiteName = 'BMaster'</code> session variable and receives its own theme, navigation menus, and member roles.</p>
+        <p>The entry point for the BMaster site is:</p>
+        <ul>
+            <li><a href="/BMaster"><code>/BMaster</code></a> — site home page, served by <code>Controller::BMaster::index</code>, renders <code>BMaster/BMaster.tt</code></li>
+        </ul>
+        <p>The <code>BMaster.pm</code> controller retains the site home and chained base, but all beekeeping <em>feature</em> actions have been moved to <code>Controller::Beekeeping</code>. The old <code>/BMaster/*</code> feature URLs remain as backward-compatible redirect stubs.</p>
+    </div>
+</div>
 
-<h2 id="BMaster_api-integration"><a href="#BMaster_top">API Integration</a></h2>
-<p>The BMaster application includes an API that allows other systems to retrieve data about the hives. The API provides endpoints to get data for a specific hive, get data for all hives for a specific beekeeper, and get data for a specific season.</p>
+<div class="app-section">
+    <h2 id="beekeeping-feature">Beekeeping Feature — Separation from SiteName (May 2026)</h2>
+    <div class="content-section">
+        <p>Prior to May 2026, all beekeeping feature routes lived under <code>/BMaster/*</code> in <code>Controller::BMaster</code>. This created an architectural ambiguity: <em>BMaster</em> meant both the Comserv SiteName and the beekeeping application feature.</p>
+        <p>The refactoring introduced a dedicated <strong><code>Controller::Beekeeping</code></strong> hierarchy. All beekeeping feature URLs now live under <code>/Beekeeping/*</code>. The old <code>/BMaster/*</code> URLs issue HTTP 302 redirects to the canonical <code>/Beekeeping/*</code> equivalents so existing bookmarks and external links continue to work.</p>
+        <p>The Apiary management system (logged-in member tools) continues to live under <code>/Apiary/*</code> in <code>Controller::Apiary</code> — this was not changed.</p>
+    </div>
+</div>
 
-<h2 id="BMaster_instructions"><a href="#BMaster_top">Instructions for Developers</a></h2>
-<p>Developers contributing to the BMaster project should adhere to the following guidelines:</p>
-<ul>
-    <li><strong>Naming Conventions:</strong> Follow the existing naming conventions for consistency. If you encounter any deviations, normalize them to maintain uniformity.</li>
-    <li><strong>Code Quality:</strong> Ensure that all code is well-documented and adheres to the project's coding standards. Use meaningful variable and function names to enhance readability and maintainability.</li>
-    <li><strong>Error Handling:</strong> Implement robust error handling in all subroutines to ensure the application behaves predictably under unexpected conditions.</li>
-    <li><strong>To-Do List:</strong> If you identify any issues or potential improvements in the code, add them to the 'Todo' section of this documentation.</li>
-    <li><strong>Code Reviews:</strong> Submit your code for review by peers to catch potential issues early and ensure adherence to best practices.</li>
-</ul>
+<div class="app-section">
+    <h2 id="controller-hierarchy">Controller Hierarchy</h2>
+    <div class="content-section">
+        <table class="data-table">
+            <thead>
+                <tr><th>Controller</th><th>Path Prefix</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Controller::BMaster</code></td>
+                    <td><code>/BMaster</code></td>
+                    <td>BMaster site home + backward-compat redirect stubs for old <code>/BMaster/*</code> URLs</td>
+                </tr>
+                <tr>
+                    <td><code>Controller::Beekeeping</code></td>
+                    <td><code>/Beekeeping</code></td>
+                    <td>Beekeeping feature hub — public info pages (apiary, environment, education, products)</td>
+                </tr>
+                <tr>
+                    <td><code>Controller::Beekeeping::Yards</code></td>
+                    <td><code>/Beekeeping/yards</code>, <code>/Beekeeping/add_yard</code></td>
+                    <td>Yard listing and creation (member tool)</td>
+                </tr>
+                <tr>
+                    <td><code>Controller::Beekeeping::Health</code></td>
+                    <td><code>/Beekeeping/health</code></td>
+                    <td>Bee health information page</td>
+                </tr>
+                <tr>
+                    <td><code>Controller::Beekeeping::Harvest</code></td>
+                    <td><code>/Beekeeping/harvest</code></td>
+                    <td>Honey production and harvest page</td>
+                </tr>
+                <tr>
+                    <td><code>Controller::Apiary</code></td>
+                    <td><code>/Apiary</code></td>
+                    <td>Full apiary management system (inspections, hives, queens) — requires login</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
 
-<h2 id="BMaster_future"><a href="#BMaster_top">Future Improvements</a></h2>
-<p>Future improvements to the BMaster application may include enhancements to existing features or the addition of new ones. Developers are encouraged to contribute to these improvements by keeping this documentation up to date and following the guidelines provided.</p>
-<h2 id="BMaster_routes"><a href="#BMaster_top">Routes</a></h2>
-<p>The BMaster module includes the following routes:</p>
-<ul>
-    <li><a href="/BMaster">/BMaster</a> (Not defined yet)</li>
-    <li><a href="/BMaster/bee_pasture">/BMaster/bee_pasture</a></li>
-    <li><a href="/BMaster/add_graft">/BMaster/add_graft</a></li>
-    <li><a href="/BMaster/frames">/BMaster/frames</a> (Error: Can't call method "get_frames_data" on an undefined value)</li>
-    <li><a href="/BMaster/api/frames">/BMaster/api/frames</a> (Error: Can't call method "get_frames_data" on an undefined value)</li>
-    <li><a href="/BMaster/products">/BMaster/products</a></li>
-    <li><a href="/BMaster/yards">/BMaster/yards</a> (Error: Can't call method "get_yards" on an undefined value)</li>
-    <li><a href="/BMaster/apiary">/BMaster/apiary</a></li>
-    <li><a href="/BMaster/Queens">/BMaster/Queens</a></li>
-    <li><a href="/BMaster/hive">/BMaster/hive</a></li>
-    <li><a href="/BMaster/honey">/BMaster/honey</a></li>
-    <li><a href="/BMaster/beehealth">/BMaster/beehealth</a></li>
-    <li><a href="/BMaster/environment">/BMaster/environment</a></li>
-    <li><a href="/BMaster/education">/BMaster/education</a></li>
-</ul>
-[% INCLUDE 'Documentation/BMasterController.tt' %]
-<h3 id="Model"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/BMaserModel.tt' %]
-<h3 id="Model"><a href="#top">Back to top</a> </h3>
-[% INCLUDE 'Documentation/Queens.tt' %]
+<div class="app-section">
+    <h2 id="routes">All Routes</h2>
+
+    <h3>BMaster Site Routes (Controller::BMaster)</h3>
+    <div class="content-section">
+        <table class="data-table">
+            <thead>
+                <tr><th>URL</th><th>Action</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><a href="/BMaster"><code>/BMaster</code></a></td><td><code>index</code></td><td>Site home — renders <code>BMaster/BMaster.tt</code></td></tr>
+                <tr><td><code>/BMaster/bee_pasture</code></td><td><code>bee_pasture</code></td><td>Redirect → <code>/Beekeeping/bee_pasture</code></td></tr>
+                <tr><td><code>/BMaster/apiary</code></td><td><code>apiary</code></td><td>Redirect → <code>/Beekeeping/apiary</code></td></tr>
+                <tr><td><code>/BMaster/Queens</code></td><td><code>queens</code></td><td>Redirect → <code>/Beekeeping/Queens</code></td></tr>
+                <tr><td><code>/BMaster/hive</code></td><td><code>hive</code></td><td>Redirect → <code>/Beekeeping/hive</code></td></tr>
+                <tr><td><code>/BMaster/beehealth</code></td><td><code>beehealth</code></td><td>Redirect → <code>/Beekeeping/health</code></td></tr>
+                <tr><td><code>/BMaster/honey</code></td><td><code>honey</code></td><td>Redirect → <code>/Beekeeping/harvest</code></td></tr>
+                <tr><td><code>/BMaster/environment</code></td><td><code>environment</code></td><td>Redirect → <code>/Beekeeping/environment</code></td></tr>
+                <tr><td><code>/BMaster/education</code></td><td><code>education</code></td><td>Redirect → <code>/Beekeeping/education</code></td></tr>
+                <tr><td><code>/BMaster/yards</code></td><td><code>yards</code></td><td>Redirect → <code>/Beekeeping/yards</code></td></tr>
+                <tr><td><code>/BMaster/add_yard</code></td><td><code>add_yard</code></td><td>Redirect → <code>/Beekeeping/add_yard</code></td></tr>
+                <tr><td><code>/BMaster/products</code></td><td><code>products</code></td><td>Redirect → <code>/Beekeeping/products</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Beekeeping Feature Routes (Controller::Beekeeping and sub-controllers)</h3>
+    <div class="content-section">
+        <table class="data-table">
+            <thead>
+                <tr><th>URL</th><th>Controller</th><th>Template</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><a href="/Beekeeping"><code>/Beekeeping</code></a></td><td><code>Beekeeping::index</code></td><td><code>BMaster/BMaster.tt</code></td><td>Beekeeping hub (same landing as BMaster home)</td></tr>
+                <tr><td><a href="/Beekeeping/bee_pasture"><code>/Beekeeping/bee_pasture</code></a></td><td><code>Beekeeping::bee_pasture</code></td><td>—</td><td>Redirects to <code>/ENCY/BeePastureView</code></td></tr>
+                <tr><td><a href="/Beekeeping/apiary"><code>/Beekeeping/apiary</code></a></td><td><code>Beekeeping::apiary</code></td><td><code>Beekeeping/apiary.tt</code></td><td>Guests see info page; members redirect to <code>/Apiary</code></td></tr>
+                <tr><td><a href="/Beekeeping/Queens"><code>/Beekeeping/Queens</code></a></td><td><code>Beekeeping::queens</code></td><td>—</td><td>Redirects to <code>/Apiary/QueenRearing</code></td></tr>
+                <tr><td><a href="/Beekeeping/hive"><code>/Beekeeping/hive</code></a></td><td><code>Beekeeping::hive</code></td><td>—</td><td>Redirects to <code>/Apiary/HiveManagement</code></td></tr>
+                <tr><td><a href="/Beekeeping/health"><code>/Beekeeping/health</code></a></td><td><code>Beekeeping::Health::beehealth</code></td><td><code>Beekeeping/health.tt</code></td><td>Bee health information</td></tr>
+                <tr><td><a href="/Beekeeping/harvest"><code>/Beekeeping/harvest</code></a></td><td><code>Beekeeping::Harvest::honey</code></td><td><code>Beekeeping/harvest.tt</code></td><td>Honey production guide</td></tr>
+                <tr><td><a href="/Beekeeping/environment"><code>/Beekeeping/environment</code></a></td><td><code>Beekeeping::environment</code></td><td><code>Beekeeping/environment.tt</code></td><td>Environmental planning</td></tr>
+                <tr><td><a href="/Beekeeping/education"><code>/Beekeeping/education</code></a></td><td><code>Beekeeping::education</code></td><td><code>Beekeeping/education.tt</code></td><td>Education and workshops</td></tr>
+                <tr><td><a href="/Beekeeping/products"><code>/Beekeeping/products</code></a></td><td><code>Beekeeping::products</code></td><td><code>Beekeeping/products.tt</code></td><td>Bee products and services</td></tr>
+                <tr><td><a href="/Beekeeping/yards"><code>/Beekeeping/yards</code></a></td><td><code>Beekeeping::Yards::yards</code></td><td><code>Beekeeping/Yards/index.tt</code></td><td>Yard list (member tool)</td></tr>
+                <tr><td><a href="/Beekeeping/add_yard"><code>/Beekeeping/add_yard</code></a></td><td><code>Beekeeping::Yards::add_yard</code></td><td><code>Beekeeping/Yards/add.tt</code></td><td>Add a new yard (GET + POST)</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <h3>Apiary Management Routes (Controller::Apiary — members only)</h3>
+    <div class="content-section">
+        <p>See <a href="/Documentation/controllers/Apiary">Apiary Controller Documentation</a> for the full route list. Key routes:</p>
+        <ul>
+            <li><a href="/Apiary"><code>/Apiary</code></a> — member apiary dashboard</li>
+            <li><code>/Apiary/HiveManagement</code> — hive management</li>
+            <li><code>/Apiary/QueenRearing</code> — queen rearing system</li>
+            <li><code>/Apiary/BeeHealth</code> — colony health monitoring</li>
+            <li><code>/Apiary/inspections</code> — hive inspection records</li>
+            <li><code>/Apiary/inspections/new</code> — new inspection form</li>
+            <li><code>/Apiary/inspections/calendar</code> — inspection calendar</li>
+            <li><code>/Apiary/inspections/reports</code> — seasonal reports</li>
+        </ul>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="templates">Templates</h2>
+    <div class="content-section">
+        <table class="data-table">
+            <thead>
+                <tr><th>Template path</th><th>Served by</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>root/BMaster/BMaster.tt</code></td><td>BMaster site home + <code>/Beekeeping</code> index</td></tr>
+                <tr><td><code>root/Beekeeping/apiary.tt</code></td><td><code>/Beekeeping/apiary</code> (guest info page)</td></tr>
+                <tr><td><code>root/Beekeeping/queens.tt</code></td><td>Queen rearing info (guest facing)</td></tr>
+                <tr><td><code>root/Beekeeping/health.tt</code></td><td><code>/Beekeeping/health</code></td></tr>
+                <tr><td><code>root/Beekeeping/harvest.tt</code></td><td><code>/Beekeeping/harvest</code></td></tr>
+                <tr><td><code>root/Beekeeping/environment.tt</code></td><td><code>/Beekeeping/environment</code></td></tr>
+                <tr><td><code>root/Beekeeping/education.tt</code></td><td><code>/Beekeeping/education</code></td></tr>
+                <tr><td><code>root/Beekeeping/products.tt</code></td><td><code>/Beekeeping/products</code></td></tr>
+                <tr><td><code>root/Beekeeping/Yards/index.tt</code></td><td><code>/Beekeeping/yards</code></td></tr>
+                <tr><td><code>root/Beekeeping/Yards/add.tt</code></td><td><code>/Beekeeping/add_yard</code></td></tr>
+            </tbody>
+        </table>
+        <p>Old <code>root/BMaster/</code> templates remain for the BMaster site home (<code>BMaster.tt</code>) and legacy reference. The Beekeeping feature templates are authoritative in <code>root/Beekeeping/</code>.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="model">Models</h2>
+    <div class="content-section">
+        <table class="data-table">
+            <thead>
+                <tr><th>Model</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Model::BeekeepingModel</code></td>
+                    <td>Yard and hive-list helpers for the Beekeeping controller hierarchy. Methods: <code>get_yards_for_site($c, $sitename)</code>, <code>get_hives_for_yard($c, $yard_id)</code>, <code>create_yard($c, \%params)</code>.</td>
+                </tr>
+                <tr>
+                    <td><code>Model::ApiaryModel</code></td>
+                    <td>Inspection and queen-assignment helpers used by <code>Controller::Apiary</code>. Methods: <code>get_queens_for_hive</code>, <code>get_current_queen_for_hive</code>.</td>
+                </tr>
+                <tr>
+                    <td><code>Model::BMaster</code></td>
+                    <td><strong>Deprecated.</strong> All methods forward to <code>ApiaryModel</code> with a deprecation warning. Will be removed in a future release.</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="schema">Schema / Result Classes</h2>
+    <div class="content-section">
+        <p>All beekeeping-related DBIx::Class Result classes live in the <code>Comserv::Model::Schema::Ency::Result::Beekeeping::</code> namespace. These are used via <code>$c->model('DBEncy')->resultset('Beekeeping::ClassName')</code>.</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>ResultSet name</th><th>DB table</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>Beekeeping::Yard</code></td><td><code>yards</code></td><td>Apiary yard/location records</td></tr>
+                <tr><td><code>Beekeeping::Hive</code></td><td><code>hives</code></td><td>Individual hive records</td></tr>
+                <tr><td><code>Beekeeping::HiveFrame</code></td><td><code>hive_frames</code></td><td>Frame state per inspection</td></tr>
+                <tr><td><code>Beekeeping::HiveConfiguration</code></td><td><code>hive_configurations</code></td><td>Equipment configuration snapshots</td></tr>
+                <tr><td><code>Beekeeping::HiveConfigurationHistory</code></td><td><code>hive_configuration_history</code></td><td>Configuration change history</td></tr>
+                <tr><td><code>Beekeeping::HiveAssembly</code></td><td><code>hive_assemblies</code></td><td>Box/super assembly records</td></tr>
+                <tr><td><code>Beekeeping::HiveMovement</code></td><td><code>hive_movements</code></td><td>Hive location movement audit trail</td></tr>
+                <tr><td><code>Beekeeping::HiveComponent</code></td><td><code>hive_components</code></td><td>Hive equipment component inventory</td></tr>
+                <tr><td><code>Beekeeping::Box</code></td><td><code>boxes</code></td><td>Individual box/super records</td></tr>
+                <tr><td><code>Beekeeping::ConfigurationBox</code></td><td><code>configuration_boxes</code></td><td>Box options for hive configurations</td></tr>
+                <tr><td><code>Beekeeping::FrameMovement</code></td><td><code>frame_movements</code></td><td>Frame movement audit trail</td></tr>
+                <tr><td><code>Beekeeping::Queen</code></td><td><code>queens</code></td><td>Queen records (genetics, marking, status)</td></tr>
+                <tr><td><code>Beekeeping::QueenEnhanced</code></td><td><code>queens_enhanced</code></td><td>Staging/reference — pre-migration data</td></tr>
+                <tr><td><code>Beekeeping::QueenEvent</code></td><td><code>queen_events</code></td><td>Queen lifecycle event log</td></tr>
+                <tr><td><code>Beekeeping::QueenHiveAssignment</code></td><td><code>queen_hive_assignments</code></td><td>Queen-to-hive assignment history</td></tr>
+                <tr><td><code>Beekeeping::Inspection</code></td><td><code>inspections</code></td><td>Hive inspection records</td></tr>
+                <tr><td><code>Beekeeping::InspectionDetail</code></td><td><code>inspection_details</code></td><td>Per-box/frame inspection observations</td></tr>
+                <tr><td><code>Beekeeping::InspectionFeeding</code></td><td><code>inspection_feedings</code></td><td>Feeding records linked to inspections</td></tr>
+                <tr><td><code>Beekeeping::HoneyHarvest</code></td><td><code>honey_harvests</code></td><td>Harvest records per hive</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="navigation">Navigation</h2>
+    <div class="content-section">
+        <p>The beekeeping menu is defined in <code>root/Navigation/TopDropListBeekeeping.tt</code>. It is included by <code>pagetop.tt</code> when the site or member has the beekeeping module enabled.</p>
+        <p>Visibility rules:</p>
+        <ul>
+            <li><code>enabled_modules.beekeeping</code> — member opted into the beekeeping feature</li>
+            <li><code>enabled_modules.apiary</code> — site-level apiary module enabled</li>
+            <li><code>SiteName == 'BMaster'</code> — always shown on the BMaster site</li>
+        </ul>
+        <p>Link strategy in the menu:</p>
+        <ul>
+            <li><strong>Guests (not logged in)</strong> — info and advertising pages under <code>/Beekeeping/*</code></li>
+            <li><strong>Members (logged in)</strong> — working management pages under <code>/Apiary/*</code></li>
+        </ul>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="dev-notes">Developer Notes</h2>
+    <div class="content-section">
+        <h3>Adding a new Beekeeping feature page</h3>
+        <ol>
+            <li>Add an action to <code>Controller::Beekeeping</code> (or a new sub-controller under <code>Controller::Beekeeping/</code>) using <code>:Path('/Beekeeping/your-route')</code>.</li>
+            <li>Create the template in <code>root/Beekeeping/your-template.tt</code>. Follow the theme compliance rules in <code>root/Documentation/ApplicationTtTemplate.tt</code>: use <code>app-container</code>, <code>app-section</code>, <code>content-section</code> CSS classes.</li>
+            <li>Add the route to <code>root/Navigation/TopDropListBeekeeping.tt</code> if it belongs in the nav menu.</li>
+            <li>Update this documentation.</li>
+        </ol>
+
+        <h3>Backward-compat redirect pattern</h3>
+        <p>When renaming or moving a route, keep the old URL as a redirect stub in the original controller. Example pattern used in <code>BMaster.pm</code>:</p>
+        <pre class="code-block">sub old_name :Path('/OldPath/action') :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'old_name', "old_name → /NewPath/action");
+    $c->response->redirect('/NewPath/action');
+}</pre>
+
+        <h3>Guest vs member routing pattern</h3>
+        <p>Public info pages are served from <code>Controller::Beekeeping</code>. Member management tools live in <code>Controller::Apiary</code>. The <code>/Beekeeping/apiary</code> action demonstrates the guest/member split:</p>
+        <pre class="code-block">if ($c->session->{user_id}) {
+    $c->response->redirect($c->uri_for('/Apiary'));
+} else {
+    $c->stash(template => 'Beekeeping/apiary.tt');
+}</pre>
+
+        <h3>Verification</h3>
+        <p>After any change to a controller or model, run:</p>
+        <pre class="code-block">perl -cw Comserv/script/comserv_server.pl</pre>
+    </div>
+</div>
+
+</div>
+</div>
+</div>

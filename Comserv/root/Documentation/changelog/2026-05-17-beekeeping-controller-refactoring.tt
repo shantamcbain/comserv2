@@ -1,0 +1,142 @@
+[% META
+   title = 'Beekeeping: Controller Refactoring — Separate Feature from SiteName'
+   description = 'Moved all beekeeping feature routes from Controller::BMaster (/BMaster/*) into a new dedicated Controller::Beekeeping hierarchy (/Beekeeping/*). BMaster retains the site home only; old URLs redirect.'
+   author = 'shanta'
+   date = '2026-05-17'
+   roles = 'admin developer'
+   TemplateType = 'Documentation'
+   category = 'Beekeeping'
+%]
+[% PageVersion = 'Documentation/changelog/2026-05-17-beekeeping-controller-refactoring.tt,v 1.00 2026/05/17 shanta Exp' %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<div class="changelog-entry">
+    <header class="changelog-header">
+        <h1>Beekeeping: Controller Refactoring — Separate Feature from SiteName</h1>
+        <div class="changelog-meta">
+            <span class="date">May 17, 2026</span>
+            <span class="author">by shanta</span>
+            <span class="type">Refactoring</span>
+        </div>
+    </header>
+
+    <section class="changelog-summary">
+        <h2>Summary</h2>
+        <p>All beekeeping feature routes were moved out of <code>Controller::BMaster</code> and into a new dedicated <code>Controller::Beekeeping</code> hierarchy. This resolves a long-standing architectural ambiguity where <em>BMaster</em> referred to both a Comserv <strong>SiteName</strong> and the <strong>beekeeping application feature</strong> simultaneously.</p>
+        <p>All canonical beekeeping feature URLs now live under <code>/Beekeeping/*</code>. The old <code>/BMaster/*</code> feature URLs remain as HTTP 302 redirect stubs — no existing bookmarks or external links are broken.</p>
+    </section>
+
+    <section class="changelog-details">
+
+        <h2>Problem</h2>
+        <p>Before this change, <code>Controller::BMaster</code> served two unrelated purposes:</p>
+        <ul>
+            <li>The BMaster <em>site home</em> (<code>/BMaster</code>)</li>
+            <li>All beekeeping <em>feature pages</em> (<code>/BMaster/apiary</code>, <code>/BMaster/yards</code>, <code>/BMaster/honey</code>, etc.)</li>
+        </ul>
+        <p>This made it difficult to add new features, understand routing, or share beekeeping tools with sites other than BMaster.</p>
+
+        <h2>New Controller Hierarchy</h2>
+        <table class="data-table">
+            <thead>
+                <tr><th>New file</th><th>URL prefix</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>Controller/Beekeeping.pm</code></td>
+                    <td><code>/Beekeeping</code></td>
+                    <td>Feature hub — apiary info, environment, education, products</td>
+                </tr>
+                <tr>
+                    <td><code>Controller/Beekeeping/Yards.pm</code></td>
+                    <td><code>/Beekeeping/yards</code>, <code>/Beekeeping/add_yard</code></td>
+                    <td>Yard listing and creation</td>
+                </tr>
+                <tr>
+                    <td><code>Controller/Beekeeping/Health.pm</code></td>
+                    <td><code>/Beekeeping/health</code></td>
+                    <td>Bee health information</td>
+                </tr>
+                <tr>
+                    <td><code>Controller/Beekeeping/Harvest.pm</code></td>
+                    <td><code>/Beekeeping/harvest</code></td>
+                    <td>Honey production and harvest</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h2>New Model</h2>
+        <ul>
+            <li><code>Model/BeekeepingModel.pm</code> — yard and hive-list helpers extracted from <code>ApiaryModel</code>. Methods: <code>get_yards_for_site</code>, <code>get_hives_for_yard</code>, <code>create_yard</code>.</li>
+        </ul>
+
+        <h2>New Templates (<code>root/Beekeeping/</code>)</h2>
+        <ul>
+            <li><code>Beekeeping/apiary.tt</code> — guest-facing apiary overview with membership CTAs</li>
+            <li><code>Beekeeping/queens.tt</code> — queen rearing overview for guests</li>
+            <li><code>Beekeeping/health.tt</code> — bee health information</li>
+            <li><code>Beekeeping/harvest.tt</code> — honey production guide</li>
+            <li><code>Beekeeping/environment.tt</code> — environmental planning</li>
+            <li><code>Beekeeping/education.tt</code> — beekeeping education hub</li>
+            <li><code>Beekeeping/products.tt</code> — bee products and services</li>
+            <li><code>Beekeeping/Yards/index.tt</code> — yard list</li>
+            <li><code>Beekeeping/Yards/add.tt</code> — add-yard form</li>
+        </ul>
+
+        <h2>Route Mapping — Old → New</h2>
+        <table class="data-table">
+            <thead>
+                <tr><th>Old URL (BMaster)</th><th>New canonical URL (Beekeeping)</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>/BMaster/bee_pasture</code></td><td><code>/Beekeeping/bee_pasture</code> → <code>/ENCY/BeePastureView</code></td></tr>
+                <tr><td><code>/BMaster/apiary</code></td><td><code>/Beekeeping/apiary</code></td></tr>
+                <tr><td><code>/BMaster/Queens</code></td><td><code>/Beekeeping/Queens</code> → <code>/Apiary/QueenRearing</code></td></tr>
+                <tr><td><code>/BMaster/hive</code></td><td><code>/Beekeeping/hive</code> → <code>/Apiary/HiveManagement</code></td></tr>
+                <tr><td><code>/BMaster/beehealth</code></td><td><code>/Beekeeping/health</code></td></tr>
+                <tr><td><code>/BMaster/honey</code></td><td><code>/Beekeeping/harvest</code></td></tr>
+                <tr><td><code>/BMaster/environment</code></td><td><code>/Beekeeping/environment</code></td></tr>
+                <tr><td><code>/BMaster/education</code></td><td><code>/Beekeeping/education</code></td></tr>
+                <tr><td><code>/BMaster/yards</code></td><td><code>/Beekeeping/yards</code></td></tr>
+                <tr><td><code>/BMaster/add_yard</code></td><td><code>/Beekeeping/add_yard</code></td></tr>
+                <tr><td><code>/BMaster/products</code></td><td><code>/Beekeeping/products</code></td></tr>
+            </tbody>
+        </table>
+
+        <h2>Navigation Updated</h2>
+        <ul>
+            <li><code>Navigation/TopDropListBeekeeping.tt</code> — all <code>/BMaster/*</code> hrefs updated to <code>/Beekeeping/*</code>. Guest drop-button now points to <code>/Beekeeping/apiary</code>.</li>
+        </ul>
+
+        <h2>Bug Fixed</h2>
+        <ul>
+            <li><code>Model/Schema/Ency/Result/Beekeeping/Yard.pm</code> — leading whitespace on the <code>package</code> declaration removed. All 19 <code>Result/Beekeeping/</code> package names now verified to match their file paths.</li>
+        </ul>
+
+        <h2>Documentation Updated</h2>
+        <ul>
+            <li><code>Documentation/BMaster.tt</code> — complete rewrite reflecting the separation; full route tables for both BMaster and Beekeeping; schema class reference; developer notes.</li>
+            <li><code>Documentation/BMasterController.tt</code> — rewritten to document the site-home role and the redirect-stub pattern.</li>
+            <li><code>Documentation/controllers/Beekeeping.tt</code> — new file documenting the full Beekeeping controller hierarchy, model, templates, and design patterns.</li>
+        </ul>
+
+        <h2>Files Changed</h2>
+        <ul>
+            <li><code>lib/Comserv/Controller/Beekeeping.pm</code> — new</li>
+            <li><code>lib/Comserv/Controller/Beekeeping/Yards.pm</code> — new</li>
+            <li><code>lib/Comserv/Controller/Beekeeping/Health.pm</code> — new</li>
+            <li><code>lib/Comserv/Controller/Beekeeping/Harvest.pm</code> — new</li>
+            <li><code>lib/Comserv/Model/BeekeepingModel.pm</code> — new</li>
+            <li><code>lib/Comserv/Controller/BMaster.pm</code> — feature actions replaced with redirect stubs</li>
+            <li><code>lib/Comserv/Model/Schema/Ency/Result/Beekeeping/Yard.pm</code> — whitespace fix on package line</li>
+            <li><code>root/Beekeeping/</code> — 9 new templates</li>
+            <li><code>root/Navigation/TopDropListBeekeeping.tt</code> — all links updated</li>
+            <li><code>root/Documentation/BMaster.tt</code> — rewritten</li>
+            <li><code>root/Documentation/BMasterController.tt</code> — rewritten</li>
+            <li><code>root/Documentation/controllers/Beekeeping.tt</code> — new</li>
+        </ul>
+
+        <h2>Verification</h2>
+        <p><code>perl -cw Comserv/script/comserv_server.pl</code> → <strong>syntax OK</strong></p>
+    </section>
+</div>

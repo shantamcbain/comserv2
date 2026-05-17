@@ -1,48 +1,91 @@
-[% PageVersion = 'Documentation/BMasterController.tt,v 0.03 2024/06/01 Shanta Exp shanta ' %]
+[% META
+   title = "BMaster Controller Documentation"
+   description = "Documents the BMaster Catalyst controller — site home and backward-compat redirect stubs"
+   roles = "admin developer"
+   TemplateType = "Documentation"
+   category = "Beekeeping"
+   page_version = "0.04"
+   last_updated = "2026-05-17"
+%]
+[% PageVersion = 'Documentation/BMasterController.tt,v 0.04 2026/05/17 shanta Exp shanta' %]
 
-<h1 id="BMaster_top"><a href="#BMaster_top">BMaster Controller Documentation</a></h1>
+<div class="app-container">
 
-<h2 id="base">base</h2>
-<p>The 'base' function serves as the root of the chained actions in the BMaster controller. It captures '/BMaster' in the URL and performs common setup tasks that are shared by multiple actions in the controller. This function is crucial for avoiding code duplication and enhancing code maintainability and readability. Here are some tasks that the 'base' function can perform:</p>
+<div class="page-header">
+    <h1 id="BMasterController_top">BMaster Controller (<code>Controller::BMaster</code>)</h1>
+    <p class="page-subtitle">Site home and backward-compatible redirect stubs.</p>
+</div>
 
-<ul>
-    <li><strong>Loading Model Data:</strong> The 'base' function can load data from the BMaster model that is required by multiple actions in the BMaster controller. This data is stored in the stash for other actions to use.</li>
-    <li><strong>Checking User Permissions:</strong> The 'base' function can verify if the user has the necessary permissions for multiple actions in the BMaster controller. If the user lacks the required permissions, they are redirected to an error page.</li>
-    <li><strong>Setting Common Template Variables:</strong> The 'base' function can set template variables that are used by multiple actions in the BMaster controller.</li>
-</ul>
+<div class="content-container">
+<div class="content-primary">
 
-<h2 id="index">index</h2>
-<p>The 'index' function sets the template to 'BMaster/BMaster.tt' and forwards to the TT view. This function is responsible for rendering the main page of the BMaster section.</p>
+<div class="app-section">
+    <h2>Overview</h2>
+    <div class="content-section">
+        <p><code>Comserv::Controller::BMaster</code> serves two purposes:</p>
+        <ol>
+            <li><strong>BMaster site home</strong> — the <code>/BMaster</code> and chained <code>/BMaster/</code> entry points that render the main BMaster landing page (<code>BMaster/BMaster.tt</code>).</li>
+            <li><strong>Backward-compatible redirect stubs</strong> — every beekeeping feature route that used to live here (e.g. <code>/BMaster/apiary</code>) now issues an HTTP 302 redirect to the canonical <code>/Beekeeping/*</code> URL in <code>Controller::Beekeeping</code>.</li>
+        </ol>
+        <p>New beekeeping feature development should go into <code>Controller::Beekeeping</code> or one of its sub-controllers, not into <code>Controller::BMaster</code>.</p>
+    </div>
+</div>
 
-<h2 id="frames">frames</h2>
-<p>The 'frames' function retrieves the frames for a specified queen and sets the template to 'BMaster/frames.tt'. This function is used to display the frames associated with a particular queen bee.</p>
+<div class="app-section">
+    <h2>Actions</h2>
 
-<h2 id="api_frames">api_frames</h2>
-<p>The 'api_frames' function fetches the data for the frames and sets the response body to the JSON representation of the data. This function is used to provide a JSON API for accessing frame data.</p>
+    <h3 id="base"><code>base</code></h3>
+    <div class="content-section">
+        <p>Chained root action. <code>:Chained('/') :PathPart('BMaster') :CaptureArgs(0)</code>. Captures the <code>/BMaster</code> path prefix for all chained actions. No logic — just establishes the chain.</p>
+    </div>
 
-<h2 id="products">products</h2>
-<p>The 'products' function sets the template to 'BMaster/products.tt'. This function is used to render the page that displays the products of the BMaster.</p>
+    <h3 id="index"><code>index</code></h3>
+    <div class="content-section">
+        <p><code>:Path('/BMaster') :Args(0)</code> — serves the BMaster site home. Sets <code>template =&gt; 'BMaster/BMaster.tt'</code>. This is the canonical entry point for the BMaster site for both guests and members.</p>
+    </div>
 
-<h2 id="yards">yards</h2>
-<p>The 'yards' function retrieves the yards and sets the template to 'BMaster/yards.tt'. This function is used to display the yards associated with the BMaster.</p>
+    <h3 id="chained_index"><code>chained_index</code></h3>
+    <div class="content-section">
+        <p><code>:Chained('base') :PathPart('') :Args(0)</code> — chained variant of the index, also renders <code>BMaster/BMaster.tt</code>. Handles <code>/BMaster/</code> (trailing slash) requests.</p>
+    </div>
 
-<h2 id="apiary">apiary</h2>
-<p>The 'apiary' function sets the template to 'BMaster/apiary.tt'. This function is used to render the page that displays the apiary of the BMaster.</p>
+    <h3 id="redirect-stubs">Backward-Compatible Redirect Stubs</h3>
+    <div class="content-section">
+        <p>The following actions exist solely to redirect old bookmarks and external links to the canonical <code>/Beekeeping/*</code> equivalents. They log the redirect at <code>info</code> level and issue an HTTP 302. Do not add new logic to these — if a stub needs real behaviour, move it to <code>Controller::Beekeeping</code> instead.</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>Action</th><th>Old URL</th><th>Redirects to</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>bee_pasture</code></td><td><code>/BMaster/bee_pasture</code></td><td><code>/Beekeeping/bee_pasture</code></td></tr>
+                <tr><td><code>apiary</code></td><td><code>/BMaster/apiary</code></td><td><code>/Beekeeping/apiary</code></td></tr>
+                <tr><td><code>queens</code></td><td><code>/BMaster/Queens</code></td><td><code>/Beekeeping/Queens</code></td></tr>
+                <tr><td><code>hive</code></td><td><code>/BMaster/hive</code></td><td><code>/Beekeeping/hive</code></td></tr>
+                <tr><td><code>beehealth</code></td><td><code>/BMaster/beehealth</code></td><td><code>/Beekeeping/health</code></td></tr>
+                <tr><td><code>honey</code></td><td><code>/BMaster/honey</code></td><td><code>/Beekeeping/harvest</code></td></tr>
+                <tr><td><code>environment</code></td><td><code>/BMaster/environment</code></td><td><code>/Beekeeping/environment</code></td></tr>
+                <tr><td><code>education</code></td><td><code>/BMaster/education</code></td><td><code>/Beekeeping/education</code></td></tr>
+                <tr><td><code>yards</code></td><td><code>/BMaster/yards</code></td><td><code>/Beekeeping/yards</code></td></tr>
+                <tr><td><code>add_yard</code></td><td><code>/BMaster/add_yard</code></td><td><code>/Beekeeping/add_yard</code></td></tr>
+                <tr><td><code>products</code></td><td><code>/BMaster/products</code></td><td><code>/Beekeeping/products</code></td></tr>
+            </tbody>
+        </table>
+    </div>
 
-<h2 id="queens">queens</h2>
-<p>The 'queens' function sets the template to 'BMaster/Queens.tt'. This function is used to render the page that displays the queens of the BMaster. It also calculates and displays the graft dates for each queen.</p>
+    <h3 id="default"><code>default</code></h3>
+    <div class="content-section">
+        <p><code>:Path :Args</code> — catch-all for any unrecognised <code>/BMaster/*</code> URL. Redirects to <code>/BMaster</code> (site home).</p>
+    </div>
+</div>
 
-<h2 id="hive">hive</h2>
-<p>The 'hive' function sets the template to 'BMaster/hive.tt'. This function is used to render the page that displays the hives of the BMaster.</p>
+<div class="app-section">
+    <h2>File Location</h2>
+    <div class="content-section">
+        <p><code>Comserv/lib/Comserv/Controller/BMaster.pm</code></p>
+        <p>See also: <a href="/Documentation/BMaster">BMaster System Overview</a> | <a href="/Documentation/controllers/Beekeeping">Beekeeping Controller Documentation</a></p>
+    </div>
+</div>
 
-<h2 id="honey">honey</h2>
-<p>The 'honey' function sets the template to 'BMaster/honey.tt'. This function is used to render the page that displays the honey products of the BMaster.</p>
-
-<h2 id="beehealth">beehealth</h2>
-<p>The 'beehealth' function sets the template to 'BMaster/beehealth.tt'. This function is used to render the page that displays the health status of the bees in the BMaster.</p>
-
-<h2 id="environment">environment</h2>
-<p>The 'environment' function sets the template to 'BMaster/environment.tt'. This function is used to render the page that displays the environmental conditions of the BMaster.</p>
-
-<h2 id="education">education</h2>
-<p>The 'education' function sets the template to 'BMaster/education.tt'. This function is used to render the page that displays the educational resources of the BMaster.</p>
+</div>
+</div>
+</div>

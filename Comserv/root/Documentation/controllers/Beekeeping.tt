@@ -1,0 +1,350 @@
+[% META
+   title = "Beekeeping Controller Documentation"
+   description = "Full reference for the Beekeeping Catalyst controller hierarchy — routes, actions, sub-controllers, templates, and model"
+   roles = "admin developer"
+   TemplateType = "Documentation"
+   category = "Beekeeping"
+   page_version = "1.00"
+   last_updated = "2026-05-17"
+%]
+[% PageVersion = 'Documentation/controllers/Beekeeping.tt,v 1.00 2026/05/17 shanta Exp shanta' %]
+[% IF c.session.debug_mode == 1 %]
+    [% PageVersion %]
+[% END %]
+
+<div class="app-container">
+
+<div class="page-header">
+    <h1 id="beekeeping_top">Beekeeping Controller Hierarchy</h1>
+    <p class="page-subtitle">Reference for <code>Controller::Beekeeping</code> and its sub-controllers — the canonical home for all beekeeping feature routes.</p>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<nav class="app-section">
+    <ul class="inline-nav">
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#beekeeping-pm">Beekeeping.pm</a></li>
+        <li><a href="#yards-pm">Beekeeping::Yards</a></li>
+        <li><a href="#health-pm">Beekeeping::Health</a></li>
+        <li><a href="#harvest-pm">Beekeeping::Harvest</a></li>
+        <li><a href="#model">BeekeepingModel</a></li>
+        <li><a href="#templates">Templates</a></li>
+        <li><a href="#design-patterns">Design Patterns</a></li>
+        <li><a href="#extending">Extending the System</a></li>
+    </ul>
+</nav>
+
+<div class="app-section">
+    <h2 id="overview">Overview</h2>
+    <div class="content-section">
+        <p>The <strong>Beekeeping controller hierarchy</strong> was introduced in May 2026 to resolve an architectural ambiguity. Previously, all beekeeping feature routes lived under <code>/BMaster/*</code> inside <code>Controller::BMaster</code> — the same controller that serves the BMaster <em>site home</em>. This made it impossible to distinguish between "BMaster as a Comserv SiteName" and "BMaster as a beekeeping application feature."</p>
+
+        <p>The refactoring separates these concerns cleanly:</p>
+        <ul>
+            <li><code>Controller::BMaster</code> — owns <code>/BMaster</code> (the site home only). All old feature routes redirect to <code>/Beekeeping/*</code>.</li>
+            <li><code>Controller::Beekeeping</code> (and sub-controllers) — owns all beekeeping feature routes under <code>/Beekeeping/*</code>.</li>
+            <li><code>Controller::Apiary</code> — owns the member-only apiary management tools under <code>/Apiary/*</code> (unchanged).</li>
+        </ul>
+
+        <h3>Audience split</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Audience</th><th>Controller</th><th>URL prefix</th><th>Purpose</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Guests / public</td><td><code>Beekeeping</code></td><td><code>/Beekeeping/*</code></td><td>Education, information, membership pitch</td></tr>
+                <tr><td>Members (logged in)</td><td><code>Apiary</code></td><td><code>/Apiary/*</code></td><td>Hive tracking, inspections, queen rearing, health</td></tr>
+                <tr><td>BMaster site entry</td><td><code>BMaster</code></td><td><code>/BMaster</code></td><td>Site landing page only</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="beekeeping-pm"><code>Controller::Beekeeping</code> (<code>Beekeeping.pm</code>)</h2>
+    <div class="content-section">
+        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Controller/Beekeeping.pm</code></p>
+        <p><strong>Base chain:</strong> <code>:Chained('/') :PathPart('Beekeeping') :CaptureArgs(0)</code></p>
+
+        <table class="data-table">
+            <thead>
+                <tr><th>Action</th><th>Attr</th><th>URL</th><th>Template / destination</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>base</code></td>
+                    <td><code>:Chained('/') :PathPart('Beekeeping') :CaptureArgs(0)</code></td>
+                    <td>—</td>
+                    <td>Chain root — no output</td>
+                </tr>
+                <tr>
+                    <td><code>index</code></td>
+                    <td><code>:Chained('base') :PathPart('') :Args(0)</code></td>
+                    <td><a href="/Beekeeping"><code>/Beekeeping</code></a></td>
+                    <td><code>BMaster/BMaster.tt</code></td>
+                </tr>
+                <tr>
+                    <td><code>bee_pasture</code></td>
+                    <td><code>:Path('/Beekeeping/bee_pasture') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/bee_pasture"><code>/Beekeeping/bee_pasture</code></a></td>
+                    <td>Redirect → <code>/ENCY/BeePastureView</code></td>
+                </tr>
+                <tr>
+                    <td><code>apiary</code></td>
+                    <td><code>:Path('/Beekeeping/apiary') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/apiary"><code>/Beekeeping/apiary</code></a></td>
+                    <td>Guests: <code>Beekeeping/apiary.tt</code> — Members: redirect → <code>/Apiary</code></td>
+                </tr>
+                <tr>
+                    <td><code>queens</code></td>
+                    <td><code>:Path('/Beekeeping/Queens') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/Queens"><code>/Beekeeping/Queens</code></a></td>
+                    <td>Redirect → <code>/Apiary/QueenRearing</code></td>
+                </tr>
+                <tr>
+                    <td><code>hive</code></td>
+                    <td><code>:Path('/Beekeeping/hive') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/hive"><code>/Beekeeping/hive</code></a></td>
+                    <td>Redirect → <code>/Apiary/HiveManagement</code></td>
+                </tr>
+                <tr>
+                    <td><code>environment</code></td>
+                    <td><code>:Path('/Beekeeping/environment') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/environment"><code>/Beekeeping/environment</code></a></td>
+                    <td><code>Beekeeping/environment.tt</code></td>
+                </tr>
+                <tr>
+                    <td><code>education</code></td>
+                    <td><code>:Path('/Beekeeping/education') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/education"><code>/Beekeeping/education</code></a></td>
+                    <td><code>Beekeeping/education.tt</code></td>
+                </tr>
+                <tr>
+                    <td><code>products</code></td>
+                    <td><code>:Path('/Beekeeping/products') :Args(0)</code></td>
+                    <td><a href="/Beekeeping/products"><code>/Beekeeping/products</code></a></td>
+                    <td><code>Beekeeping/products.tt</code></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="yards-pm"><code>Controller::Beekeeping::Yards</code> (<code>Beekeeping/Yards.pm</code>)</h2>
+    <div class="content-section">
+        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Controller/Beekeeping/Yards.pm</code></p>
+        <p>Manages yard listing and creation. Uses <code>$c->model('DBEncy')->resultset('Beekeeping::Yard')</code> directly for simplicity.</p>
+
+        <table class="data-table">
+            <thead>
+                <tr><th>Action</th><th>Method</th><th>URL</th><th>Template</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>yards</code></td>
+                    <td>GET</td>
+                    <td><a href="/Beekeeping/yards"><code>/Beekeeping/yards</code></a></td>
+                    <td><code>Beekeeping/Yards/index.tt</code></td>
+                    <td>Lists all yards for <code>session.SiteName</code></td>
+                </tr>
+                <tr>
+                    <td><code>add_yard</code></td>
+                    <td>GET + POST</td>
+                    <td><a href="/Beekeeping/add_yard"><code>/Beekeeping/add_yard</code></a></td>
+                    <td><code>Beekeeping/Yards/add.tt</code></td>
+                    <td>GET renders form; POST creates yard, redirects to <code>/Beekeeping/yards</code></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h3>Yard form fields (POST)</h3>
+        <ul>
+            <li><code>yard_code</code> — unique identifier (required)</li>
+            <li><code>yard_name</code> — display name (required)</li>
+            <li><code>sitename</code> — pre-filled from session, readonly in form</li>
+            <li><code>total_yard_size</code> — max hive count (required)</li>
+            <li><code>date_established</code> — date (required)</li>
+            <li><code>notes</code> — freetext</li>
+        </ul>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="health-pm"><code>Controller::Beekeeping::Health</code> (<code>Beekeeping/Health.pm</code>)</h2>
+    <div class="content-section">
+        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Controller/Beekeeping/Health.pm</code></p>
+
+        <table class="data-table">
+            <thead>
+                <tr><th>Action</th><th>URL</th><th>Template</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>beehealth</code></td>
+                    <td><a href="/Beekeeping/health"><code>/Beekeeping/health</code></a></td>
+                    <td><code>Beekeeping/health.tt</code></td>
+                </tr>
+            </tbody>
+        </table>
+        <p>Informational page covering pasture management, yard arrangements, Varroa monitoring, AFB, Nosema, small hive beetle. Links to <code>/Apiary/BeeHealth</code> for the member health monitoring tools.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="harvest-pm"><code>Controller::Beekeeping::Harvest</code> (<code>Beekeeping/Harvest.pm</code>)</h2>
+    <div class="content-section">
+        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Controller/Beekeeping/Harvest.pm</code></p>
+
+        <table class="data-table">
+            <thead>
+                <tr><th>Action</th><th>URL</th><th>Template</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>honey</code></td>
+                    <td><a href="/Beekeeping/harvest"><code>/Beekeeping/harvest</code></a></td>
+                    <td><code>Beekeeping/harvest.tt</code></td>
+                </tr>
+            </tbody>
+        </table>
+        <p>Covers honey harvest timing, extraction process, storage, labelling, and quality/ethics guidelines.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="model"><code>Model::BeekeepingModel</code></h2>
+    <div class="content-section">
+        <p><strong>File:</strong> <code>Comserv/lib/Comserv/Model/BeekeepingModel.pm</code></p>
+        <p>Catalyst model (<code>extends 'Catalyst::Model'</code>) providing yard and hive-list helpers for the Beekeeping controller hierarchy. Inspection and queen-assignment helpers remain in <code>ApiaryModel</code>.</p>
+
+        <h3>Methods</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Method</th><th>Signature</th><th>Returns</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><code>get_yards_for_site</code></td>
+                    <td><code>($self, $c, $sitename)</code></td>
+                    <td>ArrayRef of <code>Beekeeping::Yard</code> rows, ordered by <code>yard_name</code></td>
+                </tr>
+                <tr>
+                    <td><code>get_hives_for_yard</code></td>
+                    <td><code>($self, $c, $yard_id)</code></td>
+                    <td>ArrayRef of <code>Beekeeping::Hive</code> rows, ordered by <code>hive_name</code></td>
+                </tr>
+                <tr>
+                    <td><code>create_yard</code></td>
+                    <td><code>($self, $c, \%params)</code></td>
+                    <td><code>(1, undef)</code> on success; <code>(0, $error_string)</code> on failure</td>
+                </tr>
+            </tbody>
+        </table>
+
+        <p>All methods use <code>$c->model('DBEncy')</code> to access the database and wrap DB calls in <code>eval</code> with <code>warn</code> on error.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="templates">Templates</h2>
+    <div class="content-section">
+        <p>All templates live under <code>root/Beekeeping/</code> and comply with the theme system (use <code>app-container</code>, <code>app-section</code>, <code>content-section</code> CSS classes — see <a href="/Documentation/ApplicationTtTemplate">ApplicationTtTemplate</a>).</p>
+        <table class="data-table">
+            <thead>
+                <tr><th>Template</th><th>Route</th><th>Notes</th></tr>
+            </thead>
+            <tbody>
+                <tr><td><code>Beekeeping/apiary.tt</code></td><td><code>/Beekeeping/apiary</code></td><td>Feature overview for guests — yards, inspections, queen rearing, health, bee pasture. CTAs for signup and membership.</td></tr>
+                <tr><td><code>Beekeeping/queens.tt</code></td><td>Guest queen info (not directly routed yet)</td><td>Graft calendar form and queen rearing overview</td></tr>
+                <tr><td><code>Beekeeping/health.tt</code></td><td><code>/Beekeeping/health</code></td><td>Bee health information page</td></tr>
+                <tr><td><code>Beekeeping/harvest.tt</code></td><td><code>/Beekeeping/harvest</code></td><td>Honey production guide</td></tr>
+                <tr><td><code>Beekeeping/environment.tt</code></td><td><code>/Beekeeping/environment</code></td><td>Environmental planning — climate, agricultural practices, habitat, bee pasture planning</td></tr>
+                <tr><td><code>Beekeeping/education.tt</code></td><td><code>/Beekeeping/education</code></td><td>Education hub — bee biology, diseases, hive management, queen rearing, workshops</td></tr>
+                <tr><td><code>Beekeeping/products.tt</code></td><td><code>/Beekeeping/products</code></td><td>Honey, pollen, beeswax, propolis, royal jelly — products and member advertising</td></tr>
+                <tr><td><code>Beekeeping/Yards/index.tt</code></td><td><code>/Beekeeping/yards</code></td><td>Yard list table with link to <code>/Apiary/hives_for_yard/:id</code></td></tr>
+                <tr><td><code>Beekeeping/Yards/add.tt</code></td><td><code>/Beekeeping/add_yard</code></td><td>Add-yard form with AI form assistant partial</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="design-patterns">Design Patterns</h2>
+    <div class="content-section">
+
+        <h3>Guest / member routing split</h3>
+        <p>Pages that serve different content to guests vs members implement the following pattern in the controller action:</p>
+        <pre class="code-block">if ($c->session->{user_id}) {
+    $c->response->redirect($c->uri_for('/Apiary'));
+} else {
+    $c->stash(template => 'Beekeeping/apiary.tt');
+}</pre>
+        <p>Guest-facing templates include membership CTAs. Member-facing content lives exclusively in <code>Controller::Apiary</code>.</p>
+
+        <h3>Standard action boilerplate</h3>
+        <pre class="code-block">sub my_action :Path('/Beekeeping/my-route') :Args(0) {
+    my ($self, $c) = @_;
+    $c->stash->{debug_errors} = [] unless defined $c->stash->{debug_errors};
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'my_action', "called");
+    $c->stash(
+        template  => 'Beekeeping/my-template.tt',
+        debug_msg => 'Page Title',
+    );
+}</pre>
+
+        <h3>Sub-controller pattern</h3>
+        <p>Feature groups with multiple routes get their own sub-controller file in <code>Controller/Beekeeping/</code>. Each uses <code>:Path('/Beekeeping/...')</code> absolute path attributes — no chaining to the Beekeeping base — for simplicity and discoverability.</p>
+    </div>
+</div>
+
+<div class="app-section">
+    <h2 id="extending">Extending the System</h2>
+    <div class="content-section">
+        <h3>Adding a new public info page</h3>
+        <ol>
+            <li>Add an action to <code>Controller::Beekeeping</code> using <code>:Path('/Beekeeping/your-route') :Args(0)</code>.</li>
+            <li>Create <code>root/Beekeeping/your-template.tt</code> — start with <code>[% META title = "..." %]</code>, wrap content in <code>app-container</code> / <code>app-section</code>.</li>
+            <li>Link it from <code>root/Navigation/TopDropListBeekeeping.tt</code> if it belongs in the menu.</li>
+            <li>Update <code>root/Documentation/BMaster.tt</code> route table.</li>
+            <li>Run <code>perl -cw Comserv/script/comserv_server.pl</code>.</li>
+        </ol>
+
+        <h3>Adding a new member management feature</h3>
+        <p>Member tools go in <code>Controller::Apiary</code>, not here. Add the route under <code>/Apiary/*</code> and link it from the <code>logged_in</code> branch of <code>TopDropListBeekeeping.tt</code>.</p>
+
+        <h3>Adding a new sub-controller</h3>
+        <ol>
+            <li>Create <code>Comserv/lib/Comserv/Controller/Beekeeping/MyFeature.pm</code> with <code>package Comserv::Controller::Beekeeping::MyFeature</code>.</li>
+            <li>Use <code>BEGIN { extends 'Catalyst::Controller'; }</code>.</li>
+            <li>Define actions with absolute <code>:Path('/Beekeeping/my-feature/...')</code> attributes.</li>
+            <li>Create templates in <code>root/Beekeeping/MyFeature/</code>.</li>
+        </ol>
+
+        <h3>File locations summary</h3>
+        <table class="data-table">
+            <thead>
+                <tr><th>Type</th><th>Location</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>Controllers</td><td><code>Comserv/lib/Comserv/Controller/Beekeeping/</code></td></tr>
+                <tr><td>Templates</td><td><code>Comserv/root/Beekeeping/</code></td></tr>
+                <tr><td>Model</td><td><code>Comserv/lib/Comserv/Model/BeekeepingModel.pm</code></td></tr>
+                <tr><td>DB Result classes</td><td><code>Comserv/lib/Comserv/Model/Schema/Ency/Result/Beekeeping/</code></td></tr>
+                <tr><td>Navigation menu</td><td><code>Comserv/root/Navigation/TopDropListBeekeeping.tt</code></td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="app-section">
+    <div class="content-section">
+        <p>See also: <a href="/Documentation/BMaster">BMaster System Overview</a> | <a href="/Documentation/BMasterController">BMaster Controller</a> | <a href="/Documentation/controllers/Apiary">Apiary Controller</a></p>
+    </div>
+</div>
+
+</div>
+</div>
+</div>
