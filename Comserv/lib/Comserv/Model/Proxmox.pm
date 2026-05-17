@@ -2170,6 +2170,40 @@ sub clone_vm {
     }
 }
 
+sub set_vm_config {
+    my ($self, $vmid, %params) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(30);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/config";
+    my $req = HTTP::Request->new(PUT => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+
+    my @parts;
+    for my $key (keys %params) {
+        push @parts, uri_escape($key) . '=' . uri_escape($params{$key});
+    }
+    $req->content(join('&', @parts));
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'set_vm_config',
+        "set_vm_config vmid=$vmid => " . $res->status_line);
+
+    if ($res->is_success) {
+        return { success => 1 };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
 sub list_snapshots {
     my ($self, $vmid) = @_;
 

@@ -1165,11 +1165,15 @@ sub clone_vm_action :Path('clone_vm_action') :Args(0) {
         $c->forward('View::JSON'); return;
     }
 
-    my $vmid    = $c->req->params->{vmid}   or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
-    my $newid   = $c->req->params->{newid}  or do { $c->stash->{json} = { success => 0, error => 'newid required' }; $c->forward('View::JSON'); return; };
-    my $name    = $c->req->params->{name}   || '';
-    my $full    = $c->req->params->{full}   // 1;
-    my $storage = $c->req->params->{storage} || '';
+    my $vmid     = $c->req->params->{vmid}    or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
+    my $newid    = $c->req->params->{newid}   or do { $c->stash->{json} = { success => 0, error => 'newid required' }; $c->forward('View::JSON'); return; };
+    my $name     = $c->req->params->{name}    || '';
+    my $full     = $c->req->params->{full}    // 1;
+    my $storage  = $c->req->params->{storage} || '';
+    my $new_ip   = $c->req->params->{new_ip}  || '';
+    my $gateway  = $c->req->params->{gateway} || '';
+    my $dns      = $c->req->params->{dns}     || '';
+    my $hostname = $c->req->params->{hostname}|| '';
 
     my $proxmox = $self->_init_proxmox($c);
     unless ($proxmox->authenticate()) {
@@ -1178,6 +1182,21 @@ sub clone_vm_action :Path('clone_vm_action') :Args(0) {
     }
 
     my $result = $proxmox->clone_vm($vmid, $newid, $name, $full, $storage);
+    if ($result->{success} && ($new_ip || $hostname || $dns)) {
+        my %config_params;
+        if ($new_ip) {
+            my $ipconfig = "ip=$new_ip";
+            $ipconfig .= ",gw=$gateway" if $gateway;
+            $config_params{ipconfig0} = $ipconfig;
+            $config_params{citype}    = 'nocloud';
+        }
+        $config_params{name}       = $hostname if $hostname;
+        $config_params{nameserver} = $dns      if $dns;
+
+        my $cfg_result = $proxmox->set_vm_config($newid, %config_params);
+        $result->{ip_config} = $cfg_result->{success} ? 'applied' : ('failed: ' . ($cfg_result->{error} || ''));
+    }
+
     $c->stash->{json} = $result;
     $c->forward('View::JSON');
 }
