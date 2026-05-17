@@ -2170,6 +2170,42 @@ sub clone_vm {
     }
 }
 
+sub restore_as_new_vm {
+    my ($self, $new_vmid, $volid, $storage, $name) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(120);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+
+    my $body = "vmid=" . uri_escape($new_vmid)
+             . "&archive=" . uri_escape($volid)
+             . "&unique=1";
+    $body .= "&storage=" . uri_escape($storage) if $storage;
+    $body .= "&name="    . uri_escape($name)    if $name;
+    $req->content($body);
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'restore_as_new_vm',
+        "restore_as_new_vm newid=$new_vmid volid=$volid => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, task_id => ($data && $data->{data}) ? $data->{data} : '', vmid => $new_vmid };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
 sub unlock_vm {
     my ($self, $vmid) = @_;
 
