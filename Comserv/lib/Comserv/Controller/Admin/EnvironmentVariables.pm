@@ -73,14 +73,22 @@ my %VAR_DESCRIPTIONS = (
     DB_PORT_PROD                           => 'Legacy: production database port (use COMSERV_DB_* instead)',
     DB_USER                                => 'Legacy: primary database username (use COMSERV_DB_* instead)',
     DB_USER_PROD                           => 'Legacy: production database username (use COMSERV_DB_* instead)',
-    MIGRATION_MYSQL_HOST                   => 'New MySQL server host (192.168.1.20) — migration target',
-    MIGRATION_MYSQL_PORT                   => 'New MySQL server port (default 3306) — migration target',
-    MIGRATION_MYSQL_USER                   => 'Root username for the new MySQL server',
-    MIGRATION_MYSQL_PASSWORD               => 'Root password for the new MySQL server — SECRET',
-    MIGRATION_POSTGRES_HOST                => 'New PostgreSQL server host (192.168.1.20) — migration target',
-    MIGRATION_POSTGRES_PORT                => 'New PostgreSQL server port (default 5432) — migration target',
-    MIGRATION_POSTGRES_USER                => 'Root/superuser username for the new PostgreSQL server',
-    MIGRATION_POSTGRES_PASSWORD            => 'Root/superuser password for the new PostgreSQL server — SECRET',
+    COMSERV_ACTIVE_DB_ENV                  => 'Currently selected DB environment for sync operations (production, new_production, dev)',
+    COMSERV_DB_DEV_HOST                    => 'Dev database server hostname/IP (e.g. cloned VM or separate dev server)',
+    COMSERV_DB_DEV_PORT                    => 'Dev database server port (default 3306 for MySQL)',
+    COMSERV_DB_DEV_DATABASE                => 'Dev database name',
+    COMSERV_DB_DEV_USERNAME                => 'Dev database login username',
+    COMSERV_DB_DEV_PASSWORD                => 'Dev database login password — SECRET',
+    COMSERV_DB_DEV_DB_TYPE                 => 'Dev database type: mysql or postgres',
+    COMSERV_DB_DEV_DISPLAY_NAME            => 'Human-readable label for the dev DB environment',
+    MIGRATION_MYSQL_HOST                   => 'New MySQL/MariaDB server host (192.168.1.20) — new production server',
+    MIGRATION_MYSQL_PORT                   => 'New MySQL/MariaDB server port (default 3306)',
+    MIGRATION_MYSQL_USER                   => 'Root username for the new MySQL/MariaDB server',
+    MIGRATION_MYSQL_PASSWORD               => 'Root password for the new MySQL/MariaDB server — SECRET',
+    MIGRATION_POSTGRES_HOST                => 'New PostgreSQL server host (192.168.1.20) — new production server',
+    MIGRATION_POSTGRES_PORT                => 'New PostgreSQL server port (default 5432)',
+    MIGRATION_POSTGRES_USER                => 'Superuser username for the new PostgreSQL server',
+    MIGRATION_POSTGRES_PASSWORD            => 'Superuser password for the new PostgreSQL server — SECRET',
     MYSQL_DATA_PATH                        => 'Host path for MySQL Docker data volume',
     NGINX_CACHE_PATH                       => 'Host path for Nginx cache files',
     NGINX_PORT                             => 'Nginx HTTP port exposed on the host',
@@ -98,9 +106,10 @@ my %VAR_DESCRIPTIONS = (
 );
 
 my %GROUP_LABELS = (
-    'COMSERV_DB_PRODUCTION'  => { label => 'Production DB Connections',        icon => 'fa-database',  order => 1 },
-    'COMSERV_DB'             => { label => 'Custom DB Environments',            icon => 'fa-plus-circle', order => 2 },
-    'MIGRATION'              => { label => 'Migration Target Servers',          icon => 'fa-server',    order => 3 },
+    'COMSERV_DB_PRODUCTION'  => { label => 'Production DB Connections',        icon => 'fa-database',      order => 1 },
+    'COMSERV_DB_DEV'         => { label => 'Dev DB Environment',               icon => 'fa-code',          order => 2 },
+    'COMSERV_DB'             => { label => 'Custom DB Environments',            icon => 'fa-plus-circle',   order => 3 },
+    'MIGRATION'              => { label => 'New Production Servers',            icon => 'fa-server',        order => 4 },
     'DB'                     => { label => 'Legacy DB Variables (phase-out)',   icon => 'fa-exclamation-triangle', order => 4 },
     'REDIS'                  => { label => 'Redis Cache',                       icon => 'fa-memory',    order => 5 },
     'NGINX'                  => { label => 'Nginx Proxy',                       icon => 'fa-shield-alt', order => 6 },
@@ -114,6 +123,7 @@ my %GROUP_LABELS = (
 sub _classify_var {
     my ($key) = @_;
     return 'COMSERV_DB_PRODUCTION' if $key =~ /^COMSERV_DB_PRODUCTION/;
+    return 'COMSERV_DB_DEV'        if $key =~ /^COMSERV_DB_DEV/;
     return 'COMSERV_DB'            if $key =~ /^COMSERV_DB_/;
     return 'MIGRATION'             if $key =~ /^MIGRATION_/;
     return 'DB'                    if $key =~ /^DB_/;

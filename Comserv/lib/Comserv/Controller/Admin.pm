@@ -7211,6 +7211,349 @@ sub get_result_file_path {
     return $result_file_path;
 }
 
+sub _get_sync_environments {
+    my ($self, $c) = @_;
+    my @envs;
+
+    if ($ENV{COMSERV_DB_PRODUCTION_SERVER_HOST} && $ENV{COMSERV_DB_PRODUCTION_SERVER_PASSWORD}) {
+        push @envs, {
+            environment     => 'production',
+            connection_name => 'Old Production (DBEncy)',
+            host            => $ENV{COMSERV_DB_PRODUCTION_SERVER_HOST},
+            port            => $ENV{COMSERV_DB_PRODUCTION_SERVER_PORT} || 3306,
+            database        => $ENV{COMSERV_DB_PRODUCTION_SERVER_DATABASE} || 'ency',
+            username        => $ENV{COMSERV_DB_PRODUCTION_SERVER_USERNAME} || 'root',
+            password        => $ENV{COMSERV_DB_PRODUCTION_SERVER_PASSWORD},
+            db_type         => 'mysql',
+            available       => 1,
+            is_production   => 1,
+            metadata        => {
+                display_name  => 'Old Production (' . ($ENV{COMSERV_DB_PRODUCTION_SERVER_HOST}||'?') . ')',
+                description   => 'Current live production MariaDB — handle with care',
+                warning_level => 'critical',
+            },
+        };
+    }
+
+    if ($ENV{MIGRATION_MYSQL_PASSWORD}) {
+        push @envs, {
+            environment     => 'new_production',
+            connection_name => 'New Production MariaDB',
+            host            => $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20',
+            port            => $ENV{MIGRATION_MYSQL_PORT}     || 3306,
+            database        => '',
+            username        => $ENV{MIGRATION_MYSQL_USER}     || 'root',
+            password        => $ENV{MIGRATION_MYSQL_PASSWORD},
+            db_type         => 'mysql',
+            available       => 1,
+            is_production   => 1,
+            metadata        => {
+                display_name  => 'New Production (' . ($ENV{MIGRATION_MYSQL_HOST}||'192.168.1.20') . ')',
+                description   => 'New production MariaDB — migration target',
+                warning_level => 'high',
+            },
+        };
+    }
+
+    if ($ENV{MIGRATION_POSTGRES_PASSWORD}) {
+        push @envs, {
+            environment     => 'new_production_pg',
+            connection_name => 'New Production PostgreSQL',
+            host            => $ENV{MIGRATION_POSTGRES_HOST} || '192.168.1.20',
+            port            => $ENV{MIGRATION_POSTGRES_PORT} || 5432,
+            database        => '',
+            username        => $ENV{MIGRATION_POSTGRES_USER} || 'postgres',
+            password        => $ENV{MIGRATION_POSTGRES_PASSWORD},
+            db_type         => 'postgres',
+            available       => 1,
+            is_production   => 1,
+            metadata        => {
+                display_name  => 'New Production PostgreSQL (' . ($ENV{MIGRATION_POSTGRES_HOST}||'192.168.1.20') . ')',
+                description   => 'New production PostgreSQL — accounting schema target',
+                warning_level => 'high',
+            },
+        };
+    }
+
+    if ($ENV{COMSERV_DB_DEV_HOST} && $ENV{COMSERV_DB_DEV_PASSWORD}) {
+        push @envs, {
+            environment     => 'dev',
+            connection_name => 'Dev DB',
+            host            => $ENV{COMSERV_DB_DEV_HOST},
+            port            => $ENV{COMSERV_DB_DEV_PORT} || 3306,
+            database        => $ENV{COMSERV_DB_DEV_DATABASE} || '',
+            username        => $ENV{COMSERV_DB_DEV_USERNAME} || 'root',
+            password        => $ENV{COMSERV_DB_DEV_PASSWORD},
+            db_type         => lc($ENV{COMSERV_DB_DEV_DB_TYPE} || 'mysql'),
+            available       => 1,
+            is_production   => 0,
+            metadata        => {
+                display_name  => $ENV{COMSERV_DB_DEV_DISPLAY_NAME} || 'Dev DB (' . $ENV{COMSERV_DB_DEV_HOST} . ')',
+                description   => 'Development database — safe to overwrite',
+                warning_level => 'low',
+            },
+        };
+    }
+
+    return \@envs;
+}
+
+sub _write_mysql_cnf {
+    my ($host, $port, $user, $pass) = @_;
+    my $tmp = sprintf('/tmp/dbsync_%d_%d.cnf', $$, int(rand(999999)));
+    open my $fh, '>', $tmp or die "Cannot write $tmp: $!";
+    print $fh "[client]\nhost=$host\nport=$port\nuser=$user\npassword=$pass\n";
+    close $fh;
+    chmod 0600, $tmp;
+    return $tmp;
+}
+
+sub database_sync :Path('/admin/database-sync') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $envs          = $self->_get_sync_environments($c);
+    my $active_env    = $ENV{COMSERV_ACTIVE_DB_ENV} || 'production';
+    my $repl_status   = $self->_get_replication_status($c);
+
+    my $last_sync = undef;
+    my $last_file = '/tmp/db_last_sync.json';
+    if (-f $last_file) {
+        my $json = do { local $/; open my $fh, '<', $last_file or die; <$fh> };
+        $last_sync = eval { JSON::decode_json($json) };
+    }
+
+    $c->stash(
+        available_environments => $envs,
+        active_environment     => $active_env,
+        replication_status     => $repl_status,
+        last_sync              => $last_sync,
+        template               => 'admin/database-sync/index.tt',
+    );
+}
+
+sub _get_replication_status {
+    my ($self, $c) = @_;
+
+    return undef unless $ENV{MIGRATION_MYSQL_PASSWORD};
+
+    my $host = $ENV{MIGRATION_MYSQL_HOST} || '192.168.1.20';
+    my $port = $ENV{MIGRATION_MYSQL_PORT} || 3306;
+    my $user = $ENV{MIGRATION_MYSQL_USER} || 'root';
+    my $pass = $ENV{MIGRATION_MYSQL_PASSWORD};
+
+    my $status = eval {
+        my $dsn = "DBI:mysql:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $pass, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+            mysql_connect_timeout => 5,
+        });
+        my $row = $dbh->selectrow_hashref('SHOW SLAVE STATUS') //
+                  $dbh->selectrow_hashref('SHOW REPLICA STATUS');
+        $dbh->disconnect();
+        $row;
+    };
+    return $status;
+}
+
+sub database_replication_status :Path('/admin/database-replication-status') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+    my $status = $self->_get_replication_status($c);
+    if ($status) {
+        $c->response->body(JSON::encode_json({
+            running       => ($status->{Slave_IO_Running}  eq 'Yes' && $status->{Slave_SQL_Running} eq 'Yes') ? 1 : 0,
+            io_running    => $status->{Slave_IO_Running}  || 'No',
+            sql_running   => $status->{Slave_SQL_Running} || 'No',
+            seconds_behind => $status->{Seconds_Behind_Master} // 'N/A',
+            master_host   => $status->{Master_Host} || '',
+            master_log    => $status->{Master_Log_File} || '',
+            error         => $status->{Last_Error} || '',
+        }));
+    } else {
+        $c->response->body(JSON::encode_json({ running => 0, io_running => 'Not configured', sql_running => 'Not configured', seconds_behind => 'N/A' }));
+    }
+}
+
+sub database_sync_trigger :Path('/admin/database-sync/trigger') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('{"error":"Method not allowed"}');
+        return;
+    }
+
+    my $fh  = $c->req->body;
+    my $raw = ref($fh) ? do { local $/; <$fh> } : ($fh // '{}');
+    my $body = eval { JSON::decode_json($raw) } // {};
+
+    my $source_key  = $body->{source_env}  // '';
+    my $target_key  = $body->{target_env}  // '';
+    my $dry_run     = $body->{dry_run}     ? 1 : 0;
+    my $schema_only = $body->{schema_only} ? 1 : 0;
+    my $tables_str  = $body->{tables}      // '';
+    my $database    = $body->{database}    // '';
+
+    if ($source_key eq $target_key) {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => 'Source and target must be different' }));
+        return;
+    }
+
+    my $envs    = $self->_get_sync_environments($c);
+    my %env_map = map { $_->{environment} => $_ } @$envs;
+
+    my $src = $env_map{$source_key};
+    my $tgt = $env_map{$target_key};
+
+    unless ($src && $tgt) {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => "Unknown environment: source='$source_key' target='$target_key'" }));
+        return;
+    }
+
+    unless ($src->{db_type} eq 'mysql' && $tgt->{db_type} eq 'mysql') {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => 'Only MySQL/MariaDB→MySQL/MariaDB sync is supported at this time' }));
+        return;
+    }
+
+    my $output = '';
+    my $success = 0;
+
+    if ($dry_run) {
+        my ($src_info, $tgt_info);
+        eval {
+            my $src_cnf = _write_mysql_cnf($src->{host}, $src->{port}, $src->{username}, $src->{password});
+            my $tgt_cnf = _write_mysql_cnf($tgt->{host}, $tgt->{port}, $tgt->{username}, $tgt->{password});
+
+            my @src_lines = `mysql --defaults-file=$src_cnf -e "SELECT TABLE_SCHEMA,COUNT(*) c FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('information_schema','performance_schema','sys','mysql') GROUP BY TABLE_SCHEMA" 2>&1`;
+            my @tgt_lines = `mysql --defaults-file=$tgt_cnf -e "SELECT TABLE_SCHEMA,COUNT(*) c FROM information_schema.TABLES WHERE TABLE_SCHEMA NOT IN ('information_schema','performance_schema','sys','mysql') GROUP BY TABLE_SCHEMA" 2>&1`;
+
+            unlink $src_cnf, $tgt_cnf;
+
+            $output  = "=== DRY RUN — No data will be moved ===\n\n";
+            $output .= "SOURCE: $src->{metadata}{display_name}\n";
+            $output .= join('', @src_lines) . "\n";
+            $output .= "TARGET: $tgt->{metadata}{display_name}\n";
+            $output .= join('', @tgt_lines) . "\n";
+            $output .= "=== Sync would copy: source → target ===\n";
+            $output .= $schema_only ? "Mode: SCHEMA ONLY (no data)\n" : "Mode: FULL (schema + data)\n";
+            $output .= $tables_str  ? "Tables: $tables_str\n"         : "Tables: ALL\n";
+            $success = 1;
+        };
+        if ($@) {
+            $output = "Dry-run error: $@";
+        }
+    } else {
+        eval {
+            my $src_cnf  = _write_mysql_cnf($src->{host}, $src->{port}, $src->{username}, $src->{password});
+            my $tgt_cnf  = _write_mysql_cnf($tgt->{host}, $tgt->{port}, $tgt->{username}, $tgt->{password});
+            my $dump_file = sprintf('/tmp/dbsync_%d_%d.sql', $$, time());
+
+            my @dump_opts = ('--single-transaction', '--quick', '--routines', '--triggers');
+            push @dump_opts, '--no-data'           if $schema_only;
+            push @dump_opts, '--all-databases'     unless $database;
+            push @dump_opts, $database             if $database;
+            if ($tables_str && $database) {
+                push @dump_opts, '--tables', split(/\s*,\s*/, $tables_str);
+            }
+
+            my $dump_cmd = sprintf(
+                'mysqldump --defaults-file=%s %s > %s 2>&1',
+                $src_cnf, join(' ', @dump_opts), $dump_file
+            );
+
+            $output = "Dumping from $src->{metadata}{display_name}...\n";
+            my $dump_rc = system($dump_cmd);
+
+            if ($dump_rc != 0) {
+                unlink $src_cnf, $tgt_cnf, $dump_file;
+                die "mysqldump failed (exit $dump_rc). Check credentials and connectivity.\n";
+            }
+
+            my $dump_size = -s $dump_file;
+            $output .= sprintf("Dump complete: %.1f MB\n", $dump_size / 1_048_576);
+            $output .= "Restoring to $tgt->{metadata}{display_name}...\n";
+
+            my $restore_cmd = sprintf(
+                'mysql --defaults-file=%s < %s 2>&1',
+                $tgt_cnf, $dump_file
+            );
+            my $restore_out = `$restore_cmd`;
+            my $restore_rc  = $?;
+
+            unlink $src_cnf, $tgt_cnf, $dump_file;
+
+            if ($restore_rc != 0) {
+                die "mysql restore failed: $restore_out\n";
+            }
+
+            $output .= "Restore complete.\n";
+            $output .= $restore_out if $restore_out;
+            $success = 1;
+        };
+        if ($@) {
+            $output .= "\nERROR: $@";
+        }
+    }
+
+    my $ts = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $last = { timestamp => $ts, source_env => $source_key, target_env => $target_key, success => $success, dry_run => $dry_run };
+    eval {
+        open my $fh, '>', '/tmp/db_last_sync.json';
+        print $fh JSON::encode_json($last);
+        close $fh;
+    };
+
+    $self->logging->log_with_details($c, $success ? 'info' : 'error', __FILE__, __LINE__,
+        'database_sync_trigger',
+        "DB sync $source_key→$target_key dry=$dry_run success=$success");
+
+    $c->response->body(JSON::encode_json({ success => $success, output => $output }));
+}
+
+sub database_switch_env :Path('/admin/database-switch-env') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json; charset=utf-8');
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('{"error":"Method not allowed"}');
+        return;
+    }
+
+    my $fh  = $c->req->body;
+    my $raw = ref($fh) ? do { local $/; <$fh> } : ($fh // '{}');
+    my $body = eval { JSON::decode_json($raw) } // {};
+    my $env  = $body->{environment} // '';
+
+    unless ($env =~ /^[a-z_]+$/) {
+        $c->response->status(400);
+        $c->response->body(JSON::encode_json({ error => 'Invalid environment name' }));
+        return;
+    }
+
+    require Comserv::Util::EnvFileManager;
+    my $mgr = Comserv::Util::EnvFileManager->new(env_path => $c->path_to('.env')->stringify);
+    eval {
+        my $vars = $mgr->read_env_file();
+        $vars->{COMSERV_ACTIVE_DB_ENV} = $env;
+        $mgr->write_env_file($vars);
+        $ENV{COMSERV_ACTIVE_DB_ENV} = $env;
+    };
+    if ($@) {
+        $c->response->status(500);
+        $c->response->body(JSON::encode_json({ error => "Failed to save: $@" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'database_switch_env',
+        "Active DB environment switched to '$env'");
+    $c->response->body(JSON::encode_json({ success => 1, active_environment => $env }));
+}
+
 =head1 AUTHOR
 
 Shanta McBain

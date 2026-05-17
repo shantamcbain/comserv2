@@ -1,357 +1,351 @@
 [% META
-    title = "Database Synchronization"
-    description = "Synchronize database schemas and data between environments"
+    title = "Database Sync & Replication"
+    description = "Synchronize databases between environments and monitor replication"
     roles = "admin"
     TemplateType = "Application"
     category = "admin"
-    page_version = "1.0"
-    last_updated = "Sun Feb 02 10:00:00 AM PST 2026"
+    page_version = "2.0"
+    last_updated = "2026-05-17"
     site_specific = "true"
 %]
 
 <style>
-.env-production {
-    border-left: 4px solid #dc3545;
-    background-color: #fff5f5;
-}
-
-.env-staging {
-    border-left: 4px solid #ffc107;
-    background-color: #fffef5;
-}
-
-.env-dev {
-    border-left: 4px solid #28a745;
-    background-color: #f5fff5;
-}
-
-.env-badge {
-    padding: 4px 12px;
-    border-radius: 4px;
-    font-weight: bold;
-    font-size: 0.85rem;
-}
-
-.env-badge-production {
-    background-color: var(--danger-color, #dc3545);
-    color: white;
-}
-
-.env-badge-staging {
-    background-color: #ffc107;
-    color: var(--text-color, #333);
-}
-
-.env-badge-dev {
-    background-color: var(--success-color, #28a745);
-    color: white;
-}
-
-.sync-output {
-    background-color: #1e1e1e;
-    color: #d4d4d4;
-    font-family: 'Courier New', monospace;
-    font-size: 0.85rem;
-    padding: 15px;
-    border-radius: 4px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.sync-option-card {
-    transition: border-color 0.3s;
-}
-
-.sync-option-card:hover {
-    border-color: #007bff;
-}
+.env-card { border-radius:6px; padding:14px 16px; margin-bottom:10px; border:1px solid var(--border-color); }
+.env-critical { border-left:5px solid #dc3545; background:color-mix(in srgb,#dc3545 8%,var(--bg-color)); }
+.env-high     { border-left:5px solid #fd7e14; background:color-mix(in srgb,#fd7e14 8%,var(--bg-color)); }
+.env-low      { border-left:5px solid #28a745; background:color-mix(in srgb,#28a745 8%,var(--bg-color)); }
+.warn-badge   { font-size:0.75em; padding:2px 8px; border-radius:10px; font-weight:bold; }
+.warn-critical { background:#dc3545; color:#fff; }
+.warn-high     { background:#fd7e14; color:#fff; }
+.warn-low      { background:#28a745; color:#fff; }
+.sync-console  { background:#1a1a2e; color:#d4d4d4; font-family:monospace; font-size:0.83em; padding:14px; border-radius:6px; max-height:380px; overflow-y:auto; white-space:pre-wrap; }
+.repl-row      { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
+.repl-stat     { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:10px 16px; flex:1; min-width:140px; }
+.repl-stat strong { display:block; font-size:0.8em; color:var(--text-muted-color,#888); margin-bottom:4px; }
+.repl-stat span   { font-size:1.1em; font-weight:600; }
+.env-active-badge { background:var(--primary-color,#007bff); color:#fff; padding:2px 10px; border-radius:10px; font-size:0.78em; margin-left:8px; vertical-align:middle; }
 </style>
 
-<div class="container mt-4">
-    <div class="row">
-        <div class="col-md-12">
-            <h1>Database Synchronization</h1>
-            <p class="text-muted">Synchronize database schemas and data between environments</p>
-            
-            <div class="alert alert-warning">
-                <i class="fas fa-exclamation-triangle"></i> 
-                <strong>Important:</strong> Database synchronization can overwrite data. 
-                Always test with --dry-run first and ensure you have backups.
-            </div>
+<div style="max-width:980px;margin:0 auto;padding:16px;">
+
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;padding-bottom:12px;border-bottom:2px solid var(--primary-color);">
+        <h1 style="margin:0;font-size:1.4em;">🔄 Database Sync &amp; Replication</h1>
+        <div style="display:flex;gap:8px;">
+            <a href="[% c.uri_for('/admin/schema_compare') %]"
+               style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">← Schema Compare</a>
+            <a href="[% c.uri_for('/admin/environment_variables') %]"
+               style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Env Variables</a>
         </div>
     </div>
 
-    <!-- Active Environment Indicator -->
-    <div class="row mt-3">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-body">
-                    <h5 class="card-title">Current Active Environment</h5>
-                    <p>
-                        <span class="env-badge env-badge-[% active_environment %]">
-                            [% active_environment.ucfirst %]
-                        </span>
-                    </p>
-                    <small class="text-muted">
-                        This is the default database environment for operations. 
-                        You can override this for specific sync operations below.
-                    </small>
+    <!-- ── Replication Status ── -->
+    <details open style="border:1px solid var(--border-color);border-radius:6px;margin-bottom:16px;">
+        <summary style="padding:10px 16px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);border-radius:6px;">
+            📡 Replication Status — New Production (192.168.1.20)
+            <button type="button" onclick="refreshReplication(event)"
+                    style="margin-left:12px;padding:2px 10px;font-size:0.78em;background:var(--primary-color);color:#fff;border:none;border-radius:3px;cursor:pointer;">↺ Refresh</button>
+        </summary>
+        <div style="padding:16px;" id="repl-panel">
+            [% IF replication_status %]
+            <div class="repl-row">
+                <div class="repl-stat">
+                    <strong>IO Thread</strong>
+                    <span style="color:[% replication_status.Slave_IO_Running == 'Yes' ? '#28a745' : '#dc3545' %]">
+                        [% replication_status.Slave_IO_Running || 'Unknown' %]
+                    </span>
+                </div>
+                <div class="repl-stat">
+                    <strong>SQL Thread</strong>
+                    <span style="color:[% replication_status.Slave_SQL_Running == 'Yes' ? '#28a745' : '#dc3545' %]">
+                        [% replication_status.Slave_SQL_Running || 'Unknown' %]
+                    </span>
+                </div>
+                <div class="repl-stat">
+                    <strong>Seconds Behind Master</strong>
+                    <span>[% replication_status.Seconds_Behind_Master ?? 'N/A' %]</span>
+                </div>
+                <div class="repl-stat">
+                    <strong>Master Host</strong>
+                    <span style="font-size:0.9em;">[% replication_status.Master_Host || 'Not set' %]</span>
                 </div>
             </div>
+            [% IF replication_status.Last_Error %]
+            <div style="background:color-mix(in srgb,#dc3545 12%,var(--bg-color));border:1px solid #dc3545;border-radius:4px;padding:8px 12px;font-size:0.85em;">
+                <strong>Last Error:</strong> [% replication_status.Last_Error | html %]
+            </div>
+            [% END %]
+            [% ELSE %]
+            <div style="color:var(--text-muted-color);font-size:0.88em;padding:8px 0;">
+                <strong>Not configured</strong> — Replication is not set up on the new server yet.
+                To set up replication, the old production server must be configured as a binary-log master.
+                <a href="#repl-setup-guide" style="color:var(--primary-color);margin-left:8px;">Setup guide ↓</a>
+            </div>
+            [% END %]
         </div>
-    </div>
+    </details>
 
-    <!-- Available Environments -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <h4>Available Environments</h4>
-            <div class="row">
-                [% FOREACH env IN available_environments %]
-                <div class="col-md-4 mb-3">
-                    <div class="card env-[% env.environment %]">
-                        <div class="card-body">
-                            <h5 class="card-title">
-                                [% env.metadata.display_name %]
-                                <span class="badge badge-[% env.available ? 'success' : 'secondary' %] float-right">
-                                    [% env.available ? 'Available' : 'Not Configured' %]
-                                </span>
-                            </h5>
-                            <p class="card-text"><small>[% env.metadata.description %]</small></p>
-                            [% IF env.available %]
-                            <p class="mb-1"><small><strong>Connection:</strong> [% env.connection_name %]</small></p>
-                            <p class="mb-0"><small><strong>Warning Level:</strong> [% env.metadata.warning_level.ucfirst %]</small></p>
-                            [% END %]
-                        </div>
-                    </div>
+    <!-- ── Available Environments ── -->
+    <details open style="border:1px solid var(--border-color);border-radius:6px;margin-bottom:16px;">
+        <summary style="padding:10px 16px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);border-radius:6px;">
+            🖥️ Available Environments
+            <span style="font-size:0.8em;font-weight:normal;margin-left:8px;color:var(--text-muted-color);">Active: <strong>[% active_environment %]</strong></span>
+        </summary>
+        <div style="padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;">
+            [% FOREACH env IN available_environments %]
+            <div class="env-card env-[% env.metadata.warning_level %]">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
+                    <strong style="font-size:0.95em;">[% env.metadata.display_name | html %]</strong>
+                    <span class="warn-badge warn-[% env.metadata.warning_level %]">[% env.metadata.warning_level | ucfirst %]</span>
                 </div>
+                <div style="font-size:0.82em;color:var(--text-muted-color);margin-bottom:8px;">[% env.metadata.description | html %]</div>
+                <div style="font-size:0.8em;">
+                    <code>[% env.host %]:[% env.port %]</code> · <em>[% env.db_type | ucfirst %]</em>
+                    [% IF env.database %] · <em>[% env.database %]</em>[% END %]
+                </div>
+                [% IF env.environment == active_environment %]
+                <span class="env-active-badge">★ Active</span>
+                [% ELSE %]
+                <button type="button" onclick="switchEnv('[% env.environment %]')"
+                        style="margin-top:8px;padding:2px 10px;font-size:0.78em;background:var(--bg-secondary);border:1px solid var(--border-color);border-radius:3px;cursor:pointer;">
+                    Set as Active
+                </button>
                 [% END %]
             </div>
+            [% END %]
+            [% IF !available_environments.size %]
+            <p style="color:var(--text-muted-color);font-size:0.88em;grid-column:1/-1;">
+                No environments configured. Set <code>COMSERV_DB_PRODUCTION_SERVER_*</code>, <code>MIGRATION_MYSQL_*</code>, or <code>COMSERV_DB_DEV_*</code> variables in
+                <a href="[% c.uri_for('/admin/environment_variables') %]">Environment Variables</a>.
+            </p>
+            [% END %]
         </div>
-    </div>
+    </details>
 
-    <!-- Database Sync Form -->
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="fas fa-sync"></i> Trigger Database Sync</h5>
+    <!-- ── Sync Form ── -->
+    <details open style="border:1px solid var(--border-color);border-radius:6px;margin-bottom:16px;">
+        <summary style="padding:10px 16px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);border-radius:6px;">
+            🔄 Trigger Database Sync
+        </summary>
+        <div style="padding:16px;">
+            <div style="background:color-mix(in srgb,#ffc107 12%,var(--bg-color));border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:16px;font-size:0.86em;">
+                ⚠️ <strong>Always run Dry Run first.</strong> A real sync overwrites all data in the target database.
+                Never sync <em>to</em> Old Production without explicit confirmation.
+            </div>
+
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+                <div>
+                    <label style="font-weight:bold;display:block;margin-bottom:6px;">Source (copy FROM)</label>
+                    <select id="sourceEnv" style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);">
+                        [% FOREACH env IN available_environments %]
+                        [% IF env.db_type == 'mysql' %]
+                        <option value="[% env.environment %]">[% env.metadata.display_name | html %]</option>
+                        [% END %]
+                        [% END %]
+                    </select>
                 </div>
-                <div class="card-body">
-                    <form id="syncForm">
-                        <div class="row">
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="sourceEnv">Source Environment</label>
-                                    <select class="form-control" id="sourceEnv" name="source_env">
-                                        [% FOREACH env IN available_environments %]
-                                        [% IF env.available %]
-                                        <option value="[% env.environment %]" [% env.environment == 'production' ? 'selected' : '' %]>
-                                            [% env.metadata.display_name %]
-                                        </option>
-                                        [% END %]
-                                        [% END %]
-                                    </select>
-                                    <small class="form-text text-muted">Database to copy FROM</small>
-                                </div>
-                            </div>
-                            
-                            <div class="col-md-6">
-                                <div class="form-group">
-                                    <label for="targetEnv">Target Environment</label>
-                                    <select class="form-control" id="targetEnv" name="target_env">
-                                        [% FOREACH env IN available_environments %]
-                                        [% IF env.available %]
-                                        <option value="[% env.environment %]" [% env.environment == 'dev' ? 'selected' : '' %]>
-                                            [% env.metadata.display_name %]
-                                        </option>
-                                        [% END %]
-                                        [% END %]
-                                    </select>
-                                    <small class="form-text text-muted">Database to copy TO (will be overwritten)</small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <h6>Sync Options</h6>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-4">
-                                <div class="card sync-option-card mb-3">
-                                    <div class="card-body">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="dryRun" name="dry_run" checked>
-                                            <label class="form-check-label" for="dryRun">
-                                                <strong>Dry Run</strong>
-                                            </label>
-                                        </div>
-                                        <small class="text-muted">Preview changes without applying them</small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <div class="card sync-option-card mb-3">
-                                    <div class="card-body">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="schemaOnly" name="schema_only">
-                                            <label class="form-check-label" for="schemaOnly">
-                                                <strong>Schema Only</strong>
-                                            </label>
-                                        </div>
-                                        <small class="text-muted">Sync table structure without data</small>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="col-md-4">
-                                <div class="card sync-option-card mb-3">
-                                    <div class="card-body">
-                                        <div class="form-check">
-                                            <input class="form-check-input" type="checkbox" id="anonymize" name="anonymize" checked>
-                                            <label class="form-check-label" for="anonymize">
-                                                <strong>Anonymize Data</strong>
-                                            </label>
-                                        </div>
-                                        <small class="text-muted">Anonymize sensitive information</small>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row">
-                            <div class="col-md-12">
-                                <div class="form-group">
-                                    <label for="tables">Specific Tables (optional)</label>
-                                    <input type="text" class="form-control" id="tables" name="tables" 
-                                           placeholder="Leave empty for all tables, or enter comma-separated list: users,projects,todos">
-                                    <small class="form-text text-muted">
-                                        Comma-separated list of table names to sync. Leave empty to sync all tables.
-                                    </small>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div class="row mt-3">
-                            <div class="col-md-12">
-                                <button type="button" id="btnTriggerSync" class="btn btn-primary btn-lg">
-                                    <i class="fas fa-play"></i> Trigger Sync
-                                </button>
-                                <button type="reset" class="btn btn-secondary btn-lg">
-                                    <i class="fas fa-redo"></i> Reset
-                                </button>
-                            </div>
-                        </div>
-                    </form>
+                <div>
+                    <label style="font-weight:bold;display:block;margin-bottom:6px;">Target (copy TO — will be overwritten)</label>
+                    <select id="targetEnv" style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:4px;background:var(--bg-color);color:var(--text-color);">
+                        [% FOREACH env IN available_environments %]
+                        [% IF env.db_type == 'mysql' %]
+                        <option value="[% env.environment %]"
+                            [% IF env.environment == 'new_production' %]selected[% END %]>[% env.metadata.display_name | html %]</option>
+                        [% END %]
+                        [% END %]
+                    </select>
                 </div>
             </div>
-        </div>
-    </div>
 
-    <!-- Sync Output -->
-    <div class="row mt-4" id="syncOutputContainer" style="display: none;">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Sync Output</h5>
-                </div>
-                <div class="card-body">
-                    <div id="syncStatus" class="alert alert-info mb-3">
-                        <i class="fas fa-spinner fa-spin"></i> Sync in progress...
-                    </div>
-                    <pre id="syncOutput" class="sync-output"></pre>
-                </div>
+            <div style="margin-bottom:16px;">
+                <label style="font-weight:bold;display:block;margin-bottom:6px;">Database name (leave blank for all databases)</label>
+                <input type="text" id="database" placeholder="e.g. ency   or   forager"
+                       style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:4px;box-sizing:border-box;background:var(--bg-color);color:var(--text-color);">
+                <small style="color:var(--text-muted-color);font-size:0.8em;">Syncing a single database is faster and safer than --all-databases</small>
+            </div>
+
+            <div style="margin-bottom:16px;">
+                <label style="font-weight:bold;display:block;margin-bottom:6px;">Specific tables (optional, comma-separated — requires database name above)</label>
+                <input type="text" id="tables" placeholder="e.g. todo, project, log"
+                       style="width:100%;padding:7px 10px;border:1px solid var(--border-color);border-radius:4px;box-sizing:border-box;background:var(--bg-color);color:var(--text-color);">
+            </div>
+
+            <div style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap;">
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;">
+                    <input type="checkbox" id="dryRun" checked style="width:16px;height:16px;">
+                    <span><strong>Dry Run</strong> — preview without moving data</span>
+                </label>
+                <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.9em;">
+                    <input type="checkbox" id="schemaOnly" style="width:16px;height:16px;">
+                    <span><strong>Schema Only</strong> — structure without data</span>
+                </label>
+            </div>
+
+            <div style="display:flex;gap:10px;">
+                <button type="button" id="btnSync"
+                        style="padding:8px 20px;background:var(--primary-color);color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:0.92em;font-weight:bold;">
+                    ▶ Run Sync
+                </button>
+                <button type="button" onclick="document.getElementById('syncOutputContainer').style.display='none';"
+                        style="padding:8px 16px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;font-size:0.88em;background:var(--bg-secondary);">
+                    Clear Output
+                </button>
+            </div>
+
+            <div id="syncOutputContainer" style="display:none;margin-top:16px;">
+                <div id="syncStatus" style="padding:10px 14px;border-radius:4px;margin-bottom:10px;font-size:0.88em;"></div>
+                <pre id="syncOutput" class="sync-console"></pre>
             </div>
         </div>
-    </div>
+    </details>
 
-    <!-- Last Sync Info -->
+    <!-- ── Last Sync ── -->
     [% IF last_sync %]
-    <div class="row mt-4">
-        <div class="col-md-12">
-            <div class="card">
-                <div class="card-header">
-                    <h5 class="mb-0">Last Sync</h5>
-                </div>
-                <div class="card-body">
-                    <p><strong>Time:</strong> [% last_sync.timestamp %]</p>
-                    <p><strong>Source:</strong> [% last_sync.source_env %] → <strong>Target:</strong> [% last_sync.target_env %]</p>
-                    <p><strong>Status:</strong> 
-                        <span class="badge badge-[% last_sync.success ? 'success' : 'danger' %]">
-                            [% last_sync.success ? 'Success' : 'Failed' %]
-                        </span>
-                    </p>
-                </div>
-            </div>
-        </div>
+    <div style="border:1px solid var(--border-color);border-radius:6px;padding:12px 16px;margin-bottom:16px;font-size:0.86em;background:var(--bg-secondary);">
+        <strong>Last Sync:</strong>
+        [% last_sync.timestamp %] —
+        [% last_sync.source_env %] → [% last_sync.target_env %]
+        [% IF last_sync.dry_run %]<em>(dry run)</em>[% END %]
+        <span style="margin-left:8px;padding:2px 8px;border-radius:10px;font-size:0.82em;
+                     background:[% last_sync.success ? '#28a745' : '#dc3545' %];color:#fff;">
+            [% last_sync.success ? 'Success' : 'Failed' %]
+        </span>
     </div>
     [% END %]
+
+    <!-- ── Replication Setup Guide ── -->
+    <details id="repl-setup-guide" style="border:1px solid var(--border-color);border-radius:6px;margin-bottom:16px;">
+        <summary style="padding:10px 16px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);border-radius:6px;">
+            📖 Replication Setup Guide (Old → New Production)
+        </summary>
+        <div style="padding:16px;font-size:0.87em;line-height:1.7;">
+            <p><strong>Step 1 — Enable binary logging on old production</strong> (SSH into 192.168.1.198):</p>
+            <pre style="background:#1a1a2e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:0.85em;"># Add to /etc/mysql/mariadb.conf.d/50-server.cnf
+[mysqld]
+server-id       = 1
+log_bin         = /var/log/mysql/mysql-bin.log
+binlog_do_db    = ency
+binlog_do_db    = forager
+expire_logs_days = 7
+
+sudo systemctl restart mariadb</pre>
+
+            <p><strong>Step 2 — Create a replication user on old production</strong>:</p>
+            <pre style="background:#1a1a2e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:0.85em;">CREATE USER 'repl'@'192.168.1.20' IDENTIFIED BY 'repl_strong_password';
+GRANT REPLICATION SLAVE ON *.* TO 'repl'@'192.168.1.20';
+FLUSH PRIVILEGES;</pre>
+
+            <p><strong>Step 3 — Initial data snapshot</strong> (run from this app via Sync form above, or manually):</p>
+            <pre style="background:#1a1a2e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:0.85em;">mysqldump -h 192.168.1.198 -u root -p --all-databases \
+  --master-data=2 --single-transaction > /tmp/prod_snapshot.sql
+mysql -h 192.168.1.20 -u root -p &lt; /tmp/prod_snapshot.sql</pre>
+
+            <p><strong>Step 4 — Start replication on new server</strong> (SSH into 192.168.1.20):</p>
+            <pre style="background:#1a1a2e;color:#d4d4d4;padding:10px;border-radius:4px;font-size:0.85em;"># Add to /etc/mysql/mariadb.conf.d/50-server.cnf
+server-id = 2
+read_only = 1   # optional — prevents accidental writes while replica
+
+sudo systemctl restart mariadb
+
+# Then in mysql:
+CHANGE MASTER TO
+  MASTER_HOST='192.168.1.198',
+  MASTER_USER='repl',
+  MASTER_PASSWORD='repl_strong_password',
+  MASTER_LOG_FILE='mysql-bin.000001',   -- from --master-data dump header
+  MASTER_LOG_POS=xxxx;                  -- from --master-data dump header
+START SLAVE;</pre>
+
+            <p><strong>Step 5 — Monitor</strong> via the Replication Status panel above. Once <code>Seconds_Behind_Master</code> reaches 0, the new server is fully caught up.</p>
+            <p><strong>Cutover:</strong> When ready, update <code>COMSERV_DB_PRODUCTION_SERVER_HOST</code> in Environment Variables to <code>192.168.1.20</code> and set it as the Active environment.</p>
+        </div>
+    </details>
+
 </div>
 
 <script>
-document.getElementById('btnTriggerSync').addEventListener('click', function() {
-    const form = document.getElementById('syncForm');
-    const formData = {
-        source_env: document.getElementById('sourceEnv').value,
-        target_env: document.getElementById('targetEnv').value,
-        dry_run: document.getElementById('dryRun').checked,
-        schema_only: document.getElementById('schemaOnly').checked,
-        anonymize: document.getElementById('anonymize').checked,
-        tables: document.getElementById('tables').value,
-    };
-    
-    if (formData.source_env === formData.target_env) {
-        alert('Source and target environments must be different!');
-        return;
-    }
-    
-    if (formData.target_env === 'production' && !formData.dry_run) {
-        const confirmed = confirm(
-            'WARNING: You are about to modify the PRODUCTION database!\n\n' +
-            'This operation will overwrite production data.\n\n' +
-            'Are you absolutely sure you want to proceed?'
-        );
-        if (!confirmed) {
+(function() {
+    document.getElementById('btnSync').addEventListener('click', function() {
+        var src = document.getElementById('sourceEnv').value;
+        var tgt = document.getElementById('targetEnv').value;
+        var dryRun     = document.getElementById('dryRun').checked;
+        var schemaOnly = document.getElementById('schemaOnly').checked;
+        var tables     = document.getElementById('tables').value.trim();
+        var database   = document.getElementById('database').value.trim();
+
+        if (src === tgt) {
+            alert('Source and target must be different!');
             return;
         }
-    }
-    
-    document.getElementById('syncOutputContainer').style.display = 'block';
-    document.getElementById('syncStatus').innerHTML = '<i class="fas fa-spinner fa-spin"></i> Sync in progress...';
-    document.getElementById('syncStatus').className = 'alert alert-info mb-3';
-    document.getElementById('syncOutput').textContent = '';
-    
-    fetch('[% c.uri_for("/admin/database-sync/trigger") %]', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(formData),
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.success) {
-            document.getElementById('syncStatus').innerHTML = '<i class="fas fa-check-circle"></i> Sync completed successfully!';
-            document.getElementById('syncStatus').className = 'alert alert-success mb-3';
-        } else {
-            document.getElementById('syncStatus').innerHTML = '<i class="fas fa-times-circle"></i> Sync failed!';
-            document.getElementById('syncStatus').className = 'alert alert-danger mb-3';
+        if (tgt === 'production' && !dryRun) {
+            if (!confirm('WARNING: You are about to OVERWRITE the OLD PRODUCTION database!\n\nAre you absolutely sure?')) return;
         }
-        
-        let output = data.output || '';
-        if (data.errors) {
-            output += '\n\n=== ERRORS ===\n' + data.errors;
-        }
-        
-        document.getElementById('syncOutput').textContent = output;
-    })
-    .catch(error => {
-        document.getElementById('syncStatus').innerHTML = '<i class="fas fa-times-circle"></i> Error: ' + error.message;
-        document.getElementById('syncStatus').className = 'alert alert-danger mb-3';
-        document.getElementById('syncOutput').textContent = 'Error occurred: ' + error.message;
+
+        var container = document.getElementById('syncOutputContainer');
+        var status    = document.getElementById('syncStatus');
+        var output    = document.getElementById('syncOutput');
+        container.style.display = 'block';
+        status.style.cssText = 'padding:10px 14px;border-radius:4px;margin-bottom:10px;font-size:0.88em;background:color-mix(in srgb,#007bff 12%,var(--bg-color));border:1px solid #007bff;';
+        status.textContent = '⏳ ' + (dryRun ? 'Running dry-run...' : 'Syncing — this may take several minutes for large databases...');
+        output.textContent = '';
+
+        fetch('[% c.uri_for("/admin/database-sync/trigger") %]', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ source_env: src, target_env: tgt, dry_run: dryRun, schema_only: schemaOnly, tables: tables, database: database }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.success) {
+                status.style.cssText = 'padding:10px 14px;border-radius:4px;margin-bottom:10px;font-size:0.88em;background:color-mix(in srgb,#28a745 12%,var(--bg-color));border:1px solid #28a745;';
+                status.textContent = '✅ ' + (dryRun ? 'Dry run complete' : 'Sync complete!');
+            } else {
+                status.style.cssText = 'padding:10px 14px;border-radius:4px;margin-bottom:10px;font-size:0.88em;background:color-mix(in srgb,#dc3545 12%,var(--bg-color));border:1px solid #dc3545;';
+                status.textContent = '❌ ' + (dryRun ? 'Dry run error' : 'Sync failed — see output below');
+            }
+            output.textContent = data.output || data.error || '';
+        })
+        .catch(function(err) {
+            status.style.cssText = 'padding:10px 14px;border-radius:4px;margin-bottom:10px;font-size:0.88em;background:color-mix(in srgb,#dc3545 12%,var(--bg-color));border:1px solid #dc3545;';
+            status.textContent = '❌ Network error: ' + err.message;
+        });
     });
-});
+
+    window.switchEnv = function(env) {
+        if (!confirm('Set "' + env + '" as the active DB environment?\n\nThis records your preference — the running app only uses the main COMSERV_DB_PRODUCTION_* vars.')) return;
+        fetch('[% c.uri_for("/admin/database-switch-env") %]', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ environment: env }),
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            if (d.success) { location.reload(); }
+            else { alert('Error: ' + (d.error || 'Unknown error')); }
+        });
+    };
+
+    window.refreshReplication = function(evt) {
+        evt.stopPropagation();
+        var panel = document.getElementById('repl-panel');
+        panel.style.opacity = '0.5';
+        fetch('[% c.uri_for("/admin/database-replication-status") %]')
+        .then(function(r) { return r.json(); })
+        .then(function(d) {
+            panel.style.opacity = '1';
+            var color = d.running ? '#28a745' : '#dc3545';
+            panel.innerHTML =
+                '<div class="repl-row">' +
+                '<div class="repl-stat"><strong>IO Thread</strong><span style="color:' + (d.io_running === 'Yes' ? '#28a745' : '#dc3545') + '">' + d.io_running + '</span></div>' +
+                '<div class="repl-stat"><strong>SQL Thread</strong><span style="color:' + (d.sql_running === 'Yes' ? '#28a745' : '#dc3545') + '">' + d.sql_running + '</span></div>' +
+                '<div class="repl-stat"><strong>Seconds Behind</strong><span>' + d.seconds_behind + '</span></div>' +
+                '<div class="repl-stat"><strong>Master</strong><span style="font-size:0.85em">' + (d.master_host || 'Not configured') + '</span></div>' +
+                '</div>' +
+                (d.error ? '<div style="color:#dc3545;font-size:0.85em;margin-top:6px;"><strong>Error:</strong> ' + d.error + '</div>' : '');
+        })
+        .catch(function(err) {
+            panel.style.opacity = '1';
+            panel.innerHTML = '<div style="color:#dc3545;">Could not fetch replication status: ' + err.message + '</div>';
+        });
+    };
+})();
 </script>
