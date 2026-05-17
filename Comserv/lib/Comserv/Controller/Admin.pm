@@ -6118,21 +6118,133 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+    my $pid_file  = "/tmp/docker-build-${service}.pid";
+
+    unlink $done_file if -f $done_file;
+    open(my $lf, '>', $log_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build log: $!" }));
+        $c->response->content_type('application/json');
+        return;
     };
-    
-    $c->response->body(encode_json($result));
+    print $lf "=== Build started at " . scalar(localtime) . " ===\n";
+    close $lf;
+
+    my $disk_pct = `df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}'`;
+    chomp $disk_pct;
+    if ($disk_pct =~ /^\d+$/ && $disk_pct >= 90) {
+        $c->response->body(encode_json({
+            success => \0,
+            error   => "Disk at ${disk_pct}% — not safe to build. Run Docker Cleanup first.",
+        }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $build_target = $service eq 'all' ? '' : $service;
+    my $script = <<"SHELL";
+#!/bin/bash
+LOG="$log_file"
+DONE="$done_file"
+cd /home/shanta/PycharmProjects/comserv2
+
+echo "--- Pre-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+docker builder prune -f --keep-storage 5GB >> "\$LOG" 2>&1
+
+DISK=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk before build: \${DISK}%" >> "\$LOG"
+
+echo "--- Building $service ---" >> "\$LOG"
+docker compose build --progress=plain $build_target >> "\$LOG" 2>&1
+EXIT=\$?
+
+echo "--- Post-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+
+DISK_AFTER=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk after build: \${DISK_AFTER}%" >> "\$LOG"
+echo "=== Build finished exit=\$EXIT at \$(date) ===" >> "\$LOG"
+echo \$EXIT > "\$DONE"
+SHELL
+
+    my $script_file = "/tmp/docker-build-${service}.sh";
+    open(my $sf, '>', $script_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build script: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    };
+    print $sf $script;
+    close $sf;
+    chmod 0755, $script_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => \0, error => "Fork failed: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+    if ($pid == 0) {
+        open(STDIN,  '<', '/dev/null');
+        open(STDOUT, '>>', $log_file);
+        open(STDERR, '>>', $log_file);
+        exec($script_file);
+        exit 1;
+    }
+    if (open(my $pf, '>', $pid_file)) { print $pf $pid; close $pf; }
+
+    $c->response->body(encode_json({
+        success  => \1,
+        async    => \1,
+        job_id   => $service,
+        message  => "Build started for $service (PID $pid). Poll /admin/docker-rebuild-status/$service for progress.",
+    }));
     $c->response->content_type('application/json');
+}
+
+sub docker_rebuild_status :Path('/admin/docker-rebuild-status') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild_status')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => \0, error => 'Access denied' }));
+        return;
+    }
+
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+
+    unless (-f $log_file) {
+        $c->response->body(encode_json({ success => \0, error => "No build in progress for $service" }));
+        return;
+    }
+
+    my $done     = -f $done_file;
+    my $exit_val = 0;
+    if ($done) {
+        if (open my $df, '<', $done_file) { chomp($exit_val = <$df> // 0); close $df; }
+    }
+
+    my $output = '';
+    if (open my $lf, '<', $log_file) {
+        local $/;
+        $output = <$lf>;
+        close $lf;
+    }
+
+    $c->response->body(encode_json({
+        success   => $done ? ($exit_val == 0 ? \1 : \0) : \1,
+        done      => $done ? \1 : \0,
+        exit_code => $exit_val + 0,
+        output    => $output,
+    }));
 }
 
 sub docker_prune :Path('/admin/docker-prune') :Args(0) {
