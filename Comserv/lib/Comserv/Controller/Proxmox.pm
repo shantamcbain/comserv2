@@ -1086,6 +1086,173 @@ sub available_ips :Path('available_ips') :Args(0) {
     $c->forward('View::JSON');
 }
 
+sub vm_detail :Path('vm_detail') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->flash->{error_msg} = 'Proxmox authentication failed.';
+        $c->response->redirect($c->uri_for('/proxmox'));
+        return;
+    }
+
+    my $config    = $proxmox->get_vm_config($vmid);
+    my $status    = $proxmox->get_vm_status($vmid);
+    my $snapshots = $proxmox->list_snapshots($vmid);
+    my $backups   = $proxmox->list_backups($vmid);
+
+    my $proxmox_host = '';
+    my $creds = Comserv::Util::ProxmoxCredentials::get_credentials($c->session->{proxmox_server_id});
+    if ($creds && $creds->{api_url_base}) {
+        ($proxmox_host = $creds->{api_url_base}) =~ s|/api2/json||;
+    }
+
+    $c->stash(
+        template     => 'proxmox/vm_detail.tt',
+        vmid         => $vmid,
+        vm_config    => $config,
+        vm_status    => $status,
+        snapshots    => $snapshots,
+        backups      => $backups,
+        proxmox_host => $proxmox_host,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub clone_vm_form :Path('clone_vm') :Args(1) {
+    my ($self, $c, $vmid) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'Proxmox management is restricted to CSC administrators.';
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->flash->{error_msg} = 'Proxmox authentication failed.';
+        $c->response->redirect($c->uri_for('/proxmox'));
+        return;
+    }
+
+    my $config  = $proxmox->get_vm_config($vmid);
+    my $next_id = $proxmox->get_next_vmid();
+
+    $c->stash(
+        template  => 'proxmox/vm_detail.tt',
+        vmid      => $vmid,
+        vm_config => $config,
+        next_vmid => $next_id,
+        show_clone_form => 1,
+    );
+    $c->forward($c->view('TT'));
+}
+
+sub clone_vm_action :Path('clone_vm_action') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid    = $c->req->params->{vmid}   or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
+    my $newid   = $c->req->params->{newid}  or do { $c->stash->{json} = { success => 0, error => 'newid required' }; $c->forward('View::JSON'); return; };
+    my $name    = $c->req->params->{name}   || '';
+    my $full    = $c->req->params->{full}   // 1;
+    my $storage = $c->req->params->{storage} || '';
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->clone_vm($vmid, $newid, $name, $full, $storage);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub snapshot_create :Path('snapshot_create') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid     = $c->req->params->{vmid}     or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
+    my $snapname = $c->req->params->{snapname} or do { $c->stash->{json} = { success => 0, error => 'snapname required' }; $c->forward('View::JSON'); return; };
+    my $desc     = $c->req->params->{description} || '';
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->create_snapshot($vmid, $snapname, $desc);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub snapshot_rollback :Path('snapshot_rollback') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid     = $c->req->params->{vmid}     or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
+    my $snapname = $c->req->params->{snapname} or do { $c->stash->{json} = { success => 0, error => 'snapname required' }; $c->forward('View::JSON'); return; };
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->rollback_snapshot($vmid, $snapname);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
+sub backup_restore :Path('backup_restore') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->is_csc_admin($c)) {
+        $c->stash->{json} = { success => 0, error => 'CSC admin required' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $vmid    = $c->req->params->{vmid}    or do { $c->stash->{json} = { success => 0, error => 'vmid required' }; $c->forward('View::JSON'); return; };
+    my $volid   = $c->req->params->{volid}   or do { $c->stash->{json} = { success => 0, error => 'volid required' }; $c->forward('View::JSON'); return; };
+    my $storage = $c->req->params->{storage} || '';
+
+    my $proxmox = $self->_init_proxmox($c);
+    unless ($proxmox->authenticate()) {
+        $c->stash->{json} = { success => 0, error => 'Proxmox authentication failed' };
+        $c->forward('View::JSON'); return;
+    }
+
+    my $result = $proxmox->restore_backup($vmid, $volid, $storage);
+    $c->stash->{json} = $result;
+    $c->forward('View::JSON');
+}
+
 =head1 AUTHOR
 
 Comserv

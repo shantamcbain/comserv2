@@ -2099,4 +2099,227 @@ sub upload_iso_to_proxmox {
     }
 }
 
+sub get_vm_status {
+    my ($self, $vmid) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return undef unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return undef;
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/status/current");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return undef unless $res->is_success;
+    my $data = eval { decode_json($res->decoded_content) };
+    return ($data && $data->{data}) ? $data->{data} : undef;
+}
+
+sub get_next_vmid {
+    my ($self) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return undef unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return undef;
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/cluster/nextid");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return undef unless $res->is_success;
+    my $data = eval { decode_json($res->decoded_content) };
+    return ($data && $data->{data}) ? $data->{data} : undef;
+}
+
+sub clone_vm {
+    my ($self, $vmid, $newid, $name, $full, $storage) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(60);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/clone";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+
+    my @parts = ("newid=" . uri_escape($newid));
+    push @parts, "name="    . uri_escape($name)    if $name;
+    push @parts, "full="    . ($full ? '1' : '0');
+    push @parts, "storage=" . uri_escape($storage)  if $storage;
+    $req->content(join('&', @parts));
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'clone_vm',
+        "clone_vm src=$vmid newid=$newid => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, task_id => ($data && $data->{data}) ? $data->{data} : '', vmid => $newid };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
+sub list_snapshots {
+    my ($self, $vmid) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/snapshot");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return [] unless $res->is_success;
+    my $data = eval { decode_json($res->decoded_content) };
+    return ($data && $data->{data}) ? $data->{data} : [];
+}
+
+sub create_snapshot {
+    my ($self, $vmid, $snapname, $description) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(30);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/snapshot";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+    my $body = "snapname=" . uri_escape($snapname);
+    $body .= "&description=" . uri_escape($description) if $description;
+    $req->content($body);
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'create_snapshot',
+        "create_snapshot vmid=$vmid name=$snapname => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, task_id => ($data && $data->{data}) ? $data->{data} : '' };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
+sub rollback_snapshot {
+    my ($self, $vmid, $snapname) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(60);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu/$vmid/snapshot/$snapname/rollback";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+    $req->content('');
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'rollback_snapshot',
+        "rollback_snapshot vmid=$vmid snap=$snapname => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, task_id => ($data && $data->{data}) ? $data->{data} : '' };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
+sub list_backups {
+    my ($self, $vmid) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(15);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
+
+    my $req = HTTP::Request->new(GET =>
+        $self->{api_url_base} . "/nodes/$node_name/storage");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return [] unless $res->is_success;
+    my $sdata = eval { decode_json($res->decoded_content) };
+    return [] unless $sdata && $sdata->{data};
+
+    my @backups;
+    for my $storage (@{ $sdata->{data} }) {
+        next unless ($storage->{content} || '') =~ /\bbackup\b/;
+        my $sid = $storage->{storage};
+        my $breq = HTTP::Request->new(GET =>
+            $self->{api_url_base} . "/nodes/$node_name/storage/$sid/content?content=backup");
+        $breq->header(Authorization => $auth_header);
+        my $bres = $ua->request($breq);
+        next unless $bres->is_success;
+        my $bdata = eval { decode_json($bres->decoded_content) };
+        next unless $bdata && $bdata->{data};
+        for my $item (@{ $bdata->{data} }) {
+            next unless defined $vmid ? ($item->{volid} =~ /vzdump-qemu-$vmid-/) : 1;
+            push @backups, { %$item, storage => $sid };
+        }
+    }
+    return \@backups;
+}
+
+sub restore_backup {
+    my ($self, $vmid, $volid, $storage) = @_;
+
+    my $logging = Comserv::Util::Logging->instance;
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return { success => 0, error => 'No API URL' } unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(120);
+    my $auth_header = $self->_auth_header()
+        or return { success => 0, error => 'No credentials' };
+    my $node_name = $self->_resolve_node($ua, $auth_header);
+
+    my $url = $self->{api_url_base} . "/nodes/$node_name/qemu";
+    my $req = HTTP::Request->new(POST => $url);
+    $req->header(Authorization  => $auth_header);
+    $req->header('Content-Type' => 'application/x-www-form-urlencoded');
+
+    my $body = "vmid=" . uri_escape($vmid)
+             . "&archive=" . uri_escape($volid)
+             . "&force=1";
+    $body .= "&storage=" . uri_escape($storage) if $storage;
+    $req->content($body);
+
+    my $res = $ua->request($req);
+    $logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'restore_backup',
+        "restore_backup vmid=$vmid volid=$volid => " . $res->status_line);
+
+    if ($res->is_success) {
+        my $data = eval { decode_json($res->decoded_content) };
+        return { success => 1, task_id => ($data && $data->{data}) ? $data->{data} : '' };
+    } else {
+        return { success => 0, error => "Proxmox API error (${\$res->code}): " . $res->decoded_content };
+    }
+}
+
 1;

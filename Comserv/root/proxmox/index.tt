@@ -105,7 +105,9 @@
                         <button type="button" class="vm-btn vm-btn-stop"   onclick="vmPower('[% vm.vmid %]','shutdown','[% vm.name | html %]')" title="Shut down">■</button>
                         <button type="button" class="vm-btn vm-btn-reboot" onclick="vmPower('[% vm.vmid %]','reboot','[% vm.name | html %]')"   title="Reboot">↺</button>
                         [% END %]
+                        <a href="[% c.uri_for('/proxmox/vm_detail') %]/[% vm.vmid %]" class="vm-btn" style="background:#555;color:#fff;" title="VM Details">🔍</a>
                         <a href="[% c.uri_for('/proxmox/edit_vm') %]/[% vm.vmid %]" class="vm-btn vm-btn-edit" title="Edit VM">✎</a>
+                        <a href="[% c.uri_for('/proxmox/clone_vm') %]/[% vm.vmid %]" class="vm-btn" style="background:#9c27b0;color:#fff;" title="Clone VM">⎘</a>
                         <button type="button" class="vm-btn" onclick="showIsoPanel('[% vm.vmid %]', '[% vm.name | html %]')" title="CD/DVD ISO">💿</button>
                         [% IF proxmox_host %]
                         <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vm.vmid %]:4::::" target="_blank" class="vm-btn vm-btn-console" title="Open console">⊡</a>
