@@ -2421,14 +2421,14 @@ sub get_database_comparison {
         postgres_databases => [],
         migration_mysql => {
             name => 'migration_mysql',
-            display_name => 'New Server — MySQL Docker (192.168.1.20:3307)',
+            display_name => 'New Server — MySQL (192.168.1.20:3306)',
             connection_status => 'unknown',
             error => undef,
             databases => []
         },
         migration_postgres => {
             name => 'migration_postgres',
-            display_name => 'New Server — PostgreSQL Docker (192.168.1.20:5433)',
+            display_name => 'New Server — PostgreSQL (192.168.1.20:5432)',
             connection_status => 'unknown',
             error => undef,
             databases => []
@@ -6967,14 +6967,14 @@ sub get_migration_mysql_info {
     my ($self, $c) = @_;
 
     my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
-    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3306;
     my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'root';
     my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
 
     unless ($password) {
         return {
             connection_status => 'error',
-            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env (value from MYSQL_ROOT_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — use the Set Password button to save it',
             databases => [],
         };
     }
@@ -7018,14 +7018,14 @@ sub get_migration_postgres_info {
     my ($self, $c) = @_;
 
     my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
-    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5432;
     my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
     my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
 
     unless ($password) {
         return {
             connection_status => 'error',
-            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env (value from POSTGRES_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — use the Set Password button to save it',
             databases => [],
         };
     }
