@@ -182,7 +182,7 @@
         [% FOREACH bk IN backups %]
         <tr>
             <td style="font-size:0.85em;">[% bk.volid | html %]</td>
-            <td>[% bk.size ? (bk.size / 1073741824) | format('%.1f') _ ' GB' : 'N/A' %]</td>
+            <td>[% IF bk.size %][% (bk.size / 1073741824) | format('%.1f') %] GB[% ELSE %]N/A[% END %]</td>
             <td>[% bk.ctime ? bk.ctime : '' %]</td>
             <td>[% bk.storage | html %]</td>
             <td>
