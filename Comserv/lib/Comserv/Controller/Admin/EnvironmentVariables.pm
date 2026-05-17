@@ -4,6 +4,7 @@ use Moose;
 use namespace::autoclean;
 use Try::Tiny;
 use POSIX qw(strftime);
+use JSON;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::EnvFileManager;
@@ -309,6 +310,50 @@ sub export : Path('/admin/environment_variables/export') : Args(0) {
         $c->flash->{error_msg} = "Error exporting .env file: $_";
         $c->response->redirect($c->uri_for('/admin/environment_variables'));
     };
+}
+
+sub set_single :Path('/admin/environment_variables/set_single') :Args(0) {
+    my ($self, $c) = @_;
+
+    $c->response->content_type('application/json; charset=utf-8');
+
+    return unless $self->_require_admin($c);
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body('{"error":"Method not allowed"}');
+        return;
+    }
+
+    my $body  = eval { JSON::decode_json($c->req->body // '{}') } // {};
+    my $key   = $body->{key}   // '';
+    my $value = $body->{value} // '';
+
+    unless ($key =~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
+        $c->response->status(400);
+        $c->response->body('{"error":"Invalid variable name"}');
+        return;
+    }
+
+    my $result = eval {
+        my $env_vars = $self->env_manager->read_env_file();
+        $env_vars->{$key} = $value;
+        $self->env_manager->write_env_file($env_vars);
+        1;
+    };
+
+    if ($@ || !$result) {
+        my $err = "$@"; $err =~ s/\n/ /g;
+        $c->response->status(500);
+        $c->response->body(JSON::encode_json({ error => "Save failed: $err" }));
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'set_single',
+        "Set env var via modal: $key");
+
+    $c->response->status(200);
+    $c->response->body(JSON::encode_json({ success => 1 }));
 }
 
 __PACKAGE__->meta->make_immutable;

@@ -775,13 +775,12 @@
                 <div class="error-message" style="margin:12px;">
                     <i class="fas fa-exclamation-triangle"></i>
                     <strong>Connection Error:</strong> [% database_comparison.migration_mysql.error | html %]
-                    <br><small>
-                        Set <code>MIGRATION_MYSQL_PASSWORD</code> in
-                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
-                            Admin → Database Management → DB Connection Passwords
-                        </a>
-                        (copy <code>MYSQL_ROOT_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
-                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    <br><small style="display:block;margin-top:8px;">
+                        Set <code>MIGRATION_MYSQL_PASSWORD</code> to connect.
+                        <button type="button" onclick="openSetPasswordModal('MIGRATION_MYSQL_PASSWORD','MySQL Docker (192.168.1.20:3307)','Copy MYSQL_ROOT_PASSWORD from /opt/csc-db/.env on 192.168.1.20')"
+                                style="margin-left:8px;padding:3px 10px;background:#007bff;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px;">
+                            <i class="fas fa-key"></i> Set Password
+                        </button>
                     </small>
                 </div>
                 [% END %]
@@ -835,13 +834,12 @@
                 <div class="error-message" style="margin:12px;">
                     <i class="fas fa-exclamation-triangle"></i>
                     <strong>Connection Error:</strong> [% database_comparison.migration_postgres.error | html %]
-                    <br><small>
-                        Set <code>MIGRATION_POSTGRES_PASSWORD</code> in
-                        <a href="[% c.uri_for('/admin/environment_variables') %]" style="color:inherit;font-weight:bold;">
-                            Admin → Database Management → DB Connection Passwords
-                        </a>
-                        (copy <code>POSTGRES_PASSWORD</code> from <code>/opt/csc-db/.env</code> on 192.168.1.20, then restart the app).
-                        See the <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" style="color:inherit;font-weight:bold;">Migration Server Setup Guide</a>.
+                    <br><small style="display:block;margin-top:8px;">
+                        Set <code>MIGRATION_POSTGRES_PASSWORD</code> to connect.
+                        <button type="button" onclick="openSetPasswordModal('MIGRATION_POSTGRES_PASSWORD','PostgreSQL Docker (192.168.1.20:5433)','Copy POSTGRES_PASSWORD from /opt/csc-db/.env on 192.168.1.20')"
+                                style="margin-left:8px;padding:3px 10px;background:#007bff;color:#fff;border:none;border-radius:3px;cursor:pointer;font-size:12px;">
+                            <i class="fas fa-key"></i> Set Password
+                        </button>
                     </small>
                 </div>
                 [% END %]
@@ -2554,4 +2552,106 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 });
+</script>
+
+<!-- Set Password Modal -->
+<div id="setPasswordModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.55); z-index:9000; align-items:center; justify-content:center;">
+    <div style="background:#fff; border-radius:8px; padding:28px 32px; max-width:480px; width:92%; box-shadow:0 8px 32px rgba(0,0,0,0.25); position:relative;">
+        <button onclick="closeSetPasswordModal()" style="position:absolute;top:12px;right:14px;background:none;border:none;font-size:20px;cursor:pointer;color:#6c757d;" title="Close">&times;</button>
+        <h3 style="margin:0 0 6px;"><i class="fas fa-key"></i> Set Database Password</h3>
+        <p id="spModalDesc" style="font-size:13px;color:#6c757d;margin-bottom:18px;"></p>
+        <div style="background:#fff8e1;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;font-size:12px;margin-bottom:16px;">
+            <strong><i class="fas fa-info-circle"></i> Hint:</strong> <span id="spModalHint"></span>
+        </div>
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-weight:bold;margin-bottom:5px;">Variable: <code id="spModalVarName"></code></label>
+            <input type="password" id="spModalPassword" placeholder="Enter password value"
+                   style="width:100%;padding:9px;border:1px solid #ced4da;border-radius:4px;font-size:14px;box-sizing:border-box;">
+        </div>
+        <div id="spModalStatus" style="display:none;padding:9px;border-radius:4px;font-size:13px;margin-bottom:12px;"></div>
+        <div style="display:flex;gap:10px;">
+            <button id="spModalSaveBtn" onclick="saveSetPassword()"
+                    style="padding:9px 20px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+                <i class="fas fa-save"></i> Save &amp; Close
+            </button>
+            <button onclick="closeSetPasswordModal()"
+                    style="padding:9px 16px;background:#6c757d;color:#fff;border:none;border-radius:4px;cursor:pointer;">
+                Cancel
+            </button>
+            <a href="[% c.uri_for('/admin/environment_variables') %]" target="_blank"
+               style="padding:9px 14px;background:#17a2b8;color:#fff;border-radius:4px;text-decoration:none;font-size:13px;">
+                <i class="fas fa-list"></i> All Variables
+            </a>
+        </div>
+        <p style="font-size:11px;color:#6c757d;margin:12px 0 0;">
+            <i class="fas fa-sync-alt"></i> After saving, restart the Catalyst server for the new password to take effect.
+        </p>
+    </div>
+</div>
+
+<script>
+var _spVarName = '';
+
+function openSetPasswordModal(varName, serverDesc, hint) {
+    _spVarName = varName;
+    document.getElementById('spModalVarName').textContent = varName;
+    document.getElementById('spModalDesc').textContent = 'Setting password for: ' + serverDesc;
+    document.getElementById('spModalHint').textContent = hint;
+    document.getElementById('spModalPassword').value = '';
+    document.getElementById('spModalStatus').style.display = 'none';
+    document.getElementById('setPasswordModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('spModalPassword').focus(), 80);
+}
+
+function closeSetPasswordModal() {
+    document.getElementById('setPasswordModal').style.display = 'none';
+}
+
+document.getElementById('setPasswordModal').addEventListener('click', function(e) {
+    if (e.target === this) closeSetPasswordModal();
+});
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') closeSetPasswordModal();
+});
+
+function showSpStatus(msg, isError) {
+    const el = document.getElementById('spModalStatus');
+    el.style.display = 'block';
+    el.style.background = isError ? '#f8d7da' : '#d4edda';
+    el.style.color = isError ? '#721c24' : '#155724';
+    el.style.border = '1px solid ' + (isError ? '#f5c6cb' : '#c3e6cb');
+    el.innerHTML = (isError ? '<i class="fas fa-exclamation-circle"></i> ' : '<i class="fas fa-check-circle"></i> ') + msg;
+}
+
+function saveSetPassword() {
+    const pw = document.getElementById('spModalPassword').value;
+    if (!pw) { showSpStatus('Please enter a password value.', true); return; }
+
+    const btn = document.getElementById('spModalSaveBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+    fetch('[% c.uri_for("/admin/environment_variables/set_single") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ key: _spVarName, value: pw })
+    })
+    .then(handleFetchResponse)
+    .then(data => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save & Close';
+        if (data.success) {
+            showSpStatus('Saved! Restart the Catalyst server to connect.', false);
+            setTimeout(closeSetPasswordModal, 2000);
+        } else {
+            showSpStatus(data.error || 'Unknown error', true);
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fas fa-save"></i> Save & Close';
+        if (err.message !== 'auth') showSpStatus('Request failed: ' + err, true);
+    });
+}
 </script>

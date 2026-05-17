@@ -95,7 +95,7 @@ sub _quote_value {
     
     return '' if !defined $value;
     
-    if ($value =~ /[\s"'\\$]/ || $value =~ /\n/) {
+    if ($value =~ /[\s"'\\\$]/ || $value =~ /\n/) {
         $value =~ s/\\/\\\\/g;
         $value =~ s/"/\\"/g;
         $value =~ s/\$/\\\$/g;
