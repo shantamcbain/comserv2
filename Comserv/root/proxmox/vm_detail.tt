@@ -110,7 +110,26 @@
             <th>Storage</th>
             <td><input type="text" name="storage" placeholder="leave blank for same storage" style="width:220px;"></td>
         </tr>
+        <tr><td colspan="2"><hr style="margin:0.5em 0;border-color:#ddd;"></td></tr>
+        <tr>
+            <th>New IP Address</th>
+            <td><input type="text" name="new_ip" placeholder="e.g. 192.168.1.21/24" style="width:180px;">
+                <span style="font-size:0.8em;color:#888;"> (CIDR, optional)</span></td>
+        </tr>
+        <tr>
+            <th>Gateway</th>
+            <td><input type="text" name="gateway" placeholder="e.g. 192.168.1.1" style="width:180px;"></td>
+        </tr>
+        <tr>
+            <th>DNS Server</th>
+            <td><input type="text" name="dns" placeholder="e.g. 192.168.1.1" style="width:180px;"></td>
+        </tr>
+        <tr>
+            <th>Hostname</th>
+            <td><input type="text" name="hostname" placeholder="e.g. db-dev" style="width:180px;"></td>
+        </tr>
     </table>
+    <p style="font-size:0.82em;color:#888;margin:0.4em 0;">IP settings use cloud-init. If the VM has no cloud-init drive they will be ignored — see note below.</p>
     <div style="margin-top:0.75em;display:flex;gap:0.5em;">
         <button type="button" class="vm-btn" style="background:#4CAF50;" onclick="doClone()">⎘ Start Clone</button>
         <button type="button" class="vm-btn" style="background:#888;" onclick="document.getElementById('clone-panel').style.display='none';">Cancel</button>
@@ -223,7 +242,14 @@ function doClone() {
     .then(d => {
         var el = document.getElementById('clone-result');
         if (d.success) {
-            el.innerHTML = '<span style="color:green;">Clone started — new VM ID: ' + d.vmid + '. Task: ' + (d.task_id||'') + '</span>';
+            var msg = 'Clone started — new VM ID: ' + d.vmid;
+            if (d.ip_config) {
+                msg += ' | IP config: ' + d.ip_config;
+                if (d.ip_config.indexOf('failed') !== -1) {
+                    msg += ' <br><small style="color:#b37700;">Note: VM may not have a cloud-init drive — change IP manually after boot via netplan or run the setup ISO.</small>';
+                }
+            }
+            el.innerHTML = '<span style="color:green;">' + msg + '</span>';
         } else {
             el.innerHTML = '<span style="color:red;">Error: ' + (d.error||'unknown') + '</span>';
         }
