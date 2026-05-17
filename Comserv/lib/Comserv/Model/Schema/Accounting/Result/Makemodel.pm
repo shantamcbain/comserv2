@@ -7,8 +7,8 @@ __PACKAGE__->table('makemodel');
 
 __PACKAGE__->add_columns(
     parts_id => { data_type => 'integer',     is_nullable => 0, is_foreign_key => 1 },
-    make     => { data_type => 'varchar', size => 255, is_nullable => 1 },
-    model    => { data_type => 'varchar', size => 255, is_nullable => 1 },
+    make     => { data_type => 'varchar', size => 255, is_nullable => 0, default_value => '' },
+    model    => { data_type => 'varchar', size => 255, is_nullable => 0, default_value => '' },
 );
 
 __PACKAGE__->set_primary_key('parts_id', 'make', 'model');
