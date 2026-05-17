@@ -204,9 +204,10 @@ sub create : Path('/admin/environment_variables/create') : Args(0) {
             my $env_vars = $self->env_manager->read_env_file();
             $env_vars->{$key} = $value;
             $self->env_manager->write_env_file($env_vars);
+            $ENV{$key} = $value;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create',
                 "Created env var: $key");
-            $c->flash->{success_msg} = "Variable '$key' created. Restart the server/container for it to take effect.";
+            $c->flash->{success_msg} = "Variable '$key' created. Value is active immediately.";
             $c->response->redirect($c->uri_for('/admin/environment_variables'));
         } catch {
             $c->stash(
@@ -245,9 +246,10 @@ sub edit : Path('/admin/environment_variables/edit') : Args(1) {
         try {
             $env_vars->{$key} = $new_value;
             $self->env_manager->write_env_file($env_vars);
+            $ENV{$key} = $new_value;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit',
                 "Updated env var: $key");
-            $c->flash->{success_msg} = "Variable '$key' updated. Restart the server/container for it to take effect.";
+            $c->flash->{success_msg} = "Variable '$key' updated. Value is active immediately.";
             $c->response->redirect($c->uri_for('/admin/environment_variables'));
         } catch {
             $c->stash(
@@ -325,13 +327,15 @@ sub set_single :Path('/admin/environment_variables/set_single') :Args(0) {
         return;
     }
 
-    my $body  = eval { JSON::decode_json($c->req->body // '{}') } // {};
+    my $fh  = $c->req->body;
+    my $raw = ref($fh) ? do { local $/; <$fh> } : ($fh // '{}');
+    my $body  = eval { JSON::decode_json($raw) } // {};
     my $key   = $body->{key}   // '';
     my $value = $body->{value} // '';
 
     unless ($key =~ /^[A-Za-z_][A-Za-z0-9_]*$/) {
         $c->response->status(400);
-        $c->response->body('{"error":"Invalid variable name"}');
+        $c->response->body(JSON::encode_json({ error => "Invalid variable name: '$key'" }));
         return;
     }
 
@@ -339,6 +343,7 @@ sub set_single :Path('/admin/environment_variables/set_single') :Args(0) {
         my $env_vars = $self->env_manager->read_env_file();
         $env_vars->{$key} = $value;
         $self->env_manager->write_env_file($env_vars);
+        $ENV{$key} = $value;
         1;
     };
 
@@ -353,7 +358,7 @@ sub set_single :Path('/admin/environment_variables/set_single') :Args(0) {
         "Set env var via modal: $key");
 
     $c->response->status(200);
-    $c->response->body(JSON::encode_json({ success => 1 }));
+    $c->response->body(JSON::encode_json({ success => 1, no_restart_needed => 1 }));
 }
 
 __PACKAGE__->meta->make_immutable;

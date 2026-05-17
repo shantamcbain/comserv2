@@ -2584,7 +2584,7 @@ document.addEventListener('DOMContentLoaded', function() {
             </a>
         </div>
         <p style="font-size:11px;color:#6c757d;margin:12px 0 0;">
-            <i class="fas fa-sync-alt"></i> After saving, restart the Catalyst server for the new password to take effect.
+            <i class="fas fa-check-circle"></i> Password takes effect immediately — no server restart required. The page will reload to test the connection.
         </p>
     </div>
 </div>
@@ -2642,8 +2642,8 @@ function saveSetPassword() {
         btn.disabled = false;
         btn.innerHTML = '<i class="fas fa-save"></i> Save & Close';
         if (data.success) {
-            showSpStatus('Saved! Restart the Catalyst server to connect.', false);
-            setTimeout(closeSetPasswordModal, 2000);
+            showSpStatus('Saved! Reloading page — connection will be tested now.', false);
+            setTimeout(() => { closeSetPasswordModal(); window.location.reload(); }, 1800);
         } else {
             showSpStatus(data.error || 'Unknown error', true);
         }

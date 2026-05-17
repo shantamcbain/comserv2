@@ -7071,7 +7071,9 @@ sub add_database_env :Path('/admin/database-env/add') :Args(0) {
         return;
     }
 
-    my $body = eval { JSON::decode_json($c->req->body // '{}') } // {};
+    my $fh_body = $c->req->body;
+    my $raw_body = ref($fh_body) ? do { local $/; <$fh_body> } : ($fh_body // '{}');
+    my $body = eval { JSON::decode_json($raw_body) } // {};
     my $env_name     = $body->{env_name}      // '';
     my $display_name = $body->{display_name}  // $env_name;
     my $db_host      = $body->{db_host}       // '';
@@ -7142,6 +7144,13 @@ sub add_database_env :Path('/admin/database-env/add') :Args(0) {
         $env_vars->{"${prefix}_DB_TYPE"}      = $db_type;
         $env_vars->{"${prefix}_DISPLAY_NAME"} = $display_name;
         $env_mgr->write_env_file($env_vars);
+        $ENV{"${prefix}_HOST"}         = $db_host;
+        $ENV{"${prefix}_PORT"}         = $port;
+        $ENV{"${prefix}_DATABASE"}     = $db_name;
+        $ENV{"${prefix}_USERNAME"}     = $username;
+        $ENV{"${prefix}_PASSWORD"}     = $store_password;
+        $ENV{"${prefix}_DB_TYPE"}      = $db_type;
+        $ENV{"${prefix}_DISPLAY_NAME"} = $display_name;
         1;
     };
 
