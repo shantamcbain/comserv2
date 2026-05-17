@@ -2170,6 +2170,30 @@ sub clone_vm {
     }
 }
 
+sub list_storages {
+    my ($self, $content_filter) = @_;
+
+    $self->_load_credentials() unless $self->{credentials_loaded};
+    return [] unless $self->{api_url_base};
+
+    my $ua          = $self->_make_ua(10);
+    my $auth_header = $self->_auth_header() or return [];
+    my $node_name   = $self->_resolve_node($ua, $auth_header);
+
+    my $req = HTTP::Request->new(GET => $self->{api_url_base} . "/nodes/$node_name/storage");
+    $req->header(Authorization => $auth_header);
+    my $res = $ua->request($req);
+    return [] unless $res->is_success;
+    my $data = eval { decode_json($res->decoded_content) };
+    return [] unless $data && $data->{data};
+
+    my @storages = @{ $data->{data} };
+    if ($content_filter) {
+        @storages = grep { ($_->{content} || '') =~ /\b$content_filter\b/ } @storages;
+    }
+    return \@storages;
+}
+
 sub restore_as_new_vm {
     my ($self, $new_vmid, $volid, $storage, $name) = @_;
 
