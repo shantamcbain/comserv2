@@ -1185,16 +1185,21 @@ sub clone_vm_action :Path('clone_vm_action') :Args(0) {
     if ($result->{success} && ($new_ip || $hostname || $dns)) {
         my %config_params;
         if ($new_ip) {
+            $new_ip .= '/24' unless $new_ip =~ m|/\d+$|;
             my $ipconfig = "ip=$new_ip";
             $ipconfig .= ",gw=$gateway" if $gateway;
             $config_params{ipconfig0} = $ipconfig;
-            $config_params{citype}    = 'nocloud';
         }
         $config_params{name}       = $hostname if $hostname;
         $config_params{nameserver} = $dns      if $dns;
 
         my $cfg_result = $proxmox->set_vm_config($newid, %config_params);
-        $result->{ip_config} = $cfg_result->{success} ? 'applied' : ('failed: ' . ($cfg_result->{error} || ''));
+        if ($cfg_result->{success}) {
+            $result->{ip_config} = 'applied via cloud-init';
+        } else {
+            $result->{ip_config} = 'skipped';
+            $result->{ip_note}   = 'VM has no cloud-init drive. Change IP manually via netplan after boot, or use the setup ISO.';
+        }
     }
 
     $c->stash->{json} = $result;
