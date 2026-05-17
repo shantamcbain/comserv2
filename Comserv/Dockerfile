@@ -11,7 +11,7 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     apt-get install -y --no-install-recommends \
       build-essential curl git wget pkg-config default-mysql-client libmariadb-dev \
       libssl-dev libexpat-dev zlib1g-dev libxml2-dev locales ca-certificates \
-      libc6-dev libgdbm-dev libbz2-dev libdb-dev && \
+      libc6-dev libgdbm-dev libbz2-dev libdb-dev libpq-dev && \
     echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8 && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
@@ -53,7 +53,7 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     apt-get install -y --no-install-recommends \
       bash default-mysql-client libmariadb3 libssl3 libxml2 curl locales \
       ca-certificates supervisor logrotate cron \
-      python3 python3-venv python3-pip ffmpeg && \
+      python3 python3-venv python3-pip ffmpeg libpq5 && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN python3 -m venv /opt/comserv/whisper_venv && \
