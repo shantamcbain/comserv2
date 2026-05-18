@@ -77,8 +77,15 @@
                 <label for="database"><strong>Database Name *</strong></label>
                 <input type="text" id="database" name="database"
                        value="[% form_data.database | html %]"
-                       placeholder="e.g. ency" required
+                       list="known_databases_list"
+                       placeholder="Select or type a database name" required
                        style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+                <datalist id="known_databases_list">
+                    [% FOREACH db IN known_databases %]
+                    <option value="[% db | html %]">[% db | html %]</option>
+                    [% END %]
+                </datalist>
+                <small style="color:#666;">Choose from known databases or type a new one.</small>
             </div>
 
             <div>
