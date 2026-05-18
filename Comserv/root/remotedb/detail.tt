@@ -1,73 +1,62 @@
-
-[% IF success_msg %]<div class="alert alert-success">[% success_msg | html %]</div>[% END %]
-[% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
-
 [% SET cfg = conn.config %]
+[% META title = 'DB Server: ' _ conn_name %]
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1em;flex-wrap:wrap;gap:0.5em;">
-    <h1 style="margin:0;">[% conn_name | html %]</h1>
-    <div style="display:flex;gap:0.5em;flex-wrap:wrap;">
-        <a href="[% c.uri_for('/remotedb/edit') %]/[% conn_name | uri %]"
-           class="btn btn-primary">✎ Edit Settings</a>
+[% IF success_msg %]<div class="success-message">[% success_msg | html %]</div>[% END %]
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
+
+<div class="page-header">
+    <h1>[% conn_name | html %]</h1>
+    <div class="action-buttons">
+        <a href="[% c.uri_for('/remotedb/edit') %]/[% conn_name | uri %]" class="btn btn-primary">&#9998; Edit Settings</a>
         <a href="[% c.uri_for('/remotedb/test') %]/[% conn_name | uri %]"
            class="btn btn-outline-success"
-           title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]">⚡ Test Connection</a>
-        <a href="[% c.uri_for('/remotedb/view') %]/[% conn_name | uri %]"
-           class="btn btn-outline-secondary">⊞ Browse Tables</a>
+           title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]">&#9889; Test Connection</a>
+        <a href="[% c.uri_for('/remotedb/view') %]/[% conn_name | uri %]" class="btn btn-secondary">&#8862; Browse Tables</a>
         <a href="[% c.uri_for('/remotedb/remove') %]/[% conn_name | uri %]"
-           class="btn btn-outline-danger"
-           onclick="return confirm('Remove [% conn_name | html %]?')">✕ Remove</a>
-        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">← Back to List</a>
+           class="btn btn-danger"
+           onclick="return confirm('Remove [% conn_name | html %]?')">&#10005; Remove</a>
+        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">&#8592; Back to List</a>
     </div>
 </div>
 
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:1.2em;max-width:800px;">
-
-    <div style="border:1px solid #ddd;border-radius:6px;padding:1em;">
-        <h3 style="margin-top:0;border-bottom:1px solid #eee;padding-bottom:0.4em;">Connection</h3>
-        <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="padding:5px 8px;color:#666;width:40%;">Type</td>
-                <td style="padding:5px 8px;"><code>[% cfg.db_type | html %]</code></td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Host</td>
-                <td style="padding:5px 8px;font-family:monospace;">[% cfg.host | html %]</td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Port</td>
-                <td style="padding:5px 8px;font-family:monospace;">[% cfg.port | html %]</td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Database</td>
-                <td style="padding:5px 8px;"><code>[% cfg.database | html %]</code></td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Username</td>
-                <td style="padding:5px 8px;">[% cfg.username | html %]</td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Password</td>
-                <td style="padding:5px 8px;color:#999;">●●●●●●●● (stored)</td></tr>
-        </table>
-    </div>
-
-    <div style="border:1px solid #ddd;border-radius:6px;padding:1em;">
-        <h3 style="margin-top:0;border-bottom:1px solid #eee;padding-bottom:0.4em;">Classification</h3>
-        <table style="width:100%;border-collapse:collapse;">
-            <tr><td style="padding:5px 8px;color:#666;width:40%;">Environment</td>
-                <td style="padding:5px 8px;">
-                    [% SET env_badge = cfg.environment == 'production' ? 'background:#d32f2f;color:#fff' :
-                                       cfg.environment == 'development' ? 'background:#1976d2;color:#fff' :
-                                       cfg.environment == 'staging'     ? 'background:#f57c00;color:#fff' :
-                                                                          'background:#555;color:#fff' %]
-                    <span style="[% env_badge %];padding:2px 8px;border-radius:10px;font-size:0.85em;">
-                        [% cfg.environment | html %]
-                    </span>
-                </td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Role</td>
-                <td style="padding:5px 8px;">[% cfg.role | html %]</td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Priority</td>
-                <td style="padding:5px 8px;">[% cfg.priority | html %] (1 = highest)</td></tr>
-            <tr><td style="padding:5px 8px;color:#666;">Local Override</td>
-                <td style="padding:5px 8px;">[% cfg.localhost_override ? 'Yes' : 'No' %]</td></tr>
-        </table>
-    </div>
-
-    [% IF cfg.description %]
-    <div style="border:1px solid #ddd;border-radius:6px;padding:1em;grid-column:span 2;">
-        <h3 style="margin-top:0;">Description</h3>
-        <p style="margin:0;">[% cfg.description | html %]</p>
-    </div>
-    [% END %]
-
+<div class="form-section">
+    <h2>Connection</h2>
+    <table class="data-table">
+        <tbody>
+            <tr><th>Type</th><td><code>[% cfg.db_type | html %]</code></td></tr>
+            <tr><th>Host</th><td><code>[% cfg.host | html %]</code></td></tr>
+            <tr><th>Port</th><td><code>[% cfg.port | html %]</code></td></tr>
+            <tr><th>Database</th><td><code>[% cfg.database | html %]</code></td></tr>
+            <tr><th>Username</th><td>[% cfg.username | html %]</td></tr>
+            <tr><th>Password</th><td class="muted">&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679;&#9679; (stored securely)</td></tr>
+        </tbody>
+    </table>
 </div>
+
+<div class="form-section">
+    <h2>Classification</h2>
+    <table class="data-table">
+        <tbody>
+            <tr>
+                <th>Environment</th>
+                <td>
+                    [% SET env_class = cfg.environment == 'production'  ? 'badge-danger'  :
+                                       cfg.environment == 'development' ? 'badge-info'    :
+                                       cfg.environment == 'staging'     ? 'badge-warning' :
+                                                                          'badge-default' %]
+                    <span class="badge [% env_class %]">[% cfg.environment | html %]</span>
+                </td>
+            </tr>
+            <tr><th>Role</th><td>[% cfg.role | html %]</td></tr>
+            <tr><th>Priority</th><td>[% cfg.priority | html %] <span class="help-text">(1 = highest)</span></td></tr>
+            <tr><th>Localhost Override</th><td>[% cfg.localhost_override ? 'Yes' : 'No' %]</td></tr>
+        </tbody>
+    </table>
+</div>
+
+[% IF cfg.description %]
+<div class="form-section">
+    <h2>Description</h2>
+    <p>[% cfg.description | html %]</p>
+</div>
+[% END %]
