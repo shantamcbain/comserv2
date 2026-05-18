@@ -53,31 +53,47 @@ sub index :Path('/log') :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Accessed log index");
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
-    # Retrieve the status from the query parameters, default to 'open'
-    my $status = $c->request->params->{status} // 'open';
 
-    # Create a new instance of the Log model
-    my $log_model = Comserv::Model::Log->new();
+    my $status      = $c->request->params->{status} // 'open';
+    my $site_filter = $c->request->params->{site}   // '';
 
-    # Fetch logs based on the status
-    my $rs;
-    if ($status eq 'all') {
-        $rs = $log_model->get_logs($c, 'all');  # Fetch all logs without status filter
-    } elsif ($status eq 'open') {
-        $rs = $log_model->get_logs($c, 'open');  # Fetch open logs (status not equal to 3)
+    my $username = $c->session->{username} || '';
+    my $sitename = $c->session->{SiteName} || '';
+    my $roles    = $c->session->{roles}    || [];
+    my $has_admin = ref($roles) eq 'ARRAY'
+        ? (grep { $_ eq 'admin' } @$roles) > 0
+        : ($roles && $roles =~ /\badmin\b/i);
+    my $is_csc_admin = ($sitename eq 'CSC' && $has_admin) || $username eq 'Shanta';
+
+    my @allowed_sites;
+    if ($is_csc_admin) {
+        my @all = $c->model('DBEncy')->resultset('Site')->search({}, { columns => ['name'], order_by => 'name' })->all;
+        @allowed_sites = map { $_->name } @all;
     } else {
-        $rs = $log_model->get_logs($c, $status);  # Fetch logs with specific status
+        my $user_id = $c->session->{user_id};
+        if ($user_id) {
+            my @usr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                { user_id => $user_id, is_active => 1 },
+                { join => 'site', columns => [qw(site.name)], distinct => 1 }
+            )->all;
+            @allowed_sites = map { $_->site ? $_->site->name : () } @usr;
+        }
+        @allowed_sites = ($sitename) unless @allowed_sites;
     }
 
-    # Debug: Print all logs
-    #$self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Fetched logs: " . Dumper([$rs->all]));
+    my $effective_site = ($site_filter && grep { $_ eq $site_filter } @allowed_sites)
+        ? $site_filter : '';
 
-    $c->stash->{debug_errors} //= []; # Ensure debug_errors is initialized
-    # Pass the logs and status to the template
+    my $log_model = Comserv::Model::Log->new();
+    my $rs = $log_model->get_logs($c, $status, $effective_site, \@allowed_sites);
+
+    $c->stash->{debug_errors} //= [];
     $c->stash(
-        logs     => [ $rs->all ],
-        status   => $status, # Pass the current status to the template
-        template => 'log/index.tt'
+        logs          => [ $rs->all ],
+        status        => $status,
+        allowed_sites => \@allowed_sites,
+        site_filter   => $effective_site,
+        template      => 'log/index.tt'
     );
 }
 
@@ -504,12 +520,117 @@ sub create_log :Path('/log/create_log') :Args() {
         points_processed => 0,
     });
 
-    # Log the success event
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log', "Log entry created successfully: ID " . $logEntry->id);
+
+    # ── Accounting integration ─────────────────────────────────────────────────
+    # If this log is linked to a todo, update accumulative_time, create a
+    # TodoInterval, and (if the todo is billable) draft a GL entry.
+    if ($logEntry && $logEntry->todo_record_id && $time_diff_in_minutes > 0) {
+        eval {
+            my $todo = $schema->resultset('Todo')->find($logEntry->todo_record_id);
+            if ($todo) {
+                $schema->txn_do(sub {
+                    $schema->resultset('TodoInterval')->create({
+                        todo_record_id => $logEntry->todo_record_id,
+                        start_date     => $start_date || $current_date,
+                        start_time     => $start_time,
+                        end_date       => $current_date,
+                        end_time       => $end_time,
+                        interval_type  => 'actual',
+                        status         => 'completed',
+                        last_mod_by    => $username,
+                        last_mod_date  => $current_date,
+                    });
+
+                    my $existing = $todo->accumulative_time || '00:00:00';
+                    $existing = '00:00:00' unless $existing =~ /^\d+:\d+/;
+                    my ($ah, $am, $as_) = split ':', $existing;
+                    my $total_secs = (int($ah||0)*3600 + int($am||0)*60 + int($as_||0))
+                                   + $time_diff_in_minutes * 60;
+                    $todo->update({
+                        accumulative_time => sprintf('%02d:%02d:%02d',
+                            int($total_secs/3600),
+                            int(($total_secs%3600)/60),
+                            $total_secs % 60),
+                        last_mod_by   => $username,
+                        last_mod_date => $current_date,
+                    });
+
+                    my $rate = ($todo->can('point_rate') && $todo->point_rate) ? $todo->point_rate + 0 : 0;
+                    if ($todo->can('billable') && $todo->billable && $rate > 0) {
+                        my $hours_decimal = $time_diff_in_minutes / 60;
+                        my $amount        = sprintf('%.2f', $hours_decimal * $rate);
+                        if ($amount > 0) {
+                            my $labor_acct = $schema->resultset('Accounting::CoaAccount')->search(
+                                { accno => { -in => ['5100', '5000', '6000', '6700'] } },
+                                { rows => 1 }
+                            )->first;
+                            my $ap_acct = $schema->resultset('Accounting::CoaAccount')->search(
+                                { accno => '2000' }, { rows => 1 }
+                            )->first;
+                            if ($labor_acct && $ap_acct) {
+                                my $gl = $schema->resultset('Accounting::GlEntry')->create({
+                                    reference   => 'LOG-' . $logEntry->id,
+                                    description => $subject . ' — '
+                                        . sprintf('%dh %dm', $hours, $minutes)
+                                        . ' @ $' . $rate . '/hr',
+                                    entry_type  => 'labor',
+                                    post_date   => $current_date,
+                                    approved    => 0,
+                                    currency    => 'CAD',
+                                    sitename    => $sitename,
+                                    entered_by  => $c->session->{user_id} || undef,
+                                });
+                                $schema->resultset('Accounting::GlEntryLine')->create({
+                                    gl_entry_id => $gl->id,
+                                    account_id  => $labor_acct->id,
+                                    amount      =>  $amount,
+                                    memo        => 'Labor: ' . $subject,
+                                    sort_order  => 1,
+                                });
+                                $schema->resultset('Accounting::GlEntryLine')->create({
+                                    gl_entry_id => $gl->id,
+                                    account_id  => $ap_acct->id,
+                                    amount      => -$amount,
+                                    memo        => 'AP: ' . $username,
+                                    sort_order  => 2,
+                                });
+                                $logEntry->update({ points_processed => 1, point_rate => $rate });
+                                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_log',
+                                    "GL draft LOG-" . $logEntry->id . " created: \$$amount labor for " . $subject);
+                            }
+
+                            my $uid = $c->session->{user_id};
+                            if ($uid) {
+                                my $pts = $hours_decimal * $rate;
+                                if ($pts >= 0.0001) {
+                                    eval {
+                                        my $ps = Comserv::Util::PointSystem->new(c => $c);
+                                        $ps->credit(
+                                            user_id          => $uid,
+                                            amount           => $pts,
+                                            transaction_type => 'work',
+                                            description      => 'Work log: ' . $subject . ' — '
+                                                . sprintf('%dh %dm', $hours, $minutes),
+                                            reference_type   => 'log',
+                                            reference_id     => $logEntry->id,
+                                        );
+                                    };
+                                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_log',
+                                        "Point credit failed: $@") if $@;
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'create_log',
+            "Accounting integration warning: $@") if $@;
+    }
 
     $c->flash->{success_msg} = 'Log entry created successfully';
 
-    # Redirect to /log after save
     $c->response->redirect($c->uri_for('/log'));
 }
 

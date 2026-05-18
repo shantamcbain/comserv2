@@ -1,0 +1,197 @@
+[%#
+  Shared 2-line todo card — flex layout, never overflows page width.
+
+  Required:
+    tc              - todo object (record_id, subject, priority, status, sitename, etc.)
+
+  Optional context flags (used to control what extras render):
+    tc_wrapper_id         - div id="..."
+    tc_wrapper_extra_data - extra data-* attributes string (for JS filtering)
+    tc_rank               - rank number badge (priority list context)
+    tc_icon_char          - icon character for col-1 badge (audit: ⚠/↳)
+    tc_icon_color         - bg color for col-1 badge (default primary)
+    tc_is_audit_root      - show "AUDIT ROOT" badge
+    tc_is_stale           - stale flag
+    tc_stale_days         - days stale
+    tc_is_blocking        - blocking flag
+    tc_is_cross_blocker   - cross-project blocker flag
+    tc_blocking_count     - number blocked
+    tc_blocking_names     - names of blocked items
+    tc_is_overdue         - overdue flag
+    tc_due_today          - due-today flag
+    tc_is_blocked         - this todo is blocked by another
+    tc_blocker_subject    - subject of the blocker
+    tc_show_done          - show Done button (also needs is_admin from outer scope)
+    tc_done_fn            - JS function for Done button (default: quickClose)
+    tc_meta_extra         - extra HTML injected into meta line
+    tc_est_mins           - estimated minutes (day/calendar context)
+
+  Outer-scope variables used automatically: is_admin, is_csc
+%]
+[% tc_done_fn = tc_done_fn || 'quickClose' -%]
+[% SET _tc_p = tc.priority || 9 -%]
+[% SET _tc_status = tc.status -%]
+[% SET _tc_is_done = (_tc_status == 3 OR _tc_status == 4
+    OR _tc_status == 'DONE' OR _tc_status == 'Completed'
+    OR _tc_status == 'completed' OR _tc_status == 'Closed'
+    OR _tc_status == 'closed' OR _tc_status == 'Done') -%]
+[% SET _tc_opacity = (_tc_is_done OR tc_is_blocked) ? '0.6' : '1' -%]
+[%# Compute border color %]
+[% IF tc_is_audit_root -%]
+  [% SET _tc_bc = '#c45d00' -%]
+[% ELSIF tc_is_blocked -%]
+  [% SET _tc_bc = 'var(--border-color)' -%]
+[% ELSIF tc_is_overdue -%]
+  [% SET _tc_bc = '#dc3545' -%]
+[% ELSIF tc_due_today -%]
+  [% SET _tc_bc = '#ffc107' -%]
+[% ELSIF tc_is_stale -%]
+  [% SET _tc_bc = '#fd7e14' -%]
+[% ELSE -%]
+  [% SET _tc_bc = 'var(--border-color)' -%]
+[% END -%]
+[%# Compute background color %]
+[% IF tc_is_audit_root -%]
+  [% SET _tc_bg = 'color-mix(in srgb,#c45d00 8%,var(--bg-color))' -%]
+[% ELSIF tc_is_blocked -%]
+  [% SET _tc_bg = 'var(--bg-secondary)' -%]
+[% ELSIF tc_is_overdue -%]
+  [% SET _tc_bg = 'color-mix(in srgb,#dc3545 6%,var(--bg-color))' -%]
+[% ELSIF _tc_status == 2 -%]
+  [% SET _tc_bg = 'color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))' -%]
+[% ELSE -%]
+  [% SET _tc_bg = 'var(--bg-color)' -%]
+[% END -%]
+<div [% IF tc_wrapper_id %]id="[% tc_wrapper_id %]"[% END %]
+     [% tc_wrapper_extra_data %]
+     style="display:flex;align-items:flex-start;gap:5px;padding:6px 8px;margin-bottom:5px;border-radius:5px;box-sizing:border-box;border:1px solid [% _tc_bc %];background:[% _tc_bg %];opacity:[% _tc_opacity %];min-width:0;">
+
+  [%# Col 1: icon/rank badge (fixed small width) %]
+  [% IF tc_rank || tc_icon_char %]
+  <div style="flex-shrink:0;display:flex;align-items:center;justify-content:center;width:24px;padding-top:2px;">
+    [% IF tc_icon_char %]
+    <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:[% tc_icon_color || '#c45d00' %];color:#fff;align-items:center;justify-content:center;font-size:0.72em;font-weight:bold;">[% tc_icon_char %]</span>
+    [% ELSIF tc_rank %]
+    <span style="display:inline-flex;width:22px;height:22px;border-radius:50%;background:var(--primary-color);color:#fff;align-items:center;justify-content:center;font-size:0.72em;font-weight:bold;">[% tc_rank %]</span>
+    [% END %]
+  </div>
+  [% END %]
+
+  [%# Col 2: content area (flex:1, min-width:0 required for ellipsis truncation) %]
+  <div style="flex:1;min-width:0;">
+
+    [%# Row 1: all badges + subject link (truncated) %]
+    <div style="display:flex;align-items:center;gap:3px;min-width:0;margin-bottom:2px;flex-wrap:nowrap;">
+
+      [%# Priority badge %]
+      <span style="flex-shrink:0;font-size:0.68em;font-weight:bold;padding:1px 4px;border-radius:3px;
+          [% IF _tc_p <= 2 %]background:var(--danger-color,#dc3545);color:#fff
+          [% ELSIF _tc_p <= 4 %]background:#fd7e14;color:#fff
+          [% ELSIF _tc_p <= 6 %]background:#ffc107;color:var(--text-color,#333)
+          [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">P[% _tc_p %]</span>
+
+      [%# Status badge %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;
+          [% IF _tc_status == 2 %]background:#17a2b8;color:#fff
+          [% ELSIF _tc_is_done %]background:#28a745;color:#fff
+          [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
+        [% IF _tc_status == 2 %]IN PROGRESS[% ELSIF _tc_is_done %]✓ DONE[% ELSE %]NEW[% END %]
+      </span>
+
+      [%# Audit ROOT badge %]
+      [% IF tc_is_audit_root %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#c45d00;color:#fff;">AUDIT ROOT</span>
+      [% END %]
+
+      [%# Todo type badge (appointment / meeting / event / reminder) %]
+      [% SET _tc_type = tc.todo_type || 'task' %]
+      [% IF _tc_type == 'appointment' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#0d6efd;color:#fff;" title="Appointment">📌</span>
+      [% ELSIF _tc_type == 'meeting' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#6610f2;color:#fff;" title="Meeting">🤝</span>
+      [% ELSIF _tc_type == 'event' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#d63384;color:#fff;" title="Event">🎂</span>
+      [% ELSIF _tc_type == 'reminder' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#fd7e14;color:#fff;" title="Reminder">🔔</span>
+      [% END %]
+
+      [%# Recurring badge — DB flag authoritative, fall back to subject keyword %]
+      [% SET _tc_subj_l = tc.subject.lower %]
+      [% IF tc.is_recurring OR _tc_subj_l.match('lunch') OR _tc_subj_l.match('break') OR _tc_subj_l.match('standup') %]
+      <span style="flex-shrink:0;font-size:0.72em;" title="[% tc.recurrence_rule || 'recurring' %]">🔁</span>
+      [% END %]
+
+      [%# Stale badge %]
+      [% IF tc_is_stale %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#fd7e14;color:#fff;" title="No activity for [% tc_stale_days %] days">⏳ [% tc_stale_days %]d</span>
+      [% END %]
+
+      [%# Blocking badge %]
+      [% IF tc_is_blocking %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:var(--danger-color,#dc3545);color:#fff;" title="Other tasks depend on this">🔒</span>
+      [% END %]
+
+      [%# Cross-project blocker badge %]
+      [% IF tc_is_cross_blocker && tc_is_blocking %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#6f42c1;color:#fff;" title="Unblocks [% tc_blocking_count %] task(s)">🔗[% tc_blocking_count %]</span>
+      [% END %]
+
+      [%# Blocked badge %]
+      [% IF tc_is_blocked %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#adb5bd;color:var(--text-color,#333);" title="Waiting on: [% tc_blocker_subject %]">⏸</span>
+      [% END %]
+
+      [%# Overdue / due-today badge %]
+      [% IF tc_is_overdue %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#dc3545;color:#fff;">🔴 OVR</span>
+      [% ELSIF tc_due_today %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#ffc107;color:#333;">⚡</span>
+      [% END %]
+
+      [%# Site badge (CSC admin viewing multiple sites) %]
+      [% IF is_csc && tc.sitename && tc.sitename != 'CSC' %]
+      <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:var(--primary-color);color:#fff;">[% tc.sitename %]</span>
+      [% END %]
+
+      [%# Subject link — flex:1 with min-width:0 allows truncation; title=full text on hover %]
+      <a href="/todo/details?record_id=[% tc.record_id %]"
+         title="[% tc.subject | html %]"
+         style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:bold;font-size:0.88em;color:[% IF tc_is_blocked || _tc_is_done %]var(--text-muted-color)[% ELSE %]var(--text-color)[% END %];text-decoration:[% IF _tc_is_done %]line-through[% ELSE %]none[% END %];">
+        [% tc.subject || '(No subject)' %]
+      </a>
+    </div>
+
+    [%# Row 2: meta (left, truncated) + action buttons (right, no-shrink) %]
+    <div style="display:flex;align-items:center;gap:4px;min-width:0;">
+
+      [%# Meta left — truncates gracefully %]
+      <div style="flex:1;min-width:0;font-size:0.74em;color:var(--text-muted-color);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">
+        [% IF tc.project_name %]📁 [% tc.project_name %]
+        [% ELSIF tc.project_code && tc.project_code != 'system' %]📁 [% tc.project_code %][% END %]
+        [% IF tc.due_date %] · 📅 [% tc.due_date %][% END %]
+        [% IF tc.start_date %] · 🗓 [% tc.start_date %][% END %]
+        [% IF tc.sitename && !(is_csc && tc.sitename != 'CSC') %] · [% tc.sitename %][% END %]
+        [% IF tc_is_blocked && tc_blocker_subject %] · ⏸ [% tc_blocker_subject %][% END %]
+        [% IF tc_is_cross_blocker && tc_is_blocking && tc_blocking_names %] · 🔗 [% tc_blocking_names %][% END %]
+        [% IF tc_est_mins && tc_est_mins > 0 %]
+          [% IF tc_est_mins >= 60 %] · ⏱ [% FILTER format('%d') %][% tc_est_mins / 60 %][% END %]h[% IF tc_est_mins % 60 %][% tc_est_mins % 60 %]m[% END %]
+          [% ELSE %] · ⏱ [% tc_est_mins %]m[% END %]
+        [% END %]
+        [% tc_meta_extra %]
+      </div>
+
+      [%# Action buttons — right side, never shrinks, never overflows %]
+      <div style="flex-shrink:0;display:flex;align-items:center;gap:3px;">
+        <a href="/todo/details?record_id=[% tc.record_id %]"
+           style="font-size:0.68em;padding:2px 6px;border:1px solid var(--primary-color);border-radius:3px;text-decoration:none;color:var(--primary-color);white-space:nowrap;">View</a>
+        <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
+           style="font-size:0.68em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add time log">Log</a>
+        [% IF tc_show_done && is_admin %]
+        <button onclick="[% tc_done_fn %]([% tc.record_id %])"
+            style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
+        [% END %]
+      </div>
+    </div>
+
+  </div>
+</div>
