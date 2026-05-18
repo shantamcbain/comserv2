@@ -115,7 +115,8 @@ sub add_connection :Path('add') :Args(0) {
 }
 
 sub edit :Path('edit') :Args(1) {
-    my ($self, $c, $conn_name) = @_;
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
     $self->_require_admin($c);
 
     my $remote_db = $self->_remote_db();
@@ -178,7 +179,8 @@ sub edit :Path('edit') :Args(1) {
 }
 
 sub test_connection :Path('test') :Args(1) {
-    my ($self, $c, $conn_name) = @_;
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
     $self->_require_admin($c);
 
     my $remote_db = $self->_remote_db();
@@ -187,13 +189,15 @@ sub test_connection :Path('test') :Args(1) {
     if ($ok) {
         $c->flash->{success_msg} = "Connection '$conn_name' tested successfully — server reachable.";
     } else {
-        $c->flash->{error_msg} = "Connection '$conn_name' failed — check host, port, and credentials.";
+        my $err = $@ || '';
+        $c->flash->{error_msg} = "Connection '$conn_name' failed — check host, port, and credentials." . ($err ? " ($err)" : '');
     }
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
 
 sub remove :Path('remove') :Args(1) {
-    my ($self, $c, $conn_name) = @_;
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
     $self->_require_admin($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'remove',
@@ -211,7 +215,8 @@ sub remove :Path('remove') :Args(1) {
 }
 
 sub view :Path('view') :Args(1) {
-    my ($self, $c, $conn_name) = @_;
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
     $self->_require_admin($c);
 
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
@@ -234,7 +239,8 @@ sub view :Path('view') :Args(1) {
 }
 
 sub query :Path('query') :Args(1) {
-    my ($self, $c, $conn_name) = @_;
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
     $self->_require_admin($c);
 
     my $remote_db = $self->_remote_db();
