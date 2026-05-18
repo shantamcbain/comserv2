@@ -21,17 +21,6 @@ my @ROLES = qw(primary replica migration backup development);
 
 sub _remote_db { Comserv::Model::RemoteDB->new() }
 
-sub _known_databases {
-    my ($self) = @_;
-    my $remote_db = $self->_remote_db();
-    my $all = $remote_db->get_all_connections();
-    my %seen;
-    my @names = sort grep { !$seen{$_}++ && length($_) }
-                map  { $all->{$_}{config}{database} // '' }
-                keys %$all;
-    return \@names;
-}
-
 sub _require_admin {
     my ($self, $c) = @_;
     my $admin_auth = Comserv::Util::AdminAuth->new();
@@ -70,15 +59,18 @@ sub add_connection :Path('add') :Args(0) {
         $conn_name =~ s/\s+/_/g;
         $conn_name = lc($conn_name);
 
+        my $remote_db_add = $self->_remote_db();
+        my $all_add = $remote_db_add->get_all_connections();
+
         unless ($conn_name =~ /^[a-z0-9_]+$/) {
             $c->stash(
-                error_msg        => 'Connection name must contain only letters, numbers, and underscores.',
-                form_data        => $p,
-                db_types         => \@DB_TYPES,
-                environments     => \@ENVIRONMENTS,
-                roles            => \@ROLES,
-                known_databases  => $self->_known_databases(),
-                template         => 'remotedb/add.tt',
+                error_msg    => 'Connection name must contain only letters, numbers, and underscores.',
+                form_data    => $p,
+                db_types     => \@DB_TYPES,
+                environments => \@ENVIRONMENTS,
+                roles        => \@ROLES,
+                connections  => $all_add,
+                template     => 'remotedb/add.tt',
             );
             return;
         }
@@ -98,33 +90,33 @@ sub add_connection :Path('add') :Args(0) {
         };
 
         try {
-            my $remote_db = $self->_remote_db();
-            $remote_db->save_connection($conn_name, $conn_config);
+            $remote_db_add->save_connection($conn_name, $conn_config);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_connection',
                 "Added DB server: $conn_name at $conn_config->{host}:$conn_config->{port}");
             $c->flash->{success_msg} = "Database server '$conn_name' added successfully.";
             $c->response->redirect($c->uri_for($self->action_for('index')));
         } catch {
             $c->stash(
-                error_msg       => "Failed to save connection: $_",
-                form_data       => $p,
-                db_types        => \@DB_TYPES,
-                environments    => \@ENVIRONMENTS,
-                roles           => \@ROLES,
-                known_databases => $self->_known_databases(),
-                template        => 'remotedb/add.tt',
+                error_msg    => "Failed to save connection: $_",
+                form_data    => $p,
+                db_types     => \@DB_TYPES,
+                environments => \@ENVIRONMENTS,
+                roles        => \@ROLES,
+                connections  => $all_add,
+                template     => 'remotedb/add.tt',
             );
         };
         return;
     }
 
+    my $remote_db_add = $self->_remote_db();
     $c->stash(
-        form_data       => {},
-        db_types        => \@DB_TYPES,
-        environments    => \@ENVIRONMENTS,
-        roles           => \@ROLES,
-        known_databases => $self->_known_databases(),
-        template        => 'remotedb/add.tt',
+        form_data    => {},
+        db_types     => \@DB_TYPES,
+        environments => \@ENVIRONMENTS,
+        roles        => \@ROLES,
+        connections  => $remote_db_add->get_all_connections(),
+        template     => 'remotedb/add.tt',
     );
 }
 
@@ -168,29 +160,29 @@ sub edit :Path('edit') :Args(1) {
             $c->response->redirect($c->uri_for($self->action_for('index')));
         } catch {
             $c->stash(
-                error_msg       => "Failed to update connection: $_",
-                form_data       => { %$conn, conn_name => $conn_name },
-                conn_name       => $conn_name,
-                db_types        => \@DB_TYPES,
-                environments    => \@ENVIRONMENTS,
-                roles           => \@ROLES,
-                known_databases => $self->_known_databases(),
-                is_edit         => 1,
-                template        => 'remotedb/add.tt',
+                error_msg    => "Failed to update connection: $_",
+                form_data    => { %$conn, conn_name => $conn_name },
+                conn_name    => $conn_name,
+                db_types     => \@DB_TYPES,
+                environments => \@ENVIRONMENTS,
+                roles        => \@ROLES,
+                connections  => $all,
+                is_edit      => 1,
+                template     => 'remotedb/add.tt',
             );
         };
         return;
     }
 
     $c->stash(
-        form_data       => { %$conn, conn_name => $conn_name },
-        conn_name       => $conn_name,
-        db_types        => \@DB_TYPES,
-        environments    => \@ENVIRONMENTS,
-        roles           => \@ROLES,
-        known_databases => $self->_known_databases(),
-        is_edit         => 1,
-        template        => 'remotedb/add.tt',
+        form_data    => { %$conn, conn_name => $conn_name },
+        conn_name    => $conn_name,
+        db_types     => \@DB_TYPES,
+        environments => \@ENVIRONMENTS,
+        roles        => \@ROLES,
+        connections  => $all,
+        is_edit      => 1,
+        template     => 'remotedb/add.tt',
     );
 }
 
