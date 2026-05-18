@@ -981,57 +981,72 @@
             });
     }
 
-    function rebuildContainerDirect(service) {
-        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes and stop the container.`)) {
-            return;
-        }
+    let rebuildPollTimer = null;
+    let rebuildLastLen   = 0;
 
-        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
-        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        
-        // Disable rebuild buttons during rebuild
+    function _startRebuildPoll(service, autoStart) {
+        rebuildLastLen = 0;
+        rebuildPollTimer = setInterval(async () => {
+            try {
+                const resp = await safeFetch(`/admin/docker-rebuild-status/${service}`);
+                const data = await resp.json();
+                const full = data.output || '';
+                if (full.length > rebuildLastLen) {
+                    const newText = full.slice(rebuildLastLen);
+                    rebuildLastLen = full.length;
+                    appendOutput(newText);
+                }
+                if (data.done) {
+                    clearInterval(rebuildPollTimer);
+                    rebuildPollTimer = null;
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    if (data.exit_code === 0) {
+                        appendOutput(`✓ ${service} rebuilt successfully!\n`);
+                        if (autoStart) {
+                            appendOutput(`⏳ Starting ${service}...\n`);
+                            const sr = await safeFetch(`/admin/docker-up/${service}`);
+                            const sd = await sr.json();
+                            appendOutput(sd.success ? `✓ ${service} started.\n` : `✗ Start failed.\n`);
+                        }
+                        setTimeout(() => { refreshContainers(); enableRebuildButtons(); }, 2000);
+                    } else {
+                        appendOutput(`✗ Build failed (exit ${data.exit_code}).\n`);
+                        enableRebuildButtons();
+                    }
+                }
+            } catch(e) {
+                clearInterval(rebuildPollTimer);
+                rebuildPollTimer = null;
+                appendOutput(`Poll error: ${e.message}\n`);
+                enableRebuildButtons();
+            }
+        }, 5000);
+    }
+
+    function _doRebuild(service, autoStart) {
         disableRebuildButtons();
-
+        appendOutput(`⏳ Rebuilding ${service}... (runs in background, updates every 5s)\n`);
+        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
         safeFetch(`/admin/docker-rebuild/${service}`)
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`✓ ${service} rebuilt successfully!\n`);
-                    appendOutput(`\nBuild output (last 50 lines):\n`);
-                    const lines = (data.stdout || '').split('\n');
-                    appendOutput(lines.slice(-50).join('\n'));
-                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`⏳ Starting ${service}...\n`);
-                    // Auto-start after rebuild
-                    return safeFetch(`/admin/docker-up/${service}`);
+                    appendOutput(`Build started (PID tracked). Streaming output...\n`);
+                    _startRebuildPoll(service, autoStart);
                 } else {
-                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`✗ Failed to rebuild ${service}:\n`);
-                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
-                    enableRebuildButtons();
-                    throw new Error('Rebuild failed');
-                }
-            })
-            .then(response => response ? response.json() : null)
-            .then(data => {
-                if (data && data.success) {
-                    appendOutput(`✓ ${service} started successfully!\n`);
-                    setTimeout(() => {
-                        refreshContainers();
-                        enableRebuildButtons();
-                    }, 2000);
-                } else if (data) {
-                    appendOutput(`✗ Failed to start ${service} after rebuild\n`);
+                    appendOutput(`✗ Could not start build: ${data.error || 'Unknown error'}\n`);
                     enableRebuildButtons();
                 }
             })
-            .catch(error => {
-                if (error.message !== 'Rebuild failed') {
-                    appendOutput(`Error: ${error.message}\n`);
-                }
+            .catch(err => {
+                appendOutput(`✗ Request error: ${err.message}\n`);
                 enableRebuildButtons();
             });
+    }
+
+    function rebuildContainerDirect(service) {
+        if (!confirm(`Rebuild ${service}? This takes ~8 minutes. The build runs in the background — you can watch progress here.`)) return;
+        _doRebuild(service, true);
     }
 
     function disableRebuildButtons() {
@@ -1051,40 +1066,8 @@
     function rebuildContainer() {
         const service = getSelectedService();
         if (!service) return;
-
-        if (!confirm(`Are you sure you want to rebuild ${service}? This will take 2-5 minutes.`)) {
-            return;
-        }
-
-        appendOutput(`⏳ Rebuilding ${service}... This may take several minutes.\n`);
-        appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-        
-        disableRebuildButtons();
-
-        safeFetch(`/admin/docker-rebuild/${service}`)
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`✓ Rebuild successful!\n`);
-                    appendOutput(`\nBuild output (last 50 lines):\n`);
-                    const lines = (data.stdout || '').split('\n');
-                    appendOutput(lines.slice(-50).join('\n'));
-                    setTimeout(() => {
-                        refreshContainers();
-                        enableRebuildButtons();
-                    }, 2000);
-                } else {
-                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`✗ Rebuild failed:\n`);
-                    appendOutput((data.stderr || data.error || 'Unknown error') + '\n');
-                    enableRebuildButtons();
-                }
-            })
-            .catch(error => {
-                appendOutput(`Error: ${error.message}\n`);
-                enableRebuildButtons();
-            });
+        if (!confirm(`Rebuild ${service}? This takes ~8 minutes. The build runs in the background — you can watch progress here.`)) return;
+        _doRebuild(service, false);
     }
 
     function pruneDockerSystem() {

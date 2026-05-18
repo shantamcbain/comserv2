@@ -1,5 +1,5 @@
 ---
-description: "AI behavioral constraints, prompt limits, and approval-based workflow"
+description: "AI behavioral constraints and approval-based workflow"
 globs: []
 alwaysApply: true
 ---
@@ -12,14 +12,6 @@ alwaysApply: true
 - **Execution**: Never run the application unless explicitly requested by the user.
 - **File Management**: Do not create new documents or code files if one already exists for the same purpose.
 - **Consolidation**: If there are two or more documents or code files for the same purpose, ask to consolidate them into one.
-
-### 5-Prompt Limitation System - STRICTLY ENFORCED
-- **Maximum Prompts**: 5 prompts per chat session - NO EXCEPTIONS.
-- **Current Prompt Counter**: AI must track and announce prompt count at start of each response (e.g., "CURRENT PROMPT: This is prompt #[X] of 5 maximum allowed prompts.").
-- **Reason 1**: Zencoder cost management - additional prompts incur higher charges.
-- **Reason 2**: AI confusion prevention - performance degrades with extended conversations.
-- **Action on 4th Prompt**: Alert user that next prompt will trigger handoff.
-- **Action on 5th Prompt**: Refuse to continue, provide handoff documentation and automatically update documentation.
 
 ## APPROVAL-BASED CODE REVIEW WORKFLOW
 
@@ -68,15 +60,14 @@ Show exact changes using +- diff format.
 ## Communication Efficiency Rules
 - **Avoid External Commands**: Don't ask user to run commands outside the chat.
 - **Stay Within Scope**: Focus only on requested functions.
-- **Minimize Prompts**: Each communication counts toward the 5-prompt limit.
+- **Minimize Unnecessary Back-and-Forth**: Keep communication focused and actionable.
 - **Direct Action**: Use available tools directly instead of requesting external actions.
 
-## HANDOFF TEMPLATE (Use on 5th Prompt)
+## HANDOFF TEMPLATE (Use when user requests handoff)
 ```
-🚨 PROMPT LIMIT REACHED - HANDOFF REQUIRED
+🚨 HANDOFF REQUESTED
 
 📊 SESSION SUMMARY:
-- Prompts Used: 5/5
 - Files Modified: [list]
 - Tasks Completed: [list]
 - Tasks Remaining: [list]
