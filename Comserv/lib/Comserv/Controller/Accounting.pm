@@ -63,39 +63,39 @@ sub index :Path('/Accounting') :Args(0) {
     my ($acct_count, $entry_count, $ap_outstanding, $ar_outstanding,
         $item_count, $supplier_count, $location_count, $low_stock) = (0) x 8;
 
-    eval { $acct_count    = $schema->resultset('CoaAccount')->search({ obsolete => 0 })->count };
-    eval { $entry_count   = $schema->resultset('GlEntry')->search({ sitename => $sitename })->count };
+    eval { $acct_count    = $schema->resultset('Accounting::CoaAccount')->search({ obsolete => 0 })->count };
+    eval { $entry_count   = $schema->resultset('Accounting::GlEntry')->search({ sitename => $sitename })->count };
     eval {
-        $ap_outstanding = $schema->resultset('InventorySupplierInvoice')->search(
+        $ap_outstanding = $schema->resultset('Accounting::InventorySupplierInvoice')->search(
             { sitename => $sitename, status => 'outstanding' }
         )->count;
     };
     eval {
-        $ar_outstanding = $schema->resultset('InventoryCustomerOrder')->search(
+        $ar_outstanding = $schema->resultset('Accounting::InventoryCustomerOrder')->search(
             { sitename => $sitename, status => { -not_in => [qw(paid cancelled)] } }
         )->count;
     };
     eval {
-        $item_count = $schema->resultset('InventoryItem')->search(
+        $item_count = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active' }
         )->count;
     };
     eval {
-        $supplier_count = $schema->resultset('InventorySupplier')->search(
+        $supplier_count = $schema->resultset('Accounting::InventorySupplier')->search(
             { sitename => $sitename }
         )->count;
     };
     eval {
-        $location_count = $schema->resultset('InventoryLocation')->search(
+        $location_count = $schema->resultset('Accounting::InventoryLocation')->search(
             { sitename => $sitename }
         )->count;
     };
     eval {
-        my @items = $schema->resultset('InventoryItem')->search(
+        my @items = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', reorder_point => { '>' => 0 } }
         )->all;
         for my $item (@items) {
-            my $stock = $schema->resultset('InventoryStockLevel')->search(
+            my $stock = $schema->resultset('Accounting::InventoryStockLevel')->search(
                 { item_id => $item->id }
             )->get_column('quantity')->sum // 0;
             $low_stock++ if $stock <= $item->reorder_point;
@@ -128,7 +128,7 @@ sub coa_list :Path('/Accounting/coa') :Args(0) {
     my @accounts;
     my $list_error;
     eval {
-        @accounts = $schema->resultset('CoaAccount')->search(
+        @accounts = $schema->resultset('Accounting::CoaAccount')->search(
             { obsolete => 0 },
             { order_by => 'accno' }
         )->all;
@@ -149,7 +149,7 @@ sub coa_view :Path('/Accounting/coa/view') :Args(1) {
     my ($self, $c, $id) = @_;
     my $schema = $self->_schema($c);
     my $account;
-    eval { $account = $schema->resultset('CoaAccount')->find($id, { prefetch => 'heading' }) };
+    eval { $account = $schema->resultset('Accounting::CoaAccount')->find($id, { prefetch => 'heading' }) };
     unless ($account) {
         $c->flash->{error_msg} = 'Account not found';
         $c->res->redirect($c->uri_for('/Accounting/coa'));
@@ -158,7 +158,7 @@ sub coa_view :Path('/Accounting/coa/view') :Args(1) {
 
     my @lines;
     eval {
-        @lines = $schema->resultset('GlEntryLine')->search(
+        @lines = $schema->resultset('Accounting::GlEntryLine')->search(
             { account_id => $id },
             { order_by => { -desc => 'me.id' }, rows => 50 }
         )->all;
@@ -188,7 +188,7 @@ sub gl_list :Path('/Accounting/gl') :Args(0) {
 
     my (@entries, $gl_error);
     eval {
-        @entries = $schema->resultset('GlEntry')->search(
+        @entries = $schema->resultset('Accounting::GlEntry')->search(
             \%search,
             { order_by => { -desc => 'post_date' }, rows => 100 }
         )->all;
@@ -209,7 +209,7 @@ sub gl_view :Path('/Accounting/gl/view') :Args(1) {
     my $schema = $self->_schema($c);
     my $entry;
     eval {
-        $entry = $schema->resultset('GlEntry')->find(
+        $entry = $schema->resultset('Accounting::GlEntry')->find(
             $id,
             { prefetch => { lines => 'account' } }
         );
@@ -235,7 +235,7 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
     my $schema = $self->_schema($c);
 
     my $existing = 0;
-    eval { $existing = $schema->resultset('CoaAccount')->count };
+    eval { $existing = $schema->resultset('Accounting::CoaAccount')->count };
 
     if ($existing > 0) {
         $c->flash->{info_msg} = "Chart of Accounts already has $existing accounts — seed skipped.";
@@ -309,7 +309,7 @@ sub seed_coa :Path('/Accounting/coa/seed') :Args(0) {
     my $added = 0;
     eval {
         for my $acct (@default_accounts) {
-            $schema->resultset('CoaAccount')->find_or_create({
+            $schema->resultset('Accounting::CoaAccount')->find_or_create({
                 accno       => $acct->{accno},
                 description => $acct->{description},
                 category    => $acct->{category},
@@ -396,11 +396,11 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my ($added, $skipped) = (0, 0);
     eval {
         for my $acct (@all_accounts) {
-            my $existing = $schema->resultset('CoaAccount')->find({ accno => $acct->{accno} });
+            my $existing = $schema->resultset('Accounting::CoaAccount')->find({ accno => $acct->{accno} });
             if ($existing) {
                 $skipped++;
             } else {
-                $schema->resultset('CoaAccount')->create({
+                $schema->resultset('Accounting::CoaAccount')->create({
                     accno       => $acct->{accno},
                     description => $acct->{description},
                     category    => $acct->{category},
@@ -414,13 +414,13 @@ sub seed_coa_merge :Path('/Accounting/coa/seed_merge') :Args(0) {
     my ($retired, $updated) = (0, 0);
     eval {
         for my $old_accno (qw(1020 1021 1022 1023)) {
-            my $row = $schema->resultset('CoaAccount')->find({ accno => $old_accno });
+            my $row = $schema->resultset('Accounting::CoaAccount')->find({ accno => $old_accno });
             if ($row && !$row->obsolete) {
                 $row->update({ obsolete => 1 });
                 $retired++;
             }
         }
-        my $p1029 = $schema->resultset('CoaAccount')->find({ accno => '1029' });
+        my $p1029 = $schema->resultset('Accounting::CoaAccount')->find({ accno => '1029' });
         if ($p1029 && $p1029->description ne 'Prepaid Vendor Balances') {
             $p1029->update({ description => 'Prepaid Vendor Balances', obsolete => 0 });
             $updated++;
@@ -458,7 +458,7 @@ sub transfer_new :Path('/Accounting/transfer/new') :Args(0) {
 
     my (@asset_accounts, @liability_accounts, @expense_accounts);
     eval {
-        my @all = $schema->resultset('CoaAccount')->search(
+        my @all = $schema->resultset('Accounting::CoaAccount')->search(
             { obsolete => 0 },
             { order_by => 'accno' }
         )->all;
@@ -522,7 +522,7 @@ sub transfer_create :Path('/Accounting/transfer/create') :Args(0) {
     my ($gl_id, $err);
     eval {
         $schema->txn_do(sub {
-            my $gl = $schema->resultset('GlEntry')->create({
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
                 reference   => $reference,
                 description => $notes,
                 entry_type  => $entry_type,
@@ -535,14 +535,14 @@ sub transfer_create :Path('/Accounting/transfer/create') :Args(0) {
             $gl_id = $gl->id;
 
             my $sort = 1;
-            $schema->resultset('GlEntryLine')->create({
+            $schema->resultset('Accounting::GlEntryLine')->create({
                 gl_entry_id => $gl_id,
                 account_id  => $to_id,
                 amount      => $amount,
                 memo        => $notes,
                 sort_order  => $sort++,
             });
-            $schema->resultset('GlEntryLine')->create({
+            $schema->resultset('Accounting::GlEntryLine')->create({
                 gl_entry_id => $gl_id,
                 account_id  => $from_id,
                 amount      => -$amount,
@@ -551,14 +551,14 @@ sub transfer_create :Path('/Accounting/transfer/create') :Args(0) {
             });
 
             if ($fee_amount > 0 && $fee_acct) {
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl_id,
                     account_id  => $fee_acct,
                     amount      => $fee_amount,
                     memo        => 'Fee: ' . $notes,
                     sort_order  => $sort++,
                 });
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl_id,
                     account_id  => $from_id,
                     amount      => -$fee_amount,
@@ -728,7 +728,7 @@ sub api_gl :Path('/Accounting/api/gl') :Args(0) {
 
     eval {
         $schema->txn_do(sub {
-            my $gl = $schema->resultset('GlEntry')->create({
+            my $gl = $schema->resultset('Accounting::GlEntry')->create({
                 reference   => $reference,
                 description => $data->{description} || undef,
                 entry_type  => $data->{entry_type}  || 'general',
@@ -742,7 +742,7 @@ sub api_gl :Path('/Accounting/api/gl') :Args(0) {
 
             my $sort = 1;
             for my $line (@$lines) {
-                $schema->resultset('GlEntryLine')->create({
+                $schema->resultset('Accounting::GlEntryLine')->create({
                     gl_entry_id => $gl_entry_id,
                     account_id  => $line->{account_id},
                     amount      => $line->{amount},
@@ -788,7 +788,7 @@ sub api_gl_view :Path('/Accounting/api/gl') :Args(1) {
 
     my ($entry, $err);
     eval {
-        $entry = $self->_schema($c)->resultset('GlEntry')->find(
+        $entry = $self->_schema($c)->resultset('Accounting::GlEntry')->find(
             $id,
             { prefetch => { lines => 'account' } }
         );

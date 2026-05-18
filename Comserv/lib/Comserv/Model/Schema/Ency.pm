@@ -94,5 +94,8 @@ __PACKAGE__->register_class('InventoryItemBOM', 'Comserv::Model::Schema::Ency::R
 __PACKAGE__->register_class('SupportTicket', 'Comserv::Model::Schema::Ency::Result::SupportTicket');
 __PACKAGE__->register_class('TicketMessage', 'Comserv::Model::Schema::Ency::Result::TicketMessage');
 
+# Register schedule settings for time-block planner
+__PACKAGE__->register_class('UserScheduleSettings', 'Comserv::Model::Schema::Ency::Result::UserScheduleSettings');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;
