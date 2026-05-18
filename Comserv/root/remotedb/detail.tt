@@ -12,6 +12,7 @@
            class="btn btn-secondary"
            title="Test TCP connectivity to [% conn.config.host | html %]:[% conn.config.port | html %]">Test Connection</a>
         <a href="[% c.uri_for('/remotedb/view') %]/[% conn_name | uri %]" class="btn btn-secondary">Browse Tables</a>
+        <a href="[% c.uri_for('/remotedb/migrate') %]?target=[% conn_name | uri %]" class="btn btn-secondary">&#8658; Migrate To/From</a>
         <a href="[% c.uri_for('/remotedb/remove') %]/[% conn_name | uri %]"
            class="btn btn-delete"
            onclick="return confirm('Remove [% conn_name | html %]? This cannot be undone.')">Remove</a>
