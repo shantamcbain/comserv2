@@ -1,73 +1,93 @@
-[% META title = 'Remote Database Management' %]
+[% META title = 'Database Server Management' %]
 
-<div class="container">
-    <h1>Remote Database Management</h1>
-    
-    [% IF c.flash.success_msg %]
-    <div class="alert alert-success">
-        [% c.flash.success_msg %]
-    </div>
+[% IF success_msg %]<div class="alert alert-success">[% success_msg | html %]</div>[% END %]
+[% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1em;flex-wrap:wrap;gap:0.5em;">
+    <h1 style="margin:0;">Database Server Management</h1>
+    <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
+</div>
+
+<p style="color:#666;margin-bottom:1.5em;">
+    Servers are stored in <code>~/.comserv/secrets/dbi/</code> — shared across all branches, no per-branch reconfiguration needed.
+    Changes take effect after an application restart.
+</p>
+
+[% SET conn_keys = connections.keys.sort %]
+[% IF conn_keys.size > 0 %]
+
+<div style="overflow-x:auto;">
+<table class="table table-striped" style="width:100%;border-collapse:collapse;">
+    <thead style="background:#f0f0f0;">
+        <tr>
+            <th style="padding:8px;">Name</th>
+            <th style="padding:8px;">Type</th>
+            <th style="padding:8px;">Host : Port</th>
+            <th style="padding:8px;">Database</th>
+            <th style="padding:8px;">Environment</th>
+            <th style="padding:8px;">Role</th>
+            <th style="padding:8px;">Priority</th>
+            <th style="padding:8px;">Description</th>
+            <th style="padding:8px;">Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    [% FOREACH name IN conn_keys %]
+        [% SET conn = connections.$name %]
+        [% SET cfg  = conn.config %]
+        [% SET env_badge = cfg.environment == 'production' ? 'background:#d32f2f;color:#fff' :
+                           cfg.environment == 'development' ? 'background:#1976d2;color:#fff' :
+                           cfg.environment == 'staging'     ? 'background:#f57c00;color:#fff' :
+                                                              'background:#555;color:#fff' %]
+        <tr>
+            <td style="padding:8px;font-weight:bold;">[% name | html %]</td>
+            <td style="padding:8px;"><code>[% cfg.db_type | html %]</code></td>
+            <td style="padding:8px;font-family:monospace;">[% cfg.host | html %]:[% cfg.port | html %]</td>
+            <td style="padding:8px;"><code>[% cfg.database | html %]</code></td>
+            <td style="padding:8px;">
+                <span style="[% env_badge %];padding:2px 8px;border-radius:10px;font-size:0.85em;">
+                    [% cfg.environment | html %]
+                </span>
+            </td>
+            <td style="padding:8px;">[% cfg.role | html %]</td>
+            <td style="padding:8px;text-align:center;">[% cfg.priority | html %]</td>
+            <td style="padding:8px;font-size:0.9em;color:#555;">[% cfg.description | html %]</td>
+            <td style="padding:8px;white-space:nowrap;">
+                <a href="[% c.uri_for('/remotedb/test', [name]) %]"
+                   class="btn btn-sm btn-outline-success"
+                   style="margin:1px;"
+                   title="Test TCP connectivity">⚡ Test</a>
+                <a href="[% c.uri_for('/remotedb/edit', [name]) %]"
+                   class="btn btn-sm btn-outline-primary"
+                   style="margin:1px;">✎ Edit</a>
+                <a href="[% c.uri_for('/remotedb/view', [name]) %]"
+                   class="btn btn-sm btn-outline-secondary"
+                   style="margin:1px;">⊞ Tables</a>
+                <a href="[% c.uri_for('/remotedb/remove', [name]) %]"
+                   class="btn btn-sm btn-outline-danger"
+                   style="margin:1px;"
+                   onclick="return confirm('Remove [% name | html %]?')">✕ Remove</a>
+            </td>
+        </tr>
     [% END %]
-    
-    [% IF c.flash.error_msg %]
-    <div class="alert alert-danger">
-        [% c.flash.error_msg %]
-    </div>
-    [% END %]
-    
-    <div class="row mb-4">
-        <div class="col">
-            <a href="[% c.uri_for(c.controller('RemoteDB').action_for('add_connection')) %]" class="btn btn-primary">
-                Add New Remote Database Connection
-            </a>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h2>Configured Remote Connections</h2>
-        </div>
-        <div class="card-body">
-            [% IF connections.keys.size > 0 %]
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Connection Name</th>
-                            <th>Database Type</th>
-                            <th>Host</th>
-                            <th>Database</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH conn_name IN connections.keys.sort %]
-                            [% SET conn = connections.$conn_name %]
-                            <tr>
-                                <td>[% conn_name %]</td>
-                                <td>[% conn.config.db_type %]</td>
-                                <td>[% conn.config.host %]:[% conn.config.port %]</td>
-                                <td>[% conn.config.database %]</td>
-                                <td>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('view'), [conn_name]) %]" class="btn btn-sm btn-info">
-                                        View Tables
-                                    </a>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('query'), [conn_name]) %]" class="btn btn-sm btn-secondary">
-                                        Run Query
-                                    </a>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('remove'), [conn_name]) %]" class="btn btn-sm btn-danger" 
-                                       onclick="return confirm('Are you sure you want to remove this connection?');">
-                                        Remove
-                                    </a>
-                                </td>
-                            </tr>
-                        [% END %]
-                    </tbody>
-                </table>
-            [% ELSE %]
-                <div class="alert alert-info">
-                    No remote database connections configured yet. Click the button above to add one.
-                </div>
-            [% END %]
-        </div>
-    </div>
+    </tbody>
+</table>
+</div>
+
+[% ELSE %]
+<div class="alert alert-info">
+    No database servers configured yet.
+    <a href="[% c.uri_for('/remotedb/add') %]">Add the first one.</a>
+</div>
+[% END %]
+
+<div style="margin-top:2em;padding:1em;background:#f9f9f9;border:1px solid #ddd;border-radius:5px;">
+    <h3 style="margin-top:0;">How the connection system works</h3>
+    <ul style="margin:0;">
+        <li><strong>Priority 1</strong> = highest priority (tried first for a given database name)</li>
+        <li>The app tests each connection in priority order and uses the first one that responds</li>
+        <li>Files live at <code>~/.comserv/secrets/dbi/&lt;name&gt;.json</code> — one file per server</li>
+        <li>This directory is shared across all branches — set once, works everywhere</li>
+        <li>For Docker containers: use the <em>external</em> mapped port (e.g. 3307, 5433) not the internal port</li>
+    </ul>
 </div>

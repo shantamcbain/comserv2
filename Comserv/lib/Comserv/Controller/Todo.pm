@@ -655,12 +655,14 @@ sub edit :Path('/todo/edit') :Args(1) {
 
     my $edit_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my $edit_sites = [];
-    eval {
-        my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
-            {}, { order_by => 'name' }
-        )->all;
-        $edit_sites = \@site_rows;
-    };
+    if ($edit_is_csc) {
+        eval {
+            my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $edit_sites = \@site_rows;
+        };
+    }
 
     my $todo_sitename = eval { $todo->get_column('sitename') } // '';
 
@@ -2687,11 +2689,13 @@ sub reschedule :Path('reschedule') :Args(0) {
                     if $days_stale > 180;
             }
 
+            my $new_due_date;
             if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                 my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
                 if ($days_until_due < 0) {
                     $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
+                    $new_due_date = $today;
                 } elsif ($days_until_due <= 7) {
                     $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
                 }
@@ -2720,6 +2724,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                 last_mod_by      => 'reschedule',
                 last_mod_date    => $today,
             );
+            $update{due_date} = $new_due_date if $new_due_date;
 
             eval { $todo->update(\%update) };
             if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }

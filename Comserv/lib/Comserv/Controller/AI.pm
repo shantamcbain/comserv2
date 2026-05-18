@@ -770,12 +770,14 @@ sub generate :Local :Args(0) {
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-4.3
             );
-            my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -812,12 +814,12 @@ sub generate :Local :Args(0) {
                     if ($key_obj) {
                         my $meta       = $key_obj->get_metadata() || {};
                         my $deprecated = $meta->{deprecated_models} || {};
-                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} } && !$GROK_DEAD{ $meta->{last_working_model} }) {
                             $grok->model($meta->{last_working_model});
                         } else {
                             my $synced = $meta->{available_models} || [];
                             my ($first) = grep {
-                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} } && !$GROK_DEAD{ $_->{id} }
                             } @$synced;
                             $grok->model($first->{id}) if $first && $first->{id};
                         }
@@ -875,11 +877,16 @@ sub generate :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer newer models: use reverse-alphabetical sort as heuristic
-                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
-                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
+                            # Prefer numeric-version models (grok-4, grok-3...) over
+                            # alphabetic-named ones (grok-code-*, grok-beta) then reverse-sort
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -2323,12 +2330,14 @@ sub chat :Local :Args(0) {
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
+                grok-4.3
             );
-            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
+            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2368,9 +2377,14 @@ sub chat :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
+                                         && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
+                            my ($best) = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -6787,16 +6801,32 @@ sub sync_models :Local :Args(0) {
         }
 
         # Extract model list (OpenAI-compatible format: data[].id)
+        my %SYNC_DEAD = map { $_ => 1 } qw(
+            grok-code-fast-1
+            grok-4-fast-non-reasoning
+            grok-4-1-fast-non-reasoning
+            grok-4-0709
+            grok-3
+            grok-4-fast-reasoning
+            grok-4-1-fast-reasoning
+            grok-4.3
+        );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
             foreach my $m (@{$data->{data}}) {
                 next unless $m->{id};
+                next if $SYNC_DEAD{$m->{id}};
+                next if $m->{id} =~ /imagine|video/i;
                 push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
             }
         }
 
-        # Sort models alphabetically
-        @models = sort { $a->{id} cmp $b->{id} } @models;
+        # Sort models: numeric-version first (grok-4, grok-3...) then alphabetic, reverse within groups
+        @models = sort {
+            my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+            $bn <=> $an || $b->{id} cmp $a->{id}
+        } @models;
 
         # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
@@ -9838,28 +9868,55 @@ journal entries, and pre-fill data-entry forms. You do NOT post actual GL entrie
 records, or execute any accounting transaction directly — all financial records must be created by
 a human through the appropriate form.
 
-Do NOT emit create_gl_entry or any action that writes directly to accounting tables. Instead,
-explain the correct journal entry (DR/CR accounts, amounts, reference) and direct the user to
-/Accounting/gl/new to enter it manually.
+PERMITTED ACTIONS (the ONLY actions you may emit):
+- navigate_and_fill — to open and pre-fill a form (supplier invoice OR account transfer)
+
+FORBIDDEN ACTIONS (never emit these, no matter what the user asks):
+- create_gl_entry — direct the user to /Accounting/gl/new instead
+- create_todo — tell the user to add it manually in /todo
+- update_todo_status, reschedule_todo, add_todo_comment, create_log_entry — not your domain
+- Any action that writes to the database directly
+
+When the user asks you to "create a todo", "add a reminder", "log this", or similar:
+Respond with plain text only — describe what todo they should add, then tell them to go to /todo
+to add it manually. Do NOT emit any ACTION block.
 
 ## PRE-FILL FORM ACTIONS
-You may open and pre-fill data-entry forms so the user can review and submit them:
 
-To open the supplier invoice form and pre-fill it from a bill the user has pasted:
-Parse the bill text, then emit ONE navigate_and_fill action on its own line:
+### Automatic form opening (NO explicit request needed)
+When the user pastes ANY financial document — a bill, invoice, receipt, payment confirmation,
+deposit notification, account refill email, or subscription renewal — you MUST immediately open
+and pre-fill the correct form WITHOUT waiting to be asked. Do NOT give step-by-step instructions.
+Do NOT ask the user to navigate manually.
 
-[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. Freedom Mobile autopay Apr 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
+### Supplier invoices / bills (goods or services received, pay later)
+Use the supplier invoice form. Parse the document then emit ONE navigate_and_fill action:
 
-Rules for navigate_and_fill invoice entry:
-- supplier_id is a dropdown — tell the user the supplier name and ask them to select it after the form opens.
-- If the supplier does not exist, suggest they go to /Inventory/supplier/add first.
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_OR_REF_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT"}}]
+
+Rules for invoice entries:
+- supplier_id is a dropdown — tell the user which supplier to select. If missing, open
+  /Inventory/supplier/add?popup=1, add the supplier, then return to select it.
 - Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
-- If the bill shows "$22.40 total, tax included" with no breakdown, set tax_amount to 0 and unit_cost_0 to the full amount.
-- auto_pay_method and auto_pay: fill both only if the bill shows "Auto Pay" or similar (e.g. "Visa Auto Pay"); omit both if not autopay.
-- After the action line, briefly list the values you used so the user can verify before saving.
+- auto_pay / auto_pay_method: fill only if the document shows "Auto Pay".
+- After the action, list the extracted values so the user can verify before saving.
 
-Only use actions when the user explicitly requests a data change.  Always confirm
-the details before executing.
+### Deposit / account refill / prepaid top-up emails
+These are confirmations that money was transferred FROM one of your payment accounts INTO a
+prepaid vendor balance (PayPal reseller credit, HostGator prepaid, eNom prepaid, etc.).
+This is NOT a supplier invoice — it is an asset transfer. Use the Transfer form:
+
+[ACTION: {"action": "navigate_and_fill", "url": "/Accounting/transfer/new", "fields": {"entry_type": "prepaid_topup", "amount": "DEPOSIT_AMOUNT", "post_date": "YYYY-MM-DD", "reference": "REFERENCE_NO", "notes": "e.g. PayPal → eNom prepaid top-up shantahostgator May 2026", "fee_amount": "CONVENIENCE_FEE_IF_ANY"}}]
+
+After the action, tell the user:
+- Which "From" account to select (e.g. "1010 PayPal Account" if paid via PayPal)
+- Which "To" account to select (e.g. "1021 HostGator Prepaid Balance")
+- If a fee was charged, the fee account (default: "6720 PayPal / Stripe Convenience Fees")
+- Transaction type: select "Prepaid Top-Up" tab
+
+Signals this is a deposit/refill (not an invoice):
+"Amount Deposited", "Account Balance", "Account Refill", "Refill Convenience Charge",
+"adding funds", "Reference No" with no line-item products.
 
 $editor_section
 The current user is: $username
@@ -10249,6 +10306,28 @@ sub transcribe :Local :Args(0) {
         return;
     }
 
+    my $safe_user_early = $username; $safe_user_early =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base_early       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs_early      = "${nfs_base_early}/bmaster/audio";
+    my $transcript_nfs_early = "${nfs_base_early}/bmaster/transcripts";
+    my $timestamp_early      = time();
+    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
+    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+    my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size_early = $upload->size;
+
+    eval {
+        require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
+        require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
+            or die "copy to NFS failed: $!";
+    };
+    if ($@) {
+        unlink $tmp_file;
+        $c->response->status(500);
+        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS: $@" }));
+        return;
+    }
+
     my $worktree  = $c->path_to('..')->stringify;
     my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
@@ -10281,10 +10360,17 @@ sub transcribe :Local :Args(0) {
 
     unless ($python_bin) {
         unlink $tmp_file;
-        $c->response->status(503);
         $c->response->body(encode_json({
-            success => JSON::false,
-            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
+            success              => JSON::true,
+            audio_saved          => JSON::true,
+            transcription_status => 'whisper_unavailable',
+            audio_nfs_path       => $nfs_audio_file_early,
+            message              => 'Audio saved. Whisper not available — install openai-whisper to enable transcription.',
+            orig_name            => $orig_name,
+            file_size            => $upload_size_early,
+            sitename             => $sitename_early,
+            username             => $username,
+            ext                  => $ext,
         }));
         return;
     }
@@ -10361,15 +10447,14 @@ PYSCRIPT
     print $sfh $whisper_script;
     close $sfh;
 
-    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
-    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
-    my $audio_nfs      = "${nfs_base}/bmaster/audio";
-    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
-    my $timestamp      = time();
-    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
-    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
-    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
-    my $upload_size    = $upload->size;
+    my $safe_user           = $safe_user_early;
+    my $audio_nfs           = $audio_nfs_early;
+    my $transcript_nfs      = $transcript_nfs_early;
+    my $timestamp           = $timestamp_early;
+    my $nfs_audio_file      = $nfs_audio_file_early;
+    my $nfs_transcript_file = $nfs_transcript_file_early;
+    my $sitename            = $sitename_early;
+    my $upload_size         = $upload_size_early;
 
     {
         open(my $sf, '>', $status_file) or do { };
@@ -10408,26 +10493,24 @@ PYSCRIPT
 
             if ($@ || !$json_out) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@", audio_nfs_path => $nfs_audio_file }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $result = eval { decode_json($json_out) };
             unless ($result && $result->{transcript}) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript', audio_nfs_path => $nfs_audio_file }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $model_used = $result->{model} || $whisper_model;
             my $segments   = $result->{segments} || [];
 
-            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
-            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
             unlink $tmp_file;
 
-            my $nfs_ok = !$@;
-            if ($nfs_ok) {
+            my $transcript_ok = 1;
+            {
                 my $transcript_json = encode_json({
                     transcript => $result->{transcript},
                     segments   => $segments,
@@ -10435,7 +10518,9 @@ PYSCRIPT
                     recorded_by => $username,
                     original_filename => $orig_name,
                 });
-                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
+                open(my $tfh, '>:utf8', $nfs_transcript_file) or ($transcript_ok = 0);
+                print $tfh $transcript_json if $transcript_ok;
+                close $tfh if $transcript_ok;
             }
 
             open(my $rf, '>', $result_file);
@@ -10445,8 +10530,8 @@ PYSCRIPT
                 model_used         => $model_used,
                 segments           => $segments,
                 diarized           => $has_diarizer ? JSON::true : JSON::false,
-                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
-                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
+                audio_nfs_path     => $nfs_audio_file,
+                transcript_nfs_path=> $transcript_ok ? $nfs_transcript_file : undef,
                 orig_name          => $orig_name,
                 file_size          => $upload_size,
                 sitename           => $sitename,

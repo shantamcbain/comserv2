@@ -580,19 +580,67 @@ sub get_available_connections_for_database {
     return \@available;
 }
 
-sub add_connection {
+sub _secrets_dir {
+    my ($self) = @_;
+    my $home = $ENV{HOME} || '/home/shanta';
+    return "$home/.comserv/secrets/dbi";
+}
+
+sub save_connection {
     my ($self, $conn_name, $conn_config) = @_;
-    
+
+    my $dir = $self->_secrets_dir();
+    unless (-d $dir) {
+        require File::Path;
+        File::Path::make_path($dir, { mode => 0700 });
+    }
+
+    my $file = "$dir/${conn_name}.json";
+    my $data = { $conn_name => $conn_config };
+
+    try {
+        open my $fh, '>', $file or die "Cannot write $file: $!";
+        print $fh JSON::encode_json($data);
+        close $fh;
+        chmod 0600, $file;
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'save_connection',
+            "Saved connection '$conn_name' to $file");
+    } catch {
+        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'save_connection',
+            "Failed to save connection '$conn_name': $_");
+        die $_;
+    };
+
     $self->_load_config();
     my $config = $self->config;
-    
     $config->{$conn_name} = $conn_config;
     $self->config($config);
-    
-    $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'add_connection',
-        "Added new connection: $conn_name");
-    
+
     return 1;
+}
+
+sub remove_connection {
+    my ($self, $conn_name) = @_;
+
+    my $file = $self->_secrets_dir() . "/${conn_name}.json";
+    if (-f $file) {
+        unlink $file or die "Cannot delete $file: $!";
+        $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'remove_connection',
+            "Deleted secrets file for '$conn_name'");
+    }
+
+    $self->_load_config();
+    my $config = $self->config;
+    delete $config->{$conn_name};
+    $self->config($config);
+
+    return 1;
+}
+
+sub add_connection {
+    my ($self, $conn_name, $conn_config) = @_;
+
+    return $self->save_connection($conn_name, $conn_config);
 }
 
 sub get_connection {
