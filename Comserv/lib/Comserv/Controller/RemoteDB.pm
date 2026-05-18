@@ -302,5 +302,54 @@ sub query :Path('query') :Args(1) {
     );
 }
 
+sub migrate :Path('migrate') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+
+    my $remote_db   = $self->_remote_db();
+    my $connections = $remote_db->get_all_connections();
+    my @conn_keys   = sort keys %$connections;
+
+    if ($c->req->method eq 'POST') {
+        my $p           = $c->req->params;
+        my $source      = $p->{source}      // '';
+        my $target      = $p->{target}      // '';
+        my $schema_only = $p->{schema_only} ? 1 : 0;
+        my $truncate    = $p->{truncate}    ? 1 : 0;
+
+        unless ($source && $target) {
+            $c->stash(error_msg => 'Please select both a source and target connection.');
+        } elsif ($source eq $target) {
+            $c->stash(error_msg => 'Source and target must be different connections.');
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
+                "Starting migration: $source -> $target (schema_only=$schema_only, truncate=$truncate)");
+
+            my ($ok, $results, $err) = $remote_db->migrate_database($source, $target, {
+                schema_only => $schema_only,
+                truncate    => $truncate,
+            });
+
+            $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'migrate',
+                "Migration $source -> $target " . ($ok ? "completed OK" : "FAILED: $err"));
+
+            $c->stash(
+                migrate_done    => 1,
+                migrate_ok      => $ok,
+                migrate_results => $results,
+                migrate_error   => $err,
+                last_source     => $source,
+                last_target     => $target,
+            );
+        }
+    }
+
+    $c->stash(
+        template    => 'remotedb/migrate.tt',
+        connections => $connections,
+        conn_keys   => \@conn_keys,
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
