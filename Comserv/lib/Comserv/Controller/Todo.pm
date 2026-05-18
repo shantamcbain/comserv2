@@ -168,7 +168,7 @@ sub begin :Private {
     return 1 if $c->req->path =~ m{^api/};
 
     # AJAX update endpoints require only a valid session, not admin/developer
-    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single|quick_close|quick_priority|reschedule|day_drop)\b}) {
+    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single|quick_close|quick_priority|reschedule|day_drop|update_recurring_time|open_log|close_log)\b}) {
         unless ($c->session->{user_id}) {
             $c->stash(json => { success => 0, error => 'Not authenticated' });
             $c->forward('View::JSON');
