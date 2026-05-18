@@ -1069,18 +1069,28 @@ sub migrate_database {
     }
 
     my @tables;
+    my @views;
     eval {
-        my $sth = $src_dbh->prepare("SHOW TABLES");
+        my $sth = $src_dbh->prepare("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
         $sth->execute();
         while (my ($t) = $sth->fetchrow_array()) {
             push @tables, $t;
         }
+        my $vsth = $src_dbh->prepare("SHOW FULL TABLES WHERE Table_type = 'VIEW'");
+        $vsth->execute();
+        while (my ($v) = $vsth->fetchrow_array()) {
+            push @views, $v;
+        }
     };
-    if ($@ || !@tables) {
+    if ($@) {
         $src_dbh->disconnect();
         $tgt_dbh->disconnect();
-        my $err = $@ || "No tables found in source database";
-        return (0, [], "Failed to list source tables: $err");
+        return (0, [], "Failed to list source tables: $@");
+    }
+    unless (@tables || @views) {
+        $src_dbh->disconnect();
+        $tgt_dbh->disconnect();
+        return (0, [], "No tables or views found in source database");
     }
 
     my @results;
@@ -1134,6 +1144,22 @@ sub migrate_database {
             }
         }
 
+        push @results, $result;
+    }
+
+    foreach my $view (@views) {
+        my $result = { table => "$view (view)", schema_ok => 0, rows => 0, error => '' };
+        eval {
+            my $row = $src_dbh->selectrow_arrayref("SHOW CREATE VIEW `$view`");
+            my $create = $row->[1];
+            $tgt_dbh->do("DROP VIEW IF EXISTS `$view`");
+            $tgt_dbh->do($create);
+            $result->{schema_ok} = 1;
+        };
+        if ($@) {
+            $result->{error} = "View: $@";
+            $overall_ok = 0;
+        }
         push @results, $result;
     }
 

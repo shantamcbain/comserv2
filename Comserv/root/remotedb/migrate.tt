@@ -123,8 +123,7 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" class="btn btn-primary"
-                onclick="return confirm('This will write data to the target server. Continue?')">
+        <button type="submit" id="migrate-btn" class="btn btn-primary">
             Run Migration
         </button>
         <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">Cancel</a>
@@ -135,4 +134,49 @@
 </div>
 </div>
 
+<div id="migrate-progress" style="display:none;">
+    <div class="content-container">
+    <div class="form-section">
+        <h3>Migration In Progress</h3>
+        <p>Copying schema and data between servers. This may take several minutes for large databases.</p>
+        <p>
+            <strong id="progress-elapsed">Elapsed: 0s</strong>
+        </p>
+        <div id="progress-bar-wrap" style="background:#e0e0e0;border-radius:4px;height:18px;width:100%;max-width:500px;">
+            <div id="progress-bar" style="background:#1976d2;height:18px;border-radius:4px;width:0%;transition:width 0.5s;"></div>
+        </div>
+        <p style="color:#666;font-size:0.9em;margin-top:0.5em;">Do not close this page. The page will reload automatically when the migration completes.</p>
+    </div>
+    </div>
 </div>
+
+<script>
+(function() {
+    var form = document.querySelector('form.app-form');
+    var btn  = document.getElementById('migrate-btn');
+    var prog = document.getElementById('migrate-progress');
+    var bar  = document.getElementById('progress-bar');
+    var elapsed = document.getElementById('progress-elapsed');
+    var seconds = 0;
+    var timer;
+
+    form.addEventListener('submit', function(e) {
+        if (!confirm('This will write data to the target server. Continue?')) {
+            e.preventDefault();
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Migrating...';
+        prog.style.display = 'block';
+        form.querySelector('.form-section').style.display = 'none';
+
+        timer = setInterval(function() {
+            seconds++;
+            elapsed.textContent = 'Elapsed: ' + seconds + 's';
+            var pct = Math.min(95, seconds * 2);
+            bar.style.width = pct + '%';
+        }, 1000);
+    });
+})();
+</script>
+
