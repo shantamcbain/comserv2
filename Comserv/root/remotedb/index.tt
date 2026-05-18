@@ -1,84 +1,77 @@
 [% META title = 'Database Server Management' %]
 
-[% IF success_msg %]<div class="alert alert-success">[% success_msg | html %]</div>[% END %]
-[% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+[% IF success_msg %]<div class="success-message">[% success_msg | html %]</div>[% END %]
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1em;flex-wrap:wrap;gap:0.5em;">
-    <h1 style="margin:0;">Database Server Management</h1>
+<div class="page-header">
+    <h1>Database Server Management</h1>
     <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
 </div>
 
-<p style="color:#666;margin-bottom:1.5em;">
+<p class="help-text">
     Servers are stored in <code>~/.comserv/secrets/dbi/</code> — shared across all branches, no per-branch reconfiguration needed.
-    Changes take effect after an application restart.
 </p>
 
 [% SET conn_keys = connections.keys.sort %]
 [% IF conn_keys.size > 0 %]
 
-<div style="overflow-x:auto;">
-<table class="table table-striped" style="width:100%;border-collapse:collapse;">
-    <thead style="background:#f0f0f0;">
+<table class="data-table">
+    <thead>
         <tr>
-            <th style="padding:8px;">Name</th>
-            <th style="padding:8px;">Type</th>
-            <th style="padding:8px;">Host : Port</th>
-            <th style="padding:8px;">Database</th>
-            <th style="padding:8px;">Environment</th>
-            <th style="padding:8px;">Role</th>
-            <th style="padding:8px;">Priority</th>
-            <th style="padding:8px;">Description</th>
-            <th style="padding:8px;">Actions</th>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Host : Port</th>
+            <th>Database</th>
+            <th>Environment</th>
+            <th>Role</th>
+            <th>Priority</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
     [% FOREACH name IN conn_keys %]
         [% SET conn = connections.$name %]
         [% SET cfg  = conn.config %]
-        [% SET env_badge = cfg.environment == 'production' ? 'background:#d32f2f;color:#fff' :
-                           cfg.environment == 'development' ? 'background:#1976d2;color:#fff' :
-                           cfg.environment == 'staging'     ? 'background:#f57c00;color:#fff' :
-                                                              'background:#555;color:#fff' %]
         <tr>
-            <td style="padding:8px;font-weight:bold;">
+            <td>
                 <a href="[% c.uri_for('/remotedb/detail') %]/[% name | uri %]"
                    title="Click to view details and edit settings for [% name | html %]"
-                   style="text-decoration:none;color:inherit;border-bottom:1px dotted #666;">
+                   class="detail-link">
                     [% name | html %]
                 </a>
             </td>
-            <td style="padding:8px;"><code>[% cfg.db_type | html %]</code></td>
-            <td style="padding:8px;font-family:monospace;">[% cfg.host | html %]:[% cfg.port | html %]</td>
-            <td style="padding:8px;"><code>[% cfg.database | html %]</code></td>
-            <td style="padding:8px;">
-                <span style="[% env_badge %];padding:2px 8px;border-radius:10px;font-size:0.85em;">
-                    [% cfg.environment | html %]
-                </span>
+            <td><code>[% cfg.db_type | html %]</code></td>
+            <td><code>[% cfg.host | html %]:[% cfg.port | html %]</code></td>
+            <td><code>[% cfg.database | html %]</code></td>
+            <td>
+                [% SET env_class = cfg.environment == 'production'  ? 'badge-danger'  :
+                                   cfg.environment == 'development' ? 'badge-info'    :
+                                   cfg.environment == 'staging'     ? 'badge-warning' :
+                                                                      'badge-default' %]
+                <span class="badge [% env_class %]">[% cfg.environment | html %]</span>
             </td>
-            <td style="padding:8px;">[% cfg.role | html %]</td>
-            <td style="padding:8px;text-align:center;">[% cfg.priority | html %]</td>
-            <td style="padding:8px;font-size:0.9em;color:#555;">[% cfg.description | html %]</td>
-            <td style="padding:8px;white-space:nowrap;">
+            <td>[% cfg.role | html %]</td>
+            <td>[% cfg.priority | html %]</td>
+            <td>
                 <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
                    title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]"
-                   style="margin:1px;">⚡ Test</a>
+                   class="btn btn-sm btn-outline-success">&#9889; Test</a>
             </td>
         </tr>
     [% END %]
     </tbody>
 </table>
-</div>
 
 [% ELSE %]
-<div class="alert alert-info">
+<div class="info-message">
     No database servers configured yet.
     <a href="[% c.uri_for('/remotedb/add') %]">Add the first one.</a>
 </div>
 [% END %]
 
-<div style="margin-top:2em;padding:1em;background:#f9f9f9;border:1px solid #ddd;border-radius:5px;">
-    <h3 style="margin-top:0;">How the connection system works</h3>
-    <ul style="margin:0;">
+<div class="info-box">
+    <h3>How the connection system works</h3>
+    <ul>
         <li><strong>Priority 1</strong> = highest priority (tried first for a given database name)</li>
         <li>The app tests each connection in priority order and uses the first one that responds</li>
         <li>Files live at <code>~/.comserv/secrets/dbi/&lt;name&gt;.json</code> — one file per server</li>
