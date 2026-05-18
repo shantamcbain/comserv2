@@ -330,8 +330,16 @@ sub migrate :Path('migrate') :Args(0) {
                 truncate    => $truncate,
             });
 
-            $self->logging->log_with_details($c, $ok ? 'info' : 'error', __FILE__, __LINE__, 'migrate',
-                "Migration $source -> $target " . ($ok ? "completed OK" : "FAILED: $err"));
+            if (!$ok) {
+                my @errs = grep { $_->{error} } @$results;
+                my $err_summary = $err || join('; ', map { "$_->{table}: $_->{error}" } @errs);
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'migrate',
+                    "Migration $source -> $target FAILED — " . scalar(@errs) . " table(s) had errors: $err_summary");
+            } else {
+                my $rows = 0; $rows += ($_->{rows} // 0) for @$results;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
+                    "Migration $source -> $target completed OK — " . scalar(@$results) . " objects, $rows rows total");
+            }
 
             $c->stash(
                 migrate_done    => 1,
