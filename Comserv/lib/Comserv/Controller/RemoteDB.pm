@@ -18,6 +18,7 @@ has 'logging' => (
 my @DB_TYPES = qw(mariadb mysql postgresql sqlite);
 my @ENVIRONMENTS = qw(production development staging backup);
 my @ROLES = qw(primary replica migration backup development);
+my @APP_DATABASES = qw(ency shanta_forager csc_accounting);
 
 sub _remote_db { Comserv::Model::RemoteDB->new() }
 
@@ -70,6 +71,7 @@ sub add_connection :Path('add') :Args(0) {
                 environments => \@ENVIRONMENTS,
                 roles        => \@ROLES,
                 connections  => $all_add,
+                app_databases => \@APP_DATABASES,
                 template     => 'remotedb/add.tt',
             );
             return;
@@ -103,6 +105,7 @@ sub add_connection :Path('add') :Args(0) {
                 environments => \@ENVIRONMENTS,
                 roles        => \@ROLES,
                 connections  => $all_add,
+                app_databases => \@APP_DATABASES,
                 template     => 'remotedb/add.tt',
             );
         };
@@ -111,12 +114,13 @@ sub add_connection :Path('add') :Args(0) {
 
     my $remote_db_add = $self->_remote_db();
     $c->stash(
-        form_data    => {},
-        db_types     => \@DB_TYPES,
-        environments => \@ENVIRONMENTS,
-        roles        => \@ROLES,
-        connections  => $remote_db_add->get_all_connections(),
-        template     => 'remotedb/add.tt',
+        form_data     => {},
+        db_types      => \@DB_TYPES,
+        environments  => \@ENVIRONMENTS,
+        roles         => \@ROLES,
+        connections   => $remote_db_add->get_all_connections(),
+        app_databases => \@APP_DATABASES,
+        template      => 'remotedb/add.tt',
     );
 }
 
@@ -160,29 +164,31 @@ sub edit :Path('edit') :Args(1) {
             $c->response->redirect($c->uri_for($self->action_for('index')));
         } catch {
             $c->stash(
-                error_msg    => "Failed to update connection: $_",
-                form_data    => { %$conn, conn_name => $conn_name },
-                conn_name    => $conn_name,
-                db_types     => \@DB_TYPES,
-                environments => \@ENVIRONMENTS,
-                roles        => \@ROLES,
-                connections  => $all,
-                is_edit      => 1,
-                template     => 'remotedb/add.tt',
+                error_msg     => "Failed to update connection: $_",
+                form_data     => { %$conn, conn_name => $conn_name },
+                conn_name     => $conn_name,
+                db_types      => \@DB_TYPES,
+                environments  => \@ENVIRONMENTS,
+                roles         => \@ROLES,
+                connections   => $all,
+                app_databases => \@APP_DATABASES,
+                is_edit       => 1,
+                template      => 'remotedb/add.tt',
             );
         };
         return;
     }
 
     $c->stash(
-        form_data    => { %$conn, conn_name => $conn_name },
-        conn_name    => $conn_name,
-        db_types     => \@DB_TYPES,
-        environments => \@ENVIRONMENTS,
-        roles        => \@ROLES,
-        connections  => $all,
-        is_edit      => 1,
-        template     => 'remotedb/add.tt',
+        form_data     => { %$conn, conn_name => $conn_name },
+        conn_name     => $conn_name,
+        db_types      => \@DB_TYPES,
+        environments  => \@ENVIRONMENTS,
+        roles         => \@ROLES,
+        connections   => $all,
+        app_databases => \@APP_DATABASES,
+        is_edit       => 1,
+        template      => 'remotedb/add.tt',
     );
 }
 

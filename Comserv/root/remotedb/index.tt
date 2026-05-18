@@ -1,65 +1,66 @@
-[% META title = 'Database Server Management' %]
+
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Database Server Management</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
+    </div>
+</div>
 
 [% IF success_msg %]<div class="success-message">[% success_msg | html %]</div>[% END %]
 [% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
 
-<div class="container">
+<p class="page-subtitle">Servers stored in <code>~/.comserv/secrets/dbi/</code> — shared across all branches.</p>
 
-<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1em;flex-wrap:wrap;gap:0.5em;">
-    <h1 style="margin:0;">Database Server Management</h1>
-    <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
-</div>
-
-<p style="color:var(--text-muted,#666);margin-bottom:1.5em;font-size:0.9em;">
-    Servers stored in <code>~/.comserv/secrets/dbi/</code> — shared across all branches.
-</p>
+<div class="content-container">
+<div class="data-container">
 
 [% SET conn_keys = connections.keys.sort %]
 [% IF conn_keys.size > 0 %]
 
-<div style="overflow-x:auto;">
-<table style="width:100%;border-collapse:collapse;border:1px solid var(--border-color,#ccc);">
+<div class="table-container">
+<table class="data-table">
     <thead>
-        <tr style="background:var(--table-header-bg,#f2f2f2);">
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Name</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Type</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Host : Port</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Database</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Environment</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Role</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Priority</th>
-            <th style="padding:8px;border:1px solid var(--border-color,#ccc);">Actions</th>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Host : Port</th>
+            <th>Database</th>
+            <th>Environment</th>
+            <th>Role</th>
+            <th>Priority</th>
+            <th>Actions</th>
         </tr>
     </thead>
     <tbody>
     [% FOREACH name IN conn_keys %]
         [% SET conn = connections.$name %]
         [% SET cfg  = conn.config %]
-        [% SET env_bg = cfg.environment == 'production'  ? '#d32f2f' :
-                        cfg.environment == 'development' ? '#1976d2' :
-                        cfg.environment == 'staging'     ? '#f57c00' : '#555' %]
+        [% SET env_colour = cfg.environment == 'production'  ? '#d32f2f' :
+                            cfg.environment == 'development' ? '#1565c0' :
+                            cfg.environment == 'staging'     ? '#e65100' : '#555' %]
         <tr>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);font-weight:bold;">
+            <td>
                 <a href="[% c.uri_for('/remotedb/detail') %]/[% name | uri %]"
-                   title="Click to view details and edit settings for [% name | html %]"
-                   style="border-bottom:1px dotted var(--text-color,#333);">
+                   title="Click to view details and edit [% name | html %]">
                     [% name | html %]
                 </a>
             </td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);"><code>[% cfg.db_type | html %]</code></td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);font-family:monospace;">[% cfg.host | html %]:[% cfg.port | html %]</td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);"><code>[% cfg.database | html %]</code></td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);">
-                <span style="background:[% env_bg %];color:#fff;padding:2px 8px;border-radius:10px;font-size:0.85em;">
+            <td><code>[% cfg.db_type | html %]</code></td>
+            <td><code>[% cfg.host | html %]:[% cfg.port | html %]</code></td>
+            <td><code>[% cfg.database | html %]</code></td>
+            <td>
+                <span style="background:[% env_colour %];color:#fff;padding:2px 8px;border-radius:10px;font-size:0.85em;">
                     [% cfg.environment | html %]
                 </span>
             </td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);">[% cfg.role | html %]</td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);text-align:center;">[% cfg.priority | html %]</td>
-            <td style="padding:8px;border:1px solid var(--border-color,#ccc);white-space:nowrap;">
+            <td>[% cfg.role | html %]</td>
+            <td>[% cfg.priority | html %]</td>
+            <td class="action-cell">
                 <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
-                   title="Test connection to [% cfg.host | html %]:[% cfg.port | html %]"
-                   class="btn btn-primary" style="font-size:0.85em;padding:3px 8px;">&#9889; Test</a>
+                   class="btn btn-sm btn-primary"
+                   title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]">Test</a>
             </td>
         </tr>
     [% END %]
@@ -68,13 +69,18 @@
 </div>
 
 [% ELSE %]
-<p>No database servers configured yet. <a href="[% c.uri_for('/remotedb/add') %]">Add the first one.</a></p>
+<div class="empty-state">
+    <p>No database servers configured yet. <a href="[% c.uri_for('/remotedb/add') %]">Add the first one.</a></p>
+</div>
 [% END %]
 
-<div style="margin-top:2em;padding:1em;background:var(--secondary-color,#f9f9f9);border:1px solid var(--border-color,#ccc);border-radius:4px;">
-    <strong>How it works:</strong> Priority 1 = highest (tried first). Files live at
+</div>
+</div>
+
+<div class="content-section">
+    <p><strong>How it works:</strong> Priority 1 = highest (tried first). Files live at
     <code>~/.comserv/secrets/dbi/&lt;name&gt;.json</code> — shared across all branches.
-    Docker containers: use the external mapped port (3307, 5433) not the internal port.
+    Docker containers: use the external mapped port (3307, 5433) not the internal port.</p>
 </div>
 
 </div>
