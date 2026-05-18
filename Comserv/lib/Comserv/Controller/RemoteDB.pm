@@ -18,9 +18,19 @@ has 'logging' => (
 my @DB_TYPES = qw(mariadb mysql postgresql sqlite);
 my @ENVIRONMENTS = qw(production development staging backup);
 my @ROLES = qw(primary replica migration backup development);
-my @KNOWN_DATABASES = qw(ency shanta_forager csc);
 
 sub _remote_db { Comserv::Model::RemoteDB->new() }
+
+sub _known_databases {
+    my ($self) = @_;
+    my $remote_db = $self->_remote_db();
+    my $all = $remote_db->get_all_connections();
+    my %seen;
+    my @names = sort grep { !$seen{$_}++ && length($_) }
+                map  { $all->{$_}{config}{database} // '' }
+                keys %$all;
+    return \@names;
+}
 
 sub _require_admin {
     my ($self, $c) = @_;
@@ -67,7 +77,7 @@ sub add_connection :Path('add') :Args(0) {
                 db_types         => \@DB_TYPES,
                 environments     => \@ENVIRONMENTS,
                 roles            => \@ROLES,
-                known_databases  => \@KNOWN_DATABASES,
+                known_databases  => $self->_known_databases(),
                 template         => 'remotedb/add.tt',
             );
             return;
@@ -101,7 +111,7 @@ sub add_connection :Path('add') :Args(0) {
                 db_types        => \@DB_TYPES,
                 environments    => \@ENVIRONMENTS,
                 roles           => \@ROLES,
-                known_databases => \@KNOWN_DATABASES,
+                known_databases => $self->_known_databases(),
                 template        => 'remotedb/add.tt',
             );
         };
@@ -113,7 +123,7 @@ sub add_connection :Path('add') :Args(0) {
         db_types        => \@DB_TYPES,
         environments    => \@ENVIRONMENTS,
         roles           => \@ROLES,
-        known_databases => \@KNOWN_DATABASES,
+        known_databases => $self->_known_databases(),
         template        => 'remotedb/add.tt',
     );
 }
@@ -164,7 +174,7 @@ sub edit :Path('edit') :Args(1) {
                 db_types        => \@DB_TYPES,
                 environments    => \@ENVIRONMENTS,
                 roles           => \@ROLES,
-                known_databases => \@KNOWN_DATABASES,
+                known_databases => $self->_known_databases(),
                 is_edit         => 1,
                 template        => 'remotedb/add.tt',
             );
@@ -178,7 +188,7 @@ sub edit :Path('edit') :Args(1) {
         db_types        => \@DB_TYPES,
         environments    => \@ENVIRONMENTS,
         roles           => \@ROLES,
-        known_databases => \@KNOWN_DATABASES,
+        known_databases => $self->_known_databases(),
         is_edit         => 1,
         template        => 'remotedb/add.tt',
     );
