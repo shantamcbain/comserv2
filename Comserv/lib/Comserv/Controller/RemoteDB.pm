@@ -214,6 +214,27 @@ sub remove :Path('remove') :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
 
+sub detail :Path('detail') :Args(1) {
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
+    $self->_require_admin($c);
+
+    my $remote_db = $self->_remote_db();
+    my $all = $remote_db->get_all_connections();
+
+    unless (exists $all->{$conn_name}) {
+        $c->flash->{error_msg} = "Connection '$conn_name' not found.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(
+        template  => 'remotedb/detail.tt',
+        conn_name => $conn_name,
+        conn      => $all->{$conn_name},
+    );
+}
+
 sub view :Path('view') :Args(1) {
     my ($self, $c) = @_;
     my $conn_name = $c->req->args->[0] // '';

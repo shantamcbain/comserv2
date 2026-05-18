@@ -40,7 +40,13 @@
                            cfg.environment == 'staging'     ? 'background:#f57c00;color:#fff' :
                                                               'background:#555;color:#fff' %]
         <tr>
-            <td style="padding:8px;font-weight:bold;">[% name | html %]</td>
+            <td style="padding:8px;font-weight:bold;">
+                <a href="[% c.uri_for('/remotedb/detail') %]/[% name | uri %]"
+                   title="Click to view details and edit settings for [% name | html %]"
+                   style="text-decoration:none;color:inherit;border-bottom:1px dotted #666;">
+                    [% name | html %]
+                </a>
+            </td>
             <td style="padding:8px;"><code>[% cfg.db_type | html %]</code></td>
             <td style="padding:8px;font-family:monospace;">[% cfg.host | html %]:[% cfg.port | html %]</td>
             <td style="padding:8px;"><code>[% cfg.database | html %]</code></td>
@@ -54,19 +60,8 @@
             <td style="padding:8px;font-size:0.9em;color:#555;">[% cfg.description | html %]</td>
             <td style="padding:8px;white-space:nowrap;">
                 <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
-                   class="btn btn-sm btn-outline-success"
-                   style="margin:1px;"
-                   title="Test TCP connectivity">⚡ Test</a>
-                <a href="[% c.uri_for('/remotedb/edit') %]/[% name | uri %]"
-                   class="btn btn-sm btn-outline-primary"
-                   style="margin:1px;">✎ Edit</a>
-                <a href="[% c.uri_for('/remotedb/view') %]/[% name | uri %]"
-                   class="btn btn-sm btn-outline-secondary"
-                   style="margin:1px;">⊞ Tables</a>
-                <a href="[% c.uri_for('/remotedb/remove') %]/[% name | uri %]"
-                   class="btn btn-sm btn-outline-danger"
-                   style="margin:1px;"
-                   onclick="return confirm('Remove [% name | html %]?')">✕ Remove</a>
+                   title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]"
+                   style="margin:1px;">⚡ Test</a>
             </td>
         </tr>
     [% END %]
