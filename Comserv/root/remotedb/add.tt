@@ -75,9 +75,16 @@
                    placeholder="Type or choose from list"
                    required>
             <datalist id="known_databases_list">
-                [% FOREACH db IN known_databases %]<option value="[% db | html %]">[% END %]
+                [% SET db_seen = {} %]
+                [% FOREACH cname IN connections.keys.sort %]
+                    [% SET db = connections.$cname.config.database %]
+                    [% IF db && !db_seen.$db %]
+                        <option value="[% db | html %]">
+                        [% db_seen.$db = 1 %]
+                    [% END %]
+                [% END %]
             </datalist>
-            <small style="color:var(--text-muted,#666);">Known: [% known_databases.join(', ') %] — or type any new name.</small>
+            <small style="color:var(--text-muted,#666);">Choose an existing database name or type a new one.</small>
         </p>
 
         <p style="margin:0 0 0.6em;">
