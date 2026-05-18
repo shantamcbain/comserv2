@@ -172,7 +172,8 @@
 .gcal-ev {
     position: absolute; border-radius: 4px; padding: 2px 5px;
     font-size: 0.77em; overflow: hidden; box-sizing: border-box;
-    color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    color: #fff; background: #1a73e8; border-left: 3px solid #1a73e8;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
     cursor: grab; z-index: 3; transition: box-shadow 0.12s, opacity 0.12s;
     min-height: 18px;
 }
