@@ -727,8 +727,8 @@ sub list_tables {
     }
     
     try {
-        my $tables = $dbh->tables(undef, undef, '%', 'TABLE');
-        return [map { s/^.*\.//; $_ } @$tables];
+        my @tables = $dbh->tables(undef, undef, '%', 'TABLE');
+        return [map { (my $t = $_) =~ s/^.*\.//; $t } @tables];
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_tables',
             "Failed to list tables for '$conn_name': $_");

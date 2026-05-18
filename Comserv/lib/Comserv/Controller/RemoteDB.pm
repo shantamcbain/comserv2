@@ -272,8 +272,13 @@ sub view :Path('view') :Args(1) {
     my $tables = $remote_db->list_tables($c, $conn_name);
 
     unless (defined $tables) {
-        $c->flash->{error_msg} = "Failed to connect to database server '$conn_name'";
+        $c->flash->{error_msg} = "Failed to connect to '$conn_name' — check credentials and that the server is running.";
         $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    if (!@$tables) {
+        $c->flash->{error_msg} = "Connected to '$conn_name' but the database has no tables yet. Run a migration to populate it.";
+        $c->response->redirect($c->uri_for('/remotedb/migrate'));
         return;
     }
 
