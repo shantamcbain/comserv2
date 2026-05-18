@@ -12,7 +12,7 @@
 [% END %]
 
 <form method="post"
-      action="[% is_edit ? c.uri_for('/remotedb/edit', [conn_name]) : c.uri_for('/remotedb/add') %]"
+      action="[% is_edit ? c.uri_for('/remotedb/edit') _ '/' _ conn_name : c.uri_for('/remotedb/add') %]"
       style="max-width:700px;">
 
     <fieldset style="border:1px solid #ccc;padding:1em;border-radius:5px;margin-bottom:1.2em;">
