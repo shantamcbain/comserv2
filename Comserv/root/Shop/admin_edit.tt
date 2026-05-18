@@ -70,6 +70,17 @@
           Show item as available without displaying the quantity — ideal for made-to-order items (3D prints, custom orders, services).
         </small>
       </div>
+
+      <div style="margin-bottom:0.8em;padding:0.8em;border:1px solid #ce93d8;border-radius:4px;background:#f3e5f5">
+        <label style="display:flex;align-items:center;gap:0.5em;cursor:pointer;font-family:var(--body-font);color:#4a148c;font-weight:bold">
+          <input type="checkbox" name="accepts_points" value="1" [% IF item.accepts_points %]checked[% END %]
+                 style="width:16px;height:16px">
+          ★ Accept Points as Payment
+        </label>
+        <small style="display:block;margin-top:0.3em;color:#6a1b9a;font-family:var(--body-font)">
+          Displays a "Points Accepted" badge on this item. Members who have a points balance can see their balance on the item page and contact you to arrange payment. No automatic transfer — buyer and seller agree manually.
+        </small>
+      </div>
     </div>
 
     <div>
