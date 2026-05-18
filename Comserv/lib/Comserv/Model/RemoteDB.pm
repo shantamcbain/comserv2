@@ -1038,5 +1038,110 @@ sub _connect_to_database {
     };
 }
 
+sub migrate_database {
+    my ($self, $source_name, $target_name, $opts) = @_;
+    $opts //= {};
+    my $schema_only = $opts->{schema_only} // 0;
+    my $truncate    = $opts->{truncate}     // 0;
+
+    $self->_load_config();
+    my $all = $self->get_all_connections();
+
+    return (0, [], "Source connection '$source_name' not found")
+        unless exists $all->{$source_name};
+    return (0, [], "Target connection '$target_name' not found")
+        unless exists $all->{$target_name};
+
+    my $src_dbh = $self->_connect_to_database($all->{$source_name});
+    return (0, [], "Cannot connect to source '$source_name'") unless $src_dbh;
+
+    my $tgt_dbh = $self->_connect_to_database($all->{$target_name});
+    unless ($tgt_dbh) {
+        $src_dbh->disconnect();
+        return (0, [], "Cannot connect to target '$target_name'");
+    }
+
+    my $tgt_db  = $all->{$target_name}{config}{database} // '';
+    my $src_type = lc($all->{$source_name}{config}{db_type} // 'mysql');
+
+    unless ($src_type eq 'postgresql') {
+        eval { $tgt_dbh->do("CREATE DATABASE IF NOT EXISTS `$tgt_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci") };
+    }
+
+    my @tables;
+    eval {
+        my $sth = $src_dbh->prepare("SHOW TABLES");
+        $sth->execute();
+        while (my ($t) = $sth->fetchrow_array()) {
+            push @tables, $t;
+        }
+    };
+    if ($@ || !@tables) {
+        $src_dbh->disconnect();
+        $tgt_dbh->disconnect();
+        my $err = $@ || "No tables found in source database";
+        return (0, [], "Failed to list source tables: $err");
+    }
+
+    my @results;
+    my $overall_ok = 1;
+
+    foreach my $table (@tables) {
+        my $result = { table => $table, schema_ok => 0, rows => 0, error => '' };
+
+        eval {
+            my $row = $src_dbh->selectrow_arrayref("SHOW CREATE TABLE `$table`");
+            my $create = $row->[1];
+            $create =~ s/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /;
+            $tgt_dbh->do($create);
+            $result->{schema_ok} = 1;
+        };
+        if ($@) {
+            $result->{error} = "Schema: $@";
+            $overall_ok = 0;
+            push @results, $result;
+            next;
+        }
+
+        unless ($schema_only) {
+            eval {
+                $tgt_dbh->do("TRUNCATE TABLE `$table`") if $truncate;
+                my $sth = $src_dbh->prepare("SELECT * FROM `$table`");
+                $sth->execute();
+                my $count = 0;
+                $tgt_dbh->begin_work();
+                while (my $row = $sth->fetchrow_hashref()) {
+                    my @cols = keys %$row;
+                    my $col_list    = join(',', map { "`$_`" } @cols);
+                    my $placeholders = join(',', ('?') x scalar @cols);
+                    $tgt_dbh->do(
+                        "INSERT IGNORE INTO `$table` ($col_list) VALUES ($placeholders)",
+                        undef, @{$row}{@cols}
+                    );
+                    $count++;
+                    if ($count % 500 == 0) {
+                        $tgt_dbh->commit();
+                        $tgt_dbh->begin_work();
+                    }
+                }
+                $tgt_dbh->commit();
+                $result->{rows} = $count;
+            };
+            if ($@) {
+                eval { $tgt_dbh->rollback() };
+                $result->{error} .= "Data: $@";
+                $overall_ok = 0;
+            }
+        }
+
+        push @results, $result;
+    }
+
+    $src_dbh->disconnect();
+    $tgt_dbh->disconnect();
+
+    return ($overall_ok, \@results, '');
+}
+
 __PACKAGE__->meta->make_immutable;
 1;

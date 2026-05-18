@@ -1,0 +1,138 @@
+
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Database Migration</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">&#8592; Back to Servers</a>
+    </div>
+</div>
+
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
+
+[% IF migrate_done %]
+    [% IF migrate_ok %]
+    <div class="success-message">Migration completed successfully: [% last_source | html %] &#8594; [% last_target | html %]</div>
+    [% ELSE %]
+    <div class="error-message">Migration failed: [% migrate_error | html %]</div>
+    [% END %]
+
+    [% IF migrate_results.size %]
+    <div class="content-container">
+    <div class="data-container">
+    <div class="form-section">
+        <h3>Results</h3>
+        <div class="table-container">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>Table</th>
+                    <th>Schema</th>
+                    <th>Rows Copied</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH r IN migrate_results %]
+                <tr>
+                    <td><code>[% r.table | html %]</code></td>
+                    <td>[% r.schema_ok ? '&#10003;' : '&#10005;' %]</td>
+                    <td>[% r.rows %]</td>
+                    <td>
+                        [% IF r.error %]
+                            <span style="color:#c00;">[% r.error | html %]</span>
+                        [% ELSE %]
+                            OK
+                        [% END %]
+                    </td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+        </div>
+    </div>
+    </div>
+    </div>
+    [% END %]
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="form-container">
+
+<form method="post" action="[% c.uri_for('/remotedb/migrate') %]" class="app-form">
+
+    <div class="form-section">
+        <h3>Source &amp; Target</h3>
+        <p>Copies schema (and optionally data) from the source database server to the target. Both must be registered in the server list.</p>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="source">Source Server (copy FROM)</label>
+                <select id="source" name="source" class="form-input" required>
+                    <option value="">-- select source --</option>
+                    [% FOREACH name IN conn_keys %]
+                    [% SET cfg = connections.$name.config %]
+                    <option value="[% name | html %]"
+                        [% IF last_source == name %]selected[% END %]>
+                        [% name | html %] ([% cfg.host | html %]:[% cfg.port | html %] / [% cfg.database | html %])
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="target">Target Server (copy TO)</label>
+                <select id="target" name="target" class="form-input" required>
+                    <option value="">-- select target --</option>
+                    [% FOREACH name IN conn_keys %]
+                    [% SET cfg = connections.$name.config %]
+                    <option value="[% name | html %]"
+                        [% IF last_target == name %]selected[% END %]>
+                        [% name | html %] ([% cfg.host | html %]:[% cfg.port | html %] / [% cfg.database | html %])
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Options</h3>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="schema_only" value="1">
+                    Schema only — copy table structure but not data
+                </label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="truncate" value="1">
+                    Truncate target tables before copying data
+                    <small>(clears existing data on target — use with caution)</small>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary"
+                onclick="return confirm('This will write data to the target server. Continue?')">
+            Run Migration
+        </button>
+        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+</div>
+</div>
+</div>
+
+</div>

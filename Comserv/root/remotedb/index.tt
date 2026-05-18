@@ -5,6 +5,7 @@
     <h1>Database Server Management</h1>
     <div class="form-actions">
         <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
+        <a href="[% c.uri_for('/remotedb/migrate') %]" class="btn btn-secondary">&#8658; Migrate / Copy Database</a>
     </div>
 </div>
 
