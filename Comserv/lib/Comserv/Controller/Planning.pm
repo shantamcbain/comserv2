@@ -531,8 +531,10 @@ sub daily :Path('/planning/daily') :Args {
         my @ap_all_sitenames;
         if ($is_csc) {
             eval {
-                my $site_rows = $c->model('Site')->get_all_sites($c);
-                @ap_all_sitenames = sort map { $_->name } @$site_rows;
+                my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                    {}, { order_by => 'name' }
+                )->all;
+                @ap_all_sitenames = sort map { $_->name } @site_rows;
             };
         } else {
             eval {
@@ -746,9 +748,8 @@ sub daily :Path('/planning/daily') :Args {
                 : ($_rls && $_rls =~ /\badmin\b/i);
             my $_is_csc = ($_sn eq 'CSC' && $_has_admin) || $_lu eq 'Shanta';
             eval {
-                my $today_str = $current_date_str;
                 my $_filter = {
-                    start_date => { '<' => $today_str },
+                    start_date => { '<' => $current_date_str },
                     status     => { -in => [1, 2, 'open', 'in-progress'] },
                 };
                 $_filter->{sitename} = $_sn unless $_is_csc;
@@ -844,6 +845,37 @@ sub daily :Path('/planning/daily') :Args {
                     )->all;
             };
             \@ht;
+        },
+
+        scheduled_todos => do {
+            my @st;
+            eval {
+                my %sched_cond = (
+                    scheduled_start => { -like => "$current_date_str%" },
+                    status          => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                );
+                $sched_cond{sitename} = $sitename unless $is_csc;
+                my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+                    \%sched_cond,
+                    { order_by => { -asc => 'scheduled_start' }, rows => 200 }
+                )->all;
+                my %_proj_cache;
+                for my $row (@rows) {
+                    my %h = $row->get_columns;
+                    my $pid = $h{project_id} || '';
+                    if ($pid && !exists $_proj_cache{$pid}) {
+                        eval {
+                            my $p = $c->model('DBEncy')->resultset('Project')->find($pid);
+                            $_proj_cache{$pid} = $p ? $p->name : '';
+                        };
+                        $_proj_cache{$pid} //= '';
+                    }
+                    $h{project_name} = $pid ? ($_proj_cache{$pid} // '') : '';
+                    $h{role_cats}    = $self->_classify_todo_roles($h{project_name}, $h{project_code}, $h{subject});
+                    push @st, \%h;
+                }
+            };
+            \@st;
         },
 
         template => 'admin/planning/DailyPlan.tt',
@@ -1115,6 +1147,15 @@ sub _run_audit_scan {
                               status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
                             { rows => 1 }
                         )->first;
+                        unless ($open_exists) {
+                            $open_exists = $schema->resultset('Todo')->search(
+                                { sitename   => $sitename,
+                                  subject    => { -like => "%$safe_sub%" },
+                                  start_date => $today,
+                                  status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                                { rows => 1 }
+                            )->first;
+                        }
                     };
                     next if $open_exists;
                     my $closed_child;
@@ -1205,7 +1246,10 @@ sub _build_error_todo {
     my $top_level = (grep { $_->{level} =~ /^CRITICAL$/i } @entries) ? 'CRITICAL'
                   : (grep { $_->{level} =~ /^ERROR$/i   } @entries) ? 'ERROR'
                   : 'WARN';
-    my $default_priority = ($top_level eq 'WARN') ? 3 : 1;
+    my $is_editor_area = ($sub =~ /ENCY|Glossary|Constituent|Organism|Encyclopedia|Formula|Herb/i) ? 1 : 0;
+    my $default_priority = ($top_level eq 'WARN') ? 3
+                         : $is_editor_area         ? 3
+                         :                           2;
     my ($ai_subject, $ai_desc, $ai_priority) = ("$sub — $count $top_level(s) ($today)", $raw_err, $default_priority);
 
     if ($ollama) {
@@ -1227,7 +1271,8 @@ sub _build_error_todo {
                     $ai_subject  = substr($parsed->{subject} || $ai_subject, 0, 200);
                     $ai_desc     = $parsed->{description} || $ai_desc;
                     $ai_priority = $parsed->{priority} || $default_priority;
-                    $ai_priority = 1  if $ai_priority < 1;
+                    $ai_priority = 3  if $ai_priority < 1;
+                    $ai_priority = 3  if $is_editor_area && $ai_priority < 3;
                     $ai_priority = 10 if $ai_priority > 10;
                     $ai_desc .= "\n\n--- Raw errors ($count occurrence(s)) ---\n$raw_err";
                 }
@@ -1430,6 +1475,9 @@ sub _daily_log_action {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
             "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
+        $self->_ensure_break_todos($c, $schema, $username, $user_id, $sitename, $today);
+        $self->_schedule_day($c, $schema, $sitename, $today);
+
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
         my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
         my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
@@ -1479,6 +1527,215 @@ sub _daily_log_action {
     }
 
     return { success => JSON::false, error => "Unknown action '$action'" };
+}
+
+sub _ensure_break_todos {
+    my ($self, $c, $schema, $username, $user_id, $sitename, $today) = @_;
+
+    my $existing_count = 0;
+    eval {
+        $existing_count = $schema->resultset('Todo')->search(
+            { sitename           => $sitename,
+              username_of_poster => $username,
+              start_date         => $today,
+              is_fixed           => 1,
+              subject            => [ { -like => '%Break%' }, { -like => '%Lunch%' } ] }
+        )->count;
+    };
+    return if $existing_count;
+
+    my @breaks = (
+        { subject => "\x{2615} Morning Break",   time_of_day => '10:00:00', dur => 15 },
+        { subject => "\x{1F957} Lunch",           time_of_day => '12:00:00', dur => 60 },
+        { subject => "\x{2615} Afternoon Break",  time_of_day => '15:00:00', dur => 15 },
+    );
+
+    for my $brk (@breaks) {
+        my ($hh, $mm) = $brk->{time_of_day} =~ /^(\d+):(\d+)/;
+        my $end_min = $hh * 60 + $mm + $brk->{dur};
+        my $end_str = sprintf('%02d:%02d:00', int($end_min / 60), $end_min % 60);
+        eval {
+            $schema->resultset('Todo')->create({
+                sitename             => $sitename,
+                start_date           => $today,
+                due_date             => $today,
+                subject              => $brk->{subject},
+                description          => 'Scheduled break',
+                estimated_man_hours  => 0,
+                project_code         => 'daily',
+                project_id           => 1,
+                user_id              => $user_id,
+                status               => 1,
+                priority             => 10,
+                last_mod_by          => 'schedule',
+                last_mod_date        => $today,
+                group_of_poster      => 'admin',
+                username_of_poster   => $username,
+                parent_todo          => '',
+                share                => 0,
+                is_blocking          => 0,
+                is_fixed             => 1,
+                time_of_day          => $brk->{time_of_day},
+                scheduled_start      => "$today " . $brk->{time_of_day},
+                scheduled_end        => "$today $end_str",
+            });
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_break_todos',
+            "Break create error: $@") if $@;
+    }
+}
+
+sub schedule_day :Path('/planning/schedule_day') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
+    my $username = $c->session->{username} || '';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->body('{"ok":0,"error":"DB unavailable"}');
+        return;
+    }
+    $self->_ensure_break_todos($c, $schema, $username, $user_id, $sitename, $today);
+    my $count = $self->_schedule_day($c, $schema, $sitename, $today);
+    $c->response->body('{"ok":1,"count":' . ($count || 0) . '}');
+}
+
+sub _schedule_day {
+    my ($self, $c, $schema, $sitename, $today) = @_;
+
+    my $settings;
+    eval {
+        $settings = $schema->resultset('UserScheduleSettings')->search(
+            {}, { rows => 1 }
+        )->first;
+    };
+
+    my $default_min = $settings ? ($settings->default_duration_min || 15) : 15;
+    my $segs_json   = $settings ? ($settings->work_segments || '[{"start":"08:00","end":"17:00"}]')
+                                : '[{"start":"08:00","end":"17:00"}]';
+    my $work_segs;
+    eval { $work_segs = decode_json($segs_json) };
+    $work_segs = [{ start => '08:00', end => '17:00' }] if $@ || !$work_segs || !@$work_segs;
+
+    my @free_slots;
+    for my $seg (@$work_segs) {
+        my ($sh, $sm) = split(':', $seg->{start} || '08:00');
+        my ($eh, $em) = split(':', $seg->{end}   || '17:00');
+        push @free_slots, [ ($sh||8)*60+($sm||0), ($eh||17)*60+($em||0) ];
+    }
+    @free_slots = sort { $a->[0] <=> $b->[0] } @free_slots;
+
+    my @fixed_todos;
+    eval {
+        @fixed_todos = $schema->resultset('Todo')->search(
+            { sitename   => $sitename,
+              is_fixed   => 1,
+              start_date => $today },
+            { order_by => { -asc => 'time_of_day' } }
+        )->all;
+    };
+
+    for my $ft (@fixed_todos) {
+        next unless $ft->scheduled_start && $ft->scheduled_end;
+        my $fs = _hhmm_to_min($ft->scheduled_start);
+        my $fe = _hhmm_to_min($ft->scheduled_end);
+        @free_slots = _subtract_slot(\@free_slots, $fs, $fe);
+    }
+
+    my @todos;
+    eval {
+        @todos = $schema->resultset('Todo')->search(
+            { sitename  => $sitename,
+              is_fixed  => 0,
+              due_date  => $today,
+              status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+            { order_by => [{ -asc => 'priority' }, { -asc => 'sort_order' }] }
+        )->all;
+    };
+
+    my $count = 0;
+    for my $todo (@todos) {
+        my $emh = $todo->estimated_man_hours || 0;
+        if ($emh == 0) {
+            my $avg_min = 0;
+            eval {
+                my @logs = $schema->resultset('Log')->search(
+                    { todo_record_id => $todo->record_id,
+                      time           => { '!=' => '00:00:00' } },
+                    { columns => ['time'], rows => 20 }
+                )->all;
+                if (@logs) {
+                    my $total = 0;
+                    for my $lg (@logs) {
+                        my $t = $lg->time || '00:00:00';
+                        my ($h, $m, $s) = split(':', $t);
+                        $total += ($h||0)*60 + ($m||0) + int(($s||0)/60);
+                    }
+                    $avg_min = int($total / scalar @logs);
+                    if ($avg_min > 0) {
+                        my $new_emh = int(($avg_min + 30) / 60) || 1;
+                        eval { $todo->update({ estimated_man_hours => $new_emh }) };
+                        $emh = $new_emh;
+                    }
+                }
+            };
+        }
+        my $dur = $emh > 0 ? int($emh * 60) : $default_min;
+        $dur = 15 if $dur < 1;
+
+        my ($s, $e) = _find_slot(\@free_slots, $dur);
+        last unless defined $s;
+
+        @free_slots = _subtract_slot(\@free_slots, $s, $e);
+        my $ss = sprintf('%s %02d:%02d:00', $today, int($s/60), $s%60);
+        my $se = sprintf('%s %02d:%02d:00', $today, int($e/60), $e%60);
+        eval { $todo->update({ scheduled_start => $ss, scheduled_end => $se }) };
+        $count++ unless $@;
+    }
+    return $count;
+}
+
+sub _hhmm_to_min {
+    my ($dt) = @_;
+    return ($1 * 60 + $2) if $dt =~ /(\d{1,2}):(\d{2})/;
+    return 0;
+}
+
+sub _find_slot {
+    my ($slots, $dur) = @_;
+    for my $sl (@$slots) {
+        my ($s, $e) = @$sl;
+        return ($s, $s + $dur) if ($e - $s) >= $dur;
+    }
+    return (undef, undef);
+}
+
+sub _subtract_slot {
+    my ($slots, $from, $to) = @_;
+    my @result;
+    for my $sl (@$slots) {
+        my ($s, $e) = @$sl;
+        if ($to <= $s || $from >= $e) {
+            push @result, [$s, $e];
+        } elsif ($from <= $s && $to >= $e) {
+        } elsif ($from <= $s) {
+            push @result, [$to, $e] if $to < $e;
+        } elsif ($to >= $e) {
+            push @result, [$s, $from] if $from > $s;
+        } else {
+            push @result, [$s, $from] if $from > $s;
+            push @result, [$to, $e]  if $to < $e;
+        }
+    }
+    return @result;
 }
 
 =head2 update_log_entry
