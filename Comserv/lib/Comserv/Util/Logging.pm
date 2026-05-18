@@ -163,6 +163,37 @@ sub rotate_log {
     _cleanup_old_logs($archive_dir, $filename);
 
     _print_log("Log rotated: $archived_log");
+
+    # Async copy of the archived log to NFS — runs in a child process so the
+    # server never blocks waiting for NFS I/O.
+    _copy_archive_to_nfs_async($archived_log) if defined $archived_log && -e $archived_log;
+}
+
+sub _copy_archive_to_nfs_async {
+    my ($archived_log) = @_;
+    return unless defined $archived_log && length $archived_log;
+
+    my $nfs_archive_dir;
+    eval {
+        my $nfs_util = Comserv::Util::NfsPath->new();
+        my $nfs_root = $nfs_util->get_nfs_root();
+        $nfs_archive_dir = File::Spec->catdir($nfs_root, 'logs', 'archive');
+    };
+    return if $@ || !defined $nfs_archive_dir;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        _print_log("NFS archive copy: fork failed (non-fatal): $!");
+        return;
+    }
+    if ($pid == 0) {
+        eval {
+            make_path($nfs_archive_dir) unless -d $nfs_archive_dir;
+            my (undef, undef, $fname) = File::Spec->splitpath($archived_log);
+            File::Copy::copy($archived_log, File::Spec->catfile($nfs_archive_dir, $fname));
+        };
+        exit 0;
+    }
 }
 
 # Helper function to clean up old log files
@@ -274,38 +305,16 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
-    # Determine the base directory for logs
-    # Priority 1: Configured path in Database (logging_nfs_dir)
-    # Priority 2: Standardized NFS shared directory (via Comserv::Util::NfsPath)
-    # Priority 3: NFS shared directory from ENV (COMSERV_NFS_LOG_DIR)
-    # Priority 4: Specific log directory from ENV (COMSERV_LOG_DIR)
-    # Priority 5: Default relative to binary
+    # Always write to the local log directory first — never NFS during startup.
+    # NFS is only used for archiving rotated logs (via rotate_log), not for live writes.
+    # This prevents the server from hanging in uninterruptible D-state when NFS is slow.
     my $log_file;
     my $log_dir;
 
-    # Note: DB access in init() might be restricted depending on startup sequence.
-    # We use ENV as primary for bootstrap, and refresh_settings() for DB overrides later.
-    
-    my $nfs_path_util = Comserv::Util::NfsPath->new();
-    my $standard_nfs = $nfs_path_util->get_nfs_root();
-    my $standard_log_dir = File::Spec->catdir($standard_nfs, 'logs');
-    
-    my $nfs_log_dir = $ENV{'COMSERV_NFS_LOG_DIR'};
-    
-    if (-d $standard_log_dir && -w $standard_log_dir) {
-        $log_dir  = $standard_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using standardized NFS log directory: $log_dir");
-    } elsif ($nfs_log_dir && -d $nfs_log_dir && -w $nfs_log_dir) {
-        $log_dir  = $nfs_log_dir;
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using centralized log directory: $log_dir");
-    } else {
-        my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-        $log_dir  = File::Spec->catdir($base_dir, "logs");
-        $log_file = File::Spec->catfile($log_dir, "application.log");
-        _print_log("Using local log directory: $log_dir");
-    }
+    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
+    $log_dir  = File::Spec->catdir($base_dir, "logs");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+    _print_log("Using local log directory: $log_dir");
 
     _print_log("Log file: $log_file");
 
