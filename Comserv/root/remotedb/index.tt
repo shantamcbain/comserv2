@@ -61,7 +61,7 @@
             <td class="action-cell">
                 <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
                    class="btn btn-sm btn-primary"
-                   title="Test TCP connectivity to [% cfg.host | html %]:[% cfg.port | html %]">Test</a>
+                   title="Check connection and count tables in [% cfg.database | html %]">Check DB</a>
             </td>
         </tr>
     [% END %]

@@ -1038,6 +1038,58 @@ sub _connect_to_database {
     };
 }
 
+sub check_database_status {
+    my ($self, $conn_name) = @_;
+
+    $self->_load_config();
+    my $all = $self->get_all_connections();
+
+    unless (exists $all->{$conn_name}) {
+        return { ok => 0, error => "Connection '$conn_name' not found" };
+    }
+
+    my $cfg = $all->{$conn_name}{config};
+    my $dbh;
+    eval { $dbh = $self->_connect_to_database($all->{$conn_name}) };
+    if ($@ || !$dbh) {
+        return {
+            ok      => 0,
+            error   => $@ || 'Connection failed',
+            host    => $cfg->{host},
+            port    => $cfg->{port},
+            database => $cfg->{database},
+        };
+    }
+
+    my ($table_count, $view_count, $db_exists) = (0, 0, 0);
+    eval {
+        my $row = $dbh->selectrow_arrayref(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'",
+            undef, $cfg->{database}
+        );
+        $table_count = $row ? ($row->[0] // 0) : 0;
+
+        my $vrow = $dbh->selectrow_arrayref(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_type = 'VIEW'",
+            undef, $cfg->{database}
+        );
+        $view_count = $vrow ? ($vrow->[0] // 0) : 0;
+        $db_exists  = 1;
+    };
+    $dbh->disconnect();
+
+    return {
+        ok          => 1,
+        database    => $cfg->{database},
+        host        => $cfg->{host},
+        port        => $cfg->{port},
+        table_count => $table_count,
+        view_count  => $view_count,
+        db_exists   => $db_exists,
+        empty       => ($table_count == 0),
+    };
+}
+
 sub migrate_database {
     my ($self, $source_name, $target_name, $opts) = @_;
     $opts //= {};
