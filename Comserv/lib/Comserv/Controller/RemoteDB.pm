@@ -198,13 +198,24 @@ sub test_connection :Path('test') :Args(1) {
     $self->_require_admin($c);
 
     my $remote_db = $self->_remote_db();
-    my $ok = eval { $remote_db->test_connection($conn_name) };
+    my $status = $remote_db->check_database_status($conn_name);
 
-    if ($ok) {
-        $c->flash->{success_msg} = "Connection '$conn_name' tested successfully — server reachable.";
+    if ($status->{ok}) {
+        my $db   = $status->{database};
+        my $tbls = $status->{table_count};
+        my $views = $status->{view_count};
+        if ($status->{empty}) {
+            $c->flash->{error_msg} =
+                "Connected to '$conn_name' ($db on $status->{host}:$status->{port}) — "
+                . "database exists but has NO TABLES. Run a migration to populate it.";
+        } else {
+            $c->flash->{success_msg} =
+                "Connected to '$conn_name' — database '$db' on $status->{host}:$status->{port} "
+                . "has $tbls table(s) and $views view(s).";
+        }
     } else {
-        my $err = $@ || '';
-        $c->flash->{error_msg} = "Connection '$conn_name' failed — check host, port, and credentials." . ($err ? " ($err)" : '');
+        $c->flash->{error_msg} =
+            "Connection '$conn_name' failed: " . ($status->{error} || 'Unknown error');
     }
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
