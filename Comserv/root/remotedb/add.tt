@@ -1,5 +1,3 @@
-[% META title = is_edit ? 'Edit Database Server' : 'Add Database Server' %]
-
 [% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
 
 <h1>[% is_edit ? 'Edit' : 'Add' %] Database Server</h1>
