@@ -6,6 +6,7 @@ use JSON;
 use Try::Tiny;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
+use Comserv::Model::RemoteDB;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -17,6 +18,8 @@ has 'logging' => (
 my @DB_TYPES = qw(mariadb mysql postgresql sqlite);
 my @ENVIRONMENTS = qw(production development staging backup);
 my @ROLES = qw(primary replica migration backup development);
+
+sub _remote_db { Comserv::Model::RemoteDB->new() }
 
 sub _require_admin {
     my ($self, $c) = @_;
@@ -35,7 +38,7 @@ sub index :Path :Args(0) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
         'Accessing database server management');
 
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db();
     my $connections = $remote_db->get_all_connections();
 
     $c->stash(
@@ -83,7 +86,7 @@ sub add_connection :Path('add') :Args(0) {
         };
 
         try {
-            my $remote_db = $c->model('RemoteDB');
+            my $remote_db = $self->_remote_db();
             $remote_db->save_connection($conn_name, $conn_config);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_connection',
                 "Added DB server: $conn_name at $conn_config->{host}:$conn_config->{port}");
@@ -115,7 +118,7 @@ sub edit :Path('edit') :Args(1) {
     my ($self, $c, $conn_name) = @_;
     $self->_require_admin($c);
 
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db();
     my $all = $remote_db->get_all_connections();
 
     unless (exists $all->{$conn_name}) {
@@ -178,7 +181,7 @@ sub test_connection :Path('test') :Args(1) {
     my ($self, $c, $conn_name) = @_;
     $self->_require_admin($c);
 
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db();
     my $ok = eval { $remote_db->test_connection($conn_name) };
 
     if ($ok) {
@@ -197,7 +200,7 @@ sub remove :Path('remove') :Args(1) {
         "Removing DB server: $conn_name");
 
     try {
-        my $remote_db = $c->model('RemoteDB');
+        my $remote_db = $self->_remote_db();
         $remote_db->remove_connection($conn_name);
         $c->flash->{success_msg} = "Database server '$conn_name' removed.";
     } catch {
@@ -214,7 +217,7 @@ sub view :Path('view') :Args(1) {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'view',
         "Viewing remote database: $conn_name");
 
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db();
     my $tables = $remote_db->list_tables($c, $conn_name);
 
     unless (defined $tables) {
@@ -234,7 +237,7 @@ sub query :Path('query') :Args(1) {
     my ($self, $c, $conn_name) = @_;
     $self->_require_admin($c);
 
-    my $remote_db = $c->model('RemoteDB');
+    my $remote_db = $self->_remote_db();
 
     if ($c->req->method eq 'POST') {
         my $query = $c->req->param('query');
