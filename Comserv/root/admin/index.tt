@@ -307,6 +307,10 @@
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    <a href="[% c.uri_for('/remotedb') %]" class="admin-link">
+                        <i class="fas fa-server"></i>
+                        <span>Database Servers</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/schema_compare') %]" class="admin-link">
                         <i class="fas fa-code-branch"></i>
                         <span>Schema Compare &amp; Migration</span>
@@ -314,6 +318,10 @@
                     <a href="[% c.uri_for('/admin/compare_schema') %]" class="admin-link">
                         <i class="fas fa-database"></i>
                         <span>Schema Manager (legacy)</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/schema_compare', { database => 'ency' }) %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Schema Compare (Ency)</span>
                     </a>
                     <a href="[% c.uri_for('/admin/migrate_schema') %]" class="admin-link">
                         <i class="fas fa-exchange-alt"></i>
