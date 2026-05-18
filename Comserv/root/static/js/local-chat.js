@@ -2127,6 +2127,11 @@
         if (!state.userModelOverride) {
             autoTier = classifyQuery(prompt);
             effectiveProvider = autoSelectProvider(autoTier);
+            // Accounting agent always uses local Ollama — financial data stays on-device.
+            // Override only when the user has NOT manually selected a provider.
+            if (_agentId === 'accounting' && effectiveProvider && effectiveProvider.startsWith('grok')) {
+                effectiveProvider = state.modelTiers.large || state.modelTiers.medium || state.modelTiers.small || 'ollama';
+            }
             // Reflect auto-selection in the dropdown UI
             const sel = document.getElementById('ai-provider');
             if (sel && sel.querySelector('option[value="' + effectiveProvider + '"]')) {
@@ -2169,9 +2174,9 @@
         const _explicitFormRequest = /open.*invoice.*form|file.*form|open.*form|open.*supplier|file.*invoice/i.test(prompt);
         if (_agentId === 'accounting' && (_looksLikeBill || _looksLikeDeposit || _explicitFormRequest)) {
             const _depositNote = _looksLikeDeposit && !_looksLikeBill
-                ? '\n\nNOTE: This is a DEPOSIT/REFILL email. Use the Transfer form at /Accounting/transfer/new with entry_type=prepaid_topup. Map "Amount Deposited" → amount, "Convenience Charge" → fee_amount, "Reference No" → reference.'
+                ? '\n\nNOTE: This appears to be a DEPOSIT/REFILL confirmation email (money paid TO a supplier account, e.g. PayPal reseller credit). Treat the "Amount Deposited" as unit_cost_0 (the main payment), and any "Convenience Charge" as a separate second line item (description_0 and unit_cost_1). Use "Prepaid Hosting / Account Refill" as description_0 if no clearer description is shown.'
                 : '';
-            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill or payment receipt and/or asked to open the invoice form. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INV_NUM_HERE", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER invoice INV_NUM DATE", "unit_cost_0": "TOTAL_AMOUNT", "quantity_0": "1", "description_0": "Service charge"}}]\nReplace all placeholders with values parsed from the pasted bill. Only add auto_pay_method if the bill explicitly says "Auto Pay". After the ACTION line, list the values you used in one short sentence so the user can verify.' + _depositNote;
+            _agentSys = (_agentSys || '') + '\n\n## CRITICAL INVOICE ACTION RULE\nThe user has pasted a bill, payment receipt, or deposit confirmation email. You MUST respond by emitting this action on its own line — do NOT give manual step-by-step instructions:\n[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "REFERENCE_OR_INV_NO", "invoice_date": "YYYY-MM-DD", "notes": "SUPPLIER payment/deposit REFERENCE DATE", "unit_cost_0": "MAIN_AMOUNT", "quantity_0": "1", "description_0": "SERVICE DESCRIPTION"}}]\nReplace all placeholders with values parsed from the pasted text. Only add auto_pay_method if it explicitly says "Auto Pay". If a convenience/service fee is shown as a separate amount, add a second line (unit_cost_1, description_1, quantity_1). After the ACTION line, tell the user: (a) which supplier name to select in the dropdown, and (b) if that supplier does not exist yet, open /Inventory/supplier/add first.' + _depositNote;
         }
 
         // ENCY agent: inject navigate_and_fill instruction when user asks to add a constituent or fix unresolved term.
@@ -2184,7 +2189,7 @@
             }
         }
         // Client-side fast path: open the correct accounting form without an AI round-trip.
-        // _looksLikeDeposit → fires for any agent — opens /Accounting/transfer/new
+        // _looksLikeDeposit → always fires (any agent) — opens /Accounting/transfer/new
         // _looksLikeBill / _enterIntent → only fires for accounting agent — opens /Inventory/invoice/new
         const _isDepositFastPath = _looksLikeDeposit;
         if (_isDepositFastPath || _agentId === 'accounting') {
@@ -2201,6 +2206,7 @@
                     });
                 }
                 const _nfFields = {};
+                // Deposit email: use "Amount Deposited" as main amount
                 const _depositAmtM = _billText.match(/Amount\s+Deposited[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
                 const _feeAmtM = _billText.match(/(?:Refill\s+Convenience\s+Charge|Convenience\s+(?:Fee|Charge)|Service\s+(?:Fee|Charge))[:\s]+\$?\s*([\d,]+\.?\d{0,2})/i);
                 if (_depositAmtM) {
@@ -2275,18 +2281,18 @@
                     _lblAcc.textContent = 'Accounting Agent';
                     const _elAcc = document.createElement('div');
                     _elAcc.className = 'message ai-message';
-                    const _isDepositLocal = !!_depositAmtM;
-                    const _supplierHint = _isDepositLocal
-                        ? ' Select the correct <strong>From</strong> and <strong>To</strong> accounts, then save.'
+                    const _supplierHint = _isDeposit
+                        ? ' Select <strong>prepaid_topup</strong> transaction type and choose the correct From/To accounts.'
                         : (_supplierName !== 'Supplier'
-                            ? ' Select <strong>' + _supplierName + '</strong> as the supplier (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).'
-                            : ' Select the supplier in the dropdown.');
+                            ? ' Select <strong>' + _supplierName + '</strong> as the supplier'
+                                + ' (add at <a href="/Inventory/supplier/add?popup=1" target="_blank">/Inventory/supplier/add</a> if missing).'
+                            : ' Select the supplier in the dropdown (add if missing).');
                     _elAcc.innerHTML = '\uD83D\uDCCB '
-                        + (_isDepositLocal ? 'Transfer form' : 'Invoice form')
-                        + ' opened and pre-filled — verify the amounts, then save.'
+                        + (_isDeposit ? 'Deposit/refill transfer' : 'Invoice')
+                        + ' form opened and pre-filled — verify the amounts, then save.'
                         + _supplierHint
                         + '<br><small>'
-                        + (_isDepositLocal ? 'Deposit: $' : 'Amount: $') + _nfFields.unit_cost_0
+                        + (_isDeposit ? 'Deposit: $' : 'Amount: $') + _nfFields.unit_cost_0
                         + (_nfFields.unit_cost_1 ? ' + fee: $' + _nfFields.unit_cost_1 : '')
                         + (_nfFields.invoice_date ? ' | Date: ' + _nfFields.invoice_date : '')
                         + (_nfFields.invoice_number ? ' | Ref: ' + _nfFields.invoice_number : '')
@@ -2296,7 +2302,7 @@
                     if (_chatMsgs) { _chatMsgs.appendChild(_wAcc); _chatMsgs.scrollTop = _chatMsgs.scrollHeight; }
                     if (_enterIntent || _looksLikeDeposit) {
                         loadingMessage.remove();
-                        statusIndicator.textContent = _isDepositLocal ? '\uD83D\uDFE2 Transfer form opened' : '\uD83D\uDFE2 Invoice form opened';
+                        statusIndicator.textContent = _isDeposit ? '\uD83D\uDFE2 Transfer form opened' : '\uD83D\uDFE2 Invoice form opened';
                         statusIndicator.className = 'chat-status connected';
                         return;
                     }
@@ -2689,7 +2695,11 @@
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
             liveThinkEl.remove();
-            
+
+            if (!data) {
+                throw new Error('AI server returned an empty response. Please try again.');
+            }
+
             if (data.success) {
                 // Reset retry counter on success
                 state.retryCount = 0;
@@ -4402,6 +4412,9 @@
         })
         .then(function(r) { return r.json(); })
         .then(function(result) {
+            if (!result) {
+                throw new Error('Action server returned an empty response');
+            }
             if (result.success && result.action === 'open_project_wizard') {
                 openProjectWizard(result.wizard_title || '');
                 return;

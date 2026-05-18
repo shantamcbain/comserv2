@@ -138,6 +138,22 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
+# Bootstrap whisper_venv on named volume if not yet installed
+if [ ! -f "/opt/comserv/whisper_venv/bin/python3" ]; then
+  echo "Whisper venv not found — bootstrapping (this may take a few minutes on first run)..."
+  if command -v python3 &>/dev/null && python3 -m ensurepip --version &>/dev/null 2>&1; then
+    python3 -m venv /opt/comserv/whisper_venv && \
+    /opt/comserv/whisper_venv/bin/pip install --no-cache-dir \
+      torch --index-url https://download.pytorch.org/whl/cpu \
+      openai-whisper >> /tmp/whisper_install.log 2>&1 && \
+    echo "✓ Whisper installed successfully" || echo "⚠ Whisper install failed — see /tmp/whisper_install.log"
+  else
+    echo "⚠ python3-venv not available — voice transcription will be unavailable"
+  fi
+else
+  echo "✓ Whisper venv ready at /opt/comserv/whisper_venv"
+fi
+
 # Create workshop files directory on shared volume
 if [ "${SKIP_NFS_SETUP}" != "1" ]; then
   WORKSHOP_DIR="/data/nfs/workshop_files"

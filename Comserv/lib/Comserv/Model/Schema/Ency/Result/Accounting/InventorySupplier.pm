@@ -87,7 +87,7 @@ __PACKAGE__->add_columns(
 __PACKAGE__->set_primary_key('id');
 
 __PACKAGE__->belongs_to(
-    'prepaid_account' => 'Comserv::Model::Schema::Ency::Result::CoaAccount',
+    'prepaid_account' => 'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccount',
     { 'foreign.id' => 'self.prepaid_accno_id' },
     { join_type => 'LEFT', on_delete => 'SET NULL', on_update => 'CASCADE' }
 );

@@ -21,6 +21,7 @@ use Digest::SHA qw(sha256_hex);
 use File::Find;
 use Module::Load;
 use POSIX qw(_exit);
+use DBI;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -2423,8 +2424,22 @@ sub get_database_comparison {
             error => undef,
             table_comparisons => []
         },
+        migration_mysql => {
+            name => 'migration_mysql',
+            display_name => 'New Server — MySQL Docker (192.168.1.20:3307)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
+        migration_postgres => {
+            name => 'migration_postgres',
+            display_name => 'New Server — PostgreSQL Docker (192.168.1.20:5433)',
+            connection_status => 'unknown',
+            error => undef,
+            databases => []
+        },
         summary => {
-            total_databases => 2,
+            total_databases => 4,
             connected_databases => 0,
             total_tables => 0,
             tables_with_results => 0,
@@ -2530,7 +2545,27 @@ sub get_database_comparison {
         $comparison->{forager}->{connection_status} = 'error';
         $comparison->{forager}->{error} = $error;
     };
-    
+
+    # Get migration target MySQL server info
+    my $mysql_info = $self->get_migration_mysql_info($c);
+    $comparison->{migration_mysql}->{connection_status} = $mysql_info->{connection_status};
+    $comparison->{migration_mysql}->{error}             = $mysql_info->{error};
+    $comparison->{migration_mysql}->{databases}         = $mysql_info->{databases} // [];
+    $comparison->{migration_mysql}->{host}              = $mysql_info->{host};
+    if ($mysql_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
+    # Get migration target PostgreSQL server info
+    my $pg_info = $self->get_migration_postgres_info($c);
+    $comparison->{migration_postgres}->{connection_status} = $pg_info->{connection_status};
+    $comparison->{migration_postgres}->{error}             = $pg_info->{error};
+    $comparison->{migration_postgres}->{databases}         = $pg_info->{databases} // [];
+    $comparison->{migration_postgres}->{host}              = $pg_info->{host};
+    if ($pg_info->{connection_status} eq 'connected') {
+        $comparison->{summary}->{connected_databases}++;
+    }
+
     return $comparison;
 }
 
@@ -5907,21 +5942,133 @@ sub docker_rebuild :Path('/admin/docker-rebuild') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose build --no-cache --progress=plain $service 2>&1";
-    
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+    my $pid_file  = "/tmp/docker-build-${service}.pid";
+
+    unlink $done_file if -f $done_file;
+    open(my $lf, '>', $log_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build log: $!" }));
+        $c->response->content_type('application/json');
+        return;
     };
-    
-    $c->response->body(encode_json($result));
+    print $lf "=== Build started at " . scalar(localtime) . " ===\n";
+    close $lf;
+
+    my $disk_pct = `df / | awk 'NR==2 {gsub(/%/,"",$5); print $5}'`;
+    chomp $disk_pct;
+    if ($disk_pct =~ /^\d+$/ && $disk_pct >= 90) {
+        $c->response->body(encode_json({
+            success => \0,
+            error   => "Disk at ${disk_pct}% — not safe to build. Run Docker Cleanup first.",
+        }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
+    my $build_target = $service eq 'all' ? '' : $service;
+    my $script = <<"SHELL";
+#!/bin/bash
+LOG="$log_file"
+DONE="$done_file"
+cd /home/shanta/PycharmProjects/comserv2
+
+echo "--- Pre-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+docker builder prune -f --keep-storage 5GB >> "\$LOG" 2>&1
+
+DISK=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk before build: \${DISK}%" >> "\$LOG"
+
+echo "--- Building $service ---" >> "\$LOG"
+docker compose build --progress=plain $build_target >> "\$LOG" 2>&1
+EXIT=\$?
+
+echo "--- Post-build cleanup ---" >> "\$LOG"
+docker image prune -f >> "\$LOG" 2>&1
+
+DISK_AFTER=\$(df / | awk 'NR==2 {gsub(/%/,"",\$5); print \$5}')
+echo "Disk after build: \${DISK_AFTER}%" >> "\$LOG"
+echo "=== Build finished exit=\$EXIT at \$(date) ===" >> "\$LOG"
+echo \$EXIT > "\$DONE"
+SHELL
+
+    my $script_file = "/tmp/docker-build-${service}.sh";
+    open(my $sf, '>', $script_file) or do {
+        $c->response->body(encode_json({ success => \0, error => "Cannot write build script: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    };
+    print $sf $script;
+    close $sf;
+    chmod 0755, $script_file;
+
+    my $pid = fork();
+    if (!defined $pid) {
+        $c->response->body(encode_json({ success => \0, error => "Fork failed: $!" }));
+        $c->response->content_type('application/json');
+        return;
+    }
+    if ($pid == 0) {
+        open(STDIN,  '<', '/dev/null');
+        open(STDOUT, '>>', $log_file);
+        open(STDERR, '>>', $log_file);
+        exec($script_file);
+        exit 1;
+    }
+    if (open(my $pf, '>', $pid_file)) { print $pf $pid; close $pf; }
+
+    $c->response->body(encode_json({
+        success  => \1,
+        async    => \1,
+        job_id   => $service,
+        message  => "Build started for $service (PID $pid). Poll /admin/docker-rebuild-status/$service for progress.",
+    }));
     $c->response->content_type('application/json');
+}
+
+sub docker_rebuild_status :Path('/admin/docker-rebuild-status') :Args(1) {
+    my ($self, $c, $service) = @_;
+
+    $c->response->content_type('application/json');
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_rebuild_status')) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => \0, error => 'Access denied' }));
+        return;
+    }
+
+    $service =~ s/[^a-zA-Z0-9_\-]//g;
+
+    my $log_file  = "/tmp/docker-build-${service}.log";
+    my $done_file = "/tmp/docker-build-${service}.done";
+
+    unless (-f $log_file) {
+        $c->response->body(encode_json({ success => \0, error => "No build in progress for $service" }));
+        return;
+    }
+
+    my $done     = -f $done_file;
+    my $exit_val = 0;
+    if ($done) {
+        if (open my $df, '<', $done_file) { chomp($exit_val = <$df> // 0); close $df; }
+    }
+
+    my $output = '';
+    if (open my $lf, '<', $log_file) {
+        local $/;
+        $output = <$lf>;
+        close $lf;
+    }
+
+    $c->response->body(encode_json({
+        success   => $done ? ($exit_val == 0 ? \1 : \0) : \1,
+        done      => $done ? \1 : \0,
+        exit_code => $exit_val + 0,
+        output    => $output,
+    }));
 }
 
 sub docker_prune :Path('/admin/docker-prune') :Args(0) {
@@ -6748,6 +6895,105 @@ sub table_name_to_class_name {
     my $class_name = join '', map { ucfirst(lc($_)) } @words;
     
     return $class_name;
+}
+
+# Connect to the new MySQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_mysql_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_MYSQL_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_MYSQL_PORT}     || 3307;
+    my $user     = $ENV{MIGRATION_MYSQL_USER}     || 'root';
+    my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env (value from MYSQL_ROOT_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:mysql:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1, mysql_connect_timeout => 5,
+        });
+
+        my $sth = $dbh->prepare("SHOW DATABASES");
+        $sth->execute();
+        my @databases;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name =~ /^(information_schema|performance_schema|sys|mysql)$/i;
+            my $tbl_sth = $dbh->prepare("SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA = ?");
+            $tbl_sth->execute($db_name);
+            my ($table_count) = $tbl_sth->fetchrow_array();
+            push @databases, { name => $db_name, table_count => $table_count };
+        }
+        $dbh->disconnect();
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        $result->{error} = "MySQL connection failed: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_mysql_info', $result->{error});
+    };
+
+    return $result;
+}
+
+# Connect to the new PostgreSQL Docker server and return database/table information.
+# Credentials are read exclusively from environment variables (loaded from Comserv/.env).
+sub get_migration_postgres_info {
+    my ($self, $c) = @_;
+
+    my $host     = $ENV{MIGRATION_POSTGRES_HOST}     || '192.168.1.20';
+    my $port     = $ENV{MIGRATION_POSTGRES_PORT}     || 5433;
+    my $user     = $ENV{MIGRATION_POSTGRES_USER}     || 'postgres';
+    my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
+
+    unless ($password) {
+        return {
+            connection_status => 'error',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env (value from POSTGRES_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            databases => [],
+        };
+    }
+
+    my $result = { connection_status => 'unknown', databases => [] };
+
+    try {
+        my $dsn = "DBI:Pg:host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user, $password, {
+            RaiseError => 1, PrintError => 0, AutoCommit => 1,
+        });
+
+        my $sth = $dbh->prepare("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname");
+        $sth->execute();
+        my @databases;
+        while (my ($db_name) = $sth->fetchrow_array()) {
+            next if $db_name eq 'postgres';
+            push @databases, { name => $db_name, table_count => undef };
+        }
+        $dbh->disconnect();
+
+        $result->{connection_status} = 'connected';
+        $result->{databases} = \@databases;
+        $result->{host} = "$host:$port";
+
+    } catch {
+        $result->{connection_status} = 'error';
+        $result->{error} = "PostgreSQL connection failed: $_";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_postgres_info', $result->{error});
+    };
+
+    return $result;
 }
 
 # Helper method to determine Result file path
