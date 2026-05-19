@@ -552,16 +552,49 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     );
 
     # Add the projects, sitename, and users to the stash
+    my $add_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my $add_sites  = [];
+    eval {
+        if ($add_is_csc) {
+            my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $add_sites = \@site_rows;
+        } else {
+            my $user_id = $c->session->{user_id};
+            if ($user_id) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @$add_sites, $site;
+                        }
+                    };
+                }
+            }
+            push @$add_sites, $c->model('DBEncy')->resultset('Site')->search(
+                { name => $c->session->{SiteName} }
+            )->first
+                unless grep { $_->name eq ($c->session->{SiteName} || '') } @$add_sites;
+        }
+    };
+
     $c->stash(
         projects        => $projects,
         current_project => $current_project,
         users           => \@users,
         build_priority  => $self->priority_options,
         build_status    => \%status_options,
-        return_to       => $return_to,       # URL to return to after action
+        return_to       => $return_to,
         start_date      => $c->request->params->{start_date} || DateTime->now->ymd,
         time_of_day     => $c->request->params->{time_of_day},
-        template        => 'todo/addtodo.tt' # Template for rendering
+        sites           => $add_sites,
+        is_csc          => $add_is_csc,
+        template        => 'todo/addtodo.tt'
     );
 
     # Log the end of the addtodo subroutine
@@ -659,14 +692,36 @@ sub edit :Path('/todo/edit') :Args(1) {
 
     my $edit_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my $edit_sites = [];
-    if ($edit_is_csc) {
-        eval {
+    eval {
+        if ($edit_is_csc) {
             my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
                 {}, { order_by => 'name' }
             )->all;
             $edit_sites = \@site_rows;
-        };
-    }
+        } else {
+            my $uid = $c->session->{user_id};
+            if ($uid) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @$edit_sites, $site;
+                        }
+                    };
+                }
+            }
+            unless (grep { $_->name eq ($c->session->{SiteName} || '') } @$edit_sites) {
+                my $cur = $c->model('DBEncy')->resultset('Site')->search(
+                    { name => $c->session->{SiteName} }
+                )->first;
+                push @$edit_sites, $cur if $cur;
+            }
+        }
+    };
 
     my $todo_sitename = eval { $todo->get_column('sitename') } // '';
 
