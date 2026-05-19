@@ -1334,43 +1334,146 @@ sub update_status :Path('/todo/update_status') :Args(0) {
             my $sitename  = $c->session->{SiteName}  || $todo->sitename || 'CSC';
             my $group     = $c->session->{group}     || $c->session->{roles}[0] || 'user';
 
-            my $start_raw = $todo->time_of_day // '';
-            $start_raw = ref($start_raw) ? sprintf('%02d:%02d:%02d', $start_raw->hours//0, $start_raw->minutes//0, 0) : "$start_raw";
-            my $start_hms = ($start_raw =~ /^\d{2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
-
-            my ($sh, $sm) = ($start_hms =~ /^(\d{2}):(\d{2})/);
-            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
-            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
-            $dur_mins = $todo->estimated_man_hours || 30 if $dur_mins <= 0;
-            my $dur_hms   = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
-
             my $start_date = $today;
             if ($todo->start_date) {
                 my $sd = ref($todo->start_date) ? $todo->start_date->ymd : "${\$todo->start_date}";
                 $start_date = substr($sd, 0, 10) if length($sd) >= 10;
             }
 
-            my $log_entry = $c->model('DBEncy')->resultset('Log')->create({
+            my $schema = $c->model('DBEncy');
+
+            # 1. Look for an existing open log (end_time = midnight sentinel, not closed)
+            my $open_log = $schema->resultset('Log')->search({
                 todo_record_id => $record_id,
-                username       => $username,
-                sitename       => $sitename,
-                start_date     => $start_date,
-                project_code   => $todo->project_id || 0,
-                due_date       => $today,
-                abstract       => ($todo->subject // 'Completed todo'),
-                details        => '',
-                start_time     => $start_hms,
-                end_time       => $now_hms,
-                time           => $dur_hms,
-                group_of_poster => $group,
-                status         => 'closed',
-                priority       => $todo->priority || 5,
-                last_mod_by    => $username,
-                last_mod_date  => $today,
-                comments       => '',
-                points_processed => 0,
-            });
-            $log_id = $log_entry->record_id;
+                end_time       => '00:00:00',
+                status         => { '!=' => 3 },
+            }, { order_by => { -desc => 'record_id' } })->first;
+
+            my ($start_hms, $dur_mins, $log_entry);
+
+            if ($open_log) {
+                # Close the open log and derive actual duration from it
+                my $raw_start = $open_log->start_time // '09:00:00';
+                $raw_start = ref($raw_start)
+                    ? sprintf('%02d:%02d:%02d', $raw_start->hours//0, $raw_start->minutes//0, 0)
+                    : "$raw_start";
+                $start_hms = ($raw_start =~ /^\d{2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+
+                my ($sh, $sm) = ($start_hms =~ /^(\d{2}):(\d{2})/);
+                my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+                $dur_mins = ($eh * 60 + $em) - ($sh * 60 + $sm);
+                $dur_mins = 1 if $dur_mins <= 0;
+                my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+                $open_log->update({
+                    end_time      => $now_hms,
+                    time          => $dur_hms,
+                    status        => 3,
+                    last_mod_by   => $username,
+                    last_mod_date => $today,
+                    details       => 'Auto-closed when todo marked done',
+                });
+                $log_id = $open_log->record_id;
+
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+                    "Closed open log " . $open_log->record_id . " for todo $record_id: $dur_mins min");
+            } else {
+                # No open log — estimate duration intelligently
+                $dur_mins = undef;
+
+                # 2a. Average duration from past closed logs for this exact todo
+                my @same_logs = $schema->resultset('Log')->search({
+                    todo_record_id => $record_id,
+                    status         => 3,
+                    time           => { '!=' => '00:00:00' },
+                })->all;
+                if (@same_logs) {
+                    my $total = 0; my $count = 0;
+                    for my $lg (@same_logs) {
+                        my $t = $lg->time // '00:00:00';
+                        $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
+                        if ($t =~ /^(\d+):(\d+)/) {
+                            $total += $1 * 60 + $2;
+                            $count++;
+                        }
+                    }
+                    $dur_mins = int($total / $count) if $count > 0;
+                }
+
+                # 2b. Average from logs with similar abstract (first 40 chars of subject)
+                if (!$dur_mins && $todo->subject) {
+                    my $kw = substr($todo->subject, 0, 40);
+                    $kw =~ s/[%_]//g;
+                    my @kw_logs = $schema->resultset('Log')->search({
+                        abstract => { 'like' => "%$kw%" },
+                        status   => 3,
+                        time     => { '!=' => '00:00:00' },
+                    }, { rows => 50 })->all;
+                    if (@kw_logs) {
+                        my $total = 0; my $count = 0;
+                        for my $lg (@kw_logs) {
+                            my $t = $lg->time // '00:00:00';
+                            $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
+                            if ($t =~ /^(\d+):(\d+)/) {
+                                $total += $1 * 60 + $2;
+                                $count++;
+                            }
+                        }
+                        $dur_mins = int($total / $count) if $count > 0;
+                    }
+                }
+
+                # 2c. Use estimated_man_hours (stored in minutes) from the todo record
+                if (!$dur_mins && $todo->estimated_man_hours && $todo->estimated_man_hours > 0) {
+                    $dur_mins = $todo->estimated_man_hours;
+                }
+
+                # 2d. Industry-standard defaults by todo_type
+                if (!$dur_mins) {
+                    my $ttype = lc($todo->todo_type // 'task');
+                    my %type_defaults = (
+                        task        => 30,
+                        appointment => 60,
+                        meeting     => 60,
+                        event       => 120,
+                        reminder    => 5,
+                    );
+                    $dur_mins = $type_defaults{$ttype} // 30;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+                        "Using industry default $dur_mins min for type '$ttype' on todo $record_id");
+                }
+
+                # Derive start from scheduled time_of_day; end = now
+                my $start_raw = $todo->time_of_day // '';
+                $start_raw = ref($start_raw)
+                    ? sprintf('%02d:%02d:%02d', $start_raw->hours//0, $start_raw->minutes//0, 0)
+                    : "$start_raw";
+                $start_hms = ($start_raw =~ /^\d{2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
+
+                my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+                $log_entry = $schema->resultset('Log')->create({
+                    todo_record_id  => $record_id,
+                    username        => $username,
+                    sitename        => $sitename,
+                    start_date      => $start_date,
+                    project_code    => $todo->project_id || 0,
+                    due_date        => $today,
+                    abstract        => ($todo->subject // 'Completed todo'),
+                    details         => "Auto-log: estimated $dur_mins min (no open log found)",
+                    start_time      => $start_hms,
+                    end_time        => $now_hms,
+                    time            => $dur_hms,
+                    group_of_poster => $group,
+                    status          => 3,
+                    priority        => $todo->priority || 5,
+                    last_mod_by     => $username,
+                    last_mod_date   => $today,
+                    comments        => '',
+                    points_processed => 0,
+                });
+                $log_id = $log_entry->record_id;
+            }
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_status',
             "Auto-log error for todo $record_id: $@") if $@;
