@@ -311,6 +311,8 @@ function initMonthViewDragAndDrop() {
     });
 }
 
+var _dndReloading = false;
+
 /**
  * Update todo time only (for day view)
  */
@@ -327,15 +329,20 @@ function updateTodoTime(todoId, newTime) {
     })
     .then(data => {
         if (data.success) {
+            _dndReloading = true;
             window.location.reload();
         } else {
-            console.error('update_time failed:', data.error);
-            alert('Failed to update todo time: ' + (data.error || 'Unknown error'));
+            if (!_dndReloading) {
+                console.error('update_time failed:', data.error);
+                alert('Failed to update todo time: ' + (data.error || 'Unknown error'));
+            }
         }
     })
     .catch(error => {
-        console.error('Error updating todo time:', error);
-        alert('Failed to update todo time: ' + error);
+        if (!_dndReloading) {
+            console.error('Error updating todo time:', error);
+            alert('Failed to update todo time: ' + error);
+        }
     });
 }
 
@@ -357,15 +364,20 @@ function updateTodoTimeAndDate(todoId, newTime, newDate) {
     })
     .then(data => {
         if (data.success) {
+            _dndReloading = true;
             window.location.reload();
         } else {
-            console.error('update_time_and_date failed:', data.error);
-            alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+            if (!_dndReloading) {
+                console.error('update_time_and_date failed:', data.error);
+                alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+            }
         }
     })
     .catch(error => {
-        console.error('Error updating todo:', error);
-        alert('Failed to update todo: ' + error);
+        if (!_dndReloading) {
+            console.error('Error updating todo:', error);
+            alert('Failed to update todo: ' + error);
+        }
     });
 }
 
@@ -387,15 +399,20 @@ function updateTodoTimeAndDateBoth(todoId, newTime, newDate) {
     })
     .then(data => {
         if (data.success) {
+            _dndReloading = true;
             window.location.reload();
         } else {
-            console.error('update_display_date failed:', data.error);
-            alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+            if (!_dndReloading) {
+                console.error('update_display_date failed:', data.error);
+                alert('Failed to update todo: ' + (data.error || 'Unknown error'));
+            }
         }
     })
     .catch(error => {
-        console.error('Error updating todo:', error);
-        alert('Failed to update todo: ' + error);
+        if (!_dndReloading) {
+            console.error('Error updating todo:', error);
+            alert('Failed to update todo: ' + error);
+        }
     });
 }
 
