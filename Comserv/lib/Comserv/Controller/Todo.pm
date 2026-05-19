@@ -2776,16 +2776,16 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         # Distribute todos from today forward using start_date and time_of_day
-        # Work window: 05:00 – 17:00 (calendar display starts at 5 AM)
-        # For scheduling: today starts from current time; future days start from 09:00
-        my $WORK_START_MIN      = 5 * 60;   # 300 – earliest allowed start (today only)
+        # Work window: 09:00 – 17:00
+        # Today: start from current time (min 09:00); future days: start from 09:00
+        my $WORK_START_MIN      = 9 * 60;   # 540 – earliest allowed start
         my $WORK_END_MIN        = 17 * 60;  # 1020 – end of work day
         my $NEXT_DAY_START_MIN  = 9 * 60;   # 540 – start of work day for future days
 
         my $cur_dt      = $today_dt->clone;
         my $now_abs_min = $today_dt->hour * 60 + $today_dt->minute;
 
-        # Start from current time; snap to WORK_START_MIN if before 5 AM;
+        # Start from current time; snap to 09:00 if before 9 AM;
         # if already past work end, roll to tomorrow at 09:00
         my $cur_abs_min;
         if ($now_abs_min >= $WORK_END_MIN) {
