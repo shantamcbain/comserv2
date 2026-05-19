@@ -193,7 +193,7 @@ sub daily :Path('/planning/daily') :Args {
                                           @{ $week_todos_by_date{$d_str} // [] };
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
-                    } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
+                    } elsif ($start eq $selected_date || $due eq $selected_date) {
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
                         push @$todos_for_today, $todo;
