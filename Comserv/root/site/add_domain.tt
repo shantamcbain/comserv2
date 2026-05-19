@@ -1,4 +1,4 @@
-[% PageVersion = 'add_domain.tt,v 0.01 2024/08/09 shanta Exp shanta ' %]
+[% PageVersion = 'add_domain.tt,v 0.02 2024/08/09 shanta Exp shanta ' %]
 [% IF debug_mode == 1 %]
 [% PageVersion %]
 [% END %]
@@ -12,13 +12,91 @@
 <h1>Add Domain</h1>
 
 <form method="POST" action="[% c.uri_for('/site/add_domain_post') %]">
-    <label for="site_id">Site:</label>
-    <select name="site_id" id="site_id">
-        [% FOREACH site IN sites %]
-            <option value="[% site.id %]">[% site.name %]</option>
-        [% END %]
-    </select><br>
-    <label for="domain">Domain:</label>
-    <input type="text" id="domain" name="domain" required><br>
-    <input type="submit" value="Add Domain">
+    <div style="margin-bottom:14px;">
+        <label for="site_id" style="display:block;font-weight:bold;margin-bottom:4px;">Site:</label>
+        <select name="site_id" id="site_id" style="width:100%;max-width:400px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+            [% FOREACH site IN sites %]
+                <option value="[% site.id %]">[% site.name %]</option>
+            [% END %]
+        </select>
+    </div>
+
+    <div style="margin-bottom:14px;">
+        <label for="domain" style="display:block;font-weight:bold;margin-bottom:4px;">Domain / Base Domain:</label>
+        <input type="text" id="domain" name="domain" required placeholder="e.g. example.com"
+               style="width:100%;max-width:400px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+    </div>
+
+    <div style="margin-bottom:14px;">
+        <label style="display:block;font-weight:bold;margin-bottom:4px;">
+            <input type="checkbox" name="is_subdomain" id="is_subdomain" value="1" onchange="toggleSubdomain()">
+            This is a subdomain
+        </label>
+        <div id="subdomain_fields" style="display:none;margin-top:8px;">
+            <label for="subdomain_prefix" style="display:block;margin-bottom:4px;">Subdomain prefix:</label>
+            <input type="text" id="subdomain_prefix" name="subdomain_prefix" placeholder="e.g. www"
+                   style="width:100%;max-width:400px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+            <small style="color:#666;">Result: <strong id="subdomain_preview" style="color:#333;"></strong></small>
+        </div>
+    </div>
+
+    <div style="border:1px solid #4a90d9;border-radius:6px;padding:16px;margin-bottom:16px;background:#f0f8ff;">
+        <h3 style="margin-top:0;font-size:1em;">
+            <label>
+                <input type="checkbox" name="add_to_cloudflare" id="add_to_cloudflare" value="1" onchange="toggleCloudflare()">
+                Also create DNS record in Cloudflare
+            </label>
+        </h3>
+        <div id="cloudflare_fields" style="display:none;">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px;">
+                <div>
+                    <label for="cf_zone_name" style="display:block;margin-bottom:4px;font-weight:bold;">Cloudflare Zone (root domain):</label>
+                    <input type="text" id="cf_zone_name" name="cf_zone_name" placeholder="e.g. example.com"
+                           style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                </div>
+                <div>
+                    <label for="cf_record_type" style="display:block;margin-bottom:4px;font-weight:bold;">Record Type:</label>
+                    <select id="cf_record_type" name="cf_record_type"
+                            style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+                        <option value="A">A (IPv4 address)</option>
+                        <option value="CNAME">CNAME (alias)</option>
+                        <option value="AAAA">AAAA (IPv6 address)</option>
+                        <option value="MX">MX (mail)</option>
+                        <option value="TXT">TXT</option>
+                    </select>
+                </div>
+                <div style="grid-column:1/-1;">
+                    <label for="cf_content" style="display:block;margin-bottom:4px;font-weight:bold;">Content (IP address or target):</label>
+                    <input type="text" id="cf_content" name="cf_content" placeholder="e.g. 203.0.113.10"
+                           style="width:100%;padding:7px 10px;border:1px solid #ccc;border-radius:4px;box-sizing:border-box;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <input type="submit" value="Add Domain" style="padding:9px 22px;background:#007bff;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:1em;">
+    <a href="[% c.uri_for('/site') %]" style="margin-left:12px;color:#666;">Cancel</a>
 </form>
+
+<script>
+function toggleSubdomain() {
+    var checked = document.getElementById('is_subdomain').checked;
+    document.getElementById('subdomain_fields').style.display = checked ? 'block' : 'none';
+    updateSubdomainPreview();
+}
+
+function updateSubdomainPreview() {
+    var prefix = document.getElementById('subdomain_prefix').value.trim();
+    var domain = document.getElementById('domain').value.trim();
+    var preview = (prefix && domain) ? prefix + '.' + domain : (domain || '');
+    document.getElementById('subdomain_preview').textContent = preview;
+}
+
+function toggleCloudflare() {
+    var checked = document.getElementById('add_to_cloudflare').checked;
+    document.getElementById('cloudflare_fields').style.display = checked ? 'block' : 'none';
+}
+
+document.getElementById('subdomain_prefix').addEventListener('input', updateSubdomainPreview);
+document.getElementById('domain').addEventListener('input', updateSubdomainPreview);
+</script>

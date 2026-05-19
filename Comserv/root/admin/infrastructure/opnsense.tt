@@ -1,0 +1,262 @@
+[% META
+  title = 'OPNsense Gateway Management'
+  roles = 'admin,developer'
+  TemplateType = 'Application'
+  category = 'admin,infrastructure'
+%]
+
+<style>
+.opnsense-dashboard { max-width: 1200px; margin: 0 auto; padding: 20px; }
+.panel { border: 1px solid var(--border-color, #ddd); border-radius: 8px; margin-bottom: 20px;
+         background: var(--card-bg, #fff); box-shadow: 0 2px 4px rgba(0,0,0,0.08); }
+.panel-header { background: var(--header-bg, #f5f5f5); padding: 12px 18px; border-radius: 8px 8px 0 0;
+                border-bottom: 1px solid var(--border-color, #ddd); display: flex;
+                justify-content: space-between; align-items: center; }
+.panel-header h3 { margin: 0; font-size: 1.1em; }
+.panel-body { padding: 18px; }
+.status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.status-card { border: 1px solid var(--border-color, #ddd); border-radius: 6px; padding: 14px;
+               background: var(--bg-secondary, #fafafa); }
+.status-card h4 { margin: 0 0 10px; font-size: 1em; color: var(--text-color, #333); }
+.badge { display: inline-block; padding: 2px 10px; border-radius: 10px; font-size: 0.82em;
+         font-weight: bold; text-transform: uppercase; }
+.badge-ok  { background: #d4edda; color: #155724; }
+.badge-err { background: #f8d7da; color: #721c24; }
+.badge-warn{ background: #fff3cd; color: #856404; }
+table.data-table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+table.data-table th { background: var(--header-bg, #f0f0f0); padding: 8px 10px; text-align: left; }
+table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-color, #eee); }
+.config-form label { display: block; margin-bottom: 4px; font-weight: bold; }
+.config-form input[type=text], .config-form input[type=number], .config-form input[type=password] {
+    width: 100%; padding: 7px 10px; border: 1px solid var(--border-color, #ccc);
+    border-radius: 4px; margin-bottom: 12px; box-sizing: border-box; }
+.btn { padding: 8px 18px; border: none; border-radius: 4px; cursor: pointer; font-size: 0.95em;
+       text-decoration: none; display: inline-block; }
+.btn-primary  { background: #2196f3; color: #fff; }
+.btn-secondary{ background: #757575; color: #fff; }
+.btn-success  { background: #4caf50; color: #fff; }
+.error-banner { background: #ffebee; border: 1px solid #ef9a9a; padding: 12px 16px;
+                border-radius: 4px; margin-bottom: 16px; color: #c62828; }
+.success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 12px 16px;
+                  border-radius: 4px; margin-bottom: 16px; color: #1b5e20; }
+</style>
+
+<div class="opnsense-dashboard">
+    <h1><i class="fas fa-shield-alt"></i> OPNsense Gateway Management</h1>
+    <p><a href="[% c.uri_for('/admin/infrastructure') %]">&laquo; Infrastructure Dashboard</a></p>
+
+    [% IF c.flash.success_msg %]
+    <div class="success-banner">[% c.flash.success_msg | html %]</div>
+    [% END %]
+
+    [% IF opnsense_error %]
+    <div class="error-banner"><strong>Notice:</strong> [% opnsense_error | html %]</div>
+    [% END %]
+
+    [%# ── Configuration Panel ──────────────────────────────────────── %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-cog"></i> Connection Configuration</h3>
+            <button class="btn btn-secondary" onclick="toggleConfig()">
+                [% IF opnsense_config.host %]Edit[% ELSE %]Configure[% END %]
+            </button>
+        </div>
+        <div class="panel-body" id="config-panel" style="[% IF opnsense_config.host %]display:none[% END %]">
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/save') %]" class="config-form">
+                <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <div>
+                        <label for="host">OPNsense Host / IP</label>
+                        <input type="text" id="host" name="host" required
+                               value="[% opnsense_config.host | html %]" placeholder="192.168.1.1">
+                        <label for="port">Port (default 443)</label>
+                        <input type="number" id="port" name="port"
+                               value="[% opnsense_config.port || 443 %]">
+                    </div>
+                    <div>
+                        <label for="key">API Key</label>
+                        <input type="text" id="key" name="key"
+                               value="[% opnsense_config.key | html %]" placeholder="API key from OPNsense System &gt; Access &gt; Users">
+                        <label for="secret">API Secret</label>
+                        <input type="password" id="secret" name="secret"
+                               value="[% opnsense_config.secret | html %]" placeholder="API secret">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+                            <input type="checkbox" name="verify_ssl" value="1"
+                                   [% IF opnsense_config.verify_ssl %]checked[% END %]>
+                            Verify SSL certificate
+                        </label>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:10px;">Save Configuration</button>
+            </form>
+        </div>
+        [% IF opnsense_config.host %]
+        <div class="panel-body" style="padding-top:0;">
+            <small style="color:var(--text-muted-color,#666);">
+                Connected to: <strong>[% opnsense_config.host | html %]:[% opnsense_config.port || 443 %]</strong>
+                &nbsp;&nbsp;
+                <button class="btn btn-secondary" style="padding:3px 10px;font-size:0.85em;"
+                        onclick="refreshStatus()">Refresh Status</button>
+            </small>
+        </div>
+        [% END %]
+    </div>
+
+    [% IF opnsense_status %]
+
+    [%# ── Firmware / System ────────────────────────────────────── %]
+    [% fw = opnsense_status.firmware %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-info-circle"></i> System Information</h3>
+            [% IF fw.error %]
+                <span class="badge badge-err">unavailable</span>
+            [% ELSE %]
+                <span class="badge badge-ok">online</span>
+            [% END %]
+        </div>
+        <div class="panel-body">
+            [% IF fw.error %]
+                <p style="color:#c62828;">[% fw.error | html %]</p>
+            [% ELSE %]
+                <p>Firmware status retrieved successfully.</p>
+                <pre style="font-size:0.82em;overflow-x:auto;">[% fw | json %]</pre>
+            [% END %]
+        </div>
+    </div>
+
+    [%# ── Interfaces ───────────────────────────────────────────── %]
+    [% ifaces = opnsense_status.interfaces %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-network-wired"></i> Interfaces</h3>
+        </div>
+        <div class="panel-body">
+            [% IF ifaces.error %]
+                <p style="color:#c62828;">[% ifaces.error | html %]</p>
+            [% ELSIF ifaces.rows.size %]
+            <table class="data-table">
+                <thead><tr><th>Interface</th><th>Name</th><th>IPv4</th><th>IPv6</th><th>Status</th></tr></thead>
+                <tbody>
+                [% FOREACH iface IN ifaces.rows %]
+                <tr>
+                    <td><code>[% iface.identifier | html %]</code></td>
+                    <td>[% iface.descr | html %]</td>
+                    <td>[% iface.ipaddr | html %]</td>
+                    <td>[% iface.ipv6 | html %]</td>
+                    <td><span class="badge [% iface.status == 'up' ? 'badge-ok' : 'badge-err' %]">
+                        [% iface.status | html %]</span></td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+                <p style="color:#888;">No interface data available.</p>
+            [% END %]
+        </div>
+    </div>
+
+    [%# ── DHCP Leases ──────────────────────────────────────────── %]
+    [% dhcp = opnsense_status.dhcp %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-list-alt"></i> Active DHCP Leases</h3>
+            [% IF dhcp.total %]<span class="badge badge-ok">[% dhcp.total %] leases</span>[% END %]
+        </div>
+        <div class="panel-body">
+            [% IF dhcp.error %]
+                <p style="color:#c62828;">[% dhcp.error | html %]</p>
+            [% ELSIF dhcp.rows.size %]
+            <table class="data-table">
+                <thead><tr><th>Hostname</th><th>IP Address</th><th>MAC Address</th><th>Expires</th></tr></thead>
+                <tbody>
+                [% FOREACH lease IN dhcp.rows %]
+                <tr>
+                    <td>[% lease.hostname | html %]</td>
+                    <td><code>[% lease.address | html %]</code></td>
+                    <td><code>[% lease.hwaddr | html %]</code></td>
+                    <td>[% lease.ends | html %]</td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+                <p style="color:#888;">No active DHCP leases found.</p>
+            [% END %]
+        </div>
+    </div>
+
+    [%# ── Firewall Rules (summary) ─────────────────────────────── %]
+    [% fw_rules = opnsense_status.firewall %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-fire-alt"></i> Firewall Rules</h3>
+            [% IF fw_rules.total_rows %]
+            <span class="badge badge-ok">[% fw_rules.total_rows %] rules</span>
+            [% END %]
+        </div>
+        <div class="panel-body">
+            [% IF fw_rules.error %]
+                <p style="color:#c62828;">[% fw_rules.error | html %]</p>
+            [% ELSIF fw_rules.rows.size %]
+            <table class="data-table">
+                <thead><tr><th>Description</th><th>Interface</th><th>Protocol</th><th>Source</th><th>Destination</th><th>Action</th></tr></thead>
+                <tbody>
+                [% FOREACH rule IN fw_rules.rows %]
+                <tr>
+                    <td>[% rule.description | html %]</td>
+                    <td>[% rule.interface | html %]</td>
+                    <td>[% rule.protocol | html %]</td>
+                    <td>[% rule.source_net | html %]</td>
+                    <td>[% rule.destination_net | html %]</td>
+                    <td><span class="badge [% rule.action == 'pass' ? 'badge-ok' : 'badge-err' %]">
+                        [% rule.action | html %]</span></td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+                <p style="color:#888;">No firewall rules returned.</p>
+            [% END %]
+        </div>
+    </div>
+
+    [%# ── DNS / Unbound ────────────────────────────────────────── %]
+    [% unbound = opnsense_status.unbound %]
+    <div class="panel">
+        <div class="panel-header">
+            <h3><i class="fas fa-search"></i> Unbound DNS Resolver</h3>
+            [% IF unbound.status %]
+            <span class="badge [% unbound.status == 'running' ? 'badge-ok' : 'badge-warn' %]">
+                [% unbound.status | html %]</span>
+            [% END %]
+        </div>
+        <div class="panel-body">
+            [% IF unbound.error %]
+                <p style="color:#c62828;">[% unbound.error | html %]</p>
+            [% ELSE %]
+                <p>DNS Resolver status: <strong>[% unbound.status | html %]</strong></p>
+            [% END %]
+        </div>
+    </div>
+
+    [% END %][%# /IF opnsense_status %]
+
+    [% UNLESS opnsense_config.host %]
+    <div class="panel">
+        <div class="panel-body">
+            <p>Configure the OPNsense connection above to start managing your gateway.</p>
+            <p>To generate an API key in OPNsense: <em>System &rarr; Access &rarr; Users &rarr; edit user &rarr; API keys &rarr; Add key</em></p>
+        </div>
+    </div>
+    [% END %]
+</div>
+
+<script>
+function toggleConfig() {
+    var panel = document.getElementById('config-panel');
+    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+}
+function refreshStatus() {
+    window.location.reload();
+}
+</script>

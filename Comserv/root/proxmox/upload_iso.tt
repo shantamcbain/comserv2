@@ -1,0 +1,113 @@
+
+<div class="container">
+    <h1>Upload ISO to Proxmox</h1>
+
+    [% IF error_msg %]
+    <div class="error-message">[% error_msg %]</div>
+    [% END %]
+
+    <p>Select a local ISO file from the server's kvm-images directory and upload it directly to Proxmox storage via the API.</p>
+
+    <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:12px;margin-bottom:16px;">
+        <strong>CSC Setup ISO:</strong> The <code>csc_setup_new.iso</code> contains setup scripts for NFS, MySQL, PostgreSQL, Docker, ZeroTier, Webmin, and Virtualmin.
+        Attach it to a new VM as a CD-ROM, then run <code>bash /mnt/cdrom/scripts/setup_all.sh</code> inside the VM.
+    </div>
+
+    <div class="form-section">
+        <h2>Select ISO &amp; Storage</h2>
+
+        <div class="form-group">
+            <label for="iso_path">ISO File:</label>
+            <select id="iso_path" name="iso_path" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                <option value="">-- Select ISO --</option>
+                [% FOREACH iso IN local_isos %]
+                <option value="[% iso.path | html %]">[% iso.name | html %]</option>
+                [% END %]
+            </select>
+        </div>
+
+        <div class="form-group" style="margin-top:12px;">
+            <label for="storage">Proxmox Storage:</label>
+            <select id="storage" name="storage" style="width:100%;padding:8px;border:1px solid #ccc;border-radius:4px;">
+                [% IF storages && storages.size > 0 %]
+                    [% FOREACH s IN storages %]
+                    <option value="[% s.id | html %]">[% s.id | html %] ([% s.type | html %])</option>
+                    [% END %]
+                [% ELSE %]
+                <option value="local">local (default)</option>
+                [% END %]
+            </select>
+        </div>
+
+        <div style="margin-top:16px;">
+            <button type="button" onclick="doUpload()" id="uploadBtn"
+                    style="padding:10px 22px;background:#28a745;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;font-size:1em;">
+                Upload to Proxmox
+            </button>
+            <a href="[% c.uri_for('/proxmox') %]" style="margin-left:12px;">Back to Dashboard</a>
+        </div>
+
+        <div id="uploadStatus" style="margin-top:14px;font-weight:bold;"></div>
+        <div id="progressWrap" style="display:none;margin-top:8px;">
+            <div style="background:#e9ecef;border-radius:4px;height:18px;overflow:hidden;">
+                <div id="progressBar" style="width:0%;height:100%;background:#28a745;transition:width 0.3s;"></div>
+            </div>
+            <div id="progressText" style="font-size:0.85em;color:#555;margin-top:4px;">Uploading… this may take a minute for large ISOs.</div>
+        </div>
+    </div>
+</div>
+
+<script>
+function doUpload() {
+    var path    = document.getElementById('iso_path').value;
+    var storage = document.getElementById('storage').value;
+    if (!path) { alert('Please select an ISO file.'); return; }
+
+    var btn = document.getElementById('uploadBtn');
+    var status = document.getElementById('uploadStatus');
+    var progressWrap = document.getElementById('progressWrap');
+    var progressBar  = document.getElementById('progressBar');
+
+    btn.disabled = true;
+    btn.textContent = 'Uploading…';
+    status.style.color = '#555';
+    status.textContent = 'Starting upload…';
+    progressWrap.style.display = 'block';
+
+    var animated = 0;
+    var ticker = setInterval(function() {
+        animated = Math.min(animated + 2, 90);
+        progressBar.style.width = animated + '%';
+    }, 800);
+
+    fetch('[% c.uri_for("/proxmox/upload_iso") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'iso_path=' + encodeURIComponent(path) + '&storage=' + encodeURIComponent(storage)
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        clearInterval(ticker);
+        progressBar.style.width = '100%';
+        if (d.success) {
+            status.style.color = '#155724';
+            status.textContent = d.message || 'Upload complete!';
+            document.getElementById('progressText').textContent = d.task_id ? 'Task: ' + d.task_id : 'Done.';
+        } else {
+            status.style.color = '#721c24';
+            status.textContent = 'Error: ' + (d.error || 'Unknown error');
+            progressBar.style.background = '#dc3545';
+            btn.disabled = false;
+            btn.textContent = 'Upload to Proxmox';
+        }
+    })
+    .catch(function(e){
+        clearInterval(ticker);
+        status.style.color = '#721c24';
+        status.textContent = 'Request failed: ' + e.message;
+        progressBar.style.background = '#dc3545';
+        btn.disabled = false;
+        btn.textContent = 'Upload to Proxmox';
+    });
+}
+</script>
