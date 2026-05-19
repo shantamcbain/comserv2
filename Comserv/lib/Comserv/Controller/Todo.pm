@@ -2704,11 +2704,34 @@ sub reschedule :Path('reschedule') :Args(0) {
             my $sd_raw = $todo->start_date // '';
             $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
             my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
-            if ($sd && $sd gt $today) {
+            my $tod = $todo->time_of_day // '';
+            my $has_time = ($tod =~ /^\d{1,2}:\d{2}/);
+            if ($sd && $sd gt $today && $has_time) {
                 push @anchored, $todo;
             } else {
                 push @floatable, $todo;
             }
+        }
+
+        # De-duplicate anchored: if two anchored todos share the same date+time,
+        # keep the first (lower record_id), demote the rest to floatable.
+        {
+            my %seen_slot;
+            my (@keep_anchored, @demoted);
+            for my $todo (sort { $a->record_id <=> $b->record_id } @anchored) {
+                my $sd_raw = $todo->start_date // '';
+                $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+                my $sd  = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+                my $tod = $todo->time_of_day // '';
+                my $slot_key = "$sd|$tod";
+                if ($seen_slot{$slot_key}++) {
+                    push @demoted, $todo;
+                } else {
+                    push @keep_anchored, $todo;
+                }
+            }
+            @anchored = @keep_anchored;
+            push @floatable, @demoted;
         }
 
         # Build anchored-todo lookup by date so get_blocked can include them.
