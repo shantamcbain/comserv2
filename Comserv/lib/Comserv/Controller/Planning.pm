@@ -195,6 +195,8 @@ sub daily :Path('/planning/daily') :Args {
                         }
                     } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
                         push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
+                        push @$todos_for_today, $todo;
                     } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
                         push @$overdue_todos, $todo;
                     }
