@@ -84,15 +84,19 @@ sub filter_todos_by_date_range {
             $include_todo = 1;
         }
 
-        # No start_date: fall back to due_date as anchor
-        if (!$sd && $dd && $dd ge $start_date && $dd le $end_date) {
+        # due_date within range always qualifies — regardless of whether start_date is set.
+        # A todo due today belongs on today's calendar even if it started (on paper) in the past.
+        if ($dd && $dd ge $start_date && $dd le $end_date) {
             $include_todo = 1;
         }
 
-        # Overdue: only for non-done todos; anchor before range start
+        # Overdue: only when BOTH anchor dates are before the range start
         if ($include_overdue && !$is_done) {
-            my $anchor = $sd || $dd;
-            if ($anchor && $anchor lt $start_date) {
+            my $sd_before = $sd && $sd lt $start_date;
+            my $dd_before = $dd && $dd lt $start_date;
+            my $sd_in     = $sd && $sd ge $start_date && $sd le $end_date;
+            my $dd_in     = $dd && $dd ge $start_date && $dd le $end_date;
+            if (!$sd_in && !$dd_in && ($sd_before || $dd_before)) {
                 $include_todo = 1;
             }
         }
