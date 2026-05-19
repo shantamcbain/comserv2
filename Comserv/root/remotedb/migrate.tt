@@ -12,55 +12,44 @@
 
 [% IF migrate_done %]
     [% IF migrate_ok %]
-    <div class="success-message">Migration completed successfully: [% last_source | html %] &#8594; [% last_target | html %]</div>
+    <div class="success-message">Migration completed: [% last_source | html %] &#8594; [% last_target | html %]</div>
     [% ELSE %]
     <div class="error-message">Migration failed: [% migrate_error | html %]</div>
     [% END %]
 
     [% IF migrate_results.size %]
     <div class="content-container">
+    <div class="content-primary">
     <div class="data-container">
     <div class="form-section">
-        <h3>Results</h3>
-        <div class="table-container">
-        <table class="data-table">
-            <thead>
-                <tr>
-                    <th>Table</th>
-                    <th>Schema</th>
-                    <th>Rows Copied</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody>
-            [% FOREACH r IN migrate_results %]
-                <tr>
-                    <td><code>[% r.table | html %]</code></td>
-                    <td>[% r.schema_ok ? '&#10003;' : '&#10005;' %]</td>
-                    <td>[% r.rows %]</td>
-                    <td>
-                        [% IF r.error %]
-                            <span style="color:#c00;">[% r.error | html %]</span>
-                        [% ELSE %]
-                            OK
-                        [% END %]
-                    </td>
-                </tr>
-            [% END %]
-            </tbody>
-        </table>
+        <h3>Migration Log</h3>
+        <div class="migrate-log">
+        [% FOREACH r IN migrate_results %]
+            <div class="migrate-log-entry[% r.error ? ' migrate-log-error' : ' migrate-log-ok' %]">
+                <span class="migrate-log-icon">[% r.error ? '&#10005;' : '&#10003;' %]</span>
+                <span class="migrate-log-table"><code>[% r.table | html %]</code></span>
+                <span class="migrate-log-rows">[% r.rows %] row(s)</span>
+                [% IF r.error %]<span class="migrate-log-msg">[% r.error | html %]</span>[% END %]
+            </div>
+        [% END %]
         </div>
+        <div class="form-actions">
+            <a href="[% c.uri_for('/remotedb/migrate') %]" class="btn btn-primary">Run Another Migration</a>
+            <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">&#8592; Back to Servers</a>
+        </div>
+    </div>
     </div>
     </div>
     </div>
     [% END %]
 [% END %]
 
+[% UNLESS migrate_done %]
 <div class="content-container">
 <div class="content-primary">
 <div class="form-container">
 
-<form method="post" action="[% c.uri_for('/remotedb/migrate') %]" class="app-form">
+<form method="post" action="[% c.uri_for('/remotedb/migrate') %]" class="app-form" id="migrate-form">
 
     <div class="form-section">
         <h3>Source &amp; Target</h3>
@@ -123,9 +112,7 @@
     </div>
 
     <div class="form-actions">
-        <button type="submit" id="migrate-btn" class="btn btn-primary">
-            Run Migration
-        </button>
+        <button type="submit" id="migrate-btn" class="btn btn-primary">Run Migration</button>
         <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">Cancel</a>
     </div>
 
@@ -133,32 +120,76 @@
 </div>
 </div>
 </div>
+[% END %]
 
-<div id="migrate-progress" style="display:none;">
+<div id="migrate-progress" class="migrate-progress-hidden">
     <div class="content-container">
+    <div class="content-primary">
     <div class="form-section">
         <h3>Migration In Progress</h3>
-        <p>Copying schema and data between servers. This may take several minutes for large databases.</p>
-        <p>
-            <strong id="progress-elapsed">Elapsed: 0s</strong>
-        </p>
-        <div id="progress-bar-wrap" style="background:#e0e0e0;border-radius:4px;height:18px;width:100%;max-width:500px;">
-            <div id="progress-bar" style="background:#1976d2;height:18px;border-radius:4px;width:0%;transition:width 0.5s;"></div>
+        <p id="migrate-progress-note">Do not close this page. The migration is running on the server.</p>
+        <div class="migrate-log" id="migrate-step-log">
+            <div class="migrate-log-entry migrate-log-waiting" id="step-source">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Connecting to source server&hellip;</span>
+                <span class="migrate-log-rows" id="elapsed-display"></span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-target">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Connecting to target server&hellip;</span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-createdb">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Creating target database (if needed)&hellip;</span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-copy">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Copying tables and data&hellip;</span>
+            </div>
         </div>
-        <p style="color:#666;font-size:0.9em;margin-top:0.5em;">Do not close this page. The page will reload automatically when the migration completes.</p>
+    </div>
     </div>
     </div>
 </div>
 
+<style>
+.migrate-progress-hidden { display: none; }
+.migrate-log { border: 1px solid var(--border-color, #ccc); border-radius: 4px; overflow: hidden; }
+.migrate-log-entry { display: flex; align-items: baseline; gap: 0.75em; padding: 0.55em 0.9em; border-bottom: 1px solid var(--border-color, #eee); font-family: monospace; font-size: 0.92em; }
+.migrate-log-entry:last-child { border-bottom: none; }
+.migrate-log-ok   { background: rgba(0,128,0,0.08); }
+.migrate-log-error { background: rgba(200,0,0,0.08); }
+.migrate-log-waiting { background: rgba(25,118,210,0.08); }
+.migrate-log-pending { opacity: 0.4; }
+.migrate-log-icon { font-size: 1.1em; min-width: 1.2em; }
+.migrate-log-table { flex: 1; }
+.migrate-log-rows { color: var(--secondary-text-color, #666); font-size: 0.9em; white-space: nowrap; }
+.migrate-log-msg { color: var(--error-color, #c00); font-size: 0.88em; }
+</style>
+
 <script>
 (function() {
-    var form = document.querySelector('form.app-form');
-    var btn  = document.getElementById('migrate-btn');
-    var prog = document.getElementById('migrate-progress');
-    var bar  = document.getElementById('progress-bar');
-    var elapsed = document.getElementById('progress-elapsed');
+    var form   = document.getElementById('migrate-form');
+    if (!form) return;
+    var btn    = document.getElementById('migrate-btn');
+    var prog   = document.getElementById('migrate-progress');
+    var elapsed = document.getElementById('elapsed-display');
     var seconds = 0;
     var timer;
+
+    var steps = [
+        { el: document.getElementById('step-source'),   after: 0  },
+        { el: document.getElementById('step-target'),   after: 6  },
+        { el: document.getElementById('step-createdb'), after: 12 },
+        { el: document.getElementById('step-copy'),     after: 18 }
+    ];
+
+    function activateStep(idx) {
+        var s = steps[idx];
+        if (!s || !s.el) return;
+        s.el.className = 'migrate-log-entry migrate-log-waiting';
+        s.el.querySelector('.migrate-log-icon').textContent = '\u25CB';
+    }
 
     form.addEventListener('submit', function(e) {
         if (!confirm('This will write data to the target server. Continue?')) {
@@ -166,17 +197,17 @@
             return;
         }
         btn.disabled = true;
-        btn.textContent = 'Migrating...';
-        prog.style.display = 'block';
-        form.querySelector('.form-section').style.display = 'none';
+        btn.textContent = 'Migrating\u2026';
+        prog.className = '';
+        activateStep(0);
 
         timer = setInterval(function() {
             seconds++;
-            elapsed.textContent = 'Elapsed: ' + seconds + 's';
-            var pct = Math.min(95, seconds * 2);
-            bar.style.width = pct + '%';
+            if (elapsed) elapsed.textContent = seconds + 's';
+            for (var i = 0; i < steps.length; i++) {
+                if (seconds >= steps[i].after) activateStep(i);
+            }
         }, 1000);
     });
 })();
 </script>
-
