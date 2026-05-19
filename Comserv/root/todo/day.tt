@@ -172,7 +172,7 @@
 .gcal-ev {
     position: absolute; border-radius: 4px; padding: 2px 5px;
     font-size: 0.77em; overflow: hidden; box-sizing: border-box;
-    color: #fff; background: #1a73e8; border-left: 3px solid #1a73e8;
+    color: #fff; background: var(--gcal-ev-color, #1a73e8); border-left: 3px solid var(--gcal-ev-color, #1a73e8);
     box-shadow: 0 1px 3px rgba(0,0,0,0.25);
     cursor: grab; z-index: 3; transition: box-shadow 0.12s, opacity 0.12s;
     min-height: 18px;
@@ -696,13 +696,18 @@ function _updateDaySiteSummary() {
 
 /* ── Google Calendar layout helpers ── */
 
-var GCAL_PALETTE = [
-    '#1e88e5','#43a047','#8e24aa','#e53935','#fb8c00',
-    '#00897b','#6d4c41','#1565c0','#558b2f','#c62828','#00838f','#4527a0'
-];
+var GCAL_PALETTE = [];
 var _gcalSiteColors = {};
 var _gcalColorIdx = 0;
+function _buildGcalPalette() {
+    var s = getComputedStyle(document.documentElement);
+    var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
+    var info    = s.getPropertyValue('--info-color').trim()    || '#00897B';
+    var success = s.getPropertyValue('--success-color').trim() || '#43A047';
+    return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
+}
 function gcalSiteColor(site) {
+    if (!GCAL_PALETTE.length) GCAL_PALETTE = _buildGcalPalette();
     if (!site) return '#757575';
     if (!_gcalSiteColors[site]) {
         _gcalSiteColors[site] = GCAL_PALETTE[_gcalColorIdx % GCAL_PALETTE.length];

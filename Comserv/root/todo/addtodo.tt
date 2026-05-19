@@ -246,6 +246,12 @@ function syncDur() {
             <option value="reminder"    [% IF todo.todo_type == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
         </select>
     </div>
+    <div id="is-fixed-row">
+        <label for="is_fixed">Fixed Time:</label>
+        <input type="checkbox" id="is_fixed" name="is_fixed" value="1"
+               [% IF todo.is_fixed %]checked[% END %]>
+        <small style="color:var(--text-muted-color,#666);margin-left:6px;">Fixed events are never moved by reschedule (auto-set for appointments &amp; meetings).</small>
+    </div>
     <div id="recurring-row">
         <label for="is_recurring">Repeats:</label>
         <input type="checkbox" id="is_recurring" name="is_recurring" value="1"

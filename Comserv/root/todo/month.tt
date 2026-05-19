@@ -655,13 +655,18 @@ document.addEventListener('DOMContentLoaded', function() {
     </div>
 </div>
 <script>
-var MONTH_PALETTE = [
-    '#1a73e8','#43a047','#8e24aa','#e53935','#fb8c00',
-    '#00897b','#6d4c41','#1565c0','#558b2f','#c62828','#00838f','#4527a0'
-];
+var MONTH_PALETTE = [];
 var _monthSiteColors = {};
 var _monthColorIdx = 0;
+function _buildMonthPalette() {
+    var s = getComputedStyle(document.documentElement);
+    var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
+    var info    = s.getPropertyValue('--info-color').trim()    || '#00897B';
+    var success = s.getPropertyValue('--success-color').trim() || '#43A047';
+    return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
+}
 function monthSiteColor(site) {
+    if (!MONTH_PALETTE.length) MONTH_PALETTE = _buildMonthPalette();
     if (!site) return '#757575';
     if (!_monthSiteColors[site]) {
         _monthSiteColors[site] = MONTH_PALETTE[_monthColorIdx % MONTH_PALETTE.length];
