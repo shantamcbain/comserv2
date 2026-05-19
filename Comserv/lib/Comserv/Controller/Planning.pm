@@ -443,7 +443,7 @@ sub daily :Path('/planning/daily') :Args {
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
-            next if ($h{todo_type} // '') =~ /^(appointment|event)$/i;
+            next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
             next if ($h{is_recurring} // 0);
 
             my $st          = $h{status} // '';
