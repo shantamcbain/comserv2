@@ -2749,18 +2749,21 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         # Distribute todos from today forward using start_date and time_of_day
-        # Work window: 05:00 – 17:00 (calendar starts at 5 AM)
-        my $WORK_START_MIN = 5 * 60;   # 300 minutes from midnight
-        my $WORK_END_MIN   = 17 * 60;  # 1020 minutes from midnight
+        # Work window: 05:00 – 17:00 (calendar display starts at 5 AM)
+        # For scheduling: today starts from current time; future days start from 09:00
+        my $WORK_START_MIN      = 5 * 60;   # 300 – earliest allowed start (today only)
+        my $WORK_END_MIN        = 17 * 60;  # 1020 – end of work day
+        my $NEXT_DAY_START_MIN  = 9 * 60;   # 540 – start of work day for future days
 
         my $cur_dt      = $today_dt->clone;
         my $now_abs_min = $today_dt->hour * 60 + $today_dt->minute;
 
-        # Start from current time; if already past work end, roll to next day at work start
+        # Start from current time; snap to WORK_START_MIN if before 5 AM;
+        # if already past work end, roll to tomorrow at 09:00
         my $cur_abs_min;
         if ($now_abs_min >= $WORK_END_MIN) {
             $cur_dt->add(days => 1);
-            $cur_abs_min = $WORK_START_MIN;
+            $cur_abs_min = $NEXT_DAY_START_MIN;
         } elsif ($now_abs_min < $WORK_START_MIN) {
             $cur_abs_min = $WORK_START_MIN;
         } else {
@@ -2768,10 +2771,11 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         for my $todo (@rows) {
-            # Skip recurring events and appointments — fixed in time, never rescheduled.
-            my $skip_rec  = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
-            my $skip_appt = $todo->can('todo_type') && ($todo->todo_type // 'task') eq 'appointment';
-            next if $skip_rec || $skip_appt;
+            # Skip recurring events, appointments, and is_fixed todos — fixed in time, never rescheduled.
+            my $skip_rec   = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+            my $skip_appt  = $todo->can('todo_type') && ($todo->todo_type // 'task') eq 'appointment';
+            my $skip_fixed = $todo->can('is_fixed') ? ($todo->is_fixed // 0) : 0;
+            next if $skip_rec || $skip_appt || $skip_fixed;
 
             # estimated_man_hours is stored as MINUTES (integer).
             my $stored_mins    = $todo->estimated_man_hours // 0;
@@ -2787,7 +2791,7 @@ sub reschedule :Path('reschedule') :Args(0) {
             # Roll to next work day if we are at or past work end
             while ($cur_abs_min >= $WORK_END_MIN) {
                 $cur_dt->add(days => 1);
-                $cur_abs_min = $WORK_START_MIN;
+                $cur_abs_min = $NEXT_DAY_START_MIN;
             }
 
             my $new_start = $cur_dt->ymd;
@@ -2811,7 +2815,7 @@ sub reschedule :Path('reschedule') :Args(0) {
                     # If a conflict pushed us past work end, roll to next day and retry
                     if ($cur_abs_min >= $WORK_END_MIN) {
                         $cur_dt->add(days => 1);
-                        $cur_abs_min = $WORK_START_MIN;
+                        $cur_abs_min = $NEXT_DAY_START_MIN;
                         $new_start   = $cur_dt->ymd;
                         $changed     = 1;
                     }
