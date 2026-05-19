@@ -1674,4 +1674,34 @@ function saveLogNotes(entryId) {
         if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }
+
+function startWorkTodoCard(btn, recordId) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/todo/open_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.textContent = '▶ Active';
+            btn.style.background = '#fd7e14';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#fd7e14';
+            btn.disabled = false;
+            btn.title = 'Log started — click Done when finished';
+            var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+            if (card) card.style.background = 'color-mix(in srgb,#0d6efd 8%,var(--bg-color,#fff))';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '▶ Start';
+            alert('Could not start: ' + (d.error || 'unknown error'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '▶ Start';
+        alert('Error: ' + e);
+    });
+}
 </script>

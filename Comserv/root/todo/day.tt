@@ -497,6 +497,13 @@
     .todo-popup .popup-action-btn.btn-view {
         background: #757575; border-color: #757575;
     }
+    .todo-popup .popup-action-btn.btn-start {
+        background: #0d6efd; border-color: #0d6efd;
+    }
+    .gcal-ev-btn-active {
+        background: rgba(253,126,20,0.9) !important;
+        font-weight: bold;
+    }
 
     /* Responsive design */
     @media (max-width: 768px) {
@@ -636,6 +643,45 @@ function markDoneGcal(btn, recordId) {
             alert('Could not mark done: ' + (d.error || 'unknown'));
         }
     }).catch(function(e){ alert('Error: ' + e); });
+}
+
+function startWorkGcal(btn, recordId) {
+    btn.disabled = true;
+    var origText = btn.textContent.trim();
+    btn.textContent = '…';
+    fetch('/todo/open_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.textContent = '▶ Active';
+            btn.classList.add('gcal-ev-btn-active');
+            btn.disabled = false;
+            btn.title = 'Log started — click Done when finished';
+            var ev = btn.closest('.gcal-ev');
+            if (ev) {
+                ev.style.outline = '2px solid #fd7e14';
+                var popup = ev.querySelector('.todo-popup .btn-start');
+                if (popup) { popup.textContent = '▶ Active'; popup.style.background = '#fd7e14'; popup.style.borderColor = '#fd7e14'; }
+            }
+        } else {
+            btn.disabled = false;
+            btn.textContent = origText;
+            if (d.error && d.error.indexOf('already open') !== -1) {
+                btn.textContent = '▶ Active';
+                btn.classList.add('gcal-ev-btn-active');
+                btn.title = 'Log already open — click Done when finished';
+            } else {
+                alert('Could not start: ' + (d.error || 'unknown error'));
+            }
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        alert('Error: ' + e);
+    });
 }
 
 function _updateDaySiteSummary() {
@@ -1193,7 +1239,15 @@ document.addEventListener('DOMContentLoaded', function() {
                         </select>
                         <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]">View</a>
                         <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS tdone %]<button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
+                        [% UNLESS tdone %]
+                        [% SET _tis_inprog = (todo.status == 2) %]
+                        <button class="gcal-ev-btn[% IF _tis_inprog %] gcal-ev-btn-active[% END %]" draggable="false"
+                            onclick="startWorkGcal(this,[% todo.record_id %])"
+                            title="[% IF _tis_inprog %]In progress — log open[% ELSE %]Start working on this todo[% END %]">
+                            [% IF _tis_inprog %]▶ Active[% ELSE %]▶ Start[% END %]
+                        </button>
+                        <button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>
+                        [% END %]
                     </div>
                 </div>
                 <div class="todo-popup">
@@ -1216,7 +1270,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <div class="popup-actions">
                         <a class="popup-action-btn btn-view" href="/todo/details?record_id=[% todo.record_id %]">View</a>
                         <a class="popup-action-btn btn-log" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS tdone %]<button class="popup-action-btn btn-done" onclick="markDoneGcal(this,[% todo.record_id %]);this.closest('.todo-popup').style.display='none';">Done</button>[% END %]
+                        [% UNLESS tdone %]
+                        <button class="popup-action-btn btn-start" onclick="startWorkGcal(this,[% todo.record_id %])">▶ Start</button>
+                        <button class="popup-action-btn btn-done" onclick="markDoneGcal(this,[% todo.record_id %]);this.closest('.todo-popup').style.display='none';">Done</button>
+                        [% END %]
                     </div>
                 </div>
             </div>

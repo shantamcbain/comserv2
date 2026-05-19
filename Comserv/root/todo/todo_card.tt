@@ -186,7 +186,17 @@
            style="font-size:0.68em;padding:2px 6px;border:1px solid var(--primary-color);border-radius:3px;text-decoration:none;color:var(--primary-color);white-space:nowrap;">View</a>
         <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
            style="font-size:0.68em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add time log">Log</a>
-        [% IF tc_show_done && is_admin %]
+        [% IF tc_show_done && is_admin && !_tc_is_done %]
+          [% IF _tc_status == 2 %]
+          <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="In progress — click to re-open log">▶ Active</button>
+          [% ELSE %]
+          <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — opens a time log">▶ Start</button>
+          [% END %]
+        <button onclick="[% tc_done_fn %]([% tc.record_id %])"
+            style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
+        [% ELSIF tc_show_done && is_admin %]
         <button onclick="[% tc_done_fn %]([% tc.record_id %])"
             style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
         [% END %]
