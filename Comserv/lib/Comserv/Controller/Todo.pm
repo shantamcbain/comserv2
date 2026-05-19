@@ -1810,6 +1810,7 @@ sub day :Path('/todo/day') :Args {
         my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
         if (!$is_done && $anchor && $anchor lt $date && !$is_rec) {
             push @overdue_todos, $todo;
+            push @today_todos, $todo;
         } else {
             push @today_todos, $todo;
         }

@@ -199,6 +199,7 @@ sub daily :Path('/planning/daily') :Args {
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
                         push @$overdue_todos, $todo;
+                        push @$todos_for_today, $todo if $selected_date eq $current_date_str;
                     }
 
                     unless ($is_recurr) {
@@ -249,7 +250,7 @@ sub daily :Path('/planning/daily') :Args {
         my $top_px = $start_min - $GRID_START_MIN;
         $top_px = 0    if $top_px < 0;
         $top_px = 1000 if $top_px > 1000;
-        my $height = $est_mins < 30 ? 30 : $est_mins;
+        my $height = $est_mins < 15 ? 15 : $est_mins;
         $height = 900 if $height > 900;
         my $end_min = $start_min + $est_mins;
 
