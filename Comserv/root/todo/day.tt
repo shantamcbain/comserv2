@@ -1209,7 +1209,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET tpx      = stm - 300 %]
             [% IF tpx < 0 %][% SET tpx = 0 %][% END %]
             [% IF tpx > 1000 %][% SET tpx = 1000 %][% END %]
-            [% SET tht      = test < 30 ? 30 : test %]
+            [% SET tht      = test < 15 ? 15 : test %]
             [% IF tht > 900 %][% SET tht = 900 %][% END %]
             [% SET tlbl     = todstr.substr(0, 5) %]
             [% END %]
