@@ -1108,17 +1108,24 @@ sub migrate_database {
     my $src_dbh = $self->_connect_to_database($all->{$source_name});
     return (0, [], "Cannot connect to source '$source_name'") unless $src_dbh;
 
-    my $tgt_dbh = $self->_connect_to_database($all->{$target_name});
+    my $tgt_db   = $all->{$target_name}{config}{database} // '';
+    my $src_type = lc($all->{$source_name}{config}{db_type} // 'mysql');
+    my $tgt_type = lc($all->{$target_name}{config}{db_type} // 'mysql');
+
+    my $tgt_dbh;
+    unless ($tgt_type eq 'postgresql') {
+        my $no_db_conn = { %{$all->{$target_name}} };
+        $no_db_conn->{config} = { %{$all->{$target_name}{config}}, database => '' };
+        $tgt_dbh = $self->_connect_to_database($no_db_conn);
+        if ($tgt_dbh) {
+            eval { $tgt_dbh->do("CREATE DATABASE IF NOT EXISTS `$tgt_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci") };
+            eval { $tgt_dbh->do("USE `$tgt_db`") };
+        }
+    }
+    $tgt_dbh //= $self->_connect_to_database($all->{$target_name});
     unless ($tgt_dbh) {
         $src_dbh->disconnect();
         return (0, [], "Cannot connect to target '$target_name'");
-    }
-
-    my $tgt_db  = $all->{$target_name}{config}{database} // '';
-    my $src_type = lc($all->{$source_name}{config}{db_type} // 'mysql');
-
-    unless ($src_type eq 'postgresql') {
-        eval { $tgt_dbh->do("CREATE DATABASE IF NOT EXISTS `$tgt_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci") };
     }
 
     my @tables;
