@@ -13,7 +13,13 @@ use POSIX qw(strftime);
 has 'env_path' => (
     is => 'rw',
     isa => 'Str',
-    default => sub { $ENV{COMSERV_ENV_FILE} || '.env' }
+    default => sub {
+        if ($ENV{COMSERV_ENV_FILE}) {
+            return $ENV{COMSERV_ENV_FILE};
+        }
+        my $shared = ($ENV{HOME} || '/home/shanta') . '/.csc-shared.env';
+        return -f $shared ? $shared : '.env';
+    }
 );
 
 has 'backup_dir' => (
