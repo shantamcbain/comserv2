@@ -1018,9 +1018,10 @@ sub _connect_to_database {
     my $dsn;
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=$database";
+    } elsif ($db_type eq 'postgresql') {
+        $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
     } else {
-        my $driver = 'mysql';
-        $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
+        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
     }
     
     try {
