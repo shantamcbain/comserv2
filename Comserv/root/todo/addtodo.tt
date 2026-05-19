@@ -127,8 +127,13 @@ function syncDur() {
     <input type="hidden" name="return_to" value="[% return_to %]">
     <!-- record_id is auto-increment, no need for manual input -->
     <div>
-        <label for="sitename">Site Name:</label>
-        <input type="text" id="sitename" name="sitename" value="[% SiteName OR 'Site Name' %]" readonly>
+        [% IF sites && sites.size > 1 %]
+            [% INCLUDE 'todo/site_list.tt' selected_sitename=SiteName %]
+        [% ELSE %]
+            <label for="sitename">Site Name:</label>
+            <input type="hidden" name="sitename" value="[% SiteName %]">
+            <input type="text" id="sitename" value="[% SiteName %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
+        [% END %]
     </div>
     <div>
         <label for="start_date">Start Date:</label>

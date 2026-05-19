@@ -167,7 +167,7 @@ function syncDur() {
     <form action="/todo/modify/[% record.get_column('record_id') %]" method="post" onsubmit="syncDur()">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
-            [% IF is_csc && sites && sites.size %]
+            [% IF sites && sites.size > 1 %]
                 [% SET _rec_site = record.get_column('sitename') || todo_sitename %]
                 [% INCLUDE 'todo/site_list.tt' selected_sitename=_rec_site %]
             [% ELSE %]
