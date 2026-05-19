@@ -885,6 +885,9 @@ sub modify :Path('/todo/modify') :Args(1) {
             is_recurring     => defined($form_data->{is_recurring}) ? ($form_data->{is_recurring} ? 1 : 0) : $todo->get_column('is_recurring'),
             recurrence_rule  => $form_data->{recurrence_rule}  || $todo->get_column('recurrence_rule')  || undef,
             creator_timezone => $form_data->{creator_timezone} || $todo->get_column('creator_timezone') || undef,
+            is_fixed         => defined($form_data->{is_fixed})
+                ? ($form_data->{is_fixed} ? 1 : 0)
+                : ($todo->get_column('is_fixed') // (($form_data->{todo_type} // $todo->get_column('todo_type') // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0)),
         });
     };
     if ($@) {
@@ -1139,6 +1142,9 @@ sub create :Local {
         is_recurring     => $params->{is_recurring}     ? 1 : 0,
         recurrence_rule  => $params->{recurrence_rule}  || undef,
         creator_timezone => $params->{creator_timezone} || undef,
+        is_fixed         => defined($params->{is_fixed})
+            ? ($params->{is_fixed} ? 1 : 0)
+            : (($params->{todo_type} // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0),
     };
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
