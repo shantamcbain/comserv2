@@ -2749,94 +2749,81 @@ sub reschedule :Path('reschedule') :Args(0) {
         }
 
         # Distribute todos from today forward using start_date and time_of_day
-        # Work window: 09:00 – 17:00 (8 hours per day)
-        my $WORK_START_MIN = 9 * 60;   # 540 minutes from midnight
+        # Work window: 05:00 – 17:00 (calendar starts at 5 AM)
+        my $WORK_START_MIN = 5 * 60;   # 300 minutes from midnight
         my $WORK_END_MIN   = 17 * 60;  # 1020 minutes from midnight
-        my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
 
-        my $cur_dt       = $today_dt->clone;
+        my $cur_dt      = $today_dt->clone;
+        my $now_abs_min = $today_dt->hour * 60 + $today_dt->minute;
 
-        # For today, start scheduling from the current time (not 9am if it's already later)
-        my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
-        my $cur_slot_min  = ($now_total_min > $WORK_START_MIN && $now_total_min < $WORK_END_MIN)
-            ? ($now_total_min - $WORK_START_MIN)
-            : ($now_total_min >= $WORK_END_MIN ? $WORK_DAY_MINS : 0);
+        # Start from current time; if already past work end, roll to next day at work start
+        my $cur_abs_min;
+        if ($now_abs_min >= $WORK_END_MIN) {
+            $cur_dt->add(days => 1);
+            $cur_abs_min = $WORK_START_MIN;
+        } elsif ($now_abs_min < $WORK_START_MIN) {
+            $cur_abs_min = $WORK_START_MIN;
+        } else {
+            $cur_abs_min = $now_abs_min;
+        }
 
         for my $todo (@rows) {
             # Skip recurring events and appointments — fixed in time, never rescheduled.
-            # DB flag is authoritative; keyword match is a fallback for un-migrated rows.
-            my $skip_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+            my $skip_rec  = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
             my $skip_appt = $todo->can('todo_type') && ($todo->todo_type // 'task') eq 'appointment';
             next if $skip_rec || $skip_appt;
 
             # estimated_man_hours is stored as MINUTES (integer).
-            # Always compute heuristic from logs + subject keyword to get a realistic estimate.
-            # Use max(stored, heuristic) so user-set values above heuristic are respected,
-            # but previously auto-set minimums (e.g. 5 min) get bumped to realistic values.
-            my $stored_mins   = $todo->estimated_man_hours // 0;
+            my $stored_mins    = $todo->estimated_man_hours // 0;
             my $heuristic_mins;
             if (exists $log_duration_mins{ $todo->record_id }) {
                 $heuristic_mins = int($log_duration_mins{ $todo->record_id } + 0.5);
             } else {
                 $heuristic_mins = _estimate_mins_heuristic($todo->subject // '');
             }
-            my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
-            $est_mins = 5 if $est_mins < 5;   # minimum 5 minutes per task (read + evaluate + log overhead)
+            my $est_mins = ($stored_mins > ($heuristic_mins // 0)) ? $stored_mins : ($heuristic_mins // 0);
+            $est_mins = 5 if $est_mins < 5;
 
-            # Advance to next day if current day can't fit this todo
-            if ($cur_slot_min > 0 && $cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+            # Roll to next work day if we are at or past work end
+            while ($cur_abs_min >= $WORK_END_MIN) {
                 $cur_dt->add(days => 1);
-                $cur_slot_min = 0;
+                $cur_abs_min = $WORK_START_MIN;
             }
 
-            my $new_start    = $cur_dt->ymd;
+            my $new_start = $cur_dt->ymd;
 
-            # Advance $cur_slot_min past any fixed-event conflicts for this day.
-            # Loops until the [slot_abs, slot_abs+est] range is clear.
+            # Advance $cur_abs_min past any fixed-event conflicts for this day.
+            # All intervals in $get_blocked are absolute minutes from midnight.
+            # Loop until the window [$cur_abs_min, $cur_abs_min+$est_mins) is clear.
             {
-                my $blocked = $get_blocked->($new_start);
-                my $changed = 1;
-                while ($changed) {
+                my $safe_iters = 0;
+                my $changed    = 1;
+                while ($changed && $safe_iters++ < 50) {
                     $changed = 0;
+                    my $blocked = $get_blocked->($new_start);
                     for my $b (@$blocked) {
                         my ($bs, $be) = @$b;
-                        my $slot_abs = $WORK_START_MIN + $cur_slot_min;
-                        if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
-                            # Conflict: push slot_abs to end of this block
-                            $cur_slot_min = $be - $WORK_START_MIN;
-                            $changed = 1;
+                        if ($cur_abs_min < $be && $cur_abs_min + $est_mins > $bs) {
+                            $cur_abs_min = $be;
+                            $changed     = 1;
                         }
                     }
-                }
-                # If pushing past blocks overflows the work day, roll to next day
-                if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
-                    $cur_dt->add(days => 1);
-                    $cur_slot_min = 0;
-                    $new_start    = $cur_dt->ymd;
-                    # Re-run conflict check for new day (recurse via redo is tricky;
-                    # a second pass handles any fixed events on the new day)
-                    my $blocked2 = $get_blocked->($new_start);
-                    my $c2 = 1;
-                    while ($c2) {
-                        $c2 = 0;
-                        for my $b (@$blocked2) {
-                            my ($bs, $be) = @$b;
-                            my $slot_abs = $WORK_START_MIN + $cur_slot_min;
-                            if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
-                                $cur_slot_min = $be - $WORK_START_MIN;
-                                $c2 = 1;
-                            }
-                        }
+                    # If a conflict pushed us past work end, roll to next day and retry
+                    if ($cur_abs_min >= $WORK_END_MIN) {
+                        $cur_dt->add(days => 1);
+                        $cur_abs_min = $WORK_START_MIN;
+                        $new_start   = $cur_dt->ymd;
+                        $changed     = 1;
                     }
                 }
             }
 
-            my $slot_abs_min  = $WORK_START_MIN + $cur_slot_min;
-            my $new_time_str  = sprintf('%02d:%02d:00',
-                                    int($slot_abs_min / 60),
-                                    $slot_abs_min % 60);
+            my $slot_abs_min = $cur_abs_min;
+            my $new_time_str = sprintf('%02d:%02d:00',
+                                   int($slot_abs_min / 60),
+                                   $slot_abs_min % 60);
 
-            $cur_slot_min += $est_mins;
+            $cur_abs_min += $est_mins;
 
             # Recalculate priority based on staleness + due date + blocking
             my $orig_priority = $todo->priority || 5;
