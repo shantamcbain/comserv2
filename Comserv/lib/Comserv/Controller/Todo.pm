@@ -2619,17 +2619,37 @@ sub reschedule :Path('reschedule') :Args(0) {
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
-        # Scope reschedule to the same site the calendar shows (session SiteName).
-        # This ensures rescheduled todos appear in the day/week/month calendar views.
-        # The calendar (get_all_todos_for_calendar) always filters by session SiteName.
+        # Determine accessible sites (same logic as _get_user_accessible_sites)
         my @allowed_sites = ($sitename);
+        eval {
+            my $uid = $c->session->{user_id};
+            if ($uid) {
+                my @sr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen = ($sitename => 1);
+                for my $r (@sr) {
+                    eval {
+                        my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        push @allowed_sites, $s->name
+                            if $s && $s->name && !$seen{$s->name}++;
+                    };
+                }
+            }
+        };
 
-        # Fetch open todos for accessible sites
-        my %search = ( status => { -not_in => \@done_statuses } );
-        $search{sitename} = { -in => \@allowed_sites } if @allowed_sites;
+        # Fetch open todos for accessible sites (also include todos assigned to user)
+        my @user_or_conds = (
+            { 'me.sitename' => { -in => \@allowed_sites } },
+        );
+        push @user_or_conds, { 'me.developer'          => $username } if $username;
+        push @user_or_conds, { 'me.username_of_poster' => $username } if $username;
 
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
-            \%search,
+            {
+                'me.status' => { -not_in => \@done_statuses },
+                -or => \@user_or_conds,
+            },
             {
                 columns => [qw(record_id priority status is_blocking
                                due_date start_date last_mod_date
