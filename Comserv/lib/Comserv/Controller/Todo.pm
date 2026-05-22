@@ -1233,11 +1233,10 @@ sub update_time :Path('/todo/update_time') :Args(0) {
         my $eh = int($end_min / 60) % 24;
         my $em = $end_min % 60;
         my $end_time = sprintf('%02d:%02d:00', $eh, $em);
-        $todo->update({
-            time_of_day     => $time_of_day,
-            scheduled_start => "$sd $time_of_day",
-            scheduled_end   => "$sd $end_time",
-        });
+        $c->model('DBEncy')->storage->dbh->do(
+            'UPDATE todo SET time_of_day=?, scheduled_start=?, scheduled_end=? WHERE record_id=?',
+            undef, $time_of_day, "$sd $time_of_day", "$sd $end_time", $record_id
+        );
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
             "Updated time_of_day for todo $record_id to $time_of_day");
     };
@@ -1653,12 +1652,10 @@ sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
         my $eh = int($end_min / 60) % 24;
         my $em = $end_min % 60;
         my $end_time = sprintf('%02d:%02d:00', $eh, $em);
-        $todo->update({
-            time_of_day     => $time_of_day,
-            start_date      => $start_date,
-            scheduled_start => "$start_date $time_of_day",
-            scheduled_end   => "$start_date $end_time",
-        });
+        $c->model('DBEncy')->storage->dbh->do(
+            'UPDATE todo SET time_of_day=?, start_date=?, scheduled_start=?, scheduled_end=? WHERE record_id=?',
+            undef, $time_of_day, $start_date, "$start_date $time_of_day", "$start_date $end_time", $record_id
+        );
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
             "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
     };
@@ -2908,19 +2905,23 @@ sub reschedule :Path('reschedule') :Args(0) {
             ($end_h, $end_m) = (23, 59) if $end_h >= 24;
             my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
 
-            my %upd = (
-                start_date          => $new_start,
-                time_of_day         => $new_time_str,
-                scheduled_start     => "$new_start $new_time_str",
-                scheduled_end       => "$new_start $end_time_str",
-                estimated_man_hours => int($est_mins + 0.5) || 5,
-                priority            => $new_priority,
-                last_mod_by         => 'reschedule',
-                last_mod_date       => $today,
-            );
-            $upd{due_date} = $new_due_date if $new_due_date;
+            my $est_mins_int = int($est_mins + 0.5) || 5;
 
-            my $ok = eval { $todo->update(\%upd); 1 };
+            my $ok = eval {
+                my $sql;
+                my @bind;
+                if ($new_due_date) {
+                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=?, due_date=? WHERE record_id=?';
+                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
+                             $est_mins_int, $new_priority, 'reschedule', $today, $new_due_date, $todo->record_id);
+                } else {
+                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?';
+                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
+                             $est_mins_int, $new_priority, 'reschedule', $today, $todo->record_id);
+                }
+                $c->model('DBEncy')->storage->dbh->do($sql, undef, @bind);
+                1;
+            };
             if (!$ok || $@) {
                 push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
             } else {
