@@ -24,6 +24,9 @@
         <a href="[% c.uri_for('/Apiary/inspections/calendar') %]" class="btn btn-info">
             <i class="fas fa-calendar"></i> Calendar View
         </a>
+        <a href="[% c.uri_for('/Apiary/voice_recordings') %]" class="btn btn-secondary">
+            🎤 Voice Recordings
+        </a>
     </div>
 
     <div class="feature-grid">
