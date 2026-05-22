@@ -80,6 +80,9 @@
     <label for="common_names">Common Names:</label><br>
     <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]"><br>
 
+    <label for="key_name">Key Name:</label><br>
+    <input type="text" id="key_name" name="key_name" maxlength="255"><br>
+
     <label for="therapeutic_action">Therapeutic Action:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
     <textarea id="therapeutic_action" name="therapeutic_action"></textarea><br>
@@ -208,9 +211,6 @@
     <label for="reference">Reference:</label><br>
     <textarea id="reference" name="reference"></textarea><br>
 
-    <label for="preparation">Preparation:</label><br>
-    <input type="text" id="preparation" name="preparation" maxlength="150"><br>
-
     <div>
         <label for="share">Share:</label>
         <select id="share" name="share">
@@ -218,6 +218,92 @@
             <option value="1">Private</option>
         </select>
     </div>
+
+    <label for="preparation">Preparation:</label><br>
+    <textarea id="preparation" name="preparation"></textarea><br>
+
+<input type="hidden" id="ncbi_tax_id" name="ncbi_tax_id" value="">
+
+<div id="add-ncbi-panel" style="margin:1em 0;padding:1em;border:1px solid #b0c4de;border-radius:5px;background:#f4f8ff;">
+  <strong>NCBI Taxonomy Lookup</strong>
+  <span style="font-size:0.85em;color:#555;margin-left:0.5em;">Reads the Botanical Name field above — save to link automatically.</span>
+  <div style="margin-top:0.5em;">
+    <button type="button" id="add-ncbi-lookup-btn" onclick="addHerbNcbiLookup()"
+            style="padding:0.3em 0.8em;">Look up NCBI</button>
+    <span id="add-ncbi-status" style="margin-left:1em;color:#555;font-style:italic;"></span>
+  </div>
+  <div id="add-ncbi-body" style="margin-top:0.6em;display:none;"></div>
+  <div id="add-ncbi-actions" style="margin-top:0.5em;display:none;">
+    <button type="button" onclick="addHerbNcbiUse()" style="background:#d4edda;border:1px solid #28a745;padding:0.3em 0.7em;">
+      Use this taxonomy (will link on save)
+    </button>
+    <button type="button" onclick="document.getElementById('add-ncbi-body').style.display='none';document.getElementById('add-ncbi-actions').style.display='none';"
+            style="margin-left:0.5em;">Close</button>
+  </div>
+  <div id="add-ncbi-linked" style="display:none;margin-top:0.4em;color:#155724;font-weight:bold;">
+    ✓ Taxonomy will be linked on save.
+  </div>
+</div>
+
+<script>
+var addNcbiResult = null;
+function addHerbNcbiLookup() {
+  var botName = (document.getElementById('botanical_name') || {}).value || '';
+  botName = botName.trim();
+  if (!botName) { alert('Please enter the Botanical Name first.'); return; }
+  var statusEl = document.getElementById('add-ncbi-status');
+  var bodyEl   = document.getElementById('add-ncbi-body');
+  var actEl    = document.getElementById('add-ncbi-actions');
+  var linkEl   = document.getElementById('add-ncbi-linked');
+  var btn      = document.getElementById('add-ncbi-lookup-btn');
+  btn.disabled = true;
+  statusEl.textContent = 'Searching NCBI\u2026';
+  bodyEl.style.display = 'none';
+  actEl.style.display  = 'none';
+  linkEl.style.display = 'none';
+  addNcbiResult = null;
+  fetch('/ENCY/herb_ncbi_lookup?botanical_name=' + encodeURIComponent(botName))
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+      btn.disabled = false;
+      if (!d.ok) { statusEl.textContent = 'Not found: ' + d.error; return; }
+      addNcbiResult = d.ncbi;
+      statusEl.textContent = '';
+      var n = d.ncbi;
+      var rows = [
+        ['Scientific Name', n.scientific_name],
+        ['Common Name',     n.common_name],
+        ['Kingdom',         n.kingdom],
+        ['Phylum',          n.phylum],
+        ['Class',           n.class_name],
+        ['Order',           n.order_name],
+        ['Family',          n.family_name],
+        ['Genus',           n.genus],
+        ['NCBI Tax ID',     n.ncbi_tax_id
+          ? '<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id='+n.ncbi_tax_id+'" target="_blank">'+n.ncbi_tax_id+'</a>'
+          : ''],
+      ];
+      var html = '<table style="border-collapse:collapse;">';
+      rows.forEach(function(r){
+        if (r[1]) html += '<tr><td style="font-weight:bold;padding:2px 8px 2px 0;">'+r[0]+'</td><td>'+r[1]+'</td></tr>';
+      });
+      html += '</table>';
+      bodyEl.innerHTML = html;
+      bodyEl.style.display = '';
+      actEl.style.display  = '';
+    })
+    .catch(function(e){
+      btn.disabled = false;
+      statusEl.textContent = 'Lookup failed: ' + e;
+    });
+}
+function addHerbNcbiUse() {
+  if (!addNcbiResult || !addNcbiResult.ncbi_tax_id) { alert('No NCBI result loaded.'); return; }
+  document.getElementById('ncbi_tax_id').value = addNcbiResult.ncbi_tax_id;
+  document.getElementById('add-ncbi-actions').style.display = 'none';
+  document.getElementById('add-ncbi-linked').style.display  = '';
+}
+</script>
 <br>
     <input type="submit" value="Add Herb">
 </form>
