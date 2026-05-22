@@ -1147,7 +1147,7 @@ sub create :Local {
     
     # Log the data being inserted for debugging
     my $insert_data = {
-        sitename => $c->session->{SiteName} || 'default_site',
+        sitename => $params->{sitename} || $c->session->{SiteName} || 'default_site',
         start_date => $start_date,
         parent_todo => $params->{parent_todo} || '',
         due_date => $due_date,
