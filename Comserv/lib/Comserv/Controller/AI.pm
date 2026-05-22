@@ -10328,6 +10328,26 @@ sub transcribe :Local :Args(0) {
         return;
     }
 
+    my $audio_file_id = undef;
+    eval {
+        my $schema  = $c->model('DBEncy');
+        my $audio_row = $schema->resultset('File')->create({
+            file_name   => $orig_name,
+            nfs_path    => $nfs_audio_file_early,
+            file_type   => 'audio',
+            file_format => 'audio/' . $ext,
+            file_size   => $upload_size_early,
+            source_type => 'nfs',
+            sitename    => $sitename_early,
+            description => "Hive inspection audio recorded by " . ($username || ''),
+            user_id     => undef,
+        });
+        $audio_file_id = $audio_row->id + 0;
+    };
+    if ($@) {
+        warn "Failed to create early File database row for audio: $@\n";
+    }
+
     my $worktree  = $c->path_to('..')->stringify;
     my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
@@ -10365,6 +10385,7 @@ sub transcribe :Local :Args(0) {
             audio_saved          => JSON::true,
             transcription_status => 'whisper_unavailable',
             audio_nfs_path       => $nfs_audio_file_early,
+            audio_file_id        => $audio_file_id,
             message              => 'Audio saved. Whisper not available — install openai-whisper to enable transcription.',
             orig_name            => $orig_name,
             file_size            => $upload_size_early,
@@ -10555,6 +10576,7 @@ PYSCRIPT
         success => JSON::true,
         job_id  => $job_id,
         status  => 'processing',
+        audio_file_id => $audio_file_id,
     }));
 }
 
@@ -10587,29 +10609,35 @@ sub transcribe_status :Local :Args(0) {
             eval {
                 my $schema  = $c->model('DBEncy');
                 my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
-                my $audio_row = $schema->resultset('File')->create({
-                    file_name   => $result->{orig_name},
-                    nfs_path    => $result->{audio_nfs_path},
-                    file_type   => 'audio',
-                    file_format => 'audio/' . ($result->{ext} || 'wav'),
-                    file_size   => $result->{file_size} || 0,
-                    source_type => 'nfs',
-                    sitename    => $sitename,
-                    description => "Hive inspection audio recorded by " . ($result->{username} || ''),
-                    user_id     => undef,
-                });
+                my $audio_row = $schema->resultset('File')->find({ nfs_path => $result->{audio_nfs_path} });
+                unless ($audio_row) {
+                    $audio_row = $schema->resultset('File')->create({
+                        file_name   => $result->{orig_name},
+                        nfs_path    => $result->{audio_nfs_path},
+                        file_type   => 'audio',
+                        file_format => 'audio/' . ($result->{ext} || 'wav'),
+                        file_size   => $result->{file_size} || 0,
+                        source_type => 'nfs',
+                        sitename    => $sitename,
+                        description => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                        user_id     => undef,
+                    });
+                }
                 $result->{audio_file_id} = $audio_row->id + 0;
 
                 if ($result->{transcript_nfs_path}) {
-                    my $trans_row = $schema->resultset('File')->create({
-                        file_name   => ($result->{orig_name} || 'transcript') . '.json',
-                        nfs_path    => $result->{transcript_nfs_path},
-                        file_format => 'application/json',
-                        source_type => 'nfs',
-                        sitename    => $sitename,
-                        description => "Whisper transcript for " . ($result->{orig_name} || ''),
-                        user_id     => undef,
-                    });
+                    my $trans_row = $schema->resultset('File')->find({ nfs_path => $result->{transcript_nfs_path} });
+                    unless ($trans_row) {
+                        $trans_row = $schema->resultset('File')->create({
+                            file_name   => ($result->{orig_name} || 'transcript') . '.json',
+                            nfs_path    => $result->{transcript_nfs_path},
+                            file_format => 'application/json',
+                            source_type => 'nfs',
+                            sitename    => $sitename,
+                            description => "Whisper transcript for " . ($result->{orig_name} || ''),
+                            user_id     => undef,
+                        });
+                    }
                     $result->{transcript_file_id} = $trans_row->id + 0;
                 }
             };

@@ -724,6 +724,7 @@
         chatInput.innerHTML =
             '<div id="chat-img-preview" style="display:none;padding:4px 0 2px;position:relative;"></div>' +
             '<div id="audio-transcribe-status" style="display:none;padding:3px 6px;font-size:0.82em;color:var(--text-color,#333);background:var(--table-header-bg,#f0f7ff);border:1px solid var(--border-color,#ddd);border-radius:4px;margin-bottom:3px;"></div>' +
+            '<div id="local-audio-backups-container" style="display:none;padding:5px;border:1px solid var(--border-color,#ccc);border-radius:4px;background:var(--background-color,#fff);margin-bottom:4px;font-size:0.85em;"></div>' +
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
@@ -1082,6 +1083,33 @@
             var _stream     = null;
             var _recTimer   = null;
             var _recStart   = null;
+            var _wakeLock   = null;
+
+            function _requestWakeLock() {
+                if (navigator.wakeLock && typeof navigator.wakeLock.request === 'function') {
+                    navigator.wakeLock.request('screen').then(function(lock) {
+                        _wakeLock = lock;
+                    }).catch(function(err) {
+                        console.warn('Screen Wake Lock request failed:', err);
+                    });
+                }
+            }
+
+            function _releaseWakeLock() {
+                if (_wakeLock) {
+                    _wakeLock.release().then(function() {
+                        _wakeLock = null;
+                    }).catch(function(err) {
+                        console.warn('Screen Wake Lock release failed:', err);
+                    });
+                }
+            }
+
+            document.addEventListener('visibilitychange', function() {
+                if (_mediaRec && _mediaRec.state === 'recording' && document.visibilityState === 'visible') {
+                    _requestWakeLock();
+                }
+            });
 
             function _fmtElapsed(ms) {
                 var s = Math.floor(ms / 1000);
@@ -1093,6 +1121,7 @@
             micBtn.addEventListener('click', function() {
                 if (_mediaRec && _mediaRec.state === 'recording') {
                     _mediaRec.stop();
+                    _releaseWakeLock();
                     clearInterval(_recTimer);
                     _recTimer = null;
                     return;
@@ -1112,12 +1141,22 @@
                     _mediaRec.onstop = function() {
                         clearInterval(_recTimer);
                         _recTimer = null;
+                        _releaseWakeLock();
                         stream.getTracks().forEach(function(t) { t.stop(); });
                         var blob = new Blob(_chunks, { type: _mediaRec.mimeType || 'audio/webm' });
                         var ext  = ((_mediaRec.mimeType || '').indexOf('ogg') !== -1) ? 'ogg' : 'webm';
                         var elapsed = _recStart ? _fmtElapsed(Date.now() - _recStart) : '';
                         var file = new File([blob], 'recording.' + ext, { type: blob.type });
-                        _transcribeAudioFile(file);
+
+                        var backupId = 'rec_' + Date.now() + '_' + Math.random().toString(36).substring(2, 7);
+                        _saveAudioBackup(backupId, file, elapsed).then(function() {
+                            _transcribeAudioFile(file, backupId);
+                            _renderLocalAudioBackups();
+                        }).catch(function(err) {
+                            console.error('Failed to save audio backup:', err);
+                            _transcribeAudioFile(file);
+                        });
+
                         micBtn.textContent = '🎤';
                         micBtn.title = 'Record voice inspection — click to start, click again to stop. No time limit.';
                         micBtn.style.background = '';
@@ -1126,6 +1165,7 @@
                     };
 
                     _mediaRec.start(1000);
+                    _requestWakeLock();
                     _recStart = Date.now();
                     micBtn.textContent = '⏹';
                     micBtn.title = 'Stop recording';
@@ -3860,10 +3900,222 @@
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
+    // ── Local Audio Backup Store (IndexedDB) ───────────────────────────────────
+    const dbName = 'AudioInspectionBackupDB';
+    const storeName = 'recordings';
+
+    function _openAudioDB() {
+        return new Promise((resolve, reject) => {
+            const request = indexedDB.open(dbName, 1);
+            request.onerror = (e) => reject(e.target.error);
+            request.onsuccess = (e) => resolve(e.target.result);
+            request.onupgradeneeded = (e) => {
+                const db = e.target.result;
+                if (!db.objectStoreNames.contains(storeName)) {
+                    db.createObjectStore(storeName, { keyPath: 'id' });
+                }
+            };
+        });
+    }
+
+    async function _saveAudioBackup(id, file, elapsed) {
+        try {
+            const db = await _openAudioDB();
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const record = {
+                id: id,
+                fileName: file.name,
+                type: file.type,
+                blob: file,
+                elapsed: elapsed,
+                timestamp: Date.now(),
+                status: 'pending'
+            };
+            store.put(record);
+            return new Promise((resolve, reject) => {
+                tx.oncomplete = () => resolve(record);
+                tx.onerror = (e) => reject(e.target.error);
+            });
+        } catch (err) {
+            console.error('Failed to save local audio backup:', err);
+        }
+    }
+
+    async function _getAudioBackup(id) {
+        try {
+            const db = await _openAudioDB();
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const req = store.get(id);
+            return new Promise((resolve, reject) => {
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = (e) => reject(e.target.error);
+            });
+        } catch (err) {
+            console.error('Failed to get local audio backup:', err);
+        }
+    }
+
+    async function _updateAudioBackupStatus(id, status) {
+        try {
+            const db = await _openAudioDB();
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            const req = store.get(id);
+            req.onsuccess = () => {
+                const record = req.result;
+                if (record) {
+                    record.status = status;
+                    store.put(record);
+                }
+            };
+            return new Promise((resolve) => {
+                tx.oncomplete = () => resolve();
+            });
+        } catch (err) {
+            console.error('Failed to update local audio backup status:', err);
+        }
+    }
+
+    async function _deleteAudioBackup(id) {
+        try {
+            const db = await _openAudioDB();
+            const tx = db.transaction(storeName, 'readwrite');
+            const store = tx.objectStore(storeName);
+            store.delete(id);
+            return new Promise((resolve) => {
+                tx.oncomplete = () => resolve();
+            });
+        } catch (err) {
+            console.error('Failed to delete local audio backup:', err);
+        }
+    }
+
+    async function _listAudioBackups() {
+        try {
+            const db = await _openAudioDB();
+            const tx = db.transaction(storeName, 'readonly');
+            const store = tx.objectStore(storeName);
+            const req = store.getAll();
+            return new Promise((resolve, reject) => {
+                req.onsuccess = () => resolve(req.result || []);
+                req.onerror = (e) => reject(e.target.error);
+            });
+        } catch (err) {
+            console.error('Failed to list local audio backups:', err);
+            return [];
+        }
+    }
+
+    async function _cleanupOldAudioBackups() {
+        try {
+            const backups = await _listAudioBackups();
+            const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000; // 7 days
+            for (const b of backups) {
+                if (b.timestamp < cutoff || b.status === 'uploaded') {
+                    await _deleteAudioBackup(b.id);
+                }
+            }
+        } catch (e) {
+            console.error('Failed to cleanup old audio backups:', e);
+        }
+    }
+
+    async function _renderLocalAudioBackups() {
+        const container = document.getElementById('local-audio-backups-container');
+        if (!container) return;
+
+        const backups = await _listAudioBackups();
+        const pending = backups.filter(b => b.status !== 'uploaded');
+
+        if (pending.length === 0) {
+            container.style.display = 'none';
+            container.innerHTML = '';
+            return;
+        }
+
+        container.style.display = 'block';
+        container.innerHTML = '<div style="font-weight:bold;margin-bottom:5px;border-bottom:1px solid var(--border-color,#ddd);padding-bottom:3px;display:flex;justify-content:space-between;align-items:center;">' +
+            '<span>⚠️ Unsent Voice Recordings (' + pending.length + ')</span>' +
+            '<button id="close-backups-btn" style="background:none;border:none;cursor:pointer;font-size:1.1em;padding:0;color:var(--text-muted-color,#888);">×</button>' +
+            '</div>';
+
+        // Add close button listener
+        container.querySelector('#close-backups-btn').addEventListener('click', () => {
+            container.style.display = 'none';
+        });
+
+        const listDiv = document.createElement('div');
+        listDiv.style.cssText = 'max-height:120px;overflow-y:auto;display:flex;flex-direction:column;gap:4px;';
+
+        pending.forEach(b => {
+            const item = document.createElement('div');
+            item.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:6px;padding:3px;background:var(--table-header-bg,#f9f9f9);border-radius:3px;border:1px solid var(--border-color,#eee);';
+
+            const dateStr = new Date(b.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) + ' (' + b.elapsed + ')';
+            
+            const info = document.createElement('span');
+            info.style.cssText = 'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1;font-size:0.9em;';
+            info.textContent = dateStr;
+            item.appendChild(info);
+
+            const btnGroup = document.createElement('div');
+            btnGroup.style.cssText = 'display:flex;gap:3px;';
+
+            // Retry button
+            const retryBtn = document.createElement('button');
+            retryBtn.textContent = 'Retry';
+            retryBtn.title = 'Retry upload and transcription';
+            retryBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#0077cc;color:#fff;border:none;border-radius:3px;';
+            retryBtn.addEventListener('click', async () => {
+                retryBtn.disabled = true;
+                retryBtn.textContent = '...';
+                _transcribeAudioFile(b.blob, b.id);
+            });
+            btnGroup.appendChild(retryBtn);
+
+            // Download/Save button
+            const dlBtn = document.createElement('button');
+            dlBtn.textContent = 'Save';
+            dlBtn.title = 'Download raw audio file to your device';
+            dlBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#28a745;color:#fff;border:none;border-radius:3px;';
+            dlBtn.addEventListener('click', () => {
+                const url = URL.createObjectURL(b.blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = b.fileName;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+            btnGroup.appendChild(dlBtn);
+
+            // Delete button
+            const delBtn = document.createElement('button');
+            delBtn.textContent = 'Delete';
+            delBtn.title = 'Remove local backup';
+            delBtn.style.cssText = 'padding:2px 5px;font-size:0.8em;cursor:pointer;background:#dc3545;color:#fff;border:none;border-radius:3px;';
+            delBtn.addEventListener('click', async () => {
+                if (confirm('Delete this local recording?')) {
+                    await _deleteAudioBackup(b.id);
+                    _renderLocalAudioBackups();
+                }
+            });
+            btnGroup.appendChild(delBtn);
+
+            item.appendChild(btnGroup);
+            listDiv.appendChild(item);
+        });
+
+        container.appendChild(listDiv);
+    }
+
     // ── _transcribeAudioFile ───────────────────────────────────────────────────
     // Upload an audio File object to /ai/transcribe, show progress, and on success
     // populate the chat input with the transcript so the user can review + send.
-    function _transcribeAudioFile(file) {
+    function _transcribeAudioFile(file, backupId) {
         var statusEl  = document.getElementById('audio-transcribe-status');
         var inputEl   = document.getElementById('message-input');
         var sendBtn   = document.getElementById('send-message');
@@ -3883,11 +4135,17 @@
             if (sendBtn) sendBtn.disabled = false;
             if (!data.success) {
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                if (backupId) {
+                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                }
                 return;
             }
             var transcript = (data.transcript || '').trim();
             if (!transcript) {
                 if (statusEl) { statusEl.textContent = '⚠️ Empty transcript returned.'; }
+                if (backupId) {
+                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                }
                 return;
             }
             if (data.audio_file_id)      { state.lastAudioFileId      = data.audio_file_id; }
@@ -3928,6 +4186,10 @@
                 setTimeout(function() { if (statusEl) statusEl.style.display = 'none'; }, 10000);
             }
             addMessage('🎤 Voice transcript received (' + (data.model_used || 'base') + diarizedNote + ')', 'system-message');
+
+            if (backupId) {
+                _deleteAudioBackup(backupId).then(_renderLocalAudioBackups);
+            }
         }
 
         function _pollTranscribeStatus(jobId, attempt) {
@@ -3935,6 +4197,9 @@
             if (attempt > 120) {
                 if (sendBtn) sendBtn.disabled = false;
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription timed out after 10 minutes. Try a shorter recording.'; }
+                if (backupId) {
+                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                }
                 return;
             }
             var elapsed = Math.round(attempt * 5);
@@ -3974,6 +4239,9 @@
             if (!data.success) {
                 if (sendBtn) sendBtn.disabled = false;
                 if (statusEl) { statusEl.textContent = '⚠️ Transcription failed: ' + (data.error || 'unknown error'); }
+                if (backupId) {
+                    _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+                }
                 return;
             }
             if (data.job_id) {
@@ -3986,6 +4254,9 @@
         .catch(function(err) {
             if (sendBtn) sendBtn.disabled = false;
             if (statusEl) { statusEl.textContent = '⚠️ Upload failed: ' + err.message; }
+            if (backupId) {
+                _updateAudioBackupStatus(backupId, 'failed').then(_renderLocalAudioBackups);
+            }
         });
     }
 
@@ -5403,6 +5674,11 @@
             // Expose for the template button
             window.openHelpDeskChat = _hdOpenAndGreet;
         }
+
+        // Cleanup old local voice recording backups (> 7 days) and render any pending/failed ones
+        _cleanupOldAudioBackups().then(_renderLocalAudioBackups).catch(function(e) {
+            console.error('Failed to init local audio backups:', e);
+        });
     });
 
     // Global API: open the chat widget pre-loaded with a task context.
