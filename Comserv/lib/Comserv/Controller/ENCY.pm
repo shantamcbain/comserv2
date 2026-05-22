@@ -320,6 +320,54 @@ sub edit_herb : Path('/ENCY/edit_herb') : Args(0) {
 }
 
 
+sub delete_herb : Path('/ENCY/HerbDelete') : Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{username}) {
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+    my $roles = $c->session->{roles} || [];
+    my @role_list = ref $roles ? @$roles : split /\s*,\s*/, $roles;
+    unless (grep { $_ eq 'admin' || $_ eq 'editor' || $_ eq 'developer' } @role_list) {
+        $c->flash->{error_msg} = 'You do not have permission to delete herbs.';
+        $c->response->redirect($c->uri_for('/ENCY/BotanicalNameView'));
+        return;
+    }
+    unless ($c->request->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/ENCY/BotanicalNameView'));
+        return;
+    }
+
+    my $record_id = $c->request->param('record_id') // '';
+    unless ($record_id =~ /^\d+$/) {
+        $c->flash->{error_msg} = 'Invalid herb record ID.';
+        $c->response->redirect($c->uri_for('/ENCY/BotanicalNameView'));
+        return;
+    }
+
+    my $herb = eval { $c->model('ENCYModel')->ency_schema->resultset('Ency::Herb')->find($record_id) };
+    unless ($herb) {
+        $c->flash->{error_msg} = 'Herb record not found.';
+        $c->response->redirect($c->uri_for('/ENCY/BotanicalNameView'));
+        return;
+    }
+
+    my $name = $herb->botanical_name // "record #$record_id";
+    eval { $herb->delete };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'delete_herb',
+            "Failed to delete herb $record_id: $@");
+        $c->flash->{error_msg} = "Failed to delete herb: $@";
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'delete_herb',
+            "Deleted herb $record_id: $name");
+        $c->flash->{success_msg} = "Herb '$name' deleted successfully.";
+    }
+    $c->response->redirect($c->uri_for('/ENCY/BotanicalNameView'));
+}
+
+
 sub botanical_name_view :Path('/ENCY/BotanicalNameView') :Args(0) {
     my ( $self, $c ) = @_;
 
