@@ -46,6 +46,31 @@ sub _cart_count {
     return $count;
 }
 
+sub _buyer_points_info {
+    my ($self, $c) = @_;
+    my $user_id  = $c->session->{user_id};
+    return (0, 0) unless $user_id;
+    my $schema   = $self->_schema($c);
+    my $sitename = $self->_sitename($c);
+
+    my $is_member = 0;
+    my $balance   = 0;
+
+    eval {
+        my $mem = $schema->resultset('UserMembership')->search(
+            { user_id => $user_id, sitename => $sitename, status => 'active' }
+        )->first;
+        $is_member = 1 if $mem;
+    };
+
+    eval {
+        my $pa = $schema->resultset('Accounting::PointAccount')->find({ user_id => $user_id });
+        $balance = $pa->balance if $pa && $pa->balance;
+    };
+
+    return ($is_member, $balance);
+}
+
 # -------------------------------------------------------------------------
 # Public storefront — /shop
 # -------------------------------------------------------------------------
@@ -101,16 +126,20 @@ sub index :Path('/shop') :Args(0) {
         $c->stash(error_msg => 'Could not load shop items. Please try again later.');
     }
 
+    my ($buyer_is_member, $buyer_points) = $self->_buyer_points_info($c);
+
     $c->stash(
-        items         => \@items,
-        categories    => \@categories,
-        category      => $category,
-        search        => $search,
-        sort          => $sort,
-        sitename      => $sitename,
-        cart_count    => $self->_cart_count($c),
-        is_ecommerce  => $self->_ecommerce_enabled($c),
-        template      => 'Shop/index.tt',
+        items            => \@items,
+        categories       => \@categories,
+        category         => $category,
+        search           => $search,
+        sort             => $sort,
+        sitename         => $sitename,
+        cart_count       => $self->_cart_count($c),
+        is_ecommerce     => $self->_ecommerce_enabled($c),
+        buyer_is_member  => $buyer_is_member,
+        buyer_points     => $buyer_points,
+        template         => 'Shop/index.tt',
     );
 }
 
@@ -202,16 +231,20 @@ sub item :Path('/shop/item') :Args(1) {
         $sale_price = sprintf('%.2f', $display_price * (1 - $item->discount_percent / 100));
     }
 
+    my ($buyer_is_member, $buyer_points) = $self->_buyer_points_info($c);
+
     $c->stash(
-        item          => $item,
-        options       => \@options,
-        total_stock   => $total_stock,
-        display_price => $display_price,
-        sale_price    => $sale_price,
-        cart_count    => $self->_cart_count($c),
-        sitename      => $sitename,
-        is_ecommerce  => $self->_ecommerce_enabled($c),
-        template      => 'Shop/item.tt',
+        item             => $item,
+        options          => \@options,
+        total_stock      => $total_stock,
+        display_price    => $display_price,
+        sale_price       => $sale_price,
+        cart_count       => $self->_cart_count($c),
+        sitename         => $sitename,
+        is_ecommerce     => $self->_ecommerce_enabled($c),
+        buyer_is_member  => $buyer_is_member,
+        buyer_points     => $buyer_points,
+        template         => 'Shop/item.tt',
     );
 }
 
@@ -297,6 +330,7 @@ sub admin_edit :Path('/shop/admin/edit') :Args(1) {
             description      => $p->{description}      || undef,
             show_in_shop     => ($p->{show_in_shop}     ? 1 : 0),
             hide_stock_count => ($p->{hide_stock_count} ? 1 : 0),
+            accepts_points   => ($p->{accepts_points}   ? 1 : 0),
         );
 
         if ($p->{upload_image} && $c->req->upload('upload_image')) {

@@ -589,18 +589,34 @@ sub create_mail_account :Local {
     my ($self, $c) = @_;
     
     my $params = $c->req->params;
-    my $email = $params->{email};
-    my $password = $params->{password};
-    my $domain = $params->{domain};
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
+
+    my $email_user = $params->{email_user};
+    my $domain     = $params->{domain};
+    my $email      = $params->{email};
+
+    if ($email_user && $domain && !$email) {
+        $email = "$email_user\@$domain";
+    }
+
+    my $password         = $params->{password};
+    my $password_confirm = $params->{password_confirm};
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account',
         "Creating mail account for $email on domain $domain");
-    
-    # Validate required fields
+
+    if ($password && $password_confirm && $password ne $password_confirm) {
+        $c->flash->{error_msg} = 'Passwords do not match.';
+        my $redirect = $params->{redirect_url} || $c->uri_for('/mail');
+        $c->res->redirect($redirect);
+        return;
+    }
+
     unless ($email && $password && $domain) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
             "Missing required parameters for mail account creation");
-        $c->stash->{debug_msg} = "Email, password, and domain are required";
+        $c->flash->{error_msg} = 'Email, password, and domain are required.';
+        my $redirect = $params->{redirect_url} || $c->uri_for('/mail');
+        $c->res->redirect($redirect);
         return;
     }
     
@@ -612,30 +628,27 @@ sub create_mail_account :Local {
         return;
     }
     
+    my $redirect = $params->{redirect_url} || $c->uri_for('/mail');
+
     try {
         my $result = $c->model('Mail')->create_mail_account($c, $email, $password, $domain);
-        
+
         if ($result) {
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account', 
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_mail_account',
                 "Mail account created successfully for $email");
-            $c->stash->{status_msg} = "Mail account created successfully";
+            $c->flash->{success_msg} = "Mail account $email created successfully.";
         } else {
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
                 "Failed to create mail account for $email");
-            # debug_msg is already set in the model method
+            $c->flash->{error_msg} = "Failed to create mail account for $email. Check server logs for details.";
         }
     } catch {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account', 
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'create_mail_account',
             "Error creating mail account: $_");
-        $c->stash->{debug_msg} = "Error creating mail account: $_";
+        $c->flash->{error_msg} = "Error creating mail account: $_";
     };
-    
-    # Redirect to appropriate page based on context
-    if ($c->req->params->{redirect_url}) {
-        $c->res->redirect($c->req->params->{redirect_url});
-    } else {
-        $c->res->redirect($c->uri_for('/mail'));
-    }
+
+    $c->res->redirect($redirect);
 }
 
 sub mail_admin_dashboard :Local {
@@ -767,11 +780,46 @@ sub mail_admin_dashboard :Local {
     $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'mail_admin_dashboard',
         "Mailing list stats error: $@") if $@;
 
+    my @mail_domains;
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare(
+            "SELECT DISTINCT config_value AS domain FROM site_config
+              WHERE config_key = 'smtp_from' AND config_value LIKE '%@%'
+              ORDER BY domain"
+        );
+        $sth->execute();
+        while (my $row = $sth->fetchrow_hashref) {
+            if ($row->{domain} =~ /\@(.+)$/) {
+                push @mail_domains, { domain => $1 };
+            }
+        }
+    };
+
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'mail_admin_dashboard',
+            "Could not derive mail domains from smtp_from: $@");
+    }
+
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        my $sth = $dbh->prepare(
+            "SELECT DISTINCT domain FROM mail_domains WHERE active = 1 ORDER BY domain"
+        );
+        $sth->execute();
+        my %seen = map { $_->{domain} => 1 } @mail_domains;
+        while (my $row = $sth->fetchrow_hashref) {
+            push @mail_domains, { domain => $row->{domain} }
+                unless $seen{ $row->{domain} }++;
+        }
+    };
+
     $c->stash(
         mail_stats    => $mail_stats,
         smtp_servers  => \@smtp_servers,
         mailing_lists => \@mailing_lists,
         list_stats    => $list_stats,
+        mail_domains  => \@mail_domains,
         template      => 'mail/AdminDashboard.tt',
     );
     

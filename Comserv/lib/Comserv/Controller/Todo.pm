@@ -9,6 +9,7 @@ use Comserv::Util::Logging;
 use Comserv::Util::ApiTokenValidator;
 use Comserv::Util::PointSystem;
 use Comserv::Util::Priority ();
+use Comserv::Util::TodoTypes qw(recurring_matches_date);
 BEGIN { extends 'Catalyst::Controller'; }
 
 # Helper method to get status name from code
@@ -61,42 +62,139 @@ sub normalize_status {
 sub filter_todos_by_date_range {
     my ($self, $c, $todos, $start_date, $end_date, $include_overdue) = @_;
     
-    $include_overdue //= 1; # Default to include overdue todos
-    
-    my @filtered_todos = grep { 
+    $include_overdue //= 1;
+
+    my @done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %done_set  = map { $_ => 1 } @done_vals;
+
+    my $today = DateTime->now->ymd;
+    my @filtered_todos = grep {
         my $todo = $_;
         my $include_todo = 0;
-        
-        # Include if starting within date range
-        if ($todo->start_date && $todo->start_date ge $start_date && $todo->start_date le $end_date) {
+        my $sd_raw = $todo->start_date // '';
+        my $dd_raw = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
+        my $is_done = exists $done_set{ $todo->status // '' };
+
+        # Primary anchor: start_date (the scheduled date set by reschedule).
+        # When start_date is set, it IS the calendar display date — ignore due_date for placement.
+        if ($sd && $sd ge $start_date && $sd le $end_date) {
             $include_todo = 1;
         }
-        
-        # Include if due within date range
-        if ($todo->due_date && $todo->due_date ge $start_date && $todo->due_date le $end_date) {
+
+        # due_date as fallback ONLY when start_date is not set.
+        # If start_date is set (todo has been scheduled), do NOT also show it on its due_date.
+        if (!$sd && $dd && $dd ge $start_date && $dd le $end_date) {
             $include_todo = 1;
         }
-        
-        # Include overdue todos if requested (overdue = due before start_date and not completed)
-        if ($include_overdue && $todo->due_date && $todo->due_date lt $start_date && $todo->status != 3) {
+
+        # Overdue: show in current range only when start_date is before range start.
+        # If start_date is set and is in the future, it is NOT overdue — it is just upcoming.
+        if ($include_overdue && !$is_done) {
+            if ($sd && $sd lt $start_date) {
+                # Has a scheduled date in the past — genuinely overdue
+                $include_todo = 1;
+            } elsif (!$sd && $dd && $dd lt $start_date) {
+                # No schedule date but due date is past — overdue by deadline
+                $include_todo = 1;
+            }
+        }
+
+        # Undated open todos — show only in today's single-day view
+        if (!$sd && !$dd && !$is_done && $start_date eq $end_date && $start_date eq $today) {
             $include_todo = 1;
         }
-        
-        # Include todos without any dates if they're not completed (for day view of today only)
-        my $today = DateTime->now->ymd;
-        if (!$todo->start_date && !$todo->due_date && $todo->status != 3 && $start_date eq $end_date && $start_date eq $today) {
-            $include_todo = 1;
+
+        # Recurring events: inject into any single-day view where recurrence rule matches.
+        # DB flag is authoritative; keyword is fallback for un-migrated rows.
+        # Use start_date as lower bound; fall back to today so new recurring todos
+        # don't appear in the past when start_date is not set.
+        if (!$is_done && $start_date eq $end_date
+            && ($todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // ''))) {
+            my $effective_start = $sd || $today;
+            if ($effective_start le $start_date) {
+                if (recurring_matches_date($todo, $start_date)) {
+                    $include_todo = 1;
+                }
+            }
         }
-        
+
         $include_todo;
     } @$todos;
-    
-    return \@filtered_todos;
+
+    # Deduplicate recurring events by time_of_day: when multiple recurring records
+    # exist for the same time slot (e.g. CSC Break + Shanta Break both at 10:00),
+    # keep only the one belonging to the current user's username, or the first found.
+    my $session_user = eval { $c->session->{username} } // '';
+    my %seen_rec_time;
+    my @deduped;
+    for my $todo (@filtered_todos) {
+        my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+        if ($is_rec && $start_date eq $end_date) {
+            my $tod = '';
+            eval { $tod = $todo->time_of_day // '' };
+            $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+            $tod = substr($tod, 0, 5);
+            my $key = lc($todo->subject // '') . '|' . $tod;
+            if (!$seen_rec_time{$key}) {
+                $seen_rec_time{$key} = $todo;
+                push @deduped, $todo;
+            } else {
+                # Prefer the record owned by the current user
+                my $existing_user = eval { $seen_rec_time{$key}->username_of_poster // '' } // '';
+                my $this_user     = eval { $todo->username_of_poster // '' } // '';
+                if ($this_user eq $session_user && $existing_user ne $session_user) {
+                    # Replace with this user's version
+                    @deduped = grep { $_ != $seen_rec_time{$key} } @deduped;
+                    $seen_rec_time{$key} = $todo;
+                    push @deduped, $todo;
+                }
+            }
+        } else {
+            push @deduped, $todo;
+        }
+    }
+
+    return \@deduped;
 }
 has 'logging' => (
     is => 'ro',
     default => sub { Comserv::Util::Logging->instance }
 );
+
+sub _get_user_accessible_sites {
+    my ($self, $c) = @_;
+    my $is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @sites;
+    eval {
+        if ($is_csc) {
+            my $site_model = $c->model('Site');
+            my $all = $site_model->get_all_sites($c) || [];
+            @sites = map { $_->name } @$all;
+        } else {
+            my $user_id = $c->session->{user_id};
+            if ($user_id) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @sites, $site->name;
+                        }
+                    };
+                }
+            }
+        }
+    };
+    push @sites, $c->session->{SiteName} unless grep { $_ eq ($c->session->{SiteName} || '') } @sites;
+    return @sites ? \@sites : [$c->session->{SiteName}];
+}
 
 # Apply restrictions to the entire controller
 sub begin :Private {
@@ -107,6 +205,16 @@ sub begin :Private {
 
     # API paths handle their own auth — skip session-based checks
     return 1 if $c->req->path =~ m{^api/};
+
+    # AJAX update endpoints require only a valid session, not admin/developer
+    if ($c->req->path =~ m{^todo/(?:update_time|update_time_and_date|update_priority|update_status|update_display_date|mark_done|reschedule_single|quick_close|quick_priority|reschedule|day_drop|update_recurring_time|open_log|close_log)\b}) {
+        unless ($c->session->{user_id}) {
+            $c->stash(json => { success => 0, error => 'Not authenticated' });
+            $c->forward('View::JSON');
+            $c->detach;
+        }
+        return 1;
+    }
 
     # Fetch the user's roles from the session
     my $roles = $c->session->{roles} || [];
@@ -479,16 +587,49 @@ sub addtodo :Path('/todo/addtodo') :Args(0) {
     );
 
     # Add the projects, sitename, and users to the stash
+    my $add_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my $add_sites  = [];
+    eval {
+        if ($add_is_csc) {
+            my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $add_sites = \@site_rows;
+        } else {
+            my $user_id = $c->session->{user_id};
+            if ($user_id) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @$add_sites, $site;
+                        }
+                    };
+                }
+            }
+            push @$add_sites, $c->model('DBEncy')->resultset('Site')->search(
+                { name => $c->session->{SiteName} }
+            )->first
+                unless grep { $_->name eq ($c->session->{SiteName} || '') } @$add_sites;
+        }
+    };
+
     $c->stash(
         projects        => $projects,
         current_project => $current_project,
         users           => \@users,
         build_priority  => $self->priority_options,
         build_status    => \%status_options,
-        return_to       => $return_to,       # URL to return to after action
-        start_date      => $c->request->params->{start_date},
+        return_to       => $return_to,
+        start_date      => $c->request->params->{start_date} || DateTime->now->ymd,
         time_of_day     => $c->request->params->{time_of_day},
-        template        => 'todo/addtodo.tt' # Template for rendering
+        sites           => $add_sites,
+        is_csc          => $add_is_csc,
+        template        => 'todo/addtodo.tt'
     );
 
     # Log the end of the addtodo subroutine
@@ -584,11 +725,40 @@ sub edit :Path('/todo/edit') :Args(1) {
     my $current_status   = $self->normalize_status($todo->get_column('status'));
     my $current_priority = $todo->get_column('priority') // 5;
 
+    my $edit_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
     my $edit_sites = [];
     eval {
-        my $site_model = $c->model('Site');
-        $edit_sites = $site_model->get_all_sites($c) || [] if $site_model;
+        if ($edit_is_csc) {
+            my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                {}, { order_by => 'name' }
+            )->all;
+            $edit_sites = \@site_rows;
+        } else {
+            my $uid = $c->session->{user_id};
+            if ($uid) {
+                my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                    { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                )->all;
+                my %seen;
+                for my $r (@rows) {
+                    eval {
+                        my $site = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                        if ($site && $site->name && !$seen{$site->name}++) {
+                            push @$edit_sites, $site;
+                        }
+                    };
+                }
+            }
+            unless (grep { $_->name eq ($c->session->{SiteName} || '') } @$edit_sites) {
+                my $cur = $c->model('DBEncy')->resultset('Site')->search(
+                    { name => $c->session->{SiteName} }
+                )->first;
+                push @$edit_sites, $cur if $cur;
+            }
+        }
     };
+
+    my $todo_sitename = eval { $todo->get_column('sitename') } // '';
 
     $c->stash(
         record           => $todo,
@@ -601,7 +771,9 @@ sub edit :Path('/todo/edit') :Args(1) {
         build_status     => \%status_options,
         return_to        => $return_to,
         sites            => $edit_sites,
-        form_data        => { sitename => $todo->get_column('sitename') },
+        is_csc           => $edit_is_csc,
+        todo_sitename    => $todo_sitename,
+        form_data        => { sitename => $todo_sitename },
         template         => 'todo/edit.tt'
     );
 
@@ -744,6 +916,13 @@ sub modify :Path('/todo/modify') :Args(1) {
             user_id              => $todo->get_column('user_id'),
             project_id           => ($form_data->{project_id} && $form_data->{project_id} ne '') ? $form_data->{project_id} : $todo->get_column('project_id'),
             date_time_posted     => $form_data->{date_time_posted} || $todo->get_column('date_time_posted') || $today . ' 00:00:00',
+            todo_type        => $form_data->{todo_type}        || $todo->get_column('todo_type')        || 'task',
+            is_recurring     => defined($form_data->{is_recurring}) ? ($form_data->{is_recurring} ? 1 : 0) : $todo->get_column('is_recurring'),
+            recurrence_rule  => $form_data->{recurrence_rule}  || $todo->get_column('recurrence_rule')  || undef,
+            creator_timezone => $form_data->{creator_timezone} || $todo->get_column('creator_timezone') || undef,
+            is_fixed         => defined($form_data->{is_fixed})
+                ? ($form_data->{is_fixed} ? 1 : 0)
+                : ($todo->get_column('is_fixed') // (($form_data->{todo_type} // $todo->get_column('todo_type') // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0)),
         });
     };
     if ($@) {
@@ -836,6 +1015,9 @@ sub modify :Path('/todo/modify') :Args(1) {
         }
     }
 
+    # Trigger reschedule so edited todo is placed correctly in the sequential schedule
+    eval { $self->_do_reschedule($c) };
+
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
 
@@ -886,7 +1068,7 @@ sub create :Local {
             # Try to find a default project
             my $default_project = $schema->resultset('Project')->search({
                 -or => [
-                    { project_name => 'Default' },
+                    { name => 'Default' },
                     { project_code => 'default_code' }
                 ]
             })->first;
@@ -994,6 +1176,13 @@ sub create :Local {
         date_time_posted => $params->{date_time_posted} || $current_date,
         billable   => defined($params->{billable})   ? ($params->{billable}   ? 1 : 0) : 1,
         point_rate => ($params->{point_rate} && $params->{point_rate} =~ /^\d+(\.\d+)?$/) ? $params->{point_rate} : undef,
+        todo_type        => $params->{todo_type}        || 'task',
+        is_recurring     => $params->{is_recurring}     ? 1 : 0,
+        recurrence_rule  => $params->{recurrence_rule}  || undef,
+        creator_timezone => $params->{creator_timezone} || undef,
+        is_fixed         => defined($params->{is_fixed})
+            ? ($params->{is_fixed} ? 1 : 0)
+            : (($params->{todo_type} // 'task') =~ /^(appointment|meeting)$/ ? 1 : 0),
     };
     
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'create', 
@@ -1017,12 +1206,12 @@ sub create :Local {
         $c->detach();
     }
 
+    # Trigger reschedule so new todo is placed in the sequential schedule
+    eval { $self->_do_reschedule($c) };
+
     # Redirect to the todo list or return_to URL with success message
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
     my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
-    
-    # Handle the case where the return_to URL might already have a fragment
-    # or ensure it's properly handled if coming from internal referer
     $c->response->redirect($redirect_url);
 }
 
@@ -1068,7 +1257,24 @@ sub update_time :Path('/todo/update_time') :Args(0) {
     
     # Update the time_of_day
     eval {
-        $todo->update({ time_of_day => $time_of_day });
+        my $sd = $todo->start_date // '';
+        $sd = ref($sd) ? $sd->ymd : "$sd";
+        $sd = substr($sd, 0, 10) if length($sd) >= 10;
+        $sd ||= DateTime->now->ymd;
+        my $time_hhmm = $time_of_day;
+        $time_hhmm =~ s/:00$//;
+        my $est = $todo->estimated_man_hours // 30;
+        $est ||= 30;
+        my ($th, $tm) = $time_of_day =~ /^(\d{1,2}):(\d{2})/;
+        $th //= 9; $tm //= 0;
+        my $end_min = $th * 60 + $tm + $est;
+        my $eh = int($end_min / 60) % 24;
+        my $em = $end_min % 60;
+        my $end_time = sprintf('%02d:%02d:00', $eh, $em);
+        $c->model('DBEncy')->storage->dbh->do(
+            'UPDATE todo SET time_of_day=?, scheduled_start=?, scheduled_end=? WHERE record_id=?',
+            undef, $time_of_day, "$sd $time_of_day", "$sd $end_time", $record_id
+        );
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
             "Updated time_of_day for todo $record_id to $time_of_day");
     };
@@ -1095,6 +1301,341 @@ sub update_time :Path('/todo/update_time') :Args(0) {
             new_time => $time_of_day
         }
     );
+    $c->forward('View::JSON');
+}
+
+=head2 update_recurring_time
+
+POST /todo/update_recurring_time - Move a recurring event to a new time slot.
+mode=today  : Creates a non-recurring exception clone for exception_date/time_of_day;
+              shifts original's start_date to the day after exception_date so the
+              original no longer appears on that date.
+mode=all    : Updates time_of_day (and optionally start_date) on the original record.
+
+=cut
+
+sub update_recurring_time :Path('/todo/update_recurring_time') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id      = $c->request->params->{record_id};
+    my $time_of_day    = $c->request->params->{time_of_day};
+    my $mode           = $c->request->params->{mode} // 'all';
+    my $exception_date = $c->request->params->{exception_date};
+
+    unless ($record_id && $time_of_day) {
+        $c->stash(json => { success => 0, error => 'Missing record_id or time_of_day' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $schema = $c->model('DBEncy');
+    my $todo = $schema->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $today = DateTime->now->ymd;
+    my $target_date = $exception_date || $today;
+
+    if ($mode eq 'today') {
+        eval {
+            $schema->txn_do(sub {
+                my $next_day_dt = DateTime->new(
+                    year  => substr($target_date, 0, 4),
+                    month => substr($target_date, 5, 2),
+                    day   => substr($target_date, 8, 2),
+                )->add(days => 1);
+                my $next_day = $next_day_dt->ymd;
+
+                $schema->resultset('Todo')->create({
+                    sitename            => $todo->sitename,
+                    subject             => $todo->subject,
+                    description         => $todo->description // '',
+                    status              => $todo->status,
+                    priority            => $todo->priority // 5,
+                    start_date          => $target_date,
+                    time_of_day         => $time_of_day,
+                    due_date            => $todo->due_date,
+                    estimated_man_hours => $todo->estimated_man_hours // 0,
+                    project_id          => $todo->project_id,
+                    project_code        => $todo->project_code // '',
+                    developer           => $todo->developer // '',
+                    owner               => $todo->owner // '',
+                    reporter            => $todo->reporter // '',
+                    username_of_poster  => $todo->username_of_poster // '',
+                    user_id             => $todo->user_id,
+                    group_of_poster     => $todo->group_of_poster // 'user',
+                    accumulative_time   => 0,
+                    billable            => $todo->billable // 1,
+                    is_blocking         => 0,
+                    todo_type           => $todo->todo_type // 'appointment',
+                    is_recurring        => 0,
+                    recurrence_rule     => undef,
+                    creator_timezone    => $todo->creator_timezone,
+                    last_mod_by         => 'recurring_exception',
+                    last_mod_date       => $today,
+                    date_time_posted    => $today,
+                    company_code        => $todo->company_code // 'default',
+                    share               => $todo->share // 0,
+                    parent_todo         => $todo->record_id,
+                    comments            => 'Exception from recurring event ' . $record_id,
+                });
+
+                $todo->update({ start_date => $next_day, last_mod_date => $today });
+            });
+        };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'update_recurring_time', "today-mode error: $@");
+            $c->stash(json => { success => 0, error => "$@" });
+            $c->forward('View::JSON');
+            return;
+        }
+    } else {
+        my %upd = (time_of_day => $time_of_day, last_mod_date => $today);
+        $upd{start_date} = $target_date if $exception_date;
+        eval { $todo->update(\%upd) };
+        if ($@) {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+                'update_recurring_time', "all-mode error: $@");
+            $c->stash(json => { success => 0, error => "$@" });
+            $c->forward('View::JSON');
+            return;
+        }
+    }
+
+    $c->stash(json => { success => 1, mode => $mode, todo_id => $record_id });
+    $c->forward('View::JSON');
+}
+
+=head2 update_priority
+
+POST /todo/update_priority - Update priority for a todo item (AJAX endpoint for inline priority select)
+
+=cut
+
+sub update_status :Path('/todo/update_status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id = $c->request->params->{record_id};
+    my $status    = $c->request->params->{status};
+
+    unless ($record_id && defined $status) {
+        $c->stash(json => { success => 0, error => 'Missing record_id or status' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $today   = DateTime->now->ymd;
+    my $now_hms = DateTime->now->strftime('%H:%M:%S');
+
+    eval { $todo->update({ status => $status, last_mod_date => $today }) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_status',
+            "Failed to update status for todo $record_id: $@");
+        $c->stash(json => { success => 0, error => "Failed to update: $@" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $log_id;
+    if ($status == 3 || $status eq 'DONE' || $status eq 'Done' || $status eq 'done') {
+        eval {
+            my $username  = $c->session->{username}  || 'system';
+            my $sitename  = $c->session->{SiteName}  || $todo->sitename || 'CSC';
+            my $group     = $c->session->{group}     || $c->session->{roles}[0] || 'user';
+
+            my $start_date = $today;
+            if ($todo->start_date) {
+                my $sd = ref($todo->start_date) ? $todo->start_date->ymd : "${\$todo->start_date}";
+                $start_date = substr($sd, 0, 10) if length($sd) >= 10;
+            }
+
+            my $schema = $c->model('DBEncy');
+
+            # 1. Look for an existing open log (end_time = midnight sentinel, not closed)
+            my $open_log = $schema->resultset('Log')->search({
+                todo_record_id => $record_id,
+                end_time       => '00:00:00',
+                status         => { '!=' => 3 },
+            }, { order_by => { -desc => 'record_id' } })->first;
+
+            my ($start_hms, $dur_mins, $log_entry);
+
+            if ($open_log) {
+                # Close the open log and derive actual duration from it
+                my $raw_start = $open_log->start_time // '09:00:00';
+                $raw_start = ref($raw_start)
+                    ? sprintf('%02d:%02d:%02d', $raw_start->hours//0, $raw_start->minutes//0, 0)
+                    : "$raw_start";
+                $start_hms = ($raw_start =~ /^\d{2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+
+                my ($sh, $sm) = ($start_hms =~ /^(\d{2}):(\d{2})/);
+                my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+                $dur_mins = ($eh * 60 + $em) - ($sh * 60 + $sm);
+                $dur_mins = 1 if $dur_mins <= 0;
+                my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+                $open_log->update({
+                    end_time      => $now_hms,
+                    time          => $dur_hms,
+                    status        => 3,
+                    last_mod_by   => $username,
+                    last_mod_date => $today,
+                    details       => 'Auto-closed when todo marked done',
+                });
+                $log_id = $open_log->record_id;
+
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+                    "Closed open log " . $open_log->record_id . " for todo $record_id: $dur_mins min");
+            } else {
+                # No open log — estimate duration intelligently
+                $dur_mins = undef;
+
+                # 2a. Average duration from past closed logs for this exact todo
+                my @same_logs = $schema->resultset('Log')->search({
+                    todo_record_id => $record_id,
+                    status         => 3,
+                    time           => { '!=' => '00:00:00' },
+                })->all;
+                if (@same_logs) {
+                    my $total = 0; my $count = 0;
+                    for my $lg (@same_logs) {
+                        my $t = $lg->time // '00:00:00';
+                        $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
+                        if ($t =~ /^(\d+):(\d+)/) {
+                            $total += $1 * 60 + $2;
+                            $count++;
+                        }
+                    }
+                    $dur_mins = int($total / $count) if $count > 0;
+                }
+
+                # 2b. Average from logs with similar abstract (first 40 chars of subject)
+                if (!$dur_mins && $todo->subject) {
+                    my $kw = substr($todo->subject, 0, 40);
+                    $kw =~ s/[%_]//g;
+                    my @kw_logs = $schema->resultset('Log')->search({
+                        abstract => { 'like' => "%$kw%" },
+                        status   => 3,
+                        time     => { '!=' => '00:00:00' },
+                    }, { rows => 50 })->all;
+                    if (@kw_logs) {
+                        my $total = 0; my $count = 0;
+                        for my $lg (@kw_logs) {
+                            my $t = $lg->time // '00:00:00';
+                            $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
+                            if ($t =~ /^(\d+):(\d+)/) {
+                                $total += $1 * 60 + $2;
+                                $count++;
+                            }
+                        }
+                        $dur_mins = int($total / $count) if $count > 0;
+                    }
+                }
+
+                # 2c. Use estimated_man_hours (stored in minutes) from the todo record
+                if (!$dur_mins && $todo->estimated_man_hours && $todo->estimated_man_hours > 0) {
+                    $dur_mins = $todo->estimated_man_hours;
+                }
+
+                # 2d. Industry-standard defaults by todo_type
+                if (!$dur_mins) {
+                    my $ttype = lc($todo->todo_type // 'task');
+                    my %type_defaults = (
+                        task        => 30,
+                        appointment => 60,
+                        meeting     => 60,
+                        event       => 120,
+                        reminder    => 5,
+                    );
+                    $dur_mins = $type_defaults{$ttype} // 30;
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+                        "Using industry default $dur_mins min for type '$ttype' on todo $record_id");
+                }
+
+                # Derive start from scheduled time_of_day; end = now
+                my $start_raw = $todo->time_of_day // '';
+                $start_raw = ref($start_raw)
+                    ? sprintf('%02d:%02d:%02d', $start_raw->hours//0, $start_raw->minutes//0, 0)
+                    : "$start_raw";
+                $start_hms = ($start_raw =~ /^\d{2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
+
+                my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+                $log_entry = $schema->resultset('Log')->create({
+                    todo_record_id  => $record_id,
+                    username        => $username,
+                    sitename        => $sitename,
+                    start_date      => $start_date,
+                    project_code    => $todo->project_id || 0,
+                    due_date        => $today,
+                    abstract        => ($todo->subject // 'Completed todo'),
+                    details         => "Auto-log: estimated $dur_mins min (no open log found)",
+                    start_time      => $start_hms,
+                    end_time        => $now_hms,
+                    time            => $dur_hms,
+                    group_of_poster => $group,
+                    status          => 3,
+                    priority        => $todo->priority || 5,
+                    last_mod_by     => $username,
+                    last_mod_date   => $today,
+                    comments        => '',
+                    points_processed => 0,
+                });
+                $log_id = $log_entry->record_id;
+            }
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_status',
+            "Auto-log error for todo $record_id: $@") if $@;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
+        "Updated status for todo $record_id to $status");
+    $c->stash(json => { success => 1, todo_id => $record_id, new_status => $status, log_id => $log_id });
+    $c->forward('View::JSON');
+}
+
+sub update_priority :Path('/todo/update_priority') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $record_id = $c->request->params->{record_id};
+    my $priority  = $c->request->params->{priority};
+
+    unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
+        $c->stash(json => { success => 0, error => 'Missing or invalid record_id/priority' });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+    unless ($todo) {
+        $c->stash(json => { success => 0, error => "Todo not found: $record_id" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    eval { $todo->update({ priority => $priority }) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'update_priority',
+            "Failed to update priority for todo $record_id: $@");
+        $c->stash(json => { success => 0, error => "Failed to update: $@" });
+        $c->forward('View::JSON');
+        return;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_priority',
+        "Updated priority for todo $record_id to $priority");
+    $c->stash(json => { success => 1, todo_id => $record_id, new_priority => $priority });
     $c->forward('View::JSON');
 }
 
@@ -1141,10 +1682,18 @@ sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
     
     # Update both time_of_day and start_date
     eval {
-        $todo->update({ 
-            time_of_day => $time_of_day,
-            start_date => $start_date
-        });
+        my $est = $todo->estimated_man_hours // 30;
+        $est ||= 30;
+        my ($th, $tm) = $time_of_day =~ /^(\d{1,2}):(\d{2})/;
+        $th //= 9; $tm //= 0;
+        my $end_min = $th * 60 + $tm + $est;
+        my $eh = int($end_min / 60) % 24;
+        my $em = $end_min % 60;
+        my $end_time = sprintf('%02d:%02d:00', $eh, $em);
+        $c->model('DBEncy')->storage->dbh->do(
+            'UPDATE todo SET time_of_day=?, start_date=?, scheduled_start=?, scheduled_end=? WHERE record_id=?',
+            undef, $time_of_day, $start_date, "$start_date $time_of_day", "$start_date $end_time", $record_id
+        );
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
             "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
     };
@@ -1273,16 +1822,17 @@ sub update_display_date :Path('/todo/update_display_date') :Args(0) {
 sub day :Path('/todo/day') :Args {
     my ( $self, $c, $date_arg ) = @_;
 
-    # Validate the date_arg if it's defined
+    # Validate the date_arg if it's defined — always produce a plain YYYY-MM-DD string
     my $date;
     if (defined $date_arg) {
         my $iso8601 = DateTime::Format::ISO8601->new;
-        eval { $date = $iso8601->parse_datetime($date_arg) };
-        $date = DateTime->now->ymd unless $date;  # Use today's date if $date_arg is not valid
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date_arg) };
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     } else {
-        $date = DateTime->now->ymd;  # Use today's date if $date_arg is not defined
+        $date = DateTime->now->ymd;
     }
-    
+
     # Calculate the previous and next dates
     my $dt = DateTime::Format::ISO8601->parse_datetime($date);
     my $previous_date = $dt->clone->subtract(days => 1)->strftime('%Y-%m-%d');
@@ -1291,11 +1841,11 @@ sub day :Path('/todo/day') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
-        "Fetched " . scalar(@$todos) . " total todos for site " . $c->session->{SiteName});
+        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$calendar_sites));
 
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
@@ -1310,13 +1860,26 @@ sub day :Path('/todo/day') :Args {
         ($a->start_date // '') cmp ($b->start_date // '')
     } @$filtered_todos;
 
-    # Separate overdue and today's todos
+    # Separate overdue and today's todos.
+    # Use start_date as the calendar anchor (set by reschedule).
+    # Fall back to due_date only when start_date is absent.
     my @overdue_todos;
     my @today_todos;
-    
+
+    my %_done_set = map { $_ => 1 } (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
     foreach my $todo (@sorted_todos) {
-        if ($todo->due_date && $todo->due_date lt $date && $todo->status != 3) {
+        my $is_done  = exists $_done_set{ $todo->status // '' };
+        my $sd_raw   = $todo->start_date // '';
+        my $dd_raw   = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
+        my $anchor = $sd || $dd || '';
+        my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+        if (!$is_done && $anchor && $anchor lt $date && !$is_rec) {
             push @overdue_todos, $todo;
+            push @today_todos, $todo;
         } else {
             push @today_todos, $todo;
         }
@@ -1353,7 +1916,46 @@ sub day :Path('/todo/day') :Args {
             "AI daily conv fetch error: $@") if $@;
     }
 
-    # Add the todos to the stash
+    if ($c->req->param('embed')) {
+        $c->stash(no_wrapper => 1);
+    }
+
+    my $day_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @day_all_sitenames = sort @{ $calendar_sites };
+
+    my @day_all_usernames;
+    eval {
+        if ($day_is_csc) {
+            my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                { roles => { -like => '%admin%' } },
+                { columns => ['username'], order_by => 'username' }
+            )->all;
+            my %seen;
+            for my $r (@urows) {
+                my $u = eval { $r->username } // '';
+                push @day_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            unless (@day_all_usernames) {
+                my @all_urows = $c->model('DBEncy')->resultset('Users')->search(
+                    {},
+                    { columns => ['username'], order_by => 'username', rows => 200 }
+                )->all;
+                %seen = ();
+                for my $r (@all_urows) {
+                    my $u = eval { $r->username } // '';
+                    push @day_all_usernames, $u if $u && !$seen{$u}++;
+                }
+            }
+        } else {
+            my %seen;
+            for my $t (@today_todos, @overdue_todos) {
+                my $u = eval { $t->developer || $t->username_of_poster || '' };
+                push @day_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            @day_all_usernames = sort @day_all_usernames;
+        }
+    };
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -1363,6 +1965,9 @@ sub day :Path('/todo/day') :Args {
         next_date              => $next_date,
         proj_name_map          => \%proj_name_map,
         ai_daily_conversations => \@ai_daily_conversations,
+        is_csc                 => $day_is_csc,
+        ap_all_sitenames       => \@day_all_sitenames,
+        ap_all_usernames       => \@day_all_usernames,
         template               => 'todo/day.tt',
     );
 
@@ -1374,9 +1979,12 @@ sub week :Path('/todo/week') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # If no date is provided, use the current date
-    if (!defined $date) {
-        $date = DateTime->now->ymd;
+    # Always produce a plain YYYY-MM-DD string (URL may contain T00:00:00)
+    {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     }
 
     # Calculate the start and end of the week
@@ -1396,17 +2004,22 @@ sub week :Path('/todo/week') :Args {
     
     # Generate array of dates for the week (7 days starting from Sunday)
     my @week_dates = ();
+    my $today_str = DateTime->now->ymd;
     for my $day_offset (0..6) {
         my $current_date = $start_dt->clone->add(days => $day_offset);
+        my $d_str = $current_date->strftime('%Y-%m-%d');
         push @week_dates, {
-            date_str => $current_date->strftime('%Y-%m-%d'),
-            day_num => $current_date->day,
-            is_today => ($current_date->strftime('%Y-%m-%d') eq DateTime->now->strftime('%Y-%m-%d')),
+            date_str => $d_str,
+            day_num  => $current_date->day,
+            day_name => $current_date->strftime('%A'),
+            is_today => ($d_str eq $today_str),
+            prev_date => $current_date->clone->subtract(days => 1)->ymd,
+            next_date => $current_date->clone->add(days => 1)->ymd,
         };
     }
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites_w = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_w);
 
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
@@ -1426,9 +2039,54 @@ sub week :Path('/todo/week') :Args {
         %week_proj_map = map { $_->id => $_->name } @prows;
     };
 
+    # Pre-build todos_by_date and overdue list in Perl so recurrence rules are applied correctly.
+    # TT2 cannot compute day-of-week, so weekly/biweekly injection must happen here.
+    my %week_todos_by_date;
+    my @week_overdue_todos;
+    my $first_day = $week_dates[0]{date_str};
+    my @done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %done_set  = map { $_ => 1 } @done_vals;
+
+    for my $todo (@sorted_todos) {
+        my $sd_raw = $todo->start_date // '';
+        my $dd_raw = $todo->due_date   // '';
+        $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
+        $dd_raw = ref($dd_raw) ? $dd_raw->ymd : "$dd_raw";
+        my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
+        my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
+
+        my $is_done = exists $done_set{ $todo->status // '' };
+        my $is_rec  = ($todo->can('is_recurring') ? $todo->is_recurring : 0)
+                      || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+
+        if ($is_rec && !$is_done) {
+            my $effective_start = $sd || DateTime->now->ymd;
+            for my $day_info (@week_dates) {
+                my $d_str = $day_info->{date_str};
+                next if $effective_start gt $d_str;
+                next unless recurring_matches_date($todo, $d_str);
+                my $already = grep { $_->record_id == $todo->record_id }
+                              @{ $week_todos_by_date{$d_str} // [] };
+                push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
+            }
+        } else {
+            my $anchor = $sd || $dd;
+            next unless $anchor;
+            if ($anchor lt $first_day) {
+                push @week_overdue_todos, $todo unless $is_done;
+            } else {
+                my $already = grep { $_->record_id == $todo->record_id }
+                              @{ $week_todos_by_date{$anchor} // [] };
+                push @{ $week_todos_by_date{$anchor} }, $todo unless $already;
+            }
+        }
+    }
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
+        week_todos_by_date => \%week_todos_by_date,
+        week_overdue_todos => \@week_overdue_todos,
         sitename => $c->session->{SiteName},
         start_of_week => $start_of_week,
         end_of_week => $end_of_week,
@@ -1448,9 +2106,12 @@ sub month :Path('/todo/month') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    # If no date is provided, use the current date
-    if (!defined $date) {
-        $date = DateTime->now->ymd;
+    # Always produce a plain YYYY-MM-DD string (URL may contain T00:00:00)
+    {
+        my $iso8601 = DateTime::Format::ISO8601->new;
+        my $dt_parsed;
+        eval { $dt_parsed = $iso8601->parse_datetime($date) } if defined $date;
+        $date = $dt_parsed ? $dt_parsed->ymd : DateTime->now->ymd;
     }
 
     # Parse the date
@@ -1464,8 +2125,8 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    # Fetch ALL todos for the site for calendar view
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $c->session->{SiteName});
+    my $calendar_sites_m = $self->_get_user_accessible_sites($c);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_m);
 
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
@@ -1899,6 +2560,41 @@ sub quick_close :Path('quick_close') :Args(0) {
     $c->response->body('{"ok":1}');
 }
 
+sub quick_priority :Path('quick_priority') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $username = $c->session->{username} // '';
+    unless ($username && $username ne 'anonymous') {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $body_fh = $c->req->body;
+    my $body = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    my $priority  = $data->{priority}  if $data;
+    unless ($record_id && defined $priority && $priority =~ /^\d+$/) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id or priority"}');
+        return;
+    }
+    $priority = int($priority);
+    $priority = 1 if $priority < 1;
+    $priority = 10 if $priority > 10;
+    eval {
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+        $todo->update({ priority => $priority, last_mod_by => $username });
+    };
+    if ($@) {
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        return;
+    }
+    $c->response->body('{"ok":1}');
+}
+
 sub triage_stale :Path('triage_stale') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -1946,6 +2642,333 @@ sub triage_stale :Path('triage_stale') :Args(0) {
     $c->response->body('{"ok":1,"count":' . $count . '}');
 }
 
+sub _is_recurring {
+    my ($subject) = @_;
+    return ($subject // '') =~ /\b(lunch|break|standup|daily.standup|morning.break|afternoon.break|morning break|afternoon break)\b/i;
+}
+
+sub _estimate_mins_heuristic {
+    my ($subject) = @_;
+    my $s = lc($subject // '');
+    return 15  if $s =~ /morning.break|afternoon.break|\bbreak\b/;
+    return 60  if $s =~ /\blunch\b/;
+    return 15  if $s =~ /audit|morning audit|check|verify|review|standup|daily standup/;
+    return 30  if $s =~ /meeting|call|discuss|triage/;
+    return 60  if $s =~ /fix|debug|investigate|diagnose|resolve|test|patch/;
+    return 120 if $s =~ /design|plan|spec|document|write|research|analyse|analyze/;
+    return 240 if $s =~ /implement|build|create|develop|integrate|refactor|migration/;
+    return 30;
+}
+
+sub _do_reschedule {
+    my ($self, $c) = @_;
+
+    require POSIX;
+    my $username   = $c->session->{username} // '';
+    my $sitename   = $c->session->{SiteName} // '';
+    my $roles      = $c->session->{roles} || [];
+    my @rl         = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    my $is_admin   = grep { /^(admin)$/i } @rl;
+    my $is_csc     = ($sitename eq 'CSC' && $is_admin) || $username eq 'Shanta';
+
+    my $now_epoch  = time();
+    my $today_dt   = DateTime->now(time_zone => 'local');
+    my $today      = $today_dt->ymd;
+    my $count      = 0;
+    my @errors;
+
+    eval {
+        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+
+        # Build the todo WHERE clause.
+        # CSC super-admin (Shanta) schedules ALL open todos across every site.
+        # Other admins schedule todos for their accessible sites + personally assigned.
+        my %todo_where = ( status => { -not_in => \@done_statuses } );
+
+        unless ($is_csc) {
+            my @allowed_sites = ($sitename);
+            eval {
+                my $uid = $c->session->{user_id};
+                if ($uid) {
+                    my @sr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                        { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                    )->all;
+                    my %seen = ($sitename => 1);
+                    for my $r (@sr) {
+                        eval {
+                            my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                            push @allowed_sites, $s->name
+                                if $s && $s->name && !$seen{$s->name}++;
+                        };
+                    }
+                }
+            };
+            $todo_where{-or} = [
+                { sitename           => { -in => \@allowed_sites } },
+                { developer          => $username },
+                { username_of_poster => $username },
+            ];
+        }
+
+        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+            \%todo_where,
+            {
+                columns => [qw(record_id priority status is_blocking
+                               due_date start_date last_mod_date
+                               date_time_posted estimated_man_hours
+                               blocked_by_todo_id sitename developer
+                               username_of_poster project_id subject
+                               time_of_day is_recurring todo_type
+                               recurrence_rule is_fixed)],
+            }
+        )->all;
+
+        # Load fixed/recurring events (all sites for CSC, allowed sites for others)
+        my %fixed_where = (
+            -or => [
+                { is_recurring => 1 },
+                { todo_type    => { -in => [qw(appointment meeting)] } },
+                { is_fixed     => 1 },
+            ],
+        );
+        unless ($is_csc) {
+            my @allowed_sites = ($sitename);
+            $fixed_where{sitename} = { -in => \@allowed_sites };
+        }
+        my @fixed_events = $c->model('DBEncy')->resultset('Todo')->search(
+            \%fixed_where,
+            {
+                columns => [qw(record_id start_date time_of_day
+                               estimated_man_hours is_recurring
+                               todo_type recurrence_rule subject)],
+            }
+        )->all;
+
+        # Build blocked-slot lookup per date (cached)
+        my %blocked_cache;
+        my $get_blocked = sub {
+            my ($date_str) = @_;
+            return $blocked_cache{$date_str} if exists $blocked_cache{$date_str};
+            my @intervals;
+            for my $fe (@fixed_events) {
+                my $fe_sd = ref($fe->start_date) ? $fe->start_date->ymd : ($fe->start_date // '');
+                $fe_sd = substr($fe_sd, 0, 10) if length($fe_sd) >= 10;
+                my $effective_start = $fe_sd || $today;
+                next if $effective_start gt $date_str;
+
+                my $matches = 0;
+                if ($fe->is_recurring) {
+                    $matches = recurring_matches_date($fe, $date_str);
+                } elsif ($fe_sd eq $date_str) {
+                    $matches = 1;
+                }
+                next unless $matches;
+
+                my $tod = $fe->time_of_day // '';
+                next unless $tod =~ /^(\d{1,2}):(\d{2})/;
+                my $abs_start = $1 * 60 + $2;
+                my $dur = ($fe->estimated_man_hours // 0) || 30;
+                push @intervals, [$abs_start, $abs_start + $dur];
+            }
+            $blocked_cache{$date_str} = [sort { $a->[0] <=> $b->[0] } @intervals];
+            return $blocked_cache{$date_str};
+        };
+
+        # Build project sort_order lookup
+        my %proj_sort;
+        {
+            my @pids = grep { defined $_ && $_ > 0 } map { $_->project_id } @rows;
+            if (@pids) {
+                my @projs = $c->model('DBEncy')->resultset('Project')->search(
+                    { id => { -in => \@pids } },
+                    { columns => [qw(id sort_order)] }
+                )->all;
+                %proj_sort = map { $_->id => ($_->sort_order // 9999) } @projs;
+            }
+        }
+
+        # Sort: blocking > project sort_order > priority > due_date
+        @rows = sort {
+            ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
+            || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
+            || (($a->priority || 9) <=> ($b->priority || 9))
+            || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
+        } @rows;
+
+        # Pre-fetch average log durations per todo (in minutes)
+        my %log_duration_mins;
+        {
+            my @todo_ids = map { $_->record_id } @rows;
+            if (@todo_ids) {
+                eval {
+                    my @log_rows = $c->model('DBEncy')->resultset('Log')->search(
+                        { todo_record_id => { -in => \@todo_ids } },
+                        { columns => [qw(todo_record_id start_time end_time)] }
+                    )->all;
+                    my %durations;
+                    for my $lr (@log_rows) {
+                        my ($st, $et) = ($lr->start_time // '', $lr->end_time // '');
+                        next unless $st =~ /^(\d+):(\d+)/ && $et =~ /^(\d+):(\d+)/;
+                        my $dur = ($et =~ /^(\d+):(\d+)/)[0] * 60 + ($et =~ /^(\d+):(\d+)/)[1]
+                                - ($st =~ /^(\d+):(\d+)/)[0] * 60 - ($st =~ /^(\d+):(\d+)/)[1];
+                        push @{ $durations{ $lr->todo_record_id } }, $dur if $dur > 0;
+                    }
+                    for my $tid (keys %durations) {
+                        my @d = @{ $durations{$tid} };
+                        my $sum = 0; $sum += $_ for @d;
+                        my $avg = $sum / scalar(@d);
+                        $log_duration_mins{$tid} = $avg if $avg >= 5;
+                    }
+                };
+            }
+        }
+
+        # Work window: 05:00–22:00 (matches calendar grid)
+        my $WORK_START_MIN = 5 * 60;   # 300
+        my $WORK_END_MIN   = 22 * 60;  # 1320 — 10 PM (calendar spans 5 AM–10 PM)
+        my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
+
+        my $cur_dt = $today_dt->clone;
+
+        # For today, start from NOW (current minute within the day window).
+        # If before 5 AM, start from 5 AM. If past 10 PM, roll to next day at 5 AM.
+        my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
+        my $cur_slot_min;   # relative offset from WORK_START_MIN for current day
+        if ($now_total_min >= $WORK_END_MIN) {
+            $cur_dt->add(days => 1);
+            $cur_slot_min = 0;
+        } else {
+            # Start from current time (clamped to day start 5 AM)
+            $cur_slot_min = $now_total_min > $WORK_START_MIN
+                ? $now_total_min - $WORK_START_MIN
+                : 0;
+        }
+
+        # Schedule ALL open non-fixed/non-recurring todos sequentially from now forward
+        for my $todo (@rows) {
+            my $is_rec   = $todo->can('is_recurring') ? ($todo->is_recurring // 0) : 0;
+            my $is_fixed = $todo->can('is_fixed')     ? ($todo->is_fixed     // 0) : 0;
+            my $ttype    = $todo->can('todo_type')    ? ($todo->todo_type    // 'task') : 'task';
+            next if $is_rec || $is_fixed
+                 || $ttype eq 'appointment' || $ttype eq 'meeting';
+
+            # Estimate duration in minutes: prefer log avg > stored > heuristic, min 5
+            my $stored_mins    = $todo->estimated_man_hours // 0;
+            my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
+                ? int($log_duration_mins{ $todo->record_id } + 0.5)
+                : _estimate_mins_heuristic($todo->subject // '');
+            my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
+            $est_mins = 5 if $est_mins < 5;
+
+            # Roll to next work day when current day is full
+            if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                $cur_dt->add(days => 1);
+                $cur_slot_min = 0;
+            }
+
+            my $new_start = $cur_dt->ymd;
+
+            # Advance past fixed/recurring blocked slots for this day
+            {
+                my $blocked = $get_blocked->($new_start);
+                my $changed = 1;
+                while ($changed) {
+                    $changed = 0;
+                    for my $b (@$blocked) {
+                        my ($bs, $be) = @$b;
+                        my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                        if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                            $cur_slot_min = $be - $WORK_START_MIN;
+                            $changed = 1;
+                        }
+                    }
+                }
+                # If blocked slots push us past end of day, roll to next day
+                if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                    $cur_dt->add(days => 1);
+                    $cur_slot_min = 0;
+                    $new_start    = $cur_dt->ymd;
+                    my $blocked2 = $get_blocked->($new_start);
+                    my $c2 = 1;
+                    while ($c2) {
+                        $c2 = 0;
+                        for my $b (@$blocked2) {
+                            my ($bs, $be) = @$b;
+                            my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                            if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                                $cur_slot_min = $be - $WORK_START_MIN;
+                                $c2 = 1;
+                            }
+                        }
+                    }
+                }
+            }
+
+            my $slot_abs_min = $WORK_START_MIN + $cur_slot_min;
+            my $new_time_str = sprintf('%02d:%02d:00',
+                                   int($slot_abs_min / 60), $slot_abs_min % 60);
+            $cur_slot_min += $est_mins;
+
+            # Priority adjustments based on staleness and due date
+            my $new_priority = $todo->priority || 5;
+            my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
+            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                my $days_stale = int(($now_epoch - $act_epoch) / 86400);
+                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                    if $days_stale > 180;
+            }
+            my $new_due_date;
+            if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
+                my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
+                if ($days_until_due < 0) {
+                    $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
+                    $new_due_date = $today;
+                } elsif ($days_until_due <= 7) {
+                    $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
+                }
+            }
+            $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1
+                if $todo->is_blocking;
+
+            my $end_abs_min = $slot_abs_min + $est_mins;
+            my ($end_h, $end_m) = (int($end_abs_min / 60), $end_abs_min % 60);
+            ($end_h, $end_m) = (23, 59) if $end_h >= 24;
+            my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
+
+            my $est_mins_int = int($est_mins + 0.5) || 5;
+
+            my $ok = eval {
+                my $sql;
+                my @bind;
+                if ($new_due_date) {
+                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=?, due_date=? WHERE record_id=?';
+                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
+                             $est_mins_int, $new_priority, 'reschedule', $today, $new_due_date, $todo->record_id);
+                } else {
+                    $sql = 'UPDATE todo SET start_date=?, time_of_day=?, scheduled_start=?, scheduled_end=?, estimated_man_hours=?, priority=?, last_mod_by=?, last_mod_date=? WHERE record_id=?';
+                    @bind = ($new_start, $new_time_str, "$new_start $new_time_str", "$new_start $end_time_str",
+                             $est_mins_int, $new_priority, 'reschedule', $today, $todo->record_id);
+                }
+                $c->model('DBEncy')->storage->dbh->do($sql, undef, @bind);
+                1;
+            };
+            if (!$ok || $@) {
+                push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
+            } else {
+                $count++;
+            }
+        }
+    };
+    die $@ if $@;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
+        "Reschedule by $username: $count todos scheduled, " . scalar(@errors) . " errors, from $today forward");
+
+    return ($count, \@errors, $today);
+}
+
 sub reschedule :Path('reschedule') :Args(0) {
     my ($self, $c) = @_;
     $c->response->content_type('application/json');
@@ -1953,98 +2976,23 @@ sub reschedule :Path('reschedule') :Args(0) {
     my $username = $c->session->{username} // '';
     my $roles    = $c->session->{roles} || [];
     my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    unless ($username && $username ne 'anonymous' && grep { /^(admin)$/i } @rl) {
+    my $is_admin = grep { /^(admin)$/i } @rl;
+
+    unless ($username && $username ne 'anonymous' && $is_admin) {
         $c->response->status(403);
         $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
     }
 
-    require POSIX;
-    my $now_epoch  = time();
-    my $today      = DateTime->now->ymd;
-    my $count      = 0;
-    my $date_count = 0;
-    my @errors;
-
-    eval {
-        my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
-        my @rows = $c->model('DBEncy')->resultset('Todo')->search(
-            { status => { -not_in => \@done_statuses } },
-            { columns => [qw(record_id priority status is_blocking
-                             due_date last_mod_date date_time_posted)] }
-        )->all;
-
-        for my $todo (@rows) {
-            my $orig_priority = $todo->priority || 5;
-            my $new_priority  = $orig_priority;
-            my $new_due_date  = undef;   # only set if we need to extend
-
-            # Staleness: >180 days inactive → lower priority (push down)
-            my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
-            my $days_stale   = 0;
-            if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                $days_stale    = int(($now_epoch - $act_epoch) / 86400);
-                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
-                    if $days_stale > 180;
-            }
-
-            # Due-date handling
-            if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
-                my $days_until_due = int(($due_epoch - $now_epoch) / 86400);
-
-                if ($days_until_due < 0) {
-                    # Overdue — adjust priority upward
-                    $new_priority = ($new_priority - 2 >= 1) ? $new_priority - 2 : 1;
-
-                    # Also extend due_date so it stops showing permanently overdue:
-                    # IN-PROGRESS: extend 14 days (actively being worked)
-                    # NEW stale 30+ days: extend 30 days (date was clearly abandoned)
-                    # NEW stale < 30 days: leave as-is (genuinely overdue, keep the signal)
-                    my $st = $todo->status // '';
-                    my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process)$/i);
-                    if ($in_progress) {
-                        $new_due_date = DateTime->now->add(days => 14)->ymd;
-                    } elsif ($days_stale >= 30) {
-                        $new_due_date = DateTime->now->add(days => 30)->ymd;
-                    }
-                } elsif ($days_until_due <= 7) {
-                    $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
-                }
-            }
-
-            # Blocking: raises priority by 1
-            if ($todo->is_blocking) {
-                $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1;
-            }
-
-            my $priority_changed  = ($new_priority != $orig_priority);
-            my $due_date_changed  = defined $new_due_date;
-
-            next unless $priority_changed || $due_date_changed;
-
-            my %update = (last_mod_by => 'reschedule', last_mod_date => $today);
-            $update{priority} = $new_priority if $priority_changed;
-            $update{due_date} = $new_due_date if $due_date_changed;
-
-            eval { $todo->update(\%update) };
-            if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
-            else {
-                $count++;
-                $date_count++ if $due_date_changed;
-            }
-        }
-    };
+    require JSON;
+    my ($count, $errors, $today) = eval { $self->_do_reschedule($c) };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule', "Error: $@");
-        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+        $c->response->body('{"ok":0,"error":' . JSON::encode_json("$@") . '}');
         return;
     }
 
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos updated ($date_count due-dates extended)");
-    $c->response->body('{"ok":1,"count":' . $count . ',"date_count":' . $date_count . ',"errors":' . (JSON::encode_json(\@errors)) . '}');
+    $c->response->body('{"ok":1,"count":' . ($count // 0) . ',"error_count":' . scalar(@{$errors // []}) . ',"today":"' . ($today // '') . '","errors":' . JSON::encode_json($errors // []) . '}');
 }
 
 sub open_log :Path('open_log') :Args(0) {

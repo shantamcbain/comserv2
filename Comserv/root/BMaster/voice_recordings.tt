@@ -1,0 +1,157 @@
+[%# BMaster/voice_recordings.tt — Voice Recording Library %]
+[% PageVersion = 'BMaster/voice_recordings.tt,v 1.0 2026/05/16 shanta Exp' %]
+
+<div class="app-container">
+    <div class="page-header">
+        <h1>🎤 Voice Recordings</h1>
+        <p class="page-subtitle">Saved hive inspection recordings and transcripts. Play back any recording or create an inspection from the transcript.</p>
+    </div>
+
+    <div class="content-container">
+        <div class="content-primary">
+
+            [% IF recordings.size == 0 %]
+            <div class="content-section" style="padding:2rem;text-align:center;color:var(--text-muted,#888);">
+                <p style="font-size:1.2em;">No voice recordings found for this site.</p>
+                <p>Use the 🎤 microphone button in the AI chat widget to record a hive inspection. The audio and transcript will appear here.</p>
+                <a href="/BMaster" class="btn btn-primary">Go to Apiary</a>
+            </div>
+            [% ELSE %]
+
+            <div class="content-section" style="margin-bottom:1rem;padding:0.75rem 1rem;background:var(--info-bg,#e8f4fd);border:1px solid var(--info-border,#b8d9f5);border-radius:6px;font-size:0.9em;">
+                [% recordings.size %] recording[% IF recordings.size != 1 %]s[% END %] found.
+                To add more, use the 🎤 button in the AI chat widget on any BMaster page.
+            </div>
+
+            [% FOREACH rec IN recordings %]
+            <div class="content-section" id="rec-[% rec.id %]" style="margin-bottom:1.5rem;border:1px solid var(--border-color,#ddd);border-radius:8px;overflow:hidden;">
+
+                <div style="display:flex;align-items:center;gap:0.75rem;padding:0.75rem 1rem;background:var(--table-header-bg,#f5f5f5);border-bottom:1px solid var(--border-color,#ddd);flex-wrap:wrap;">
+                    <span style="font-size:1.2em;">🎤</span>
+                    <strong style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">[% rec.file_name | html %]</strong>
+                    [% IF rec.size_str %]
+                    <span style="font-size:0.82em;color:var(--text-muted,#888);">[% rec.size_str %]</span>
+                    [% END %]
+                    <a href="/Apiary/audio_serve/[% rec.id %]" download="[% rec.file_name | html %]" class="btn btn-secondary" style="font-size:0.82em;padding:3px 10px;">⬇ Download</a>
+                </div>
+
+                <div style="padding:1rem;">
+                    [% IF rec.nfs_path %]
+                    <audio controls style="width:100%;margin-bottom:1rem;" preload="none">
+                        <source src="/Apiary/audio_serve/[% rec.id %]" type="audio/mpeg">
+                        Your browser does not support the audio element.
+                    </audio>
+                    [% END %]
+
+                    [% IF rec.transcript %]
+                    <details open style="margin-bottom:1rem;">
+                        <summary style="cursor:pointer;font-weight:bold;padding:4px 0;">📝 Transcript</summary>
+                        <div style="margin-top:0.5rem;padding:0.75rem;background:var(--background-color,#fff);border:1px solid var(--border-color,#eee);border-radius:4px;font-size:0.88em;line-height:1.6;white-space:pre-wrap;max-height:300px;overflow-y:auto;">[% rec.transcript | html %]</div>
+                    </details>
+
+                    <div style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                        <button class="btn btn-primary"
+                            onclick="sendToInspection('[% rec.id %]', this)"
+                            style="font-size:0.88em;">
+                            🐝 Create Inspection from this Recording
+                        </button>
+                        <button class="btn btn-secondary"
+                            onclick="copyTranscript('[% rec.id %]')"
+                            style="font-size:0.88em;">
+                            📋 Copy Transcript
+                        </button>
+                    </div>
+
+                    <div id="rec-status-[% rec.id %]" style="display:none;margin-top:0.5rem;font-size:0.85em;padding:4px 8px;border-radius:4px;"></div>
+
+                    <textarea id="rec-transcript-[% rec.id %]" style="display:none;">[% rec.transcript | html %]</textarea>
+
+                    [% ELSE %]
+                    <div style="color:var(--text-muted,#888);font-size:0.88em;font-style:italic;">No transcript available for this recording.</div>
+                    [% END %]
+                </div>
+
+            </div>
+            [% END %]
+
+            [% END %]
+
+        </div>
+
+        <div class="content-secondary">
+            <div class="sidebar-section">
+                <h3>About Voice Recordings</h3>
+                <p style="font-size:0.88em;">Voice recordings are captured using the 🎤 microphone button in the AI chat widget. The audio is transcribed by Whisper and saved here automatically.</p>
+                <ul style="font-size:0.88em;line-height:1.8;">
+                    <li>Audio files are stored on the server</li>
+                    <li>Transcripts are AI-generated (Whisper)</li>
+                    <li>Click <strong>Create Inspection</strong> to save as a hive inspection record</li>
+                    <li>Use <strong>Download</strong> to save the MP3 to your device</li>
+                </ul>
+            </div>
+            <div class="sidebar-section">
+                <h3>Quick Links</h3>
+                <ul style="font-size:0.88em;line-height:2;">
+                    <li><a href="/Apiary/inspections">📋 All Inspections</a></li>
+                    <li><a href="/Apiary/inspections/new">➕ New Inspection</a></li>
+                    <li><a href="/BMaster">🏠 Apiary Home</a></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function copyTranscript(id) {
+    var el = document.getElementById('rec-transcript-' + id);
+    if (!el) return;
+    var txt = el.value;
+    navigator.clipboard.writeText(txt).then(function() {
+        var st = document.getElementById('rec-status-' + id);
+        if (st) { st.textContent = '✅ Transcript copied to clipboard.'; st.style.display=''; st.style.background='#d4edda'; st.style.color='#155724'; setTimeout(function(){ st.style.display='none'; }, 3000); }
+    }).catch(function() {
+        var st = document.getElementById('rec-status-' + id);
+        if (st) { st.textContent = '⚠️ Copy failed — select the transcript text manually.'; st.style.display=''; st.style.background='#fff3cd'; st.style.color='#856404'; }
+    });
+}
+
+function sendToInspection(id, btn) {
+    var el = document.getElementById('rec-transcript-' + id);
+    var st = document.getElementById('rec-status-' + id);
+    if (!el) return;
+    var transcript = el.value;
+    if (!transcript) { if (st) { st.textContent = '⚠️ No transcript to send.'; st.style.display=''; } return; }
+
+    var chatInput = document.getElementById('message-input');
+    if (!chatInput) {
+        if (st) {
+            st.textContent = '⚠️ Open the AI chat widget first (bottom-right), then try again.';
+            st.style.display = '';
+            st.style.background = '#fff3cd';
+            st.style.color = '#856404';
+        }
+        return;
+    }
+
+    var msg = 'Create a hive inspection from this voice recording transcript:\n\n' + transcript;
+    chatInput.value = msg;
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
+    chatInput.dispatchEvent(new Event('input', { bubbles: true }));
+    chatInput.focus();
+
+    if (st) {
+        st.textContent = '✅ Transcript sent to AI chat — review and press Send to create the inspection.';
+        st.style.display = '';
+        st.style.background = '#d4edda';
+        st.style.color = '#155724';
+    }
+
+    var chatWidget = document.getElementById('chat-widget') || document.getElementById('ai-chat-widget');
+    if (chatWidget && chatWidget.style.display === 'none') {
+        chatWidget.style.display = '';
+    }
+    var openBtn = document.getElementById('open-chat-btn') || document.getElementById('chat-toggle-btn');
+    if (openBtn) openBtn.click();
+}
+</script>
