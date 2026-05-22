@@ -24,6 +24,8 @@
         font-size: 0.9em;
         background: #f8f8f8;
         cursor: pointer;
+        width: auto !important;
+        display: inline-block !important;
     }
     .log-table {
         width: 100%;
