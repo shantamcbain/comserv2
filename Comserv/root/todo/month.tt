@@ -651,30 +651,100 @@ document.addEventListener('DOMContentLoaded', function() {
             <span id="month-day-modal-title" style="font-weight:bold;font-size:1em;"></span>
             <button onclick="closeMonthDayModal()" style="border:none;background:transparent;font-size:1.3em;cursor:pointer;color:#555;line-height:1;" title="Close (Esc)">✕</button>
         </div>
-        <div id="month-day-modal-body" style="flex:1;overflow:auto;padding:8px;"></div>
+        <div id="month-day-modal-body" style="flex:1;overflow:hidden;padding:0;display:flex;"></div>
     </div>
 </div>
 <script>
+var MONTH_PALETTE = [];
+var _monthSiteColors = {};
+var _monthColorIdx = 0;
+function _buildMonthPalette() {
+    var s = getComputedStyle(document.documentElement);
+    var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
+    var info    = s.getPropertyValue('--info-color').trim()    || '#00897B';
+    var success = s.getPropertyValue('--success-color').trim() || '#43A047';
+    return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
+}
+function monthSiteColor(site) {
+    if (!MONTH_PALETTE.length) MONTH_PALETTE = _buildMonthPalette();
+    if (!site) return '#757575';
+    if (!_monthSiteColors[site]) {
+        _monthSiteColors[site] = MONTH_PALETTE[_monthColorIdx % MONTH_PALETTE.length];
+        _monthColorIdx++;
+    }
+    return _monthSiteColors[site];
+}
+function monthColorizeAndLayout(container) {
+    container.querySelectorAll('.gcal-ev[data-site]').forEach(function(el) {
+        var col = monthSiteColor(el.getAttribute('data-site') || '');
+        el.style.background = col;
+        el.style.borderLeft = '3px solid ' + col;
+    });
+    var area = container.querySelector('.gcal-events-area, .gcal-events-area-col');
+    if (!area) return;
+    var evs = Array.from(area.querySelectorAll('.gcal-ev'));
+    if (!evs.length) return;
+    var parsed = evs.map(function(el) {
+        var s = parseInt(el.getAttribute('data-start-min')) || 300;
+        var d = Math.max(1, parseInt(el.getAttribute('data-dur-min')) || 30);
+        return { el: el, start: s, end: s + d, col: 0 };
+    });
+    parsed.sort(function(a,b){ return a.start - b.start; });
+    var ends = [];
+    parsed.forEach(function(ev) {
+        var placed = false;
+        for (var c = 0; c < ends.length; c++) {
+            if (ends[c] <= ev.start) { ev.col = c; ends[c] = ev.end; placed = true; break; }
+        }
+        if (!placed) { ev.col = ends.length; ends.push(ev.end); }
+    });
+    var nc = ends.length || 1;
+    parsed.forEach(function(ev) {
+        var pct = 100 / nc;
+        ev.el.style.left  = (ev.col * pct + 0.3) + '%';
+        ev.el.style.width = (pct - 0.6) + '%';
+        ev.el.style.right = '';
+    });
+    var now = new Date();
+    var totalMin = now.getHours() * 60 + now.getMinutes();
+    var line = container.querySelector('.gcal-now-line');
+    if (line && totalMin >= 300 && totalMin <= 1320) {
+        line.style.top = (totalMin - 300) + 'px';
+        line.style.display = 'block';
+    }
+    var outer = container.querySelector('.gcal-grid-outer');
+    if (outer) {
+        var minsFromStart = totalMin - 300;
+        if (minsFromStart > 0) outer.scrollTop = Math.max(0, minsFromStart - 60);
+    }
+}
 function showMonthDayModal(dateStr, event) {
     event.preventDefault();
     document.getElementById('month-day-modal-title').textContent = dateStr;
     var body = document.getElementById('month-day-modal-body');
-    body.innerHTML = '<p style="padding:20px;color:#888;">Loading day schedule for ' + dateStr + '...</p>';
+    body.innerHTML = '<p style="padding:20px;color:#888;">Loading...</p>';
     document.getElementById('month-day-modal').style.display = 'flex';
     document.body.style.overflow = 'hidden';
-    fetch('/todo/day/' + encodeURIComponent(dateStr) + '?embed=1', { credentials: 'same-origin' })
-        .then(function(r) {
-            if (!r.ok) { throw new Error('HTTP ' + r.status); }
-            return r.text();
-        })
-        .then(function(html) {
-            var parser = new DOMParser();
-            var doc = parser.parseFromString(html, 'text/html');
-            var src = doc.body || doc.documentElement;
-            src.querySelectorAll('link[rel="stylesheet"]').forEach(function(el) { el.remove(); });
-            body.innerHTML = src.innerHTML;
-        })
-        .catch(function(err) { body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view: ' + err + '</p>'; });
+    var iframe = document.createElement('iframe');
+    iframe.style.cssText = 'width:100%;height:100%;min-height:600px;border:none;display:flex;flex:1;';
+    iframe.src = '/todo/day/' + encodeURIComponent(dateStr) + '?embed=1';
+    iframe.onload = function() {
+        try {
+            var iDoc = iframe.contentDocument || iframe.contentWindow.document;
+            var outer = iDoc.querySelector('.gcal-grid-outer');
+            if (outer) {
+                var now = new Date();
+                var totalMin = now.getHours() * 60 + now.getMinutes();
+                var minsFromStart = totalMin - 300;
+                if (minsFromStart > 0) outer.scrollTop = Math.max(0, minsFromStart - 60);
+            }
+        } catch(e) {}
+    };
+    iframe.onerror = function() {
+        body.innerHTML = '<p style="padding:20px;color:#c00;">Could not load day view.</p>';
+    };
+    body.innerHTML = '';
+    body.appendChild(iframe);
 }
 function closeMonthDayModal() {
     document.getElementById('month-day-modal').style.display = 'none';

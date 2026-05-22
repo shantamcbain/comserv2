@@ -193,14 +193,28 @@ sub daily :Path('/planning/daily') :Args {
                                           @{ $week_todos_by_date{$d_str} // [] };
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
-                    } elsif ($start eq $selected_date || (!$start && $due eq $selected_date)) {
+                    } elsif ($start && $start eq $selected_date) {
+                        # Has scheduled start_date matching today — show it
                         push @$todos_for_today, $todo;
-                    } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
-                        push @$overdue_todos, $todo;
+                    } elsif (!$start && $due && $due eq $selected_date) {
+                        # No scheduled date, but due today — show it
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$is_recurr) {
+                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
+                        if ($start && $start lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        } elsif (!$start && $due && $due lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        }
                     }
 
                     unless ($is_recurr) {
-                        my $anchor_key = $start || $due;
+                        # Use start_date as calendar anchor; fall back to due_date only when no start_date
+                        my $anchor_key = $start || (!$start ? $due : '');
                         if ($anchor_key) {
                             if ($anchor_key lt $week_first_day) {
                                 push @week_overdue_todos, $todo unless $is_done;
@@ -227,6 +241,39 @@ sub daily :Path('/planning/daily') :Args {
         }
     }
 
+    # Deduplicate recurring events in todos_for_today (same logic as filter_todos_by_date_range)
+    {
+        my $session_user = $c->session->{username} // '';
+        my %seen_rec_time;
+        my @deduped_today;
+        for my $todo (@$todos_for_today) {
+            my $is_rec = ($todo->can('is_recurring') && $todo->is_recurring)
+                || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+            if ($is_rec) {
+                my $tod = '';
+                eval { $tod = $todo->time_of_day // '' };
+                $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+                $tod = substr($tod, 0, 5);
+                my $key = lc($todo->subject // '') . '|' . $tod;
+                if (!$seen_rec_time{$key}) {
+                    $seen_rec_time{$key} = $todo;
+                    push @deduped_today, $todo;
+                } else {
+                    my $existing_user = eval { $seen_rec_time{$key}->username_of_poster // '' } // '';
+                    my $this_user     = eval { $todo->username_of_poster // '' } // '';
+                    if ($this_user eq $session_user && $existing_user ne $session_user) {
+                        @deduped_today = grep { $_ != $seen_rec_time{$key} } @deduped_today;
+                        $seen_rec_time{$key} = $todo;
+                        push @deduped_today, $todo;
+                    }
+                }
+            } else {
+                push @deduped_today, $todo;
+            }
+        }
+        $todos_for_today = \@deduped_today;
+    }
+
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
     # column access, and lets us embed top_px/height/start_min/time_lbl directly.
@@ -247,7 +294,7 @@ sub daily :Path('/planning/daily') :Args {
         my $top_px = $start_min - $GRID_START_MIN;
         $top_px = 0    if $top_px < 0;
         $top_px = 1000 if $top_px > 1000;
-        my $height = $est_mins < 30 ? 30 : $est_mins;
+        my $height = $est_mins < 15 ? 15 : $est_mins;
         $height = 900 if $height > 900;
         my $end_min = $start_min + $est_mins;
 
@@ -440,7 +487,7 @@ sub daily :Path('/planning/daily') :Args {
         for my $todo (@rows) {
             my %h = $todo->get_columns;
 
-            next if ($h{todo_type} // '') =~ /^(appointment|event)$/i;
+            next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
             next if ($h{is_recurring} // 0);
 
             my $st          = $h{status} // '';
