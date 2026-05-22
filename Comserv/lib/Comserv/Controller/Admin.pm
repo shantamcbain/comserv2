@@ -6323,6 +6323,20 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         }
         print "\n";
 
+        print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
+        if (-f "$comserv_dir/script/docker-cleanup.sh") {
+            print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
+            my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
+            $cleanup_exit >>= 8;
+            if ($cleanup_exit != 0) {
+                print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+            } else {
+                print "✅ Local cleanup completed successfully\n\n";
+            }
+        } else {
+            print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
+        }
+
         print "--- Step 1: Building production image ($hub_image) ---\n";
         print "    compose: $comserv_dir/$prod_compose\n\n";
         my $build_exit = system('docker', 'compose',
