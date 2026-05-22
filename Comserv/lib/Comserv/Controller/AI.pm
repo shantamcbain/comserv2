@@ -7425,23 +7425,25 @@ sub action :Local :Args(0) {
         my $log_row;
         eval {
             $log_row = $schema->resultset('Log')->create({
-                todo_record_id => $todo_id || undef,
-                owner          => $current_user,
-                sitename       => $sitename,
-                start_date     => $today,
-                abstract       => $abstract,
-                details        => $details,
-                start_time     => '00:00',
-                end_time       => '00:00',
-                time           => 0,
+                todo_record_id  => $todo_id || undef,
+                username        => $current_user,
+                sitename        => $sitename,
+                start_date      => $today,
+                due_date        => $today,
+                project_code    => 'PLANNING',
+                abstract        => $abstract,
+                details         => $details,
+                start_time      => '00:00:00',
+                end_time        => '00:00:00',
+                time            => '00:00:00',
                 group_of_poster => do {
                     my $roles = $c->session->{roles} || [];
                     ref $roles eq 'ARRAY' ? join(',', @$roles) : ($roles || 'default');
                 },
-                status        => 1,
-                priority      => 2,
-                last_mod_by   => $current_user,
-                last_mod_date => $today,
+                status          => 1,
+                priority        => 2,
+                last_mod_by     => $current_user,
+                last_mod_date   => $today,
             });
         };
         if ($@ || !$log_row) {

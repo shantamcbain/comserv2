@@ -1022,14 +1022,14 @@ sub fetch_and_set {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . ($site_domain ? Dumper({ $site_domain->get_columns }) : 'undef'));
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
             my $site = $c->model('Site')->get_site_details($c, $site_id);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . ($site ? Dumper({ $site->get_columns }) : 'undef'));
 
             if ($site) {
                 $value = $site->name;
