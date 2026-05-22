@@ -1219,7 +1219,25 @@ sub update_time :Path('/todo/update_time') :Args(0) {
     
     # Update the time_of_day
     eval {
-        $todo->update({ time_of_day => $time_of_day });
+        my $sd = $todo->start_date // '';
+        $sd = ref($sd) ? $sd->ymd : "$sd";
+        $sd = substr($sd, 0, 10) if length($sd) >= 10;
+        $sd ||= DateTime->now->ymd;
+        my $time_hhmm = $time_of_day;
+        $time_hhmm =~ s/:00$//;
+        my $est = $todo->estimated_man_hours // 30;
+        $est ||= 30;
+        my ($th, $tm) = $time_of_day =~ /^(\d{1,2}):(\d{2})/;
+        $th //= 9; $tm //= 0;
+        my $end_min = $th * 60 + $tm + $est;
+        my $eh = int($end_min / 60) % 24;
+        my $em = $end_min % 60;
+        my $end_time = sprintf('%02d:%02d:00', $eh, $em);
+        $todo->update({
+            time_of_day     => $time_of_day,
+            scheduled_start => "$sd $time_of_day",
+            scheduled_end   => "$sd $end_time",
+        });
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time',
             "Updated time_of_day for todo $record_id to $time_of_day");
     };
@@ -1627,9 +1645,19 @@ sub update_time_and_date :Path('/todo/update_time_and_date') :Args(0) {
     
     # Update both time_of_day and start_date
     eval {
-        $todo->update({ 
-            time_of_day => $time_of_day,
-            start_date => $start_date
+        my $est = $todo->estimated_man_hours // 30;
+        $est ||= 30;
+        my ($th, $tm) = $time_of_day =~ /^(\d{1,2}):(\d{2})/;
+        $th //= 9; $tm //= 0;
+        my $end_min = $th * 60 + $tm + $est;
+        my $eh = int($end_min / 60) % 24;
+        my $em = $end_min % 60;
+        my $end_time = sprintf('%02d:%02d:00', $eh, $em);
+        $todo->update({
+            time_of_day     => $time_of_day,
+            start_date      => $start_date,
+            scheduled_start => "$start_date $time_of_day",
+            scheduled_end   => "$start_date $end_time",
         });
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_time_and_date',
             "Updated time_of_day to $time_of_day and start_date to $start_date for todo $record_id");
