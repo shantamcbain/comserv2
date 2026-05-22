@@ -1015,6 +1015,9 @@ sub modify :Path('/todo/modify') :Args(1) {
         }
     }
 
+    # Trigger reschedule so edited todo is placed correctly in the sequential schedule
+    eval { $self->_do_reschedule($c) };
+
     # Handle successful update
     $c->flash->{success_msg} = "Todo item with ID $record_id has been successfully updated.";
 
@@ -1203,12 +1206,12 @@ sub create :Local {
         $c->detach();
     }
 
+    # Trigger reschedule so new todo is placed in the sequential schedule
+    eval { $self->_do_reschedule($c) };
+
     # Redirect to the todo list or return_to URL with success message
     $c->flash->{success_msg} = "Successfully created todo: " . $todo->subject;
     my $redirect_url = $params->{return_to} || $c->uri_for($self->action_for('todo'));
-    
-    # Handle the case where the return_to URL might already have a fragment
-    # or ensure it's properly handled if coming from internal referer
     $c->response->redirect($redirect_url);
 }
 
@@ -2657,25 +2660,17 @@ sub _estimate_mins_heuristic {
     return 30;
 }
 
-sub reschedule :Path('reschedule') :Args(0) {
+sub _do_reschedule {
     my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    my $username = $c->session->{username} // '';
-    my $sitename = $c->session->{SiteName} // '';
-    my $user_id  = $c->session->{user_id}  // 0;
-    my $roles    = $c->session->{roles} || [];
-    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
-    my $is_admin = grep { /^(admin)$/i } @rl;
-    my $is_csc   = ($sitename eq 'CSC' && $is_admin) || $username eq 'Shanta';
-
-    unless ($username && $username ne 'anonymous' && $is_admin) {
-        $c->response->status(403);
-        $c->response->body('{"ok":0,"error":"Admin role required"}');
-        return;
-    }
 
     require POSIX;
+    my $username   = $c->session->{username} // '';
+    my $sitename   = $c->session->{SiteName} // '';
+    my $roles      = $c->session->{roles} || [];
+    my @rl         = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    my $is_admin   = grep { /^(admin)$/i } @rl;
+    my $is_csc     = ($sitename eq 'CSC' && $is_admin) || $username eq 'Shanta';
+
     my $now_epoch  = time();
     my $today_dt   = DateTime->now(time_zone => 'local');
     my $today      = $today_dt->ymd;
@@ -2966,16 +2961,38 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         }
     };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule', "Error: $@");
-        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    die $@ if $@;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
+        "Reschedule by $username: $count todos scheduled, " . scalar(@errors) . " errors, from $today forward");
+
+    return ($count, \@errors, $today);
+}
+
+sub reschedule :Path('reschedule') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    my $is_admin = grep { /^(admin)$/i } @rl;
+
+    unless ($username && $username ne 'anonymous' && $is_admin) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
         return;
     }
 
-    my $error_count = scalar(@errors);
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'reschedule',
-        "Reschedule by $username: $count todos scheduled, $error_count errors, from $today forward");
-    $c->response->body('{"ok":1,"count":' . $count . ',"error_count":' . $error_count . ',"today":"' . $today . '","errors":' . (JSON::encode_json(\@errors)) . '}');
+    require JSON;
+    my ($count, $errors, $today) = eval { $self->_do_reschedule($c) };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'reschedule', "Error: $@");
+        $c->response->body('{"ok":0,"error":' . JSON::encode_json("$@") . '}');
+        return;
+    }
+
+    $c->response->body('{"ok":1,"count":' . ($count // 0) . ',"error_count":' . scalar(@{$errors // []}) . ',"today":"' . ($today // '') . '","errors":' . JSON::encode_json($errors // []) . '}');
 }
 
 sub open_log :Path('open_log') :Args(0) {
