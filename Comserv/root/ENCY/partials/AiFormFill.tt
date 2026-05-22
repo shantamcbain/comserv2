@@ -9,7 +9,7 @@
     <input type="text" id="ency-ai-entity-name" placeholder="Enter name to look up…" size="38"
            value="[% ency_ai_entity_name | html %]" />
     <select id="ency-ai-model-sel" title="AI model to use" style="font-size:0.9em;">
-      <option value="grok-4.3|grok" selected>Grok 4.3 (loading…)</option>
+      <option value="grok-4.20-non-reasoning|grok" selected>Grok 4.20 Fast (loading…)</option>
     </select>
     <button type="button" id="ency-ai-ask-btn" onclick="encyAiFill()">Ask AI</button>
     <button type="button" id="ency-ai-review-btn" onclick="encyAiReview()"
@@ -107,8 +107,14 @@
                 if (!grokProvider) return;
                 var DEAD_MODELS = { 'grok-code-fast-1': true, 'grok-3-mini': true, 'grok-4.20-non-reasoning': true, 'grok-4.20-multi-agent-0309': true, 'grok-4.20-multi-agent': true };
                 var FALLBACK = [
-                    { val: 'grok-4.3|grok', label: 'Grok 4.3' }
+                    { val: 'grok-4.20-non-reasoning|grok', label: 'Grok 4.20 Fast' }
                 ];
+                var DEAD_MODELS = {
+                    'grok-code-fast-1': 1, 'grok-4-fast-non-reasoning': 1,
+                    'grok-4-1-fast-non-reasoning': 1, 'grok-4-0709': 1,
+                    'grok-3': 1, 'grok-4-fast-reasoning': 1, 'grok-4-1-fast-reasoning': 1,
+                    'grok-4.3': 1
+                };
                 var models = (grokProvider.models && grokProvider.models.length > 0)
                     ? grokProvider.models
                         .filter(function(m) { return m.id && !DEAD_MODELS[m.id] && !m.id.match(/imagine|video/i); })
@@ -185,7 +191,7 @@
             var parts = sel.value.split('|');
             return { model: parts[0], provider: parts[1] || 'grok' };
         }
-        return { model: 'grok-4.3', provider: 'grok' };
+        return { model: 'grok-4.20-non-reasoning', provider: 'grok' };
     }
 
     function encyAiFill() {
@@ -317,7 +323,9 @@
                         }
                         return String(v);
                     }
-                    if (Array.isArray(aiValue)) {
+                    if (typeof aiValue === 'boolean') {
+                        val = aiValue ? '1' : '0';
+                    } else if (Array.isArray(aiValue)) {
                         val = aiValue.map(flattenAiValue).join('; ');
                     } else if (typeof aiValue === 'object') {
                         val = flattenAiValue(aiValue);
@@ -368,6 +376,7 @@
                         var hasSelection = (el.selectedIndex > 0 && el.options[el.selectedIndex].value !== '');
                         if (hasSelection && !overrideAll) { skipped.push(key); return; }
                         var matched = false;
+                        var origIndex = el.selectedIndex;
                         var aiVal   = val.toLowerCase().trim();
                         // Normalise yes/no/true/false/1/0 AI responses for binary selects
                         var isBoolTrue  = /^(1|yes|true|y)\b/.test(aiVal);
@@ -382,7 +391,8 @@
                                            (isBoolFalse && (optVal === '0' || optText === 'no'));
                             if (directMatch || boolMatch) {
                                 el.selectedIndex = i;
-                                matched = true; filled++;
+                                matched = true;
+                                if (i !== origIndex) filled++;
                                 break;
                             }
                         }
@@ -619,11 +629,13 @@
 
         var prompt = 'You are reviewing an ENCY encyclopedia record for "' + name + '". '
             + 'Below are the CURRENT field values from the form. '
-            + 'Identify fields that appear INCORRECT, inconsistent with the entity, or obviously wrong (e.g. a disease name in the wrong record, wrong species data, mismatched content). '
-            + 'ONLY flag fields you are confident are wrong. Do NOT suggest changes to fields that are merely incomplete. '
+            + 'Do TWO things: '
+            + '(1) Identify fields that appear INCORRECT or obviously wrong (e.g. therapeutic actions placed in sister_plants or contra_indications, wrong species data, mismatched content) — only flag fields you are CONFIDENT are wrong. '
+            + '(2) For critical fields that are EMPTY and you have reliable knowledge about, suggest the correct value with reason "missing critical field". '
+            + 'Critical fields that must not be empty: therapeutic_action, parts_used, medical_uses, ident_character, contra_indications, dosage, constituents. '
             + 'Return ONLY a raw JSON object with this structure: '
-            + '{"corrections": [{"field": "field_name", "current": "current value", "suggested": "corrected value", "reason": "why this is wrong"}]}. '
-            + 'If nothing appears wrong, return {"corrections": []}. '
+            + '{"corrections": [{"field": "field_name", "current": "current value or empty", "suggested": "corrected value", "reason": "why this is wrong or missing critical field"}]}. '
+            + 'If nothing to correct or fill, return {"corrections": []}. '
             + 'Current field values: ' + JSON.stringify(currentValues);
 
         fetch('/ai/generate', {

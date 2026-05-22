@@ -1,43 +1,123 @@
-[% PageVersion = 'log/index.tt,v 0.02 2024/11/22 Shanta Exp shanta ' %]
+[% PageVersion = 'log/index.tt,v 0.03 2026/05/13 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% PageVersion %]
 [% END %]
 
-<!-- Ensure the style is correctly applied -->
 <style>
     .filter-button {
         margin: 5px;
-        padding: 10px;
-        border: none;
+        padding: 6px 12px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
         background-color: #f0f0f0;
         cursor: pointer;
+        font-size: 0.9em;
     }
     .filter-button.active {
         background-color: #007bff;
         color: white;
+        border-color: #0056b3;
     }
+    .log-filter-bar {
+        margin-bottom: 10px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        align-items: center;
+    }
+    .log-filter-label {
+        font-weight: bold;
+        margin-right: 4px;
+        font-size: 0.9em;
+        color: #555;
+    }
+    .log-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
+    }
+    .log-table th, .log-table td {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+        vertical-align: top;
+    }
+    .log-table th {
+        background: #f5f5f5;
+        font-weight: bold;
+    }
+    .log-table tr:nth-child(even) { background: #fafafa; }
+    .log-table tr:hover { background: #f0f7ff; }
+    .log-status-1 { color: #0066cc; }
+    .log-status-2 { color: #cc6600; }
+    .log-status-3 { color: #888; }
 </style>
 
-<h2>Our Logs</h2>
-<div id="statusButtons">
-    <button class="filter-button [% IF status == 'all' %]active[% END %]" onclick="window.location.href='/log?status=all'">All Logs</button>
-    <button class="filter-button [% IF status == 'open' %]active[% END %]" onclick="window.location.href='/log?status=open'">Open Logs</button>
-    <button class="filter-button [% IF status == '1' %]active[% END %]" onclick="window.location.href='/log?status=1'">Status 1</button>
-    <button class="filter-button [% IF status == '2' %]active[% END %]" onclick="window.location.href='/log?status=2'">Status 2</button>
-    <button class="filter-button [% IF status == '3' %]active[% END %]" onclick="window.location.href='/log?status=3'">Status 3</button>
+<h2>Logs</h2>
+
+[% SET site_param = site_filter ? ('&site=' _ site_filter) : '' %]
+<div class="log-filter-bar">
+    <span class="log-filter-label">Status:</span>
+    <button class="filter-button [% IF status == 'all' %]active[% END %]"
+        onclick="window.location.href='/log?status=all[% site_param %]'">All</button>
+    <button class="filter-button [% IF status == 'open' %]active[% END %]"
+        onclick="window.location.href='/log?status=open[% site_param %]'">Open</button>
+    <button class="filter-button [% IF status == '1' %]active[% END %]"
+        onclick="window.location.href='/log?status=1[% site_param %]'">New</button>
+    <button class="filter-button [% IF status == '2' %]active[% END %]"
+        onclick="window.location.href='/log?status=2[% site_param %]'">In Progress</button>
+    <button class="filter-button [% IF status == '3' %]active[% END %]"
+        onclick="window.location.href='/log?status=3[% site_param %]'">Done</button>
 </div>
+
+[% IF allowed_sites.size > 1 %]
+[% SET status_param = '?status=' _ status %]
+<div class="log-filter-bar">
+    <span class="log-filter-label">Site:</span>
+    <button class="filter-button [% UNLESS site_filter %]active[% END %]"
+        onclick="window.location.href='/log[% status_param %]'">All Sites</button>
+    [% FOREACH sn IN allowed_sites %]
+    <button class="filter-button [% IF site_filter == sn %]active[% END %]"
+        onclick="window.location.href='/log[% status_param %]&site=[% sn %]'">[% sn %]</button>
+    [% END %]
+</div>
+[% END %]
 
 <div id="logContainer">
     [% IF logs.size == 0 %]
-        <p>No logs available.</p>
+        <p>No logs found.</p>
     [% ELSE %]
-        [% FOREACH log IN logs %]
-        <div class="log-entry" data-status="[% log.status %]">
-            <form method="post" action="/log/details">
-                <input type="hidden" name="record_id" value="[% log.record_id %]">
-                <button type="submit">[% log.abstract %]</button>
-            </form>
-        </div>
-        [% END %]
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Site</th>
+                    <th>User</th>
+                    <th>Abstract</th>
+                    <th>Status</th>
+                    <th>Start</th>
+                    <th>End</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH log IN logs %]
+            [% SET st_class = (log.status == 1) ? 'log-status-1' : (log.status == 2) ? 'log-status-2' : (log.status == 3) ? 'log-status-3' : '' %]
+            <tr class="[% st_class %]">
+                <td>[% log.start_date %]</td>
+                <td>[% log.sitename %]</td>
+                <td>[% log.username %]</td>
+                <td>
+                    <form method="post" action="/log/details" style="margin:0">
+                        <input type="hidden" name="record_id" value="[% log.record_id %]">
+                        <button type="submit" style="background:none;border:none;padding:0;color:inherit;cursor:pointer;text-align:left;font-size:inherit;">[% log.abstract %]</button>
+                    </form>
+                </td>
+                <td>[% (log.status == 1) ? 'New' : (log.status == 2) ? 'In Progress' : (log.status == 3) ? 'Done' : log.status %]</td>
+                <td>[% log.start_time %]</td>
+                <td>[% log.end_time %]</td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
     [% END %]
 </div>

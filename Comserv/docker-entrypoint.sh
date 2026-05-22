@@ -138,6 +138,25 @@ else
   echo "⚠ Warning: cron not available - log rotation disabled"
 fi
 
+# Bootstrap whisper_venv on named volume if not yet installed — runs in background
+# so it does not block app startup or health checks
+if [ ! -f "/opt/comserv/whisper_venv/bin/python3" ]; then
+  echo "Whisper venv not found — bootstrapping in background (first-run only)..."
+  (
+    if command -v python3 &>/dev/null; then
+      python3 -m venv /opt/comserv/whisper_venv >> /tmp/whisper_install.log 2>&1 && \
+      /opt/comserv/whisper_venv/bin/pip install --no-cache-dir \
+        torch --index-url https://download.pytorch.org/whl/cpu \
+        openai-whisper >> /tmp/whisper_install.log 2>&1 && \
+      echo "✓ Whisper install complete" >> /tmp/whisper_install.log || \
+      echo "⚠ Whisper install failed — check /tmp/whisper_install.log" >> /tmp/whisper_install.log
+    fi
+  ) &
+  echo "  Whisper install started in background — see /tmp/whisper_install.log"
+else
+  echo "✓ Whisper venv ready at /opt/comserv/whisper_venv"
+fi
+
 # Create workshop files directory on shared volume
 if [ "${SKIP_NFS_SETUP}" != "1" ]; then
   WORKSHOP_DIR="/data/nfs/workshop_files"
@@ -149,6 +168,14 @@ if [ "${SKIP_NFS_SETUP}" != "1" ]; then
         chmod 775 "$WORKSHOP_DIR" 2>/dev/null || true
         chown comserv:comserv "$WORKSHOP_DIR" 2>/dev/null || true
     fi
+    NFS_LOG_DIR="/data/nfs/logs"
+    if [ ! -d "$NFS_LOG_DIR" ]; then
+        echo "Creating NFS log directory: $NFS_LOG_DIR"
+        mkdir -p "$NFS_LOG_DIR"
+        chmod 775 "$NFS_LOG_DIR" 2>/dev/null || true
+        chown comserv:comserv "$NFS_LOG_DIR" 2>/dev/null || true
+    fi
+    echo "✓ NFS log directory ready: $NFS_LOG_DIR"
   else
     echo "⚠ Warning: Workshop volume /data/nfs not available - workshop file uploads will use fallback directory"
   fi

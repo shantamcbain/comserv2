@@ -88,6 +88,48 @@
     }
 </style>
 
+<script>
+function onTodoTypeChange(sel) {
+    var type = sel.value;
+    var tzRow  = document.getElementById('timezone-row');
+    var recRow = document.getElementById('recurring-row');
+    if (tzRow)  tzRow.style.display  = (type === 'meeting' || type === 'appointment') ? '' : 'none';
+    if (recRow) recRow.style.display = (type === 'task') ? 'none' : '';
+}
+function onRecurringChange(cb) {
+    var wrap = document.getElementById('recurrence-rule-wrap');
+    if (wrap) wrap.style.display = cb.checked ? '' : 'none';
+}
+function syncDur() {
+    var h = parseInt(document.getElementById('est_h').value) || 0;
+    var m = parseInt(document.getElementById('est_m').value) || 0;
+    document.getElementById('estimated_man_hours').value = h * 60 + m;
+}
+(function initDur() {
+    var raw = parseInt('[% record.get_column("estimated_man_hours") || 30 %]') || 30;
+    var hEl = document.getElementById('est_h');
+    var mEl = document.getElementById('est_m');
+    if (hEl) hEl.value = Math.floor(raw / 60);
+    if (mEl) mEl.value = raw % 60;
+    syncDur();
+})();
+(function populateTimezones() {
+    var sel = document.getElementById('creator_timezone');
+    if (!sel || !Intl || !Intl.supportedValuesOf) return;
+    var current = sel.dataset.current || '';
+    var localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    var zones = Intl.supportedValuesOf('timeZone');
+    zones.forEach(function(tz) {
+        var opt = document.createElement('option');
+        opt.value = tz;
+        opt.textContent = tz;
+        if (tz === (current || localTZ)) opt.selected = true;
+        sel.appendChild(opt);
+    });
+    if (!current && localTZ) sel.value = localTZ;
+})();
+</script>
+
 <div class="form-container">
     <h1>Edit Todo</h1>
 
@@ -122,10 +164,17 @@
         <span id="accumulative_time_display">[% accumulative_time %]</span>
     </div>
     
-    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post">
+    <form action="/todo/modify/[% record.get_column('record_id') %]" method="post" onsubmit="syncDur()">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
-            [% INCLUDE 'todo/site_list.tt' %]
+            [% IF sites && sites.size > 1 %]
+                [% SET _rec_site = record.get_column('sitename') || todo_sitename %]
+                [% INCLUDE 'todo/site_list.tt' selected_sitename=_rec_site %]
+            [% ELSE %]
+                <label for="sitename">Site Name:</label>
+                <input type="hidden" name="sitename" value="[% record.get_column('sitename') %]">
+                <input type="text" id="sitename" value="[% record.get_column('sitename') %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
+            [% END %]
         </div>
         
         <div class="form-group">
@@ -170,7 +219,7 @@
                             SET time_value_24 = hour_24 _ ':' _ minute;
                             SET time_display = hour_12 _ ':' _ minute _ ' ' _ period;
                 %]
-                <option value="[% time_value_24 %]:00" [% IF current_time_short == time_value_24 %]selected[% END %]>[% time_display %]</option>
+                <option value="[% time_value_24 %]:00" [% IF current_time_short.substr(0,2) == hour_24 AND current_time_short.substr(3,2) == minute %]selected[% END %]>[% time_display %]</option>
                 [%
                         END;
                     END;
@@ -194,8 +243,15 @@
         </div>
         
         <div class="form-group">
-            <label for="estimated_man_hours">Estimated Man Hours:</label>
-            <input type="number" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') %]" required>
+            <label>Duration:</label>
+            <span style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                <input type="number" id="est_h" min="0" max="99" value="0"
+                       style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> h
+                <input type="number" id="est_m" min="0" max="59" value="30"
+                       style="width:60px;padding:6px;" onchange="syncDur()" oninput="syncDur()"> min
+                <input type="hidden" id="estimated_man_hours" name="estimated_man_hours" value="[% record.get_column('estimated_man_hours') || 30 %]">
+                <small style="color:var(--text-muted-color,#888);margin-left:4px;">stored as minutes</small>
+            </span>
         </div>
         
         <div class="form-group">
@@ -219,7 +275,50 @@
                 [% INCLUDE 'todo/priority_select.tt' %]
             </select>
         </div>
-        
+
+        <div class="form-group">
+            <label for="todo_type">Type:</label>
+            <select id="todo_type" name="todo_type" class="form-select" onchange="onTodoTypeChange(this)">
+                [% SET _tt = record.get_column('todo_type') || 'task' %]
+                <option value="task"        [% IF _tt == 'task'        %]selected[% END %]>Task</option>
+                <option value="appointment" [% IF _tt == 'appointment' %]selected[% END %]>📌 Appointment</option>
+                <option value="meeting"     [% IF _tt == 'meeting'     %]selected[% END %]>🤝 Meeting</option>
+                <option value="event"       [% IF _tt == 'event'       %]selected[% END %]>🎂 Event</option>
+                <option value="reminder"    [% IF _tt == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
+            </select>
+        </div>
+        <div class="form-group" id="is-fixed-row">
+            <label for="is_fixed">Fixed Time:</label>
+            <input type="checkbox" id="is_fixed" name="is_fixed" value="1"
+                   [% IF record.get_column('is_fixed') %]checked[% END %]>
+            <small style="color:var(--text-muted-color,#666);margin-left:6px;">Fixed events are never moved by reschedule.</small>
+        </div>
+        <div class="form-group" id="recurring-row">
+            <label>Repeats:</label>
+            <input type="checkbox" id="is_recurring" name="is_recurring" value="1"
+                   [% IF record.get_column('is_recurring') %]checked[% END %]
+                   onchange="onRecurringChange(this)">
+            <span id="recurrence-rule-wrap" style="[% UNLESS record.get_column('is_recurring') %]display:none[% END %]">
+                [% SET _rr = record.get_column('recurrence_rule') || '' %]
+                <select id="recurrence_rule" name="recurrence_rule" class="form-select" style="display:inline-block;width:auto;margin-left:8px;">
+                    <option value="">— Select cadence —</option>
+                    <option value="daily"    [% IF _rr == 'daily'    %]selected[% END %]>Every Day</option>
+                    <option value="weekdays" [% IF _rr == 'weekdays' %]selected[% END %]>Weekdays (Mon–Fri)</option>
+                    <option value="weekly"   [% IF _rr == 'weekly'   %]selected[% END %]>Every Week</option>
+                    <option value="biweekly" [% IF _rr == 'biweekly' %]selected[% END %]>Every Two Weeks</option>
+                    <option value="monthly"  [% IF _rr == 'monthly'  %]selected[% END %]>Every Month</option>
+                    <option value="yearly"   [% IF _rr == 'yearly'   %]selected[% END %]>Every Year</option>
+                </select>
+            </span>
+        </div>
+        <div class="form-group" id="timezone-row" style="[% UNLESS (_tt == 'meeting' OR _tt == 'appointment') %]display:none[% END %]">
+            <label for="creator_timezone">Time Zone:</label>
+            <select id="creator_timezone" name="creator_timezone" class="form-select" data-current="[% record.get_column('creator_timezone') || '' %]">
+                <option value="">— Use local time —</option>
+            </select>
+            <small>Set your timezone so attendees see the correct local time.</small>
+        </div>
+
         <div class="form-group">
             <label for="developer">Developer:</label>
             <input type="text" id="developer" name="developer" value="[% record.get_column('developer') %]">
@@ -269,7 +368,7 @@
                 [% END %]
             </select>
         </div>
-        
+
         <!-- Hidden fields to preserve data -->
         <input type="hidden" name="date_time_posted" value="[% record.get_column('date_time_posted') %]">
         <input type="hidden" name="username_of_poster" value="[% record.get_column('username_of_poster') %]">

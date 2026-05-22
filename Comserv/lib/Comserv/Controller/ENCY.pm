@@ -1141,7 +1141,21 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
-            $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg";
+            my $ncbi_msg = '';
+            my $ncbi_tax_id = $form_data->{ncbi_tax_id} // '';
+            if ($ncbi_tax_id =~ /^\d+$/) {
+                eval {
+                    my $ncbi_data = $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id);
+                    if ($ncbi_data) {
+                        my $organism = $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data);
+                        if ($organism) {
+                            $c->model('ENCYModel')->link_herb_to_organism($c, $new_id, $organism->record_id);
+                            $ncbi_msg = " Taxonomy linked (NCBI ID $ncbi_tax_id).";
+                        }
+                    }
+                };
+            }
+            $c->flash->{success_msg} = "Herb added successfully.$link_msg$todo_msg$ncbi_msg";
             my $caller_return_to = $form_data->{return_to} // '';
             my $herb_detail      = $c->uri_for('/ENCY/herb_detail/' . $new_id);
             my $return_to        = ($caller_return_to && $caller_return_to =~ m{^/}) ? $caller_return_to : $herb_detail;
@@ -1150,10 +1164,11 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             }
         } else {
             $c->stash(
-                error_msg      => "Failed to add herb: $result",
-                template       => 'ENCY/add_herb_form.tt',
-                user_role      => $c->session->{roles},
-                ency_ai_prompt => _herb_ai_prompt(),
+                error_msg           => "Failed to add herb: $result",
+                template            => 'ENCY/add_herb_form.tt',
+                user_role           => $c->session->{roles},
+                ency_ai_entity_name => $form_data->{botanical_name} || $form_data->{common_names} || '',
+                ency_ai_prompt      => _herb_ai_prompt(),
                 form_data      => $form_data,
             );
             $self->_stash_image_files($c);
@@ -1171,6 +1186,7 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
             prefill_botanical     => $prefill_botanical,
             prefill_common        => $prefill_common,
             return_to             => $return_to,
+            ency_ai_entity_name   => $prefill_botanical || $prefill_common || '',
         );
     }
 }
@@ -3863,12 +3879,12 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
     }
 
     my $herb_id = $c->request->param('record_id') // '';
-    unless ($herb_id =~ /^\d+$/) {
-        $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
-        return;
-    }
 
     if ($c->request->method eq 'POST') {
+        unless ($herb_id =~ /^\d+$/) {
+            $c->response->body(JSON::encode_json({ ok => 0, error => 'Invalid herb ID' }));
+            return;
+        }
         my $p      = $c->request->body_parameters;
         my $action = $p->{action} // '';
 
@@ -3924,7 +3940,23 @@ sub herb_ncbi_lookup : Path('/ENCY/herb_ncbi_lookup') : Args(0) {
         return;
     }
 
-    my ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    my $form_botanical = $c->request->param('botanical_name') // '';
+    $form_botanical =~ s/^\s+|\s+$//g;
+
+    my ($ok, $data);
+    if ($form_botanical) {
+        my $ncbi_data = $c->model('ExternalDB')->ncbi_search_taxonomy($c, $form_botanical);
+        if ($ncbi_data) {
+            $ncbi_data->{herb_id}        = $herb_id;
+            $ncbi_data->{botanical_name} = $form_botanical;
+            ($ok, $data) = (1, $ncbi_data);
+        } else {
+            ($ok, $data) = (0, "No NCBI record found for '$form_botanical'");
+        }
+    } else {
+        ($ok, $data) = $c->model('ENCYModel')->ncbi_lookup_for_herb($c, $herb_id);
+    }
+
     unless ($ok) {
         $c->response->body(JSON::encode_json({ ok => 0, error => $data }));
         return;
