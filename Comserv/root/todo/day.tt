@@ -623,6 +623,7 @@ function markDoneCalendar(btn, recordId) {
 }
 
 function markDoneGcal(btn, recordId) {
+    btn.disabled = true;
     fetch('/todo/update_status', {
         method: 'POST',
         credentials: 'same-origin',
@@ -633,16 +634,22 @@ function markDoneGcal(btn, recordId) {
             var ev = btn.closest('.gcal-ev');
             if (ev) {
                 ev.classList.add('is-done');
-                btn.remove();
                 var title = ev.querySelector('.gcal-ev-title');
                 if (title && !title.textContent.trim().startsWith('✓')) {
                     title.textContent = '✓ ' + title.textContent.trim();
                 }
             }
+            if (typeof _rescheduleAndReload === 'function') {
+                _rescheduleAndReload();
+            } else {
+                fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
+                    .finally(function() { window.location.reload(); });
+            }
         } else {
+            btn.disabled = false;
             alert('Could not mark done: ' + (d.error || 'unknown'));
         }
-    }).catch(function(e){ alert('Error: ' + e); });
+    }).catch(function(e){ btn.disabled = false; alert('Error: ' + e); });
 }
 
 function startWorkGcal(btn, recordId) {
