@@ -3175,13 +3175,15 @@ sub models :Local :Args(0) {
             'models', "Failed to fetch user API keys: $_");
     };
     
-    # Set template variables
+    my $is_csc_admin_models = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+
     $c->stash(
         template => 'ai/models.tt',
         page_title => 'AI Models',
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
+        is_csc_admin => $is_csc_admin_models ? 1 : 0,
         servers_json => encode_json($servers || []),
         user_api_keys => \@user_api_keys
     );
@@ -6968,6 +6970,73 @@ sub auto_sync_models :Local :Args(0) {
         servers       => \@results,
         total_pulled  => $total_pulled,
         total_removed => $total_removed,
+    }));
+}
+
+=head2 upgrade_ollama
+
+CSC-admin-only endpoint: runs the official Ollama installer script to upgrade
+the Ollama binary on the local server. Returns JSON with stdout/stderr and
+the detected version before and after the upgrade.
+
+=cut
+
+sub upgrade_ollama :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+    unless ($is_csc_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'CSC admin access required' }));
+        return;
+    }
+
+    my $version_before = '';
+    {
+        my $out = `ollama --version 2>&1`;
+        ($version_before) = $out =~ /(\d+\.\d+[\.\d]*)/;
+        $version_before ||= $out;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'upgrade_ollama', "CSC admin initiated Ollama upgrade. Version before: $version_before");
+
+    my $stdout = '';
+    my $stderr = '';
+    my $exit_code;
+
+    eval {
+        require IPC::Open3;
+        require POSIX;
+        my $cmd = 'curl -fsSL https://ollama.com/install.sh | sh 2>&1';
+        $stdout = `$cmd`;
+        $exit_code = $? >> 8;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'upgrade_ollama', "Upgrade exception: $@");
+        $c->response->body(encode_json({ success => JSON::false, error => "Upgrade failed: $@" }));
+        return;
+    }
+
+    my $version_after = '';
+    {
+        my $out = `ollama --version 2>&1`;
+        ($version_after) = $out =~ /(\d+\.\d+[\.\d]*)/;
+        $version_after ||= $out;
+    }
+
+    my $success = ($exit_code == 0) ? JSON::true : JSON::false;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'upgrade_ollama', "Upgrade complete. Exit=$exit_code before=$version_before after=$version_after");
+
+    $c->response->body(encode_json({
+        success        => $success,
+        exit_code      => $exit_code,
+        version_before => $version_before,
+        version_after  => $version_after,
+        output         => $stdout,
     }));
 }
 

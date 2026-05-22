@@ -1128,16 +1128,6 @@ sub add_herb :Path('/ENCY/add_herb') :Args(0) {
 
         if ($ok) {
             my $new_id = $result->record_id;
-            my $ncbi_tax_id = $form_data->{ncbi_tax_id} // '';
-            if ($ncbi_tax_id =~ /^\d+$/) {
-                my $ncbi_data = eval { $c->model('ExternalDB')->ncbi_fetch_by_tax_id($c, $ncbi_tax_id) };
-                if ($ncbi_data) {
-                    my $organism = eval { $c->model('ENCYModel')->find_or_create_organism_from_ncbi($c, $ncbi_data) };
-                    if ($organism) {
-                        eval { $c->model('ENCYModel')->link_herb_to_organism($c, $new_id, $organism->record_id) };
-                    }
-                }
-            }
             my ($auto_linked, $unresolved, $action_items) = $c->model('ENCYModel')->auto_link_herb_data($c, $new_id, $new_herb);
             my $link_msg = $auto_linked ? " Auto-linked $auto_linked constituent(s)." : '';
             my $todo_msg = $unresolved   ? " $unresolved term(s) need attention." : '';
