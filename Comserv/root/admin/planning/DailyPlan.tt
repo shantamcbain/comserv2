@@ -794,10 +794,9 @@
             'planning-system-continue-from-pl-bdac'    => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
-            'new-task-9cf1'                            => 4003,
+            'infrastructuremanagement-d133'             => 4003,
             'workshops-7d21'                           => 4004,
             'users-e5b8'                               => 4005,
-            'set-up-project-config-d327'               => 3000,
             'new-task-bb05'                            => 4006,
             'unified-mail-system-site-managed-2c53'    => 4007,
             'membership-1304'                          => 4008,
@@ -815,7 +814,6 @@
             'inventory-system-104a'                    => 4021,
             '3dprinting-use-this-as-the-branc-41f3'    => 4030,
             'developer-time-logging-points-ba-542a'    => 4022,
-            'infrastructuremanagement-d133'            => 4033,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -824,10 +822,9 @@
             { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
             { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4010 -r' },
             { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4002 -r' },
-            { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
+            { name => 'infrastructuremanagement-d133',           port => 4003, label => 'InfrastructureMgmt', url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
             { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4004 -r' },
             { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4005 -r' },
-            { name => 'set-up-project-config-d327',             port => 3000, label => 'ProjectConfig',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/set-up-project-config-d327/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3000 -r' },
             { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4006 -r' },
             { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4007 -r' },
             { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4008 -r' },
@@ -845,7 +842,6 @@
             { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4021 -r' },
             { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4030 -r' },
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4022 -r' },
-            { name => 'infrastructuremanagement-d133',          port => 4033, label => 'InfraMgmt',            url => '/admin/infrastructure', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4033 -r' },
         ] %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
@@ -1676,6 +1672,36 @@ function saveLogNotes(entryId) {
     })
     .catch(function() {
         if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
+    });
+}
+
+function startWorkTodoCard(btn, recordId) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/todo/open_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.textContent = '▶ Active';
+            btn.style.background = '#fd7e14';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#fd7e14';
+            btn.disabled = false;
+            btn.title = 'Log started — click Done when finished';
+            var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+            if (card) card.style.background = 'color-mix(in srgb,#0d6efd 8%,var(--bg-color,#fff))';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '▶ Start';
+            alert('Could not start: ' + (d.error || 'unknown error'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '▶ Start';
+        alert('Error: ' + e);
     });
 }
 </script>
