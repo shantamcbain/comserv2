@@ -124,8 +124,41 @@ sub filter_todos_by_date_range {
 
         $include_todo;
     } @$todos;
-    
-    return \@filtered_todos;
+
+    # Deduplicate recurring events by time_of_day: when multiple recurring records
+    # exist for the same time slot (e.g. CSC Break + Shanta Break both at 10:00),
+    # keep only the one belonging to the current user's username, or the first found.
+    my $session_user = eval { $c->session->{username} } // '';
+    my %seen_rec_time;
+    my @deduped;
+    for my $todo (@filtered_todos) {
+        my $is_rec = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
+        if ($is_rec && $start_date eq $end_date) {
+            my $tod = '';
+            eval { $tod = $todo->time_of_day // '' };
+            $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+            $tod = substr($tod, 0, 5);
+            my $key = lc($todo->subject // '') . '|' . $tod;
+            if (!$seen_rec_time{$key}) {
+                $seen_rec_time{$key} = $todo;
+                push @deduped, $todo;
+            } else {
+                # Prefer the record owned by the current user
+                my $existing_user = eval { $seen_rec_time{$key}->username_of_poster // '' } // '';
+                my $this_user     = eval { $todo->username_of_poster // '' } // '';
+                if ($this_user eq $session_user && $existing_user ne $session_user) {
+                    # Replace with this user's version
+                    @deduped = grep { $_ != $seen_rec_time{$key} } @deduped;
+                    $seen_rec_time{$key} = $todo;
+                    push @deduped, $todo;
+                }
+            }
+        } else {
+            push @deduped, $todo;
+        }
+    }
+
+    return \@deduped;
 }
 has 'logging' => (
     is => 'ro',
@@ -2795,23 +2828,25 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         }
 
-        # Work window: 09:00–17:00 (480 min/day)
-        my $WORK_START_MIN = 9 * 60;   # 540
-        my $WORK_END_MIN   = 17 * 60;  # 1020
+        # Work window: 05:00–22:00 (matches calendar grid)
+        my $WORK_START_MIN = 5 * 60;   # 300
+        my $WORK_END_MIN   = 22 * 60;  # 1320 — 10 PM (calendar spans 5 AM–10 PM)
         my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
 
         my $cur_dt = $today_dt->clone;
 
-        # For today, start from now (clamped to work start); past end → use next day
+        # For today, start from NOW (current minute within the day window).
+        # If before 5 AM, start from 5 AM. If past 10 PM, roll to next day at 5 AM.
         my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
         my $cur_slot_min;   # relative offset from WORK_START_MIN for current day
         if ($now_total_min >= $WORK_END_MIN) {
             $cur_dt->add(days => 1);
             $cur_slot_min = 0;
-        } elsif ($now_total_min > $WORK_START_MIN) {
-            $cur_slot_min = $now_total_min - $WORK_START_MIN;
         } else {
-            $cur_slot_min = 0;
+            # Start from current time (clamped to day start 5 AM)
+            $cur_slot_min = $now_total_min > $WORK_START_MIN
+                ? $now_total_min - $WORK_START_MIN
+                : 0;
         }
 
         # Schedule ALL open non-fixed/non-recurring todos sequentially from now forward
