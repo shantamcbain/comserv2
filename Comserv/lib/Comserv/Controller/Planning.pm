@@ -241,6 +241,39 @@ sub daily :Path('/planning/daily') :Args {
         }
     }
 
+    # Deduplicate recurring events in todos_for_today (same logic as filter_todos_by_date_range)
+    {
+        my $session_user = $c->session->{username} // '';
+        my %seen_rec_time;
+        my @deduped_today;
+        for my $todo (@$todos_for_today) {
+            my $is_rec = ($todo->can('is_recurring') && $todo->is_recurring)
+                || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+            if ($is_rec) {
+                my $tod = '';
+                eval { $tod = $todo->time_of_day // '' };
+                $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+                $tod = substr($tod, 0, 5);
+                my $key = lc($todo->subject // '') . '|' . $tod;
+                if (!$seen_rec_time{$key}) {
+                    $seen_rec_time{$key} = $todo;
+                    push @deduped_today, $todo;
+                } else {
+                    my $existing_user = eval { $seen_rec_time{$key}->username_of_poster // '' } // '';
+                    my $this_user     = eval { $todo->username_of_poster // '' } // '';
+                    if ($this_user eq $session_user && $existing_user ne $session_user) {
+                        @deduped_today = grep { $_ != $seen_rec_time{$key} } @deduped_today;
+                        $seen_rec_time{$key} = $todo;
+                        push @deduped_today, $todo;
+                    }
+                }
+            } else {
+                push @deduped_today, $todo;
+            }
+        }
+        $todos_for_today = \@deduped_today;
+    }
+
     # Convert todos_for_today to plain hashrefs with precomputed display fields.
     # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
     # column access, and lets us embed top_px/height/start_min/time_lbl directly.
