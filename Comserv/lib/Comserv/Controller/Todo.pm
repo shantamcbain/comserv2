@@ -2625,36 +2625,41 @@ sub reschedule :Path('reschedule') :Args(0) {
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
-        # Determine accessible sites (same logic as _get_user_accessible_sites)
+        # Determine accessible sites for this user
         my @allowed_sites = ($sitename);
-        eval {
-            my $uid = $c->session->{user_id};
-            if ($uid) {
-                my @sr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
-                    { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
-                )->all;
+        if ($is_csc) {
+            eval {
+                my $all_s = $c->model('Site')->get_all_sites($c) || [];
                 my %seen = ($sitename => 1);
-                for my $r (@sr) {
-                    eval {
-                        my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
-                        push @allowed_sites, $s->name
-                            if $s && $s->name && !$seen{$s->name}++;
-                    };
+                for my $s (@$all_s) {
+                    push @allowed_sites, $s->name
+                        if $s && $s->name && !$seen{$s->name}++;
                 }
-            }
-        };
+            };
+        } else {
+            eval {
+                my $uid = $c->session->{user_id};
+                if ($uid) {
+                    my @sr = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                        { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                    )->all;
+                    my %seen = ($sitename => 1);
+                    for my $r (@sr) {
+                        eval {
+                            my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                            push @allowed_sites, $s->name
+                                if $s && $s->name && !$seen{$s->name}++;
+                        };
+                    }
+                }
+            };
+        }
 
-        # Fetch open todos for accessible sites (also include todos assigned to user)
-        my @user_or_conds = (
-            { 'me.sitename' => { -in => \@allowed_sites } },
-        );
-        push @user_or_conds, { 'me.developer'          => $username } if $username;
-        push @user_or_conds, { 'me.username_of_poster' => $username } if $username;
-
+        # Fetch all open todos for accessible sites/user — single flat query, no join
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
             {
-                'me.status' => { -not_in => \@done_statuses },
-                -or => \@user_or_conds,
+                status   => { -not_in => \@done_statuses },
+                sitename => { -in => \@allowed_sites },
             },
             {
                 columns => [qw(record_id priority status is_blocking
@@ -2667,97 +2672,63 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         )->all;
 
-        # Load ALL fixed events (recurring + appointments/meetings/is_fixed) so we can
-        # block their time slots during scheduling.
-        my @fixed_events;
-        eval {
-            @fixed_events = $c->model('DBEncy')->resultset('Todo')->search(
+        # Also include todos assigned to this user from other sites
+        if ($username) {
+            my %seen_id = map { $_->record_id => 1 } @rows;
+            my @extra = $c->model('DBEncy')->resultset('Todo')->search(
                 {
-                    sitename => { -in => \@allowed_sites },
+                    status => { -not_in => \@done_statuses },
                     -or => [
-                        { is_recurring => 1 },
-                        { todo_type    => 'appointment' },
-                        { todo_type    => 'meeting' },
-                        { is_fixed     => 1 },
+                        { developer          => $username },
+                        { username_of_poster => $username },
                     ],
                 },
                 {
-                    columns => [qw(record_id start_date time_of_day
-                                   estimated_man_hours is_recurring
-                                   todo_type recurrence_rule subject)],
+                    columns => [qw(record_id priority status is_blocking
+                                   due_date start_date last_mod_date
+                                   date_time_posted estimated_man_hours
+                                   blocked_by_todo_id sitename developer
+                                   username_of_poster project_id subject
+                                   time_of_day is_recurring todo_type
+                                   recurrence_rule is_fixed)],
                 }
             )->all;
-        };
-
-        # Split @rows into two groups:
-        #   @anchored  — already scheduled for a FUTURE date (start_date > today);
-        #                keep their date/time, only block their slots.
-        #   @floatable — overdue (start_date <= today), today, or undated;
-        #                these get rescheduled from current time forward.
-        my (@anchored, @floatable);
-        for my $todo (@rows) {
-            my $skip_rec   = $todo->can('is_recurring') ? $todo->is_recurring : _is_recurring($todo->subject // '');
-            my $skip_appt  = $todo->can('todo_type') && ($todo->todo_type // 'task') eq 'appointment';
-            my $skip_fixed = $todo->can('is_fixed') ? ($todo->is_fixed // 0) : 0;
-            next if $skip_rec || $skip_appt || $skip_fixed;
-
-            my $sd_raw = $todo->start_date // '';
-            $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
-            my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
-            my $tod = $todo->time_of_day // '';
-            my $has_time = ($tod =~ /^\d{1,2}:\d{2}/);
-            if ($sd && $sd gt $today && $has_time) {
-                push @anchored, $todo;
-            } else {
-                push @floatable, $todo;
+            for my $t (@extra) {
+                push @rows, $t unless $seen_id{$t->record_id}++;
             }
         }
 
-        # De-duplicate anchored: if two anchored todos share the same date+time,
-        # keep the first (lower record_id), demote the rest to floatable.
-        {
-            my %seen_slot;
-            my (@keep_anchored, @demoted);
-            for my $todo (sort { $a->record_id <=> $b->record_id } @anchored) {
-                my $sd_raw = $todo->start_date // '';
-                $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
-                my $sd  = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
-                my $tod = $todo->time_of_day // '';
-                my $slot_key = "$sd|$tod";
-                if ($seen_slot{$slot_key}++) {
-                    push @demoted, $todo;
-                } else {
-                    push @keep_anchored, $todo;
-                }
+        # Load fixed/recurring events to block their slots during scheduling
+        my @fixed_events = $c->model('DBEncy')->resultset('Todo')->search(
+            {
+                sitename => { -in => \@allowed_sites },
+                -or => [
+                    { is_recurring => 1 },
+                    { todo_type    => { -in => [qw(appointment meeting)] } },
+                    { is_fixed     => 1 },
+                ],
+            },
+            {
+                columns => [qw(record_id start_date time_of_day
+                               estimated_man_hours is_recurring
+                               todo_type recurrence_rule subject)],
             }
-            @anchored = @keep_anchored;
-            push @floatable, @demoted;
-        }
+        )->all;
 
-        # Build anchored-todo lookup by date so get_blocked can include them.
-        my %anchored_by_date;
-        for my $todo (@anchored) {
-            my $sd_raw = $todo->start_date // '';
-            $sd_raw = ref($sd_raw) ? $sd_raw->ymd : "$sd_raw";
-            my $sd = length($sd_raw) >= 10 ? substr($sd_raw, 0, 10) : '';
-            push @{ $anchored_by_date{$sd} }, $todo if $sd;
-        }
-
+        # Build blocked-slot lookup per date (cached)
         my %blocked_cache;
         my $get_blocked = sub {
             my ($date_str) = @_;
             return $blocked_cache{$date_str} if exists $blocked_cache{$date_str};
             my @intervals;
             for my $fe (@fixed_events) {
-                my $fe_sd_raw = $fe->start_date // '';
-                $fe_sd_raw = ref($fe_sd_raw) ? $fe_sd_raw->ymd : "$fe_sd_raw";
-                my $fe_sd = length($fe_sd_raw) >= 10 ? substr($fe_sd_raw, 0, 10) : '';
+                my $fe_sd = ref($fe->start_date) ? $fe->start_date->ymd : ($fe->start_date // '');
+                $fe_sd = substr($fe_sd, 0, 10) if length($fe_sd) >= 10;
                 my $effective_start = $fe_sd || $today;
                 next if $effective_start gt $date_str;
 
-                my $is_rec = $fe->is_recurring // 0;
-                my $matches;
-                if ($is_rec) {
+                my $matches = 0;
+                if ($fe->is_recurring) {
                     $matches = recurring_matches_date($fe, $date_str);
                 } elsif ($fe_sd eq $date_str) {
                     $matches = 1;
@@ -2765,18 +2736,9 @@ sub reschedule :Path('reschedule') :Args(0) {
                 next unless $matches;
 
                 my $tod = $fe->time_of_day // '';
-                next unless $tod =~ /^(\d+):(\d+)/;
+                next unless $tod =~ /^(\d{1,2}):(\d{2})/;
                 my $abs_start = $1 * 60 + $2;
-                my $dur = ($fe->estimated_man_hours // 0);
-                $dur = 30 unless $dur > 0;
-                push @intervals, [$abs_start, $abs_start + $dur];
-            }
-            for my $todo (@{ $anchored_by_date{$date_str} // [] }) {
-                my $tod = $todo->time_of_day // '';
-                next unless $tod =~ /^(\d+):(\d+)/;
-                my $abs_start = $1 * 60 + $2;
-                my $dur = ($todo->estimated_man_hours // 0);
-                $dur = 30 unless $dur > 0;
+                my $dur = ($fe->estimated_man_hours // 0) || 30;
                 push @intervals, [$abs_start, $abs_start + $dur];
             }
             $blocked_cache{$date_str} = [sort { $a->[0] <=> $b->[0] } @intervals];
@@ -2786,8 +2748,7 @@ sub reschedule :Path('reschedule') :Args(0) {
         # Build project sort_order lookup
         my %proj_sort;
         {
-            my @pids = grep { defined $_ && $_ > 0 }
-                       map  { $_->project_id } @floatable;
+            my @pids = grep { defined $_ && $_ > 0 } map { $_->project_id } @rows;
             if (@pids) {
                 my @projs = $c->model('DBEncy')->resultset('Project')->search(
                     { id => { -in => \@pids } },
@@ -2797,18 +2758,18 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         }
 
-        # Sort floatable: blocking first, then project sort_order, priority, due_date
-        @floatable = sort {
+        # Sort: blocking > project sort_order > priority > due_date
+        @rows = sort {
             ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
             || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
             || (($a->priority || 9) <=> ($b->priority || 9))
             || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
-        } @floatable;
+        } @rows;
 
-        # Pre-fetch log durations in MINUTES for floatable todos
+        # Pre-fetch average log durations per todo (in minutes)
         my %log_duration_mins;
         {
-            my @todo_ids = map { $_->record_id } @floatable;
+            my @todo_ids = map { $_->record_id } @rows;
             if (@todo_ids) {
                 eval {
                     my @log_rows = $c->model('DBEncy')->resultset('Log')->search(
@@ -2817,14 +2778,11 @@ sub reschedule :Path('reschedule') :Args(0) {
                     )->all;
                     my %durations;
                     for my $lr (@log_rows) {
-                        my $st = $lr->start_time // '';
-                        my $et = $lr->end_time   // '';
-                        next unless $st && $et;
+                        my ($st, $et) = ($lr->start_time // '', $lr->end_time // '');
                         next unless $st =~ /^(\d+):(\d+)/ && $et =~ /^(\d+):(\d+)/;
-                        my ($sh, $sm) = ($st =~ /^(\d+):(\d+)/);
-                        my ($eh, $em) = ($et =~ /^(\d+):(\d+)/);
-                        my $dur_mins = $eh * 60 + $em - $sh * 60 - $sm;
-                        push @{ $durations{ $lr->todo_record_id } }, $dur_mins if $dur_mins > 0;
+                        my $dur = ($et =~ /^(\d+):(\d+)/)[0] * 60 + ($et =~ /^(\d+):(\d+)/)[1]
+                                - ($st =~ /^(\d+):(\d+)/)[0] * 60 - ($st =~ /^(\d+):(\d+)/)[1];
+                        push @{ $durations{ $lr->todo_record_id } }, $dur if $dur > 0;
                     }
                     for my $tid (keys %durations) {
                         my @d = @{ $durations{$tid} };
@@ -2836,86 +2794,99 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         }
 
-        # Work window: 09:00 – 17:00
-        # Today: start from current time (never before 09:00);
-        # future days: always start from 09:00
-        my $WORK_START_MIN     = 9 * 60;   # 540
-        my $WORK_END_MIN       = 17 * 60;  # 1020
-        my $NEXT_DAY_START_MIN = 9 * 60;   # 540
+        # Work window: 09:00–17:00 (480 min/day)
+        my $WORK_START_MIN = 9 * 60;   # 540
+        my $WORK_END_MIN   = 17 * 60;  # 1020
+        my $WORK_DAY_MINS  = $WORK_END_MIN - $WORK_START_MIN;
 
-        my $cur_dt      = $today_dt->clone;
-        my $now_abs_min = $today_dt->hour * 60 + $today_dt->minute;
+        my $cur_dt = $today_dt->clone;
 
-        my $cur_abs_min;
-        if ($now_abs_min >= $WORK_END_MIN) {
+        # For today, start from now (clamped to work start); past end → use next day
+        my $now_total_min = $today_dt->hour * 60 + $today_dt->minute;
+        my $cur_slot_min;   # relative offset from WORK_START_MIN for current day
+        if ($now_total_min >= $WORK_END_MIN) {
             $cur_dt->add(days => 1);
-            $cur_abs_min = $NEXT_DAY_START_MIN;
-        } elsif ($now_abs_min < $WORK_START_MIN) {
-            $cur_abs_min = $WORK_START_MIN;
+            $cur_slot_min = 0;
+        } elsif ($now_total_min > $WORK_START_MIN) {
+            $cur_slot_min = $now_total_min - $WORK_START_MIN;
         } else {
-            $cur_abs_min = $now_abs_min;
+            $cur_slot_min = 0;
         }
 
-        # Schedule only the floatable (overdue/today/undated) todos sequentially
-        for my $todo (@floatable) {
-            # estimated_man_hours stored as MINUTES
-            my $stored_mins = $todo->estimated_man_hours // 0;
-            my $heuristic_mins;
-            if (exists $log_duration_mins{ $todo->record_id }) {
-                $heuristic_mins = int($log_duration_mins{ $todo->record_id } + 0.5);
-            } else {
-                $heuristic_mins = _estimate_mins_heuristic($todo->subject // '');
-            }
-            my $est_mins = ($stored_mins > ($heuristic_mins // 0)) ? $stored_mins : ($heuristic_mins // 0);
+        # Schedule ALL open non-fixed/non-recurring todos sequentially from now forward
+        for my $todo (@rows) {
+            my $is_rec   = $todo->can('is_recurring') ? ($todo->is_recurring // 0) : 0;
+            my $is_fixed = $todo->can('is_fixed')     ? ($todo->is_fixed     // 0) : 0;
+            my $ttype    = $todo->can('todo_type')    ? ($todo->todo_type    // 'task') : 'task';
+            next if $is_rec || $is_fixed
+                 || $ttype eq 'appointment' || $ttype eq 'meeting';
+
+            # Estimate duration in minutes: prefer log avg > stored > heuristic, min 5
+            my $stored_mins    = $todo->estimated_man_hours // 0;
+            my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
+                ? int($log_duration_mins{ $todo->record_id } + 0.5)
+                : _estimate_mins_heuristic($todo->subject // '');
+            my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
             $est_mins = 5 if $est_mins < 5;
 
-            # Roll to next work day if at or past work end
-            while ($cur_abs_min >= $WORK_END_MIN) {
+            # Roll to next work day when current day is full
+            if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
                 $cur_dt->add(days => 1);
-                $cur_abs_min = $NEXT_DAY_START_MIN;
+                $cur_slot_min = 0;
             }
 
             my $new_start = $cur_dt->ymd;
 
-            # Advance past any blocked slots (fixed events + anchored todos)
+            # Advance past fixed/recurring blocked slots for this day
             {
-                my $safe_iters = 0;
-                my $changed    = 1;
-                while ($changed && $safe_iters++ < 100) {
+                my $blocked = $get_blocked->($new_start);
+                my $changed = 1;
+                while ($changed) {
                     $changed = 0;
-                    my $blocked = $get_blocked->($new_start);
                     for my $b (@$blocked) {
                         my ($bs, $be) = @$b;
-                        if ($cur_abs_min < $be && $cur_abs_min + $est_mins > $bs) {
-                            $cur_abs_min = $be;
-                            $changed     = 1;
+                        my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                        if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                            $cur_slot_min = $be - $WORK_START_MIN;
+                            $changed = 1;
                         }
                     }
-                    if ($cur_abs_min >= $WORK_END_MIN) {
-                        $cur_dt->add(days => 1);
-                        $cur_abs_min = $NEXT_DAY_START_MIN;
-                        $new_start   = $cur_dt->ymd;
-                        $changed     = 1;
+                }
+                # If blocked slots push us past end of day, roll to next day
+                if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                    $cur_dt->add(days => 1);
+                    $cur_slot_min = 0;
+                    $new_start    = $cur_dt->ymd;
+                    my $blocked2 = $get_blocked->($new_start);
+                    my $c2 = 1;
+                    while ($c2) {
+                        $c2 = 0;
+                        for my $b (@$blocked2) {
+                            my ($bs, $be) = @$b;
+                            my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                            if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
+                                $cur_slot_min = $be - $WORK_START_MIN;
+                                $c2 = 1;
+                            }
+                        }
                     }
                 }
             }
 
-            my $slot_abs_min = $cur_abs_min;
+            my $slot_abs_min = $WORK_START_MIN + $cur_slot_min;
             my $new_time_str = sprintf('%02d:%02d:00',
-                                   int($slot_abs_min / 60),
-                                   $slot_abs_min % 60);
-            $cur_abs_min += $est_mins;
+                                   int($slot_abs_min / 60), $slot_abs_min % 60);
+            $cur_slot_min += $est_mins;
 
-            # Priority adjustments
+            # Priority adjustments based on staleness and due date
             my $new_priority = $todo->priority || 5;
             my $activity_str = $todo->last_mod_date || $todo->date_time_posted || '';
             if ($activity_str =~ /^(\d{4})-(\d{2})-(\d{2})/) {
-                my $act_epoch = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
+                my $act_epoch  = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
                 my $days_stale = int(($now_epoch - $act_epoch) / 86400);
-                $new_priority = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
+                $new_priority  = ($new_priority + 2 <= 10) ? $new_priority + 2 : 10
                     if $days_stale > 180;
             }
-
             my $new_due_date;
             if ($todo->due_date && $todo->due_date =~ /^(\d{4})-(\d{2})-(\d{2})/) {
                 my $due_epoch      = POSIX::mktime(0, 0, 0, $3, $2 - 1, $1 - 1900);
@@ -2931,28 +2902,28 @@ sub reschedule :Path('reschedule') :Args(0) {
                 if $todo->is_blocking;
 
             my $end_abs_min = $slot_abs_min + $est_mins;
-            my $end_h = int($end_abs_min / 60);
-            my $end_m = $end_abs_min % 60;
-            if ($end_h >= 24) { $end_h = 23; $end_m = 59; }
-            my $end_time_str    = sprintf('%02d:%02d:00', $end_h, $end_m);
-            my $sched_start_str = $new_start . ' ' . $new_time_str;
-            my $sched_end_str   = $new_start . ' ' . $end_time_str;
+            my ($end_h, $end_m) = (int($end_abs_min / 60), $end_abs_min % 60);
+            ($end_h, $end_m) = (23, 59) if $end_h >= 24;
+            my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
 
-            my %update = (
+            my %upd = (
                 start_date          => $new_start,
                 time_of_day         => $new_time_str,
-                scheduled_start     => $sched_start_str,
-                scheduled_end       => $sched_end_str,
+                scheduled_start     => "$new_start $new_time_str",
+                scheduled_end       => "$new_start $end_time_str",
                 estimated_man_hours => int($est_mins + 0.5) || 5,
                 priority            => $new_priority,
                 last_mod_by         => 'reschedule',
                 last_mod_date       => $today,
             );
-            $update{due_date} = $new_due_date if $new_due_date;
+            $upd{due_date} = $new_due_date if $new_due_date;
 
-            eval { $todo->update(\%update) };
-            if ($@) { push @errors, "todo " . $todo->record_id . ": $@"; }
-            else     { $count++; }
+            my $ok = eval { $todo->update(\%upd); 1 };
+            if (!$ok || $@) {
+                push @errors, "id=" . $todo->record_id . ": " . ($@ || 'unknown error');
+            } else {
+                $count++;
+            }
         }
     };
     if ($@) {
