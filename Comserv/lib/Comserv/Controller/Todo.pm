@@ -2625,18 +2625,13 @@ sub reschedule :Path('reschedule') :Args(0) {
     eval {
         my @done_statuses = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
 
-        # Determine accessible sites for this user
-        my @allowed_sites = ($sitename);
-        if ($is_csc) {
-            eval {
-                my $all_s = $c->model('Site')->get_all_sites($c) || [];
-                my %seen = ($sitename => 1);
-                for my $s (@$all_s) {
-                    push @allowed_sites, $s->name
-                        if $s && $s->name && !$seen{$s->name}++;
-                }
-            };
-        } else {
+        # Build the todo WHERE clause.
+        # CSC super-admin (Shanta) schedules ALL open todos across every site.
+        # Other admins schedule todos for their accessible sites + personally assigned.
+        my %todo_where = ( status => { -not_in => \@done_statuses } );
+
+        unless ($is_csc) {
+            my @allowed_sites = ($sitename);
             eval {
                 my $uid = $c->session->{user_id};
                 if ($uid) {
@@ -2653,14 +2648,15 @@ sub reschedule :Path('reschedule') :Args(0) {
                     }
                 }
             };
+            $todo_where{-or} = [
+                { sitename           => { -in => \@allowed_sites } },
+                { developer          => $username },
+                { username_of_poster => $username },
+            ];
         }
 
-        # Fetch all open todos for accessible sites/user — single flat query, no join
         my @rows = $c->model('DBEncy')->resultset('Todo')->search(
-            {
-                status   => { -not_in => \@done_statuses },
-                sitename => { -in => \@allowed_sites },
-            },
+            \%todo_where,
             {
                 columns => [qw(record_id priority status is_blocking
                                due_date start_date last_mod_date
@@ -2672,42 +2668,20 @@ sub reschedule :Path('reschedule') :Args(0) {
             }
         )->all;
 
-        # Also include todos assigned to this user from other sites
-        if ($username) {
-            my %seen_id = map { $_->record_id => 1 } @rows;
-            my @extra = $c->model('DBEncy')->resultset('Todo')->search(
-                {
-                    status => { -not_in => \@done_statuses },
-                    -or => [
-                        { developer          => $username },
-                        { username_of_poster => $username },
-                    ],
-                },
-                {
-                    columns => [qw(record_id priority status is_blocking
-                                   due_date start_date last_mod_date
-                                   date_time_posted estimated_man_hours
-                                   blocked_by_todo_id sitename developer
-                                   username_of_poster project_id subject
-                                   time_of_day is_recurring todo_type
-                                   recurrence_rule is_fixed)],
-                }
-            )->all;
-            for my $t (@extra) {
-                push @rows, $t unless $seen_id{$t->record_id}++;
-            }
+        # Load fixed/recurring events (all sites for CSC, allowed sites for others)
+        my %fixed_where = (
+            -or => [
+                { is_recurring => 1 },
+                { todo_type    => { -in => [qw(appointment meeting)] } },
+                { is_fixed     => 1 },
+            ],
+        );
+        unless ($is_csc) {
+            my @allowed_sites = ($sitename);
+            $fixed_where{sitename} = { -in => \@allowed_sites };
         }
-
-        # Load fixed/recurring events to block their slots during scheduling
         my @fixed_events = $c->model('DBEncy')->resultset('Todo')->search(
-            {
-                sitename => { -in => \@allowed_sites },
-                -or => [
-                    { is_recurring => 1 },
-                    { todo_type    => { -in => [qw(appointment meeting)] } },
-                    { is_fixed     => 1 },
-                ],
-            },
+            \%fixed_where,
             {
                 columns => [qw(record_id start_date time_of_day
                                estimated_man_hours is_recurring
