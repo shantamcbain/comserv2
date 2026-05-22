@@ -79,24 +79,26 @@ sub filter_todos_by_date_range {
         my $dd = length($dd_raw) >= 10 ? substr($dd_raw, 0, 10) : '';
         my $is_done = exists $done_set{ $todo->status // '' };
 
-        # Primary anchor: start_date. Include if within range.
+        # Primary anchor: start_date (the scheduled date set by reschedule).
+        # When start_date is set, it IS the calendar display date — ignore due_date for placement.
         if ($sd && $sd ge $start_date && $sd le $end_date) {
             $include_todo = 1;
         }
 
-        # due_date within range always qualifies — regardless of whether start_date is set.
-        # A todo due today belongs on today's calendar even if it started (on paper) in the past.
-        if ($dd && $dd ge $start_date && $dd le $end_date) {
+        # due_date as fallback ONLY when start_date is not set.
+        # If start_date is set (todo has been scheduled), do NOT also show it on its due_date.
+        if (!$sd && $dd && $dd ge $start_date && $dd le $end_date) {
             $include_todo = 1;
         }
 
-        # Overdue: only when BOTH anchor dates are before the range start
+        # Overdue: show in current range only when start_date is before range start.
+        # If start_date is set and is in the future, it is NOT overdue — it is just upcoming.
         if ($include_overdue && !$is_done) {
-            my $sd_before = $sd && $sd lt $start_date;
-            my $dd_before = $dd && $dd lt $start_date;
-            my $sd_in     = $sd && $sd ge $start_date && $sd le $end_date;
-            my $dd_in     = $dd && $dd ge $start_date && $dd le $end_date;
-            if (!$sd_in && !$dd_in && ($sd_before || $dd_before)) {
+            if ($sd && $sd lt $start_date) {
+                # Has a scheduled date in the past — genuinely overdue
+                $include_todo = 1;
+            } elsif (!$sd && $dd && $dd lt $start_date) {
+                # No schedule date but due date is past — overdue by deadline
                 $include_todo = 1;
             }
         }

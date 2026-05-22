@@ -193,17 +193,28 @@ sub daily :Path('/planning/daily') :Args {
                                           @{ $week_todos_by_date{$d_str} // [] };
                             push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
                         }
-                    } elsif ($start eq $selected_date || $due eq $selected_date) {
+                    } elsif ($start && $start eq $selected_date) {
+                        # Has scheduled start_date matching today — show it
+                        push @$todos_for_today, $todo;
+                    } elsif (!$start && $due && $due eq $selected_date) {
+                        # No scheduled date, but due today — show it
                         push @$todos_for_today, $todo;
                     } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
                         push @$todos_for_today, $todo;
-                    } elsif (!$is_done && $anchor && $anchor lt $selected_date && !$is_recurr) {
-                        push @$overdue_todos, $todo;
-                        push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                    } elsif (!$is_done && !$is_recurr) {
+                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
+                        if ($start && $start lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        } elsif (!$start && $due && $due lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        }
                     }
 
                     unless ($is_recurr) {
-                        my $anchor_key = $start || $due;
+                        # Use start_date as calendar anchor; fall back to due_date only when no start_date
+                        my $anchor_key = $start || (!$start ? $due : '');
                         if ($anchor_key) {
                             if ($anchor_key lt $week_first_day) {
                                 push @week_overdue_todos, $todo unless $is_done;
