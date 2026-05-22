@@ -314,6 +314,17 @@ function initMonthViewDragAndDrop() {
 var _dndReloading = false;
 
 /**
+ * After any DnD save, trigger a reschedule then reload so all todos are
+ * re-sequenced around the newly placed event.
+ */
+function _rescheduleAndReload() {
+    if (_dndReloading) return;
+    _dndReloading = true;
+    fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
+        .finally(function() { window.location.reload(); });
+}
+
+/**
  * Update todo time only (for day view)
  */
 function updateTodoTime(todoId, newTime) {
@@ -329,8 +340,7 @@ function updateTodoTime(todoId, newTime) {
     })
     .then(data => {
         if (data.success) {
-            _dndReloading = true;
-            window.location.reload();
+            _rescheduleAndReload();
         } else {
             if (!_dndReloading) {
                 console.error('update_time failed:', data.error);
@@ -364,8 +374,7 @@ function updateTodoTimeAndDate(todoId, newTime, newDate) {
     })
     .then(data => {
         if (data.success) {
-            _dndReloading = true;
-            window.location.reload();
+            _rescheduleAndReload();
         } else {
             if (!_dndReloading) {
                 console.error('update_time_and_date failed:', data.error);
@@ -399,8 +408,7 @@ function updateTodoTimeAndDateBoth(todoId, newTime, newDate) {
     })
     .then(data => {
         if (data.success) {
-            _dndReloading = true;
-            window.location.reload();
+            _rescheduleAndReload();
         } else {
             if (!_dndReloading) {
                 console.error('update_display_date failed:', data.error);
