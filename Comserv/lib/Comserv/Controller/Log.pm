@@ -54,7 +54,7 @@ sub index :Path('/log') :Args(0) {
     $c->stash->{debug_errors} //= [];
     $c->stash(debug_errors => []);
 
-    my $status      = $c->request->params->{status} // 'open';
+    my $status      = $c->request->params->{status} // '2';
     my $site_filter = $c->request->params->{site}   // '';
 
     my $username = $c->session->{username} || '';
