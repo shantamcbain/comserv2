@@ -157,8 +157,7 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
-                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4.3', provider => 'grok', label => 'Grok 4.3 (xAI)' };
                 }
             }
         } catch {
@@ -764,20 +763,25 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4.3' } qw(
                 grok-code-fast-1
                 grok-4-fast-non-reasoning
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
-                grok-4.3
+                grok-3-mini
+                grok-4.20-non-reasoning
+                grok-4.20-multi-agent-0309
+                grok-4.20-multi-agent
+                grok-4.20-0309-non-reasoning
+                grok-4.20-0309-reasoning
             );
-            my %GROK_DEAD_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD_REASON = map { $_ => 'grok-4.3' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
-            $grok->model('grok-4.20-non-reasoning');
+            $grok->model('grok-4.3');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -860,11 +864,22 @@ sub generate :Local :Args(0) {
             
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
+                # If web search caused the failure (non-410 error), retry without it
+                if ($use_search && $error !~ /410|404|no longer available|not found/) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'generate', "Web search failed ($error); retrying without search");
+                    $response = $grok->chat(
+                        messages   => \@grok_messages,
+                        use_search => 0,
+                    );
+                    $error = $grok->last_error || $error unless $response;
+                }
                 # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
-                if ($error =~ /410|404|no longer available|not found/) {
+                if (!$response && $error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
                     my $discovery_err = '';
+                    my @candidates;
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -875,36 +890,17 @@ sub generate :Local :Args(0) {
                         my $resp = $ua->request($req);
                         if ($resp->is_success) {
                             my $mdata = eval { decode_json($resp->content) } || {};
-                            my @live  = grep {
+                            @candidates = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } grep {
                                 $_->{id} && $_->{id} ne $failed_model
                                          && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer numeric-version models (grok-4, grok-3...) over
-                            # alphabetic-named ones (grok-code-*, grok-beta) then reverse-sort
-                            my ($best) = sort {
-                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                $bn <=> $an || $b->{id} cmp $a->{id}
-                            } @live;
-                            if ($best) {
-                                $fallback = $best->{id};
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta       = $key_obj->get_metadata() || {};
-                                    my $deprecated = $meta->{deprecated_models} || {};
-                                    $deprecated->{$failed_model} = time();
-                                    $meta->{deprecated_models} = $deprecated;
-                                    $meta->{available_models}   = [ map { { id => $_->{id} } } @live ];
-                                    $meta->{models_synced_at}   = time();
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            } else {
-                                $discovery_err = "xAI returned model list but no usable models found";
+                            unless (@candidates) {
+                                $discovery_err = "xAI returned model list but no usable candidates found";
                             }
                         } else {
                             $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
@@ -915,28 +911,48 @@ sub generate :Local :Args(0) {
                         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                             'generate', "410 fallback failed — $discovery_err");
                     }
-                    if ($fallback) {
+                    my %tried = ($failed_model => 1);
+                    for my $candidate (@candidates) {
+                        next if $tried{$candidate->{id}};
+                        $tried{$candidate->{id}} = 1;
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                            'generate', "Model $failed_model unavailable; live-discovered $fallback");
-                        $grok->model($fallback);
+                            'generate', "Model $failed_model unavailable; trying $candidate->{id}");
+                        $grok->model($candidate->{id});
                         $response = $grok->chat(
                             messages   => \@grok_messages,
                             use_search => $use_search,
                         );
                         if ($response) {
-                            eval {
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta = $key_obj->get_metadata() || {};
-                                    $meta->{last_working_model} = $fallback;
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            };
+                            $fallback = $candidate->{id};
+                            last;
                         }
+                        my $candidate_err = $grok->last_error || '';
+                        last unless $candidate_err =~ /410|404|no longer available|not found/;
+                        $GROK_DEAD{$candidate->{id}} = 1;
+                    }
+                    if ($fallback) {
+                        eval {
+                            my $schema  = $c->model('DBEncy')->schema;
+                            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                { service => 'grok', is_active => '1' }
+                            )->first;
+                            if ($key_obj) {
+                                my $meta       = $key_obj->get_metadata() || {};
+                                my $deprecated = $meta->{deprecated_models} || {};
+                                for my $dead_id (keys %tried) {
+                                    next if $dead_id eq $fallback;
+                                    $deprecated->{$dead_id} = time();
+                                }
+                                my @surviving = grep { !$deprecated->{$_->{id}} && !$GROK_DEAD{$_->{id}} }
+                                                @candidates;
+                                $meta->{deprecated_models} = $deprecated;
+                                $meta->{available_models}  = [ map { { id => $_->{id} } } @surviving ];
+                                $meta->{models_synced_at}  = time();
+                                $meta->{last_working_model} = $fallback;
+                                $key_obj->set_metadata($meta);
+                                eval { $key_obj->update };
+                            }
+                        };
                     }
                 }
                 unless ($response) {
@@ -2324,20 +2340,25 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.3' } qw(
                 grok-code-fast-1
                 grok-4-fast-non-reasoning
                 grok-4-1-fast-non-reasoning
                 grok-4-0709
                 grok-3
-                grok-4.3
+                grok-3-mini
+                grok-4.20-non-reasoning
+                grok-4.20-multi-agent-0309
+                grok-4.20-multi-agent
+                grok-4.20-0309-non-reasoning
+                grok-4.20-0309-reasoning
             );
-            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.3' } qw(
                 grok-4-fast-reasoning
                 grok-4-1-fast-reasoning
             );
             %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
-            $grok->model('grok-4.20-non-reasoning');
+            $grok->model('grok-4.3');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2360,11 +2381,20 @@ sub chat :Local :Args(0) {
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
+                # If web search caused the failure (non-410 error), retry without it
+                if ($use_search_chat && $error !~ /410|404|no longer available|not found/) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+                        'chat', "Web search failed ($error); retrying without search");
+                    push @chat_trace, "\u26a0\ufe0f Web search unavailable ($error); retrying without search";
+                    $response = $grok->chat(messages => \@final_messages, use_search => 0);
+                    $error = $grok->last_error || $error unless $response;
+                }
                 # Auto-fallback: if model is deprecated (410/404), live-query xAI for available models
-                if ($error =~ /410|404|no longer available|not found/) {
+                if (!$response && $error =~ /410|404|no longer available|not found/) {
                     my $failed_model = $grok->model;
                     my $fallback;
                     my $discovery_err = '';
+                    my @candidates;
                     eval {
                         require LWP::UserAgent;
                         require HTTP::Request;
@@ -2375,31 +2405,17 @@ sub chat :Local :Args(0) {
                         my $resp = $ua->request($req);
                         if ($resp->is_success) {
                             my $mdata = eval { decode_json($resp->content) } || {};
-                            my @live  = grep {
+                            @candidates = sort {
+                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
+                                $bn <=> $an || $b->{id} cmp $a->{id}
+                            } grep {
                                 $_->{id} && $_->{id} ne $failed_model
                                          && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort {
-                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                $bn <=> $an || $b->{id} cmp $a->{id}
-                            } @live;
-                            if ($best) {
-                                $fallback = $best->{id};
-                                my $schema  = $c->model('DBEncy')->schema;
-                                my $key_obj = $schema->resultset('UserApiKeys')->search(
-                                    { service => 'grok', is_active => '1' }
-                                )->first;
-                                if ($key_obj) {
-                                    my $meta = $key_obj->get_metadata() || {};
-                                    $meta->{available_models} = [ map { { id => $_->{id} } } @live ];
-                                    $meta->{models_synced_at} = time();
-                                    $key_obj->set_metadata($meta);
-                                    eval { $key_obj->update };
-                                }
-                            } else {
-                                $discovery_err = "xAI returned model list but no usable models found";
+                            unless (@candidates) {
+                                $discovery_err = "xAI returned model list but no usable candidates found";
                             }
                         } else {
                             $discovery_err = "xAI models endpoint returned: " . $resp->status_line;
@@ -2410,12 +2426,46 @@ sub chat :Local :Args(0) {
                         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
                             'chat', "410 fallback failed — $discovery_err");
                     }
-                    if ($fallback) {
+                    my %tried_chat = ($failed_model => 1);
+                    for my $candidate (@candidates) {
+                        next if $tried_chat{$candidate->{id}};
+                        $tried_chat{$candidate->{id}} = 1;
                         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
-                            'chat', "Model $failed_model unavailable; live-discovered $fallback");
-                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); auto-switched to $fallback";
-                        $grok->model($fallback);
+                            'chat', "Model $failed_model unavailable; trying $candidate->{id}");
+                        push @chat_trace, "⚠️ Model $failed_model unavailable (410); trying $candidate->{id}";
+                        $grok->model($candidate->{id});
                         $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+                        if ($response) {
+                            $fallback = $candidate->{id};
+                            last;
+                        }
+                        my $candidate_err = $grok->last_error || '';
+                        last unless $candidate_err =~ /410|404|no longer available|not found/;
+                        $GROK_DEAD_CHAT{$candidate->{id}} = 1;
+                    }
+                    if ($fallback) {
+                        eval {
+                            my $schema  = $c->model('DBEncy')->schema;
+                            my $key_obj = $schema->resultset('UserApiKeys')->search(
+                                { service => 'grok', is_active => '1' }
+                            )->first;
+                            if ($key_obj) {
+                                my $meta       = $key_obj->get_metadata() || {};
+                                my $deprecated = $meta->{deprecated_models} || {};
+                                for my $dead_id (keys %tried_chat) {
+                                    next if $dead_id eq $fallback;
+                                    $deprecated->{$dead_id} = time();
+                                }
+                                my @surviving = grep { !$deprecated->{$_->{id}} && !$GROK_DEAD_CHAT{$_->{id}} }
+                                                @candidates;
+                                $meta->{deprecated_models}  = $deprecated;
+                                $meta->{available_models}   = [ map { { id => $_->{id} } } @surviving ];
+                                $meta->{models_synced_at}   = time();
+                                $meta->{last_working_model} = $fallback;
+                                $key_obj->set_metadata($meta);
+                                eval { $key_obj->update };
+                            }
+                        };
                     }
                 }
                 unless ($response) {
@@ -3125,13 +3175,15 @@ sub models :Local :Args(0) {
             'models', "Failed to fetch user API keys: $_");
     };
     
-    # Set template variables
+    my $is_csc_admin_models = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+
     $c->stash(
         template => 'ai/models.tt',
         page_title => 'AI Models',
         username => $username,
         servers => $servers,
         can_select_model => $can_select_model,
+        is_csc_admin => $is_csc_admin_models ? 1 : 0,
         servers_json => encode_json($servers || []),
         user_api_keys => \@user_api_keys
     );
@@ -4269,67 +4321,6 @@ sub _get_module_data {
         };
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
-    }
-
-    # --- ENCY Entity verified references ---
-    # When user is on a specific ENCY entity page, fetch linked Reference records via
-    # EntityReference. Injecting these (or an explicit "none exist") prevents the AI from
-    # fabricating citations from training data.
-    if ($is_ency_agent) {
-        eval {
-            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
-            if ($ency_schema) {
-                my ($entity_type, $entity_id);
-                if    ($page_path_req =~ m{/ENCY/Formula/(\d+)}i)                          { ($entity_type,$entity_id) = ('formula',     $1) }
-                elsif ($page_path_req =~ m{/ENCY/herb_detail.*?record_id=(\d+)}i)          { ($entity_type,$entity_id) = ('herb',        $1) }
-                elsif ($page_path_req =~ m{/ENCY/Constituent/edit.*?record_id=(\d+)}i)     { ($entity_type,$entity_id) = ('constituent', $1) }
-                elsif ($page_path_req =~ m{/ENCY/Constituent/(\d+)}i)                      { ($entity_type,$entity_id) = ('constituent', $1) }
-                elsif ($page_path_req =~ m{/ENCY/InsectDetail/(\d+)}i)                     { ($entity_type,$entity_id) = ('insect',      $1) }
-                elsif ($page_path_req =~ m{/ENCY/OrganismDetail/(\d+)}i)                   { ($entity_type,$entity_id) = ('organism',    $1) }
-                elsif ($page_path_req =~ m{/ENCY/ReferenceDetail/(\d+)}i)                  { ($entity_type,$entity_id) = ('reference',   $1) }
-
-                if ($entity_type && $entity_id) {
-                    my @entity_refs = $ency_schema->resultset('Ency::EntityReference')->search(
-                        { entity_type => $entity_type, entity_id => $entity_id }
-                    )->all;
-
-                    if (@entity_refs) {
-                        my @ref_lines;
-                        for my $er (@entity_refs) {
-                            my $ref = $er->reference;
-                            next unless $ref;
-                            my $line = '';
-                            $line .= '"' . $ref->title . '"'          if $ref->title;
-                            $line .= ' — ' . $ref->author             if $ref->author;
-                            $line .= ' (' . $ref->publication_date . ')' if $ref->publication_date;
-                            $line .= ', ' . $ref->publisher           if $ref->publisher;
-                            $line .= ' [ISBN: ' . $ref->isbn . ']'    if $ref->isbn;
-                            $line .= ' URL: ' . $ref->url             if $ref->url;
-                            my $bias = $ref->source_bias_rating;
-                            $line .= ' [bias: ' . $bias . '/5]'       if defined $bias;
-                            $line .= "\n    Notes: " . $ref->notes    if $ref->notes;
-                            push @ref_lines, "• $line" if $line;
-                        }
-                        if (@ref_lines) {
-                            push @sections,
-                                "VERIFIED ENCY REFERENCES for this $entity_type (id=$entity_id) — "
-                                . "cite ONLY these, never invent additional sources:\n"
-                                . join("\n", @ref_lines);
-                        }
-                    } else {
-                        push @sections,
-                            "ENCY REFERENCE STATUS: No verified references are recorded in the ENCY "
-                            . "reference system for this $entity_type (id=$entity_id). "
-                            . "Do NOT generate, invent, or fabricate any citations, author names, "
-                            . "book titles, journal names, or URLs from training data. "
-                            . "If the user asks for sources, tell them none are yet linked in ENCY "
-                            . "and suggest adding them via the Reference section.";
-                    }
-                }
-            }
-        };
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            '_get_module_data', "ENCY entity reference fetch error: $@") if $@;
     }
 
     # --- Constituent live data ---
@@ -6622,7 +6613,6 @@ sub get_user_providers :Local :Args(0) {
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
                         { id => 'grok-4.3' },
-                        { id => 'grok-4.20-non-reasoning' },
                     ];
                 }
 
@@ -6807,9 +6797,14 @@ sub sync_models :Local :Args(0) {
             grok-4-1-fast-non-reasoning
             grok-4-0709
             grok-3
+            grok-3-mini
             grok-4-fast-reasoning
             grok-4-1-fast-reasoning
-            grok-4.3
+            grok-4.20-non-reasoning
+            grok-4.20-multi-agent-0309
+            grok-4.20-multi-agent
+            grok-4.20-0309-non-reasoning
+            grok-4.20-0309-reasoning
         );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
@@ -6836,7 +6831,7 @@ sub sync_models :Local :Args(0) {
         $key_obj->update;
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-            'sync_models', "Synced " . scalar(@models) . " models for service $service");
+            'sync_models', "Synced " . scalar(@models) . " models for service $service: " . join(', ', map { $_->{id} } @models));
 
         $c->response->body(encode_json({
             success => JSON::true,
@@ -6975,6 +6970,73 @@ sub auto_sync_models :Local :Args(0) {
         servers       => \@results,
         total_pulled  => $total_pulled,
         total_removed => $total_removed,
+    }));
+}
+
+=head2 upgrade_ollama
+
+CSC-admin-only endpoint: runs the official Ollama installer script to upgrade
+the Ollama binary on the local server. Returns JSON with stdout/stderr and
+the detected version before and after the upgrade.
+
+=cut
+
+sub upgrade_ollama :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $is_csc_admin = Comserv::Util::AdminAuth->new()->is_csc_admin($c);
+    unless ($is_csc_admin) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'CSC admin access required' }));
+        return;
+    }
+
+    my $version_before = '';
+    {
+        my $out = `ollama --version 2>&1`;
+        ($version_before) = $out =~ /(\d+\.\d+[\.\d]*)/;
+        $version_before ||= $out;
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'upgrade_ollama', "CSC admin initiated Ollama upgrade. Version before: $version_before");
+
+    my $stdout = '';
+    my $stderr = '';
+    my $exit_code;
+
+    eval {
+        require IPC::Open3;
+        require POSIX;
+        my $cmd = 'curl -fsSL https://ollama.com/install.sh | sh 2>&1';
+        $stdout = `$cmd`;
+        $exit_code = $? >> 8;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'upgrade_ollama', "Upgrade exception: $@");
+        $c->response->body(encode_json({ success => JSON::false, error => "Upgrade failed: $@" }));
+        return;
+    }
+
+    my $version_after = '';
+    {
+        my $out = `ollama --version 2>&1`;
+        ($version_after) = $out =~ /(\d+\.\d+[\.\d]*)/;
+        $version_after ||= $out;
+    }
+
+    my $success = ($exit_code == 0) ? JSON::true : JSON::false;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'upgrade_ollama', "Upgrade complete. Exit=$exit_code before=$version_before after=$version_after");
+
+    $c->response->body(encode_json({
+        success        => $success,
+        exit_code      => $exit_code,
+        version_before => $version_before,
+        version_after  => $version_after,
+        output         => $stdout,
     }));
 }
 
@@ -9260,17 +9322,6 @@ DATA ALREADY INJECTED:
 The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
 when relevant records are found. ALWAYS use this live data to answer questions — do not ask the
 user to paste records.
-
-CITATION RULES — CRITICAL, NO EXCEPTIONS:
-- NEVER invent, fabricate, or guess URLs, book titles, author names, journal names, DOIs, ISBNs,
-  or any citation details from your training data.
-- The ENCY Reference system is the SOLE authority on what is verified. Only cite sources that
-  appear in the "VERIFIED ENCY REFERENCES" block injected into the context below.
-- If no verified references are injected (or the status says "No verified references"), tell
-  the user: "No references are currently recorded in the ENCY system for this topic." Do NOT
-  supplement with training-data citations.
-- You MAY summarise what the ENCY database fields say (description, notes, constituents, etc.)
-  — that is verified DB content. You may NOT add facts or sources beyond what the DB supplies.
 
 GUIDELINES:
 - For health questions, always note: "This is educational information only — consult a healthcare provider."

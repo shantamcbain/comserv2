@@ -174,7 +174,7 @@ Record ID:[% herb.record_id %]
             [% ELSE %]
                 [% term_preview(field_html.sister_plants) %]
                 [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-                <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" required />
+                <input type="text" id="sister_plants" name="sister_plants" value="[% herb.sister_plants %]" size="50" />
             [% END %]
         </td>
     </tr>
@@ -482,16 +482,27 @@ Record ID:[% herb.record_id %]
     <tr>
         <td>Formulas:</td>
         <td>
-            [% IF !edit_mode %]
+            [% IF linked_formulas && linked_formulas.size %]
+            <ul style="margin:0 0 0.4em 1.2em;padding:0;">
+                [% FOREACH fh IN linked_formulas %]
+                [% SET f = fh.formula %]
+                [% IF f %]
+                <li><a href="[% c.uri_for('/ENCY/Formula/' _ f.record_id) %]">Formula #[% f.formula_number | html %][% IF f.name %]: [% f.name | html %][% END %]</a></li>
+                [% END %]
+                [% END %]
+            </ul>
+            [% ELSIF !edit_mode %]
                 [% field_html.formulas %]
-            [% ELSE %]
+            [% END %]
+            [% IF edit_mode %]
                 [% term_preview(field_html.formulas) %]
                 <textarea id="formulas" name="formulas" rows="4" cols="50">[% herb.formulas %]</textarea>
+                <div style="font-size:0.8em;color:#777;margin-top:0.2em;">Legacy text field. Formulas above are auto-linked from the formula database.</div>
             [% END %]
         </td>
     </tr>
     <tr>
-        <td>Contra Indications:</td>
+        <td>Contraindications:</td>
         <td>
             [% IF !edit_mode %]
                 [% field_html.contra_indications %]
@@ -509,7 +520,7 @@ Record ID:[% herb.record_id %]
                 [% field_html.preparation %]
             [% ELSE %]
                 [% term_preview(field_html.preparation) %]
-                <textarea id="preparation" name="preparation" rows="4" cols="50" required>[% herb.preparation %]</textarea>
+                <textarea id="preparation" name="preparation" rows="4" cols="50">[% herb.preparation %]</textarea>
             [% END %]
         </td>
     </tr>
@@ -640,7 +651,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 [% field_html.culinary %]
             [% ELSE %]
-                <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" required />
+                <input type="text" id="culinary" name="culinary" value="[% herb.culinary %]" size="50" />
             [% END %]
         </td>
     </tr>
@@ -670,7 +681,7 @@ Record ID:[% herb.record_id %]
             [% IF !edit_mode %]
                 <a href="[% herb.url %]">[% herb.url %]</a>
             [% ELSE %]
-                <input type="url" id="url" name="url" value="[% herb.url %]" size="50" required />
+                <input type="url" id="url" name="url" value="[% herb.url %]" size="50" />
             [% END %]
         </td>
     </tr>
@@ -695,6 +706,15 @@ Record ID:[% herb.record_id %]
 [% IF edit_mode %]
         <input type="submit" value="Update Herb" />
 </form>
+[% END %]
+
+[% IF is_editor %]
+<div style="margin-top:20px; border-top:1px solid #ccc; padding-top:20px; padding-bottom: 20px;">
+    <form action="[% c.uri_for('/ENCY/HerbDelete') %]" method="post" onsubmit="return confirm('Are you absolutely sure you want to delete this herb record?');">
+        <input type="hidden" name="record_id" value="[% herb.record_id %]" />
+        <button type="submit" class="btn btn-danger" style="background-color:#d9534f; color:white; border:none; padding:6px 12px; border-radius:4px; cursor:pointer;">Delete Herb</button>
+    </form>
+</div>
 [% END %]
 
 <div id="ency-constituent-modal" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;z-index:9000;background:rgba(0,0,0,0.45);">
