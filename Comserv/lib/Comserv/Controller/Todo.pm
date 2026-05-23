@@ -1466,7 +1466,7 @@ sub update_status :Path('/todo/update_status') :Args(0) {
             # 1. Find an open log (end_time = sentinel 00:00:00, status != 3) using raw SQL
             #    to bypass DBIx::Class TIME column inflator which corrupts time comparisons.
             my $open_row = $dbh->selectrow_hashref(
-                'SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time="00:00:00" AND status!=3 ORDER BY record_id DESC LIMIT 1',
+                "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
                 undef, $record_id
             );
 
@@ -3012,7 +3012,7 @@ sub open_log :Path('open_log') :Args(0) {
 
         # Use raw SQL to check for existing open log — avoids TIME inflator bug
         my $existing_open = $dbh->selectrow_hashref(
-            'SELECT record_id FROM log WHERE todo_record_id=? AND end_time="00:00:00" AND status!=3 LIMIT 1',
+            "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
             undef, $record_id
         );
         die "Log already open for this todo\n" if $existing_open;
