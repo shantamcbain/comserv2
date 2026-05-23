@@ -1435,8 +1435,9 @@ sub update_status :Path('/todo/update_status') :Args(0) {
         return;
     }
 
-    my $today   = DateTime->now->ymd;
-    my $now_hms = DateTime->now->strftime('%H:%M:%S');
+    my $_now_dt = DateTime->now(time_zone => 'local');
+    my $today   = $_now_dt->ymd;
+    my $now_hms = $_now_dt->strftime('%H:%M:%S');
 
     eval { $todo->update({ status => $status, last_mod_date => $today }) };
     if ($@) {
@@ -3000,7 +3001,7 @@ sub open_log :Path('open_log') :Args(0) {
         return;
     }
 
-    my $now   = DateTime->now;
+    my $now   = DateTime->now(time_zone => 'local');
     my $today = $now->ymd;
     my $time  = $now->hms;
 
