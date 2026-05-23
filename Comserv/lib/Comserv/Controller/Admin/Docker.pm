@@ -90,6 +90,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
+            last_mod_date   => $today,
             project_code    => 'PLANNING',
             details         => 'Deploy in progress…',
         );
@@ -182,6 +183,7 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
+            last_mod_date   => $today,
             project_code    => 'PLANNING',
             details         => 'Hub deploy in progress\x{2026}',
         );
