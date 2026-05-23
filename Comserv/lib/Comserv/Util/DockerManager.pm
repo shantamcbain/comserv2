@@ -176,31 +176,41 @@ sub restart_containers {
         };
     }
     
-    my @cmd = (
+    my @base_cmd = (
         @{$self->docker_compose_cmd},
         '--project-directory', $self->project_root,
         '-f', $compose_file
     );
-    
+
+    my ($all_out, $all_err, $all_cmds) = ('', '', '');
+    my $success = 1;
+
     if ($force) {
-        push @cmd, ('down', '--remove-orphans');
-        if (@$services) {
-            push @cmd, @$services;
-        }
+        my @down_cmd = (@base_cmd, 'down', '--remove-orphans');
+        push @down_cmd, @$services if @$services;
+        my ($dout, $derr);
+        my $dok = run \@down_cmd, \undef, \$dout, \$derr;
+        $all_out  .= ($dout // '');
+        $all_err  .= ($derr // '');
+        $all_cmds .= join(' ', @down_cmd) . "\n";
+        $success = 0 unless $dok;
     }
-    
-    push @cmd, 'up', '-d';
-    push @cmd, @$services if @$services;
-    
-    my ($out, $err);
-    my $success = run \@cmd, \undef, \$out, \$err;
-    
+
+    my @up_cmd = (@base_cmd, 'up', '-d');
+    push @up_cmd, @$services if @$services;
+    my ($uout, $uerr);
+    my $uok = run \@up_cmd, \undef, \$uout, \$uerr;
+    $all_out  .= ($uout // '');
+    $all_err  .= ($uerr // '');
+    $all_cmds .= join(' ', @up_cmd);
+    $success = 0 unless $uok;
+
     return {
         success => $success,
-        stdout => $out // '',
-        stderr => $err // '',
+        stdout  => $all_out,
+        stderr  => $all_err,
         timestamp => strftime('%Y-%m-%d %H:%M:%S', localtime),
-        command => join(' ', @cmd),
+        command => $all_cmds,
     };
 }
 

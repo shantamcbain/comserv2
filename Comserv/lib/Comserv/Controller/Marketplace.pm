@@ -119,7 +119,29 @@ sub view :Path('/marketplace/view') :Args(1) {
         return;
     }
 
-    $c->stash(listing => $listing, template => 'marketplace/view.tt');
+    my ($buyer_is_member, $buyer_points) = (0, 0);
+    my $user_id = $c->session->{user_id};
+    if ($user_id && $listing->accepts_points) {
+        my $schema   = $self->_schema($c);
+        my $sitename = $self->_sitename($c);
+        eval {
+            my $mem = $schema->resultset('UserMembership')->search(
+                { user_id => $user_id, sitename => $sitename, status => 'active' }
+            )->first;
+            $buyer_is_member = 1 if $mem;
+        };
+        eval {
+            my $pa = $schema->resultset('Accounting::PointAccount')->find({ user_id => $user_id });
+            $buyer_points = $pa->balance if $pa && $pa->balance;
+        };
+    }
+
+    $c->stash(
+        listing        => $listing,
+        buyer_is_member => $buyer_is_member,
+        buyer_points    => $buyer_points,
+        template        => 'marketplace/view.tt',
+    );
 }
 
 # -------------------------------------------------------------------------

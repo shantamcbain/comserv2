@@ -1502,13 +1502,19 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            eval { $self->site_setup($c, $SiteName) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                    "site_setup('CSC') failed in domain_error handler: $@");
+            }
 
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: $error_msg";
 
-            # Send email notification to admin
-            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+            # Send email notification to admin — only for non-bot traffic
+            my $ua = $c->req->user_agent // '';
+            my $is_likely_bot = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua eq '' || $ua =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
+            if (!$is_likely_bot && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1563,9 +1569,11 @@ sub setup_site {
             # Detach to the error template and stop processing
             $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         } else {
-            # Generic error case (should not happen with our improved error handling)
+            # Generic error case — unknown domain (commonly bots/scanners hitting a raw IP)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
-            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site', $error_msg);
+            my $_ua_chk = $c->req->user_agent // '';
+            my $_log_level = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $_ua_chk eq '' || $_ua_chk =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i) ? 'warn' : 'error';
+            $self->logging->log_with_details($c, $_log_level, __FILE__, __LINE__, 'setup_site', $error_msg);
 
             # Add to debug_errors if not already there
             unless (grep { $_ eq $error_msg } @{$c->stash->{debug_errors}}) {
@@ -1582,10 +1590,16 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            $self->site_setup($c, $SiteName);
+            eval { $self->site_setup($c, $SiteName) };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                    "site_setup('CSC') failed in generic domain-missing handler: $@");
+            }
 
-            # Send email notification to admin
-            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
+            # Send email notification to admin — skip for bots/scanners hitting raw IPs
+            my $ua_generic  = $c->req->user_agent // '';
+            my $is_bot_req  = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua_generic eq '' || $ua_generic =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
+            if (!$is_bot_req && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1601,12 +1615,18 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                if ($self->send_email($c, $email_params)) {
-                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                        "Sent admin notification email about domain error for $domain");
-                } else {
-                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
-                        "Failed to send admin email notification about domain error for $domain");
+                eval {
+                    if ($self->send_email($c, $email_params)) {
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                            "Sent admin notification email about domain error for $domain");
+                    } else {
+                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                            "Failed to send admin email notification about domain error for $domain");
+                    }
+                };
+                if ($@) {
+                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
+                        "Exception sending admin email for domain_missing ($domain): $@");
                 }
             }
 

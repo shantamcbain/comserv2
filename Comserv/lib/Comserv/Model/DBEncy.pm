@@ -169,7 +169,21 @@ sub COMPONENT {
     }
 
     $args->{connect_info} = $connect_info;
-    return $self->next::method($app, $args);
+    my $instance = $self->next::method($app, $args);
+
+    if ($db_type eq 'sqlite') {
+        eval {
+            $instance->schema->deploy({ add_drop_tables => 0 });
+            $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy SQLite fallback: schema deployed successfully.");
+        };
+        if ($@) {
+            $logger->log_with_details(undef, 'warn', __FILE__, __LINE__, 'COMPONENT',
+                "DBEncy SQLite fallback: schema deploy encountered errors (tables may already exist): $@");
+        }
+    }
+
+    return $instance;
 }
 
 # Method to get current connection info for debugging

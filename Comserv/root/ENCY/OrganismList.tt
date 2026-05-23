@@ -31,7 +31,8 @@
         <select name="organism_type">
             <option value="">-- All --</option>
             <option value="human"[%     IF organism_type == 'human'     %] selected="selected"[% END %]>Human</option>
-            <option value="animal"[%    IF organism_type == 'animal'    %] selected="selected"[% END %]>Animal</option>
+            <option value="mammal"[%    IF organism_type == 'mammal'    %] selected="selected"[% END %]>Mammal</option>
+            <option value="animal"[%    IF organism_type == 'animal'    %] selected="selected"[% END %]>Animal (other)</option>
             <option value="plant"[%     IF organism_type == 'plant'     %] selected="selected"[% END %]>Plant</option>
             <option value="insect"[%    IF organism_type == 'insect'    %] selected="selected"[% END %]>Insect</option>
             <option value="bird"[%      IF organism_type == 'bird'      %] selected="selected"[% END %]>Bird</option>
@@ -41,6 +42,7 @@
             <option value="fungus"[%    IF organism_type == 'fungus'    %] selected="selected"[% END %]>Fungus</option>
             <option value="bacterium"[% IF organism_type == 'bacterium' %] selected="selected"[% END %]>Bacterium</option>
             <option value="virus"[%     IF organism_type == 'virus'     %] selected="selected"[% END %]>Virus</option>
+            <option value="unknown"[%   IF organism_type == 'unknown'   %] selected="selected"[% END %]>Unknown</option>
         </select>
     </label>
     <label>Search:
@@ -53,17 +55,18 @@
 [% IF organisms && organisms.size %]
 <table border="1" cellpadding="4" cellspacing="0">
     <tr>
-        <th>Common Name</th>
         <th>Scientific Name</th>
+        <th>Common Name(s)</th>
         <th>Type</th>
         <th>Taxonomy</th>
         <th>NCBI Tax ID</th>
         <th></th>
     </tr>
     [% FOREACH o IN organisms %]
+    [% SET _cn_list = o.common_names.all %]
     <tr>
-        <td>[% o.common_name | html %]</td>
         <td><em>[% o.scientific_name | html %]</em></td>
+        <td>[% FOREACH cn IN _cn_list %][% cn.name | html %][% UNLESS loop.last %]; [% END %][% END %]</td>
         <td>[% o.organism_type | html %]</td>
         <td>[% o.family_name | html %][% IF o.order_name %], [% o.order_name | html %][% END %]</td>
         <td>[% IF o.ncbi_tax_id %]<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id=[% o.ncbi_tax_id | html %]" target="_blank">[% o.ncbi_tax_id | html %]</a>[% END %]</td>

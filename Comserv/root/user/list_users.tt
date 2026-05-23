@@ -5,6 +5,13 @@
 <div class="user-mgmt-container">
     <h1>User Management</h1>
 
+    <div style="margin-bottom:12px;">
+        <a href="/user/admin_purge_unverified" class="btn btn-danger btn-sm"
+           style="background:#c0392b;color:#fff;text-decoration:none;padding:5px 14px;border-radius:4px;font-size:0.88em;">
+            &#128465; Purge Unverified Accounts
+        </a>
+    </div>
+
     <form method="get" action="[% c.uri_for('/user/list_users') %]" class="user-search-form">
         <div class="search-row">
             <input type="text" name="q" value="[% q | html %]"

@@ -52,7 +52,8 @@ RUN apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60 || \
     (sleep 10 && apt-get update -o Acquire::Retries=3 -o Acquire::http::Timeout=60) && \
     apt-get install -y --no-install-recommends \
       bash default-mysql-client libmariadb3 libssl3 libxml2 curl locales \
-      ca-certificates supervisor logrotate cron && \
+      ca-certificates supervisor logrotate cron \
+      python3 python3-venv python3-pip ffmpeg && \
     apt-get clean && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN echo "en_US.UTF-8 UTF-8" > /etc/locale.gen && locale-gen en_US.UTF-8

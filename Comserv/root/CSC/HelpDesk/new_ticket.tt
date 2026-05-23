@@ -122,6 +122,32 @@
         formSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
         if (showBtn) showBtn.style.display = 'none';
     };
+
+    (function() {
+        var qp = new URLSearchParams(window.location.search);
+        if (qp.get('from_chat')) {
+            var subjectEl = document.getElementById('subject');
+            var descEl    = document.getElementById('description');
+            var catEl     = document.getElementById('category');
+            var priEl     = document.getElementById('priority');
+            if (subjectEl && qp.get('subject')) subjectEl.value = qp.get('subject');
+            if (descEl    && qp.get('description')) descEl.value = qp.get('description');
+            if (catEl     && qp.get('category')) {
+                var opt = catEl.querySelector('option[value="' + qp.get('category') + '"]');
+                if (!opt) {
+                    opt = document.createElement('option');
+                    opt.value = qp.get('category');
+                    opt.textContent = qp.get('category').charAt(0).toUpperCase() + qp.get('category').slice(1);
+                    catEl.appendChild(opt);
+                }
+                catEl.value = qp.get('category');
+            }
+            if (priEl && qp.get('priority')) priEl.value = qp.get('priority');
+            formSec.style.display = 'block';
+            if (showBtn) showBtn.style.display = 'none';
+            formSec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    })();
 })();
 </script>
 
