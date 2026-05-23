@@ -238,6 +238,7 @@
                 [% END %]
                 <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                <button onclick="openDeployModal()" style="padding:4px 12px;border:1px solid #dc3545;border-radius:4px;background:transparent;font-size:0.82em;color:#dc3545;cursor:pointer;" title="Deploy system updates (Production or Local)">🚀 Deploy</button>
                 [% END %]
             </div>
 
@@ -1731,4 +1732,245 @@ function saveLogNotes(entryId) {
         if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }
+
+// --- Deployment Control Center Modal JS ---
+let deployPollingInterval = null;
+let deployLastLogLength = 0;
+
+function openDeployModal() {
+    document.getElementById('deploy-modal').style.display = 'flex';
+    document.getElementById('deploy-progress-container').style.display = 'none';
+    document.getElementById('deploy-output-box').textContent = '';
+    document.getElementById('deploy-start-btn').disabled = false;
+    document.getElementById('deploy-cancel-btn').disabled = false;
+    
+    // Attempt to load saved credentials
+    fetch('/admin/docker-load-credentials')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (data.ssh_target) {
+                    document.getElementById('deploy-ssh-target').value = data.ssh_target;
+                }
+                if (data.ssh_password) {
+                    document.getElementById('deploy-ssh-password').value = data.ssh_password;
+                }
+            }
+        })
+        .catch(err => console.log('Failed to load credentials:', err));
+}
+
+function closeDeployModal() {
+    if (deployPollingInterval) {
+        clearInterval(deployPollingInterval);
+        deployPollingInterval = null;
+    }
+    document.getElementById('deploy-modal').style.display = 'none';
+}
+
+function toggleDeployForm() {
+    const selected = document.querySelector('input[name="deploy_method"]:checked').value;
+    const settings = document.getElementById('production-deploy-settings');
+    if (selected === 'production') {
+        settings.style.display = 'flex';
+    } else {
+        settings.style.display = 'none';
+    }
+}
+
+function startDeploymentAction() {
+    const method = document.querySelector('input[name="deploy_method"]:checked').value;
+    const startBtn = document.getElementById('deploy-start-btn');
+    const cancelBtn = document.getElementById('deploy-cancel-btn');
+    const progressContainer = document.getElementById('deploy-progress-container');
+    const outputBox = document.getElementById('deploy-output-box');
+    const spinner = document.getElementById('deploy-status-spinner');
+    
+    startBtn.disabled = true;
+    cancelBtn.disabled = true;
+    progressContainer.style.display = 'flex';
+    outputBox.textContent = 'Initializing deployment...\n';
+    spinner.style.display = 'flex';
+    
+    if (method === 'production') {
+        const sshTarget = document.getElementById('deploy-ssh-target').value.trim();
+        const sshPassword = document.getElementById('deploy-ssh-password').value;
+        
+        outputBox.textContent += `Starting background Docker Hub deployment to ${sshTarget}...\n`;
+        
+        fetch('/admin/docker-deploy-to-production', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                outputBox.textContent += `✅ Background deploy process successfully started.\n`;
+                outputBox.textContent += `Log file: ${data.log_file || 'n/a'}\n`;
+                outputBox.textContent += `Streaming status output below:\n\n`;
+                
+                // Start polling status
+                deployLastLogLength = 0;
+                pollDeploymentProgress();
+            } else {
+                outputBox.textContent += `❌ FAILED: ${data.error || 'Unknown error'}\n`;
+                startBtn.disabled = false;
+                cancelBtn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        })
+        .catch(err => {
+            outputBox.textContent += `❌ REQUEST ERROR: ${err.message}\n`;
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        });
+    } else {
+        outputBox.textContent += `Triggering synchronous local workstation deployment (this will pull and restart local dev/prod containers)...\n`;
+        outputBox.textContent += `Please wait, output will display upon completion (takes about 5-15 seconds)...\n\n`;
+        
+        fetch('/admin/docker/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                outputBox.textContent += `✅ LOCAL DEPLOY COMPLETED SUCCESSFULLY!\n\n`;
+                outputBox.textContent += data.output || '';
+            } else {
+                outputBox.textContent += `❌ LOCAL DEPLOY HAD ERRORS:\n\n`;
+                outputBox.textContent += data.output || data.message || 'Unknown error';
+            }
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        })
+        .catch(err => {
+            outputBox.textContent += `❌ REQUEST ERROR: ${err.message}\n`;
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        });
+    }
+}
+
+function pollDeploymentProgress() {
+    if (deployPollingInterval) clearInterval(deployPollingInterval);
+    
+    deployPollingInterval = setInterval(() => {
+        fetch('/admin/docker-deploy-status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.output && data.output.length > deployLastLogLength) {
+                        const newText = data.output.substring(deployLastLogLength);
+                        const outputBox = document.getElementById('deploy-output-box');
+                        outputBox.textContent += newText;
+                        outputBox.scrollTop = outputBox.scrollHeight;
+                        deployLastLogLength = data.output.length;
+                    }
+                    
+                    if (!data.is_running) {
+                        clearInterval(deployPollingInterval);
+                        deployPollingInterval = null;
+                        
+                        const outputBox = document.getElementById('deploy-output-box');
+                        outputBox.textContent += `\n================================================================================\n`;
+                        outputBox.textContent += `✅ DEPLOYMENT FINISHED AT ${new Date().toLocaleTimeString()}\n`;
+                        outputBox.textContent += `================================================================================\n`;
+                        outputBox.scrollTop = outputBox.scrollHeight;
+                        
+                        document.getElementById('deploy-start-btn').disabled = false;
+                        document.getElementById('deploy-cancel-btn').disabled = false;
+                        document.getElementById('deploy-status-spinner').style.display = 'none';
+                    }
+                }
+            })
+            .catch(err => console.log('Error polling status:', err));
+    }, 2000);
+}
 </script>
+
+<!-- Deploy Control Center Modal HTML -->
+<div id="deploy-modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6); align-items:center; justify-content:center; padding: 20px; box-sizing: border-box;">
+    <div style="background:var(--bg-secondary, #f8f9fa); color:var(--text-color, #333); border:1px solid var(--border-color, #dee2e6); border-radius:8px; max-width:650px; width:100%; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:flex; flex-direction:column; gap:15px; box-sizing: border-box;">
+        
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color, #dee2e6); padding-bottom:10px; margin-bottom:5px;">
+            <h3 style="margin:0; font-size:1.25em; display:flex; align-items:center; gap:8px;">
+                <span>🚀 Deploy Control Center</span>
+            </h3>
+            <button onclick="closeDeployModal()" style="background:none; border:none; font-size:1.5em; color:var(--text-muted-color, #6c757d); cursor:pointer; padding:0; line-height:1;">&times;</button>
+        </div>
+
+        <!-- Description -->
+        <p style="margin:0; font-size:0.9em; color:var(--text-muted-color, #6c757d);">
+            Select a deployment method. <strong>Docker Hub Production</strong> is the primary choice, which builds the image, pushes it to Docker Hub, and triggers a pull on the production server.
+        </p>
+
+        <!-- Form Options -->
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <!-- Option 1: Hub Production -->
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border-color, #dee2e6); border-radius:6px; cursor:pointer; background:var(--bg-color, #fff);">
+                <input type="radio" name="deploy_method" value="production" checked onchange="toggleDeployForm()" style="margin-top:3px; cursor:pointer;">
+                <div>
+                    <strong style="display:block; font-size:0.95em; color:var(--primary-color, #007bff);">Docker Hub Production Deploy (Primary)</strong>
+                    <span style="font-size:0.82em; color:var(--text-muted-color, #6c757d);">Builds production image, pushes to Docker Hub, and SSH-triggers pull on the server ubuntu@192.168.1.126.</span>
+                </div>
+            </label>
+
+            <!-- Option 2: Local Workstation -->
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border-color, #dee2e6); border-radius:6px; cursor:pointer; background:var(--bg-color, #fff);">
+                <input type="radio" name="deploy_method" value="local" onchange="toggleDeployForm()" style="margin-top:3px; cursor:pointer;">
+                <div>
+                    <strong style="display:block; font-size:0.95em; color:var(--text-color, #333);">Local Workstation Deploy</strong>
+                    <span style="font-size:0.82em; color:var(--text-muted-color, #6c757d);">Performs a git pull and rebuilds/recreates the local workstation containers.</span>
+                </div>
+            </label>
+        </div>
+
+        <!-- Production Deploy Settings -->
+        <div id="production-deploy-settings" style="display:flex; flex-direction:column; gap:10px; padding:12px; background:var(--bg-color, #fff); border:1px solid var(--border-color, #dee2e6); border-radius:6px; box-sizing: border-box;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                    <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Target:</label>
+                    <input type="text" id="deploy-ssh-target" value="ubuntu@192.168.1.126" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Password:</label>
+                    <input type="password" id="deploy-ssh-password" placeholder="Saved password will be used" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                </div>
+            </div>
+            <div style="font-size:0.75em; color:var(--text-muted-color, #6c757d);">
+                Saved credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> will be loaded automatically if present.
+            </div>
+        </div>
+
+        <!-- Progress Log -->
+        <div id="deploy-progress-container" style="display:none; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:0.85em; color:var(--text-color);">Console Log Output:</strong>
+                <span id="deploy-status-spinner" style="font-size:0.85em; color:var(--primary-color); display:flex; align-items:center; gap:5px;">
+                    <span style="display:inline-block; width:10px; height:10px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></span>
+                    Deploying...
+                </span>
+            </div>
+            <pre id="deploy-output-box" style="background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:6px; font-family:'Courier New', monospace; font-size:0.82em; max-height:200px; overflow-y:auto; margin:0; border:1px solid #333; white-space:pre-wrap;"></pre>
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color, #dee2e6); padding-top:10px; margin-top:5px;">
+            <button onclick="closeDeployModal()" id="deploy-cancel-btn" style="padding:6px 14px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; background:transparent; color:var(--text-color, #333); cursor:pointer; font-size:0.88em;">Cancel</button>
+            <button onclick="startDeploymentAction()" id="deploy-start-btn" style="padding:6px 16px; border:none; border-radius:4px; background:var(--primary-color, #007bff); color:#fff; cursor:pointer; font-size:0.88em; font-weight:bold;">Start Deploy</button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>
