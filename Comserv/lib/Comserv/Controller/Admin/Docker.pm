@@ -82,6 +82,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             username        => $username,
             sitename        => $sitename,
             start_date      => $today,
+            due_date        => $today,
             start_time      => $now_time,
             end_time        => $now_time,
             time            => '00:00:00',
@@ -89,6 +90,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
+            project_code    => 'PLANNING',
             details         => 'Deploy in progress…',
         );
         $log_fields{todo_record_id} = $todo_record_id || undef;
@@ -172,6 +174,7 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
             username        => $username,
             sitename        => $sitename,
             start_date      => $today,
+            due_date        => $today,
             start_time      => $now_time,
             end_time        => $now_time,
             time            => '00:00:00',
@@ -179,6 +182,7 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
             priority        => 3,
             group_of_poster => 'admin',
             last_mod_by     => $username,
+            project_code    => 'PLANNING',
             details         => 'Hub deploy in progress\x{2026}',
         );
         $log_fields{todo_record_id} = $todo_record_id || undef;
