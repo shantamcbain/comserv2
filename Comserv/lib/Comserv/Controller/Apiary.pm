@@ -838,6 +838,135 @@ sub api_image_extract :Path('/Apiary/api/image_extract') :Args(0) {
 }
 
 # ============================================================================
+# ============================================================================
+# VOICE RECORDINGS
+# ============================================================================
+
+sub voice_recordings :Path('/Apiary/voice_recordings') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} || '';
+    unless ($username) {
+        $c->response->redirect($c->uri_for('/login'));
+        $c->detach;
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my @recordings;
+
+    eval {
+        my $schema = $c->model('DBEncy');
+        my @audio_rows = $schema->resultset('File')->search(
+            {
+                file_type => 'audio',
+                sitename  => $sitename,
+            },
+            { order_by => { -desc => 'id' }, rows => 50 }
+        )->all;
+
+        my @transcript_rows = $schema->resultset('File')->search(
+            {
+                file_format => 'application/json',
+                sitename    => $sitename,
+                description => { like => 'Whisper transcript%' },
+            },
+            { order_by => { -desc => 'id' } }
+        )->all;
+
+        my %transcripts_by_audio;
+        for my $t (@transcript_rows) {
+            my $desc = $t->description || '';
+            my ($orig) = $desc =~ /Whisper transcript for (.+)$/;
+            $transcripts_by_audio{$orig} = $t if $orig;
+        }
+
+        for my $row (@audio_rows) {
+            my $orig_name = $row->file_name || '';
+            my $trans_row = $transcripts_by_audio{$orig_name};
+            my $transcript_text = '';
+            if ($trans_row && $trans_row->nfs_path && -f $trans_row->nfs_path) {
+                eval {
+                    open(my $fh, '<:utf8', $trans_row->nfs_path) or die;
+                    my $json = do { local $/; <$fh> };
+                    close $fh;
+                    my $data = decode_json($json);
+                    $transcript_text = $data->{transcript} || '';
+                };
+            }
+            my $bytes = $row->file_size || 0;
+            my $size_str = $bytes > 1048576 ? sprintf('%.1f MB', $bytes / 1048576)
+                         : $bytes > 1024    ? sprintf('%d KB',   int($bytes / 1024))
+                         : ($bytes . ' B');
+            push @recordings, {
+                id            => $row->id,
+                file_name     => $orig_name,
+                nfs_path      => $row->nfs_path || '',
+                file_size     => $bytes,
+                size_str      => $size_str,
+                description   => $row->description || '',
+                transcript    => $transcript_text,
+                transcript_id => $trans_row ? $trans_row->id : undef,
+            };
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
+            'voice_recordings', "Error loading recordings: $@");
+    }
+
+    $c->stash(
+        recordings => \@recordings,
+        template   => 'BMaster/voice_recordings.tt',
+    );
+}
+
+sub audio_serve :Path('/Apiary/audio_serve') :Args(1) {
+    my ($self, $c, $file_id) = @_;
+
+    my $username = $c->session->{username} || '';
+    unless ($username && $file_id =~ /^\d+$/) {
+        $c->response->status(403);
+        $c->response->body('Forbidden');
+        return;
+    }
+
+    my $sitename = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $row;
+    eval {
+        $row = $c->model('DBEncy')->resultset('File')->find({
+            id       => $file_id,
+            sitename => $sitename,
+            file_type => 'audio',
+        });
+    };
+
+    unless ($row && $row->nfs_path && -f $row->nfs_path) {
+        $c->response->status(404);
+        $c->response->body('Not found');
+        return;
+    }
+
+    my $nfs_path = $row->nfs_path;
+    my $fmt      = $row->file_format || 'audio/mpeg';
+    my $size     = -s $nfs_path;
+
+    $c->response->content_type($fmt);
+    $c->response->headers->header('Content-Length' => $size);
+    $c->response->headers->header('Accept-Ranges'  => 'bytes');
+    $c->response->headers->header('Content-Disposition' => 'inline; filename="' . ($row->file_name || 'recording.mp3') . '"');
+
+    open(my $fh, '<:raw', $nfs_path) or do {
+        $c->response->status(500);
+        $c->response->body('Read error');
+        return;
+    };
+    local $/;
+    $c->response->body(<$fh>);
+    close $fh;
+}
+
+# ============================================================================
 # PRIVATE HELPERS
 # ============================================================================
 

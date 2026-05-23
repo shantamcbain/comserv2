@@ -1,0 +1,207 @@
+[% META title = 'Edit VM' %]
+
+<div class="container">
+    <h1>Edit Virtual Machine [% vmid %]</h1>
+
+    [% IF error_msg %]
+    <div class="error-message">[% error_msg %]</div>
+    [% END %]
+
+    [% IF vm_config %]
+    <div class="vm-info-bar">
+        <strong>VM [% vmid %]</strong> — [% vm_config.name | html %]
+        [% IF proxmox_host %]
+        &nbsp;|&nbsp;
+        <a href="[% proxmox_host %]/#v1:0=qemu%2F[% vmid %]:4::::" target="_blank" class="console-link">Open Console in Proxmox</a>
+        [% END %]
+    </div>
+
+    <form method="POST" action="[% c.uri_for('/proxmox/edit_vm_action') %]" class="edit-form">
+        <input type="hidden" name="vmid" value="[% vmid %]">
+
+        <div class="form-section">
+            <h2>Identity</h2>
+
+            <div class="form-group">
+                <label for="name">VM Name:</label>
+                <input type="text" id="name" name="name" value="[% vm_config.name | html %]" required>
+            </div>
+
+            <div class="form-group">
+                <label for="description">Description:</label>
+                <textarea id="description" name="description" rows="3">[% vm_config.description | html %]</textarea>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Resources</h2>
+
+            <div class="form-group">
+                <label for="cores">CPU Cores:</label>
+                <select id="cores" name="cores">
+                    [% FOREACH n IN [1, 2, 4, 6, 8, 12, 16] %]
+                    <option value="[% n %]" [% IF vm_config.cores == n %]selected[% END %]>[% n %] Core[% n > 1 ? 's' : '' %]</option>
+                    [% END %]
+                </select>
+                <span class="help-text">Current: [% vm_config.cores || 'unknown' %] — change takes effect after reboot</span>
+            </div>
+
+            <div class="form-group">
+                <label for="memory">Memory (MB):</label>
+                <select id="memory" name="memory">
+                    [% FOREACH opt IN [{v=1024,l='1 GB'},{v=2048,l='2 GB'},{v=4096,l='4 GB'},{v=8192,l='8 GB'},{v=16384,l='16 GB'},{v=32768,l='32 GB'},{v=40448,l='39.5 GB'},{v=65536,l='64 GB'}] %]
+                    <option value="[% opt.v %]" [% IF vm_config.memory == opt.v %]selected[% END %]>[% opt.l %]</option>
+                    [% END %]
+                </select>
+                <span class="help-text">Current: [% vm_config.memory ? (vm_config.memory / 1024) _ ' GB' : 'unknown' %] — change takes effect after reboot</span>
+            </div>
+        </div>
+
+        <div class="form-section">
+            <h2>Options</h2>
+
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="onboot" value="1" [% IF vm_config.onboot %]checked[% END %]>
+                    Start on boot
+                </label>
+            </div>
+
+            <div class="form-group checkbox-group">
+                <label>
+                    <input type="checkbox" name="agent" value="1" [% IF vm_config.agent && vm_config.agent != '0' %]checked[% END %]>
+                    QEMU Guest Agent enabled
+                </label>
+            </div>
+        </div>
+
+        [% IF vm_config.scsi0 %]
+        [% current_gb = 0 %]
+        [% IF vm_config.scsi0.match('size=(\d+)G') %]
+            [% current_gb = vm_config.scsi0.match('size=(\d+)G').0 %]
+        [% END %]
+        <div class="form-section">
+            <h2>Disk Resize</h2>
+            <div style="background:#fff3cd;border:1px solid #ffc107;border-radius:4px;padding:10px 14px;margin-bottom:14px;font-size:0.9em;">
+                <strong>Note:</strong> Proxmox can only <strong>grow</strong> a disk, never shrink it.
+                After resizing you must also resize the partition inside the OS
+                (e.g. <code>growpart /dev/sda 1 &amp;&amp; resize2fs /dev/sda1</code>).
+            </div>
+            <table class="config-table" style="margin-bottom:12px;">
+                <tr><th>Hard Disk (scsi0):</th><td><code>[% vm_config.scsi0 | html %]</code></td></tr>
+                [% IF current_gb %]<tr><th>Current size:</th><td><strong>[% current_gb %] GB</strong></td></tr>[% END %]
+            </table>
+            <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;">
+                <label for="new_disk_gb" style="font-weight:bold;white-space:nowrap;">New size (GB):</label>
+                <input type="number" id="new_disk_gb" min="[% current_gb + 1 %]" max="4000" step="1"
+                       value="[% current_gb ? current_gb + 20 : 40 %]"
+                       style="width:110px;padding:7px 10px;border:1px solid #ccc;border-radius:4px;">
+                <button type="button" onclick="resizeDisk()"
+                        style="padding:8px 18px;background:#e47000;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold;">
+                    Resize Disk
+                </button>
+                [% IF current_gb %]
+                <span style="font-size:0.85em;color:#666;">Minimum: [% current_gb + 1 %] GB</span>
+                [% END %]
+            </div>
+            <div id="resizeResult" style="margin-top:10px;font-weight:bold;font-size:0.92em;"></div>
+        </div>
+        [% END %]
+
+        <div class="form-section read-only-section">
+            <h2>Other Hardware (read-only)</h2>
+            <table class="config-table">
+                [% IF vm_config.ide2 %]
+                <tr><th>CD/DVD Drive (ide2):</th><td>[% vm_config.ide2 | html %]</td></tr>
+                [% END %]
+                [% IF vm_config.net0 %]
+                <tr><th>Network (net0):</th><td>[% vm_config.net0 | html %]</td></tr>
+                [% END %]
+                [% IF vm_config.boot %]
+                <tr><th>Boot order:</th><td>[% vm_config.boot | html %]</td></tr>
+                [% END %]
+                [% IF vm_config.ostype %]
+                <tr><th>OS type:</th><td>[% vm_config.ostype %]</td></tr>
+                [% END %]
+            </table>
+            <p class="help-text">To change network or boot order use the <a href="[% proxmox_host %]" target="_blank">Proxmox Web UI</a>.</p>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-save">Save Changes</button>
+            <a href="[% c.uri_for('/proxmox') %]" class="btn-cancel">Cancel</a>
+        </div>
+    </form>
+    [% ELSE %]
+    <p><a href="[% c.uri_for('/proxmox') %]">&larr; Back to Dashboard</a></p>
+    [% END %]
+</div>
+
+<style>
+.container { max-width: 860px; margin: 0 auto; padding: 20px; font-family: Arial, sans-serif; }
+h1 { color: #333; margin-bottom: 20px; }
+h2 { color: #555; margin-top: 0; margin-bottom: 14px; border-bottom: 1px solid #ddd; padding-bottom: 8px; }
+.vm-info-bar { background: #f0f4ff; border: 1px solid #c5d0e6; border-radius: 4px; padding: 10px 14px; margin-bottom: 20px; font-size: 0.95em; }
+.console-link { color: #e47000; font-weight: bold; text-decoration: none; }
+.console-link:hover { text-decoration: underline; }
+.form-section { background: #f9f9f9; border: 1px solid #ddd; border-radius: 5px; padding: 20px; margin-bottom: 18px; }
+.read-only-section { background: #f0f0f0; }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; font-weight: bold; margin-bottom: 5px; }
+.form-group input[type=text], .form-group select, .form-group textarea {
+    width: 100%; padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box; font-size: 0.95em;
+}
+.form-group textarea { resize: vertical; }
+.checkbox-group label { font-weight: normal; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.checkbox-group input[type=checkbox] { width: auto; }
+.help-text { font-size: 0.82em; color: #666; margin-top: 4px; display: block; }
+.config-table { width: 100%; border-collapse: collapse; font-size: 0.88em; word-break: break-all; }
+.config-table th { width: 180px; text-align: left; padding: 6px 10px; font-weight: bold; vertical-align: top; }
+.config-table td { padding: 6px 10px; color: #444; }
+.config-table tr:nth-child(even) { background: #e8e8e8; }
+.error-message { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; padding: 14px; border-radius: 4px; margin-bottom: 16px; }
+.form-actions { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+.btn-save { background: #28a745; color: #fff; border: none; padding: 10px 24px; border-radius: 4px; font-size: 1em; cursor: pointer; font-weight: bold; }
+.btn-save:hover { background: #218838; }
+.btn-cancel { background: #6c757d; color: #fff; padding: 10px 18px; border-radius: 4px; text-decoration: none; font-size: 1em; }
+.btn-cancel:hover { background: #5a6268; }
+</style>
+
+<script>
+function resizeDisk() {
+    var newSize = parseInt(document.getElementById('new_disk_gb').value, 10);
+    var minSize = parseInt(document.getElementById('new_disk_gb').getAttribute('min'), 10) || 1;
+    var res     = document.getElementById('resizeResult');
+
+    if (!newSize || newSize < minSize) {
+        res.style.color = '#721c24';
+        res.textContent = 'New size must be at least ' + minSize + ' GB.';
+        return;
+    }
+
+    if (!confirm('Resize disk scsi0 to ' + newSize + ' GB? This cannot be undone.')) return;
+
+    res.style.color = '#555';
+    res.textContent = 'Resizing…';
+
+    fetch('[% c.uri_for("/proxmox/resize_disk") %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'vmid=[% vmid %]&disk=scsi0&new_size_gb=' + newSize
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+        if (d.success) {
+            res.style.color = '#155724';
+            res.textContent = d.message || 'Disk resized successfully.';
+        } else {
+            res.style.color = '#721c24';
+            res.textContent = 'Error: ' + (d.error || 'Unknown error');
+        }
+    })
+    .catch(function(e) {
+        res.style.color = '#721c24';
+        res.textContent = 'Request failed: ' + e.message;
+    });
+}
+</script>
