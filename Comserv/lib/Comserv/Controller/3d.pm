@@ -1491,11 +1491,11 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
             my $score = 0;
             if ($req_color && $fil->{color}) {
                 $score += 2 if lc($fil->{color}) eq lc($req_color);
-                $score += 1 if index(lc($fil->{color}), lc($req_color)) >= 0;
+                $score += 1 if CORE::index(lc($fil->{color}), lc($req_color)) >= 0;
             }
             if ($req_type && $fil->{type}) {
                 $score += 2 if lc($fil->{type}) eq lc($req_type);
-                $score += 1 if index(lc($fil->{type}), lc($req_type)) >= 0;
+                $score += 1 if CORE::index(lc($fil->{type}), lc($req_type)) >= 0;
             }
             if (!$best || $score > $best_score) {
                 $best       = $fil;
@@ -1564,8 +1564,8 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                                               Grey Gray Silver Gold Clear Natural Transparent
                                               Pink Brown Copper Bronze);
                         my $uc = uc($line_notes);
-                        for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $n_type  = $t; last; } }
-                        for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $n_color = $co; last; } }
+                        for my $t (@known_types)  { if (CORE::index($uc, uc($t)) >= 0) { $n_type  = $t; last; } }
+                        for my $co (@known_colors) { if (CORE::index(lc($line_notes), lc($co)) >= 0) { $n_color = $co; last; } }
                     }
                     $req_color = $n_color if $n_color;
                     $req_type  = $n_type  if $n_type;
@@ -1743,11 +1743,11 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
 
         # Include if ANY of these match (broad — catch 3d_printed_item, 3d_printed, printed_item, etc.)
         my $is_3d_item =
-               index($origin,   '3d_print')  >= 0
-            || index($origin,   'printed')    >= 0
-            || index($category, '3d_print')   >= 0
-            || index($category, 'printed')    >= 0
-            || index($category, 'filament')   >= 0
+               CORE::index($origin,   '3d_print')  >= 0
+            || CORE::index($origin,   'printed')    >= 0
+            || CORE::index($category, '3d_print')   >= 0
+            || CORE::index($category, 'printed')    >= 0
+            || CORE::index($category, 'filament')   >= 0
             || $req_print;
 
         next unless $is_3d_item;
@@ -1774,8 +1774,8 @@ sub queue_sync :Path('/3d/queue_sync') :Args(0) {
                 my @known_colors = qw(Black White Red Blue Green Yellow Orange Purple Grey Gray
                                       Silver Gold Clear Natural Transparent Pink Brown Copper Bronze);
                 my $uc = uc($line_notes);
-                for my $t (@known_types)  { if (index($uc, uc($t)) >= 0) { $notes_type  = $t; last; } }
-                for my $co (@known_colors) { if (index(lc($line_notes), lc($co)) >= 0) { $notes_color = $co; last; } }
+                for my $t (@known_types)  { if (CORE::index($uc, uc($t)) >= 0) { $notes_type  = $t; last; } }
+                for my $co (@known_colors) { if (CORE::index(lc($line_notes), lc($co)) >= 0) { $notes_color = $co; last; } }
             }
         }
         # Consignment note wins; fall back to item-level filament defaults

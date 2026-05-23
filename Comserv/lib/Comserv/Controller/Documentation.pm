@@ -24,11 +24,21 @@ __PACKAGE__->config(namespace => 'Documentation');
 sub _load_json_file {
     my ($path) = @_;
     return unless defined $path && -e $path;
+    return unless -s $path;
     local $/;
     open my $fh, '<:encoding(UTF-8)', $path or return;
     my $content = <$fh>;
     close $fh;
-    return JSON->new->utf8->decode($content);
+    return unless defined $content && $content =~ /\S/;
+    my $data;
+    eval {
+        $data = JSON->new->utf8->decode($content);
+    };
+    if ($@) {
+        warn "Failed to decode JSON from $path: $@";
+        return;
+    }
+    return $data;
 }
 
 sub _atomic_write_json {
