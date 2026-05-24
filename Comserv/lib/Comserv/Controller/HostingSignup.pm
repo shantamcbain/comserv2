@@ -172,7 +172,7 @@ sub process_signup :Path('process') :Args(0) {
         # 2. Save pending hosting request and notify admin
         my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
         my $ha = eval {
-            $c->model('DBEncy')->resultset('HostingAccount')->find_or_create(
+            $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find_or_create(
                 { sitename => $params->{site_name} },
                 {
                     key    => 'sitename',

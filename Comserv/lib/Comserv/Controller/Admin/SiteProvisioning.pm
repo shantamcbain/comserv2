@@ -27,19 +27,19 @@ sub auto :Private {
 
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
-    my @requests = $c->model('DBEncy')->resultset('HostingAccount')->search(
+    my @requests = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
         {},
         { order_by => { -desc => 'created_at' } }
     )->all;
     $c->stash(
-        template => 'admin/site_provisioning/list.tt',
+        template => 'admin/site_provisioning/index.tt',
         requests => \@requests,
     );
 }
 
 sub review :Path('review') :Args(1) {
     my ($self, $c, $id) = @_;
-    my $request = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
     unless ($request) {
         $c->flash->{error_msg} = "Hosting request #$id not found.";
         $c->response->redirect($c->uri_for($self->action_for('index')));
@@ -63,7 +63,7 @@ sub provision :Path('provision') :Args(0) {
         return $c->response->redirect($c->uri_for($self->action_for('index')));
     };
 
-    my $request = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
     unless ($request) {
         $c->flash->{error_msg} = "Request #$id not found.";
         return $c->response->redirect($c->uri_for($self->action_for('index')));
