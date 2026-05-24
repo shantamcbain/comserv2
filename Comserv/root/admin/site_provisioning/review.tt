@@ -140,6 +140,16 @@
 [% ELSE %]
 <div class="app-section">
     <p>This request has already been provisioned (status: <strong>[% request.status | html %]</strong>).</p>
+    <form method="get" action="[% c.uri_for('/admin/site_provisioning/retry_dns', [request.id]) %]" style="margin-top:1rem;">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="retry_ip">Server IP for DNS A record</label>
+                <input type="text" name="server_ip" id="retry_ip" class="form-input"
+                       value="[% cf_zone_ip | html %]" placeholder="e.g. 203.0.113.10">
+            </div>
+        </div>
+        <button type="submit" class="btn btn-secondary">&#8635; Retry Cloudflare DNS Creation</button>
+    </form>
 </div>
 [% END %]
 
