@@ -184,12 +184,20 @@ sub review :Path('review') :Args(1) {
 
     my ($cf_a_records, $cf_zone_ip) = $self->_get_zone_a_records($zone_name);
 
+    my $suggested_domain = $domain;
+    if ($zone_name && $domain eq $zone_name) {
+        my $prefix = lc($request->sitename || '');
+        $prefix =~ s/[^a-z0-9-]/-/g;
+        $suggested_domain = "$prefix.$zone_name" if $prefix;
+    }
+
     $c->stash(
-        template     => 'admin/site_provisioning/review.tt',
-        request      => $request,
-        cf_zone_name => $zone_name,
-        cf_a_records => $cf_a_records,
-        cf_zone_ip   => $cf_zone_ip || $ENV{SERVER_PUBLIC_IP} || '',
+        template         => 'admin/site_provisioning/review.tt',
+        request          => $request,
+        cf_zone_name     => $zone_name,
+        cf_a_records     => $cf_a_records,
+        cf_zone_ip       => $cf_zone_ip || $ENV{SERVER_PUBLIC_IP} || '',
+        suggested_domain => $suggested_domain,
     );
 }
 
