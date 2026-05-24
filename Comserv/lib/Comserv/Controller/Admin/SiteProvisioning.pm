@@ -111,7 +111,10 @@ sub _get_cloudflare_data {
 
     eval {
         my $cf = Comserv::Util::CloudflareManager->new();
-        my $email = $c->session->{email} || $ENV{CLOUDFLARE_EMAIL} || '';
+        my $email = $cf->config->{cloudflare}{email}
+                 || $c->session->{email}
+                 || $ENV{CLOUDFLARE_EMAIL}
+                 || '';
         my $raw = $cf->list_zones($email);
         my @raw_zones = ref $raw eq 'ARRAY' ? @$raw : ();
 
@@ -148,6 +151,24 @@ sub _get_cloudflare_data {
     return (\@zones, $default_domain, $server_ip);
 }
 
+sub _get_zone_a_records {
+    my ($self, $zone_name) = @_;
+    my (@a_records, $zone_ip);
+    eval {
+        my $cf    = Comserv::Util::CloudflareManager->new();
+        my $email = $cf->config->{cloudflare}{email} || $ENV{CLOUDFLARE_EMAIL} || '';
+        my $records = $cf->list_dns_records($email, $zone_name);
+        for my $r (@{ $records || [] }) {
+            next unless ref $r eq 'HASH' && ($r->{type} || '') eq 'A';
+            push @a_records, { name => $r->{name}, ip => $r->{content} };
+            if (!$zone_ip && ($r->{name} eq $zone_name || $r->{name} eq '@')) {
+                $zone_ip = $r->{content};
+            }
+        }
+    };
+    return (\@a_records, $zone_ip);
+}
+
 sub review :Path('review') :Args(1) {
     my ($self, $c, $id) = @_;
     my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
@@ -156,9 +177,19 @@ sub review :Path('review') :Args(1) {
         $c->response->redirect($c->uri_for($self->action_for('index')));
         return;
     }
+
+    my $domain = $request->domain || '';
+    my ($zone_name) = ($domain =~ /([^.]+\.[^.]+)$/);
+    $zone_name ||= $domain;
+
+    my ($cf_a_records, $cf_zone_ip) = $self->_get_zone_a_records($zone_name);
+
     $c->stash(
-        template => 'admin/site_provisioning/review.tt',
-        request  => $request,
+        template     => 'admin/site_provisioning/review.tt',
+        request      => $request,
+        cf_zone_name => $zone_name,
+        cf_a_records => $cf_a_records,
+        cf_zone_ip   => $cf_zone_ip || $ENV{SERVER_PUBLIC_IP} || '',
     );
 }
 

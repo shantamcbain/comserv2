@@ -122,8 +122,12 @@ sub _build_config {
         $self->logger->error("Failed to load API credentials: $_");
     };
     
-    # Try to load the cloudflare_config.json file
+    # Try to load the cloudflare_config.json file — check multiple locations
     my $cloudflare_config_path = File::Spec->catfile($base_dir, 'config', 'cloudflare_config.json');
+    unless (-f $cloudflare_config_path) {
+        my $alt = File::Spec->catfile($base_dir, 'root', 'config', 'api', 'cloudflare_config.json');
+        $cloudflare_config_path = $alt if -f $alt;
+    }
     
     try {
         if (-f $cloudflare_config_path) {
