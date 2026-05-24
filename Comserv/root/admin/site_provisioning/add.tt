@@ -1,0 +1,98 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Add Site Request</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">&#8592; Back</a>
+    </div>
+</div>
+
+[% IF errors.size %]
+<div class="error-message">
+    <ul>[% FOREACH e IN errors %]<li>[% e | html %]</li>[% END %]</ul>
+</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="form-container">
+
+<form method="post" action="[% c.uri_for('/admin/site_provisioning/add') %]" class="app-form">
+
+    <div class="form-section">
+        <h3>Site Details</h3>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="sitename">Site Name <small>(alphanumeric + underscore, no spaces)</small></label>
+                <input type="text" id="sitename" name="sitename" class="form-input"
+                       value="[% form_data.sitename | html %]" required placeholder="e.g. MyCoOp">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain">Domain / Subdomain</label>
+                <input type="text" id="domain" name="domain" class="form-input"
+                       value="[% form_data.domain | html %]" required placeholder="e.g. mycoop.computersystemconsulting.ca">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain_type">Domain Type</label>
+                <select id="domain_type" name="domain_type" class="form-input">
+                    <option value="subdomain" [% IF !form_data.domain_type || form_data.domain_type == 'subdomain' %]selected[% END %]>Subdomain</option>
+                    <option value="custom"    [% IF form_data.domain_type == 'custom'    %]selected[% END %]>Custom Domain</option>
+                    <option value="subpath"   [% IF form_data.domain_type == 'subpath'   %]selected[% END %]>Subpath</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="contact_email">Contact Email</label>
+                <input type="email" id="contact_email" name="contact_email" class="form-input"
+                       value="[% form_data.contact_email | html %]" placeholder="client@example.com">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="plan_slug">Plan</label>
+                <select id="plan_slug" name="plan_slug" class="form-input">
+                    <option value="hosting-subdomain" [% IF !form_data.plan_slug || form_data.plan_slug == 'hosting-subdomain' %]selected[% END %]>Subdomain Hosting</option>
+                    <option value="hosting-app"       [% IF form_data.plan_slug == 'hosting-app'  %]selected[% END %]>App Hosting</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="status">Status</label>
+                <select id="status" name="status" class="form-input">
+                    <option value="pending" [% IF !form_data.status || form_data.status == 'pending' %]selected[% END %]>Pending (review before provisioning)</option>
+                    <option value="active"  [% IF form_data.status == 'active'  %]selected[% END %]>Active (already provisioned)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" class="form-input" rows="3">[% form_data.notes | html %]</textarea>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Request</button>
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+</div>
+</div>
+</div>
+
+</div>

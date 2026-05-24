@@ -37,6 +37,53 @@ sub index :Path :Args(0) {
     );
 }
 
+sub add :Path('add') :Args(0) {
+    my ($self, $c) = @_;
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+        my @errors;
+        push @errors, 'Site name is required' unless $p->{sitename};
+        push @errors, 'Domain is required'    unless $p->{domain};
+
+        if (@errors) {
+            $c->stash(
+                template   => 'admin/site_provisioning/add.tt',
+                errors     => \@errors,
+                form_data  => $p,
+            );
+            return;
+        }
+
+        eval {
+            $c->model('DBEncy')->resultset('Accounting::HostingAccount')->create({
+                sitename      => $p->{sitename},
+                domain        => $p->{domain},
+                domain_type   => $p->{domain_type}   || 'subdomain',
+                contact_email => $p->{contact_email} || '',
+                plan_slug     => $p->{plan_slug}     || 'hosting-subdomain',
+                status        => $p->{status}        || 'pending',
+                notes         => $p->{notes}         || '',
+                created_by    => $c->session->{username} || 'admin',
+            });
+        };
+        if ($@) {
+            $c->stash(
+                template  => 'admin/site_provisioning/add.tt',
+                errors    => ["Failed to create record: $@"],
+                form_data => $p,
+            );
+            return;
+        }
+
+        $c->flash->{success_msg} = "Site request for '$p->{sitename}' added.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(template => 'admin/site_provisioning/add.tt');
+}
+
 sub review :Path('review') :Args(1) {
     my ($self, $c, $id) = @_;
     my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
