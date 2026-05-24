@@ -2233,14 +2233,18 @@ sub bulk_delete_users :Local :Args(0) {
                 my ($storage, $dbh) = @_;
                 for my $tbl (qw(
                     admin_presence
-                    ai_conversations
                     ai_support_sessions
                     api_tokens
+                    benefactor_contributions
+                    crypto_transactions
                     email_verification_codes
+                    env_variable_audit_logs
                     event
                     internal_currency_accounts
+                    job_applications
                     membership_service_access
                     password_reset_tokens
+                    payment_transactions
                     plan_audit
                     point_accounts
                     user_api_keys
@@ -2250,8 +2254,22 @@ sub bulk_delete_users :Local :Args(0) {
                     user_sites
                     workshop_roles
                 )) {
-                    $dbh->do("DELETE FROM $tbl WHERE user_id = ?", undef, $uid);
+                    eval { $dbh->do("DELETE FROM $tbl WHERE user_id = ?", undef, $uid) };
                 }
+                $dbh->do("DELETE FROM ai_support_sessions WHERE admin_user_id = ?", undef, $uid);
+                $dbh->do("DELETE FROM ai_support_messages WHERE sender_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE internal_currency_transactions SET from_user_id = NULL WHERE from_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE internal_currency_transactions SET to_user_id = NULL WHERE to_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE jobs SET posted_by_user_id = NULL WHERE posted_by_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE point_ledger SET from_user_id = NULL WHERE from_user_id = ?", undef, $uid);
+                $dbh->do("UPDATE point_ledger SET to_user_id = NULL WHERE to_user_id = ?", undef, $uid);
+                my @conv_ids = map { $_->[0] }
+                    @{ $dbh->selectall_arrayref("SELECT id FROM ai_conversations WHERE user_id = ?", undef, $uid) };
+                if (@conv_ids) {
+                    my $ph = join(',', ('?') x @conv_ids);
+                    $dbh->do("DELETE FROM ai_messages WHERE conversation_id IN ($ph)", undef, @conv_ids);
+                }
+                $dbh->do("DELETE FROM ai_conversations WHERE user_id = ?", undef, $uid);
                 for my $col_tbl (
                     ['content',                'created_by'],
                     ['content',                'updated_by'],
@@ -2259,7 +2277,6 @@ sub bulk_delete_users :Local :Args(0) {
                     ['documentation',          'updated_by'],
                     ['env_variables',          'created_by'],
                     ['env_variables',          'updated_by'],
-                    ['env_variable_audit_logs','user_id'],
                     ['nfs_directory',          'created_by'],
                     ['system_cost_tracking',   'created_by'],
                     ['todo',                   'user_id'],
@@ -2267,7 +2284,7 @@ sub bulk_delete_users :Local :Args(0) {
                     ['workshop_resource',      'uploaded_by'],
                 ) {
                     my ($tbl, $col) = @$col_tbl;
-                    $dbh->do("UPDATE $tbl SET $col = NULL WHERE $col = ?", undef, $uid);
+                    eval { $dbh->do("UPDATE $tbl SET $col = NULL WHERE $col = ?", undef, $uid) };
                 }
             });
         };
@@ -2862,7 +2879,7 @@ sub admin_delete_user :Local :Args(1) {
 
     unless ($user) {
         $c->flash->{error_msg} = 'User not found.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2873,7 +2890,7 @@ sub admin_delete_user :Local :Args(1) {
 
     if ($user_id == $admin_uid) {
         $c->flash->{error_msg} = 'You cannot delete your own account.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -2886,7 +2903,7 @@ sub admin_delete_user :Local :Args(1) {
             })->count;
             unless ($access) {
                 $c->flash->{error_msg} = 'Access denied. You can only delete users in your site.';
-                $c->response->redirect($c->uri_for('/admin/users'));
+                $c->response->redirect($c->uri_for('/user/list_users'));
                 return;
             }
         }
@@ -2945,13 +2962,13 @@ sub do_admin_delete_user :Local :Args(1) {
 
     unless ($user) {
         $c->flash->{error_msg} = 'User not found.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
     if ($user_id == $admin_uid) {
         $c->flash->{error_msg} = 'You cannot delete your own account.';
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -3070,7 +3087,7 @@ sub do_admin_delete_user :Local :Args(1) {
             "User deletion failed: $deleted_username",
             "user_id=$user_id\nerror=$delete_err");
         $c->flash->{error_msg} = "Failed to delete user '$deleted_username': $delete_err";
-        $c->response->redirect($c->uri_for('/admin/users'));
+        $c->response->redirect($c->uri_for('/user/list_users'));
         return;
     }
 
@@ -3079,7 +3096,7 @@ sub do_admin_delete_user :Local :Args(1) {
         "AUDIT: User deleted username='$deleted_username' user_id=$user_id admin_id=$admin_uid ip=$del_ip");
 
     $c->flash->{success_msg} = "User '$deleted_username' deleted successfully.";
-    $c->response->redirect($c->uri_for('/admin/users'));
+    $c->response->redirect($c->uri_for('/user/list_users'));
 }
 
 sub register :Local {
