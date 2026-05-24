@@ -288,7 +288,41 @@ document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
         <a href="/todo[% url_hash %]">Back to Todo List</a>
         <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week ▶</a>
     </div>
+    [% IF ap_all_sitenames.size > 0 %]
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:4px 0 8px 0;">
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">Site:</span>
+        <select id="week-site-filter" onchange="weekApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH sname IN ap_all_sitenames %]
+            <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
+            [% END %]
+        </select>
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">User:</span>
+        <select id="week-user-filter" onchange="weekApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH uname IN ap_all_usernames %]
+            <option value="[% uname %]"[% IF cal_filter_user == uname %] selected[% END %]>[% uname %]</option>
+            [% END %]
+        </select>
+    </div>
+    [% END %]
 [% END %]
+
+<script>
+function weekApplyFilters() {
+    var siteSel = document.getElementById('week-site-filter');
+    var userSel = document.getElementById('week-user-filter');
+    var filterSite = siteSel ? siteSel.value : '';
+    var filterUser = userSel ? userSel.value : '';
+    var newUrl = window.location.pathname + '?site=' + encodeURIComponent(filterSite) + '&user=' + encodeURIComponent(filterUser);
+    fetch('/planning/set_filter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: filterSite, user: filterUser })
+    }).then(function() { window.location.href = newUrl; }).catch(function() { window.location.href = newUrl; });
+}
+</script>
 
 [%# Use pre-built todos_by_date from Perl controller if available (recurrence rules applied).
     Perl correctly handles weekly/biweekly/monthly/yearly recurrence — TT2 cannot compute day-of-week.

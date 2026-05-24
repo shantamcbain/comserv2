@@ -488,7 +488,32 @@ document.addEventListener('DOMContentLoaded', function() {
         <a href="/todo[% url_hash %]">Back to Todo List</a>
         <a href="/todo/month/[% next_month_date %][% url_hash %]">Next Month ▶</a>
     </div>
+    [% IF ap_all_sitenames.size > 0 %]
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:4px 0 8px 0;">
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">Site:</span>
+        <select id="month-site-filter" onchange="monthApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH sname IN ap_all_sitenames %]
+            <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
+            [% END %]
+        </select>
+    </div>
+    [% END %]
 [% END %]
+
+<script>
+function monthApplyFilters() {
+    var siteSel = document.getElementById('month-site-filter');
+    var filterSite = siteSel ? siteSel.value : '';
+    var newUrl = window.location.pathname;
+    fetch('/planning/set_filter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: filterSite })
+    }).then(function() { window.location.href = newUrl; }).catch(function() { window.location.href = newUrl; });
+}
+</script>
 
 [% # Calculate overdue todos (before the first day of this month) %]
 [% SET all_overdue_todos = [] %]
