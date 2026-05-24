@@ -160,7 +160,12 @@ sub daily :Path('/planning/daily') :Args {
                 };
                 push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
             }
-            my $filter_site = $c->session->{cal_filter_site} // '';
+            my $filter_site;
+            if (!exists $c->session->{cal_filter_site}) {
+                $filter_site = $sitename;
+            } else {
+                $filter_site = $c->session->{cal_filter_site} // '';
+            }
             my @_filtered_sites = ($filter_site && grep { $_ eq $filter_site } @_cal_sites) ? ($filter_site) : @_cal_sites;
             $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_filtered_sites);
             if (my $filter_user = $c->session->{cal_filter_user} // '') {
@@ -641,7 +646,7 @@ sub daily :Path('/planning/daily') :Args {
             ap_user_roles    => $user_roles,
             ap_all_sitenames => \@ap_all_sitenames,
             ap_all_usernames => \@ap_all_usernames,
-            cal_filter_site  => ($c->session->{cal_filter_site} // ''),
+            cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : $sitename),
             cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         );
     };
