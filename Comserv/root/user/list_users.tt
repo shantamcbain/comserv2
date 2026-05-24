@@ -75,8 +75,11 @@
         <td>[% u.created_date | html %]</td>
         <td class="action-cell">
             <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
-            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
-               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+            <form method="post" action="[% c.uri_for('/user/do_admin_delete_user', u.id) %]" style="display:inline"
+                  onsubmit="return confirm('Delete user [% u.username | html %]?')">
+                <input type="hidden" name="todo_action" value="delete">
+                <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+            </form>
         </td>
     </tr>
     [% END %]
@@ -116,8 +119,11 @@
         <td>[% u.created_date | html %]</td>
         <td class="action-cell">
             <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
-            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
-               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+            <form method="post" action="[% c.uri_for('/user/do_admin_delete_user', u.id) %]" style="display:inline"
+                  onsubmit="return confirm('Delete user [% u.username | html %]?')">
+                <input type="hidden" name="todo_action" value="delete">
+                <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+            </form>
         </td>
     </tr>
     [% END %]
@@ -170,8 +176,11 @@
         </td>
         <td class="action-cell">
             <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
-            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
-               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+            <form method="post" action="[% c.uri_for('/user/do_admin_delete_user', u.id) %]" style="display:inline"
+                  onsubmit="return confirm('Delete user [% u.username | html %]?')">
+                <input type="hidden" name="todo_action" value="delete">
+                <button type="submit" class="btn btn-sm btn-delete">Delete</button>
+            </form>
         </td>
     </tr>
     [% END %]
@@ -222,5 +231,9 @@ function confirmBulk() {
 .text-danger { color:#c0392b; }
 details[open] .group-header::before { content:'▲ '; font-size:0.7em; }
 details:not([open]) .group-header::before { content:'▶ '; font-size:0.7em; }
-.table-container { overflow-x:auto; width:100%; max-width:100%; }
+.data-container { overflow:hidden; max-width:100%; }
+.table-container { overflow-x:auto; width:100%; }
+.data-table { table-layout:auto; word-break:break-word; }
+.data-table td, .data-table th { max-width:220px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.data-table td.action-cell, .data-table th:last-child { white-space:nowrap; width:1%; }
 </style>
