@@ -29,9 +29,11 @@
     <div class="form-section">
         <h3>Cloudflare API Token</h3>
         <p class="form-hint">
-            Create a token at
+            &#9888; <strong>This is NOT the Cloudflare Tunnel token.</strong>
+            Create a <strong>DNS API token</strong> at
             <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare → My Profile → API Tokens</a>
-            with permissions: <strong>Zone → DNS → Read + Edit</strong> on all zones.
+            — use the <em>"Edit zone DNS"</em> template → permissions: <strong>Zone → DNS → Edit</strong> on all zones.
+            The token will be ~40 alphanumeric characters (not a UUID).
         </p>
 
         <div class="form-row">
