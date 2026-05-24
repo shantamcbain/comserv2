@@ -847,12 +847,14 @@ function gcalApplyFilters() {
         var userOk = !filterUser || user === filterUser;
         el.style.display = (siteOk && userOk) ? '' : 'none';
     });
-    fetch('/planning/set_filter', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ site: filterSite, user: filterUser })
-    }).catch(function(){});
+    if (window.self === window.top) {
+        fetch('/planning/set_filter', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site: filterSite, user: filterUser })
+        }).catch(function(){});
+    }
 }
 
 function gcalNavigateDay(dir) {
@@ -1006,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(gcalUpdateNowLine, 60000);
     initGcalDragDrop();
     gcalPopulateUserFilter();
+    gcalApplyFilters();
     if (typeof initDayViewDragAndDrop === 'function') {
         initDayViewDragAndDrop();
     }
