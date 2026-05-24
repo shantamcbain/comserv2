@@ -55,7 +55,7 @@
                 <label for="domain">Full Domain / Subdomain
                     <small>(e.g. icehorse.[% cf_zone_name | html %])</small></label>
                 <input type="text" id="domain" name="domain" class="form-input"
-                       value="[% request.domain | html %]" required
+                       value="[% suggested_domain | html %]" required
                        placeholder="e.g. icehorse.[% cf_zone_name | html %]">
                 [% IF cf_zone_name && request.domain == cf_zone_name %]
                 <small class="form-hint" style="color:#b45309;">
