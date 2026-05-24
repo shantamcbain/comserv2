@@ -1,5 +1,4 @@
-[% META title = 'User Management' %]
-[% PageVersion = 'user/list_users.tt,v 0.03 2026/05/24' %]
+[% PageVersion = 'user/list_users.tt,v 0.04 2026/05/24' %]
 [% IF debug_mode == 1 %][% PageVersion %][% INCLUDE 'debug.tt' %][% END %]
 
 <div class="app-container">
@@ -7,7 +6,6 @@
 <div class="page-header">
     <h1>User Management</h1>
     <div class="form-actions">
-        <a href="[% c.uri_for('/user/admin_purge_unverified') %]" class="btn btn-secondary">&#128465; Purge Unverified</a>
         <a href="[% c.uri_for('/user/admin_create_user') %]" class="btn btn-primary">+ Add User</a>
     </div>
 </div>
@@ -50,95 +48,146 @@
     </div>
 </form>
 
-[% MACRO user_row(u, show_check) BLOCK %]
-<tr class="[% u.stale ? 'row-stale' : '' %] [% u.email_failed ? 'row-failed' : '' %]">
-    [% IF show_check %]
-    <td class="action-cell">
-        <input type="checkbox" name="delete_ids" value="[% u.id | html %]"
-               [% u.stale || u.email_failed ? 'checked' : '' %]>
-    </td>
+<div class="data-container">
+<details open>
+<summary class="group-header">
+    &#127775; Members &amp; Above
+    <span class="status-badge count-badge">[% members.size %]</span>
+</summary>
+[% IF members.size %]
+<div class="table-container">
+<table class="data-table">
+    <thead><tr>
+        <th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Verification</th><th>Registered</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+    [% FOREACH u IN members %]
+    <tr>
+        <td><strong>[% u.username | html %]</strong></td>
+        <td>[% u.first_name | html %] [% u.last_name | html %]</td>
+        <td>[% IF u.email %]<a href="mailto:[% u.email | html %]">[% u.email | html %]</a>[% ELSE %]<span class="text-muted">(none)</span>[% END %]</td>
+        <td>[% IF u.roles %]<span class="status-badge">[% u.roles | html %]</span>[% ELSE %]<span class="text-muted">—</span>[% END %]</td>
+        <td>
+            [% IF u.email_verified_at %]<span class="status-badge status-active">&#10003; Verified</span>
+            [% ELSIF u.status == 'pending_verification' %]<span class="status-badge status-pending">Pending</span>
+            [% ELSE %]<span class="status-badge">[% u.status | html %]</span>[% END %]
+        </td>
+        <td>[% u.created_date | html %]</td>
+        <td class="action-cell">
+            <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
+            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
+               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+        </td>
+    </tr>
     [% END %]
-    <td><strong>[% u.username | html %]</strong></td>
-    <td>[% u.first_name | html %] [% u.last_name | html %]</td>
-    <td>
-        [% IF u.email %]<a href="mailto:[% u.email | html %]">[% u.email | html %]</a>[% ELSE %]<span class="text-muted">(none)</span>[% END %]
-        [% IF u.email_failed %]<span class="status-badge" style="background:#c0392b;color:#fff;" title="All verification codes expired — email may have bounced">&#9888; Email failed</span>[% END %]
-    </td>
-    <td>
-        [% IF u.roles %]<span class="status-badge">[% u.roles | html %]</span>[% ELSE %]<span class="text-muted">—</span>[% END %]
-    </td>
-    <td>
-        [% IF u.email_verified_at %]
-            <span class="status-badge status-active" title="[% u.email_verified_at | html %]">&#10003; Verified</span>
-        [% ELSIF u.status == 'pending_verification' %]
-            <span class="status-badge status-pending">Pending</span>
-        [% ELSE %]
-            <span class="status-badge">[% u.status | html %]</span>
-        [% END %]
-    </td>
-    <td title="[% u.created_at | html %]">
-        [% u.created_at.substr(0,10) | html %]
-        [% IF u.stale %]<small class="text-danger">&nbsp;([% u.age_days | html %]d old)</small>[% END %]
-    </td>
-    <td class="action-cell">
-        <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
-        <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
-           onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
-    </td>
-</tr>
-[% END %]
-
-[% MACRO group_table(group_name, group_id, rows, show_check, open) BLOCK %]
-<div class="data-container" style="margin-bottom:1rem;">
-    <div class="form-section">
-        <h3 style="cursor:pointer;user-select:none;" onclick="toggleGroup('[% group_id %]')">
-            [% group_name %]
-            <span class="status-badge" style="font-size:0.8em;background:#6c757d;color:#fff;">[% rows.size %]</span>
-            <span id="arrow-[% group_id %]" style="float:right;font-size:0.85em;">[% open ? '&#9650;' : '&#9660;' %] [% open ? 'collapse' : 'expand' %]</span>
-        </h3>
-        <div id="[% group_id %]" [% open ? '' : 'style="display:none"' %]>
-        [% IF rows.size %]
-        [% IF show_check %]
-        <form method="post" action="[% c.uri_for('/user/bulk_delete_users') %]" id="form-[% group_id %]"
-              onsubmit="return confirmBulk('[% group_id %]')">
-        [% END %]
-        <div class="table-container">
-        <table class="data-table">
-            <thead><tr>
-                [% IF show_check %]<th><input type="checkbox" onclick="toggleAll('[% group_id %]', this)"> All</th>[% END %]
-                <th>Username</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Role</th>
-                <th>Verification</th>
-                <th>Registered</th>
-                <th>Actions</th>
-            </tr></thead>
-            <tbody>
-            [% FOREACH u IN rows %]
-                [% user_row(u, show_check) %]
-            [% END %]
-            </tbody>
-        </table>
-        </div>
-        [% IF show_check %]
-        <div class="form-actions" style="margin-top:0.5rem;">
-            <button type="submit" class="btn btn-delete">&#128465; Delete Selected</button>
-            <button type="button" class="btn btn-secondary" onclick="clearChecks('[% group_id %]')">Clear</button>
-        </div>
-        </form>
-        [% END %]
-        [% ELSE %]
-        <div class="empty-state"><p>No users in this group.</p></div>
-        [% END %]
-        </div>
-    </div>
+    </tbody>
+</table>
 </div>
+[% ELSE %]
+<div class="empty-state"><p>No members found.</p></div>
 [% END %]
+</details>
+</div>
 
-[% group_table('&#127775; Members &amp; Above', 'grp-members', members, 0, 1) %]
-[% group_table('&#10003; Verified (Normal)', 'grp-verified', verified, 0, 1) %]
-[% group_table('&#9203; Pending / Unverified', 'grp-pending', pending, 1, 1) %]
+<div class="data-container">
+<details>
+<summary class="group-header">
+    &#10003; Verified (Normal)
+    <span class="status-badge count-badge">[% verified.size %]</span>
+</summary>
+[% IF verified.size %]
+<div class="table-container">
+<table class="data-table">
+    <thead><tr>
+        <th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Verification</th><th>Registered</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+    [% FOREACH u IN verified %]
+    <tr>
+        <td><strong>[% u.username | html %]</strong></td>
+        <td>[% u.first_name | html %] [% u.last_name | html %]</td>
+        <td>[% IF u.email %]<a href="mailto:[% u.email | html %]">[% u.email | html %]</a>[% ELSE %]<span class="text-muted">(none)</span>[% END %]</td>
+        <td>[% IF u.roles %]<span class="status-badge">[% u.roles | html %]</span>[% ELSE %]<span class="text-muted">—</span>[% END %]</td>
+        <td>
+            [% IF u.email_verified_at %]<span class="status-badge status-active">&#10003; Verified</span>
+            [% ELSIF u.status == 'pending_verification' %]<span class="status-badge status-pending">Pending</span>
+            [% ELSE %]<span class="status-badge">[% u.status | html %]</span>[% END %]
+        </td>
+        <td>[% u.created_date | html %]</td>
+        <td class="action-cell">
+            <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
+            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
+               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+        </td>
+    </tr>
+    [% END %]
+    </tbody>
+</table>
+</div>
+[% ELSE %]
+<div class="empty-state"><p>No verified users found.</p></div>
+[% END %]
+</details>
+</div>
+
+<div class="data-container">
+<details open>
+<summary class="group-header">
+    &#9203; Pending / Unverified
+    <span class="status-badge count-badge">[% pending.size %]</span>
+</summary>
+[% IF pending.size %]
+<form method="post" action="[% c.uri_for('/user/bulk_delete_users') %]" id="form-pending"
+      onsubmit="return confirmBulk()">
+<div class="table-container">
+<table class="data-table">
+    <thead><tr>
+        <th><input type="checkbox" id="chk-all" onclick="toggleAll(this)"> All</th>
+        <th>Username</th><th>Name</th><th>Email</th><th>Role</th><th>Verification</th><th>Registered</th><th>Actions</th>
+    </tr></thead>
+    <tbody>
+    [% FOREACH u IN pending %]
+    <tr[% IF u.stale %] class="row-stale"[% ELSIF u.email_failed %] class="row-failed"[% END %]>
+        <td class="action-cell">
+            <input type="checkbox" name="delete_ids" value="[% u.id | html %]"
+                   [% u.stale || u.email_failed ? 'checked' : '' %]>
+        </td>
+        <td><strong>[% u.username | html %]</strong></td>
+        <td>[% u.first_name | html %] [% u.last_name | html %]</td>
+        <td>
+            [% IF u.email %]<a href="mailto:[% u.email | html %]">[% u.email | html %]</a>[% ELSE %]<span class="text-muted">(none)</span>[% END %]
+            [% IF u.email_failed %]<span class="status-badge badge-danger" title="All codes expired — email may have bounced">&#9888; Failed</span>[% END %]
+        </td>
+        <td>[% IF u.roles %]<span class="status-badge">[% u.roles | html %]</span>[% ELSE %]<span class="text-muted">—</span>[% END %]</td>
+        <td>
+            [% IF u.email_verified_at %]<span class="status-badge status-active">&#10003; Verified</span>
+            [% ELSIF u.status == 'pending_verification' %]<span class="status-badge status-pending">Pending</span>
+            [% ELSE %]<span class="status-badge">[% u.status | html %]</span>[% END %]
+        </td>
+        <td title="[% u.created_at | html %]">
+            [% u.created_date | html %]
+            [% IF u.stale %]<small class="text-danger">&nbsp;([% u.age_days | html %]d)</small>[% END %]
+        </td>
+        <td class="action-cell">
+            <a href="[% c.uri_for('/user/edit_user', u.id) %]" class="btn btn-sm btn-edit">Edit</a>
+            <a href="[% c.uri_for('/user/admin_delete_user', u.id) %]" class="btn btn-sm btn-delete"
+               onclick="return confirm('Delete user [% u.username | html %]?')">Delete</a>
+        </td>
+    </tr>
+    [% END %]
+    </tbody>
+</table>
+</div>
+<div class="form-actions" style="margin-top:0.5rem;">
+    <button type="submit" class="btn btn-delete">&#128465; Delete Selected</button>
+    <button type="button" class="btn btn-secondary" onclick="clearChecks()">Clear</button>
+</div>
+</form>
+[% ELSE %]
+<div class="empty-state"><p>No pending users.</p></div>
+[% END %]
+</details>
+</div>
 
 </div>
 </div>
@@ -146,37 +195,31 @@
 </div>
 
 <script>
-function toggleGroup(id) {
-    var el = document.getElementById(id);
-    var arrow = document.getElementById('arrow-' + id);
-    if (!el) return;
-    var open = el.style.display !== 'none';
-    el.style.display = open ? 'none' : '';
-    if (arrow) arrow.innerHTML = open ? '&#9660; expand' : '&#9650; collapse';
+function toggleAll(cb) {
+    document.querySelectorAll('#form-pending input[name="delete_ids"]')
+        .forEach(function(b) { b.checked = cb.checked; });
 }
-function toggleAll(groupId, cb) {
-    var form = document.getElementById('form-' + groupId);
-    if (!form) return;
-    var boxes = form.querySelectorAll('input[name="delete_ids"]');
-    boxes.forEach(function(b) { b.checked = cb.checked; });
+function clearChecks() {
+    document.querySelectorAll('#form-pending input[name="delete_ids"]')
+        .forEach(function(b) { b.checked = false; });
+    document.getElementById('chk-all').checked = false;
 }
-function clearChecks(groupId) {
-    var form = document.getElementById('form-' + groupId);
-    if (!form) return;
-    form.querySelectorAll('input[name="delete_ids"]').forEach(function(b) { b.checked = false; });
-}
-function confirmBulk(groupId) {
-    var form = document.getElementById('form-' + groupId);
-    if (!form) return false;
-    var checked = form.querySelectorAll('input[name="delete_ids"]:checked').length;
+function confirmBulk() {
+    var checked = document.querySelectorAll('#form-pending input[name="delete_ids"]:checked').length;
     if (!checked) { alert('No users selected.'); return false; }
     return confirm('Permanently delete ' + checked + ' selected user(s)? This cannot be undone.');
 }
 </script>
 
 <style>
-.row-stale td { background: rgba(255,200,0,0.08); }
-.row-failed td { background: rgba(220,50,50,0.07); }
-.text-muted { color: #aaa; font-style: italic; }
-.text-danger { color: #c0392b; }
+.group-header { cursor:pointer; font-size:1.1em; font-weight:bold; padding:0.6rem 0.4rem; list-style:none; display:flex; align-items:center; gap:0.5rem; }
+.group-header::-webkit-details-marker { display:none; }
+.count-badge { background:#6c757d; color:#fff; font-size:0.75em; padding:0.15em 0.5em; border-radius:1em; }
+.badge-danger { background:#c0392b; color:#fff; }
+.row-stale td { background:rgba(255,200,0,0.10); }
+.row-failed td { background:rgba(220,50,50,0.08); }
+.text-muted { color:#aaa; font-style:italic; }
+.text-danger { color:#c0392b; }
+details[open] .group-header::before { content:'▲ '; font-size:0.7em; }
+details:not([open]) .group-header::before { content:'▶ '; font-size:0.7em; }
 </style>
