@@ -177,6 +177,16 @@ sub psgi_app {
 
 # Session store is now properly configured in the plugin list above
 
+# LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
+# that could be injected (e.g. HTML entities like &#39; from attackers)
+around 'get_session_id' => sub {
+    my ($orig, $c, @args) = @_;
+    my $id = eval { $c->$orig(@args) };
+    return undef if $@ || !defined $id;
+    $id =~ s/[^0-9a-fA-F]//g;
+    return length($id) >= 20 ? lc($id) : undef;
+};
+
 # LAYER 3: Global Application Error Handler
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {

@@ -29,6 +29,10 @@
 <p><a href="[% c.uri_for('/ENCY/Disease') %]">&larr; Back to Diseases</a>
 [% IF is_editor && !edit_mode && disease.record_id %]
   | <a href="[% c.uri_for('/ENCY/Disease/edit', { record_id => disease.record_id }) %]">Edit</a>
+  | <form method="post" action="[% c.uri_for('/ENCY/DiseaseDelete') %]" style="display:inline;" onsubmit="return confirm('Delete disease &quot;[% disease.common_name | html %]&quot;? This cannot be undone.');">
+      <input type="hidden" name="record_id" value="[% disease.record_id %]" />
+      <button type="submit" style="background:none;border:none;padding:0;color:#c00;cursor:pointer;font-size:1em;text-decoration:underline;">Delete</button>
+    </form>
 [% END %]
 </p>
 
@@ -308,4 +312,10 @@
 <input type="submit" value="[% IF disease.record_id %]Update Disease[% ELSE %]Add Disease[% END %]" class="btn btn-primary" />
 <a href="[% c.uri_for('/ENCY/Disease') %]" class="btn btn-default">Cancel</a>
 </form>
+[% IF is_editor && disease.record_id %]
+<form method="post" action="[% c.uri_for('/ENCY/DiseaseDelete') %]" style="display:inline;margin-left:1em;" onsubmit="return confirm('Delete disease &quot;[% disease.common_name | html %]&quot;? This cannot be undone.');">
+  <input type="hidden" name="record_id" value="[% disease.record_id %]" />
+  <button type="submit" class="btn btn-danger">Delete</button>
+</form>
+[% END %]
 [% END %]
