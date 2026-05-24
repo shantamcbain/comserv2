@@ -196,6 +196,25 @@ sub _get_user_accessible_sites {
     return @sites ? \@sites : [$c->session->{SiteName}];
 }
 
+sub _get_filtered_calendar_sites {
+    my ($self, $c, $all_sites) = @_;
+    my $filter_site = $c->session->{cal_filter_site} // '';
+    return $all_sites unless $filter_site && $filter_site ne '';
+    return (grep { $_ eq $filter_site } @$all_sites) ? [$filter_site] : $all_sites;
+}
+
+sub _apply_user_filter {
+    my ($self, $c, $todos) = @_;
+    my $filter_user = $c->session->{cal_filter_user} // '';
+    return $todos unless $filter_user && $filter_user ne '';
+    my @filtered = grep {
+        my $dev = eval { $_->developer }          // '';
+        my $uop = eval { $_->username_of_poster } // '';
+        $dev eq $filter_user || $uop eq $filter_user;
+    } @$todos;
+    return \@filtered;
+}
+
 # Apply restrictions to the entire controller
 sub begin :Private {
     my ($self, $c) = @_;
@@ -1843,11 +1862,13 @@ sub day :Path('/todo/day') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    my $calendar_sites = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites);
+    my $calendar_sites          = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites = $self->_get_filtered_calendar_sites($c, $calendar_sites);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
-        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$calendar_sites));
+        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$filtered_calendar_sites));
 
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
@@ -1970,6 +1991,8 @@ sub day :Path('/todo/day') :Args {
         is_csc                 => $day_is_csc,
         ap_all_sitenames       => \@day_all_sitenames,
         ap_all_usernames       => \@day_all_usernames,
+        cal_filter_site        => ($c->session->{cal_filter_site} // ''),
+        cal_filter_user        => ($c->session->{cal_filter_user} // ''),
         template               => 'todo/day.tt',
     );
 
@@ -2020,8 +2043,10 @@ sub week :Path('/todo/week') :Args {
         };
     }
 
-    my $calendar_sites_w = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_w);
+    my $calendar_sites_w         = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites_w = $self->_get_filtered_calendar_sites($c, $calendar_sites_w);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites_w);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
@@ -2084,6 +2109,28 @@ sub week :Path('/todo/week') :Args {
         }
     }
 
+    my $week_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @week_all_usernames;
+    eval {
+        if ($week_is_csc) {
+            my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                {}, { columns => ['username'], order_by => 'username', rows => 200 }
+            )->all;
+            my %seen;
+            for my $r (@urows) {
+                my $u = eval { $r->username } // '';
+                push @week_all_usernames, $u if $u && !$seen{$u}++;
+            }
+        } else {
+            my %seen;
+            for my $t (@sorted_todos) {
+                my $u = eval { $t->developer || $t->username_of_poster || '' };
+                push @week_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            @week_all_usernames = sort @week_all_usernames;
+        }
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -2096,6 +2143,11 @@ sub week :Path('/todo/week') :Args {
         next_week_date => $next_week_date,
         week_dates => \@week_dates,
         proj_name_map => \%week_proj_map,
+        ap_all_sitenames => $calendar_sites_w,
+        ap_all_usernames => \@week_all_usernames,
+        cal_filter_site  => ($c->session->{cal_filter_site} // ''),
+        cal_filter_user  => ($c->session->{cal_filter_user} // ''),
+        is_csc           => $week_is_csc,
         template => 'todo/week.tt',
     );
 
@@ -2127,8 +2179,10 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    my $calendar_sites_m = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_m);
+    my $calendar_sites_m          = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites_m = $self->_get_filtered_calendar_sites($c, $calendar_sites_m);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites_m);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
@@ -2176,6 +2230,8 @@ sub month :Path('/todo/month') :Args {
     # Get today's date for highlighting
     my $today = DateTime->now->ymd;
 
+    my $month_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+
     # Add the todos and calendar to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -2188,6 +2244,10 @@ sub month :Path('/todo/month') :Args {
         prev_month_date => $prev_month_date,
         next_month_date => $next_month_date,
         today => $today,
+        ap_all_sitenames => $calendar_sites_m,
+        cal_filter_site  => ($c->session->{cal_filter_site} // ''),
+        cal_filter_user  => ($c->session->{cal_filter_user} // ''),
+        is_csc           => $month_is_csc,
         template => 'todo/month.tt',
     );
 
