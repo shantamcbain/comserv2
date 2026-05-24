@@ -81,7 +81,71 @@ sub add :Path('add') :Args(0) {
         return;
     }
 
-    $c->stash(template => 'admin/site_provisioning/add.tt');
+    my ($cf_zones, $default_domain, $server_ip) = $self->_get_cloudflare_data($c);
+    $c->stash(
+        template       => 'admin/site_provisioning/add.tt',
+        cf_zones       => $cf_zones,
+        default_domain => $default_domain,
+        server_ip      => $server_ip,
+    );
+}
+
+sub _get_cloudflare_data {
+    my ($self, $c) = @_;
+    my @zones;
+    my $default_domain = '';
+    my $server_ip = $ENV{SERVER_PUBLIC_IP} || '';
+
+    my $site_name = $c->session->{SiteName} || $c->stash->{SiteName} || '';
+    if ($site_name) {
+        my $sd = eval {
+            $c->model('DBEncy')->resultset('SiteDomain')
+              ->search({ site_id => { -in =>
+                  $c->model('DBEncy')->resultset('Site')
+                    ->search({ name => $site_name }, { columns => ['id'] })
+                    ->as_query
+              }}, { rows => 1 })->first
+        };
+        $default_domain = $sd->domain if $sd;
+    }
+
+    eval {
+        my $cf = Comserv::Util::CloudflareManager->new();
+        my $email = $c->session->{email} || $ENV{CLOUDFLARE_EMAIL} || '';
+        my $raw = $cf->list_zones($email);
+        my @raw_zones = ref $raw eq 'ARRAY' ? @$raw : ();
+
+        for my $zone (@raw_zones) {
+            my $zname = ref $zone eq 'HASH' ? $zone->{name} : "$zone";
+            next unless $zname;
+
+            my @a_records;
+            eval {
+                my $records = $cf->list_dns_records($email, $zname);
+                for my $r (@{ $records || [] }) {
+                    next unless ref $r eq 'HASH' && ($r->{type} || '') eq 'A';
+                    push @a_records, { name => $r->{name}, ip => $r->{content} };
+                }
+            };
+
+            my $zone_ip = '';
+            for my $r (@a_records) {
+                if ($r->{name} eq $zname || $r->{name} eq '@') {
+                    $zone_ip = $r->{ip};
+                    last;
+                }
+            }
+            $server_ip ||= $zone_ip;
+
+            push @zones, {
+                name      => $zname,
+                ip        => $zone_ip,
+                a_records => \@a_records,
+            };
+        }
+    };
+
+    return (\@zones, $default_domain, $server_ip);
 }
 
 sub review :Path('review') :Args(1) {
