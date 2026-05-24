@@ -487,7 +487,23 @@ sub cf_settings :Path('cf_settings') :Args(0) {
     if ($c->req->method eq 'POST') {
         my $p     = $c->req->params;
         my $token = $p->{api_token} // '';
-        my $email = $p->{email}     // $db_email;
+        $token =~ s/^\s+|\s+$//g;
+        my $email = $p->{email} // $db_email;
+
+        if ($token) {
+            if ($token =~ /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i) {
+                $c->flash->{error_msg} = 'That looks like a Cloudflare Tunnel token (UUID format), not a DNS API token. '
+                    . 'Create a DNS API token at: https://dash.cloudflare.com/profile/api-tokens '
+                    . '— use the "Edit zone DNS" template with Zone:DNS:Edit permissions.';
+                $c->response->redirect($c->uri_for($self->action_for('cf_settings')));
+                return;
+            }
+            if (length($token) < 30) {
+                $c->flash->{error_msg} = 'Token too short — Cloudflare API tokens are typically 40+ characters.';
+                $c->response->redirect($c->uri_for($self->action_for('cf_settings')));
+                return;
+            }
+        }
 
         eval {
             if ($token) {
