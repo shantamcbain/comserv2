@@ -114,7 +114,27 @@ sub _build_config {
     my ($self) = @_;
     
     my $config = {};
-    
+
+    # FIRST: check ~/.comserv/secrets/cloudflare.json — shared across all branches and Docker mounts
+    my $secrets_dir = $ENV{COMSERV_SECRETS_DIR}
+                   || File::Spec->catfile($ENV{HOME} || '/root', '.comserv', 'secrets');
+    my $shared_cf_path = File::Spec->catfile($secrets_dir, 'cloudflare.json');
+    try {
+        if (-f $shared_cf_path) {
+            open my $fh, '<:encoding(UTF-8)', $shared_cf_path
+                or die "Cannot open $shared_cf_path: $!";
+            my $json = do { local $/; <$fh> };
+            close $fh;
+            my $shared = decode_json($json);
+            $self->logger->info("Cloudflare credentials loaded from shared secrets: $shared_cf_path");
+            if ($shared->{cloudflare}) {
+                $config->{cloudflare} = { %{ $config->{cloudflare} || {} }, %{ $shared->{cloudflare} } };
+            }
+        }
+    } catch {
+        $self->logger->warn("Could not load shared CF secrets from $shared_cf_path: $_");
+    };
+
     # Try to load the api_credentials.json file
     my $base_dir = $ENV{CATALYST_HOME} || '.';
     my $api_creds_path = File::Spec->catfile($base_dir, 'config', 'api_credentials.json');
