@@ -105,6 +105,30 @@
 
 [% ELSE %]
 
+[% IF error_source && (error_source.server || error_source.branch || error_source.file) %]
+<div style="background:#fff3cd;border:2px solid #ffc107;border-radius:6px;padding:12px 16px;margin-bottom:16px">
+  <strong style="font-size:1.1em;color:#856404">⚠ Error Source</strong>
+  <table style="margin-top:8px;border-collapse:collapse;font-size:0.9em">
+    [% IF error_source.server %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">🖥 Server:</td>
+        <td style="font-family:monospace">[% error_source.server | html %]</td></tr>
+    [% END %]
+    [% IF error_source.branch %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">🌿 Branch:</td>
+        <td style="font-family:monospace">[% error_source.branch | html %]</td></tr>
+    [% END %]
+    [% IF error_source.file %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">📄 File:</td>
+        <td style="font-family:monospace">[% error_source.file | html %]</td></tr>
+    [% END %]
+    [% IF error_source.function %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">⚙ Function:</td>
+        <td style="font-family:monospace">[% error_source.function | html %]</td></tr>
+    [% END %]
+  </table>
+</div>
+[% END %]
+
 <table border="0" cellpadding="6" style="width:100%;max-width:800px">
     <tr><th align="left" width="180">Record ID</th>
         <td>[% record.get_column('record_id') %]</td></tr>

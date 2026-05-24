@@ -502,6 +502,25 @@ sub details :Path('/todo/details') :Args {
         my $current_status   = $self->normalize_status($todo->get_column('status'));
         my $current_priority = $todo->get_column('priority') // 5;
 
+        my %error_source = ();
+        my $subj = $todo->get_column('subject') // '';
+        if ($subj =~ /^\[(Error|AUDIT)\]/i) {
+            my $comments = $todo->get_column('comments') // '';
+            my $desc     = $todo->get_column('description') // '';
+            if ($comments =~ /^Server:/m) {
+                $error_source{server}   = ($comments =~ /^Server:\s*(.+)/m)   ? $1 : '';
+                $error_source{branch}   = ($comments =~ /^Branch:\s*(.+)/m)   ? $1 : '';
+                $error_source{file}     = ($comments =~ /^File:\s*(.+)/m)     ? $1 : '';
+                $error_source{function} = ($comments =~ /^Function:\s*(.+)/m) ? $1 : '';
+            } else {
+                ($error_source{server})   = $desc =~ /\[([a-zA-Z0-9._-]+:\d+)\]/;
+                ($error_source{branch})   = $desc =~ m{/worktrees/([^/]+)/};
+                ($error_source{file})     = $desc =~ m{(Comserv/[^\s\]]+\.pm(?::\d+)?)};
+                ($error_source{function}) = $desc =~ /\] (\S+) - /;
+            }
+            $_ = ($_ // '') =~ s/^\s+|\s+$//gr for values %error_source;
+        }
+
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
@@ -512,6 +531,7 @@ sub details :Path('/todo/details') :Args {
             projects          => $projects,
             todo_intervals    => \@intervals,
             ai_conversations  => \@ai_conversations,
+            error_source      => \%error_source,
             return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
