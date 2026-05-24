@@ -365,7 +365,8 @@ sub _create_cloudflare_dns {
         return;
     }
     try {
-        my $cf = Comserv::Util::CloudflareManager->new();
+        my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+        my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
         my ($parent_zone, $record_name);
         if ($domain_type eq 'subdomain') {
             ($record_name, $parent_zone) = ($domain =~ /^([^.]+)\.(.+)$/);
@@ -375,12 +376,37 @@ sub _create_cloudflare_dns {
             $parent_zone = $domain;
             $record_name = '@';
         }
-        my $admin_email = $c->session->{email} || $ENV{CLOUDFLARE_EMAIL} || '';
-        $cf->create_dns_record($admin_email, $parent_zone, 'A', $record_name, $server_ip, 1, 1);
-        push @$steps, "Cloudflare DNS: created A record '$record_name' → $server_ip in zone '$parent_zone'.";
+        my $zones_resp = $cf->_api_request('GET', "/zones?name=" . URI::Escape::uri_escape($parent_zone) . "&per_page=5");
+        my @zones = ref $zones_resp eq 'HASH'  ? @{ $zones_resp->{result} || [] }
+                  : ref $zones_resp eq 'ARRAY' ? @$zones_resp
+                  : ();
+        my $zone_id = @zones ? $zones[0]{id} : '';
+        die "Zone '$parent_zone' not found in Cloudflare" unless $zone_id;
+        $cf->_api_request('POST', "/zones/$zone_id/dns_records", {
+            type    => 'A',
+            name    => $record_name,
+            content => $server_ip,
+            ttl     => 1,
+            proxied => \1,
+        });
+        push @$steps, "Cloudflare DNS: created A record '$record_name.$parent_zone' → $server_ip.";
     } catch {
         push @$steps, "Cloudflare DNS: skipped (error: $_). Create the DNS record manually.";
     };
+}
+
+sub retry_dns :Path('retry_dns') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
+    unless ($request) {
+        $c->flash->{error_msg} = "Request #$id not found.";
+        return $c->response->redirect($c->uri_for($self->action_for('index')));
+    }
+    my @steps;
+    $self->_provision_cloudflare_dns($c, $request->domain, $request->domain_type || 'subdomain',
+        $c->req->params->{server_ip} || $ENV{SERVER_PUBLIC_IP} || '', \@steps);
+    $c->flash->{success_msg} = join(' ', @steps);
+    $c->response->redirect($c->uri_for($self->action_for('review'), [$id]));
 }
 
 sub _create_admin_todo {
