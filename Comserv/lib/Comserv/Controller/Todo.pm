@@ -2491,17 +2491,18 @@ sub quick_close :Path('quick_close') :Args(0) {
         return;
     }
 
-    my $today = DateTime->now->ymd;
+    my $now_dt     = DateTime->now(time_zone => 'local');
+    my $today      = $now_dt->ymd;
+    my $now_hms    = $now_dt->strftime('%H:%M:%S');
     eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
         die "Todo not found\n" unless $todo;
 
-        my $close_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
         $todo->update({
             status        => 3,
             last_mod_by   => $username,
             last_mod_date => $today,
-            time_of_day   => $close_time,
         });
 
         my $proj_code = '';
@@ -2509,26 +2510,45 @@ sub quick_close :Path('quick_close') :Args(0) {
             my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
             $proj_code = $proj ? ($proj->project_code || '') : '';
         }
-        $c->model('DBEncy')->resultset('Log')->create({
-            todo_record_id  => $record_id,
-            username        => $username,
-            sitename        => $todo->sitename || $c->session->{SiteName},
-            project_code    => $proj_code,
-            abstract        => 'Quick-closed from Active Priorities panel',
-            details         => 'Marked done via quick-close button on DailyPlan by ' . $username,
-            start_date      => $today,
-            due_date        => $today,
-            start_time      => '00:00:00',
-            end_time        => '00:00:00',
-            time            => '00:00:00',
-            status          => 3,
-            priority        => $todo->priority || 5,
-            last_mod_by     => $username,
-            last_mod_date   => $today,
-            group_of_poster  => $c->session->{group} || '',
-            comments         => '',
-            points_processed => 0,
-        });
+        my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
+        my $priority_val = eval { $todo->priority } // 5;
+        my $group_val    = $c->session->{group} || '';
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+
+        if ($open_row) {
+            my $raw_start = $open_row->{start_time} // '09:00:00';
+            $raw_start = "$raw_start";
+            my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+            my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
+            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+            $dur_mins = 1 if $dur_mins <= 0;
+            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, details=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today,
+                'Closed via quick-close button on DailyPlan by ' . $username,
+                $open_row->{record_id}
+            );
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
+                "Closed open log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
+        } else {
+            my $abstract = eval { $todo->subject } // 'Quick-closed todo';
+            $dbh->do(
+                'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments, points_processed) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?,0)',
+                undef,
+                $record_id, $username, $sitename_val, $proj_code,
+                $abstract,
+                'Quick-closed from Active Priorities panel by ' . $username,
+                $today, $today, $now_hms, $now_hms, '00:01:00',
+                $priority_val, $username, $today, $group_val, ''
+            );
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'quick_close',
@@ -3057,6 +3077,73 @@ sub open_log :Path('open_log') :Args(0) {
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'open_log',
             "Failed open_log for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    }
+}
+
+sub close_log :Path('close_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $now_dt  = DateTime->now(time_zone => 'local');
+    my $today   = $now_dt->ymd;
+    my $now_hms = $now_dt->strftime('%H:%M:%S');
+
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+        die "No open log found for todo $record_id\n" unless $open_row;
+
+        my $raw_start = $open_row->{start_time} // '09:00:00';
+        $raw_start = "$raw_start";
+        my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+        my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
+        my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+        my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+        $dur_mins = 1 if $dur_mins <= 0;
+        my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+        $dbh->do(
+            'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?',
+            undef, $now_hms, $dur_hms, $username, $today, $open_row->{record_id}
+        );
+
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        if ($todo && ($todo->status // 0) == 2) {
+            $todo->update({ status => 1, last_mod_by => $username, last_mod_date => $today });
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
+            "Closed log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
+        $c->response->body('{"ok":1,"duration_mins":' . $dur_mins . '}');
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'close_log',
+            "Failed close_log for todo $record_id: $@");
         $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
     }
 }
