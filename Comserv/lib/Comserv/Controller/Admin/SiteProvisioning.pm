@@ -449,15 +449,13 @@ sub _db_get_secret {
 sub _db_set_secret {
     my ($self, $c, $key, $value, $desc) = @_;
     my $who = $c->session->{username} || 'admin';
-    $c->model('DBEncy')->resultset('AppSecret')->update_or_create(
-        { secret_key => $key },
-        {
-            secret_value => $value,
-            description  => $desc || '',
-            updated_by   => $who,
-        },
-        { key => 'secret_key' }
-    );
+    my $rs  = $c->model('DBEncy')->resultset('AppSecret');
+    my $row = $rs->find({ secret_key => $key });
+    if ($row) {
+        $row->update({ secret_value => $value, description => $desc || '', updated_by => $who });
+    } else {
+        $rs->create({ secret_key => $key, secret_value => $value, description => $desc || '', updated_by => $who });
+    }
 }
 
 sub cf_settings :Path('cf_settings') :Args(0) {
