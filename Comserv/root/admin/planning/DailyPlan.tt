@@ -1693,6 +1693,13 @@ function startWorkTodoCard(btn, recordId) {
             btn.title = 'Log started — click Done when finished';
             var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
             if (card) card.style.background = 'color-mix(in srgb,#0d6efd 8%,var(--bg-color,#fff))';
+        } else if (d.error && d.error.indexOf('already open') !== -1) {
+            btn.textContent = '▶ Active';
+            btn.style.background = '#fd7e14';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#fd7e14';
+            btn.disabled = false;
+            btn.title = 'Log already open — click Done when finished';
         } else {
             btn.disabled = false;
             btn.textContent = '▶ Start';
@@ -1701,6 +1708,37 @@ function startWorkTodoCard(btn, recordId) {
     }).catch(function(e) {
         btn.disabled = false;
         btn.textContent = '▶ Start';
+        alert('Error: ' + e);
+    });
+}
+
+function closeLogTodoCard(btn, recordId) {
+    btn.disabled = true;
+    fetch('/todo/close_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.disabled = false;
+            btn.textContent = '▶ Start';
+            btn.style.border = '1px solid #6c757d';
+            btn.style.background = 'transparent';
+            btn.style.color = '#6c757d';
+            var startBtn = btn.previousElementSibling;
+            if (startBtn) {
+                startBtn.textContent = '▶ Start';
+                startBtn.style.background = 'transparent';
+                startBtn.style.color = '#0d6efd';
+                startBtn.style.borderColor = '#0d6efd';
+            }
+        } else {
+            btn.disabled = false;
+            alert('Could not close log: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
         alert('Error: ' + e);
     });
 }
