@@ -3,6 +3,7 @@
 <div class="page-header">
     <h1>Site Provisioning</h1>
     <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning/add') %]" class="btn btn-primary">+ Add Site Request</a>
         <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
     </div>
 </div>
