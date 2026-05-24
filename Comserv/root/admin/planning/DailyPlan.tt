@@ -369,14 +369,18 @@
                     </details>
                     [% END %]
 
-                    [%# Site multi-select (CSC only) — all sites from site table %]
-                    [% IF is_csc && ap_all_sitenames && ap_all_sitenames.size %]
+                    [%# Site filter — shown to any user with access to more than one site %]
+                    [% IF ap_all_sitenames && ap_all_sitenames.size > 1 %]
                     <details class="ap-dropdown" style="position:relative;display:inline-block;">
-                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: [% cal_filter_site || 'All' %] ▾</summary>
                         <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="site-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] onchange="applyAllFilters()">
+                                All Sites
+                            </label>
                             [% FOREACH sname IN ap_all_sitenames %]
                             <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" [% IF !cal_filter_site || cal_filter_site == sname %]checked[% END %] onchange="applyAllFilters()">
                                 [% sname %]
                             </label>
                             [% END %]
@@ -586,6 +590,17 @@
                 var countEl = document.getElementById('ap-visible-count');
                 if (countEl) countEl.textContent = visible;
                 _updateDropdownSummaries();
+
+                var checkedSiteVals = Array.from(document.querySelectorAll('.site-cb:checked'))
+                                           .map(function(cb){ return cb.value; })
+                                           .filter(function(v){ return v !== ''; });
+                var sessionSite = (checkedSiteVals.length === 1) ? checkedSiteVals[0] : '';
+                fetch('/planning/set_filter', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ site: sessionSite })
+                }).catch(function(){});
             }
 
             function onProjectParentChange(cb) {
