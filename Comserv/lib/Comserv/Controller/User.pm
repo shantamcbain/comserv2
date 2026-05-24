@@ -2137,6 +2137,9 @@ sub list_users :Local :Args(0) {
 
         my $stale = ($age_days >= 30 && $status eq 'pending_verification') ? 1 : 0;
 
+        my $created_date = '';
+        $created_date = substr($ca_str, 0, 10) if $ca_str;
+
         my %row = (
             obj          => $u,
             id           => $u->id,
@@ -2147,6 +2150,7 @@ sub list_users :Local :Args(0) {
             roles        => $roles_str,
             status       => $status,
             created_at   => $ca_str,
+            created_date => $created_date,
             email_verified_at => $ev_at,
             age_days     => $age_days,
             email_failed => $email_failed,
