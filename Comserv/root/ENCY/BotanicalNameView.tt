@@ -30,12 +30,12 @@
 
 	[% IF c.session.username %]
 
-<h3 > Hello  [% first_name%]  [% last_name%]! Welcome to The Encyclopaedia of Biological life!</h3>
+<h3>Hello [% first_name %] [% last_name %]! Welcome to The Encyclopedia of Biological Life!</h3>
 	  
 
 	[% ELSE %]
 
-	<h3>  Hello! Welcome to The Encyclopaedia of Biological life!</h3>
+	<h3>Hello! Welcome to The Encyclopedia of Biological Life!</h3>
 
 	[% END %]
 
@@ -44,21 +44,21 @@
 <A NAME="PageTop"></A>
 </div>
      
-        <h2>Herbs by Botanical name.</h2>
+        <h2>Herbs by Botanical Name</h2>
  <!-- Display the Add Herb button only for admin users -->
 [% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add Herb</a>
 [% END %]
 
 <form action="search" method="POST">
-    <label for="search">Search our herbal Database:</label>
+    <label for="search">Search our herbal database:</label>
     <input type="text" id="search" name="search_string" value="">
     <input type="submit" value="Go">
 </form>
 
-<p>     <a href="ForumulaView"> Formulas.</a>
+<p>     <a href="[% c.uri_for('/ENCY/Formula') %]">Formulas</a></p>
 
- <p> These Herbs are in the data base.
+<p>These herbs are in the database.
 [% IF is_editor %]
     <a href="/ENCY/add_herb" class="btn btn-primary">Add new Herb</a>
     &nbsp;

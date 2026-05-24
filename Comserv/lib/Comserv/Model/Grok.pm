@@ -323,11 +323,10 @@ sub chat {
     # xAI search_parameters: mode "on" = always search, "auto" = model decides, "off" = never
     if ($use_search) {
         $payload->{search_parameters} = {
-            mode            => 'auto',
-            return_citations => JSON::true,
+            mode => 'auto',
         };
         $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'chat',
-            "Web search enabled (mode=auto, return_citations=true)");
+            "Web search enabled (mode=auto)");
     }
     
     return $self->_send_request($payload, 'chat');
