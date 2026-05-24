@@ -265,6 +265,17 @@ __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
 __PACKAGE__->_initialize_ai_chat_schema();
 
+# LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
+# that could be injected (e.g. HTML entities like &#39; from attackers).
+# Must be applied AFTER setup() so the session plugin has mixed in get_session_id.
+__PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
+    my ($orig, $c, @args) = @_;
+    my $id = eval { $c->$orig(@args) };
+    return undef if $@ || !defined $id;
+    $id =~ s/[^0-9a-fA-F]//g;
+    return length($id) >= 20 ? lc($id) : undef;
+});
+
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality
 # as the application uses db_config.json for database connections instead.
