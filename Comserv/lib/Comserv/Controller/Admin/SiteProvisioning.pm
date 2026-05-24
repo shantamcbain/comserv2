@@ -7,6 +7,8 @@ use Comserv::Util::CloudflareManager;
 use Try::Tiny;
 use File::Path qw(make_path);
 use POSIX qw(strftime);
+use JSON qw(decode_json encode_json);
+use File::Spec;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -428,6 +430,62 @@ sub _default_home_template {
 </div>
 </div>
 END_TT
+}
+
+sub _cf_secrets_path {
+    my $home = $ENV{HOME} || '/root';
+    my $dir  = $ENV{COMSERV_SECRETS_DIR} || File::Spec->catfile($home, '.comserv', 'secrets');
+    return File::Spec->catfile($dir, 'cloudflare.json');
+}
+
+sub cf_settings :Path('cf_settings') :Args(0) {
+    my ($self, $c) = @_;
+    my $path = $self->_cf_secrets_path();
+    my $current = {};
+    eval {
+        if (-f $path) {
+            open my $fh, '<:encoding(UTF-8)', $path or die;
+            local $/;
+            $current = decode_json(<$fh>);
+            close $fh;
+        }
+    };
+    my $cf = $current->{cloudflare} || {};
+
+    if ($c->req->method eq 'POST') {
+        my $p = $c->req->params;
+        my $token = $p->{api_token} // '';
+        my $email = $p->{email}     // $cf->{email} // '';
+
+        if ($token && $token ne '(unchanged)') {
+            $cf->{api_token} = $token;
+        }
+        $cf->{email} = $email if $email;
+        $current->{cloudflare} = $cf;
+
+        eval {
+            make_path(do { my $d = $path; $d =~ s|/[^/]+$||; $d });
+            open my $fh, '>:encoding(UTF-8)', $path or die "Cannot write $path: $!";
+            print $fh encode_json($current);
+            close $fh;
+            chmod 0600, $path;
+        };
+        if ($@) {
+            $c->flash->{error_msg} = "Failed to save: $@";
+        } else {
+            $c->flash->{success_msg} = 'Cloudflare credentials saved to ~/.comserv/secrets/cloudflare.json (shared across all branches and Docker).';
+        }
+        $c->response->redirect($c->uri_for($self->action_for('cf_settings')));
+        return;
+    }
+
+    my $token_set = $cf->{api_token} && $cf->{api_token} !~ /^\[%|^__REPLACE/;
+    $c->stash(
+        template   => 'admin/site_provisioning/cf_settings.tt',
+        cf_email   => $cf->{email} || '',
+        token_set  => $token_set,
+        secrets_path => $path,
+    );
 }
 
 __PACKAGE__->meta->make_immutable;
