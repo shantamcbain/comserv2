@@ -404,10 +404,10 @@ sub retry_dns :Path('retry_dns') :Args(1) {
         return $c->response->redirect($c->uri_for($self->action_for('index')));
     }
     my @steps;
-    $self->_provision_cloudflare_dns($c, $request->domain, $request->domain_type || 'subdomain',
+    $self->_create_cloudflare_dns($c, $request->domain, $request->domain_type || 'subdomain',
         $c->req->params->{server_ip} || $ENV{SERVER_PUBLIC_IP} || '', \@steps);
     $c->flash->{success_msg} = join(' ', @steps);
-    $c->response->redirect($c->uri_for($self->action_for('review'), [$id]));
+    $c->response->redirect($c->uri_for('/admin/site_provisioning/review/' . $id));
 }
 
 sub _create_admin_todo {
