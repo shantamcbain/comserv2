@@ -1,0 +1,284 @@
+package Comserv::Controller::Admin::SiteProvisioning;
+use Moose;
+use namespace::autoclean;
+use Comserv::Util::Logging;
+use Comserv::Util::AdminAuth;
+use Comserv::Util::CloudflareManager;
+use Try::Tiny;
+use File::Path qw(make_path);
+use POSIX qw(strftime);
+
+BEGIN { extends 'Catalyst::Controller'; }
+
+__PACKAGE__->config(namespace => 'admin/site_provisioning');
+
+has 'logging' => (is => 'ro', default => sub { Comserv::Util::Logging->instance });
+has 'admin_auth' => (is => 'ro', default => sub { Comserv::Util::AdminAuth->new });
+
+sub auto :Private {
+    my ($self, $c) = @_;
+    unless ($self->admin_auth->is_csc_admin($c)) {
+        $c->flash->{error_msg} = 'CSC administrator access required.';
+        $c->response->redirect($c->uri_for('/'));
+        return 0;
+    }
+    return 1;
+}
+
+sub index :Path :Args(0) {
+    my ($self, $c) = @_;
+    my @requests = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        {},
+        { order_by => { -desc => 'created_at' } }
+    )->all;
+    $c->stash(
+        template => 'admin/site_provisioning/list.tt',
+        requests => \@requests,
+    );
+}
+
+sub review :Path('review') :Args(1) {
+    my ($self, $c, $id) = @_;
+    my $request = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    unless ($request) {
+        $c->flash->{error_msg} = "Hosting request #$id not found.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    $c->stash(
+        template => 'admin/site_provisioning/review.tt',
+        request  => $request,
+    );
+}
+
+sub provision :Path('provision') :Args(0) {
+    my ($self, $c) = @_;
+
+    return $c->response->redirect($c->uri_for($self->action_for('index')))
+        unless $c->req->method eq 'POST';
+
+    my $p = $c->req->params;
+    my $id          = $p->{request_id} or do {
+        $c->flash->{error_msg} = 'No request ID provided.';
+        return $c->response->redirect($c->uri_for($self->action_for('index')));
+    };
+
+    my $request = $c->model('DBEncy')->resultset('HostingAccount')->find($id);
+    unless ($request) {
+        $c->flash->{error_msg} = "Request #$id not found.";
+        return $c->response->redirect($c->uri_for($self->action_for('index')));
+    }
+
+    my $site_name   = $p->{site_name}   || $request->sitename;
+    my $domain      = $p->{domain}      || $request->domain;
+    my $domain_type = $p->{domain_type} || $request->domain_type || 'subdomain';
+    my $email       = $p->{email}       || $request->contact_email;
+    my $display     = $p->{display_name}|| $site_name;
+    my @errors;
+    my @steps;
+
+    try {
+        # 1. Create site record
+        my $existing_site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->first;
+        my $site;
+        if ($existing_site) {
+            $site = $existing_site;
+            push @steps, "Site '$site_name' already exists — skipping creation.";
+        } else {
+            $site = $c->model('DBEncy')->resultset('Site')->create({
+                name                       => $site_name,
+                description                => $display,
+                site_display_name          => $display,
+                affiliate                  => 1,
+                pid                        => 0,
+                auth_table                 => 'users',
+                home_view                  => 'SiteHome',
+                css_view_name              => 'default',
+                mail_from                  => $email,
+                mail_to                    => $email,
+                mail_to_discussion         => $email,
+                mail_to_admin              => $email,
+                mail_to_user               => $email,
+                mail_to_client             => $email,
+                mail_replyto               => $email,
+                app_logo                   => '/static/images/default_logo.png',
+                app_logo_alt               => "$site_name Logo",
+                app_logo_width             => 200,
+                app_logo_height            => 100,
+                document_root_url          => '/',
+                link_target                => '_self',
+                http_header_params         => '',
+                image_root_url             => '/static/images/',
+                global_datafiles_directory => '/data/',
+                templates_cache_directory  => '/tmp/',
+                app_datafiles_directory    => '/data/app/',
+                datasource_type            => 'db',
+                cal_table                  => 'calendar',
+                http_header_description    => "$display website",
+                http_header_keywords       => 'website',
+            });
+            push @steps, "Created site record for '$site_name'.";
+        }
+
+        # 2. Add sitedomain entry
+        my $existing_domain = $c->model('DBEncy')->resultset('SiteDomain')->search({ domain => $domain })->first;
+        unless ($existing_domain) {
+            $c->model('DBEncy')->resultset('SiteDomain')->create({
+                site_id => $site->id,
+                domain  => $domain,
+            });
+            push @steps, "Mapped domain '$domain' to site '$site_name'.";
+        } else {
+            push @steps, "Domain '$domain' already mapped — skipping.";
+        }
+
+        # 3. Create home page template for this site
+        my $root = $c->path_to('root');
+        my $tpl_dir = "$root/SiteHome";
+        make_path($tpl_dir) unless -d $tpl_dir;
+        my $tpl_file = "$tpl_dir/${site_name}.tt";
+        unless (-f $tpl_file) {
+            open my $fh, '>', $tpl_file or die "Cannot write template: $!";
+            print $fh _default_home_template($site_name, $display, $domain);
+            close $fh;
+            push @steps, "Created home page template at root/SiteHome/${site_name}.tt.";
+        } else {
+            push @steps, "Template already exists — skipping.";
+        }
+
+        # 4. Cloudflare DNS
+        my $cf_result = $self->_create_cloudflare_dns($c, $domain, $domain_type, $p->{server_ip}, \@steps);
+
+        # 5. Set theme
+        eval { $c->model('ThemeConfig')->set_site_theme($c, $site_name, 'default') };
+
+        # 6. Mark hosting_account active
+        $request->update({ status => 'active' });
+        push @steps, "Hosting account marked active.";
+
+        # 7. Create admin todo noting recompile needed
+        $self->_create_admin_todo($c, $site_name, \@steps);
+
+        $c->stash(
+            template  => 'admin/site_provisioning/result.tt',
+            site_name => $site_name,
+            domain    => $domain,
+            steps     => \@steps,
+            errors    => \@errors,
+            success   => 1,
+        );
+
+    } catch {
+        push @errors, "Provisioning failed: $_";
+        $c->stash(
+            template  => 'admin/site_provisioning/result.tt',
+            site_name => $site_name,
+            domain    => $domain,
+            steps     => \@steps,
+            errors    => \@errors,
+            success   => 0,
+        );
+    };
+}
+
+sub _create_cloudflare_dns {
+    my ($self, $c, $domain, $domain_type, $server_ip, $steps) = @_;
+    $server_ip ||= $ENV{SERVER_PUBLIC_IP} || '';
+    unless ($server_ip) {
+        push @$steps, "Cloudflare DNS: no SERVER_PUBLIC_IP configured — skipping DNS creation. Set it in .env to automate.";
+        return;
+    }
+    try {
+        my $cf = Comserv::Util::CloudflareManager->new();
+        my ($parent_zone, $record_name);
+        if ($domain_type eq 'subdomain') {
+            ($record_name, $parent_zone) = ($domain =~ /^([^.]+)\.(.+)$/);
+            $parent_zone ||= $domain;
+            $record_name ||= '@';
+        } else {
+            $parent_zone = $domain;
+            $record_name = '@';
+        }
+        my $admin_email = $c->session->{email} || $ENV{CLOUDFLARE_EMAIL} || '';
+        $cf->create_dns_record($admin_email, $parent_zone, 'A', $record_name, $server_ip, 1, 1);
+        push @$steps, "Cloudflare DNS: created A record '$record_name' → $server_ip in zone '$parent_zone'.";
+    } catch {
+        push @$steps, "Cloudflare DNS: skipped (error: $_). Create the DNS record manually.";
+    };
+}
+
+sub _create_admin_todo {
+    my ($self, $c, $site_name, $steps) = @_;
+    my $now = strftime('%Y-%m-%d', localtime);
+    eval {
+        $c->model('DBEncy')->resultset('Todo')->create({
+            sitename              => 'CSC',
+            subject               => "[Site Provisioned] $site_name — review and restart app",
+            description           => "New site '$site_name' was provisioned via the hosting signup system.\n\n"
+                                   . "Steps completed:\n" . join("\n", map { "- $_" } @$steps) . "\n\n"
+                                   . "ACTION REQUIRED: The app serves this site via the generic SiteHome controller. "
+                                   . "No recompile is needed — routing is DB-driven.\n"
+                                   . "Review the site at /site and verify DNS propagation.",
+            status                => 1,
+            priority              => 2,
+            share                 => 0,
+            project_code          => 'CSC',
+            project_id            => 1,
+            username_of_poster    => $c->session->{username} || 'system',
+            group_of_poster       => 'admin',
+            last_mod_by           => 'system',
+            parent_todo           => '',
+            reporter              => '',
+            company_code          => 'CSC',
+            owner                 => '',
+            developer             => '',
+            estimated_man_hours   => 0,
+            user_id               => $c->session->{user_id} || 0,
+            start_date            => $now,
+            due_date              => $now,
+            last_mod_date         => $now,
+            date_time_posted      => $now,
+        });
+    };
+}
+
+sub _default_home_template {
+    my ($site_name, $display, $domain) = @_;
+    return <<"END_TT";
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Welcome to [% site.site_display_name || '$display' %]</h1>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<div class="app-section">
+    <h2>Your site is live!</h2>
+    <p>This is the home page for <strong>$domain</strong>. You can now customise it through the page management system.</p>
+</div>
+
+<div class="app-section">
+    <h2>Getting Started</h2>
+    <ul>
+        <li><strong>Add pages</strong> — go to <a href="/admin/pages">Admin &rsaquo; Pages</a> and create pages for your site.</li>
+        <li><strong>Change your logo and colours</strong> — go to <a href="/admin/theme">Admin &rsaquo; Theme</a>.</li>
+        <li><strong>Manage navigation</strong> — add links via <a href="/admin/navigation">Admin &rsaquo; Navigation</a>.</li>
+        <li><strong>Add users</strong> — invite team members via <a href="/admin/users">Admin &rsaquo; Users</a>.</li>
+    </ul>
+</div>
+
+<div class="app-section">
+    <h2>Need help?</h2>
+    <p>Contact <a href="/helpdesk">our HelpDesk</a> or visit the <a href="/ENCY">knowledge base</a>.</p>
+</div>
+
+</div>
+</div>
+</div>
+END_TT
+}
+
+__PACKAGE__->meta->make_immutable;
+1;

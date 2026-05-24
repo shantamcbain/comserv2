@@ -131,7 +131,7 @@ sub process_signup :Path('process') :Args(0) {
         return;
     }
     
-    # Process the signup - create user and site
+    # Process the signup - create user, save pending hosting request, notify admin
     try {
         # 1. Create the user
         my $user_data = {
@@ -169,6 +169,81 @@ sub process_signup :Path('process') :Args(0) {
             return;
         }
         
+        # 2. Save pending hosting request and notify admin
+        my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
+        my $ha = eval {
+            $c->model('DBEncy')->resultset('HostingAccount')->find_or_create(
+                { sitename => $params->{site_name} },
+                {
+                    key    => 'sitename',
+                    default => {
+                        plan_slug      => $params->{plan_slug} || 'hosting-subdomain',
+                        domain         => $params->{domain_name},
+                        domain_type    => $params->{domain_type} || 'subdomain',
+                        status         => 'pending',
+                        contact_email  => $params->{email},
+                        created_by     => $params->{username},
+                        notes          => "First name: $params->{first_name} $params->{last_name}",
+                    }
+                }
+            );
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'process_signup',
+            "Could not save hosting_account record: $@") if $@;
+
+        # Notify admin via todo
+        eval {
+            $c->model('DBEncy')->resultset('Todo')->create({
+                sitename              => 'CSC',
+                subject               => "[Hosting Signup] $params->{site_name} — pending review",
+                description           => "New hosting signup received.\n\n"
+                                       . "Contact: $params->{first_name} $params->{last_name} <$params->{email}>\n"
+                                       . "Username: $params->{username}\n"
+                                       . "Site name: $params->{site_name}\n"
+                                       . "Domain: $params->{domain_name}\n\n"
+                                       . "Review and provision at: /admin/site_provisioning",
+                status                => 1,
+                priority              => 2,
+                share                 => 0,
+                project_code          => 'CSC',
+                project_id            => 1,
+                username_of_poster    => 'system',
+                group_of_poster       => 'admin',
+                last_mod_by           => 'system',
+                parent_todo           => '',
+                reporter              => '',
+                company_code          => 'CSC',
+                owner                 => '',
+                developer             => '',
+                estimated_man_hours   => 0,
+                user_id               => 0,
+                start_date            => $now,
+                due_date              => $now,
+                last_mod_date         => $now,
+                date_time_posted      => $now,
+            });
+        };
+
+        $self->send_confirmation_email($c, {
+            username    => $params->{username},
+            email       => $params->{email},
+            first_name  => $params->{first_name},
+            last_name   => $params->{last_name},
+            site_name   => $params->{site_name},
+            domain_name => $params->{domain_name},
+        });
+
+        $c->stash(
+            template    => 'hosting/signup_pending.tt',
+            title       => 'Application Received',
+            site_name   => $params->{site_name},
+            domain_name => $params->{domain_name},
+            email       => $params->{email},
+            username    => $params->{username},
+        );
+        return;
+
+        # LEGACY: old immediate-provisioning path (kept for reference only, never reached)
         # 2. Create the site
         my $site_data = {
             name => $params->{site_name},

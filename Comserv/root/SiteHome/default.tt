@@ -1,0 +1,25 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Welcome to [% site.site_display_name || site.name || 'Your Site' %]</h1>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<div class="app-section">
+    <h2>Your site is live!</h2>
+    <p>This site is freshly provisioned. An administrator will customise this page shortly.</p>
+</div>
+
+<div class="app-section">
+    <h2>Getting Started</h2>
+    <ul>
+        <li><a href="/helpdesk">Contact HelpDesk</a> if you need assistance.</li>
+    </ul>
+</div>
+
+</div>
+</div>
+
+</div>

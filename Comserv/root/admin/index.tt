@@ -42,9 +42,9 @@
           [% IF pending_hosting == 1 %]has[% ELSE %]have[% END %] submitted a CSC hosting registration request and [% IF pending_hosting == 1 %]is[% ELSE %]are[% END %] waiting for your approval.
         </div>
       </div>
-      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]"
+      <a href="[% c.uri_for('/admin/site_provisioning') %]"
          style="white-space:nowrap;margin-left:1.5rem;background:#e67e22;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
-        Review &amp; Approve →
+        Review &amp; Provision →
       </a>
     </div>
     [% END %]
@@ -230,6 +230,10 @@
                     <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="admin-link">
                         <i class="fas fa-server"></i>
                         <span>Hosting Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/site_provisioning') %]" class="admin-link">
+                        <i class="fas fa-globe"></i>
+                        <span>Site Provisioning</span>
                     </a>
                     [% ELSE %]
                     <a href="[% c.uri_for('/membership/hosting_signup') %]" class="admin-link">
