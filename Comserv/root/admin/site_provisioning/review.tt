@@ -145,7 +145,7 @@
             <div class="form-field">
                 <label for="retry_domain">Full Domain (subdomain)</label>
                 <input type="text" name="domain" id="retry_domain" class="form-input"
-                       value="[% request.domain | html %]" placeholder="e.g. icehorse.beemaster.ca">
+                       value="[% suggested_domain | html %]" placeholder="e.g. icehorse.beemaster.ca">
             </div>
         </div>
         <div class="form-row">
