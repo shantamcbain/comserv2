@@ -691,6 +691,34 @@ function startWorkGcal(btn, recordId) {
     });
 }
 
+function closeLogTodoCard(btn, recordId) {
+    btn.disabled = true;
+    fetch('/todo/close_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.disabled = false;
+            var startBtn = btn.previousElementSibling;
+            if (startBtn) {
+                startBtn.textContent = '▶ Start';
+                startBtn.style.background = 'transparent';
+                startBtn.style.color = '#0d6efd';
+                startBtn.style.borderColor = '#0d6efd';
+            }
+            btn.remove();
+        } else {
+            btn.disabled = false;
+            alert('Could not close log: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        alert('Error: ' + e);
+    });
+}
+
 function _updateDaySiteSummary() {
     var sumEl = document.getElementById('day-site-summary');
     if (!sumEl) return;
