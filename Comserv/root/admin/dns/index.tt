@@ -1,11 +1,11 @@
 <div class="app-container">
 
 <div class="page-header">
-    <h1>Site Provisioning</h1>
+    <h1>DNS Management</h1>
     <div class="form-actions">
-        <a href="[% c.uri_for('/admin/site_provisioning/add') %]" class="btn btn-primary">+ Add Site Request</a>
-        <a href="[% c.uri_for('/admin/dns') %]" class="btn btn-secondary">&#127758; DNS Dashboard</a>
+        [% IF is_csc_admin %]
         <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]" class="btn btn-secondary">&#9881; Cloudflare Credentials</a>
+        [% END %]
         <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
     </div>
 </div>
@@ -17,52 +17,59 @@
 <div class="success-message">[% c.flash.success_msg | html %]</div>
 [% END %]
 
+[% IF cf_error %]
+<div class="error-message">
+    <strong>Cloudflare API error:</strong> [% cf_error | html %]
+    [% IF is_csc_admin %]
+    &mdash; <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Check Cloudflare credentials</a>
+    [% END %]
+</div>
+[% END %]
+
 <div class="content-container">
 <div class="content-primary">
 <div class="data-container">
 
-[% IF requests.size %]
+[% IF zones.size %]
 <div class="table-container">
 <table class="data-table">
     <thead>
         <tr>
-            <th>#</th>
-            <th>Site Name</th>
-            <th>Domain</th>
-            <th>Contact Email</th>
+            <th>Zone / Domain</th>
             <th>Status</th>
-            <th>Requested</th>
+            <th>Plan</th>
             <th>Actions</th>
         </tr>
     </thead>
     <tbody>
-    [% FOREACH req IN requests %]
+    [% FOREACH zone IN zones %]
         <tr>
-            <td>[% req.id | html %]</td>
-            <td><strong>[% req.sitename | html %]</strong></td>
-            <td><code>[% req.domain | html %]</code></td>
-            <td>[% req.contact_email | html %]</td>
+            <td><strong>[% zone.name | html %]</strong></td>
             <td>
-                [% IF req.status == 'pending' %]
-                    <span class="status-badge status-pending">Pending</span>
-                [% ELSIF req.status == 'active' %]
+                [% IF zone.status == 'active' %]
                     <span class="status-badge status-active">Active</span>
                 [% ELSE %]
-                    <span class="status-badge">[% req.status | html %]</span>
+                    <span class="status-badge status-pending">[% zone.status | html %]</span>
                 [% END %]
             </td>
-            <td>[% req.created_at | html %]</td>
+            <td>[% zone.plan | html %]</td>
             <td class="action-cell">
-                <a href="[% c.uri_for('/admin/site_provisioning/review', req.id) %]" class="btn btn-sm btn-edit">Review</a>
+                <a href="[% c.uri_for('/admin/dns/zone/' _ zone.name) %]" class="btn btn-sm btn-edit">Manage DNS Records</a>
             </td>
         </tr>
     [% END %]
     </tbody>
 </table>
 </div>
-[% ELSE %]
+[% ELSIF !cf_error %]
 <div class="empty-state">
-    <p>No hosting signup requests found.</p>
+    <p>No Cloudflare zones found.
+    [% IF is_csc_admin %]
+    Ensure your <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Cloudflare credentials</a> are set correctly.
+    [% ELSE %]
+    Your site must own a root domain (not a subdomain) to manage DNS.
+    [% END %]
+    </p>
 </div>
 [% END %]
 
