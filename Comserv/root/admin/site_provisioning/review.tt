@@ -1,0 +1,107 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Review Hosting Request</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">&#8592; Back</a>
+    </div>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<div class="data-container">
+<div class="form-section">
+    <h3>Request Details</h3>
+    <table class="data-table">
+        <tr><th>Site Name</th><td><strong>[% request.sitename | html %]</strong></td></tr>
+        <tr><th>Domain</th><td><code>[% request.domain | html %]</code></td></tr>
+        <tr><th>Domain Type</th><td>[% request.domain_type | html %]</td></tr>
+        <tr><th>Contact Email</th><td>[% request.contact_email | html %]</td></tr>
+        <tr><th>Status</th><td>[% request.status | html %]</td></tr>
+        <tr><th>Notes</th><td>[% request.notes | html %]</td></tr>
+        <tr><th>Requested Add-ons</th><td>[% request.requested_addons | html %]</td></tr>
+        <tr><th>Created</th><td>[% request.created_at | html %]</td></tr>
+    </table>
+</div>
+</div>
+
+[% IF request.status == 'pending' %]
+<div class="form-container">
+<form method="post" action="[% c.uri_for('/admin/site_provisioning/provision') %]" class="app-form">
+    <input type="hidden" name="request_id" value="[% request.id | html %]">
+
+    <div class="form-section">
+        <h3>Provision Settings</h3>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="site_name">Site Name <small>(alphanumeric + underscore)</small></label>
+                <input type="text" id="site_name" name="site_name" class="form-input"
+                       value="[% request.sitename | html %]" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="display_name">Display Name</label>
+                <input type="text" id="display_name" name="display_name" class="form-input"
+                       value="[% request.sitename | html %]">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain">Domain / Subdomain</label>
+                <input type="text" id="domain" name="domain" class="form-input"
+                       value="[% request.domain | html %]" required>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain_type">Domain Type</label>
+                <select id="domain_type" name="domain_type" class="form-input">
+                    <option value="subdomain" [% IF request.domain_type == 'subdomain' %]selected[% END %]>Subdomain</option>
+                    <option value="custom"    [% IF request.domain_type == 'custom'    %]selected[% END %]>Custom Domain</option>
+                    <option value="subpath"   [% IF request.domain_type == 'subpath'   %]selected[% END %]>Subpath</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="server_ip">Server Public IP <small>(for Cloudflare DNS A record — leave blank to skip)</small></label>
+                <input type="text" id="server_ip" name="server_ip" class="form-input"
+                       value="[% ENV.SERVER_PUBLIC_IP | html %]" placeholder="e.g. 203.0.113.10">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="email">Contact Email</label>
+                <input type="email" id="email" name="email" class="form-input"
+                       value="[% request.contact_email | html %]">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary"
+                onclick="return confirm('Provision site [% request.sitename | html %]? This will create the site record, domain mapping, and Cloudflare DNS entry.')">
+            &#10003; Provision Site
+        </button>
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+</form>
+</div>
+[% ELSE %]
+<div class="app-section">
+    <p>This request has already been provisioned (status: <strong>[% request.status | html %]</strong>).</p>
+</div>
+[% END %]
+
+</div>
+</div>
+
+</div>
