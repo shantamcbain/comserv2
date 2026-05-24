@@ -397,7 +397,8 @@ sub _create_cloudflare_dns {
 
 sub retry_dns :Path('retry_dns') :Args(1) {
     my ($self, $c, $id) = @_;
-    my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find($id);
+    $id = ref $id ? $id->[0] : $id;
+    my $request = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->find({ id => $id });
     unless ($request) {
         $c->flash->{error_msg} = "Request #$id not found.";
         return $c->response->redirect($c->uri_for($self->action_for('index')));
