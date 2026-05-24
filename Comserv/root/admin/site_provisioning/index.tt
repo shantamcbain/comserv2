@@ -4,6 +4,7 @@
     <h1>Site Provisioning</h1>
     <div class="form-actions">
         <a href="[% c.uri_for('/admin/site_provisioning/add') %]" class="btn btn-primary">+ Add Site Request</a>
+        <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]" class="btn btn-secondary">&#9881; Cloudflare Credentials</a>
         <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
     </div>
 </div>

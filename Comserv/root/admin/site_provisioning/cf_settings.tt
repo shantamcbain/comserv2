@@ -1,0 +1,67 @@
+
+<div class="page-header">
+    <h1>Cloudflare API Credentials</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">&#8592; Site Provisioning</a>
+    </div>
+</div>
+
+[% IF c.flash.error_msg %]
+<div class="error-message">[% c.flash.error_msg | html %]</div>
+[% END %]
+[% IF c.flash.success_msg %]
+<div class="success-message">[% c.flash.success_msg | html %]</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="data-container">
+
+<div class="form-section">
+    <h3>Storage Location</h3>
+    <p>Credentials are stored in <code>[% secrets_path | html %]</code> — outside git, shared
+    across all branches and Docker containers (mount as a volume on the server).</p>
+    <p>Status: [% IF token_set %]<span class="status-badge status-active">&#10003; API token is set</span>[% ELSE %]<span class="status-badge status-pending">&#9888; Token not set or placeholder</span>[% END %]</p>
+</div>
+
+<div class="form-container">
+<form method="post" action="[% c.uri_for('/admin/site_provisioning/cf_settings') %]" class="app-form">
+
+    <div class="form-section">
+        <h3>Cloudflare API Token</h3>
+        <p class="form-hint">
+            Create a token at
+            <a href="https://dash.cloudflare.com/profile/api-tokens" target="_blank">Cloudflare → My Profile → API Tokens</a>
+            with permissions: <strong>Zone → DNS → Read + Edit</strong> on all zones.
+        </p>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="api_token">API Token[% IF token_set %] <small>(currently set — enter new value to replace)</small>[% END %]</label>
+                <input type="password" id="api_token" name="api_token" class="form-input"
+                       placeholder="[% IF token_set %]Leave blank to keep current token[% ELSE %]Paste your Cloudflare API token here[% END %]"
+                       autocomplete="off">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="email">Cloudflare Account Email</label>
+                <input type="email" id="email" name="email" class="form-input"
+                       value="[% cf_email | html %]"
+                       placeholder="e.g. shantamcbain@gmail.com">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">&#10003; Save Credentials</button>
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+</div>
+
+</div>
+</div>
+</div>
