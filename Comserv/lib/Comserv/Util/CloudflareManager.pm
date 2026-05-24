@@ -61,6 +61,11 @@ has 'logger' => (
 );
 
 # Configuration file path
+has 'dbh' => (
+    is      => 'ro',
+    default => undef,
+);
+
 has 'config_path' => (
     is => 'ro',
     default => sub {
@@ -115,7 +120,29 @@ sub _build_config {
     
     my $config = {};
 
-    # FIRST: check ~/.comserv/secrets/cloudflare.json — shared across all branches and Docker mounts
+    # PRIORITY 0: read from app_secrets DB table — most secure, shared across all machines
+    if ($self->dbh) {
+        eval {
+            my $sth = $self->dbh->prepare(
+                "SELECT secret_key, secret_value FROM app_secrets WHERE secret_key IN (?,?,?)"
+            );
+            $sth->execute('cloudflare_api_token', 'cloudflare_email', 'cloudflare_api_key');
+            my %row;
+            while (my ($k,$v) = $sth->fetchrow_array) { $row{$k} = $v }
+            if ($row{cloudflare_api_token} || $row{cloudflare_api_key}) {
+                $config->{cloudflare} = {
+                    api_token => $row{cloudflare_api_token} || '',
+                    api_key   => $row{cloudflare_api_key}   || '',
+                    email     => $row{cloudflare_email}      || '',
+                };
+                $self->logger->info("Cloudflare credentials loaded from app_secrets DB table");
+            }
+        };
+        $self->logger->warn("DB secret lookup failed: $@") if $@;
+    }
+    return $config if $config->{cloudflare}{api_token} || $config->{cloudflare}{api_key};
+
+    # PRIORITY 1: check ~/.comserv/secrets/cloudflare.json — shared across all branches and Docker mounts
     my $secrets_dir = $ENV{COMSERV_SECRETS_DIR}
                    || File::Spec->catfile($ENV{HOME} || '/root', '.comserv', 'secrets');
     my $shared_cf_path = File::Spec->catfile($secrets_dir, 'cloudflare.json');
