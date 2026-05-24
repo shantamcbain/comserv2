@@ -52,9 +52,17 @@
 
         <div class="form-row">
             <div class="form-field">
-                <label for="domain">Domain / Subdomain</label>
+                <label for="domain">Full Domain / Subdomain
+                    <small>(e.g. icehorse.[% cf_zone_name | html %])</small></label>
                 <input type="text" id="domain" name="domain" class="form-input"
-                       value="[% request.domain | html %]" required>
+                       value="[% request.domain | html %]" required
+                       placeholder="e.g. icehorse.[% cf_zone_name | html %]">
+                [% IF cf_zone_name && request.domain == cf_zone_name %]
+                <small class="form-hint" style="color:#b45309;">
+                    &#9888; The stored domain is the same as the zone root (<strong>[% cf_zone_name | html %]</strong>).
+                    For a subdomain, prefix it — e.g. <strong>icehorse.[% cf_zone_name | html %]</strong>.
+                </small>
+                [% END %]
             </div>
         </div>
 
@@ -73,9 +81,37 @@
             <div class="form-field">
                 <label for="server_ip">Server Public IP <small>(for Cloudflare DNS A record — leave blank to skip)</small></label>
                 <input type="text" id="server_ip" name="server_ip" class="form-input"
-                       value="[% ENV.SERVER_PUBLIC_IP | html %]" placeholder="e.g. 203.0.113.10">
+                       value="[% cf_zone_ip | html %]" placeholder="e.g. 203.0.113.10">
+                [% IF cf_zone_name %]
+                <small>Auto-filled from Cloudflare zone <strong>[% cf_zone_name | html %]</strong>.
+                Provisioning <strong>will</strong> create a new Cloudflare A record pointing this subdomain to the IP above.</small>
+                [% ELSE %]
+                <small>Leave blank to skip Cloudflare DNS creation.</small>
+                [% END %]
             </div>
         </div>
+
+        [% IF cf_a_records.size %]
+        <div class="form-row">
+            <div class="form-field">
+                <label>Existing A Records in <strong>[% cf_zone_name | html %]</strong>
+                    <small>(check the subdomain prefix is not already taken)</small></label>
+                <div class="table-container" style="max-height:180px;overflow-y:auto;">
+                <table class="data-table">
+                    <thead><tr><th>Name / Subdomain</th><th>IP Address</th></tr></thead>
+                    <tbody>
+                    [% FOREACH r IN cf_a_records %]
+                    <tr>
+                        <td><code>[% r.name | html %]</code></td>
+                        <td>[% r.ip | html %]</td>
+                    </tr>
+                    [% END %]
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        [% END %]
 
         <div class="form-row">
             <div class="form-field">
