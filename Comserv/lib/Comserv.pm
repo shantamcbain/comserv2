@@ -177,20 +177,37 @@ sub psgi_app {
 
 # Session store is now properly configured in the plugin list above
 
-# LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
-# that could be injected (e.g. HTML entities like &#39; from attackers)
-around 'get_session_id' => sub {
-    my ($orig, $c, @args) = @_;
-    my $id = eval { $c->$orig(@args) };
-    return undef if $@ || !defined $id;
-    $id =~ s/[^0-9a-fA-F]//g;
-    return length($id) >= 20 ? lc($id) : undef;
-};
-
 # LAYER 3: Global Application Error Handler
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {
     my ($orig, $c) = @_;
+
+    # Handle invalid session ID attacks (e.g. HTML entities injected into cookie)
+    # Treat as a security event — clear error, delete bad cookie, redirect to home
+    if ($c && $c->error && @{$c->error}) {
+        my $err0 = "${\($c->error->[0] // '')}";
+        if ($err0 =~ /invalid session ID/i) {
+            eval {
+                my $logger = Comserv::Util::Logging->instance;
+                my %req = Comserv::Util::Logging::extract_request_info($c);
+                $logger->log_with_details($c, 'warn', __FILE__, __LINE__, 'finalize_error',
+                    "[SECURITY] Invalid session ID rejected from IP:" . ($req{ip_address}//'?')
+                    . " UA:" . substr($req{user_agent}//'', 0, 80));
+            };
+            $c->clear_errors;
+            eval {
+                my $cookie_name = $c->config->{'Plugin::Session'}{cookie_name}
+                    || 'comserv_session_' . ($ENV{COMSERV_PORT} || 4001);
+                $c->res->cookies->{$cookie_name} = {
+                    value => '', expires => time() - 86400, path => '/'
+                };
+            };
+            $c->res->status(302);
+            $c->res->redirect($c->uri_for('/'));
+            $c->$orig();
+            return;
+        }
+    }
 
     # Log all unhandled errors with context
     eval {
