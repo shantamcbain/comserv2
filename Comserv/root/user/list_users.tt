@@ -222,4 +222,5 @@ function confirmBulk() {
 .text-danger { color:#c0392b; }
 details[open] .group-header::before { content:'▲ '; font-size:0.7em; }
 details:not([open]) .group-header::before { content:'▶ '; font-size:0.7em; }
+.table-container { overflow-x:auto; width:100%; max-width:100%; }
 </style>

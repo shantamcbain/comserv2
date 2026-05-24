@@ -2231,18 +2231,52 @@ sub bulk_delete_users :Local :Args(0) {
         eval {
             $schema->storage->dbh_do(sub {
                 my ($storage, $dbh) = @_;
-                $dbh->do("DELETE FROM user_sites WHERE user_id = ?", undef, $uid);
+                for my $tbl (qw(
+                    admin_presence
+                    ai_conversations
+                    ai_support_sessions
+                    api_tokens
+                    email_verification_codes
+                    event
+                    internal_currency_accounts
+                    membership_service_access
+                    password_reset_tokens
+                    plan_audit
+                    point_accounts
+                    user_api_keys
+                    user_groups
+                    user_memberships
+                    user_site_roles
+                    user_sites
+                    workshop_roles
+                )) {
+                    $dbh->do("DELETE FROM $tbl WHERE user_id = ?", undef, $uid);
+                }
+                for my $col_tbl (
+                    ['content',                'created_by'],
+                    ['content',                'updated_by'],
+                    ['documentation',          'created_by'],
+                    ['documentation',          'updated_by'],
+                    ['env_variables',          'created_by'],
+                    ['env_variables',          'updated_by'],
+                    ['env_variable_audit_logs','user_id'],
+                    ['nfs_directory',          'created_by'],
+                    ['system_cost_tracking',   'created_by'],
+                    ['todo',                   'user_id'],
+                    ['workshop_mail_templates','created_by'],
+                    ['workshop_resource',      'uploaded_by'],
+                ) {
+                    my ($tbl, $col) = @$col_tbl;
+                    $dbh->do("UPDATE $tbl SET $col = NULL WHERE $col = ?", undef, $uid);
+                }
             });
         };
-        for my $rs_name (qw(WorkshopRole UserSiteRole UserGroup UserApiKeys ApiToken
-                            EmailVerificationCode PasswordResetToken)) {
-            eval { $schema->resultset($rs_name)->search({ user_id => $uid })->delete };
-        }
-        eval { $schema->resultset('User')->search({ created_by => $uid })->update({ created_by => undef }) };
 
         eval { $user->delete };
         if ($@) {
             push @errors, "id=$uid: $@";
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'bulk_delete_users',
+                "Failed to delete user_id=$uid: $@");
         } else {
             $deleted++;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bulk_delete_users',
