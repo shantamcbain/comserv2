@@ -19,8 +19,7 @@
 
 <div class="form-section">
     <h3>Storage Location</h3>
-    <p>Credentials are stored in <code>[% secrets_path | html %]</code> — outside git, shared
-    across all branches and Docker containers (mount as a volume on the server).</p>
+    <p>Credentials are stored in the <code>app_secrets</code> database table — shared across all branches, servers, and Docker containers. No env files required.</p>
     <p>Status: [% IF token_set %]<span class="status-badge status-active">&#10003; API token is set</span>[% ELSE %]<span class="status-badge status-pending">&#9888; Token not set or placeholder</span>[% END %]</p>
 </div>
 
