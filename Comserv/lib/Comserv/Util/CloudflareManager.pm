@@ -31,18 +31,32 @@ site and user roles from the Comserv2 database.
 has 'logger' => (
     is => 'ro',
     default => sub {
-        my $logger = Log::Log4perl->get_logger("CloudflareManager");
         unless (Log::Log4perl->initialized()) {
-            Log::Log4perl->init({
-                'log4perl.rootLogger' => 'INFO, LOGFILE',
-                'log4perl.appender.LOGFILE' => 'Log::Log4perl::Appender::File',
-                'log4perl.appender.LOGFILE.filename' => '/var/log/comserv2/cloudflare.log',
-                'log4perl.appender.LOGFILE.mode' => 'append',
-                'log4perl.appender.LOGFILE.layout' => 'Log::Log4perl::Layout::PatternLayout',
-                'log4perl.appender.LOGFILE.layout.ConversionPattern' => '%d [%p] %c - %m%n',
-            });
+            my $log_file = '/var/log/comserv2/cloudflare.log';
+            mkdir('/var/log/comserv2') unless -d '/var/log/comserv2';
+            my $fh_test;
+            my $can_write = open($fh_test, '>>', $log_file);
+            close($fh_test) if $can_write;
+            if ($can_write) {
+                Log::Log4perl->init({
+                    'log4perl.rootLogger'                              => 'INFO, LOGFILE',
+                    'log4perl.appender.LOGFILE'                        => 'Log::Log4perl::Appender::File',
+                    'log4perl.appender.LOGFILE.filename'               => $log_file,
+                    'log4perl.appender.LOGFILE.mode'                   => 'append',
+                    'log4perl.appender.LOGFILE.layout'                 => 'Log::Log4perl::Layout::PatternLayout',
+                    'log4perl.appender.LOGFILE.layout.ConversionPattern' => '%d [%p] %c - %m%n',
+                });
+            } else {
+                Log::Log4perl->init({
+                    'log4perl.rootLogger'                              => 'WARN, SCREEN',
+                    'log4perl.appender.SCREEN'                         => 'Log::Log4perl::Appender::Screen',
+                    'log4perl.appender.SCREEN.stderr'                  => 1,
+                    'log4perl.appender.SCREEN.layout'                  => 'Log::Log4perl::Layout::PatternLayout',
+                    'log4perl.appender.SCREEN.layout.ConversionPattern' => '[%p] CloudflareManager - %m%n',
+                });
+            }
         }
-        return $logger;
+        return Log::Log4perl->get_logger("CloudflareManager");
     }
 );
 
@@ -172,6 +186,18 @@ sub _build_config {
         };
     }
     
+    # Override with real values from environment variables if the JSON has TT2 placeholders
+    my $cf = $config->{cloudflare} ||= {};
+    if (!$cf->{api_token} || $cf->{api_token} =~ /^\[%/) {
+        $cf->{api_token} = $ENV{CLOUDFLARE_API_TOKEN} || $ENV{CF_API_TOKEN} || '';
+    }
+    if (!$cf->{api_key} || $cf->{api_key} =~ /^\[%/) {
+        $cf->{api_key} = $ENV{CLOUDFLARE_API_KEY} || $ENV{CF_API_KEY} || '';
+    }
+    if (!$cf->{email} || $cf->{email} =~ /^\[%/) {
+        $cf->{email} = $ENV{CLOUDFLARE_EMAIL} || $ENV{CF_EMAIL} || '';
+    }
+
     return $config;
 }
 
