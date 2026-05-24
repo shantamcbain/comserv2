@@ -517,6 +517,25 @@ sub log_with_details {
 
                 my $effective_uid = defined($uid) ? $uid : 178;
 
+                my ($src_server, $src_branch, $src_file) = ('', '', '');
+                if ($log_message =~ /\[([^\]]+:\d+)\]/) {
+                    $src_server = $1;
+                }
+                if ($log_message =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                } elsif ($file && $file =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                }
+                if ($file) {
+                    ($src_file = $file) =~ s{.*/Comserv/}{Comserv/};
+                    $src_file .= ":$line" if $line;
+                }
+                my $source_comment = '';
+                $source_comment .= "Server: $src_server\n"  if $src_server;
+                $source_comment .= "Branch: $src_branch\n"  if $src_branch;
+                $source_comment .= "File:   $src_file\n"    if $src_file;
+                $source_comment .= "Function: $sub_name\n"  if $sub_name;
+
                 my %create_args = (
                     subject             => $todo_subject,
                     description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
@@ -539,6 +558,7 @@ sub log_with_details {
                     group_of_poster     => 'admin',
                     project_code        => $matched_project_code,
                     share               => 0,
+                    comments            => $source_comment,
                 );
                 $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
             }
