@@ -1838,7 +1838,7 @@ sub _create_ency_todo {
         }
         my $now = do { use POSIX qw(strftime); strftime('%Y-%m-%d', localtime) };
         $c->model('DBEncy')->resultset('Todo')->create({
-            sitename           => $c->stash->{SiteName} || 'ENCY',
+            sitename           => 'ENCY',
             subject            => $trunc_subject,
             description        => $description,
             status             => 1,
