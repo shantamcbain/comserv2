@@ -9,6 +9,7 @@ use File::Path qw(make_path);
 use POSIX qw(strftime);
 use JSON qw(decode_json encode_json);
 use File::Spec;
+use URI::Escape;
 
 BEGIN { extends 'Catalyst::Controller'; }
 
@@ -83,12 +84,13 @@ sub add :Path('add') :Args(0) {
         return;
     }
 
-    my ($cf_zones, $default_domain, $server_ip) = $self->_get_cloudflare_data($c);
+    my ($cf_zones, $default_domain, $server_ip, $cf_error) = $self->_get_cloudflare_data($c);
     $c->stash(
         template       => 'admin/site_provisioning/add.tt',
         cf_zones       => $cf_zones,
         default_domain => $default_domain,
         server_ip      => $server_ip,
+        cf_error       => $cf_error,
     );
 }
 
@@ -111,15 +113,21 @@ sub _get_cloudflare_data {
         $default_domain = $sd->domain if $sd;
     }
 
+    my $cf_error = '';
     eval {
         my $dbh = eval { $c->model('DBEncy')->storage->dbh };
         my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
-        my $email = $cf->config->{cloudflare}{email}
-                 || $c->session->{email}
-                 || $ENV{CLOUDFLARE_EMAIL}
-                 || '';
-        my $raw = $cf->list_zones($email);
-        my @raw_zones = ref $raw eq 'ARRAY' ? @$raw : ();
+        my $cf_email = $cf->config->{cloudflare}{email} || '';
+        my $token    = $cf->config->{cloudflare}{api_token} || '';
+
+        unless ($token) {
+            die "No Cloudflare API token found. Please set it at Cloudflare Credentials.";
+        }
+
+        my $raw = $cf->_api_request('GET', '/zones?per_page=50');
+        my @raw_zones = ref $raw eq 'HASH'  ? @{ $raw->{result} || [] }
+                      : ref $raw eq 'ARRAY' ? @$raw
+                      : ();
 
         for my $zone (@raw_zones) {
             my $zname = ref $zone eq 'HASH' ? $zone->{name} : "$zone";
@@ -127,9 +135,12 @@ sub _get_cloudflare_data {
 
             my @a_records;
             eval {
-                my $records = $cf->list_dns_records($email, $zname);
-                for my $r (@{ $records || [] }) {
-                    next unless ref $r eq 'HASH' && ($r->{type} || '') eq 'A';
+                my $records = $cf->_api_request('GET', "/zones/$zone->{id}/dns_records?type=A&per_page=100");
+                my @recs = ref $records eq 'HASH'  ? @{ $records->{result} || [] }
+                         : ref $records eq 'ARRAY' ? @$records
+                         : ();
+                for my $r (@recs) {
+                    next unless ref $r eq 'HASH';
                     push @a_records, { name => $r->{name}, ip => $r->{content} };
                 }
             };
@@ -145,31 +156,39 @@ sub _get_cloudflare_data {
 
             push @zones, {
                 name      => $zname,
+                id        => ref $zone eq 'HASH' ? ($zone->{id} || '') : '',
                 ip        => $zone_ip,
                 a_records => \@a_records,
             };
         }
     };
+    $cf_error = $@ if $@;
 
-    return (\@zones, $default_domain, $server_ip);
+    return (\@zones, $default_domain, $server_ip, $cf_error);
 }
 
 sub _get_zone_a_records {
     my ($self, $zone_name, $dbh) = @_;
-    my (@a_records, $zone_ip);
+    my (@a_records, $zone_ip, $error);
     eval {
-        my $cf    = Comserv::Util::CloudflareManager->new(dbh => $dbh);
-        my $email = $cf->config->{cloudflare}{email} || $ENV{CLOUDFLARE_EMAIL} || '';
-        my $records = $cf->list_dns_records($email, $zone_name);
-        for my $r (@{ $records || [] }) {
-            next unless ref $r eq 'HASH' && ($r->{type} || '') eq 'A';
+        my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
+        my $zones_resp = $cf->_api_request('GET', "/zones?name=" . URI::Escape::uri_escape($zone_name));
+        my @zones = ref $zones_resp eq 'HASH' ? @{ $zones_resp->{result} || [] } : ();
+        my $zone_id = @zones ? $zones[0]{id} : '';
+        die "Zone '$zone_name' not found in Cloudflare" unless $zone_id;
+
+        my $records_resp = $cf->_api_request('GET', "/zones/$zone_id/dns_records?type=A&per_page=100");
+        my @recs = ref $records_resp eq 'HASH' ? @{ $records_resp->{result} || [] } : ();
+        for my $r (@recs) {
+            next unless ref $r eq 'HASH';
             push @a_records, { name => $r->{name}, ip => $r->{content} };
             if (!$zone_ip && ($r->{name} eq $zone_name || $r->{name} eq '@')) {
                 $zone_ip = $r->{content};
             }
         }
     };
-    return (\@a_records, $zone_ip);
+    $error = $@ if $@;
+    return (\@a_records, $zone_ip, $error);
 }
 
 sub review :Path('review') :Args(1) {
@@ -186,7 +205,7 @@ sub review :Path('review') :Args(1) {
     $zone_name ||= $domain;
 
     my $dbh = eval { $c->model('DBEncy')->storage->dbh };
-    my ($cf_a_records, $cf_zone_ip) = $self->_get_zone_a_records($zone_name, $dbh);
+    my ($cf_a_records, $cf_zone_ip, $cf_error) = $self->_get_zone_a_records($zone_name, $dbh);
 
     my $suggested_domain = $domain;
     if ($zone_name && $domain eq $zone_name) {
@@ -202,6 +221,7 @@ sub review :Path('review') :Args(1) {
         cf_a_records     => $cf_a_records,
         cf_zone_ip       => $cf_zone_ip || $ENV{SERVER_PUBLIC_IP} || '',
         suggested_domain => $suggested_domain,
+        cf_error         => $cf_error,
     );
 }
 

@@ -7,6 +7,12 @@
     </div>
 </div>
 
+[% IF cf_error %]
+<div class="error-message"><strong>Cloudflare API error:</strong> [% cf_error | html %]
+    &mdash; <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Check Cloudflare credentials</a>
+</div>
+[% END %]
+
 <div class="content-container">
 <div class="content-primary">
 
