@@ -172,8 +172,10 @@ sub _get_zone_a_records {
     my (@a_records, $zone_ip, $error);
     eval {
         my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
-        my $zones_resp = $cf->_api_request('GET', "/zones?name=" . URI::Escape::uri_escape($zone_name));
-        my @zones = ref $zones_resp eq 'HASH' ? @{ $zones_resp->{result} || [] } : ();
+        my $zones_resp = $cf->_api_request('GET', "/zones?name=" . URI::Escape::uri_escape($zone_name) . "&per_page=5");
+        my @zones = ref $zones_resp eq 'HASH'  ? @{ $zones_resp->{result} || [] }
+                  : ref $zones_resp eq 'ARRAY' ? @$zones_resp
+                  : ();
         my $zone_id = @zones ? $zones[0]{id} : '';
         die "Zone '$zone_name' not found in Cloudflare" unless $zone_id;
 
