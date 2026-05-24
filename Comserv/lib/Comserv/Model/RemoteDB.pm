@@ -727,8 +727,8 @@ sub list_tables {
     }
     
     try {
-        my $tables = $dbh->tables(undef, undef, '%', 'TABLE');
-        return [map { s/^.*\.//; $_ } @$tables];
+        my @tables = $dbh->tables(undef, undef, '%', 'TABLE');
+        return [map { (my $t = $_) =~ s/^.*\.//; $t } @tables];
     } catch {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_tables',
             "Failed to list tables for '$conn_name': $_");
@@ -1018,9 +1018,10 @@ sub _connect_to_database {
     my $dsn;
     if ($db_type eq 'sqlite') {
         $dsn = "dbi:SQLite:dbname=$database";
+    } elsif ($db_type eq 'postgresql') {
+        $dsn = "dbi:Pg:dbname=$database;host=$host;port=$port";
     } else {
-        my $driver = 'mysql';
-        $dsn = "dbi:$driver:database=$database;host=$host;port=$port";
+        $dsn = "dbi:mysql:database=$database;host=$host;port=$port";
     }
     
     try {
@@ -1036,6 +1037,196 @@ sub _connect_to_database {
             "Failed to connect to database $database: $_");
         return undef;
     };
+}
+
+sub check_database_status {
+    my ($self, $conn_name) = @_;
+
+    $self->_load_config();
+    my $all = $self->get_all_connections();
+
+    unless (exists $all->{$conn_name}) {
+        return { ok => 0, error => "Connection '$conn_name' not found" };
+    }
+
+    my $cfg = $all->{$conn_name}{config};
+    my $dbh;
+    eval { $dbh = $self->_connect_to_database($all->{$conn_name}) };
+    if ($@ || !$dbh) {
+        return {
+            ok      => 0,
+            error   => $@ || 'Connection failed',
+            host    => $cfg->{host},
+            port    => $cfg->{port},
+            database => $cfg->{database},
+        };
+    }
+
+    my ($table_count, $view_count, $db_exists) = (0, 0, 0);
+    eval {
+        my $row = $dbh->selectrow_arrayref(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_type = 'BASE TABLE'",
+            undef, $cfg->{database}
+        );
+        $table_count = $row ? ($row->[0] // 0) : 0;
+
+        my $vrow = $dbh->selectrow_arrayref(
+            "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = ? AND table_type = 'VIEW'",
+            undef, $cfg->{database}
+        );
+        $view_count = $vrow ? ($vrow->[0] // 0) : 0;
+        $db_exists  = 1;
+    };
+    $dbh->disconnect();
+
+    return {
+        ok          => 1,
+        database    => $cfg->{database},
+        host        => $cfg->{host},
+        port        => $cfg->{port},
+        table_count => $table_count,
+        view_count  => $view_count,
+        db_exists   => $db_exists,
+        empty       => ($table_count == 0),
+    };
+}
+
+sub migrate_database {
+    my ($self, $source_name, $target_name, $opts) = @_;
+    $opts //= {};
+    my $schema_only = $opts->{schema_only} // 0;
+    my $truncate    = $opts->{truncate}     // 0;
+
+    $self->_load_config();
+    my $all = $self->get_all_connections();
+
+    return (0, [], "Source connection '$source_name' not found")
+        unless exists $all->{$source_name};
+    return (0, [], "Target connection '$target_name' not found")
+        unless exists $all->{$target_name};
+
+    my $src_dbh = $self->_connect_to_database($all->{$source_name});
+    return (0, [], "Cannot connect to source '$source_name'") unless $src_dbh;
+
+    my $tgt_db   = $all->{$target_name}{config}{database} // '';
+    my $src_type = lc($all->{$source_name}{config}{db_type} // 'mysql');
+    my $tgt_type = lc($all->{$target_name}{config}{db_type} // 'mysql');
+
+    my $tgt_dbh;
+    unless ($tgt_type eq 'postgresql') {
+        my $no_db_conn = { %{$all->{$target_name}} };
+        $no_db_conn->{config} = { %{$all->{$target_name}{config}}, database => '' };
+        $tgt_dbh = $self->_connect_to_database($no_db_conn);
+        if ($tgt_dbh) {
+            eval { $tgt_dbh->do("CREATE DATABASE IF NOT EXISTS `$tgt_db` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci") };
+            eval { $tgt_dbh->do("USE `$tgt_db`") };
+        }
+    }
+    $tgt_dbh //= $self->_connect_to_database($all->{$target_name});
+    unless ($tgt_dbh) {
+        $src_dbh->disconnect();
+        return (0, [], "Cannot connect to target '$target_name'");
+    }
+
+    my @tables;
+    my @views;
+    eval {
+        my $sth = $src_dbh->prepare("SHOW FULL TABLES WHERE Table_type = 'BASE TABLE'");
+        $sth->execute();
+        while (my ($t) = $sth->fetchrow_array()) {
+            push @tables, $t;
+        }
+        my $vsth = $src_dbh->prepare("SHOW FULL TABLES WHERE Table_type = 'VIEW'");
+        $vsth->execute();
+        while (my ($v) = $vsth->fetchrow_array()) {
+            push @views, $v;
+        }
+    };
+    if ($@) {
+        $src_dbh->disconnect();
+        $tgt_dbh->disconnect();
+        return (0, [], "Failed to list source tables: $@");
+    }
+    unless (@tables || @views) {
+        $src_dbh->disconnect();
+        $tgt_dbh->disconnect();
+        return (0, [], "No tables or views found in source database");
+    }
+
+    my @results;
+    my $overall_ok = 1;
+
+    foreach my $table (@tables) {
+        my $result = { table => $table, schema_ok => 0, rows => 0, error => '' };
+
+        eval {
+            my $row = $src_dbh->selectrow_arrayref("SHOW CREATE TABLE `$table`");
+            my $create = $row->[1];
+            $create =~ s/^CREATE TABLE /CREATE TABLE IF NOT EXISTS /;
+            $tgt_dbh->do($create);
+            $result->{schema_ok} = 1;
+        };
+        if ($@) {
+            $result->{error} = "Schema: $@";
+            $overall_ok = 0;
+            push @results, $result;
+            next;
+        }
+
+        unless ($schema_only) {
+            eval {
+                $tgt_dbh->do("TRUNCATE TABLE `$table`") if $truncate;
+                my $sth = $src_dbh->prepare("SELECT * FROM `$table`");
+                $sth->execute();
+                my $count = 0;
+                $tgt_dbh->begin_work();
+                while (my $row = $sth->fetchrow_hashref()) {
+                    my @cols = keys %$row;
+                    my $col_list    = join(',', map { "`$_`" } @cols);
+                    my $placeholders = join(',', ('?') x scalar @cols);
+                    $tgt_dbh->do(
+                        "INSERT IGNORE INTO `$table` ($col_list) VALUES ($placeholders)",
+                        undef, @{$row}{@cols}
+                    );
+                    $count++;
+                    if ($count % 500 == 0) {
+                        $tgt_dbh->commit();
+                        $tgt_dbh->begin_work();
+                    }
+                }
+                $tgt_dbh->commit();
+                $result->{rows} = $count;
+            };
+            if ($@) {
+                eval { $tgt_dbh->rollback() };
+                $result->{error} .= "Data: $@";
+                $overall_ok = 0;
+            }
+        }
+
+        push @results, $result;
+    }
+
+    foreach my $view (@views) {
+        my $result = { table => "$view (view)", schema_ok => 0, rows => 0, error => '' };
+        eval {
+            my $row = $src_dbh->selectrow_arrayref("SHOW CREATE VIEW `$view`");
+            my $create = $row->[1];
+            $tgt_dbh->do("DROP VIEW IF EXISTS `$view`");
+            $tgt_dbh->do($create);
+            $result->{schema_ok} = 1;
+        };
+        if ($@) {
+            $result->{error} = "View: $@";
+            $overall_ok = 0;
+        }
+        push @results, $result;
+    }
+
+    $src_dbh->disconnect();
+    $tgt_dbh->disconnect();
+
+    return ($overall_ok, \@results, '');
 }
 
 __PACKAGE__->meta->make_immutable;
