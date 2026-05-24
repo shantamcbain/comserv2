@@ -328,8 +328,8 @@ sub provision :Path('provision') :Args(0) {
         # 5. Set theme
         eval { $c->model('ThemeConfig')->set_site_theme($c, $site_name, 'default') };
 
-        # 6. Mark hosting_account active
-        $request->update({ status => 'active' });
+        # 6. Mark hosting_account active and save final domain
+        $request->update({ status => 'active', domain => $domain });
         push @steps, "Hosting account marked active.";
 
         # 7. Create admin todo noting recompile needed
@@ -403,8 +403,9 @@ sub retry_dns :Path('retry_dns') :Args(1) {
         $c->flash->{error_msg} = "Request #$id not found.";
         return $c->response->redirect($c->uri_for($self->action_for('index')));
     }
+    my $domain = $c->req->params->{domain} || $request->domain;
     my @steps;
-    $self->_create_cloudflare_dns($c, $request->domain, $request->domain_type || 'subdomain',
+    $self->_create_cloudflare_dns($c, $domain, $request->domain_type || 'subdomain',
         $c->req->params->{server_ip} || $ENV{SERVER_PUBLIC_IP} || '', \@steps);
     $c->flash->{success_msg} = join(' ', @steps);
     $c->response->redirect($c->uri_for('/admin/site_provisioning/review/' . $id));
