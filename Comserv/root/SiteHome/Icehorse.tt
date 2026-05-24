@@ -1,0 +1,32 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Welcome to [% site.site_display_name || 'Icehorse' %]</h1>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<div class="app-section">
+    <h2>Your site is live!</h2>
+    <p>This is the home page for <strong>icehorse.beemaster.ca</strong>. You can now customise it through the page management system.</p>
+</div>
+
+<div class="app-section">
+    <h2>Getting Started</h2>
+    <ul>
+        <li><strong>Add pages</strong> — go to <a href="/admin/pages">Admin &rsaquo; Pages</a> and create pages for your site.</li>
+        <li><strong>Change your logo and colours</strong> — go to <a href="/admin/theme">Admin &rsaquo; Theme</a>.</li>
+        <li><strong>Manage navigation</strong> — add links via <a href="/admin/navigation">Admin &rsaquo; Navigation</a>.</li>
+        <li><strong>Add users</strong> — invite team members via <a href="/admin/users">Admin &rsaquo; Users</a>.</li>
+    </ul>
+</div>
+
+<div class="app-section">
+    <h2>Need help?</h2>
+    <p>Contact <a href="/helpdesk">our HelpDesk</a> or visit the <a href="/ENCY">knowledge base</a>.</p>
+</div>
+
+</div>
+</div>
+</div>
