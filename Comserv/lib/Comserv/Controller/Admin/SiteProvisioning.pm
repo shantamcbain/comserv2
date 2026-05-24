@@ -332,7 +332,26 @@ sub provision :Path('provision') :Args(0) {
         $request->update({ status => 'active', domain => $domain });
         push @steps, "Hosting account marked active.";
 
-        # 7. Create admin todo noting recompile needed
+        # 7. Grant admin role to contact_email user for this site
+        my $contact_user = eval { $c->model('DBEncy')->resultset('User')->search({ email => $email })->first };
+        if ($contact_user) {
+            eval {
+                $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
+                    user_id => $contact_user->id,
+                    site_id => $site->id,
+                    role    => 'admin',
+                }, {
+                    key => 'user_site_role_unique',
+                    values => { granted_by => $c->session->{user_id} || 1, is_active => 1 },
+                });
+            };
+            push @steps, "Granted admin role to '" . $contact_user->username . "' for site '$site_name'."
+                unless $@;
+        } else {
+            push @steps, "No user found for '$email' — admin role not auto-assigned (user must register first).";
+        }
+
+        # 8. Create admin todo noting recompile needed
         $self->_create_admin_todo($c, $site_name, \@steps);
 
         $c->stash(
