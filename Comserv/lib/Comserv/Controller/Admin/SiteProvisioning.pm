@@ -112,7 +112,8 @@ sub _get_cloudflare_data {
     }
 
     eval {
-        my $cf = Comserv::Util::CloudflareManager->new();
+        my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+        my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
         my $email = $cf->config->{cloudflare}{email}
                  || $c->session->{email}
                  || $ENV{CLOUDFLARE_EMAIL}
@@ -154,10 +155,10 @@ sub _get_cloudflare_data {
 }
 
 sub _get_zone_a_records {
-    my ($self, $zone_name) = @_;
+    my ($self, $zone_name, $dbh) = @_;
     my (@a_records, $zone_ip);
     eval {
-        my $cf    = Comserv::Util::CloudflareManager->new();
+        my $cf    = Comserv::Util::CloudflareManager->new(dbh => $dbh);
         my $email = $cf->config->{cloudflare}{email} || $ENV{CLOUDFLARE_EMAIL} || '';
         my $records = $cf->list_dns_records($email, $zone_name);
         for my $r (@{ $records || [] }) {
@@ -184,7 +185,8 @@ sub review :Path('review') :Args(1) {
     my ($zone_name) = ($domain =~ /([^.]+\.[^.]+)$/);
     $zone_name ||= $domain;
 
-    my ($cf_a_records, $cf_zone_ip) = $self->_get_zone_a_records($zone_name);
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+    my ($cf_a_records, $cf_zone_ip) = $self->_get_zone_a_records($zone_name, $dbh);
 
     my $suggested_domain = $domain;
     if ($zone_name && $domain eq $zone_name) {
@@ -438,53 +440,59 @@ sub _cf_secrets_path {
     return File::Spec->catfile($dir, 'cloudflare.json');
 }
 
+sub _db_get_secret {
+    my ($self, $c, $key) = @_;
+    my $row = eval { $c->model('DBEncy')->resultset('AppSecret')->find({ secret_key => $key }) };
+    return $row ? $row->secret_value : undef;
+}
+
+sub _db_set_secret {
+    my ($self, $c, $key, $value, $desc) = @_;
+    my $who = $c->session->{username} || 'admin';
+    $c->model('DBEncy')->resultset('AppSecret')->update_or_create(
+        { secret_key => $key },
+        {
+            secret_value => $value,
+            description  => $desc || '',
+            updated_by   => $who,
+        },
+        { key => 'secret_key' }
+    );
+}
+
 sub cf_settings :Path('cf_settings') :Args(0) {
     my ($self, $c) = @_;
-    my $path = $self->_cf_secrets_path();
-    my $current = {};
-    eval {
-        if (-f $path) {
-            open my $fh, '<:encoding(UTF-8)', $path or die;
-            local $/;
-            $current = decode_json(<$fh>);
-            close $fh;
-        }
-    };
-    my $cf = $current->{cloudflare} || {};
+
+    my $db_token = $self->_db_get_secret($c, 'cloudflare_api_token') // '';
+    my $db_email = $self->_db_get_secret($c, 'cloudflare_email')     // '';
 
     if ($c->req->method eq 'POST') {
-        my $p = $c->req->params;
+        my $p     = $c->req->params;
         my $token = $p->{api_token} // '';
-        my $email = $p->{email}     // $cf->{email} // '';
-
-        if ($token && $token ne '(unchanged)') {
-            $cf->{api_token} = $token;
-        }
-        $cf->{email} = $email if $email;
-        $current->{cloudflare} = $cf;
+        my $email = $p->{email}     // $db_email;
 
         eval {
-            make_path(do { my $d = $path; $d =~ s|/[^/]+$||; $d });
-            open my $fh, '>:encoding(UTF-8)', $path or die "Cannot write $path: $!";
-            print $fh encode_json($current);
-            close $fh;
-            chmod 0600, $path;
+            if ($token) {
+                $self->_db_set_secret($c, 'cloudflare_api_token', $token,
+                    'Cloudflare API token for DNS management');
+            }
+            $self->_db_set_secret($c, 'cloudflare_email', $email,
+                'Cloudflare account email') if $email;
         };
         if ($@) {
             $c->flash->{error_msg} = "Failed to save: $@";
         } else {
-            $c->flash->{success_msg} = 'Cloudflare credentials saved to ~/.comserv/secrets/cloudflare.json (shared across all branches and Docker).';
+            $c->flash->{success_msg} = 'Cloudflare credentials saved to the database (app_secrets table) — shared across all branches and servers.';
         }
         $c->response->redirect($c->uri_for($self->action_for('cf_settings')));
         return;
     }
 
-    my $token_set = $cf->{api_token} && $cf->{api_token} !~ /^\[%|^__REPLACE/;
+    my $token_set = $db_token && length($db_token) > 20;
     $c->stash(
-        template   => 'admin/site_provisioning/cf_settings.tt',
-        cf_email   => $cf->{email} || '',
-        token_set  => $token_set,
-        secrets_path => $path,
+        template  => 'admin/site_provisioning/cf_settings.tt',
+        cf_email  => $db_email,
+        token_set => $token_set,
     );
 }
 
