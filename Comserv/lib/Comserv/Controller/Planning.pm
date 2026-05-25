@@ -595,7 +595,20 @@ sub daily :Path('/planning/daily') :Args {
                 my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
                     {}, { order_by => 'name' }
                 )->all;
-                @ap_all_sitenames = sort map { $_->name } @site_rows;
+                my %seen;
+                for my $s (@site_rows) {
+                    my $n = eval { $s->name } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename => { '!=' => undef } },
+                    { columns => ['sitename'], distinct => 1 }
+                )->all;
+                for my $r (@todo_sites) {
+                    my $n = eval { $r->get_column('sitename') } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                @ap_all_sitenames = sort @ap_all_sitenames;
             };
         } else {
             eval {
@@ -622,8 +635,8 @@ sub daily :Path('/planning/daily') :Args {
         eval {
             if ($is_csc) {
                 my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                    {},
-                    { columns => ['username'], order_by => 'username', rows => 200 }
+                    { roles => { '!=' => '', -not => undef } },
+                    { columns => ['username'], order_by => 'username' }
                 )->all;
                 my %seen;
                 for my $r (@urows) {
