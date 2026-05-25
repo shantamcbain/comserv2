@@ -3066,13 +3066,43 @@ sub do_admin_delete_user :Local :Args(1) {
         }
     }
 
-    # Step 3: Clear created_by references
+    # Step 3: NULL out FK columns that cannot be deleted (financial/audit trails)
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            for my $stmt (
+                "UPDATE point_ledger SET from_user_id = NULL WHERE from_user_id = $user_id",
+                "UPDATE point_ledger SET to_user_id   = NULL WHERE to_user_id   = $user_id",
+                "UPDATE internal_currency_transactions SET from_user_id = NULL WHERE from_user_id = $user_id",
+                "UPDATE internal_currency_transactions SET to_user_id   = NULL WHERE to_user_id   = $user_id",
+                "UPDATE jobs SET posted_by_user_id = NULL WHERE posted_by_user_id = $user_id",
+                "UPDATE content SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE content SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE documentation SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE documentation SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE env_variables SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE env_variables SET updated_by = NULL WHERE updated_by = $user_id",
+                "UPDATE nfs_directory SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE system_cost_tracking SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE workshop_mail_templates SET created_by = NULL WHERE created_by = $user_id",
+                "UPDATE workshop_resource SET uploaded_by = NULL WHERE uploaded_by = $user_id",
+                "DELETE FROM benefactor_contributions WHERE user_id = $user_id",
+                "DELETE FROM crypto_transactions WHERE user_id = $user_id",
+                "DELETE FROM payment_transactions WHERE user_id = $user_id",
+                "DELETE FROM job_applications WHERE user_id = $user_id",
+                "DELETE FROM membership_service_access WHERE user_id = $user_id",
+                "DELETE FROM admin_presence WHERE user_id = $user_id",
+                "DELETE FROM ai_support_messages WHERE sender_user_id = $user_id",
+                "DELETE FROM ai_support_sessions WHERE admin_user_id = $user_id",
+            ) {
+                eval { $dbh->do($stmt) };
+            }
+        });
+    };
     eval {
         $schema->resultset('User')->search({ created_by => $user_id })
             ->update({ created_by => undef });
     };
-    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_admin_delete_user',
-        "created_by nullify error: $@") if $@;
 
     # Step 4: Delete the user record — this is the critical step
     # Capture $@ immediately — logging/notification calls will reset it
