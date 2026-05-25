@@ -17,10 +17,12 @@ echo "Disk before: $DISK_BEFORE"
 # ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
 echo "Running routine Docker cleanup..."
 docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
-docker image prune -f                          2>&1 | grep -v "^$" || true
+# Aggressively prune ALL unused images older than 1h to reclaim major space
+docker image prune -a -f --filter "until=1h"   2>&1 | grep -v "^$" || true
 docker volume prune -f                         2>&1 | grep -v "^$" || true
 docker network prune -f                        2>&1 | grep -v "^$" || true
-docker builder prune -f --keep-storage 2GB     2>&1 | grep -v "^$" || true
+# Completely purge build cache since server only pulls pre-built production images
+docker builder prune -a -f                     2>&1 | grep -v "^$" || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
@@ -49,18 +51,57 @@ LOG_TRIM_TARGET_BYTES=10485760   # 10 MB kept after trim
 echo "Checking container log sizes..."
 for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
     LOG_FILE=$(docker inspect --format='{{.LogPath}}' "$CNAME" 2>/dev/null || true)
-    [ -z "$LOG_FILE" ] || [ ! -f "$LOG_FILE" ] && continue
-    LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
-    LOG_SIZE_MB=${LOG_SIZE_MB:-0}
-    echo "  $CNAME: ${LOG_SIZE_MB}MB"
-    if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
-        echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
-        tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
-            && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
-            && echo "  => Done." \
-            || echo "  => WARNING: trim failed for $CNAME"
+    [ -z "$LOG_FILE" ] && continue
+    
+    # Check if we can write to the log file (docker logs are owned by root)
+    if [ ! -w "$LOG_FILE" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            LOG_SIZE_MB=$(sudo du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+            LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+            echo "  $CNAME: ${LOG_SIZE_MB}MB (requires sudo)"
+            if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+                echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB) via sudo..."
+                sudo tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "/tmp/${CNAME}_log.tmp" \
+                    && sudo mv "/tmp/${CNAME}_log.tmp" "$LOG_FILE" \
+                    && sudo chmod 640 "$LOG_FILE" \
+                    && echo "  => Done." \
+                    || echo "  => WARNING: sudo trim failed for $CNAME"
+            fi
+        else
+            echo "  $CNAME: Cannot access $LOG_FILE (permission denied, sudo not available)"
+        fi
+    else
+        LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+        LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+        echo "  $CNAME: ${LOG_SIZE_MB}MB"
+        if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+            echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
+            tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
+                && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
+                && echo "  => Done." \
+                || echo "  => WARNING: trim failed for $CNAME"
+        fi
     fi
 done
+
+# ── Application log trimming (on host) ───────────────────────────────────────
+echo "Checking application log sizes in /home/ubuntu/comserv-logs/..."
+if [ -d "/home/ubuntu/comserv-logs" ]; then
+    find /home/ubuntu/comserv-logs -name "*.log" -type f 2>/dev/null | while read -r ALOG; do
+        ASIZE_MB=$(du -m "$ALOG" 2>/dev/null | cut -f1)
+        ASIZE_MB=${ASIZE_MB:-0}
+        echo "  $ALOG: ${ASIZE_MB}MB"
+        if [ "$ASIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+            echo "  => Trimming application log $ALOG (${ASIZE_MB}MB -> 10MB)..."
+            tail -c "$LOG_TRIM_TARGET_BYTES" "$ALOG" > "${ALOG}.tmp" \
+                && mv "${ALOG}.tmp" "$ALOG" \
+                && chmod 664 "$ALOG" 2>/dev/null || true
+        fi
+    done
+    # Also delete any rotated logs older than 7 days on the host
+    echo "Pruning rotated application logs older than 7 days..."
+    find /home/ubuntu/comserv-logs \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
+fi
 
 # ── Check for compose file ───────────────────────────────────────────────────
 if [ ! -f "$COMPOSE_FILE" ]; then
@@ -147,6 +188,8 @@ SEARXNG_EOF
     fi
     docker run -d \
         --name searxng \
+        --log-opt max-size=10m \
+        --log-opt max-file=3 \
         -p 127.0.0.1:8080:8080 \
         --restart unless-stopped \
         -v "$SEARXNG_CONFIG_DIR:/etc/searxng:ro" \
@@ -170,8 +213,8 @@ while [ $ATTEMPT -lt 45 ]; do
     [ $((ATTEMPT % 5)) -eq 0 ] && echo "  ...waiting ($((ATTEMPT * 2))s)"
 done
 
-echo "5. Post-deploy cleanup (remove now-dangling old image layers)..."
-docker image prune -f 2>&1 | grep -v "^$" || true
+echo "5. Post-deploy cleanup (remove unused and dangling old image layers)..."
+docker image prune -a -f --filter "until=1h" 2>&1 | grep -v "^$" || true
 
 DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after deploy: $DISK_FINAL"
