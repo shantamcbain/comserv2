@@ -1576,21 +1576,41 @@ sub get_list_subscribers :Local :Args(1) {
     }
 
     my @subs;
-    eval {
-        my $rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
-            { mailing_list_id => $list_id, is_active => 1 },
-            { prefetch => 'user' }
-        );
-        while (my $sub = $rs->next) {
-            my $email = $sub->user ? $sub->user->email : $sub->email;
-            my $name = $sub->user ? ($sub->user->first_name . ' ' . $sub->user->last_name) : (($sub->first_name // '') . ' ' . ($sub->last_name // ''));
-            $name =~ s/^\s+|\s+$//g;
-            push @subs, {
-                email => $email // '',
-                name  => $name || 'No Name',
-            };
-        }
-    };
+    my $site_id = $self->_get_site_id($c);
+
+    if ($list_id eq 'all' || $list_id eq 'paid') {
+        eval {
+            my @users = _get_site_users($c, $site_id, $list_id);
+            for my $u (@users) {
+                my $name = (($u->{first_name} // '') . ' ' . ($u->{last_name} // ''));
+                $name =~ s/^\s+|\s+$//g;
+                push @subs, {
+                    email => $u->{email} // '',
+                    name  => $name || 'No Name',
+                };
+            }
+        };
+    } elsif ($list_id eq 'custom') {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ ok => 1, is_custom_note => 1, subscribers => [] }));
+        return;
+    } else {
+        eval {
+            my $rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
+                { mailing_list_id => $list_id, is_active => 1 },
+                { prefetch => 'user' }
+            );
+            while (my $sub = $rs->next) {
+                my $email = $sub->user ? $sub->user->email : $sub->email;
+                my $name = $sub->user ? ($sub->user->first_name . ' ' . $sub->user->last_name) : (($sub->first_name // '') . ' ' . ($sub->last_name // ''));
+                $name =~ s/^\s+|\s+$//g;
+                push @subs, {
+                    email => $email // '',
+                    name  => $name || 'No Name',
+                };
+            }
+        };
+    }
 
     # Sort subscribers alphabetically by name for readability
     @subs = sort { lc($a->{name}) cmp lc($b->{name}) } @subs;
