@@ -1,0 +1,233 @@
+[% META title = 'Page Management Admin' %]
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #eee;">
+                <h2 style="margin: 0;">Page Management System</h2>
+                <div>
+                    <a href="[% c.uri_for('/admin') %]" class="btn btn-default">
+                        <i class="fa fa-arrow-left"></i> Back to Dashboard
+                    </a>
+                    [% UNLESS show_form %]
+                        <a href="[% c.uri_for('/admin/pages', { action => 'create' }) %]" class="btn btn-primary">
+                            <i class="fa fa-plus"></i> Create New Page
+                        </a>
+                    [% END %]
+                </div>
+            </div>
+
+            [% IF error_msg %]
+                <div class="alert alert-danger alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <strong>Error:</strong> [% error_msg %]
+                </div>
+            [% END %]
+
+            [% IF success_msg %]
+                <div class="alert alert-success alert-dismissible" role="alert">
+                    <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                    <strong>Success:</strong> [% success_msg %]
+                </div>
+            [% END %]
+
+            [% IF show_form %]
+                <div class="panel panel-primary">
+                    <div class="panel-heading">
+                        <h3 class="panel-title">
+                            [% IF show_form == 'edit' %]
+                                <i class="fa fa-edit"></i> Edit Page: [% page_item.page_code %]
+                            [% ELSE %]
+                                <i class="fa fa-plus"></i> Create New Page
+                            [% END %]
+                        </h3>
+                    </div>
+                    <div class="panel-body">
+                        <form method="post" action="[% c.uri_for('/admin/pages') %]">
+                            <input type="hidden" name="action" value="save">
+                            [% IF page_item.id %]
+                                <input type="hidden" name="id" value="[% page_item.id %]">
+                            [% END %]
+
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="sitename">Site Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || 'CSC' %]" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="menu">Menu Section <span class="text-danger">*</span></label>
+                                        <input type="text" name="menu" id="menu" class="form-group form-control" value="[% page_item.menu || 'main' %]" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="page_code">Page Code <span class="text-danger">*</span></label>
+                                        <input type="text" name="page_code" id="page_code" class="form-group form-control" value="[% page_item.page_code %]" placeholder="e.g. home, about_us" required [% IF show_form == 'edit' %]readonly[% END %]>
+                                        [% IF show_form == 'edit' %]<span class="help-block">Page Code cannot be modified after creation.</span>[% END %]
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-8">
+                                    <div class="form-group">
+                                        <label for="title">Page Title <span class="text-danger">*</span></label>
+                                        <input type="text" name="title" id="title" class="form-group form-control" value="[% page_item.title %]" placeholder="Enter friendly title for page" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="form-group">
+                                        <label for="link_order">Link/Sort Order</label>
+                                        <input type="number" name="link_order" id="link_order" class="form-group form-control" value="[% page_item.link_order || 0 %]">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="body">Page Body (HTML/Text) <span class="text-danger">*</span></label>
+                                <textarea name="body" id="body" rows="12" class="form-group form-control" placeholder="Enter HTML or text content for the page" required>[% page_item.body %]</textarea>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="description">SEO Description</label>
+                                        <textarea name="description" id="description" rows="3" class="form-group form-control" placeholder="Meta description for search engines">[% page_item.description %]</textarea>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="keywords">SEO Keywords</label>
+                                        <input type="text" name="keywords" id="keywords" class="form-group form-control" value="[% page_item.keywords %]" placeholder="comma, separated, keywords">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="status">Status</label>
+                                        <select name="status" id="status" class="form-group form-control">
+                                            <option value="active" [% IF page_item.status == 'active' %]selected[% END %]>Active</option>
+                                            <option value="inactive" [% IF page_item.status == 'inactive' %]selected[% END %]>Inactive</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="form-group">
+                                        <label for="roles">Access Roles</label>
+                                        <input type="text" name="roles" id="roles" class="form-group form-control" value="[% page_item.roles || 'public' %]">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fa fa-save"></i> Save Page
+                                </button>
+                                <a href="[% c.uri_for('/admin/pages') %]" class="btn btn-default">Cancel</a>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            [% ELSE %]
+                <!-- Filters / Search -->
+                <div class="well">
+                    <form method="get" action="[% c.uri_for('/admin/pages') %]" class="form-inline">
+                        <input type="hidden" name="action" value="list">
+                        
+                        <div class="form-group" style="margin-right: 15px;">
+                            <label for="search" style="margin-right: 5px;">Search:</label>
+                            <input type="text" name="search" id="search" class="form-control" value="[% search %]" placeholder="Title or Code...">
+                        </div>
+
+                        <div class="form-group" style="margin-right: 15px;">
+                            <label for="filter_site" style="margin-right: 5px;">Site:</label>
+                            <select name="filter_site" id="filter_site" class="form-control">
+                                <option value="">-- All Sites --</option>
+                                [% FORE0 = 1; FOREACH site IN site_names %]
+                                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site %]</option>
+                                [% END %]
+                            </select>
+                        </div>
+
+                        <div class="form-group" style="margin-right: 15px;">
+                            <label for="filter_status" style="margin-right: 5px;">Status:</label>
+                            <select name="filter_status" id="filter_status" class="form-control">
+                                <option value="">-- All Status --</option>
+                                <option value="active" [% IF filter_status == 'active' %]selected[% END %]>Active</option>
+                                <option value="inactive" [% IF filter_status == 'inactive' %]selected[% END %]>Inactive</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" class="btn btn-info">
+                            <i class="fa fa-filter"></i> Apply Filters
+                        </button>
+                        <a href="[% c.uri_for('/admin/pages') %]" class="btn btn-default">Clear</a>
+                    </form>
+                </div>
+
+                <!-- Page List Table -->
+                <div class="panel panel-default">
+                    <div class="panel-heading">
+                        <h3 class="panel-title"><i class="fa fa-list"></i> Managed Pages</h3>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Site</th>
+                                    <th>Menu</th>
+                                    <th>Page Code</th>
+                                    <th>Title</th>
+                                    <th>Sort Order</th>
+                                    <th>Status</th>
+                                    <th>Roles</th>
+                                    <th style="width: 150px; text-align: right;">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% IF pages.size > 0 %]
+                                    [% FOREACH page IN pages %]
+                                        <tr>
+                                            <td><span class="label label-info">[% page.sitename %]</span></td>
+                                            <td>[% page.menu %]</td>
+                                            <td><code>[% page.page_code %]</code></td>
+                                            <td>[% page.title %]</td>
+                                            <td>[% page.link_order %]</td>
+                                            <td>
+                                                [% IF page.status == 'active' %]
+                                                    <span class="label label-success">Active</span>
+                                                [% ELSE %]
+                                                    <span class="label label-default">Inactive</span>
+                                                [% END %]
+                                            </td>
+                                            <td><span class="label label-warning">[% page.roles %]</span></td>
+                                            <td style="text-align: right;">
+                                                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit">
+                                                    <i class="fa fa-edit"></i>
+                                                </a>
+                                                <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]" class="btn btn-xs btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this page? This action cannot be undone.');">
+                                                    <i class="fa fa-trash"></i>
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    [% END %]
+                                [% ELSE %]
+                                    <tr>
+                                        <td colspan="8" class="text-center text-muted" style="padding: 20px;">
+                                            No pages found matching the active criteria.
+                                        </td>
+                                    </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            [% END %]
+        </div>
+    </div>
+</div>
