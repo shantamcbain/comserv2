@@ -1566,6 +1566,43 @@ sub get_recipients :Local :Args(0) {
     $c->res->body(encode_json({ ok => 1, recipients => \@recipients }));
 }
 
+sub get_list_subscribers :Local :Args(1) {
+    my ($self, $c, $list_id) = @_;
+
+    unless ($self->_has_mail_role($c)) {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ ok => 0, error => 'Forbidden' }));
+        return;
+    }
+
+    my @subs;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('MailingListSubscription')->search(
+            { mailing_list_id => $list_id, is_active => 1 },
+            { prefetch => 'user' }
+        );
+        while (my $sub = $rs->next) {
+            my $email = $sub->user ? $sub->user->email : $sub->email;
+            my $name = $sub->user ? ($sub->user->first_name . ' ' . $sub->user->last_name) : (($sub->first_name // '') . ' ' . ($sub->last_name // ''));
+            $name =~ s/^\s+|\s+$//g;
+            push @subs, {
+                email => $email // '',
+                name  => $name || 'No Name',
+            };
+        }
+    };
+
+    # Sort subscribers alphabetically by name for readability
+    @subs = sort { lc($a->{name}) cmp lc($b->{name}) } @subs;
+
+    $c->res->content_type('application/json; charset=utf-8');
+    if ($@) {
+        $c->res->body(encode_json({ ok => 0, error => "$@" }));
+    } else {
+        $c->res->body(encode_json({ ok => 1, subscribers => \@subs }));
+    }
+}
+
 sub send_mailout_test :Local :Args(0) {
     my ($self, $c) = @_;
 

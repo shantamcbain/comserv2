@@ -44,11 +44,21 @@
                 <div style="margin-top:8px;padding:10px;background:#f0f4ff;border:1px solid #c5d0e8;border-radius:4px;">
                     <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color: var(--text-muted-color, #666);">(check any to add their members)</small>:</strong>
                     [% FOREACH list IN mailing_lists %]
-                    <div class="form-group" style="margin:4px 0;">
-                        <label><input type="checkbox" name="list_ids" value="[% list.id %]" [% IF selected_list_ids.${list.id} %]checked[% END %] onchange="updateListCount()"> 
+                    <div class="form-group" style="margin:4px 0; position: relative;">
+                        <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, [% list.id %])" onmouseleave="hideListPreview(this)">
+                            <input type="checkbox" name="list_ids" value="[% list.id %]" [% IF selected_list_ids.${list.id} %]checked[% END %] onchange="updateListCount()"> 
                             [% list.name | html %] <strong>([% list.count %])</strong>
                             <small style="color: var(--text-muted-color, #666);"> — named mailing list subscribers</small>
                         </label>
+                        <!-- Hover Preview Card -->
+                        <div class="list-preview-card" style="display:none; position:absolute; left: 100%; top: -10px; margin-left: 15px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                            <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                            <div class="preview-content" style="display: none;">
+                                <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Subscribers in list:</strong>
+                                <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                     [% END %]
                 </div>
@@ -628,6 +638,99 @@ function saveRecipientModal() {
     document.getElementById('excluded_emails').value = excluded.join(',');
     closeRecipientModal();
     updateListCount();
+}
+
+// ── Hover Preview management ──────────────────────────────────
+var listPreviewCache = {};
+
+function showListPreview(element, listId) {
+    var container = element.closest('.form-group');
+    var card = container.querySelector('.list-preview-card');
+    if (!card) return;
+    
+    card.style.display = 'block';
+    
+    if (listPreviewCache[listId]) {
+        renderListPreview(card, listPreviewCache[listId]);
+        return;
+    }
+    
+    var loading = card.querySelector('.preview-loading');
+    var content = card.querySelector('.preview-content');
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    
+    fetch('/mail/get_list_subscribers/' + listId)
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+            if (json.ok) {
+                listPreviewCache[listId] = json.subscribers || [];
+                renderListPreview(card, listPreviewCache[listId]);
+            } else {
+                loading.textContent = 'Error loading preview.';
+            }
+        })
+        .catch(function(err) {
+            loading.textContent = 'Error loading preview.';
+        });
+}
+
+function hideListPreview(element) {
+    var container = element.closest('.form-group');
+    var card = container.querySelector('.list-preview-card');
+    if (card) {
+        card.style.display = 'none';
+    }
+}
+
+function renderListPreview(card, subscribers) {
+    var loading = card.querySelector('.preview-loading');
+    var content = card.querySelector('.preview-content');
+    var list = card.querySelector('.preview-list');
+    
+    loading.style.display = 'none';
+    content.style.display = 'block';
+    list.innerHTML = '';
+    
+    if (subscribers.length === 0) {
+        list.innerHTML = '<li style="color: #888; font-style: italic; padding: 3px 0;">No subscribers</li>';
+        return;
+    }
+    
+    var limit = 10;
+    var displayed = subscribers.slice(0, limit);
+    displayed.forEach(function(sub) {
+        var li = document.createElement('li');
+        li.style.borderBottom = '1px solid #eee';
+        li.style.padding = '4px 0';
+        li.style.whiteSpace = 'nowrap';
+        li.style.overflow = 'hidden';
+        li.style.textOverflow = 'ellipsis';
+        
+        var strong = document.createElement('strong');
+        strong.textContent = sub.name || 'No Name';
+        strong.style.display = 'block';
+        strong.style.color = '#333';
+        
+        var span = document.createElement('span');
+        span.textContent = sub.email;
+        span.style.color = '#666';
+        span.style.fontSize = '11px';
+        
+        li.appendChild(strong);
+        li.appendChild(span);
+        list.appendChild(li);
+    });
+    
+    if (subscribers.length > limit) {
+        var liMore = document.createElement('li');
+        liMore.style.color = '#0d6efd';
+        liMore.style.fontWeight = 'bold';
+        liMore.style.paddingTop = '6px';
+        liMore.style.fontSize = '11px';
+        liMore.textContent = '+ ' + (subscribers.length - limit) + ' more subscriber(s)';
+        list.appendChild(liMore);
+    }
 }
 
 window.addEventListener('click', function(e) {
