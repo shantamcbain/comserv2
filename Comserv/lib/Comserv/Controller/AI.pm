@@ -977,9 +977,17 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id");
 
-            # Fast availability check (3-second timeout) before committing
-            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
-            unless ($fast_check && $fast_check->check_connection()) {
+            # Fast availability check (5-second timeout) with 3 retries before committing
+            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 5);
+            my $connected = 0;
+            for (1..3) {
+                if ($fast_check && $fast_check->check_connection()) {
+                    $connected = 1;
+                    last;
+                }
+                sleep 1;
+            }
+            unless ($connected) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
 
