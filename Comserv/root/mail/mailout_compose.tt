@@ -21,23 +21,53 @@
 
             <div class="form-section">
                 <h3>Recipients</h3>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="all" [% IF !group || group == 'all' %]checked[% END %] onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'all')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="all" [% IF !group || group == 'all' %]checked[% END %] onchange="updateCount(this)">
                         All site users <strong>([% user_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — everyone with a role on this site</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 100%; top: -10px; margin-left: 15px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">All Site Users:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="paid" [% IF group == 'paid' %]checked[% END %] onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'paid')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="paid" [% IF group == 'paid' %]checked[% END %] onchange="updateCount(this)">
                         Paid / active members <strong>([% paid_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — active or grace-period memberships</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 100%; top: -10px; margin-left: 15px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Paid / Active Members:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="custom" [% IF group == 'custom' %]checked[% END %] onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'custom')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="custom" [% IF group == 'custom' %]checked[% END %] onchange="updateCount(this)">
                         Custom addresses only
                         <small style="color: var(--text-muted-color, #666);"> — use the field below, no DB users</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 100%; top: -10px; margin-left: 15px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Custom Addresses:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 [% IF mailing_lists.size %]
