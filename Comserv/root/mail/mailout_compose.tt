@@ -22,19 +22,19 @@
             <div class="form-section">
                 <h3>Recipients</h3>
                 <div class="form-group">
-                    <label><input type="radio" name="group" value="all" checked onchange="updateCount(this)">
+                    <label><input type="radio" name="group" value="all" [% IF !group || group == 'all' %]checked[% END %] onchange="updateCount(this)">
                         All site users <strong>([% user_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — everyone with a role on this site</small>
                     </label>
                 </div>
                 <div class="form-group">
-                    <label><input type="radio" name="group" value="paid" onchange="updateCount(this)">
+                    <label><input type="radio" name="group" value="paid" [% IF group == 'paid' %]checked[% END %] onchange="updateCount(this)">
                         Paid / active members <strong>([% paid_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — active or grace-period memberships</small>
                     </label>
                 </div>
                 <div class="form-group">
-                    <label><input type="radio" name="group" value="custom" onchange="updateCount(this)">
+                    <label><input type="radio" name="group" value="custom" [% IF group == 'custom' %]checked[% END %] onchange="updateCount(this)">
                         Custom addresses only
                         <small style="color: var(--text-muted-color, #666);"> — use the field below, no DB users</small>
                     </label>
@@ -45,7 +45,7 @@
                     <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color: var(--text-muted-color, #666);">(check any to add their members)</small>:</strong>
                     [% FOREACH list IN mailing_lists %]
                     <div class="form-group" style="margin:4px 0;">
-                        <label><input type="checkbox" name="list_ids" value="[% list.id %]" onchange="updateListCount()"> 
+                        <label><input type="checkbox" name="list_ids" value="[% list.id %]" [% IF selected_list_ids.${list.id} %]checked[% END %] onchange="updateListCount()"> 
                             [% list.name | html %] <strong>([% list.count %])</strong>
                             <small style="color: var(--text-muted-color, #666);"> — named mailing list subscribers</small>
                         </label>
@@ -58,7 +58,7 @@
                     <label for="custom_addresses">Additional / Custom Addresses:</label>
                     <textarea name="custom_addresses" id="custom_addresses" rows="3"
                               placeholder="extra@example.com, another@example.com"
-                              style="width:100%;padding:6px;"></textarea>
+                              style="width:100%;padding:6px;">[% custom_addresses | html %]</textarea>
                     <small style="color: var(--text-muted-color, #666);">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
                 </div>
 
@@ -84,6 +84,7 @@
                 <div class="form-group">
                     <label for="subject">Subject <span style="color:red;">*</span></label>
                     <input type="text" name="subject" id="subject" required
+                           value="[% subject | html %]"
                            style="width:100%;padding:6px;" placeholder="Your subject line">
                 </div>
                 <div class="form-group" style="margin-top:10px;">
@@ -121,7 +122,7 @@
                         <!-- Visual editor panel -->
                         <div id="panel-visual">
                             <div id="body-editor" contenteditable="true"
-                                 style="min-height:280px;padding:10px;background: rgba(255,255,255,0.88);outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;"></div>
+                                 style="min-height:280px;padding:10px;background: rgba(255,255,255,0.88);outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;">[% body %]</div>
                         </div>
 
                         <!-- HTML source panel -->
@@ -136,12 +137,12 @@
                                 <button type="button" onclick="applySource()" class="btn btn-primary" style="padding:4px 16px;">
                                     Apply HTML &#10003;
                                 </button>
-                                <button type="button" onclick="switchTab('visual')" style="padding:4px 12px;">Cancel</button>
+                                <button type="button" onclick="cancelSource()" style="padding:4px 12px;">Cancel</button>
                             </div>
                         </div>
                     </div>
 
-                    <input type="hidden" name="body" id="body-hidden">
+                    <input type="hidden" name="body" id="body-hidden" value="[% body | html %]">
                     <small style="color: var(--text-muted-color, #666);margin-top:4px;display:block;">
                         Personalisation tags: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
                         <code>[EMAIL]</code> <code>[USERNAME]</code> — replaced per recipient.
@@ -198,7 +199,7 @@
 var counts = { all: [% user_count %], paid: [% paid_count %], custom: 0 };
 
 // ── Editor tab switching ──────────────────────────────────────
-function switchTab(tab) {
+function switchTabDirect(tab) {
     var isVisual = tab === 'visual';
     document.getElementById('panel-visual').style.display = isVisual ? '' : 'none';
     document.getElementById('panel-source').style.display = isVisual ? 'none' : '';
@@ -209,6 +210,18 @@ function switchTab(tab) {
     document.getElementById('tab-source').style.borderBottom = isVisual ? '2px solid transparent' : '2px solid #0d6efd';
     document.getElementById('tab-source').style.background   = isVisual ? 'transparent' : '#fff';
     document.getElementById('tab-source').style.fontWeight   = isVisual ? 'normal' : 'bold';
+}
+
+function switchTab(tab) {
+    var isVisual = tab === 'visual';
+    if (isVisual) {
+        // Automatically apply HTML source to visual editor when returning to visual tab
+        var src = document.getElementById('source-editor').value.trim();
+        if (src) {
+            setBodyHtml(src);
+        }
+    }
+    switchTabDirect(tab);
     if (!isVisual) {
         // Mirror current visual content into source textarea when switching to source
         document.getElementById('source-editor').value =
@@ -222,7 +235,12 @@ function applySource() {
     if (src) {
         setBodyHtml(src);
     }
-    switchTab('visual');
+    switchTabDirect('visual');
+}
+
+function cancelSource() {
+    document.getElementById('source-editor').value = document.getElementById('body-hidden').value;
+    switchTabDirect('visual');
 }
 
 // ── Inline HTML editor helpers ────────────────────────────────
@@ -249,17 +267,37 @@ document.getElementById('body-editor').addEventListener('input', syncBody);
 
 // Allow external code (e.g. AI assistant) to set the editor content as rendered HTML
 function setBodyHtml(html) {
-    // Strip full document wrapper if present — email clients only need inner HTML
-    html = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
-    // Strip <!DOCTYPE> and <html> lines that may remain
-    html = html.replace(/<!DOCTYPE[^>]*>/gi, '').replace(/<\/?html[^>]*>/gi, '')
-               .replace(/<head>[\s\S]*?<\/head>/gi, '').trim();
-    document.getElementById('body-editor').innerHTML = html;
+    // Extract any <style>...</style> blocks before stripping container elements
+    var styles = "";
+    var styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+    if (styleMatches) {
+        styles = styleMatches.join("\n") + "\n";
+    }
+
+    var inner = html;
+    var bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+        inner = bodyMatch[1];
+    } else {
+        // Strip out the head if there is one but no explicit body tag
+        inner = inner.replace(/<head>[\s\S]*?<\/head>/gi, '');
+    }
+
+    // Strip out container/document-level wrappers
+    inner = inner.replace(/<!DOCTYPE[^>]*>/gi, '')
+                 .replace(/<\/?html[^>]*>/gi, '')
+                 .replace(/<\/?head[^>]*>/gi, '')
+                 .replace(/<\/?body[^>]*>/gi, '')
+                 .trim();
+
+    // Prepend the styles back so they render in the editor and mail out properly
+    var finalHtml = styles + inner;
+    document.getElementById('body-editor').innerHTML = finalHtml;
     syncBody();
 }
 
 // Watch for changes to the hidden body field (AI assistant writes here) and mirror to editor
-var _bodyHiddenLast = '';
+var _bodyHiddenLast = document.getElementById('body-hidden') ? document.getElementById('body-hidden').value : '';
 setInterval(function() {
     var hidden = document.getElementById('body-hidden');
     if (hidden && hidden.value !== _bodyHiddenLast) {
