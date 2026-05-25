@@ -9,6 +9,9 @@ use File::Spec;
 use File::Path qw(make_path);
 use IPC::Run3;
 use DateTime;
+use LWP::UserAgent;
+use HTTP::Request;
+use MIME::Base64 qw(encode_base64);
 use Comserv::Util::Logging;
 
 BEGIN { extends 'Comserv::Controller::Base'; }
@@ -475,6 +478,136 @@ sub _deploy_monitoring_stack {
         message => $all_success ? 'Monitoring stack deployed successfully' : 'Deployment encountered errors',
         steps => \@results
     };
+}
+
+sub opnsense_index :Path('/admin/infrastructure/opnsense') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'opnsense_index',
+        'Loading OPNsense gateway management page');
+
+    my $config = $self->_load_opnsense_config($c);
+    my ($status, $error);
+
+    if ($config->{host}) {
+        ($status, $error) = $self->_fetch_opnsense_status($c, $config);
+    } else {
+        $error = 'OPNsense not configured. Please set host, key, and secret below.';
+    }
+
+    $c->stash(
+        opnsense_config => $config,
+        opnsense_status => $status,
+        opnsense_error  => $error,
+        template        => 'admin/infrastructure/opnsense.tt',
+    );
+}
+
+sub opnsense_save_config :Path('/admin/infrastructure/opnsense/save') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->req->method eq 'POST') {
+        $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+        return;
+    }
+
+    my $params  = $c->req->body_parameters;
+    my $config  = {
+        host    => $params->{host}   || '',
+        port    => $params->{port}   || 443,
+        key     => $params->{key}    || '',
+        secret  => $params->{secret} || '',
+        verify_ssl => ($params->{verify_ssl} ? 1 : 0),
+    };
+
+    $self->_save_opnsense_config($c, $config);
+
+    $c->flash->{success_msg} = 'OPNsense configuration saved.';
+    $c->response->redirect($c->uri_for('/admin/infrastructure/opnsense'));
+}
+
+sub opnsense_status :Path('/admin/infrastructure/opnsense/status') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $config = $self->_load_opnsense_config($c);
+    my ($status, $error) = $self->_fetch_opnsense_status($c, $config);
+
+    $c->stash->{json} = $error
+        ? { success => 0, error => $error }
+        : { success => 1, %$status };
+    $c->forward('View::JSON');
+}
+
+sub _load_opnsense_config {
+    my ($self, $c) = @_;
+    my $config_file = Catalyst::Utils::home('Comserv') . '/config/infrastructure/opnsense.json';
+    return {} unless -f $config_file;
+    try {
+        my $json = read_file($config_file);
+        return decode_json($json);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_load_opnsense_config',
+            "Failed to load OPNsense config: $_");
+        return {};
+    };
+}
+
+sub _save_opnsense_config {
+    my ($self, $c, $config) = @_;
+    my $config_dir  = Catalyst::Utils::home('Comserv') . '/config/infrastructure';
+    my $config_file = "$config_dir/opnsense.json";
+    make_path($config_dir) unless -d $config_dir;
+    try {
+        write_file($config_file, encode_json($config));
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_save_opnsense_config',
+            "Failed to save OPNsense config: $_");
+    };
+}
+
+sub _fetch_opnsense_status {
+    my ($self, $c, $config) = @_;
+
+    my $host   = $config->{host}   or return (undef, 'OPNsense host not configured');
+    my $port   = $config->{port}   || 443;
+    my $key    = $config->{key}    or return (undef, 'OPNsense API key not configured');
+    my $secret = $config->{secret} or return (undef, 'OPNsense API secret not configured');
+
+    my $base   = "https://$host:$port/api";
+    my $auth   = 'Basic ' . encode_base64("$key:$secret", '');
+
+    my $ua = LWP::UserAgent->new(timeout => 10);
+    $ua->ssl_opts(verify_hostname => $config->{verify_ssl} ? 1 : 0,
+                  SSL_verify_mode  => $config->{verify_ssl} ? 1 : 0);
+
+    my %status;
+    my @endpoints = (
+        { key => 'firmware',   url => "$base/core/firmware/running" },
+        { key => 'interfaces', url => "$base/interfaces/overview/interfacesInfo" },
+        { key => 'dhcp',       url => "$base/dhcpv4/leases/searchLease" },
+        { key => 'firewall',   url => "$base/firewall/filter/searchRule" },
+        { key => 'unbound',    url => "$base/unbound/service/status" },
+    );
+
+    foreach my $ep (@endpoints) {
+        my $req = HTTP::Request->new(GET => $ep->{url});
+        $req->header(Authorization => $auth);
+        $req->header('Content-Type' => 'application/json');
+        my $res = $ua->request($req);
+        if ($res->is_success) {
+            try {
+                $status{ $ep->{key} } = decode_json($res->decoded_content);
+            } catch {
+                $status{ $ep->{key} } = { error => "JSON parse error" };
+            };
+        } else {
+            $status{ $ep->{key} } = { error => $res->status_line };
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_fetch_opnsense_status',
+                "OPNsense endpoint $ep->{url} failed: " . $res->status_line);
+        }
+    }
+
+    return (\%status, undef);
 }
 
 __PACKAGE__->meta->make_immutable;

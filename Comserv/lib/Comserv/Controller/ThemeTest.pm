@@ -22,7 +22,7 @@ sub index :Path :Args(0) {
     my ($self, $c) = @_;
 
     # Log that we've entered the index method
-    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** THEMETEST INDEX METHOD CALLED *****");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** THEMETEST INDEX METHOD CALLED *****");
 
     # Check for site parameter to force theme testing
     my $site_param = $c->request->param('site');
@@ -38,14 +38,14 @@ sub index :Path :Args(0) {
         # Force theme lookup for the specified site
         $c->controller('Root')->set_theme($c);
         
-        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** FORCING THEME FOR SITE: $site_param *****");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** FORCING THEME FOR SITE: $site_param *****");
     }
 
     # Set the template to our simple test page
     $c->stash->{template} = 'themetest.tt';
 
     # Log that we're rendering the template
-    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** RENDERING TEMPLATE: themetest.tt *****");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "***** RENDERING TEMPLATE: themetest.tt *****");
 }
 
 # Test CSS editor that doesn't require authentication
@@ -53,20 +53,20 @@ sub edit_css :Path('edit_css') :Args(1) {
     my ($self, $c, $theme_name) = @_;
     
     # Log that we've entered the edit_css method
-    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "***** THEMETEST EDIT_CSS METHOD CALLED FOR $theme_name *****");
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "***** THEMETEST EDIT_CSS METHOD CALLED FOR $theme_name *****");
 
     # Get the theme CSS file path
     my $theme_css_path = $c->path_to('root', 'static', 'css', 'themes', "$theme_name.css");
     
     # Check if the theme CSS file exists
     unless (-f $theme_css_path) {
-        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "Theme CSS file not found: $theme_css_path");
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', "Theme CSS file not found: $theme_css_path");
 
         # Create the directory if it doesn't exist
         my $themes_dir = $c->path_to('root', 'static', 'css', 'themes');
         unless (-d $themes_dir) {
             make_path($themes_dir) or do {
-                $self->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create themes directory: $!");
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create themes directory: $!");
                 $c->stash->{error_msg} = "Cannot create themes directory: $!";
                 $c->stash->{template} = 'admin/theme/edit_css.tt';
                 return;
@@ -75,7 +75,7 @@ sub edit_css :Path('edit_css') :Args(1) {
         
         # Create an empty file for this theme
         open my $fh, '>', $theme_css_path or do {
-            $self->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create theme file: $!");
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', "Cannot create theme file: $!");
             $c->stash->{error_msg} = "Cannot create theme file: $!";
             $c->stash->{template} = 'admin/theme/edit_css.tt';
             return;
@@ -91,13 +91,13 @@ sub edit_css :Path('edit_css') :Args(1) {
         try {
             # Update the theme CSS file
             write_file($theme_css_path, $css_content);
-            $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
                 "Successfully updated CSS for theme: $theme_name");
             
             # Also update the main CSS file for backward compatibility
             my $main_css_file = $c->path_to('root', 'static', 'css', "$theme_name.css");
             if (-f $main_css_file) {
-                $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
                     "Updating main CSS file for backward compatibility: $main_css_file");
                 write_file($main_css_file, $css_content);
             }
@@ -105,7 +105,7 @@ sub edit_css :Path('edit_css') :Args(1) {
             # Check if the CSS contains a background image
             if ($css_content =~ /background-image\s*:\s*url\(['"]?([^'")]+)['"]?\)/i) {
                 my $bg_image = $1;
-                $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
                     "Found background image in CSS: $bg_image");
                 
                 # Update the theme_definitions.json file to include the background image
@@ -114,7 +114,7 @@ sub edit_css :Path('edit_css') :Args(1) {
                     # Extract the body styles
                     if ($css_content =~ /body\s*{([^}]+)}/i) {
                         my $body_styles = $1;
-                        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
                             "Found body styles: $body_styles");
                         
                         # Update the special_styles section
@@ -128,7 +128,7 @@ sub edit_css :Path('edit_css') :Args(1) {
                         my $json = JSON::encode_json($themes);
                         write_file($theme_defs_path, $json);
                         
-                        $self->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
+                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit_css', 
                             "Updated theme_definitions.json with background image");
                     }
                 }
@@ -136,7 +136,7 @@ sub edit_css :Path('edit_css') :Args(1) {
             
             $c->stash->{message} = "Theme CSS updated successfully";
         } catch {
-            $self->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', 
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_css', 
                 "Error updating CSS for theme $theme_name: $_");
             $c->stash->{error_msg} = "Error updating CSS: $_";
         };
@@ -156,7 +156,7 @@ sub help :Path('help') :Args(0) {
     my ($self, $c) = @_;
     
     # Log that we've entered the help method
-    $self->log_with_details($c, 'info', __FILE__, __LINE__, 'help', 
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'help', 
         "***** THEMETEST HELP METHOD CALLED *****");
     
     # Set the template

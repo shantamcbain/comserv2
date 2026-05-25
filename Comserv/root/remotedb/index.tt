@@ -1,73 +1,87 @@
-[% META title = 'Remote Database Management' %]
 
-<div class="container">
-    <h1>Remote Database Management</h1>
-    
-    [% IF c.flash.success_msg %]
-    <div class="alert alert-success">
-        [% c.flash.success_msg %]
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Database Server Management</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/remotedb/add') %]" class="btn btn-primary">+ Add Database Server</a>
+        <a href="[% c.uri_for('/remotedb/migrate') %]" class="btn btn-secondary">&#8658; Migrate / Copy Database</a>
     </div>
+</div>
+
+[% IF success_msg %]<div class="success-message">[% success_msg | html %]</div>[% END %]
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
+
+<p class="page-subtitle">Servers stored in <code>~/.comserv/secrets/dbi/</code> — shared across all branches.</p>
+
+<div class="content-container">
+<div class="data-container">
+
+[% SET conn_keys = connections.keys.sort %]
+[% IF conn_keys.size > 0 %]
+
+<div class="table-container">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            <th>Host : Port</th>
+            <th>Database</th>
+            <th>Environment</th>
+            <th>Role</th>
+            <th>Priority</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    [% FOREACH name IN conn_keys %]
+        [% SET conn = connections.$name %]
+        [% SET cfg  = conn.config %]
+        [% SET env_colour = cfg.environment == 'production'  ? '#d32f2f' :
+                            cfg.environment == 'development' ? '#1565c0' :
+                            cfg.environment == 'staging'     ? '#e65100' : '#555' %]
+        <tr>
+            <td>
+                <a href="[% c.uri_for('/remotedb/detail') %]/[% name | uri %]"
+                   title="Click to view details and edit [% name | html %]">
+                    [% name | html %]
+                </a>
+            </td>
+            <td><code>[% cfg.db_type | html %]</code></td>
+            <td><code>[% cfg.host | html %]:[% cfg.port | html %]</code></td>
+            <td><code>[% cfg.database | html %]</code></td>
+            <td>
+                <span style="background:[% env_colour %];color:#fff;padding:2px 8px;border-radius:10px;font-size:0.85em;">
+                    [% cfg.environment | html %]
+                </span>
+            </td>
+            <td>[% cfg.role | html %]</td>
+            <td>[% cfg.priority | html %]</td>
+            <td class="action-cell">
+                <a href="[% c.uri_for('/remotedb/test') %]/[% name | uri %]"
+                   class="btn btn-sm btn-primary"
+                   title="Check connection and count tables in [% cfg.database | html %]">Check DB</a>
+            </td>
+        </tr>
     [% END %]
-    
-    [% IF c.flash.error_msg %]
-    <div class="alert alert-danger">
-        [% c.flash.error_msg %]
-    </div>
-    [% END %]
-    
-    <div class="row mb-4">
-        <div class="col">
-            <a href="[% c.uri_for(c.controller('RemoteDB').action_for('add_connection')) %]" class="btn btn-primary">
-                Add New Remote Database Connection
-            </a>
-        </div>
-    </div>
-    
-    <div class="card">
-        <div class="card-header">
-            <h2>Configured Remote Connections</h2>
-        </div>
-        <div class="card-body">
-            [% IF connections.keys.size > 0 %]
-                <table class="table table-striped">
-                    <thead>
-                        <tr>
-                            <th>Connection Name</th>
-                            <th>Database Type</th>
-                            <th>Host</th>
-                            <th>Database</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        [% FOREACH conn_name IN connections.keys.sort %]
-                            [% SET conn = connections.$conn_name %]
-                            <tr>
-                                <td>[% conn_name %]</td>
-                                <td>[% conn.config.db_type %]</td>
-                                <td>[% conn.config.host %]:[% conn.config.port %]</td>
-                                <td>[% conn.config.database %]</td>
-                                <td>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('view'), [conn_name]) %]" class="btn btn-sm btn-info">
-                                        View Tables
-                                    </a>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('query'), [conn_name]) %]" class="btn btn-sm btn-secondary">
-                                        Run Query
-                                    </a>
-                                    <a href="[% c.uri_for(c.controller('RemoteDB').action_for('remove'), [conn_name]) %]" class="btn btn-sm btn-danger" 
-                                       onclick="return confirm('Are you sure you want to remove this connection?');">
-                                        Remove
-                                    </a>
-                                </td>
-                            </tr>
-                        [% END %]
-                    </tbody>
-                </table>
-            [% ELSE %]
-                <div class="alert alert-info">
-                    No remote database connections configured yet. Click the button above to add one.
-                </div>
-            [% END %]
-        </div>
-    </div>
+    </tbody>
+</table>
+</div>
+
+[% ELSE %]
+<div class="empty-state">
+    <p>No database servers configured yet. <a href="[% c.uri_for('/remotedb/add') %]">Add the first one.</a></p>
+</div>
+[% END %]
+
+</div>
+</div>
+
+<div class="content-section">
+    <p><strong>How it works:</strong> Priority 1 = highest (tried first). Files live at
+    <code>~/.comserv/secrets/dbi/&lt;name&gt;.json</code> — shared across all branches.
+    Docker containers: use the external mapped port (3307, 5433) not the internal port.</p>
+</div>
+
 </div>

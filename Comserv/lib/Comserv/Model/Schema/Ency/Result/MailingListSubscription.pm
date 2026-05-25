@@ -55,8 +55,35 @@ __PACKAGE__->add_columns(id => {
         set_on_create => 1,
     },
     is_active => {
-        data_type => 'tinyint',
+        data_type     => 'tinyint',
         default_value => 1,
+    },
+    status => {
+        data_type     => 'varchar',
+        size          => 20,
+        default_value => 'subscribed',
+        is_nullable   => 0,
+    },
+    unsubscribed_at => {
+        data_type   => 'timestamp',
+        is_nullable => 1,
+    },
+    blocked_by => {
+        data_type   => 'integer',
+        is_nullable => 1,
+    },
+    blocked_at => {
+        data_type   => 'timestamp',
+        is_nullable => 1,
+    },
+    blocked_reason => {
+        data_type   => 'text',
+        is_nullable => 1,
+    },
+    unsubscribe_token => {
+        data_type => 'varchar',
+        size      => 64,
+        is_nullable => 1,
     },
 );
 

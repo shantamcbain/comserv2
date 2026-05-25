@@ -231,6 +231,9 @@
         <button class="tab-button" onclick="switchTab(event, 'master-plan-coordination')">
             MASTER PLAN COORDINATION
         </button>
+        <button class="tab-button" onclick="switchTab(event, 'schema-management')">
+            SCHEMA MANAGEMENT
+        </button>
         [% END %]
     </div>
 
@@ -563,6 +566,7 @@
             'inventory-system-104a'                    => 4021,
             '3dprinting-use-this-as-the-branc-41f3'    => 4030,
             'developer-time-logging-points-ba-542a'    => 4022,
+            'page-management-system-implement-41a1'    => 4023,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -592,6 +596,7 @@
             { name => 'inventory-system-104a',                 port => 4021, label => 'InventorySystem',      url => '/Inventory' },
             { name => '3dprinting-use-this-as-the-branc-41f3', port => 4030, label => '3DPrinting',           url => '/Documentation/DailyPlan' },
             { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
+            { name => 'page-management-system-implement-41a1', port => 4023, label => 'PageManagement',       url => '/Documentation/DailyPlan' },
         ] %]
 
         [%# workstation.local gets full table; other domains get dropdown only %]
@@ -1170,6 +1175,105 @@
             </summary>
             <div style="padding:14px;max-height:600px;overflow-y:auto;">
                 [% INCLUDE "Documentation/MasterPlanCoordination.tt" %]
+            </div>
+        </details>
+    </div>
+
+    <!-- TAB: SCHEMA MANAGEMENT (CSC only) -->
+    <div id="schema-management" class="tab-content">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;padding-bottom:10px;border-bottom:2px solid var(--primary-color);">
+            <h2 style="margin:0;font-size:1.2em;">📊 Schema Management System</h2>
+            <div style="display:flex;gap:8px;">
+                <a href="http://workstation.local:4002/admin/schema_comparison" target="_blank"
+                   style="background:var(--primary-color);color:#fff;padding:4px 12px;border-radius:4px;text-decoration:none;font-size:0.82em;">Schema Compare ↗</a>
+                <a href="http://workstation.local:4002/admin/environment_variables" target="_blank"
+                   style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Env Variables ↗</a>
+                <a href="/Documentation/Planning#anchor-priority-schema" target="_blank"
+                   style="padding:4px 12px;border:1px solid var(--border-color);border-radius:4px;text-decoration:none;font-size:0.82em;color:var(--text-color);">Planning.tt ↗</a>
+            </div>
+        </div>
+
+        <div style="background:color-mix(in srgb,#28a745 10%,var(--bg-color));border:1px solid #28a745;border-radius:4px;padding:12px 16px;margin-bottom:16px;font-size:0.88em;">
+            <strong>✅ Branch:</strong> <code>schema-managment-system-7eb3</code> running on port 4002.
+            Both <strong>MariaDB</strong> and <strong>PostgreSQL</strong> on <code>db-production (192.168.1.20)</code> are connected with full privileges — schema operations are enabled.
+        </div>
+
+        <!-- Completed Work -->
+        <details style="border:1px solid var(--border-color);border-radius:4px;margin-bottom:10px;">
+            <summary style="padding:10px 14px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);">
+                ✅ Completed Work (2026-03 → 2026-05)
+            </summary>
+            <div style="padding:14px;font-size:0.87em;">
+                <ul style="margin:0;padding-left:20px;line-height:1.8;">
+                    <li>Unique constraint bugs (×4), enum parser, template routing — fixed</li>
+                    <li>Missing DB tables: <code>dailyplan</code>, <code>dailyplan_project</code>, <code>plan_system_mapping</code></li>
+                    <li>Remove-field endpoint and UI in schema compare</li>
+                    <li>Containers default-closed in schema compare UI</li>
+                    <li><code>quick_close</code> log error — <code>points_processed</code> default value fix</li>
+                    <li>Admin menu: DailyPlan and Documentation links at top level</li>
+                    <li>Result file refactor: 200+ files → <code>Beekeeping/</code>, <code>Ency/</code>, <code>Accounting/</code> subdirs</li>
+                    <li>PostgreSQL support: <code>SchemaComparison.pm</code>, <code>RemoteDB.pm</code>, <code>Admin.pm</code></li>
+                    <li>Add New Environment backend — writes <code>COMSERV_DB_*</code> to <code>.env</code></li>
+                    <li>Env variables list — grouped by prefix, 50+ descriptions, collapsible sections</li>
+                    <li>Set Password modal — inline popup, no restart, immediate <code>%ENV</code> update</li>
+                    <li>Global password show/hide toggle on all admin password inputs</li>
+                    <li>Port defaults corrected: MySQL 3306, PostgreSQL 5432</li>
+                    <li>ALTER USER — uses <code>CURRENT_USER()</code> to avoid Error 1396</li>
+                    <li>Dockerfile: <code>libpq-dev</code> + <code>libpq5</code>; <code>DBD::Pg</code> in <code>cpanfile</code></li>
+                    <li><code>.env</code> removed from git tracking (security fix)</li>
+                    <li><code>EnvFileManager.pm</code> regex crash fixed; JSON body parsing fixed</li>
+                </ul>
+            </div>
+        </details>
+
+        <!-- New Production Server Status -->
+        <details open style="border:1px solid var(--border-color);border-radius:4px;margin-bottom:10px;">
+            <summary style="padding:10px 14px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);">
+                🖥️ New Production Server Status — db-production (192.168.1.20)
+            </summary>
+            <div style="padding:14px;font-size:0.87em;">
+                <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+                    <thead>
+                        <tr style="background:var(--bg-secondary);">
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid var(--border-color);">Service</th>
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid var(--border-color);">Status</th>
+                            <th style="padding:6px 10px;text-align:left;border-bottom:2px solid var(--border-color);">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);">MariaDB</td>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);color:#28a745;font-weight:bold;">✅ Connected</td>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);">Port 3306 — <code>root@192.168.1.%</code> has ALL PRIVILEGES</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);">PostgreSQL 16</td>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);color:#28a745;font-weight:bold;">✅ Connected</td>
+                            <td style="padding:6px 10px;border-bottom:1px solid var(--border-color);">Port 5432 — <code>listen_addresses='*'</code>, MD5 auth for 192.168.1.0/24</td>
+                        </tr>
+                        <tr>
+                            <td style="padding:6px 10px;">Credentials</td>
+                            <td style="padding:6px 10px;color:#fd7e14;font-weight:bold;">⚠️ Pending</td>
+                            <td style="padding:6px 10px;"><code>/opt/csc-db/.env</code> on db-production still has <code>CHANGE_ME</code> — update via webmin</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </details>
+
+        <!-- Next Steps -->
+        <details open style="border:1px solid var(--border-color);border-radius:4px;margin-bottom:10px;">
+            <summary style="padding:10px 14px;cursor:pointer;font-weight:bold;background:var(--bg-secondary);">
+                ⏳ Next Steps
+            </summary>
+            <div style="padding:14px;font-size:0.87em;">
+                <ol style="margin:0;padding-left:20px;line-height:2;">
+                    <li>Update <code>/opt/csc-db/.env</code> on db-production with real passwords (webmin → MySQL/PostgreSQL root passwords)</li>
+                    <li>Create target databases on db-production: MariaDB <code>ency</code>, <code>forager</code>; PostgreSQL accounting schema</li>
+                    <li>Use Schema Compare to diff existing DB against new production server and apply migrations</li>
+                    <li>Design PostgreSQL accounting schema for SiteName opt-in</li>
+                    <li>"Add New Environment" — complete form for new SiteName DB provisioning</li>
+                </ol>
             </div>
         </details>
     </div>

@@ -1,0 +1,97 @@
+
+<div class="admin-content">
+    <div class="admin-header">
+        <h1>My Email Subscriptions</h1>
+    </div>
+
+    <div id="sub-status" style="display:none;" class="alert"></div>
+
+    [% IF lists.size %]
+    <div class="admin-card">
+        <p style="color:#555;margin-bottom:16px;">
+            Choose which mailing lists you would like to receive email from.
+            You can change your preferences at any time.
+        </p>
+        <table class="data-table" style="width:100%;">
+            <thead>
+                <tr>
+                    <th>List</th>
+                    <th>Description</th>
+                    <th style="width:130px;text-align:center;">Subscribed?</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH list IN lists %]
+                <tr id="row-[% list.id %]">
+                    <td><strong>[% list.name | html %]</strong></td>
+                    <td>[% list.description | html %]</td>
+                    <td style="text-align:center;">
+                        <button type="button"
+                                class="btn [% IF list.subscribed %]btn-danger[% ELSE %]btn-primary[% END %] sub-toggle"
+                                data-list-id="[% list.id %]"
+                                data-subscribed="[% list.subscribed %]"
+                                style="min-width:110px;">
+                            [% IF list.subscribed %]Unsubscribe[% ELSE %]Subscribe[% END %]
+                        </button>
+                    </td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% ELSE %]
+    <div class="admin-card">
+        <p>No mailing lists are currently available for this site.</p>
+    </div>
+    [% END %]
+</div>
+
+<script>
+(function () {
+    var statusEl = document.getElementById('sub-status');
+
+    function showMsg(msg, ok) {
+        statusEl.textContent = msg;
+        statusEl.className = 'alert ' + (ok ? 'alert-success' : 'alert-danger');
+        statusEl.style.display = 'block';
+        setTimeout(function () { statusEl.style.display = 'none'; }, 4000);
+    }
+
+    document.querySelectorAll('.sub-toggle').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            var listId    = btn.dataset.listId;
+            var subscribed = btn.dataset.subscribed === '1';
+            var newSub    = subscribed ? '0' : '1';
+
+            btn.disabled = true;
+
+            var fd = new FormData();
+            fd.append('list_id',   listId);
+            fd.append('subscribe', newSub);
+
+            fetch('[% c.uri_for("/mail/toggle_subscription") %]', {
+                method: 'POST',
+                body:   fd
+            })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+                if (data.ok) {
+                    var nowSub = newSub === '1';
+                    btn.dataset.subscribed = nowSub ? '1' : '0';
+                    btn.textContent  = nowSub ? 'Unsubscribe' : 'Subscribe';
+                    btn.className    = 'btn ' + (nowSub ? 'btn-danger' : 'btn-primary') + ' sub-toggle';
+                    showMsg(data.msg, true);
+                } else {
+                    showMsg(data.msg || 'Error — please try again.', false);
+                }
+            })
+            .catch(function () {
+                showMsg('Network error — please try again.', false);
+            })
+            .finally(function () {
+                btn.disabled = false;
+            });
+        });
+    });
+})();
+</script>

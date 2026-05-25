@@ -10,21 +10,22 @@
     </div>
 
     <nav class="admin-quick-nav">
-        <a href="[% c.uri_for('/admin/docker-containers') %]"><i class="fas fa-docker"></i> Docker</a>
-        <a href="#section-software"><i class="fas fa-cogs"></i> Software</a>
+        [% IF is_csc %]<a href="[% c.uri_for('/admin/docker-containers') %]"><i class="fas fa-docker"></i> Docker</a>[% END %]
+        [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
-        <a href="#section-inventory"><i class="fas fa-boxes"></i> Inventory</a>
-        <a href="#section-customers"><i class="fas fa-users"></i> Customers</a>
+        [% IF has_accounting %]<a href="#section-inventory"><i class="fas fa-boxes"></i> Inventory</a>[% END %]
+        [% IF has_accounting %]<a href="#section-customers"><i class="fas fa-users"></i> Customers</a>[% END %]
         <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
         <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
         <a href="#section-marketplace"><i class="fas fa-store"></i> Marketplace</a>
-        <a href="#section-database"><i class="fas fa-database"></i> Database</a>
+        [% IF is_csc %]<a href="#section-database"><i class="fas fa-database"></i> Database</a>[% END %]
         <a href="#section-ai"><i class="fas fa-robot"></i> AI</a>
         <a href="#section-environment"><i class="fas fa-cog"></i> Config</a>
         <a href="#section-system"><i class="fas fa-tools"></i> System</a>
-        <a href="#section-infrastructure"><i class="fas fa-cloud"></i> Infrastructure</a>
-        <a href="#section-ency"><i class="fas fa-book"></i> ENCY</a>
+        [% IF is_csc %]<a href="#section-infrastructure"><i class="fas fa-cloud"></i> Infrastructure</a>[% END %]
+        [% IF is_csc %]<a href="#section-ency"><i class="fas fa-book"></i> ENCY</a>[% END %]
         <a href="#section-files"><i class="fas fa-folder-open"></i> Files</a>
+        <a href="#section-mail"><i class="fas fa-envelope"></i> Mail</a>
     </nav>
 
     [%# ── Persistent action-required banners ──────────────────────── %]
@@ -41,9 +42,9 @@
           [% IF pending_hosting == 1 %]has[% ELSE %]have[% END %] submitted a CSC hosting registration request and [% IF pending_hosting == 1 %]is[% ELSE %]are[% END %] waiting for your approval.
         </div>
       </div>
-      <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]"
+      <a href="[% c.uri_for('/admin/site_provisioning') %]"
          style="white-space:nowrap;margin-left:1.5rem;background:#e67e22;color:#fff;padding:0.5rem 1.1rem;border-radius:6px;text-decoration:none;font-weight:bold;">
-        Review &amp; Approve →
+        Review &amp; Provision →
       </a>
     </div>
     [% END %]
@@ -72,6 +73,7 @@
 
     <!-- Admin Sections -->
     <div class="admin-sections">
+        [% IF is_csc %]
         <div id="section-software" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-cogs"></i> Software Management</h3>
@@ -104,7 +106,9 @@
                 [% END %]
             </div>
         </div>
+        [% END %]
 
+        [% IF has_accounting %]
         <div id="section-inventory" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
@@ -202,6 +206,7 @@
                 </div>
             </div>
         </div>
+        [% END %]
 
         <div id="section-membership" class="admin-section theme-section">
             <div class="section-header">
@@ -229,6 +234,10 @@
                     <a href="[% c.uri_for('/membership/admin/hosting_accounts') %]" class="admin-link">
                         <i class="fas fa-server"></i>
                         <span>Hosting Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/site_provisioning') %]" class="admin-link">
+                        <i class="fas fa-globe"></i>
+                        <span>Site Provisioning</span>
                     </a>
                     [% ELSE %]
                     <a href="[% c.uri_for('/membership/hosting_signup') %]" class="admin-link">
@@ -300,15 +309,28 @@
             </div>
         </div>
 
+        [% IF is_csc %]
         <div id="section-database" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-database"></i> Database Management</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
+                    <a href="[% c.uri_for('/remotedb') %]" class="admin-link">
+                        <i class="fas fa-server"></i>
+                        <span>Database Servers</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/schema_compare') %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Schema Compare &amp; Migration</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/compare_schema') %]" class="admin-link">
                         <i class="fas fa-database"></i>
-                        <span>Schema Manager</span>
+                        <span>Schema Manager (legacy)</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/schema_compare', { database => 'ency' }) %]" class="admin-link">
+                        <i class="fas fa-code-branch"></i>
+                        <span>Schema Compare (Ency)</span>
                     </a>
                     <a href="[% c.uri_for('/admin/migrate_schema') %]" class="admin-link">
                         <i class="fas fa-exchange-alt"></i>
@@ -318,9 +340,18 @@
                         <i class="fas fa-file-export"></i>
                         <span>Migrate Pages (Forager → Ency)</span>
                     </a>
+                    <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
+                        <i class="fas fa-key"></i>
+                        <span>DB Connection Passwords</span>
+                    </a>
+                    <a href="[% c.uri_for('/documentation/migration-server-database-setup') %]" class="admin-link">
+                        <i class="fas fa-book"></i>
+                        <span>Migration Server Setup Guide</span>
+                    </a>
                 </div>
             </div>
         </div>
+        [% END %]
 
         <div id="section-ai" class="admin-section theme-section">
             <div class="section-header">
@@ -400,32 +431,56 @@
             </div>
         </div>
 
+        [% IF is_csc %]
         <div id="section-infrastructure" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-cloud"></i> Infrastructure</h3>
+                <h3><i class="fas fa-server"></i> Infrastructure &amp; Server Room</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
                     <a href="[% c.uri_for('/admin/infrastructure') %]" class="admin-link">
-                        <i class="fas fa-dharmachakra"></i>
-                        <span>Kubernetes Clusters</span>
-                    </a>
-                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
-                        <i class="fas fa-docker"></i>
-                        <span>Docker Containers</span>
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Infrastructure Dashboard</span>
                     </a>
                     <a href="[% c.uri_for('/proxmox') %]" class="admin-link">
                         <i class="fas fa-server"></i>
-                        <span>Proxmox VM Management</span>
+                        <span>Proxmox VMs</span>
+                    </a>
+                    <a href="[% c.uri_for('/proxmox/create') %]" class="admin-link">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>Create VM</span>
                     </a>
                     <a href="[% c.uri_for('/proxmox_servers') %]" class="admin-link">
                         <i class="fas fa-hdd"></i>
-                        <span>Proxmox Server Management</span>
+                        <span>Proxmox Servers</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/infrastructure/opnsense') %]" class="admin-link">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>OPNsense Gateway</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/dns') %]" class="admin-link">
+                        <i class="fas fa-cloud"></i>
+                        <span>Cloudflare DNS</span>
+                    </a>
+                    <a href="[% c.uri_for('/hosting') %]" class="admin-link">
+                        <i class="fas fa-globe"></i>
+                        <span>Hosting Accounts</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/docker-containers') %]" class="admin-link">
+                        <i class="fas fa-cubes"></i>
+                        <span>Docker Containers</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/infrastructure') %]#k8s" class="admin-link">
+                        <i class="fas fa-dharmachakra"></i>
+                        <span>Kubernetes Clusters</span>
                     </a>
                 </div>
             </div>
         </div>
 
+        [% END %]
+
+        [% IF is_csc %]
         <div id="section-ency" class="admin-section theme-section">
             <div class="section-header">
                 <h3><i class="fas fa-book"></i> Encyclopedia (ENCY)</h3>
@@ -451,6 +506,7 @@
                 </div>
             </div>
         </div>
+        [% END %]
 
         <div id="section-helpdesk" class="admin-section theme-section">
             <div class="section-header" style="display:flex;justify-content:space-between;align-items:center;">
@@ -546,6 +602,31 @@
                     <a href="[% c.uri_for('/admin/planning') %]" class="admin-link">
                         <i class="fas fa-tasks"></i>
                         <span>Implementation Plan</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div id="section-mail" class="admin-section theme-section">
+            <div class="section-header">
+                <h3><i class="fas fa-envelope"></i> Mail</h3>
+            </div>
+            <div class="section-content">
+                <div class="admin-links">
+                    <a href="[% c.uri_for('/mail/mail_admin_dashboard') %]" class="admin-link">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>Mail Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/mail/lists') %]" class="admin-link">
+                        <i class="fas fa-list-ul"></i>
+                        <span>Mailing Lists</span>
+                    </a>
+                    <a href="[% c.uri_for('/mail/mass_email') %]" class="admin-link">
+                        <i class="fas fa-paper-plane"></i>
+                        <span>Send Mailout</span>
+                    </a>
+                    <a href="[% c.uri_for('/mail/add_mail_config_form') %]" class="admin-link">
+                        <i class="fas fa-cog"></i>
+                        <span>SMTP Settings</span>
                     </a>
                 </div>
             </div>

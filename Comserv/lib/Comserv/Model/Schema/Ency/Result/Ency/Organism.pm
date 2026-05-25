@@ -21,7 +21,7 @@ __PACKAGE__->add_columns(
         data_type     => 'varchar',
         size          => 50,
         is_nullable   => 0,
-        default_value => 'animal',
+        default_value => 'unknown',
     },
     kingdom => {
         data_type   => 'varchar',
@@ -138,6 +138,12 @@ __PACKAGE__->has_many(
 __PACKAGE__->has_many(
     herbs => 'Comserv::Model::Schema::Ency::Result::Ency::Herb',
     'organism_id',
+);
+
+__PACKAGE__->has_many(
+    images => 'Comserv::Model::Schema::Ency::Result::Ency::OrganismImage',
+    'organism_id',
+    { order_by => 'sort_order' },
 );
 
 1;

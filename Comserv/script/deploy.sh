@@ -174,6 +174,7 @@ docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "3. Starting new container..."
+
 if [ -z "$NFS_LOCAL_DIR" ]; then
     NFS_LOCAL_DIR="/home/ubuntu/comserv-workshop"
     echo "   NFS not mounted — using local fallback $NFS_LOCAL_DIR"

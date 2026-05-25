@@ -22,7 +22,7 @@
    "cloudflare" : {
       "email" : "shantamcbain@gmail.com",
       "application_id" : "comserv2",
-      "api_token" : "cXPhJ9FFvNI6XcV7Xf-TxVI_IDC2zdlVPePa_n5w",
+      "api_token" : "[% ENV.CLOUDFLARE_API_TOKEN %]",
       "domains" : {
          "computersystemconsulting.ca" : {
             "zone_id" : "ac8700ca0e7abcdf1fdd332fc9498303"
