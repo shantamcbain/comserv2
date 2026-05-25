@@ -61,6 +61,14 @@
                               style="width:100%;padding:6px;"></textarea>
                     <small style="color: var(--text-muted-color, #666);">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
                 </div>
+
+                <div class="form-group" style="margin-top:14px; display:flex; align-items:center; gap:10px;">
+                    <button type="button" class="btn" onclick="openRecipientModal()" style="background:#0d6efd;color:#fff;padding:6px 14px;border:none;border-radius:4px;cursor:pointer;">
+                        &#128065; View/Edit Recipient List
+                    </button>
+                    <span id="excluded-summary" style="font-size:13px; font-weight:bold; color:var(--text-muted-color,#666);"></span>
+                </div>
+                <input type="hidden" name="excluded_emails" id="excluded_emails" value="">
             </div>
 
             <div class="form-section" style="margin-top:20px;">
@@ -262,8 +270,7 @@ setInterval(function() {
 
 // ── Recipient count ───────────────────────────────────────────
 function updateCount(radio) {
-    var n = counts[radio.value] !== undefined ? counts[radio.value] : '?';
-    document.getElementById('recipient-count').textContent = n;
+    document.getElementById('excluded_emails').value = '';
     updateListCount();
 }
 function updateListCount() {
@@ -276,8 +283,35 @@ function updateListCount() {
     document.querySelectorAll('input[name="list_ids"]:checked').forEach(function(cb) {
         extra += parseInt(cb.parentElement.querySelector('strong').textContent.replace(/[()]/g, '')) || 0;
     });
-    document.getElementById('recipient-count').textContent = base + extra;
+
+    // Subtract any excluded emails that are actually part of the compiled total
+    var exclVal = document.getElementById('excluded_emails').value.trim();
+    var exclCount = exclVal ? exclVal.split(',').length : 0;
+
+    var finalCount = Math.max(0, base + extra - exclCount);
+    document.getElementById('recipient-count').textContent = finalCount;
+
+    var summary = document.getElementById('excluded-summary');
+    if (summary) {
+        if (exclCount > 0) {
+            summary.textContent = "(" + exclCount + " recipient(s) deselected)";
+        } else {
+            summary.textContent = "";
+        }
+    }
 }
+
+// Clear exclusions when options change
+document.querySelectorAll('input[name="list_ids"]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        document.getElementById('excluded_emails').value = '';
+        updateListCount();
+    });
+});
+document.getElementById('custom_addresses').addEventListener('input', function() {
+    document.getElementById('excluded_emails').value = '';
+    updateListCount();
+});
 
 // ── Confirm checkbox enables Send button ──────────────────────
 document.getElementById('confirm_send').addEventListener('change', function() {
@@ -349,4 +383,214 @@ function sendTestPreview() {
         alert('Test send error: ' + err);
     });
 }
+</script>
+
+<!-- Recipient Selector Modal -->
+<div id="recipient-modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+    <div style="background-color:#ffffff; margin:auto; padding:20px; border:1px solid #888; width:90%; max-width:650px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); max-height:85vh; display:flex; flex-direction:column; box-sizing:border-box; color:#333;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:14px;">
+            <h3 style="margin:0;">Select Recipients</h3>
+            <span onclick="closeRecipientModal()" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer; line-height:20px;">&times;</span>
+        </div>
+        
+        <!-- Search and Select Controls -->
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
+            <input type="text" id="modal-search" placeholder="Search by name or email..." oninput="filterModalRecipients()" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            <button type="button" onclick="toggleAllModal(true)" style="padding:6px 12px; font-size:12px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f8f9fa;">Select All</button>
+            <button type="button" onclick="toggleAllModal(false)" style="padding:6px 12px; font-size:12px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f8f9fa;">Deselect All</button>
+        </div>
+
+        <div style="overflow-y:auto; flex:1; border:1px solid #eee; border-radius:4px; padding:6px; background:#fafafa; min-height:200px;">
+            <table style="width:100%; border-collapse:collapse;" id="modal-table">
+                <thead>
+                    <tr style="border-bottom:2px solid #ddd; text-align:left; font-size:13px; color:#555; background:#eee;">
+                        <th style="padding:8px; width:30px;"><input type="checkbox" id="modal-check-all" onclick="toggleAllModal(this.checked)"></th>
+                        <th style="padding:8px;">Name</th>
+                        <th style="padding:8px;">Email</th>
+                        <th style="padding:8px;">Username</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-recipients-body" style="font-size:13px;">
+                    <!-- Filled dynamically via JS -->
+                </tbody>
+            </table>
+            <div id="modal-loading" style="text-align:center; padding:20px; font-weight:bold; color:#666;">
+                Loading recipient list...
+            </div>
+            <div id="modal-empty" style="text-align:center; padding:20px; color:#888; display:none;">
+                No matching recipients.
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:14px; margin-top:14px;">
+            <span id="modal-summary" style="font-size:13px; font-weight:bold; color:#444;">0 selected</span>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeRecipientModal()" style="padding:6px 16px;">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecipientModal()" style="padding:6px 20px; background:#0d6efd; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Apply Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Recipient Modal management ───────────────────────────────
+var modalRecipients = [];
+
+function openRecipientModal() {
+    var modal = document.getElementById('recipient-modal');
+    modal.style.display = 'flex';
+    
+    document.getElementById('modal-loading').style.display = 'block';
+    document.getElementById('modal-table').style.display = 'none';
+    document.getElementById('modal-empty').style.display = 'none';
+    document.getElementById('modal-recipients-body').innerHTML = '';
+    document.getElementById('modal-search').value = '';
+
+    // Gather form parameters
+    var group = document.querySelector('input[name="group"]:checked').value;
+    var custom_addresses = document.getElementById('custom_addresses').value;
+    
+    var data = new URLSearchParams();
+    data.append('group', group);
+    data.append('custom_addresses', custom_addresses);
+    
+    document.querySelectorAll('input[name="list_ids"]:checked').forEach(function(cb) {
+        data.append('list_ids', cb.value);
+    });
+
+    fetch('[% c.uri_for('/mail/get_recipients') %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+        document.getElementById('modal-loading').style.display = 'none';
+        if (json.ok) {
+            modalRecipients = json.recipients || [];
+            if (modalRecipients.length === 0) {
+                document.getElementById('modal-empty').style.display = 'block';
+                document.getElementById('modal-summary').textContent = '0 selected';
+                return;
+            }
+
+            var excludedString = document.getElementById('excluded_emails').value;
+            var excludedMap = {};
+            if (excludedString) {
+                excludedString.split(',').forEach(function(em) {
+                    excludedMap[em.trim().toLowerCase()] = true;
+                });
+            }
+
+            var tbody = document.getElementById('modal-recipients-body');
+            tbody.innerHTML = '';
+            
+            modalRecipients.forEach(function(r) {
+                var isChecked = !excludedMap[r.email.toLowerCase()];
+                var tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eee';
+                
+                var tdCheck = document.createElement('td');
+                tdCheck.style.padding = '8px';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'modal-recip-check';
+                cb.value = r.email;
+                cb.checked = isChecked;
+                cb.onchange = updateModalSummary;
+                tdCheck.appendChild(cb);
+                tr.appendChild(tdCheck);
+
+                var tdName = document.createElement('td');
+                tdName.style.padding = '8px';
+                tdName.textContent = (r.first_name || '') + ' ' + (r.last_name || '');
+                tr.appendChild(tdName);
+
+                var tdEmail = document.createElement('td');
+                tdEmail.style.padding = '8px';
+                tdEmail.textContent = r.email;
+                tr.appendChild(tdEmail);
+
+                var tdUser = document.createElement('td');
+                tdUser.style.padding = '8px';
+                tdUser.textContent = r.username || '';
+                tr.appendChild(tdUser);
+
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('modal-table').style.display = 'table';
+            updateModalSummary();
+        } else {
+            alert('Error loading list: ' + (json.error || 'Unknown error'));
+            closeRecipientModal();
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('modal-loading').style.display = 'none';
+        alert('Fetch error: ' + err);
+        closeRecipientModal();
+    });
+}
+
+function closeRecipientModal() {
+    document.getElementById('recipient-modal').style.display = 'none';
+}
+
+function updateModalSummary() {
+    var total = document.querySelectorAll('.modal-recip-check').length;
+    var checked = document.querySelectorAll('.modal-recip-check:checked').length;
+    document.getElementById('modal-summary').textContent = checked + ' of ' + total + ' selected';
+    document.getElementById('modal-check-all').checked = (checked === total && total > 0);
+}
+
+function toggleAllModal(checked) {
+    document.querySelectorAll('.modal-recip-check').forEach(function(cb) {
+        cb.checked = checked;
+    });
+    updateModalSummary();
+}
+
+function filterModalRecipients() {
+    var search = document.getElementById('modal-search').value.toLowerCase().trim();
+    var tbody = document.getElementById('modal-recipients-body');
+    var rows = tbody.getElementsByTagName('tr');
+    var matchCount = 0;
+
+    for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var name = tr.cells[1].textContent.toLowerCase();
+        var email = tr.cells[2].textContent.toLowerCase();
+        var username = tr.cells[3].textContent.toLowerCase();
+
+        if (name.indexOf(search) > -1 || email.indexOf(search) > -1 || username.indexOf(search) > -1) {
+            tr.style.display = '';
+            matchCount++;
+        } else {
+            tr.style.display = 'none';
+        }
+    }
+
+    document.getElementById('modal-empty').style.display = (matchCount === 0) ? 'block' : 'none';
+    document.getElementById('modal-table').style.display = (matchCount === 0) ? 'none' : 'table';
+}
+
+function saveRecipientModal() {
+    var excluded = [];
+    document.querySelectorAll('.modal-recip-check').forEach(function(cb) {
+        if (!cb.checked) {
+            excluded.push(cb.value);
+        }
+    });
+    document.getElementById('excluded_emails').value = excluded.join(',');
+    closeRecipientModal();
+    updateListCount();
+}
+
+window.addEventListener('click', function(e) {
+    var modal = document.getElementById('recipient-modal');
+    if (e.target === modal) {
+        closeRecipientModal();
+    }
+});
 </script>
