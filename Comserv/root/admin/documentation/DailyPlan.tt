@@ -566,6 +566,7 @@
             'inventory-system-104a'                    => 4021,
             '3dprinting-use-this-as-the-branc-41f3'    => 4030,
             'developer-time-logging-points-ba-542a'    => 4022,
+            'page-management-system-implement-41a1'    => 4023,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -595,6 +596,7 @@
             { name => 'inventory-system-104a',                 port => 4021, label => 'InventorySystem',      url => '/Inventory' },
             { name => '3dprinting-use-this-as-the-branc-41f3', port => 4030, label => '3DPrinting',           url => '/Documentation/DailyPlan' },
             { name => 'developer-time-logging-points-ba-542a', port => 4022, label => 'DevTimeLogging',       url => '/Documentation/DailyPlan' },
+            { name => 'page-management-system-implement-41a1', port => 4023, label => 'PageManagement',       url => '/Documentation/DailyPlan' },
         ] %]
 
         [%# workstation.local gets full table; other domains get dropdown only %]
