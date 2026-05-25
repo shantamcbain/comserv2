@@ -691,6 +691,34 @@ function startWorkGcal(btn, recordId) {
     });
 }
 
+function closeLogTodoCard(btn, recordId) {
+    btn.disabled = true;
+    fetch('/todo/close_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.disabled = false;
+            var startBtn = btn.previousElementSibling;
+            if (startBtn) {
+                startBtn.textContent = '▶ Start';
+                startBtn.style.background = 'transparent';
+                startBtn.style.color = '#0d6efd';
+                startBtn.style.borderColor = '#0d6efd';
+            }
+            btn.remove();
+        } else {
+            btn.disabled = false;
+            alert('Could not close log: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        alert('Error: ' + e);
+    });
+}
+
 function _updateDaySiteSummary() {
     var sumEl = document.getElementById('day-site-summary');
     if (!sumEl) return;
@@ -819,6 +847,14 @@ function gcalApplyFilters() {
         var userOk = !filterUser || user === filterUser;
         el.style.display = (siteOk && userOk) ? '' : 'none';
     });
+    if (window.self === window.top) {
+        fetch('/planning/set_filter', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site: filterSite, user: filterUser })
+        }).catch(function(){});
+    }
 }
 
 function gcalNavigateDay(dir) {
@@ -972,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(gcalUpdateNowLine, 60000);
     initGcalDragDrop();
     gcalPopulateUserFilter();
+    gcalApplyFilters();
     if (typeof initDayViewDragAndDrop === 'function') {
         initDayViewDragAndDrop();
     }
@@ -1149,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH sname IN ap_all_sitenames %]
-        <option value="[% sname %]">[% sname %]</option>
+        <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
         [% END %]
     </select>
     [% END %]
@@ -1157,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH uname IN ap_all_usernames %]
-        <option value="[% uname %]">[% uname %]</option>
+        <option value="[% uname %]"[% IF cal_filter_user == uname %] selected[% END %]>[% uname %]</option>
         [% END %]
     </select>
 </div>

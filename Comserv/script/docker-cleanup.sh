@@ -90,6 +90,19 @@ for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
     fi
 done
 
+# ── 8. Keep only the 10 newest archived application logs ─────────────────────
+echo ""
+echo "8. Cleaning up old archived application logs..."
+ARCHIVE_DIR="/home/shanta/nfs/logs/archive"
+if [ -d "$ARCHIVE_DIR" ]; then
+    echo "   Checking $ARCHIVE_DIR..."
+    find "$ARCHIVE_DIR" -name "application.log_*" -type f -printf "%T@ %p\n" \
+        | sort -n | cut -d' ' -f2- | head -n -10 | xargs -r rm -f \
+        && echo "   => Done." || echo "   => WARNING: archive cleanup failed."
+else
+    echo "   Archive directory $ARCHIVE_DIR not found. Skipping."
+fi
+
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
 echo "=== Docker system usage after cleanup ==="

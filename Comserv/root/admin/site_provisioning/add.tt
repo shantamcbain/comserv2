@@ -1,0 +1,288 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Add Site Request</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">&#8592; Back</a>
+    </div>
+</div>
+
+[% IF errors.size %]
+<div class="error-message">
+    <ul>[% FOREACH e IN errors %]<li>[% e | html %]</li>[% END %]</ul>
+</div>
+[% END %]
+[% IF cf_error %]
+<div class="error-message"><strong>Cloudflare API error:</strong> [% cf_error | html %]
+    &mdash; <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Check Cloudflare credentials</a>
+</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="form-container">
+
+<form method="post" action="[% c.uri_for('/admin/site_provisioning/add') %]" class="app-form" id="add-form">
+
+    <div class="form-section">
+        <h3>Domain Selection</h3>
+
+        [% IF cf_zones.size %]
+        <div class="form-row">
+            <div class="form-field">
+                <label for="cf_zone_select">Cloudflare Zone (parent domain)</label>
+                <select id="cf_zone_select" class="form-input">
+                    <option value="">-- select a zone --</option>
+                    [% FOREACH z IN cf_zones %]
+                    <option value="[% z.name | html %]"
+                            data-ip="[% z.ip | html %]"
+                            [% IF z.name == default_domain || (default_domain && default_domain.search(z.name)) %]selected[% END %]>
+                        [% z.name | html %][% IF z.ip %] &nbsp;&#8594; [% z.ip | html %][% END %]
+                    </option>
+                    [% END %]
+                </select>
+                <small>Selecting a zone populates the domain field and server IP below.</small>
+            </div>
+        </div>
+        [% ELSE %]
+        <p class="form-hint">Cloudflare zone list unavailable — enter domain manually below.
+        [% IF !ENV.CLOUDFLARE_EMAIL %](Set <code>CLOUDFLARE_EMAIL</code> in .env to enable.)[% END %]</p>
+        [% END %]
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain_type">Domain Type</label>
+                <select id="domain_type" name="domain_type" class="form-input">
+                    <option value="subdomain" [% IF !form_data.domain_type || form_data.domain_type == 'subdomain' %]selected[% END %]>Subdomain (e.g. mycoop.computersystemconsulting.ca)</option>
+                    <option value="custom"    [% IF form_data.domain_type == 'custom'    %]selected[% END %]>Custom Domain (e.g. mycoop.ca)</option>
+                    <option value="subpath"   [% IF form_data.domain_type == 'subpath'   %]selected[% END %]>Subpath (e.g. computersystemconsulting.ca/mycoop)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row" id="subdomain-row">
+            <div class="form-field">
+                <label for="subdomain_prefix">Subdomain Prefix</label>
+                <input type="text" id="subdomain_prefix" class="form-input"
+                       placeholder="e.g. mycoop"
+                       value="[% form_data.subdomain_prefix | html %]">
+                <small>The part before the dot. Auto-fills Site Name below.</small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="domain">Full Domain / Subdomain <small>(what users will type)</small></label>
+                <input type="text" id="domain" name="domain" class="form-input"
+                       value="[% form_data.domain || default_domain | html %]"
+                       required placeholder="e.g. mycoop.computersystemconsulting.ca">
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Site Details</h3>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="sitename">Site Name <small>(alphanumeric + underscore, no spaces)</small></label>
+                <input type="text" id="sitename" name="sitename" class="form-input"
+                       value="[% form_data.sitename | html %]" required placeholder="e.g. MyCoOp">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="contact_email">Contact Email</label>
+                <input type="email" id="contact_email" name="contact_email" class="form-input"
+                       value="[% form_data.contact_email | html %]" placeholder="client@example.com">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="server_ip">Server Public IP <small>(for Cloudflare DNS A record — leave blank to skip)</small></label>
+                <input type="text" id="server_ip" name="server_ip" class="form-input"
+                       value="[% form_data.server_ip || server_ip | html %]"
+                       placeholder="e.g. 203.0.113.10">
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="plan_slug">Plan</label>
+                <select id="plan_slug" name="plan_slug" class="form-input">
+                    <option value="hosting-subdomain" [% IF !form_data.plan_slug || form_data.plan_slug == 'hosting-subdomain' %]selected[% END %]>Subdomain Hosting</option>
+                    <option value="hosting-app"       [% IF form_data.plan_slug == 'hosting-app' %]selected[% END %]>App Hosting</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="status">Status</label>
+                <select id="status" name="status" class="form-input">
+                    <option value="pending" [% IF !form_data.status || form_data.status == 'pending' %]selected[% END %]>Pending (review before provisioning)</option>
+                    <option value="active"  [% IF form_data.status == 'active' %]selected[% END %]>Active (already provisioned)</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="notes">Notes</label>
+                <textarea id="notes" name="notes" class="form-input" rows="3">[% form_data.notes | html %]</textarea>
+            </div>
+        </div>
+    </div>
+
+    [% IF cf_zones.size %]
+    <div class="form-section">
+        <h3>Existing Subdomains in Selected Zone</h3>
+        <div id="existing-records-container">
+            <p class="form-hint">Select a Cloudflare zone above to see existing A records.</p>
+        </div>
+        [% FOREACH z IN cf_zones %]
+        <div id="zone-records-[% z.name | replace('\.', '_') %]" class="zone-records" style="display:none">
+            [% IF z.a_records.size %]
+            <table class="data-table">
+                <thead><tr><th>Name</th><th>IP</th><th></th></tr></thead>
+                <tbody>
+                [% FOREACH r IN z.a_records %]
+                <tr>
+                    <td><code>[% r.name | html %]</code></td>
+                    <td><code>[% r.ip | html %]</code></td>
+                    <td><button type="button" class="btn btn-sm use-ip-btn"
+                            data-ip="[% r.ip | html %]"
+                            data-name="[% r.name | html %]"
+                            data-zone="[% z.name | html %]">Use this IP</button></td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+            <p class="form-hint">No A records found in this zone.</p>
+            [% END %]
+        </div>
+        [% END %]
+    </div>
+    [% END %]
+
+    <div class="form-actions">
+        <button type="submit" class="btn btn-primary">Save Request</button>
+        <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+</div>
+</div>
+</div>
+
+</div>
+
+<script>
+(function () {
+    var defaultDomain = '[% default_domain | html %]';
+    var zoneSelect    = document.getElementById('cf_zone_select');
+    var domainInput   = document.getElementById('domain');
+    var subInput      = document.getElementById('subdomain_prefix');
+    var sitenameInput = document.getElementById('sitename');
+    var serverIpInput = document.getElementById('server_ip');
+    var domainType    = document.getElementById('domain_type');
+    var subRow        = document.getElementById('subdomain-row');
+    var container     = document.getElementById('existing-records-container');
+
+    function isSubdomain() {
+        return domainType && domainType.value === 'subdomain';
+    }
+
+    function updateSubdomainRow() {
+        if (subRow) subRow.style.display = isSubdomain() ? '' : 'none';
+    }
+    if (domainType) {
+        domainType.addEventListener('change', function () {
+            updateSubdomainRow();
+            rebuildDomain();
+        });
+        updateSubdomainRow();
+    }
+
+    function selectedZone() {
+        return zoneSelect ? zoneSelect.value : defaultDomain;
+    }
+
+    function rebuildDomain() {
+        if (!isSubdomain()) return;
+        var zone = selectedZone();
+        var prefix = subInput ? subInput.value.trim() : '';
+        if (zone && prefix) {
+            domainInput.value = prefix + '.' + zone;
+        } else if (zone) {
+            domainInput.value = zone;
+        }
+    }
+
+    if (subInput) {
+        subInput.addEventListener('input', function () {
+            rebuildDomain();
+            var v = subInput.value.trim().replace(/[^a-zA-Z0-9_]/g, '');
+            if (sitenameInput && !sitenameInput.dataset.userEdited) {
+                sitenameInput.value = v ? v.charAt(0).toUpperCase() + v.slice(1) : '';
+            }
+        });
+    }
+
+    if (sitenameInput) {
+        sitenameInput.addEventListener('input', function () {
+            sitenameInput.dataset.userEdited = '1';
+        });
+    }
+
+    function showZoneRecords(zoneName) {
+        if (!container) return;
+        var key = zoneName.replace(/\./g, '_');
+        var divs = document.querySelectorAll('.zone-records');
+        divs.forEach(function (d) { d.style.display = 'none'; });
+        var target = document.getElementById('zone-records-' + key);
+        if (target) {
+            container.innerHTML = '';
+            target.style.display = '';
+        } else {
+            container.innerHTML = '<p class="form-hint">No record data for this zone.</p>';
+        }
+    }
+
+    if (zoneSelect) {
+        zoneSelect.addEventListener('change', function () {
+            var zone = zoneSelect.value;
+            var ip = zoneSelect.options[zoneSelect.selectedIndex].dataset.ip || '';
+            if (serverIpInput && ip) serverIpInput.value = ip;
+            if (isSubdomain()) rebuildDomain();
+            else if (domainInput && zone) domainInput.value = zone;
+            showZoneRecords(zone);
+        });
+        if (zoneSelect.value) {
+            showZoneRecords(zoneSelect.value);
+            var ip0 = zoneSelect.options[zoneSelect.selectedIndex] &&
+                      zoneSelect.options[zoneSelect.selectedIndex].dataset.ip || '';
+            if (serverIpInput && ip0 && !serverIpInput.value) serverIpInput.value = ip0;
+        }
+    }
+
+    document.querySelectorAll('.use-ip-btn').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            if (serverIpInput) serverIpInput.value = btn.dataset.ip;
+            var name = btn.dataset.name;
+            var zone = btn.dataset.zone;
+            if (name && zone && name !== zone && name !== '@') {
+                var prefix = name.replace('.' + zone, '');
+                if (subInput) { subInput.value = prefix; subInput.dispatchEvent(new Event('input')); }
+            }
+        });
+    });
+
+    if (domainInput && defaultDomain && !domainInput.value) {
+        domainInput.value = defaultDomain;
+    }
+})();
+</script>
