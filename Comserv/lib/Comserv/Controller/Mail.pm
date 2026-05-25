@@ -2,6 +2,7 @@ package Comserv::Controller::Mail;
 use Moose;
 use namespace::autoclean;
 use Try::Tiny;
+use JSON;
 use Comserv::Util::Logging;
 use Digest::SHA qw(sha256_hex);
 use POSIX qw(strftime);
@@ -1359,13 +1360,25 @@ sub send_mass_email :Local :Args(0) {
         return;
     }
 
+    my $excluded_param = $c->req->param('excluded_emails') || '';
+    my %excluded_emails = map { lc($_) => 1 } split(/[\s,;]+/, $excluded_param);
+
+    # Apply exclusion filter to recipients list
+    my @filtered_recipients = grep { !$excluded_emails{lc($_->{email})} } @recipients;
+
+    unless (@filtered_recipients) {
+        $c->flash->{error_msg} = 'All selected recipients have been excluded.';
+        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        return;
+    }
+
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_mass_email',
-        "Sending to " . scalar(@recipients) . " recipients");
+        "Sending to " . scalar(@filtered_recipients) . " recipients (excluded: " . scalar(keys %excluded_emails) . ")");
 
     my ($sent, $failed) = (0, 0);
     my @failures;
 
-    for my $r (@recipients) {
+    for my $r (@filtered_recipients) {
         next unless $r->{email};
 
         # Personalise subject and body per recipient
@@ -1407,6 +1420,83 @@ sub send_mass_email :Local :Args(0) {
     }
 
     $c->res->redirect($c->uri_for('/mail/mass_email'));
+}
+
+sub get_recipients :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_has_mail_role($c)) {
+        $c->res->content_type('application/json; charset=utf-8');
+        $c->res->body(encode_json({ ok => 0, error => 'Forbidden' }));
+        return;
+    }
+
+    my $site_id = $self->_get_site_id($c);
+    my $group   = $c->req->param('group')   || 'all';
+    my $custom_addresses = $c->req->param('custom_addresses') || '';
+    my @list_ids  = $c->req->param('list_ids');
+
+    my @recipients;
+    my %seen_email;
+
+    my $_add_recip = sub {
+        my ($rec) = @_;
+        my $email = lc($rec->{email} // '');
+        return unless $email && $email =~ /\@/;
+        return if $seen_email{$email}++;
+        push @recipients, $rec;
+    };
+
+    if ($group eq 'custom') {
+        for my $addr (split /[\s,;]+/, $custom_addresses) {
+            $addr =~ s/^\s+|\s+$//g;
+            next unless $addr =~ /\@/;
+            my $rec = { email => $addr, first_name => '', last_name => '', username => '' };
+            eval {
+                my $u = $c->model('DBEncy')->resultset('User')->find({ email => $addr });
+                if ($u) {
+                    $rec->{first_name} = $u->first_name || '';
+                    $rec->{last_name}  = $u->last_name  || '';
+                    $rec->{username}   = $u->username   || '';
+                } else {
+                    my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+                    my $sth = $dbh->prepare(
+                        "SELECT first_name, last_name FROM mailing_list_subscriptions WHERE email=? AND is_active=1 LIMIT 1"
+                    );
+                    eval { $sth->execute($addr) };
+                    unless ($@) {
+                        my ($fn, $ln) = $sth->fetchrow_array;
+                        $rec->{first_name} = $fn || '';
+                        $rec->{last_name}  = $ln || '';
+                    }
+                }
+            };
+            $_add_recip->($rec);
+        }
+    } else {
+        my @users = _get_site_users($c, $site_id, $group);
+        $_add_recip->($_) for @users;
+
+        for my $addr (split /[\s,;]+/, $custom_addresses) {
+            $addr =~ s/^\s+|\s+$//g;
+            $_add_recip->({ email => $addr, first_name => '', last_name => '', username => $addr })
+                if $addr =~ /\@/;
+        }
+    }
+
+    for my $list_id (@list_ids) {
+        next unless $list_id && $list_id =~ /^\d+$/;
+        $_add_recip->($_) for _get_list_recipients($c, $list_id);
+    }
+
+    # Sort recipients by name/email for nice display
+    @recipients = sort { 
+        (lc($a->{first_name} || '') cmp lc($b->{first_name} || '')) || 
+        (lc($a->{email} || '') cmp lc($b->{email} || '')) 
+    } @recipients;
+
+    $c->res->content_type('application/json; charset=utf-8');
+    $c->res->body(encode_json({ ok => 1, recipients => \@recipients }));
 }
 
 sub send_mailout_test :Local :Args(0) {
