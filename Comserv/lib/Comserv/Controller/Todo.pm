@@ -173,7 +173,20 @@ sub _get_user_accessible_sites {
         if ($is_csc) {
             my $site_model = $c->model('Site');
             my $all = $site_model->get_all_sites($c) || [];
-            @sites = map { $_->name } @$all;
+            my %seen;
+            for my $s (@$all) {
+                my $n = eval { $s->name } // '';
+                push @sites, $n if $n && !$seen{$n}++;
+            }
+            my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                { sitename => { '!=' => undef } },
+                { columns => ['sitename'], distinct => 1 }
+            )->all;
+            for my $r (@todo_sites) {
+                my $n = eval { $r->get_column('sitename') } // '';
+                push @sites, $n if $n && !$seen{$n}++;
+            }
+            @sites = sort @sites;
         } else {
             my $user_id = $c->session->{user_id};
             if ($user_id) {
@@ -1956,24 +1969,13 @@ sub day :Path('/todo/day') :Args {
     eval {
         if ($day_is_csc) {
             my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                { roles => { -like => '%admin%' } },
+                { roles => { '!=' => '', -not => undef } },
                 { columns => ['username'], order_by => 'username' }
             )->all;
             my %seen;
             for my $r (@urows) {
                 my $u = eval { $r->username } // '';
                 push @day_all_usernames, $u if $u && !$seen{$u}++;
-            }
-            unless (@day_all_usernames) {
-                my @all_urows = $c->model('DBEncy')->resultset('Users')->search(
-                    {},
-                    { columns => ['username'], order_by => 'username', rows => 200 }
-                )->all;
-                %seen = ();
-                for my $r (@all_urows) {
-                    my $u = eval { $r->username } // '';
-                    push @day_all_usernames, $u if $u && !$seen{$u}++;
-                }
             }
         } else {
             my %seen;
@@ -2120,7 +2122,8 @@ sub week :Path('/todo/week') :Args {
     eval {
         if ($week_is_csc) {
             my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                {}, { columns => ['username'], order_by => 'username', rows => 200 }
+                { roles => { '!=' => '', -not => undef } },
+                { columns => ['username'], order_by => 'username' }
             )->all;
             my %seen;
             for my $r (@urows) {
