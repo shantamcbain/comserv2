@@ -8,6 +8,13 @@
         </div>
     </div>
 
+    [% IF c.flash.success_msg %]
+        <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+    [% END %]
+    [% IF c.flash.error_msg %]
+        <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+    [% END %]
+
     [% IF subscribers.size %]
     <div class="admin-card">
         <table class="admin-table">
@@ -17,6 +24,7 @@
                     <th>Name</th>
                     <th>Email</th>
                     <th>Source</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -26,6 +34,13 @@
                 <td>[% sub.user.first_name | html %] [% sub.user.last_name | html %]</td>
                 <td>[% sub.user.email | html %]</td>
                 <td>[% sub.source | html %]</td>
+                <td>
+                    <a href="[% c.uri_for('/mail/admin_unsubscribe_user', sub.id) %]" 
+                       class="btn-small btn-danger" 
+                       onclick="return confirm('Are you sure you want to remove [% sub.user.email | html %] from this list?');">
+                       Remove
+                    </a>
+                </td>
             </tr>
             [% END %]
             </tbody>

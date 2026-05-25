@@ -1200,16 +1200,28 @@ sub lists_subscribers {
             { prefetch => 'user', order_by => 'user.username' }
         );
         while (my $sub = $rs->next) {
-            push @subscribers, {
-                id     => $sub->id,
-                source => $sub->subscription_source,
-                user   => {
-                    id       => $sub->user->id,
-                    username => $sub->user->username,
-                    email    => $sub->user->email,
+            my $user_data;
+            if ($sub->user) {
+                $user_data = {
+                    id         => $sub->user->id,
+                    username   => $sub->user->username,
+                    email      => $sub->user->email,
                     first_name => $sub->user->first_name,
                     last_name  => $sub->user->last_name,
-                },
+                };
+            } else {
+                $user_data = {
+                    id         => undef,
+                    username   => '',
+                    email      => $sub->email // '',
+                    first_name => $sub->first_name // '',
+                    last_name  => $sub->last_name // '',
+                };
+            }
+            push @subscribers, {
+                id     => $sub->id,
+                source => $sub->subscription_source // '',
+                user   => $user_data,
             };
         }
     };
@@ -1242,7 +1254,7 @@ sub mass_email :Local :Args(0) {
     my $all_count  = _count_site_users($c, $site_id, 'all');
     my $paid_count = _count_site_users($c, $site_id, 'paid');
 
-    # Sync auto-generated lists (all members, role lists, workshop attendees) before displaying
+    # Sync auto-generated lists (all members, role lists, workshop attendees, hosting customers) before displaying
     $self->_sync_default_lists($c, $site_id) if $site_id;
 
     my @lists;
@@ -1261,11 +1273,25 @@ sub mass_email :Local :Args(0) {
         }
     };
 
+    # Read sticky values from flash if present (to survive redirects)
+    my $sticky = $c->flash->{sticky_form} || {};
+    my $subject = $sticky->{subject} || $c->req->param('subject') || '';
+    my $body = $sticky->{body} || $c->req->param('body') || '';
+    my $group = $sticky->{group} || $c->req->param('group') || 'all';
+    my $custom_addresses = $sticky->{custom_addresses} || $c->req->param('custom_addresses') || '';
+    my $list_ids_ref = $sticky->{list_ids} || [];
+    my %selected_list_ids = map { $_ => 1 } @$list_ids_ref;
+
     $c->stash(
-        user_count   => $all_count,
-        paid_count   => $paid_count,
-        mailing_lists => \@lists,
-        template     => 'mail/mailout_compose.tt',
+        user_count        => $all_count,
+        paid_count        => $paid_count,
+        mailing_lists     => \@lists,
+        subject           => $subject,
+        body              => $body,
+        group             => $group,
+        custom_addresses  => $custom_addresses,
+        selected_list_ids => \%selected_list_ids,
+        template          => 'mail/mailout_compose.tt',
     );
     $c->forward($c->view('TT'));
 }
@@ -1288,6 +1314,13 @@ sub send_mass_email :Local :Args(0) {
 
     unless ($subject && $body_tmpl) {
         $c->flash->{error_msg} = 'Subject and message body are required.';
+        $c->flash->{sticky_form} = {
+            subject => $subject,
+            body    => $body_tmpl,
+            group   => $group,
+            custom_addresses => $custom_addresses,
+            list_ids => \@list_ids,
+        };
         $c->res->redirect($c->uri_for('/mail/mass_email'));
         return;
     }
@@ -1356,6 +1389,13 @@ sub send_mass_email :Local :Args(0) {
 
     unless (@recipients) {
         $c->flash->{error_msg} = 'No recipients found for the selected group.';
+        $c->flash->{sticky_form} = {
+            subject => $subject,
+            body    => $body_tmpl,
+            group   => $group,
+            custom_addresses => $custom_addresses,
+            list_ids => \@list_ids,
+        };
         $c->res->redirect($c->uri_for('/mail/mass_email'));
         return;
     }
@@ -1368,6 +1408,13 @@ sub send_mass_email :Local :Args(0) {
 
     unless (@filtered_recipients) {
         $c->flash->{error_msg} = 'All selected recipients have been excluded.';
+        $c->flash->{sticky_form} = {
+            subject => $subject,
+            body    => $body_tmpl,
+            group   => $group,
+            custom_addresses => $custom_addresses,
+            list_ids => \@list_ids,
+        };
         $c->res->redirect($c->uri_for('/mail/mass_email'));
         return;
     }
@@ -1382,17 +1429,22 @@ sub send_mass_email :Local :Args(0) {
         next unless $r->{email};
 
         # Personalise subject and body per recipient
+        my $first_name = $r->{first_name} // '';
+        my $last_name  = $r->{last_name}  // '';
+        my $email_addr = $r->{email}      // '';
+        my $username   = $r->{username}   // '';
+
         my $per_subject = $subject;
-        $per_subject =~ s/\[FIRST_NAME\]/$r->{first_name} || ''/ge;
-        $per_subject =~ s/\[LAST_NAME\]/$r->{last_name}   || ''/ge;
-        $per_subject =~ s/\[EMAIL\]/$r->{email}/g;
-        $per_subject =~ s/\[USERNAME\]/$r->{username}     || ''/ge;
+        $per_subject =~ s/\[FIRST_NAME\]/$first_name/g;
+        $per_subject =~ s/\[LAST_NAME\]/$last_name/g;
+        $per_subject =~ s/\[EMAIL\]/$email_addr/g;
+        $per_subject =~ s/\[USERNAME\]/$username/g;
 
         my $body = $body_tmpl;
-        $body =~ s/\[FIRST_NAME\]/$r->{first_name} || ''/ge;
-        $body =~ s/\[LAST_NAME\]/$r->{last_name}   || ''/ge;
-        $body =~ s/\[EMAIL\]/$r->{email}/g;
-        $body =~ s/\[USERNAME\]/$r->{username}     || ''/ge;
+        $body =~ s/\[FIRST_NAME\]/$first_name/g;
+        $body =~ s/\[LAST_NAME\]/$last_name/g;
+        $body =~ s/\[EMAIL\]/$email_addr/g;
+        $body =~ s/\[USERNAME\]/$username/g;
 
         my $result = eval {
             $c->model('Mail')->send_email($c, $r->{email}, $per_subject, $body, $site_id, { html => 1 });
@@ -1415,8 +1467,23 @@ sub send_mass_email :Local :Args(0) {
         $c->flash->{success_msg} = "Mailout complete — $sent email(s) sent successfully.";
     } elsif ($sent) {
         $c->flash->{success_msg} = "$sent sent. $failed failed — check the application log for details.";
+        # Keep partial failure sticky
+        $c->flash->{sticky_form} = {
+            subject => $subject,
+            body    => $body_tmpl,
+            group   => $group,
+            custom_addresses => $custom_addresses,
+            list_ids => \@list_ids,
+        };
     } else {
         $c->flash->{error_msg} = "All $failed sends failed. Check SMTP config and application log.";
+        $c->flash->{sticky_form} = {
+            subject => $subject,
+            body    => $body_tmpl,
+            group   => $group,
+            custom_addresses => $custom_addresses,
+            list_ids => \@list_ids,
+        };
     }
 
     $c->res->redirect($c->uri_for('/mail/mass_email'));
@@ -1511,9 +1578,10 @@ sub send_mailout_test :Local :Args(0) {
     my $subject   = $c->req->param('subject') || '(no subject)';
     my $body_tmpl = $c->req->param('body')    || '';
 
+    $c->res->content_type('application/json; charset=utf-8');
+
     unless ($body_tmpl) {
-        $c->flash->{error_msg} = 'Message body is required for test send.';
-        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        $c->res->body('{"ok":0,"msg":"Message body is required for test send."}');
         return;
     }
 
@@ -1537,8 +1605,7 @@ sub send_mailout_test :Local :Args(0) {
     }
 
     unless ($admin_email) {
-        $c->flash->{error_msg} = 'Could not determine your email address for the test send.';
-        $c->res->redirect($c->uri_for('/mail/mass_email'));
+        $c->res->body('{"ok":0,"msg":"Could not determine your email address for the test send."}');
         return;
     }
 
@@ -1550,14 +1617,18 @@ sub send_mailout_test :Local :Args(0) {
     $body =~ s/\[USERNAME\]/$admin_user/g;
 
     my $test_subject = "[TEST PREVIEW] $subject";
+    $test_subject =~ s/\[FIRST_NAME\]/$admin_first/g;
+    $test_subject =~ s/\[LAST_NAME\]/$admin_last/g;
+    $test_subject =~ s/\[EMAIL\]/$admin_email/g;
+    $test_subject =~ s/\[USERNAME\]/$admin_user/g;
 
     my $result = eval {
         $c->model('Mail')->send_email($c, $admin_email, $test_subject, $body, $site_id, { html => 1 });
     };
 
-    $c->res->content_type('application/json; charset=utf-8');
     if ($@ || !$result) {
         my $err = $@ || $c->stash->{debug_msg} || 'unknown error';
+        $err =~ s/\r?\n/ /g;
         $err =~ s/"/\\"/g;
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'send_mailout_test',
             "Test send failed to $admin_email: $err");
@@ -1685,6 +1756,10 @@ sub _sync_default_lists {
     eval { $self->_sync_workshop_attendees_list($c, $site_id) };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
         "Workshop-attendees sync error: $@") if $@;
+
+    eval { $self->_sync_hosting_customers_list($c, $site_id) };
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_default_lists',
+        "Hosting-customers sync error: $@") if $@;
 }
 
 sub _upsert_list_subscriptions {
@@ -1978,6 +2053,78 @@ sub _sync_workshop_attendees_list {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_workshop_attendees_list',
         "Synced Workshop Attendees: " . scalar(@entries) . " entries for site_id=$site_id (" .
         scalar(@workshop_ids) . " workshops)");
+}
+
+sub _sync_hosting_customers_list {
+    my ($self, $c, $site_id) = @_;
+
+    my $list = $self->_find_or_create_list($c, $site_id,
+        'Hosting Customers',
+        '[auto] Active hosting accounts'
+    );
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_hosting_customers_list',
+        "Syncing hosting customers for site_id=$site_id");
+
+    # Find the current site name
+    my $site_row = $c->model('DBEncy')->resultset('Site')->find($site_id);
+    unless ($site_row) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_hosting_customers_list',
+            "Site not found for site_id=$site_id");
+        return;
+    }
+    my $site_name = $site_row->name || '';
+
+    my @accounts;
+    eval {
+        if (lc($site_name) eq 'csc') {
+            # For CSC, get ALL active hosting accounts
+            @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                status => 'active'
+            })->all;
+        } else {
+            # For other sites, get active accounts referred by this site, or matching this site's name
+            @accounts = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                status => 'active',
+                -or => [
+                    referring_sitename => $site_name,
+                    sitename           => $site_name,
+                ]
+            })->all;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_sync_hosting_customers_list',
+            "Error querying hosting accounts: $@");
+        return;
+    }
+
+    my @entries;
+    my %seen_email;
+    for my $acct (@accounts) {
+        my $email = $acct->contact_email;
+        next unless $email;
+        next if $seen_email{lc $email}++;
+
+        # Try to find user account by email
+        my $user;
+        eval {
+            $user = $c->model('DBEncy')->resultset('User')->find({ email => $email });
+        };
+        if ($user && $user->id) {
+            push @entries, $user->id;
+        } else {
+            # Email only subscription
+            my $first = $acct->sitename || 'Hosting';
+            my $last  = 'Customer';
+            push @entries, { email => $email, first_name => $first, last_name => $last };
+        }
+    }
+
+    $self->_upsert_list_subscriptions($c, $list->id, \@entries, 'auto-hosting');
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_sync_hosting_customers_list',
+        "Synced Hosting Customers: " . scalar(@entries) . " entries for site_id=$site_id ($site_name)");
 }
 
 sub subscribe :Local :Args(0) {
