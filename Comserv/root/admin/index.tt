@@ -344,6 +344,10 @@
                         <i class="fas fa-file-export"></i>
                         <span>Migrate Pages (Forager → Ency)</span>
                     </a>
+                    <a href="[% c.uri_for('/admin/pages') %]" class="admin-link">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Page Management System</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
                         <i class="fas fa-key"></i>
                         <span>DB Connection Passwords</span>
