@@ -589,7 +589,49 @@ last_updated = '2026/02/08'
             <details id="priority-schema-system" class="priority-container">
                 <summary class="priority-summary">📊 Schema System Plan & Enhancements</summary>
                 <div class="priority-content">
-                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span></p>
+                    <p><strong>Status:</strong> <span class="status-in-progress">IN PROGRESS</span> | <strong>Branch:</strong> <code>schema-managment-system-7eb3</code> (port 4002)</p>
+                    <p><strong>Plan file:</strong> <a href="/Documentation/DailyPlan" target="_blank">DailyPlan.tt</a> | <strong>Schema Compare:</strong> <a href="/admin/schema_comparison" target="_blank">/admin/schema_comparison</a></p>
+
+                    <h4>✅ Completed Work</h4>
+                    <ul>
+                        <li>✅ Unique constraint bug fixes (4 constraints), enum parser fixed, template routing fixed</li>
+                        <li>✅ Missing DB tables created: <code>dailyplan</code>, <code>dailyplan_project</code>, <code>plan_system_mapping</code></li>
+                        <li>✅ Remove-field endpoint and UI added to schema compare</li>
+                        <li>✅ Containers default-closed in schema compare UI</li>
+                        <li>✅ <code>quick_close</code> log error fixed (<code>points_processed</code> default value)</li>
+                        <li>✅ Admin menu: DailyPlan and Documentation links added at top level</li>
+                        <li>✅ Major Result file refactor: 200+ files reorganised into <code>Beekeeping/</code>, <code>Ency/</code>, <code>Accounting/</code> subdirectories</li>
+                        <li>✅ PostgreSQL support added to <code>SchemaComparison.pm</code>, <code>RemoteDB.pm</code>, <code>Admin.pm</code></li>
+                        <li>✅ "Add New Environment" backend: writes <code>COMSERV_DB_*</code> vars to <code>.env</code></li>
+                        <li>✅ Environment variables list: grouped by prefix with descriptions for 50+ known vars</li>
+                        <li>✅ Set Password modal: inline popup, no restart required (updates <code>%ENV</code> immediately)</li>
+                        <li>✅ Global password show/hide toggle on all admin password inputs</li>
+                        <li>✅ Port defaults corrected: MySQL 3306, PostgreSQL 5432</li>
+                        <li>✅ ALTER USER bug fixed: uses <code>CURRENT_USER()</code> to avoid Error 1396</li>
+                        <li>✅ Dockerfile: <code>libpq-dev</code> (build) + <code>libpq5</code> (runtime) for <code>DBD::Pg</code></li>
+                        <li>✅ <code>DBD::Pg</code> added to <code>cpanfile</code> — installed via cpanm at container build time</li>
+                        <li>✅ <code>.env</code> removed from git tracking (security fix)</li>
+                        <li>✅ <code>EnvFileManager.pm</code> regex bug fixed (<code>$]</code> interpolation crash)</li>
+                        <li>✅ JSON body parsing fixed for <code>set_single</code> and <code>add_database_env</code></li>
+                    </ul>
+
+                    <h4>🖥️ New Production Server (db-production: 192.168.1.20)</h4>
+                    <ul>
+                        <li>✅ <strong>MariaDB</strong> installed and running — accessible from 192.168.1.0/24 via <code>root@192.168.1.%</code></li>
+                        <li>✅ <strong>PostgreSQL 16</strong> installed and running — <code>listen_addresses='*'</code>, MD5 auth for 192.168.1.0/24</li>
+                        <li>✅ Both servers connected and visible in Schema Compare (no longer "read-only" — full privileges granted)</li>
+                        <li>⏳ Passwords stored in <code>Comserv/.env</code> as <code>MIGRATION_MYSQL_PASSWORD</code> and <code>MIGRATION_POSTGRES_PASSWORD</code></li>
+                        <li>⏳ <code>/opt/csc-db/.env</code> on db-production still has <code>CHANGE_ME</code> passwords — set via webmin or SSH</li>
+                    </ul>
+
+                    <h4>⏳ Next Steps</h4>
+                    <ul>
+                        <li>Create target databases on db-production (MariaDB: <code>ency</code>, <code>forager</code>; PostgreSQL: accounting schema)</li>
+                        <li>Schema sync workflow: compare existing DB against new production server and apply migrations</li>
+                        <li>Accounting system PostgreSQL schema design</li>
+                        <li>Infrastructure management: "Add New Environment" for SiteName opting into Accounting system</li>
+                        <li>Document environment variable meanings in admin UI tooltip/popup</li>
+                    </ul>
                 </div>
             </details>
 

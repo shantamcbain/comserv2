@@ -14,8 +14,8 @@
     <a href="/todo/week" class="return-button">Return to Week View</a>
     <a href="/todo/month" class="return-button">Return to Month View</a>
     <button type="button" class="return-button" onclick="window.history.back();">Return to Previous Page</button>
-    [% IF is_editor && !edit_mode %]
-    <a href="[% c.uri_for('/todo/details', { record_id => record.get_column('record_id'), edit => 1 }) %]"
+    [% IF is_editor %]
+    <a href="/todo/edit/[% record.get_column('record_id') %]"
        class="return-button">Edit</a>
     [% END %]
 </div>
@@ -105,6 +105,30 @@
 
 [% ELSE %]
 
+[% IF error_source && (error_source.server || error_source.branch || error_source.file) %]
+<div style="background:#fff3cd;border:2px solid #ffc107;border-radius:6px;padding:12px 16px;margin-bottom:16px">
+  <strong style="font-size:1.1em;color:#856404">⚠ Error Source</strong>
+  <table style="margin-top:8px;border-collapse:collapse;font-size:0.9em">
+    [% IF error_source.server %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">🖥 Server:</td>
+        <td style="font-family:monospace">[% error_source.server | html %]</td></tr>
+    [% END %]
+    [% IF error_source.branch %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">🌿 Branch:</td>
+        <td style="font-family:monospace">[% error_source.branch | html %]</td></tr>
+    [% END %]
+    [% IF error_source.file %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">📄 File:</td>
+        <td style="font-family:monospace">[% error_source.file | html %]</td></tr>
+    [% END %]
+    [% IF error_source.function %]
+    <tr><td style="padding:2px 12px 2px 0;font-weight:bold;white-space:nowrap">⚙ Function:</td>
+        <td style="font-family:monospace">[% error_source.function | html %]</td></tr>
+    [% END %]
+  </table>
+</div>
+[% END %]
+
 <table border="0" cellpadding="6" style="width:100%;max-width:800px">
     <tr><th align="left" width="180">Record ID</th>
         <td>[% record.get_column('record_id') %]</td></tr>
@@ -124,10 +148,41 @@
         <td>[% record.get_column('due_date') %]</td></tr>
     <tr><th align="left">Time of Day</th>
         <td>[% record.get_column('time_of_day') %]</td></tr>
-    <tr><th align="left">Est. Hours</th>
+    <tr><th align="left">Est. Minutes</th>
         <td>[% record.get_column('estimated_man_hours') %]</td></tr>
     <tr><th align="left">Accumulated Time</th>
         <td>[% accumulative_time %]</td></tr>
+    <tr><th align="left">Type</th>
+        <td>[% SET _dt = record.get_column('todo_type') || 'task' %]
+            [% IF _dt == 'appointment' %]📌 Appointment
+            [% ELSIF _dt == 'meeting' %]🤝 Meeting
+            [% ELSIF _dt == 'event' %]🎂 Event
+            [% ELSIF _dt == 'reminder' %]🔔 Reminder
+            [% ELSE %]Task[% END %]</td></tr>
+    <tr><th align="left">Recurring</th>
+        <td>[% IF record.get_column('is_recurring') %]🔁 Yes
+            [% SET _rr = record.get_column('recurrence_rule') || '' %]
+            [% IF _rr == 'daily' %]— Every Day
+            [% ELSIF _rr == 'weekdays' %]— Weekdays (Mon–Fri)
+            [% ELSIF _rr == 'weekly' %]— Every Week
+            [% ELSIF _rr == 'biweekly' %]— Every Two Weeks
+            [% ELSIF _rr == 'monthly' %]— Every Month
+            [% ELSIF _rr == 'yearly' %]— Every Year
+            [% ELSIF _rr %]— [% _rr %]
+            [% END %]
+            [% ELSE %]No[% END %]</td></tr>
+    [% IF record.get_column('creator_timezone') %]
+    <tr><th align="left">Creator Timezone</th>
+        <td>[% record.get_column('creator_timezone') %]</td></tr>
+    [% END %]
+    [% IF record.get_column('scheduled_start') %]
+    <tr><th align="left">Scheduled Start</th>
+        <td>[% record.get_column('scheduled_start') %]</td></tr>
+    [% END %]
+    [% IF record.get_column('scheduled_end') %]
+    <tr><th align="left">Scheduled End</th>
+        <td>[% record.get_column('scheduled_end') %]</td></tr>
+    [% END %]
     <tr><th align="left">Project ID</th>
         <td>[% record.get_column('project_id') || '—' %]</td></tr>
     <tr><th align="left">Group</th>
@@ -202,7 +257,7 @@
             onclick="openAIChatWithTask({record_id:[% task_id %],subject:'[% task_subject | js %]',description:'[% task_description | js %]',status:[% task_status %],due_date:'[% task_due_date %]',project:'[% task_project | js %]'})">
             💬 Chat about this task
         </button>
-        <a href="/todo/details?edit=1&amp;record_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">✏️ Edit this task</a>
+        <a href="/todo/edit/[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">✏️ Edit this task</a>
         <a href="/ai/conversations?task_id=[% task_id %]" class="button button-secondary" style="font-size:0.9em; margin-left:8px;">View all conversations</a>
     </div>
 </div>

@@ -74,10 +74,11 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
         <h2 style="color:#721c24;margin-top:0;">&#x1F6A8; Recent Alert Entries
             [% IF filter_system %]&nbsp;&mdash; <code>[% filter_system | html %]</code>[% END %]
             [% IF filter_level %]&nbsp;&mdash; Level: <code>[% filter_level | html %]</code>[% END %]
-            <small style="font-size:0.7em;font-weight:normal;color:#856404;">(last 30 min, newest first)</small>
+            <small style="font-size:0.7em;font-weight:normal;color:#856404;">(last 10 min, newest first — ERROR + CRITICAL)</small>
         </h2>
         <p style="color:#721c24;margin-top:0;font-size:0.9em;">
             These are the log entries that triggered the health alert notification.
+            [% IF recent_alerts.size %]<strong>[% recent_alerts.size %] item(s)</strong> shown.[% END %]
         </p>
         <table style="width:100%;border-collapse:collapse;font-size:0.88em;">
             <thead>
@@ -102,8 +103,8 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
                 [% END %]
             </tbody>
         </table>
-        [% IF recent_alerts.size >= 20 %]
-        <p style="margin-top:8px;font-size:0.85em;color:#721c24;">Showing 20 most recent. Adjust the look-back window below to see more.</p>
+        [% IF recent_alerts.size >= 100 %]
+        <p style="margin-top:8px;font-size:0.85em;color:#721c24;">Showing 100 most recent. Use the audit stats below for a broader view.</p>
         [% END %]
     </div>
     [% END %]

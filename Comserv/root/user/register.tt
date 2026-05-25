@@ -33,6 +33,13 @@
             <div class="form-container">
                 <form method="POST" action="/user/do_create_account" class="app-form">
 
+                    <input type="hidden" name="csrf_token" value="[% csrf_token | html %]">
+
+                    <div style="display:none;" aria-hidden="true">
+                        <label for="website">Website</label>
+                        <input type="text" id="website" name="website" value="" tabindex="-1" autocomplete="off">
+                    </div>
+
                     <div class="form-section">
                         <div class="form-row">
                             <div class="form-field">

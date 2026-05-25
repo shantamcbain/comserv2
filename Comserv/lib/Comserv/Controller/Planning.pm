@@ -2,6 +2,7 @@ package Comserv::Controller::Planning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Util::TodoTypes qw(recurring_matches_date);
 use Comserv::Model::Ollama;
 use JSON;
 use Time::Piece;
@@ -103,10 +104,14 @@ sub daily :Path('/planning/daily') :Args {
     my @week_dates;
     for my $day_offset (0..6) {
         my $cur = $start_dt->clone->add(days => $day_offset);
+        my $d_str = $cur->strftime('%Y-%m-%d');
         push @week_dates, {
-            date_str => $cur->strftime('%Y-%m-%d'),
-            day_num  => $cur->day,
-            is_today => ($cur->strftime('%Y-%m-%d') eq $current_date_str),
+            date_str  => $d_str,
+            day_num   => $cur->day,
+            day_name  => $cur->strftime('%A'),
+            is_today  => ($d_str eq $current_date_str),
+            prev_date => $cur->clone->subtract(days => 1)->ymd,
+            next_date => $cur->clone->add(days => 1)->ymd,
         };
     }
 
@@ -116,21 +121,126 @@ sub daily :Path('/planning/daily') :Args {
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
     # Todos for calendar views
-    my $todos_for_today   = [];
+    my $todos_for_today    = [];
+    my $overdue_todos      = [];
     my $all_todos_calendar = [];
     my %todos_by_day;
 
+    my @_done_vals = (3, 4, 'DONE', 'Completed', 'completed', 'Closed', 'closed', 'Done');
+    my %_done_set  = map { $_ => 1 } @_done_vals;
+
+    my %week_todos_by_date;
+    my @week_overdue_todos;
+
     if (my $todo_model = $c->model('Todo')) {
         eval {
-            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, $sitename);
+            my @_cal_sites;
+            if ($is_csc) {
+                eval {
+                    my $site_model = $c->model('Site');
+                    my $all_s = $site_model->get_all_sites($c) || [];
+                    @_cal_sites = map { $_->name } @$all_s;
+                };
+                @_cal_sites = ($sitename) unless @_cal_sites;
+            } else {
+                eval {
+                    my $uid = $c->session->{user_id};
+                    if ($uid) {
+                        my @rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                            { user_id => $uid, site_id => { '!=' => undef }, is_active => 1 }
+                        )->all;
+                        my %seen;
+                        for my $r (@rows) {
+                            eval {
+                                my $s = $c->model('DBEncy')->resultset('Site')->find($r->site_id);
+                                push @_cal_sites, $s->name if $s && $s->name && !$seen{$s->name}++;
+                            };
+                        }
+                    }
+                };
+                push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
+            }
+            my $filter_site;
+            if (!exists $c->session->{cal_filter_site}) {
+                $filter_site = $sitename;
+            } else {
+                $filter_site = $c->session->{cal_filter_site} // '';
+            }
+            my @_filtered_sites = ($filter_site && grep { $_ eq $filter_site } @_cal_sites) ? ($filter_site) : @_cal_sites;
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_filtered_sites);
+            if (my $filter_user = $c->session->{cal_filter_user} // '') {
+                $all_todos_calendar = [grep {
+                    my $dev = eval { $_->developer }          // '';
+                    my $uop = eval { $_->username_of_poster } // '';
+                    $dev eq $filter_user || $uop eq $filter_user;
+                } @$all_todos_calendar];
+            }
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
+                my $week_first_day = $week_dates[0]{date_str};
+                my $today_str = $current_date_str;
+
                 for my $todo (@$all_todos_calendar) {
-                    my $start = $todo->start_date || '';
-                    my $due   = $todo->due_date   || '';
-                    $start = $start->ymd if ref $start && eval { $start->can('ymd') };
-                    $due   = $due->ymd   if ref $due   && eval { $due->can('ymd')   };
-                    push @$todos_for_today, $todo if $start eq $selected_date || $due eq $selected_date;
-                    my $display = $due || $start;
+                    my $start_raw = $todo->start_date || '';
+                    my $due_raw   = $todo->due_date   || '';
+                    $start_raw = $start_raw->ymd if ref $start_raw && eval { $start_raw->can('ymd') };
+                    $due_raw   = $due_raw->ymd   if ref $due_raw   && eval { $due_raw->can('ymd')   };
+                    my $start = length($start_raw) >= 10 ? substr($start_raw, 0, 10) : '';
+                    my $due   = length($due_raw)   >= 10 ? substr($due_raw,   0, 10) : '';
+
+                    my $is_done    = exists $_done_set{ $todo->status // '' };
+                    my $is_recurr  = ($todo->can('is_recurring') && $todo->is_recurring)
+                        || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+                    my $anchor     = $start || $due || '';
+
+                    if ($is_recurr && !$is_done) {
+                        my $rec_sd = $start || '';
+                        push @$todos_for_today, $todo
+                            if (!$rec_sd || $rec_sd le $selected_date)
+                            && recurring_matches_date($todo, $selected_date);
+
+                        for my $day_info (@week_dates) {
+                            my $d_str = $day_info->{date_str};
+                            my $effective_start = $rec_sd || $today_str;
+                            next if $effective_start gt $d_str;
+                            next unless recurring_matches_date($todo, $d_str);
+                            my $already = grep { $_->record_id == $todo->record_id }
+                                          @{ $week_todos_by_date{$d_str} // [] };
+                            push @{ $week_todos_by_date{$d_str} }, $todo unless $already;
+                        }
+                    } elsif ($start && $start eq $selected_date) {
+                        # Has scheduled start_date matching today — show it
+                        push @$todos_for_today, $todo;
+                    } elsif (!$start && $due && $due eq $selected_date) {
+                        # No scheduled date, but due today — show it
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$start && !$due && $selected_date eq $current_date_str) {
+                        push @$todos_for_today, $todo;
+                    } elsif (!$is_done && !$is_recurr) {
+                        # Overdue: scheduled date in the past, OR (no scheduled date AND due date in past)
+                        if ($start && $start lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        } elsif (!$start && $due && $due lt $selected_date) {
+                            push @$overdue_todos, $todo;
+                            push @$todos_for_today, $todo if $selected_date eq $current_date_str;
+                        }
+                    }
+
+                    unless ($is_recurr) {
+                        # Use start_date as calendar anchor; fall back to due_date only when no start_date
+                        my $anchor_key = $start || (!$start ? $due : '');
+                        if ($anchor_key) {
+                            if ($anchor_key lt $week_first_day) {
+                                push @week_overdue_todos, $todo unless $is_done;
+                            } else {
+                                my $already = grep { $_->record_id == $todo->record_id }
+                                              @{ $week_todos_by_date{$anchor_key} // [] };
+                                push @{ $week_todos_by_date{$anchor_key} }, $todo unless $already;
+                            }
+                        }
+                    }
+
+                    my $display = $start || $due;
                     if ($display =~ /^(\d{4})-(\d{2})-(\d{2})$/) {
                         my ($y, $m, $d) = ($1, $2, $3);
                         push @{$todos_by_day{int($d)}}, $todo
@@ -144,6 +254,73 @@ sub daily :Path('/planning/daily') :Args {
                 "Error fetching todos: $@");
         }
     }
+
+    # Deduplicate recurring events in todos_for_today (same logic as filter_todos_by_date_range)
+    {
+        my $session_user = $c->session->{username} // '';
+        my %seen_rec_time;
+        my @deduped_today;
+        for my $todo (@$todos_for_today) {
+            my $is_rec = ($todo->can('is_recurring') && $todo->is_recurring)
+                || ($todo->subject // '') =~ /\b(lunch|break|standup|morning.break|afternoon.break)\b/i;
+            if ($is_rec) {
+                my $tod = '';
+                eval { $tod = $todo->time_of_day // '' };
+                $tod = ref($tod) ? sprintf('%02d:%02d', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+                $tod = substr($tod, 0, 5);
+                my $key = lc($todo->subject // '') . '|' . $tod;
+                if (!$seen_rec_time{$key}) {
+                    $seen_rec_time{$key} = $todo;
+                    push @deduped_today, $todo;
+                } else {
+                    my $existing_user = eval { $seen_rec_time{$key}->username_of_poster // '' } // '';
+                    my $this_user     = eval { $todo->username_of_poster // '' } // '';
+                    if ($this_user eq $session_user && $existing_user ne $session_user) {
+                        @deduped_today = grep { $_ != $seen_rec_time{$key} } @deduped_today;
+                        $seen_rec_time{$key} = $todo;
+                        push @deduped_today, $todo;
+                    }
+                }
+            } else {
+                push @deduped_today, $todo;
+            }
+        }
+        $todos_for_today = \@deduped_today;
+    }
+
+    # Convert todos_for_today to plain hashrefs with precomputed display fields.
+    # Using get_columns() avoids TT2 relying on DBIx::Class method calls for basic
+    # column access, and lets us embed top_px/height/start_min/time_lbl directly.
+    my $GRID_START_MIN = 5 * 60;  # 300 — grid starts at 5 AM
+    my @todos_display;
+    for my $todo (@$todos_for_today) {
+        my %row = $todo->get_columns;
+
+        my $tod = $row{time_of_day} // '';
+        $tod = ref($tod) ? sprintf('%02d:%02d:00', $tod->hours // 0, $tod->minutes // 0) : "$tod";
+        my ($h, $m) = (9, 0);
+        if ($tod =~ /^(\d{1,2}):(\d{2})/) { $h = int($1); $m = int($2); }
+
+        my $start_min = $h * 60 + $m;
+        my $est_mins  = $row{estimated_man_hours} // 0;
+        $est_mins = 30 unless $est_mins > 0;
+
+        my $top_px = $start_min - $GRID_START_MIN;
+        $top_px = 0    if $top_px < 0;
+        $top_px = 1000 if $top_px > 1000;
+        my $height = $est_mins < 15 ? 15 : $est_mins;
+        $height = 900 if $height > 900;
+        my $end_min = $start_min + $est_mins;
+
+        $row{top_px}    = $top_px;
+        $row{height}    = $height;
+        $row{start_min} = $start_min;
+        $row{est_mins}  = $est_mins;
+        $row{time_lbl}  = sprintf('%02d:%02d-%02d:%02d', $h, $m,
+                              int($end_min/60) % 24, $end_min % 60);
+        push @todos_display, \%row;
+    }
+    $todos_for_today = \@todos_display;
 
     # Month calendar grid
     my @calendar;
@@ -310,7 +487,7 @@ sub daily :Path('/planning/daily') :Args {
                     { -desc => 'is_blocking'   },
                     { -desc => 'last_mod_date' },
                 ],
-                rows => 100,
+                rows => 2000,
             }
         )->all;
 
@@ -323,6 +500,9 @@ sub daily :Path('/planning/daily') :Args {
         my @scored;
         for my $todo (@rows) {
             my %h = $todo->get_columns;
+
+            next if ($h{todo_type} // '') =~ /^(appointment|meeting|event|reminder)$/i;
+            next if ($h{is_recurring} // 0);
 
             my $st          = $h{status} // '';
             my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
@@ -375,14 +555,15 @@ sub daily :Path('/planning/daily') :Args {
             if ($h{project_id}) {
                 unless (exists $proj_cache{$h{project_id}}) {
                     my $p = eval { $c->model('DBEncy')->resultset('Project')->find($h{project_id}) };
-                    $proj_cache{$h{project_id}} = $p ? $p->name : '';
+                    $proj_cache{$h{project_id}} = $p ? { name => $p->name, parent_id => ($p->parent_id || '') } : { name => '', parent_id => '' };
                 }
-                $h{project_name} = $proj_cache{$h{project_id}};
+                $h{project_name} = $proj_cache{$h{project_id}}{name};
                 $ap_projects_seen{$h{project_id}} //= {
                     project_id   => $h{project_id},
-                    project_name => $proj_cache{$h{project_id}} || $h{project_code} || "Project #$h{project_id}",
+                    project_name => $proj_cache{$h{project_id}}{name} || $h{project_code} || "Project #$h{project_id}",
                     project_code => $h{project_code} || '',
                     sitename     => $h{sitename}     || '',
+                    parent_id    => $proj_cache{$h{project_id}}{parent_id} || '',
                 };
             }
 
@@ -402,7 +583,7 @@ sub daily :Path('/planning/daily') :Args {
             @all_sorted = grep { ($_->{project_id} // '') eq $filter_project } @all_sorted;
         }
 
-        @active_priorities = grep { defined } @all_sorted[0..24];
+        @active_priorities = @all_sorted;
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
@@ -411,16 +592,75 @@ sub daily :Path('/planning/daily') :Args {
         my @ap_all_sitenames;
         if ($is_csc) {
             eval {
-                my $site_rows = $c->model('Site')->get_all_sites($c);
-                @ap_all_sitenames = sort map { $_->name } @$site_rows;
+                my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
+                    {}, { order_by => 'name' }
+                )->all;
+                my %seen;
+                for my $s (@site_rows) {
+                    my $n = eval { $s->name } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename => { '!=' => undef } },
+                    { columns => ['sitename'], distinct => 1 }
+                )->all;
+                for my $r (@todo_sites) {
+                    my $n = eval { $r->get_column('sitename') } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                @ap_all_sitenames = sort @ap_all_sitenames;
+            };
+        } else {
+            eval {
+                my $user_id = $c->session->{user_id};
+                if ($user_id) {
+                    my @usr_rows = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+                        { user_id => $user_id, site_id => { '!=' => undef }, is_active => 1 }
+                    )->all;
+                    my %seen;
+                    for my $usr (@usr_rows) {
+                        eval {
+                            my $site = $c->model('DBEncy')->resultset('Site')->find($usr->site_id);
+                            if ($site && $site->name && !$seen{$site->name}++) {
+                                push @ap_all_sitenames, $site->name;
+                            }
+                        };
+                    }
+                    @ap_all_sitenames = sort @ap_all_sitenames;
+                }
             };
         }
+
+        my @ap_all_usernames;
+        eval {
+            if ($is_csc) {
+                my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                    { roles => { '!=' => '', -not => undef } },
+                    { columns => ['username'], order_by => 'username' }
+                )->all;
+                my %seen;
+                for my $r (@urows) {
+                    my $u = eval { $r->username } // '';
+                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
+                }
+            } else {
+                my %seen;
+                for my $todo (@all_sorted) {
+                    my $u = $todo->{developer} || $todo->{username_of_poster} || '';
+                    push @ap_all_usernames, $u if $u && !$seen{$u}++;
+                }
+                @ap_all_usernames = sort @ap_all_usernames;
+            }
+        };
 
         $c->stash(
             ap_projects      => \@ap_projects_list,
             ap_role_cats     => \@ap_role_cats_list,
             ap_user_roles    => $user_roles,
             ap_all_sitenames => \@ap_all_sitenames,
+            ap_all_usernames => \@ap_all_usernames,
+            cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : $sitename),
+            cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
@@ -530,6 +770,9 @@ sub daily :Path('/planning/daily') :Args {
         prev_date         => $prev_date,
         next_date         => $next_date,
 
+        week_todos_by_date => \%week_todos_by_date,
+        week_overdue_todos => \@week_overdue_todos,
+
         week_dates        => \@week_dates,
         start_of_week     => $start_of_week,
         end_of_week       => $end_of_week,
@@ -546,6 +789,7 @@ sub daily :Path('/planning/daily') :Args {
         today             => $current_date_str,
 
         todos             => $all_todos_calendar,
+        overdue_todos     => $overdue_todos,
         todos_for_today   => $todos_for_today,
         active_priorities => \@active_priorities,
         project_deps      => \@project_deps,
@@ -570,6 +814,26 @@ sub daily :Path('/planning/daily') :Args {
             };
             \@dp_entries;
         },
+        stale_log_count => do {
+            my $cnt = 0;
+            my $_lu  = $c->session->{username} || '';
+            my $_sn  = $c->session->{SiteName} || '';
+            my $_rls = $c->session->{roles} || [];
+            my $_has_admin = ref($_rls) eq 'ARRAY'
+                ? (grep { $_ eq 'admin' } @$_rls) > 0
+                : ($_rls && $_rls =~ /\badmin\b/i);
+            my $_is_csc = ($_sn eq 'CSC' && $_has_admin) || $_lu eq 'Shanta';
+            eval {
+                my $_filter = {
+                    start_date => { '<' => $current_date_str },
+                    status     => { -in => [1, 2, 'open', 'in-progress'] },
+                };
+                $_filter->{sitename} = $_sn unless $_is_csc;
+                $cnt = $c->model('DBEncy')->resultset('Log')->search($_filter)->count || 0;
+            };
+            $cnt;
+        },
+
         open_log_entry => do {
             my $open;
             my $_log_user = $c->session->{username} || '';
@@ -602,7 +866,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                    status  => { -in => [1, 2] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
@@ -659,6 +923,37 @@ sub daily :Path('/planning/daily') :Args {
             \@ht;
         },
 
+        scheduled_todos => do {
+            my @st;
+            eval {
+                my %sched_cond = (
+                    scheduled_start => { -like => "$current_date_str%" },
+                    status          => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] },
+                );
+                $sched_cond{sitename} = $sitename unless $is_csc;
+                my @rows = $c->model('DBEncy')->resultset('Todo')->search(
+                    \%sched_cond,
+                    { order_by => { -asc => 'scheduled_start' }, rows => 200 }
+                )->all;
+                my %_proj_cache;
+                for my $row (@rows) {
+                    my %h = $row->get_columns;
+                    my $pid = $h{project_id} || '';
+                    if ($pid && !exists $_proj_cache{$pid}) {
+                        eval {
+                            my $p = $c->model('DBEncy')->resultset('Project')->find($pid);
+                            $_proj_cache{$pid} = $p ? $p->name : '';
+                        };
+                        $_proj_cache{$pid} //= '';
+                    }
+                    $h{project_name} = $pid ? ($_proj_cache{$pid} // '') : '';
+                    $h{role_cats}    = $self->_classify_todo_roles($h{project_name}, $h{project_code}, $h{subject});
+                    push @st, \%h;
+                }
+            };
+            \@st;
+        },
+
         template => 'admin/planning/DailyPlan.tt',
     );
 }
@@ -670,6 +965,32 @@ POST params: action=start|end
 Route: /planning/daily_log
 
 =cut
+
+sub set_filter :Path('/planning/set_filter') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(401);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { $data = JSON::decode_json($body) if $body };
+    $data //= {};
+
+    if (exists $data->{site}) {
+        $c->session->{cal_filter_site} = $data->{site} // '';
+    }
+    if (exists $data->{user}) {
+        $c->session->{cal_filter_user} = $data->{user} // '';
+    }
+
+    $c->response->body('{"ok":1}');
+}
 
 sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my ($self, $c) = @_;
@@ -703,16 +1024,21 @@ sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
         $hd_count = $schema->resultset('SupportTicket')->count(\%hd) || 0;
     };
 
+    my $deploy_note = $result->{last_deploy_dt}
+        ? " (scanning since last deploy: $result->{last_deploy_dt})"
+        : " (scanning last 24h — no production deploy recorded)";
+
     $c->response->body(encode_json({
         success          => JSON::true,
         created_count    => $result->{todo_created},
         error_count      => $result->{error_count},
         helpdesk_count   => $hd_count,
+        last_deploy_dt   => $result->{last_deploy_dt} || '',
         message          => $result->{todo_created}
-            ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)"
+            ? "$result->{todo_created} new error todo(s) created from $result->{error_count} area(s)$deploy_note"
             : ($result->{error_count}
-                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences"
-                : "No errors found in the last 24h"),
+                ? "$result->{error_count} error area(s) found — all resolved or no new occurrences$deploy_note"
+                : "No errors found$deploy_note"),
     }));
 }
 
@@ -777,6 +1103,7 @@ sub _run_audit_scan {
 
     my (%groups, $error_count, $todo_created) = ();
     my @subjects;
+    my $last_deploy_dt;
 
     my $system_project_id = 1;
     eval {
@@ -803,6 +1130,21 @@ sub _run_audit_scan {
             my @t = localtime(time - 86400);
             sprintf('%04d-%02d-%02d %02d:%02d:%02d', $t[5]+1900, $t[4]+1, $t[3], $t[2], $t[1], $t[0]);
         };
+
+        eval {
+            my $deploy_log = $schema->resultset('Log')->search(
+                { abstract => { -like => '%Docker Hub Deploy%' },
+                  status   => 3 },
+                { order_by => { -desc => 'start_date', -desc => 'start_time' }, rows => 1 }
+            )->first;
+            if ($deploy_log) {
+                $last_deploy_dt = ($deploy_log->start_date || '') . ' ' . ($deploy_log->start_time || '00:00:00');
+            }
+        };
+        if ($last_deploy_dt && $last_deploy_dt gt $since) {
+            $since = $last_deploy_dt;
+        }
+
         my @errs = $schema->resultset('SystemLog')->search(
             { level     => { -in => ['error','critical','ERROR','CRITICAL'] },
               timestamp => { '>=' => $since } },
@@ -834,29 +1176,112 @@ sub _run_audit_scan {
         };
 
         if ($existing_audit) {
-            $todo_created = 0;
-            my $root_id = $existing_audit->record_id;
-            my $ollama;
-            eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
-            for my $sub (sort keys %groups) {
-                my $safe_sub = $sub;
-                $safe_sub =~ s/[%_]/\\$&/g;
-                my $open_exists;
-                eval {
-                    $open_exists = $schema->resultset('Todo')->search(
-                        { parent_id  => $root_id,
-                          subject    => { -like => "%$safe_sub%" },
-                          start_date => $today,
-                          status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
-                        { rows => 1 }
-                    )->first;
-                };
-                next if $open_exists;
-                my @entries = @{ $groups{$sub} };
-                my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
-                    $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
-                push @subjects, $ai_subject if $ai_subject;
-                $todo_created++ if $ai_subject;
+            my $root_st = $existing_audit->status // 0;
+            my $root_closed = ($root_st == 3 || $root_st =~ /^(done|completed|closed)$/i);
+
+            if ($root_closed) {
+                my $close_date = $existing_audit->last_mod_date || $today;
+                my $close_tod  = $existing_audit->time_of_day   || '23:59:59';
+                my $cutoff = $close_date . ' ' . $close_tod;
+                my %new_groups;
+                for my $sub (keys %groups) {
+                    my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                    $new_groups{$sub} = \@newer if @newer;
+                }
+                if (keys %new_groups) {
+                    my $ollama;
+                    eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                    my $new_error_count = scalar keys %new_groups;
+                    my $root_desc = "=== Audit Refresh - $today ===\n\n"
+                        . "Found $new_error_count area(s) with new errors since previous audit was closed.\n"
+                        . "Each sub-todo below was created from the system error log.\n"
+                        . "Resolve each sub-todo to clear this audit.";
+                    my $root_todo;
+                    eval {
+                        $root_todo = $schema->resultset('Todo')->create({
+                            subject             => "\x{26A0}\x{FE0F} Morning Audit: $new_error_count area(s) need review ($today)",
+                            description         => $root_desc,
+                            status              => 1,
+                            priority            => 1,
+                            is_blocking         => 1,
+                            sitename            => $sitename,
+                            developer           => $username,
+                            username_of_poster  => $username,
+                            user_id             => $admin_user_id,
+                            project_id          => $system_project_id,
+                            last_mod_by         => $username,
+                            last_mod_date       => $today,
+                            date_time_posted    => $today . ' 00:00:00',
+                            start_date          => $today,
+                            due_date            => $today,
+                            parent_todo         => '',
+                            estimated_man_hours => 0,
+                            accumulative_time   => '00:00:00',
+                            group_of_poster     => 'admin',
+                            project_code        => 'PLANNING',
+                            share               => 0,
+                        });
+                    };
+                    if ($root_todo && !$@) {
+                        $todo_created = 1;
+                        my $root_id = $root_todo->record_id;
+                        for my $sub (sort keys %new_groups) {
+                            my @entries = @{ $new_groups{$sub} };
+                            my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                                $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                            push @subjects, $ai_subject if $ai_subject;
+                        }
+                    }
+                }
+            } else {
+                $todo_created = 0;
+                my $root_id = $existing_audit->record_id;
+                my $ollama;
+                eval { $ollama = Comserv::Model::Ollama->new(timeout => 30) };
+                for my $sub (sort keys %groups) {
+                    my $safe_sub = $sub;
+                    $safe_sub =~ s/[%_]/\\$&/g;
+                    my $open_exists;
+                    eval {
+                        $open_exists = $schema->resultset('Todo')->search(
+                            { parent_id  => $root_id,
+                              subject    => { -like => "%$safe_sub%" },
+                              status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { rows => 1 }
+                        )->first;
+                        unless ($open_exists) {
+                            $open_exists = $schema->resultset('Todo')->search(
+                                { sitename   => $sitename,
+                                  subject    => { -like => "%$safe_sub%" },
+                                  start_date => $today,
+                                  status     => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                                { rows => 1 }
+                            )->first;
+                        }
+                    };
+                    next if $open_exists;
+                    my $closed_child;
+                    eval {
+                        $closed_child = $schema->resultset('Todo')->search(
+                            { parent_id => $root_id,
+                              subject   => { -like => "%$safe_sub%" },
+                              status    => { -in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+                            { order_by => { -desc => 'last_mod_date' }, rows => 1 }
+                        )->first;
+                    };
+                    if ($closed_child) {
+                        my $close_date = $closed_child->last_mod_date || $today;
+                        my $close_tod  = $closed_child->time_of_day   || '23:59:59';
+                        my $cutoff = $close_date . ' ' . $close_tod;
+                        my @newer = grep { ($_->{ts} || '') gt $cutoff } @{ $groups{$sub} };
+                        next unless @newer;
+                    }
+                    my @entries = @{ $groups{$sub} };
+                    my $ai_subject = $self->_build_error_todo($schema, $sitename, $username, $admin_user_id,
+                        $today, $sub, \@entries, $root_id, $ollama, $system_project_id);
+                    push @subjects, $ai_subject if $ai_subject;
+                    $todo_created++ if $ai_subject;
+                }
             }
         } else {
             my $ollama;
@@ -906,7 +1331,8 @@ sub _run_audit_scan {
         }
     }
 
-    return { error_count => $error_count || 0, todo_created => $todo_created || 0, subjects => \@subjects };
+    return { error_count => $error_count || 0, todo_created => $todo_created || 0, subjects => \@subjects,
+             last_deploy_dt => $last_deploy_dt || '' };
 }
 
 sub _build_error_todo {
@@ -922,7 +1348,10 @@ sub _build_error_todo {
     my $top_level = (grep { $_->{level} =~ /^CRITICAL$/i } @entries) ? 'CRITICAL'
                   : (grep { $_->{level} =~ /^ERROR$/i   } @entries) ? 'ERROR'
                   : 'WARN';
-    my $default_priority = ($top_level eq 'WARN') ? 3 : 1;
+    my $is_editor_area = ($sub =~ /ENCY|Glossary|Constituent|Organism|Encyclopedia|Formula|Herb/i) ? 1 : 0;
+    my $default_priority = ($top_level eq 'WARN') ? 3
+                         : $is_editor_area         ? 3
+                         :                           2;
     my ($ai_subject, $ai_desc, $ai_priority) = ("$sub — $count $top_level(s) ($today)", $raw_err, $default_priority);
 
     if ($ollama) {
@@ -944,7 +1373,8 @@ sub _build_error_todo {
                     $ai_subject  = substr($parsed->{subject} || $ai_subject, 0, 200);
                     $ai_desc     = $parsed->{description} || $ai_desc;
                     $ai_priority = $parsed->{priority} || $default_priority;
-                    $ai_priority = 1  if $ai_priority < 1;
+                    $ai_priority = 3  if $ai_priority < 1;
+                    $ai_priority = 3  if $is_editor_area && $ai_priority < 3;
                     $ai_priority = 10 if $ai_priority > 10;
                     $ai_desc .= "\n\n--- Raw errors ($count occurrence(s)) ---\n$raw_err";
                 }
@@ -1147,9 +1577,13 @@ sub _daily_log_action {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, '_daily_log_action',
             "Start-of-day Log #" . $log_entry->record_id . " created by $username");
 
+        $self->_ensure_break_todos($c, $schema, $username, $user_id, $sitename, $today);
+        $self->_schedule_day($c, $schema, $sitename, $today);
+
         my $stale_msg    = @stale_logs      ? " \x{26A0}\x{FE0F} <a href='/log?status=open' style='color:inherit;'>" . scalar(@stale_logs) . " unclosed log(s) from previous days</a>." : '';
         my $helpdesk_msg = $helpdesk_count  ? " \x{1F3AB} $helpdesk_count open HelpDesk ticket(s) — <a href='/HelpDesk'>view tickets</a>." : '';
-        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
+        my $deploy_since = $audit->{last_deploy_dt} ? " since last deploy ($audit->{last_deploy_dt})" : " in last 24h";
+        my $error_msg    = $error_count     ? " \x{1F6A8} $error_count error area(s) found$deploy_since — " . scalar(@audit_todo_subjects) . " AI-assisted todo(s) created — <a href='/todo'>view todos</a>." : '';
         my $priority_msg = @top_todos       ? " Top priority: " . substr($top_todos[0]->subject || '', 0, 60) . "." : '';
 
         return {
@@ -1195,6 +1629,215 @@ sub _daily_log_action {
     }
 
     return { success => JSON::false, error => "Unknown action '$action'" };
+}
+
+sub _ensure_break_todos {
+    my ($self, $c, $schema, $username, $user_id, $sitename, $today) = @_;
+
+    my $existing_count = 0;
+    eval {
+        $existing_count = $schema->resultset('Todo')->search(
+            { sitename           => $sitename,
+              username_of_poster => $username,
+              start_date         => $today,
+              is_fixed           => 1,
+              subject            => [ { -like => '%Break%' }, { -like => '%Lunch%' } ] }
+        )->count;
+    };
+    return if $existing_count;
+
+    my @breaks = (
+        { subject => "\x{2615} Morning Break",   time_of_day => '10:00:00', dur => 15 },
+        { subject => "\x{1F957} Lunch",           time_of_day => '12:00:00', dur => 60 },
+        { subject => "\x{2615} Afternoon Break",  time_of_day => '15:00:00', dur => 15 },
+    );
+
+    for my $brk (@breaks) {
+        my ($hh, $mm) = $brk->{time_of_day} =~ /^(\d+):(\d+)/;
+        my $end_min = $hh * 60 + $mm + $brk->{dur};
+        my $end_str = sprintf('%02d:%02d:00', int($end_min / 60), $end_min % 60);
+        eval {
+            $schema->resultset('Todo')->create({
+                sitename             => $sitename,
+                start_date           => $today,
+                due_date             => $today,
+                subject              => $brk->{subject},
+                description          => 'Scheduled break',
+                estimated_man_hours  => 0,
+                project_code         => 'daily',
+                project_id           => 1,
+                user_id              => $user_id,
+                status               => 1,
+                priority             => 10,
+                last_mod_by          => 'schedule',
+                last_mod_date        => $today,
+                group_of_poster      => 'admin',
+                username_of_poster   => $username,
+                parent_todo          => '',
+                share                => 0,
+                is_blocking          => 0,
+                is_fixed             => 1,
+                time_of_day          => $brk->{time_of_day},
+                scheduled_start      => "$today " . $brk->{time_of_day},
+                scheduled_end        => "$today $end_str",
+            });
+        };
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_ensure_break_todos',
+            "Break create error: $@") if $@;
+    }
+}
+
+sub schedule_day :Path('/planning/schedule_day') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $user_id = $c->session->{user_id};
+    unless ($user_id) {
+        $c->response->status(401);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+    my $sitename = $c->session->{SiteName} || $c->stash->{SiteName} || 'CSC';
+    my $username = $c->session->{username} || '';
+    my $today    = do { my @t = localtime; sprintf('%04d-%02d-%02d', $t[5]+1900, $t[4]+1, $t[3]) };
+    my $schema;
+    eval { $schema = $c->model('DBEncy')->schema };
+    if ($@ || !$schema) {
+        $c->response->body('{"ok":0,"error":"DB unavailable"}');
+        return;
+    }
+    $self->_ensure_break_todos($c, $schema, $username, $user_id, $sitename, $today);
+    my $count = $self->_schedule_day($c, $schema, $sitename, $today);
+    $c->response->body('{"ok":1,"count":' . ($count || 0) . '}');
+}
+
+sub _schedule_day {
+    my ($self, $c, $schema, $sitename, $today) = @_;
+
+    my $settings;
+    eval {
+        $settings = $schema->resultset('UserScheduleSettings')->search(
+            {}, { rows => 1 }
+        )->first;
+    };
+
+    my $default_min = $settings ? ($settings->default_duration_min || 15) : 15;
+    my $segs_json   = $settings ? ($settings->work_segments || '[{"start":"08:00","end":"17:00"}]')
+                                : '[{"start":"08:00","end":"17:00"}]';
+    my $work_segs;
+    eval { $work_segs = decode_json($segs_json) };
+    $work_segs = [{ start => '08:00', end => '17:00' }] if $@ || !$work_segs || !@$work_segs;
+
+    my @free_slots;
+    for my $seg (@$work_segs) {
+        my ($sh, $sm) = split(':', $seg->{start} || '08:00');
+        my ($eh, $em) = split(':', $seg->{end}   || '17:00');
+        push @free_slots, [ ($sh||8)*60+($sm||0), ($eh||17)*60+($em||0) ];
+    }
+    @free_slots = sort { $a->[0] <=> $b->[0] } @free_slots;
+
+    my @fixed_todos;
+    eval {
+        @fixed_todos = $schema->resultset('Todo')->search(
+            { sitename   => $sitename,
+              is_fixed   => 1,
+              start_date => $today },
+            { order_by => { -asc => 'time_of_day' } }
+        )->all;
+    };
+
+    for my $ft (@fixed_todos) {
+        next unless $ft->scheduled_start && $ft->scheduled_end;
+        my $fs = _hhmm_to_min($ft->scheduled_start);
+        my $fe = _hhmm_to_min($ft->scheduled_end);
+        @free_slots = _subtract_slot(\@free_slots, $fs, $fe);
+    }
+
+    my @todos;
+    eval {
+        @todos = $schema->resultset('Todo')->search(
+            { sitename  => $sitename,
+              is_fixed  => 0,
+              due_date  => $today,
+              status    => { -not_in => [3, 'done', 'completed', 'Completed', 'DONE'] } },
+            { order_by => [{ -asc => 'priority' }, { -asc => 'sort_order' }] }
+        )->all;
+    };
+
+    my $count = 0;
+    for my $todo (@todos) {
+        my $emh = $todo->estimated_man_hours || 0;
+        if ($emh == 0) {
+            my $avg_min = 0;
+            eval {
+                my @logs = $schema->resultset('Log')->search(
+                    { todo_record_id => $todo->record_id,
+                      time           => { '!=' => '00:00:00' } },
+                    { columns => ['time'], rows => 20 }
+                )->all;
+                if (@logs) {
+                    my $total = 0;
+                    for my $lg (@logs) {
+                        my $t = $lg->time || '00:00:00';
+                        my ($h, $m, $s) = split(':', $t);
+                        $total += ($h||0)*60 + ($m||0) + int(($s||0)/60);
+                    }
+                    $avg_min = int($total / scalar @logs);
+                    if ($avg_min > 0) {
+                        my $new_emh = int(($avg_min + 30) / 60) || 1;
+                        eval { $todo->update({ estimated_man_hours => $new_emh }) };
+                        $emh = $new_emh;
+                    }
+                }
+            };
+        }
+        my $dur = $emh > 0 ? int($emh * 60) : $default_min;
+        $dur = 15 if $dur < 1;
+
+        my ($s, $e) = _find_slot(\@free_slots, $dur);
+        last unless defined $s;
+
+        @free_slots = _subtract_slot(\@free_slots, $s, $e);
+        my $ss = sprintf('%s %02d:%02d:00', $today, int($s/60), $s%60);
+        my $se = sprintf('%s %02d:%02d:00', $today, int($e/60), $e%60);
+        eval { $todo->update({ scheduled_start => $ss, scheduled_end => $se }) };
+        $count++ unless $@;
+    }
+    return $count;
+}
+
+sub _hhmm_to_min {
+    my ($dt) = @_;
+    return ($1 * 60 + $2) if $dt =~ /(\d{1,2}):(\d{2})/;
+    return 0;
+}
+
+sub _find_slot {
+    my ($slots, $dur) = @_;
+    for my $sl (@$slots) {
+        my ($s, $e) = @$sl;
+        return ($s, $s + $dur) if ($e - $s) >= $dur;
+    }
+    return (undef, undef);
+}
+
+sub _subtract_slot {
+    my ($slots, $from, $to) = @_;
+    my @result;
+    for my $sl (@$slots) {
+        my ($s, $e) = @$sl;
+        if ($to <= $s || $from >= $e) {
+            push @result, [$s, $e];
+        } elsif ($from <= $s && $to >= $e) {
+        } elsif ($from <= $s) {
+            push @result, [$to, $e] if $to < $e;
+        } elsif ($to >= $e) {
+            push @result, [$s, $from] if $from > $s;
+        } else {
+            push @result, [$s, $from] if $from > $s;
+            push @result, [$to, $e]  if $to < $e;
+        }
+    }
+    return @result;
 }
 
 =head2 update_log_entry

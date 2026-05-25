@@ -1,43 +1,118 @@
-[% PageVersion = 'log/index.tt,v 0.02 2024/11/22 Shanta Exp shanta ' %]
+[% PageVersion = 'log/index.tt,v 0.04 2026/05/22 Shanta Exp shanta ' %]
 [% IF c.session.debug_mode == 1 %]
 [% PageVersion %]
 [% END %]
 
-<!-- Ensure the style is correctly applied -->
 <style>
-    .filter-button {
-        margin: 5px;
-        padding: 10px;
-        border: none;
-        background-color: #f0f0f0;
+    .log-filter-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 10px;
+    }
+    .log-filter-bar label {
+        font-weight: bold;
+        font-size: 0.9em;
+        color: #555;
+        white-space: nowrap;
+    }
+    .log-filter-bar select {
+        padding: 4px 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        font-size: 0.9em;
+        background: #f8f8f8;
         cursor: pointer;
+        width: auto !important;
+        display: inline-block !important;
     }
-    .filter-button.active {
-        background-color: #007bff;
-        color: white;
+    .log-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.9em;
     }
+    .log-table th, .log-table td {
+        padding: 6px 10px;
+        border: 1px solid #ddd;
+        text-align: left;
+        vertical-align: top;
+    }
+    .log-table th { background: #f5f5f5; font-weight: bold; }
+    .log-table tr:nth-child(even) { background: #fafafa; }
+    .log-table tr:hover { background: #f0f7ff; }
+    .log-status-1 { color: #0066cc; }
+    .log-status-2 { color: #cc6600; }
+    .log-status-3 { color: #888; }
 </style>
 
-<h2>Our Logs</h2>
-<div id="statusButtons">
-    <button class="filter-button [% IF status == 'all' %]active[% END %]" onclick="window.location.href='/log?status=all'">All Logs</button>
-    <button class="filter-button [% IF status == 'open' %]active[% END %]" onclick="window.location.href='/log?status=open'">Open Logs</button>
-    <button class="filter-button [% IF status == '1' %]active[% END %]" onclick="window.location.href='/log?status=1'">Status 1</button>
-    <button class="filter-button [% IF status == '2' %]active[% END %]" onclick="window.location.href='/log?status=2'">Status 2</button>
-    <button class="filter-button [% IF status == '3' %]active[% END %]" onclick="window.location.href='/log?status=3'">Status 3</button>
+<h2>Logs</h2>
+
+<div class="log-filter-bar">
+    <label for="log-status-sel">Status:</label>
+    <select id="log-status-sel" onchange="applyLogFilter()">
+        <option value="all"  [% IF status == 'all'  %]selected[% END %]>All</option>
+        <option value="open" [% IF status == 'open' %]selected[% END %]>Open</option>
+        <option value="1"    [% IF status == '1'    %]selected[% END %]>New</option>
+        <option value="2"    [% IF status == '2'    %]selected[% END %]>In Progress</option>
+        <option value="3"    [% IF status == '3'    %]selected[% END %]>Done</option>
+    </select>
+    [% IF allowed_sites.size > 1 %]
+    <label for="log-site-sel">Site:</label>
+    <select id="log-site-sel" onchange="applyLogFilter()">
+        <option value="">All Sites</option>
+        [% FOREACH sn IN allowed_sites %]
+        <option value="[% sn %]" [% IF site_filter == sn %]selected[% END %]>[% sn %]</option>
+        [% END %]
+    </select>
+    [% END %]
 </div>
+<script>
+function applyLogFilter() {
+    var s = document.getElementById('log-status-sel').value;
+    var siteEl = document.getElementById('log-site-sel');
+    var site = siteEl ? siteEl.value : '';
+    var url = '/log?status=' + encodeURIComponent(s);
+    if (site) url += '&site=' + encodeURIComponent(site);
+    window.location.href = url;
+}
+</script>
 
 <div id="logContainer">
     [% IF logs.size == 0 %]
-        <p>No logs available.</p>
+        <p>No logs found.</p>
     [% ELSE %]
-        [% FOREACH log IN logs %]
-        <div class="log-entry" data-status="[% log.status %]">
-            <form method="post" action="/log/details">
-                <input type="hidden" name="record_id" value="[% log.record_id %]">
-                <button type="submit">[% log.abstract %]</button>
-            </form>
-        </div>
-        [% END %]
+        <table class="log-table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Site</th>
+                    <th>User</th>
+                    <th>Abstract</th>
+                    <th>Status</th>
+                    <th>Start</th>
+                    <th>End</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOREACH log IN logs %]
+            [% SET st_class = (log.status == 1) ? 'log-status-1' : (log.status == 2) ? 'log-status-2' : (log.status == 3) ? 'log-status-3' : '' %]
+            <tr class="[% st_class %]">
+                <td>[% log.start_date %]</td>
+                <td>[% log.sitename %]</td>
+                <td>[% log.username %]</td>
+                <td>
+                    <form method="post" action="/log/details" style="margin:0">
+                        <input type="hidden" name="record_id" value="[% log.record_id %]">
+                        <button type="submit" style="background:none;border:none;padding:0;color:inherit;cursor:pointer;text-align:left;font-size:inherit;">[% log.abstract %]</button>
+                    </form>
+                </td>
+                <td>[% (log.status == 1) ? 'New' : (log.status == 2) ? 'In Progress' : (log.status == 3) ? 'Done' : log.status %]</td>
+                <td>[% log.start_time %]</td>
+                <td>[% log.end_time %]</td>
+            </tr>
+            [% END %]
+            </tbody>
+        </table>
     [% END %]
 </div>

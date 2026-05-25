@@ -17,6 +17,7 @@ services:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${COMSERV_LOGS_DIR:-/home/ubuntu/comserv-logs}:/opt/comserv/root/log
       - ${WORKSHOP_LOCAL_DIR:-/home/ubuntu/comserv-workshop}:/data/nfs:rw
+      - whisper-venv:/opt/comserv/whisper_venv:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
       interval: 30s
@@ -28,3 +29,7 @@ services:
       options:
         max-size: "50m"
         max-file: "10"
+
+volumes:
+  whisper-venv:
+    driver: local

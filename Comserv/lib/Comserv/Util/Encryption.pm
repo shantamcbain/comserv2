@@ -7,7 +7,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use Crypt::CBC;
 use Crypt::OpenSSL::AES;
-use Crypt::Random qw(makerandom);
+use Crypt::URandom qw(urandom);
 use MIME::Base64 qw(encode_base64 decode_base64);
 use File::Spec;
 use File::Basename;
@@ -181,7 +181,7 @@ sub _get_encryption_key {
         read($urandom, $key, 32) == 32 or die "Short read from /dev/urandom";
         close $urandom;
     } else {
-        $key = makerandom(Size => 256);
+        $key = urandom(32);
     }
 
     $class->_ensure_config_dir();

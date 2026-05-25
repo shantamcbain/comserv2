@@ -175,44 +175,39 @@ sub psgi_app {
 # Auto-fix for missing modules - attempt to load modules with fallbacks
 # This ensures the application works even if modules are missing
 
-# First, try to load email modules
-my $email_modules_loaded = 0;
-# Temporarily disabled email modules to fix startup issues
-# eval {
-#     require Comserv::View::Email;
-#     require Comserv::View::Email::Template;
-# };
-# if ($@) {
-warn "Warning: Email modules disabled for testing\n";
-warn "Email functionality may not work correctly.\n";
-# $email_modules_loaded = 0;
-
-# Try to auto-install the modules if we're in development mode
-# if ($ENV{CATALYST_DEBUG}) {
-#     warn "Attempting to auto-install email modules...\n";
-#     eval {
-#         require App::cpanminus;
-#         my $local_lib = __PACKAGE__->path_to('local');
-#         system("cpanm --local-lib=$local_lib --notest Catalyst::View::Email Catalyst::View::Email::Template");
-#         
-#         # Try loading again after installation
-#         require Comserv::View::Email;
-#         require Comserv::View::Email::Template;
-#         $email_modules_loaded = 1;
-#     };
-#     if ($@) {
-#         warn "Auto-installation failed: $@\n";
-#         warn "Email functionality will be limited.\n";
-#     }
-# }
-# }
-
 # Session store is now properly configured in the plugin list above
 
 # LAYER 3: Global Application Error Handler
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {
     my ($orig, $c) = @_;
+
+    # Handle invalid session ID attacks (e.g. HTML entities injected into cookie)
+    # Treat as a security event — clear error, delete bad cookie, redirect to home
+    if ($c && $c->error && @{$c->error}) {
+        my $err0 = "${\($c->error->[0] // '')}";
+        if ($err0 =~ /invalid session ID/i) {
+            eval {
+                my $logger = Comserv::Util::Logging->instance;
+                my %req = Comserv::Util::Logging::extract_request_info($c);
+                $logger->log_with_details($c, 'warn', __FILE__, __LINE__, 'finalize_error',
+                    "[SECURITY] Invalid session ID rejected from IP:" . ($req{ip_address}//'?')
+                    . " UA:" . substr($req{user_agent}//'', 0, 80));
+            };
+            $c->clear_errors;
+            eval {
+                my $cookie_name = $c->config->{'Plugin::Session'}{cookie_name}
+                    || 'comserv_session_' . ($ENV{COMSERV_PORT} || 4001);
+                $c->res->cookies->{$cookie_name} = {
+                    value => '', expires => time() - 86400, path => '/'
+                };
+            };
+            $c->res->status(302);
+            $c->res->redirect($c->uri_for('/'));
+            $c->$orig();
+            return;
+        }
+    }
 
     # Log all unhandled errors with context
     eval {
@@ -269,6 +264,17 @@ around 'finalize_error' => sub {
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
 __PACKAGE__->_initialize_ai_chat_schema();
+
+# LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
+# that could be injected (e.g. HTML entities like &#39; from attackers).
+# Must be applied AFTER setup() so the session plugin has mixed in get_session_id.
+__PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
+    my ($orig, $c, @args) = @_;
+    my $id = eval { $c->$orig(@args) };
+    return undef if $@ || !defined $id;
+    $id =~ s/[^0-9a-fA-F]//g;
+    return length($id) >= 20 ? lc($id) : undef;
+});
 
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality
