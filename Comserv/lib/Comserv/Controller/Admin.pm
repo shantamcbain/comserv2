@@ -247,6 +247,18 @@ sub index :Path :Args(0) {
 
     my $software_status = $self->_get_software_status($c);
 
+    my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
+    my $has_accounting = $is_csc ? 1 : 0;
+    unless ($is_csc) {
+        eval {
+            $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
+                sitename    => $site_name_idx,
+                module_name => 'accounting',
+            })->count ? 1 : 0;
+        };
+    }
+
     $c->stash(
         template              => 'admin/index.tt',
         stats                 => $stats,
@@ -258,6 +270,8 @@ sub index :Path :Args(0) {
         helpdesk_open_tickets  => $helpdesk_open_tickets,
         helpdesk_open_count    => $helpdesk_open_count,
         software_status        => $software_status,
+        is_csc                 => $is_csc,
+        has_accounting         => $has_accounting,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
@@ -6908,9 +6922,27 @@ sub get_migration_mysql_info {
     my $password = $ENV{MIGRATION_MYSQL_PASSWORD} // '';
 
     unless ($password) {
+        my $home = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_mysql.json";
+        if (-f $dbi_file) {
+            eval {
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                $host     = $cfg->{host}     if ref $cfg eq 'HASH' && $cfg->{host};
+                $port     = $cfg->{port}     if ref $cfg eq 'HASH' && $cfg->{port};
+                $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+            };
+        }
+    }
+
+    unless ($password) {
         return {
             connection_status => 'error',
-            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env (value from MYSQL_ROOT_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            error => 'MIGRATION_MYSQL_PASSWORD not set — add it to Comserv/.env or set credentials in the db_production_mysql server entry',
             databases => [],
         };
     }
@@ -6959,9 +6991,27 @@ sub get_migration_postgres_info {
     my $password = $ENV{MIGRATION_POSTGRES_PASSWORD} // '';
 
     unless ($password) {
+        my $home = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_postgres.json";
+        if (-f $dbi_file) {
+            eval {
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                $password = $cfg->{password} // '' if ref $cfg eq 'HASH';
+                $host     = $cfg->{host}     if ref $cfg eq 'HASH' && $cfg->{host};
+                $port     = $cfg->{port}     if ref $cfg eq 'HASH' && $cfg->{port};
+                $user     = $cfg->{username} if ref $cfg eq 'HASH' && $cfg->{username};
+            };
+        }
+    }
+
+    unless ($password) {
         return {
             connection_status => 'error',
-            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env (value from POSTGRES_PASSWORD in /opt/csc-db/.env on 192.168.1.20)',
+            error => 'MIGRATION_POSTGRES_PASSWORD not set — add it to Comserv/.env or set credentials in the db_production_postgres server entry',
             databases => [],
         };
     }

@@ -160,7 +160,21 @@ sub daily :Path('/planning/daily') :Args {
                 };
                 push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
             }
-            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_cal_sites);
+            my $filter_site;
+            if (!exists $c->session->{cal_filter_site}) {
+                $filter_site = $sitename;
+            } else {
+                $filter_site = $c->session->{cal_filter_site} // '';
+            }
+            my @_filtered_sites = ($filter_site && grep { $_ eq $filter_site } @_cal_sites) ? ($filter_site) : @_cal_sites;
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_filtered_sites);
+            if (my $filter_user = $c->session->{cal_filter_user} // '') {
+                $all_todos_calendar = [grep {
+                    my $dev = eval { $_->developer }          // '';
+                    my $uop = eval { $_->username_of_poster } // '';
+                    $dev eq $filter_user || $uop eq $filter_user;
+                } @$all_todos_calendar];
+            }
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 my $week_first_day = $week_dates[0]{date_str};
                 my $today_str = $current_date_str;
@@ -632,6 +646,8 @@ sub daily :Path('/planning/daily') :Args {
             ap_user_roles    => $user_roles,
             ap_all_sitenames => \@ap_all_sitenames,
             ap_all_usernames => \@ap_all_usernames,
+            cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : $sitename),
+            cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
@@ -936,6 +952,32 @@ POST params: action=start|end
 Route: /planning/daily_log
 
 =cut
+
+sub set_filter :Path('/planning/set_filter') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(401);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { $data = JSON::decode_json($body) if $body };
+    $data //= {};
+
+    if (exists $data->{site}) {
+        $c->session->{cal_filter_site} = $data->{site} // '';
+    }
+    if (exists $data->{user}) {
+        $c->session->{cal_filter_user} = $data->{user} // '';
+    }
+
+    $c->response->body('{"ok":1}');
+}
 
 sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my ($self, $c) = @_;

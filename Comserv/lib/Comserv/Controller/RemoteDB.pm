@@ -18,6 +18,7 @@ has 'logging' => (
 my @DB_TYPES = qw(mariadb mysql postgresql sqlite);
 my @ENVIRONMENTS = qw(production development staging backup);
 my @ROLES = qw(primary replica migration backup development);
+my @APP_DATABASES = qw(ency shanta_forager csc_accounting);
 
 sub _remote_db { Comserv::Model::RemoteDB->new() }
 
@@ -59,14 +60,19 @@ sub add_connection :Path('add') :Args(0) {
         $conn_name =~ s/\s+/_/g;
         $conn_name = lc($conn_name);
 
+        my $remote_db_add = $self->_remote_db();
+        my $all_add = $remote_db_add->get_all_connections();
+
         unless ($conn_name =~ /^[a-z0-9_]+$/) {
             $c->stash(
-                error_msg => 'Connection name must contain only letters, numbers, and underscores.',
-                form_data => $p,
-                db_types  => \@DB_TYPES,
+                error_msg    => 'Connection name must contain only letters, numbers, and underscores.',
+                form_data    => $p,
+                db_types     => \@DB_TYPES,
                 environments => \@ENVIRONMENTS,
-                roles     => \@ROLES,
-                template  => 'remotedb/add.tt',
+                roles        => \@ROLES,
+                connections  => $all_add,
+                app_databases => \@APP_DATABASES,
+                template     => 'remotedb/add.tt',
             );
             return;
         }
@@ -86,31 +92,35 @@ sub add_connection :Path('add') :Args(0) {
         };
 
         try {
-            my $remote_db = $self->_remote_db();
-            $remote_db->save_connection($conn_name, $conn_config);
+            $remote_db_add->save_connection($conn_name, $conn_config);
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'add_connection',
                 "Added DB server: $conn_name at $conn_config->{host}:$conn_config->{port}");
             $c->flash->{success_msg} = "Database server '$conn_name' added successfully.";
             $c->response->redirect($c->uri_for($self->action_for('index')));
         } catch {
             $c->stash(
-                error_msg => "Failed to save connection: $_",
-                form_data => $p,
-                db_types  => \@DB_TYPES,
+                error_msg    => "Failed to save connection: $_",
+                form_data    => $p,
+                db_types     => \@DB_TYPES,
                 environments => \@ENVIRONMENTS,
-                roles     => \@ROLES,
-                template  => 'remotedb/add.tt',
+                roles        => \@ROLES,
+                connections  => $all_add,
+                app_databases => \@APP_DATABASES,
+                template     => 'remotedb/add.tt',
             );
         };
         return;
     }
 
+    my $remote_db_add = $self->_remote_db();
     $c->stash(
-        form_data    => {},
-        db_types     => \@DB_TYPES,
-        environments => \@ENVIRONMENTS,
-        roles        => \@ROLES,
-        template     => 'remotedb/add.tt',
+        form_data     => {},
+        db_types      => \@DB_TYPES,
+        environments  => \@ENVIRONMENTS,
+        roles         => \@ROLES,
+        connections   => $remote_db_add->get_all_connections(),
+        app_databases => \@APP_DATABASES,
+        template      => 'remotedb/add.tt',
     );
 }
 
@@ -154,27 +164,31 @@ sub edit :Path('edit') :Args(1) {
             $c->response->redirect($c->uri_for($self->action_for('index')));
         } catch {
             $c->stash(
-                error_msg => "Failed to update connection: $_",
-                form_data => { %$conn, conn_name => $conn_name },
-                conn_name => $conn_name,
-                db_types  => \@DB_TYPES,
-                environments => \@ENVIRONMENTS,
-                roles     => \@ROLES,
-                is_edit   => 1,
-                template  => 'remotedb/add.tt',
+                error_msg     => "Failed to update connection: $_",
+                form_data     => { %$conn, conn_name => $conn_name },
+                conn_name     => $conn_name,
+                db_types      => \@DB_TYPES,
+                environments  => \@ENVIRONMENTS,
+                roles         => \@ROLES,
+                connections   => $all,
+                app_databases => \@APP_DATABASES,
+                is_edit       => 1,
+                template      => 'remotedb/add.tt',
             );
         };
         return;
     }
 
     $c->stash(
-        form_data    => { %$conn, conn_name => $conn_name },
-        conn_name    => $conn_name,
-        db_types     => \@DB_TYPES,
-        environments => \@ENVIRONMENTS,
-        roles        => \@ROLES,
-        is_edit      => 1,
-        template     => 'remotedb/add.tt',
+        form_data     => { %$conn, conn_name => $conn_name },
+        conn_name     => $conn_name,
+        db_types      => \@DB_TYPES,
+        environments  => \@ENVIRONMENTS,
+        roles         => \@ROLES,
+        connections   => $all,
+        app_databases => \@APP_DATABASES,
+        is_edit       => 1,
+        template      => 'remotedb/add.tt',
     );
 }
 
@@ -184,13 +198,24 @@ sub test_connection :Path('test') :Args(1) {
     $self->_require_admin($c);
 
     my $remote_db = $self->_remote_db();
-    my $ok = eval { $remote_db->test_connection($conn_name) };
+    my $status = $remote_db->check_database_status($conn_name);
 
-    if ($ok) {
-        $c->flash->{success_msg} = "Connection '$conn_name' tested successfully — server reachable.";
+    if ($status->{ok}) {
+        my $db   = $status->{database};
+        my $tbls = $status->{table_count};
+        my $views = $status->{view_count};
+        if ($status->{empty}) {
+            $c->flash->{error_msg} =
+                "Connected to '$conn_name' ($db on $status->{host}:$status->{port}) — "
+                . "database exists but has NO TABLES. Run a migration to populate it.";
+        } else {
+            $c->flash->{success_msg} =
+                "Connected to '$conn_name' — database '$db' on $status->{host}:$status->{port} "
+                . "has $tbls table(s) and $views view(s).";
+        }
     } else {
-        my $err = $@ || '';
-        $c->flash->{error_msg} = "Connection '$conn_name' failed — check host, port, and credentials." . ($err ? " ($err)" : '');
+        $c->flash->{error_msg} =
+            "Connection '$conn_name' failed: " . ($status->{error} || 'Unknown error');
     }
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
@@ -214,6 +239,27 @@ sub remove :Path('remove') :Args(1) {
     $c->response->redirect($c->uri_for($self->action_for('index')));
 }
 
+sub detail :Path('detail') :Args(1) {
+    my ($self, $c) = @_;
+    my $conn_name = $c->req->args->[0] // '';
+    $self->_require_admin($c);
+
+    my $remote_db = $self->_remote_db();
+    my $all = $remote_db->get_all_connections();
+
+    unless (exists $all->{$conn_name}) {
+        $c->flash->{error_msg} = "Connection '$conn_name' not found.";
+        $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+
+    $c->stash(
+        template  => 'remotedb/detail.tt',
+        conn_name => $conn_name,
+        conn      => $all->{$conn_name},
+    );
+}
+
 sub view :Path('view') :Args(1) {
     my ($self, $c) = @_;
     my $conn_name = $c->req->args->[0] // '';
@@ -226,8 +272,13 @@ sub view :Path('view') :Args(1) {
     my $tables = $remote_db->list_tables($c, $conn_name);
 
     unless (defined $tables) {
-        $c->flash->{error_msg} = "Failed to connect to database server '$conn_name'";
+        $c->flash->{error_msg} = "Failed to connect to '$conn_name' — check credentials and that the server is running.";
         $c->response->redirect($c->uri_for($self->action_for('index')));
+        return;
+    }
+    if (!@$tables) {
+        $c->flash->{error_msg} = "Connected to '$conn_name' but the database has no tables yet. Run a migration to populate it.";
+        $c->response->redirect($c->uri_for('/remotedb/migrate'));
         return;
     }
 
@@ -264,6 +315,63 @@ sub query :Path('query') :Args(1) {
     $c->stash(
         template  => 'remotedb/query.tt',
         conn_name => $conn_name,
+    );
+}
+
+sub migrate :Path('migrate') :Args(0) {
+    my ($self, $c) = @_;
+    $self->_require_admin($c);
+
+    my $remote_db   = $self->_remote_db();
+    my $connections = $remote_db->get_all_connections();
+    my @conn_keys   = sort keys %$connections;
+
+    if ($c->req->method eq 'POST') {
+        my $p           = $c->req->params;
+        my $source      = $p->{source}      // '';
+        my $target      = $p->{target}      // '';
+        my $schema_only = $p->{schema_only} ? 1 : 0;
+        my $truncate    = $p->{truncate}    ? 1 : 0;
+
+        unless ($source && $target) {
+            $c->stash(error_msg => 'Please select both a source and target connection.');
+        } elsif ($source eq $target) {
+            $c->stash(error_msg => 'Source and target must be different connections.');
+        } else {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
+                "Starting migration: $source -> $target (schema_only=$schema_only, truncate=$truncate)");
+
+            my ($ok, $results, $err) = $remote_db->migrate_database($source, $target, {
+                schema_only => $schema_only,
+                truncate    => $truncate,
+            });
+
+            if (!$ok) {
+                my @errs = grep { $_->{error} } @$results;
+                my $err_summary = $err || join('; ', map { "$_->{table}: $_->{error}" } @errs);
+                $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'migrate',
+                    "Migration $source -> $target FAILED — " . scalar(@errs) . " table(s) had errors: $err_summary");
+            } else {
+                my $rows = 0; $rows += ($_->{rows} // 0) for @$results;
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate',
+                    "Migration $source -> $target completed OK — " . scalar(@$results) . " objects, $rows rows total");
+            }
+
+            $c->stash(
+                migrate_done    => 1,
+                migrate_ok      => $ok,
+                migrate_results => $results,
+                migrate_error   => $err,
+                last_source     => $source,
+                last_target     => $target,
+            );
+        }
+    }
+
+    $c->stash(
+        template    => 'remotedb/migrate.tt',
+        connections => $connections,
+        conn_keys   => \@conn_keys,
     );
 }
 
