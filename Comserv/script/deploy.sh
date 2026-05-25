@@ -10,6 +10,35 @@ HOSTNAME_VAL=$(hostname)
 
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
+# ── Detect NFS and configure paths ───────────────────────────────────────────
+NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
+NFS_LOCAL_DIR=""
+for candidate in $NFS_MOUNT_CANDIDATES; do
+    if mount | grep -q " on ${candidate} type nfs"; then
+        NFS_LOCAL_DIR="$candidate"
+        break
+    fi
+done
+
+COMSERV_LOGS_DIR="/home/ubuntu/comserv-logs"
+NFS_DEPLOY_LOG=""
+
+if [ -n "$NFS_LOCAL_DIR" ]; then
+    echo "NFS detected at $NFS_LOCAL_DIR"
+    COMSERV_LOGS_DIR="$NFS_LOCAL_DIR/comserv-logs"
+    mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
+    echo "   Routing container logs to NFS: $COMSERV_LOGS_DIR"
+    
+    # Configure NFS Deployment Log archive path
+    NFS_LOG_DIR="$NFS_LOCAL_DIR/logs"
+    mkdir -p "$NFS_LOG_DIR" 2>/dev/null || true
+    if [ -d "$NFS_LOG_DIR" ] && [ -w "$NFS_LOG_DIR" ]; then
+        NFS_DEPLOY_LOG="${NFS_LOG_DIR}/comserv-deploy.log"
+    fi
+else
+    echo "NFS not mounted — using local fallbacks"
+fi
+
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
@@ -85,9 +114,9 @@ for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
 done
 
 # ── Application log trimming (on host) ───────────────────────────────────────
-echo "Checking application log sizes in /home/ubuntu/comserv-logs/..."
-if [ -d "/home/ubuntu/comserv-logs" ]; then
-    find /home/ubuntu/comserv-logs -name "*.log" -type f 2>/dev/null | while read -r ALOG; do
+echo "Checking application log sizes in $COMSERV_LOGS_DIR..."
+if [ -d "$COMSERV_LOGS_DIR" ]; then
+    find "$COMSERV_LOGS_DIR" -name "*.log" -type f 2>/dev/null | while read -r ALOG; do
         ASIZE_MB=$(du -m "$ALOG" 2>/dev/null | cut -f1)
         ASIZE_MB=${ASIZE_MB:-0}
         echo "  $ALOG: ${ASIZE_MB}MB"
@@ -100,7 +129,7 @@ if [ -d "/home/ubuntu/comserv-logs" ]; then
     done
     # Also delete any rotated logs older than 7 days on the host
     echo "Pruning rotated application logs older than 7 days..."
-    find /home/ubuntu/comserv-logs \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
+    find "$COMSERV_LOGS_DIR" \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
 fi
 
 # ── Check for compose file ───────────────────────────────────────────────────
@@ -145,20 +174,11 @@ docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "3. Starting new container..."
-NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
-NFS_LOCAL_DIR=""
-for candidate in $NFS_MOUNT_CANDIDATES; do
-    if mount | grep -q " on ${candidate} type nfs"; then
-        NFS_LOCAL_DIR="$candidate"
-        echo "   NFS detected at $candidate — using as /data/nfs"
-        break
-    fi
-done
 if [ -z "$NFS_LOCAL_DIR" ]; then
     NFS_LOCAL_DIR="/home/ubuntu/comserv-workshop"
     echo "   NFS not mounted — using local fallback $NFS_LOCAL_DIR"
 fi
-WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 
 echo "3b. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
@@ -235,4 +255,12 @@ if command -v mail >/dev/null 2>&1; then
     echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}\nDisk      : $DISK_FINAL" \
         | mail -s "$SUBJECT" "$EMAIL"
     echo "Notification sent to $EMAIL"
+fi
+
+# ── Archive the deployment log to the NFS drive (if available) ───────────────
+if [ -n "$NFS_DEPLOY_LOG" ] && [ -f "$DEPLOY_LOG" ]; then
+    echo "=== Deployment Run at $(date) ===" >> "$NFS_DEPLOY_LOG"
+    tail -n 1000 "$DEPLOY_LOG" >> "$NFS_DEPLOY_LOG" 2>/dev/null || true
+    echo -e "\n\n" >> "$NFS_DEPLOY_LOG"
+    echo "Full deployment log archived to NFS: $NFS_DEPLOY_LOG"
 fi
