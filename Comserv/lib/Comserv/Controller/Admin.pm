@@ -247,6 +247,18 @@ sub index :Path :Args(0) {
 
     my $software_status = $self->_get_software_status($c);
 
+    my $site_name_idx = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $is_csc        = (lc($site_name_idx) eq 'csc') ? 1 : 0;
+    my $has_accounting = $is_csc ? 1 : 0;
+    unless ($is_csc) {
+        eval {
+            $has_accounting = $c->model('DBEncy')->resultset('SiteModule')->search({
+                sitename    => $site_name_idx,
+                module_name => 'accounting',
+            })->count ? 1 : 0;
+        };
+    }
+
     $c->stash(
         template              => 'admin/index.tt',
         stats                 => $stats,
@@ -258,6 +270,8 @@ sub index :Path :Args(0) {
         helpdesk_open_tickets  => $helpdesk_open_tickets,
         helpdesk_open_count    => $helpdesk_open_count,
         software_status        => $software_status,
+        is_csc                 => $is_csc,
+        has_accounting         => $has_accounting,
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', 
