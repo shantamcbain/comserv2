@@ -277,6 +277,25 @@ sub auto :Private {
                                 role      => { -like => 'admin' },
                                 is_active => 1,
                             })->count;
+                            unless ($site_admin_count) {
+                                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                                    sitename => $site_name_check,
+                                }, { rows => 1 })->single;
+                                if ($hosting && $hosting->contact_email) {
+                                    my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
+                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                        $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
+                                            user_id   => $user_id,
+                                            site_id   => $site_obj->id,
+                                            role      => 'admin',
+                                        }, {
+                                            key => 'user_site_role_unique',
+                                            values => { granted_by => 1, is_active => 1 },
+                                        });
+                                        $site_admin_count = 1;
+                                    }
+                                }
+                            }
                             if ($site_admin_count) {
                                 $is_admin = 1;
                                 $c->session->{is_admin} = 1;
