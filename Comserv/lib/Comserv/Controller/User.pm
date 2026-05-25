@@ -2289,11 +2289,18 @@ sub bulk_delete_users :Local :Args(0) {
             });
         };
 
-        eval { $user->delete };
-        if ($@) {
-            push @errors, "id=$uid: $@";
+        my $del_err;
+        eval {
+            $schema->storage->dbh_do(sub {
+                my ($storage, $dbh) = @_;
+                $dbh->do("DELETE FROM users WHERE id = ?", undef, $uid);
+            });
+        };
+        $del_err = "$@" if $@;
+        if ($del_err) {
+            push @errors, "id=$uid: $del_err";
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'bulk_delete_users',
-                "Failed to delete user_id=$uid: $@");
+                "Failed to delete user_id=$uid: $del_err");
         } else {
             $deleted++;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'bulk_delete_users',
@@ -3104,11 +3111,16 @@ sub do_admin_delete_user :Local :Args(1) {
             ->update({ created_by => undef });
     };
 
-    # Step 4: Delete the user record — this is the critical step
-    # Capture $@ immediately — logging/notification calls will reset it
+    # Step 4: Delete the user record via raw SQL to bypass DBIC cascade logic
+    # (DBIC cascade would SELECT related tables whose schema may not match the live DB)
     my $delete_err;
-    eval { $user->delete };
-    $delete_err = "$@" if $@;   # stringify immediately before any other eval runs
+    eval {
+        $schema->storage->dbh_do(sub {
+            my ($storage, $dbh) = @_;
+            $dbh->do("DELETE FROM users WHERE id = ?", undef, $user_id);
+        });
+    };
+    $delete_err = "$@" if $@;
 
     if ($delete_err) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'do_admin_delete_user',
