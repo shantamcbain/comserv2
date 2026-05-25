@@ -1,0 +1,114 @@
+[%
+   title = "Admin Page Management"
+   description = "Manage and customize your site pages"
+   roles = "admin"
+   TemplateType = "Application"
+   category = "Admin"
+   page_version = "1.00"
+   last_updated = "2026-05-25"
+%]
+
+<div class="container mt-3">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center mb-3" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Admin Page Management</h2>
+                <div>
+                    <a href="[% c.uri_for('/pages/create') %]" class="btn btn-success">
+                        <i class="fa fa-plus"></i> Create New Page
+                    </a>
+                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="btn btn-info">
+                        <i class="fa fa-database"></i> Migrate Legacy Pages
+                    </a>
+                </div>
+            </div>
+            
+            [% IF c.flash.success_msg %]
+                <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
+            [% END %]
+            [% IF c.flash.error_msg %]
+                <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
+            [% END %]
+            [% IF error_msg %]
+                <div class="alert alert-danger">[% error_msg | html %]</div>
+            [% END %]
+            
+            <div class="card panel panel-default">
+                <div class="card-header panel-heading">
+                    <strong class="panel-title">Site Pages</strong>
+                </div>
+                <div class="card-body panel-body">
+                    <div class="table-responsive">
+                        <table class="table table-striped table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Site</th>
+                                    <th>Menu</th>
+                                    <th>Page Code</th>
+                                    <th>Title</th>
+                                    <th>Status</th>
+                                    <th>Roles</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                [% IF pages && pages.size > 0 %]
+                                    [% FOREACH page IN pages %]
+                                        <tr>
+                                            <td>[% page.sitename | html %]</td>
+                                            <td>[% page.menu | html %]</td>
+                                            <td><code>[% page.page_code | html %]</code></td>
+                                            <td>[% page.title | html %]</td>
+                                            <td>
+                                                [% IF page.status == 'active' %]
+                                                    <span class="label label-success badge bg-success">Active</span>
+                                                [% ELIF page.status == 'draft' %]
+                                                    <span class="label label-warning badge bg-warning">Draft</span>
+                                                [% ELSE %]
+                                                    <span class="label label-default badge bg-secondary">[% page.status | html %]</span>
+                                                [% END %]
+                                            </td>
+                                            <td><code>[% page.roles | html %]</code></td>
+                                            <td>
+                                                <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-xs btn-sm btn-info" target="_blank" title="View Page">
+                                                    <i class="fa fa-eye"></i> View
+                                                </a>
+                                                <a href="[% c.uri_for('/pages/edit', page.page_code) %]" class="btn btn-xs btn-sm btn-primary" title="Edit Page">
+                                                    <i class="fa fa-edit"></i> Edit
+                                                </a>
+                                                <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]" 
+                                                   class="btn btn-xs btn-sm btn-danger delete-page-btn" 
+                                                   title="Delete Page" 
+                                                   data-code="[% page.page_code | html %]">
+                                                    <i class="fa fa-trash"></i> Delete
+                                                </a>
+                                            </td>
+                                        </tr>
+                                    [% END %]
+                                [% ELSE %]
+                                    <tr>
+                                        <td colspan="7" class="text-center">No pages found in the system. Use "Create New Page" or "Migrate Legacy Pages" to add content.</td>
+                                    </tr>
+                                [% END %]
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteButtons = document.querySelectorAll('.delete-page-btn');
+    deleteButtons.forEach(button => {
+        button.addEventListener('click', function(e) {
+            const pageCode = this.getAttribute('data-code');
+            if (!confirm(`Are you sure you want to delete the page '${pageCode}'? This action cannot be undone.`)) {
+                e.preventDefault();
+            }
+        });
+    });
+});
+</script>

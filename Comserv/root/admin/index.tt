@@ -336,6 +336,10 @@
                         <i class="fas fa-exchange-alt"></i>
                         <span>Migrate Schema</span>
                     </a>
+                    <a href="[% c.uri_for('/admin/pages') %]" class="admin-link">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Page Management</span>
+                    </a>
                     <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
                         <i class="fas fa-file-export"></i>
                         <span>Migrate Pages (Forager → Ency)</span>

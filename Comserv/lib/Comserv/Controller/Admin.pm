@@ -7060,6 +7060,216 @@ sub get_result_file_path {
     return $result_file_path;
 }
 
+# Page Migration action: Forager -> Ency
+sub migrate_pages :Path('/admin/migrate_pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_pages', 
+        "Starting migrate_pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'migrate_pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    
+    if ($action eq 'preview') {
+        my $preview_data = $self->_preview_page_migration($c);
+        $c->stash(
+            show_preview => 1,
+            preview_data => $preview_data,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    elsif ($action eq 'migrate') {
+        my @selected_ids = $c->req->param('selected_pages');
+        my $result = $self->_perform_page_migration($c, \@selected_ids);
+        $c->stash(
+            show_result => 1,
+            migration_result => $result,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    else {
+        $c->stash(
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+}
+
+# Helper method to preview page migration
+sub _preview_page_migration {
+    my ($self, $c) = @_;
+    
+    my @forager_pages;
+    eval {
+        @forager_pages = $c->model('DBForager')->resultset('Page')->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_preview_page_migration', 
+            "Error fetching Forager pages: $@");
+        return {
+            total_count => 0,
+            issues_count => 0,
+            mapping_issues => [{ error => "Failed to load Forager pages: $@" }],
+            forager_pages => []
+        };
+    }
+    
+    my $total_count = scalar @forager_pages;
+    my $issues_count = 0;
+    my @mapping_issues;
+    
+    foreach my $f_page (@forager_pages) {
+        my @issues;
+        
+        # Check required fields
+        push @issues, "Missing sitename" unless $f_page->sitename;
+        push @issues, "Missing menu" unless $f_page->menu;
+        push @issues, "Missing page_code" unless $f_page->page_code;
+        
+        # Check duplicate page_code in Ency.pages_content
+        if ($f_page->page_code) {
+            my $exists = $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code });
+            if ($exists) {
+                push @issues, "Page code already exists in destination";
+            }
+        }
+        
+        if (@issues) {
+            $issues_count++;
+            push @mapping_issues, {
+                page => $f_page,
+                issues => \@issues
+            };
+        }
+    }
+    
+    return {
+        total_count => $total_count,
+        issues_count => $issues_count,
+        mapping_issues => \@mapping_issues,
+        forager_pages => \@forager_pages
+    };
+}
+
+# Helper method to perform page migration
+sub _perform_page_migration {
+    my ($self, $c, $selected_ids) = @_;
+    
+    my $migrated_count = 0;
+    my $skipped_count = 0;
+    my $error_count = 0;
+    my @migration_log;
+    my @errors;
+    
+    foreach my $id (@$selected_ids) {
+        my $f_page = eval { $c->model('DBForager')->resultset('Page')->find({ record_id => $id }) };
+        unless ($f_page) {
+            $error_count++;
+            push @errors, "Could not find Forager page with record_id: $id";
+            next;
+        }
+        
+        # Safety checks
+        my $exists = eval { $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code }) };
+        if ($exists) {
+            $skipped_count++;
+            push @migration_log, "Skipped duplicate: " . $f_page->page_code;
+            next;
+        }
+        
+        # Build page data
+        my $page_data = {
+            sitename => $f_page->sitename || 'CSC',
+            menu => $f_page->menu || 'Main',
+            page_code => $f_page->page_code,
+            title => $f_page->app_title || $f_page->page_code,
+            body => $f_page->body || '',
+            description => $f_page->description,
+            keywords => $f_page->keywords,
+            link_order => $f_page->link_order || 0,
+            status => $f_page->status || 'active',
+            roles => 'public', # default
+            created_by => $f_page->username_of_poster || 'migrated',
+        };
+        
+        eval {
+            $c->model('DBEncy')->resultset('Page')->create($page_data);
+            $migrated_count++;
+            push @migration_log, "Successfully migrated: " . $f_page->page_code;
+        };
+        if ($@) {
+            $error_count++;
+            push @errors, "Failed to migrate " . $f_page->page_code . ": $@";
+        }
+    }
+    
+    return {
+        migrated_count => $migrated_count,
+        skipped_count => $skipped_count,
+        error_count => $error_count,
+        migration_log => \@migration_log,
+        errors => \@errors
+    };
+}
+
+# Admin: Page Management UI
+sub pages :Path('/admin/pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'pages', 
+        "Starting admin pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    
+    # Handle deletion
+    if ($action eq 'delete') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            my $code = $page->page_code;
+            eval {
+                $page->delete;
+                $c->flash->{success_msg} = "Page '$code' deleted successfully.";
+            };
+            if ($@) {
+                $c->flash->{error_msg} = "Failed to delete page: $@";
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for deletion.";
+        }
+        $c->response->redirect($c->uri_for('/admin/pages'));
+        return;
+    }
+    
+    # Fetch all pages in Ency
+    my @pages;
+    eval {
+        @pages = $c->model('DBEncy')->resultset('Page')->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pages', 
+            "Error fetching Ency pages: $@");
+        $c->stash(error_msg => "Error fetching pages: $@");
+    }
+    
+    $c->stash(
+        pages => \@pages,
+        template => 'admin/pages.tt'
+    );
+}
+
 =head1 AUTHOR
 
 Shanta McBain
