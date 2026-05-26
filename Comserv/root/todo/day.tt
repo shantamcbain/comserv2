@@ -623,33 +623,71 @@ function markDoneCalendar(btn, recordId) {
 }
 
 function markDoneGcal(btn, recordId) {
-    btn.disabled = true;
-    fetch('/todo/update_status', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-        body: 'record_id=' + encodeURIComponent(recordId) + '&status=3'
-    }).then(function(r){ return r.json(); }).then(function(d){
-        if (d.success || d.ok) {
-            var ev = btn.closest('.gcal-ev');
-            if (ev) {
-                ev.classList.add('is-done');
-                var title = ev.querySelector('.gcal-ev-title');
-                if (title && !title.textContent.trim().startsWith('✓')) {
-                    title.textContent = '✓ ' + title.textContent.trim();
+    doneWithNotesGcal(btn, recordId);
+}
+
+function doneWithNotesGcal(btn, recordId) {
+    _gcalNotesModal(
+        'Mark Done — What was accomplished?',
+        'Briefly describe what was done (optional)…',
+        function(notes) {
+            btn.disabled = true;
+            fetch('/todo/done_with_log', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record_id: recordId, notes: notes })
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) {
+                    var ev = btn.closest('.gcal-ev');
+                    if (ev) {
+                        ev.classList.add('is-done');
+                        var title = ev.querySelector('.gcal-ev-title');
+                        if (title && !title.textContent.trim().startsWith('✓')) {
+                            title.textContent = '✓ ' + title.textContent.trim();
+                        }
+                    }
+                    if (typeof _rescheduleAndReload === 'function') {
+                        _rescheduleAndReload();
+                    } else {
+                        fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
+                            .finally(function() { window.location.reload(); });
+                    }
+                } else {
+                    btn.disabled = false;
+                    alert('Could not mark done: ' + (d.error || 'unknown'));
                 }
-            }
-            if (typeof _rescheduleAndReload === 'function') {
-                _rescheduleAndReload();
-            } else {
-                fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
-                    .finally(function() { window.location.reload(); });
-            }
-        } else {
-            btn.disabled = false;
-            alert('Could not mark done: ' + (d.error || 'unknown'));
+            }).catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
         }
-    }).catch(function(e){ btn.disabled = false; alert('Error: ' + e); });
+    );
+}
+
+function _gcalNotesModal(title, placeholder, onConfirm, onCancel) {
+    var modal = document.getElementById('gcal-notes-modal');
+    var titleEl = document.getElementById('gcal-notes-modal-title');
+    var input = document.getElementById('gcal-notes-input');
+    var confirmBtn = document.getElementById('gcal-notes-confirm');
+    var cancelBtn = document.getElementById('gcal-notes-cancel');
+    titleEl.textContent = title;
+    input.value = '';
+    input.placeholder = placeholder || '';
+    modal.style.display = 'flex';
+    setTimeout(function() { input.focus(); }, 50);
+    function cleanup() {
+        modal.style.display = 'none';
+        confirmBtn.removeEventListener('click', doConfirm);
+        cancelBtn.removeEventListener('click', doCancel);
+        modal.removeEventListener('click', doBackdrop);
+        input.removeEventListener('keydown', doKey);
+    }
+    function doConfirm() { cleanup(); onConfirm(input.value.trim()); }
+    function doCancel() { cleanup(); if (onCancel) onCancel(); }
+    function doBackdrop(e) { if (e.target === modal) doCancel(); }
+    function doKey(e) { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doConfirm(); } if (e.key === 'Escape') doCancel(); }
+    confirmBtn.addEventListener('click', doConfirm);
+    cancelBtn.addEventListener('click', doCancel);
+    modal.addEventListener('click', doBackdrop);
+    input.addEventListener('keydown', doKey);
 }
 
 function startWorkGcal(btn, recordId) {
@@ -663,23 +701,39 @@ function startWorkGcal(btn, recordId) {
         body: JSON.stringify({ record_id: recordId })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-            btn.textContent = '▶ Active';
+            btn.textContent = '⏸ Active';
             btn.classList.add('gcal-ev-btn-active');
+            btn.title = 'Log is open — click to close log with notes (todo stays open)';
+            btn.onclick = function() { closeLogWithNotesGcal(btn, recordId); };
             btn.disabled = false;
-            btn.title = 'Log started — click Done when finished';
             var ev = btn.closest('.gcal-ev');
             if (ev) {
                 ev.style.outline = '2px solid #fd7e14';
                 var popup = ev.querySelector('.todo-popup .btn-start');
-                if (popup) { popup.textContent = '▶ Active'; popup.style.background = '#fd7e14'; popup.style.borderColor = '#fd7e14'; }
+                if (popup) {
+                    popup.textContent = '⏸ Active';
+                    popup.style.background = '#fd7e14';
+                    popup.style.borderColor = '#fd7e14';
+                    popup.title = 'Log is open — click to close log with notes (todo stays open)';
+                    popup.onclick = function() { closeLogWithNotesGcal(popup, recordId); };
+                }
+            }
+            var subject = btn.getAttribute('data-subject') || '';
+            var desc    = btn.getAttribute('data-desc') || '';
+            var site    = btn.getAttribute('data-site') || '';
+            var project = btn.getAttribute('data-project') || '';
+            var clip = 'TODO: ' + subject + '\nSite: ' + site + '\nProject: ' + project + (desc ? '\n\n' + desc : '');
+            if (navigator.clipboard) {
+                navigator.clipboard.writeText(clip).catch(function(){});
             }
         } else {
             btn.disabled = false;
             btn.textContent = origText;
             if (d.error && d.error.indexOf('already open') !== -1) {
-                btn.textContent = '▶ Active';
+                btn.textContent = '⏸ Active';
                 btn.classList.add('gcal-ev-btn-active');
-                btn.title = 'Log already open — click Done when finished';
+                btn.title = 'Log is open — click to close log with notes (todo stays open)';
+                btn.onclick = function() { closeLogWithNotesGcal(btn, recordId); };
             } else {
                 alert('Could not start: ' + (d.error || 'unknown error'));
             }
@@ -691,32 +745,64 @@ function startWorkGcal(btn, recordId) {
     });
 }
 
-function closeLogTodoCard(btn, recordId) {
-    btn.disabled = true;
-    fetch('/todo/close_log', {
-        method: 'POST',
-        credentials: 'same-origin',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId })
-    }).then(function(r) { return r.json(); }).then(function(d) {
-        if (d.ok) {
-            btn.disabled = false;
-            var startBtn = btn.previousElementSibling;
-            if (startBtn) {
-                startBtn.textContent = '▶ Start';
-                startBtn.style.background = 'transparent';
-                startBtn.style.color = '#0d6efd';
-                startBtn.style.borderColor = '#0d6efd';
-            }
-            btn.remove();
-        } else {
-            btn.disabled = false;
-            alert('Could not close log: ' + (d.error || 'unknown'));
+function closeLogWithNotesGcal(btn, recordId) {
+    _gcalNotesModal(
+        'Close Log — What did you do?',
+        'Brief notes on what was accomplished (optional)…',
+        function(notes) {
+            btn.disabled = true;
+            fetch('/todo/close_log', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record_id: recordId, notes: notes })
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) {
+                    btn.textContent = '▶ Start';
+                    btn.classList.remove('gcal-ev-btn-active');
+                    btn.title = 'Start working on this todo — creates a log entry and copies details to clipboard';
+                    btn.onclick = function() { startWorkGcal(btn, recordId); };
+                    btn.disabled = false;
+                    var ev = btn.closest('.gcal-ev');
+                    if (ev) ev.style.outline = '';
+                } else {
+                    btn.disabled = false;
+                    alert('Could not close log: ' + (d.error || 'unknown'));
+                }
+            }).catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
         }
-    }).catch(function(e) {
-        btn.disabled = false;
-        alert('Error: ' + e);
-    });
+    );
+}
+
+function closeLogTodoCard(btn, recordId) {
+    _gcalNotesModal(
+        'Close Log — What did you do?',
+        'Brief notes on what was accomplished (optional)…',
+        function(notes) {
+            btn.disabled = true;
+            fetch('/todo/close_log', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ record_id: recordId, notes: notes })
+            }).then(function(r) { return r.json(); }).then(function(d) {
+                if (d.ok) {
+                    btn.disabled = false;
+                    var startBtn = btn.previousElementSibling;
+                    if (startBtn) {
+                        startBtn.textContent = '▶ Start';
+                        startBtn.style.background = 'transparent';
+                        startBtn.style.color = '#0d6efd';
+                        startBtn.style.borderColor = '#0d6efd';
+                    }
+                    btn.remove();
+                } else {
+                    btn.disabled = false;
+                    alert('Could not close log: ' + (d.error || 'unknown'));
+                }
+            }).catch(function(e) { btn.disabled = false; alert('Error: ' + e); });
+        }
+    );
 }
 
 function _updateDaySiteSummary() {
@@ -1286,16 +1372,26 @@ document.addEventListener('DOMContentLoaded', function() {
                         <select class="gcal-priority-sel" draggable="false" data-record-id="[% todo.record_id %]" data-orig="[% tp %]" onchange="savePriority(this)">
                             [% FOREACH pv IN [1,2,3,4,5,6,7,8,9] %]<option value="[% pv %]" [% IF pv == tp %]selected[% END %]>P[% pv %]</option>[% END %]
                         </select>
-                        <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]">View</a>
-                        <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
+                        <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]"
+                           title="View full todo details">View</a>
+                        <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]"
+                           title="Manually add a time log entry for this todo">Log</a>
                         [% UNLESS tdone %]
                         [% SET _tis_inprog = (todo.status == 2) %]
+                        [% SET _tsubject = todo.subject | html %]
+                        [% SET _tdesc    = todo.description | html %]
                         <button class="gcal-ev-btn[% IF _tis_inprog %] gcal-ev-btn-active[% END %]" draggable="false"
-                            onclick="startWorkGcal(this,[% todo.record_id %])"
-                            title="[% IF _tis_inprog %]In progress — log open[% ELSE %]Start working on this todo[% END %]">
-                            [% IF _tis_inprog %]▶ Active[% ELSE %]▶ Start[% END %]
+                            onclick="[% IF _tis_inprog %]closeLogWithNotesGcal(this,[% todo.record_id %])[% ELSE %]startWorkGcal(this,[% todo.record_id %])[% END %]"
+                            title="[% IF _tis_inprog %]Log is open — click to close log with notes (todo stays open)[% ELSE %]Start working — creates a log entry and copies todo details to clipboard[% END %]"
+                            data-subject="[% _tsubject %]"
+                            data-desc="[% _tdesc %]"
+                            data-site="[% ts %]"
+                            data-project="[% tproj %]">
+                            [% IF _tis_inprog %]⏸ Active[% ELSE %]▶ Start[% END %]
                         </button>
-                        <button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>
+                        <button class="gcal-ev-btn" draggable="false"
+                            onclick="doneWithNotesGcal(this,[% todo.record_id %])"
+                            title="Mark done — asks what was accomplished, closes open log (if any), marks todo complete">Done</button>
                         [% END %]
                     </div>
                 </div>
@@ -1379,4 +1475,14 @@ document.addEventListener('DOMContentLoaded', function() {
 </div>
 [% END %]
 
+<div id="gcal-notes-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.45);align-items:center;justify-content:center;">
+  <div style="background:#fff;border-radius:8px;padding:24px;min-width:340px;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,0.25);">
+    <h4 id="gcal-notes-modal-title" style="margin:0 0 12px;font-size:1rem;"></h4>
+    <textarea id="gcal-notes-input" rows="4" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid #ccc;border-radius:4px;font-size:0.9rem;resize:vertical;"></textarea>
+    <div style="margin-top:12px;text-align:right;display:flex;gap:8px;justify-content:flex-end;">
+      <button id="gcal-notes-cancel" style="padding:6px 18px;border:1px solid #ccc;border-radius:4px;background:#f8f9fa;cursor:pointer;">Cancel</button>
+      <button id="gcal-notes-confirm" style="padding:6px 18px;border:none;border-radius:4px;background:#0d6efd;color:#fff;cursor:pointer;">OK</button>
+    </div>
+  </div>
+</div>
 
