@@ -3125,8 +3125,8 @@ sub open_log :Path('open_log') :Args(0) {
             undef, $record_id
         );
         if ($existing_open) {
-            $todo->update({ status => 2, last_mod_by => $username, last_mod_date => $today })
-                if ($todo->status // 0) != 2;
+            $todo->update({ status => 5, last_mod_by => $username, last_mod_date => $today })
+                if ($todo->status ne '5');
             $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
             return;
         }
@@ -3159,7 +3159,7 @@ sub open_log :Path('open_log') :Args(0) {
         my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
 
         $todo->update({
-            status        => 2,
+            status        => 5,
             last_mod_by   => $username,
             last_mod_date => $today,
         });
@@ -3229,8 +3229,8 @@ sub close_log :Path('close_log') :Args(0) {
         );
 
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        if ($todo && ($todo->status // 0) == 2) {
-            $todo->update({ status => 1, last_mod_by => $username, last_mod_date => $today });
+        if ($todo && ($todo->status // 0) == 5) {
+            $todo->update({ status => 2, last_mod_by => $username, last_mod_date => $today });
         }
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',

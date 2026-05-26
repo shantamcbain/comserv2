@@ -1252,6 +1252,7 @@ document.addEventListener('DOMContentLoaded', function() {
                             <div><strong>Status:</strong> 
                                 [% IF todo.status == 1 %]New
                                 [% ELSIF todo.status == 2 %]In Progress
+                                [% ELSIF todo.status == 5 %]&#9654; Active Session
                                 [% ELSIF todo.status == 3 %]Completed
                                 [% ELSE %]Unknown[% END %]
                             </div>
@@ -1378,6 +1379,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET tlbl     = todstr.substr(0, 5) %]
             [% END %]
             [% SET tstat    = tdone ? 'Done' :
+                               (todo.status == 5) ? 'Active' :
                                (todo.status == 2 OR todo.status == 'IN PROGRESS' OR todo.status == 'In Progress') ? 'In Progress' :
                                (todo.status == 1 OR todo.status == 'NEW' OR todo.status == 'New') ? 'New' :
                                todo.status %]
@@ -1406,7 +1408,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]"
                            title="Manually add a time log entry for this todo">Log</a>
                         [% UNLESS tdone %]
-                        [% SET _tis_inprog = (todo.status == 2) %]
+                        [% SET _tis_inprog = (todo.status == 5) %]
                         [% SET _tsubject = todo.subject | html %]
                         [% SET _tdesc    = todo.description | html %]
                         <button class="gcal-ev-btn[% IF _tis_inprog %] gcal-ev-btn-active[% END %]" draggable="false"
