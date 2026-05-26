@@ -51,7 +51,7 @@ sub index :Path :Args(0) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'index', "Unauthorized access attempt to NPM controller");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to access the NPM management interface.'
         );
         return;
@@ -91,7 +91,7 @@ sub proxy_hosts :Path('proxy-hosts') :Args(0) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'proxy_hosts', "Unauthorized access attempt to NPM proxy hosts");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to access the NPM proxy hosts.'
         );
         return;
@@ -128,7 +128,7 @@ sub create_proxy_host :Path('create-proxy-host') :Args(0) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'create_proxy_host', "Unauthorized access attempt to create NPM proxy host");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to create NPM proxy hosts.'
         );
         return;
@@ -148,7 +148,7 @@ sub create_proxy_host :Path('create-proxy-host') :Args(0) {
     if ($npm_config->{access_scope} eq 'read-only') {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'create_proxy_host', "Attempted to create proxy host in read-only environment");
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'This environment is read-only. You cannot create proxy hosts in this environment.'
         );
         return;
@@ -231,7 +231,7 @@ sub edit_proxy_host :Path('edit-proxy-host') :Args(1) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'edit_proxy_host', "Unauthorized access attempt to edit NPM proxy host");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to edit NPM proxy hosts.'
         );
         return;
@@ -251,7 +251,7 @@ sub edit_proxy_host :Path('edit-proxy-host') :Args(1) {
     if ($npm_config->{access_scope} eq 'read-only') {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'edit_proxy_host', "Attempted to edit proxy host in read-only environment");
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'This environment is read-only. You cannot edit proxy hosts in this environment.'
         );
         return;
@@ -347,7 +347,7 @@ sub delete_proxy_host :Path('delete-proxy-host') :Args(1) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'delete_proxy_host', "Unauthorized access attempt to delete NPM proxy host");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to delete NPM proxy hosts.'
         );
         return;
@@ -367,7 +367,7 @@ sub delete_proxy_host :Path('delete-proxy-host') :Args(1) {
     if ($npm_config->{access_scope} eq 'read-only') {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'delete_proxy_host', "Attempted to delete proxy host in read-only environment");
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'This environment is read-only. You cannot delete proxy hosts in this environment.'
         );
         return;
@@ -427,7 +427,7 @@ sub rotate_api_key :Path('rotate-api-key') :Args(0) {
         $self->logging->log_with_details($c, 'WARN', __FILE__, __LINE__, 'rotate_api_key', "Unauthorized access attempt to rotate NPM API key");
         $c->response->status(403);
         $c->stash(
-            template => 'error/access_denied.tt',
+            template => 'CSC/error/access_denied.tt',
             error_message => 'You do not have permission to rotate the NPM API key.'
         );
         return;
