@@ -1,4 +1,3 @@
-[% META title = 'Page Management Admin' %]
 
 <div class="container-fluid">
     <div class="row">
@@ -52,7 +51,7 @@
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="sitename">Site Name <span class="text-danger">*</span></label>
+                                        <label for="sitename">Site Name <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Specifies the site context. Mapped inside the Theme system and Site setup to load site-specific stylesheets and navigation menus. AI Suggestion: Enter 'CSC' for global/base pages, or 'Icehorse' to restrict this page to your specific site."></i></label>
                                         <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || 'CSC' %]" required [% IF current_site != 'CSC' %]readonly[% END %]>
                                         [% IF current_site != 'CSC' %]
                                             <span class="help-block">This page is locked to [% current_site %].</span>
@@ -61,13 +60,13 @@
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="menu">Menu Section <span class="text-danger">*</span></label>
+                                        <label for="menu">Menu Section <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Determines which menu layout group the page belongs to. Mapped in the theme's navbar template to render navigation links. AI Suggestion: Usually 'main' for header navigation, or 'footer' for footer links."></i></label>
                                         <input type="text" name="menu" id="menu" class="form-group form-control" value="[% page_item.menu || 'main' %]" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="page_code">Page Code <span class="text-danger">*</span></label>
+                                        <label for="page_code">Page Code <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The unique URL slug identifier (e.g. '/page/[page_code]'). Used by the routing system to locate the page record in the database. AI Suggestion: Use short, lowercase names with underscores, like 'about_us' or 'get_started'."></i></label>
                                         <input type="text" name="page_code" id="page_code" class="form-group form-control" value="[% page_item.page_code %]" placeholder="e.g. home, about_us" required [% IF show_form == 'edit' %]readonly[% END %]>
                                         [% IF show_form == 'edit' %]<span class="help-block">Page Code cannot be modified after creation.</span>[% END %]
                                     </div>
@@ -77,74 +76,31 @@
                             <div class="row">
                                 <div class="col-md-8">
                                     <div class="form-group">
-                                        <label for="title">Page Title <span class="text-danger">*</span></label>
+                                        <label for="title">Page Title <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Page Title is dynamically integrated into the main Site Layout: it populates the browser tab &lt;title&gt; tag, renders as the primary &lt;h1&gt; content header on the page, generates breadcrumbs, and sets OpenGraph social media tags. AI Suggestion: Write a concise, human-friendly title, such as 'Forager Legacy Import' or 'Getting Started Guide'."></i></label>
                                         <input type="text" name="title" id="title" class="form-group form-control" value="[% page_item.title %]" placeholder="Enter friendly title for page" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="link_order">Link/Sort Order</label>
+                                        <label for="link_order">Link/Sort Order <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The numeric order in which this link is sorted in menus. Mapped in the theme layout's menu loop to order navbar links (ascending). AI Suggestion: Use '10' for first, '20' for second to allow easy insertion of links later."></i></label>
                                         <input type="number" name="link_order" id="link_order" class="form-group form-control" value="[% page_item.link_order || 0 %]">
                                     </div>
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                                    <label for="body" style="margin: 0; font-weight: bold;">Page Body (HTML/Text) <span class="text-danger">*</span></label>
-                                    <button type="button" class="btn btn-xs btn-purple" id="ai-assist-btn" style="background: #6f42c1; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;">
-                                        <i class="fa fa-magic"></i> AI Assistant
-                                    </button>
-                                </div>
-                                
-                                <!-- AI Assistant Inline Panel -->
-                                <div id="ai-assist-panel" class="panel panel-default" style="display: none; margin-bottom: 15px; border-color: #6f42c1; background-color: #fcfaff; box-shadow: 0 2px 8px rgba(111, 66, 193, 0.1);">
-                                    <div class="panel-heading" style="background-color: #f3ebff; border-color: #6f42c1; color: #512da8; font-weight: bold; display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;">
-                                        <span><i class="fa fa-robot"></i> AI Writing Assistant</span>
-                                        <button type="button" class="close" id="ai-assist-close" style="color: #512da8; opacity: 0.8; line-height: 1;">&times;</button>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                    <div>
+                                        <label for="body" style="margin: 0; font-weight: bold;">Page Body (HTML/Text) <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The core content of the page, editable in Rich Text (WYSIWYG) or raw HTML. It is rendered as the main page body inside the theme content block. AI Suggestion: Draft standard HTML layout with sections and paragraphs. You can use the AI Assistant popup to write, rewrite, or style this content."></i></label>
+                                        <span id="wysiwyg-status-badge" class="label label-success" style="margin-left: 8px;">Rich Text Mode</span>
                                     </div>
-                                    <div class="panel-body" style="padding: 15px;">
-                                        <div class="row">
-                                            <div class="col-md-8">
-                                                <div class="form-group" style="margin-bottom: 10px;">
-                                                    <label class="control-label" style="font-size: 12px; color: #512da8; font-weight: bold;">What should the AI do?</label>
-                                                    <input type="text" id="ai-prompt" class="form-control input-sm" placeholder="e.g. Write a welcome page for Icehorse with site-creation setup steps...">
-                                                </div>
-                                            </div>
-                                            <div class="col-md-4">
-                                                <div class="form-group" style="margin-bottom: 10px;">
-                                                    <label class="control-label" style="font-size: 12px; color: #512da8; font-weight: bold;">Action Preset</label>
-                                                    <select id="ai-preset" class="form-control input-sm">
-                                                        <option value="write">Draft Content from Prompt</option>
-                                                        <option value="improve">Improve Current Content</option>
-                                                        <option value="expand">Expand / Add Details</option>
-                                                        <option value="summarize">Summarize Content</option>
-                                                        <option value="seo">Suggest SEO Keywords</option>
-                                                    </select>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        
-                                        <div class="row" style="margin-top: 5px;">
-                                            <div class="col-md-12" style="display: flex; align-items: center; gap: 10px;">
-                                                <button type="button" class="btn btn-sm btn-purple" id="ai-generate-btn" style="background-color: #6f42c1; color: white; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px;">
-                                                    <i class="fa fa-cog fa-spin" id="ai-spinner" style="display: none; margin-right: 5px;"></i>
-                                                    <span id="ai-btn-text">Generate with AI</span>
-                                                </button>
-                                                <span id="ai-status-msg" style="font-size: 12px; color: #666; font-style: italic;"></span>
-                                            </div>
-                                        </div>
-                                        
-                                        <!-- AI Response Preview / Insert -->
-                                        <div id="ai-response-container" style="display: none; margin-top: 15px; padding: 12px; background: white; border: 1px dashed #6f42c1; border-radius: 4px;">
-                                            <h5 style="margin-top: 0; color: #512da8; font-weight: bold; font-size: 13px; margin-bottom: 8px;">AI Suggestion:</h5>
-                                            <div id="ai-response-text" style="font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin-bottom: 12px; max-height: 250px; overflow-y: auto; padding: 8px; background: #fafafa; border: 1px solid #eee; border-radius: 4px;"></div>
-                                            <div style="display: flex; gap: 10px;">
-                                                <button type="button" class="btn btn-xs btn-success" id="ai-insert-replace-btn" style="font-weight: bold;">Replace Body</button>
-                                                <button type="button" class="btn btn-xs btn-info" id="ai-insert-append-btn" style="font-weight: bold;">Append to Body</button>
-                                                <button type="button" class="btn btn-xs btn-default" id="ai-discard-btn">Discard</button>
-                                            </div>
-                                        </div>
+                                    <div style="display: flex; gap: 8px;">
+                                        <button type="button" class="btn btn-xs btn-warning" id="toggle-editor-mode" style="font-weight: bold;">
+                                            <i class="fa fa-code"></i> Toggle HTML / Rich Text
+                                        </button>
+                                        <button type="button" class="btn btn-xs btn-purple" onclick="openAIFormAssistant()" style="background: #6f42c1; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;">
+                                            <i class="fa fa-robot"></i> Help Edit Page with AI (Standard Form Fill)
+                                        </button>
                                     </div>
                                 </div>
 
@@ -154,13 +110,13 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="description">SEO Description</label>
+                                        <label for="description">SEO Description <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Meta description tag rendered in the HTML head wrapper as &lt;meta name='description' content='[% page.description %]'&gt; to improve search relevance. AI Suggestion: Write a concise 150-160 character summary of the page."></i></label>
                                         <textarea name="description" id="description" rows="3" class="form-group form-control" placeholder="Meta description for search engines">[% page_item.description %]</textarea>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="keywords">SEO Keywords</label>
+                                        <label for="keywords">SEO Keywords <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Meta keywords tag rendered in the HTML head wrapper as &lt;meta name='keywords' content='[% page.keywords %]'&gt; for search engines. AI Suggestion: Use 5-10 comma-separated terms relevant to your page content."></i></label>
                                         <input type="text" name="keywords" id="keywords" class="form-group form-control" value="[% page_item.keywords %]" placeholder="comma, separated, keywords">
                                     </div>
                                 </div>
@@ -169,7 +125,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="status">Status</label>
+                                        <label for="status">Status <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Active pages are published and accessible. Inactive pages return a Page Not Found (404) or Access Denied error for non-admins. AI Suggestion: Keep as 'Inactive' while drafting, and set to 'Active' to publish."></i></label>
                                         <select name="status" id="status" class="form-group form-control">
                                             <option value="active" [% IF page_item.status == 'active' %]selected[% END %]>Active</option>
                                             <option value="inactive" [% IF page_item.status == 'inactive' %]selected[% END %]>Inactive</option>
@@ -178,7 +134,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="roles">Access Roles</label>
+                                        <label for="roles">Access Roles <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Restricts page access to specific logged-in user roles. Mapped in Catalyst controller and AdminAuth to check session permissions. AI Suggestion: Use 'public' for everyone, 'member' for registered users, or 'admin' for administrators."></i></label>
                                         <input type="text" name="roles" id="roles" class="form-group form-control" value="[% page_item.roles || 'public' %]">
                                     </div>
                                 </div>
@@ -191,6 +147,12 @@
                                 <a href="[% c.uri_for('/admin/pages') %]" class="btn btn-default">Cancel</a>
                             </div>
                         </form>
+
+                        [% PROCESS 'ai/partials/ai_form_assistant.tt'
+                           ai_form_entity_label = 'page'
+                           ai_form_context      = 'web page management'
+                           ai_form_fields       = 'sitename, menu, page_code, title, link_order, body, description, keywords, status, roles'
+                        %]
                     </div>
                 </div>
             [% ELSE %]
@@ -317,164 +279,104 @@
 </style>
 
 <script>
+    function openAIFormAssistant() {
+        var panel = document.getElementById('ai-form-assistant-panel');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth' });
+            var inp = document.getElementById('ai-form-entity-name');
+            if (inp) {
+                inp.focus();
+                inp.style.outline = '2px solid #6f42c1';
+                setTimeout(() => { inp.style.outline = ''; }, 1500);
+            }
+        }
+    }
+
     $(document).ready(function() {
         let editorInstance = null;
-
-        // Initialize CKEditor 5 Classic editor on the page body textarea
-        ClassicEditor
-            .create(document.querySelector('#body'), {
-                toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
-            })
-            .then(editor => {
-                editorInstance = editor;
-            })
-            .catch(error => {
-                console.error('CKEditor 5 initialization error:', error);
-            });
-
-        // Toggle AI Assistant Panel
-        $('#ai-assist-btn').on('click', function() {
-            $('#ai-assist-panel').slideToggle(200);
-        });
-
-        $('#ai-assist-close').on('click', function() {
-            $('#ai-assist-panel').slideUp(200);
-        });
-
-        // Handle AI Content Generation
-        $('#ai-generate-btn').on('click', function() {
-            const promptText = $('#ai-prompt').val().trim();
-            const preset = $('#ai-preset').val();
-            let finalPrompt = '';
-            
-            // Read current content from CKEditor or fallback textarea
-            let currentContent = '';
-            if (editorInstance) {
-                currentContent = editorInstance.getData();
-            } else {
-                currentContent = $('#body').val();
-            }
-            
-            // Build the AI instruction prompt
-            if (preset === 'write') {
-                if (!promptText) {
-                    alert('Please enter a prompt describing what you want written.');
-                    return;
-                }
-                finalPrompt = promptText;
-            } else if (preset === 'improve') {
-                if (!currentContent) {
-                    alert('There is no content to improve. Please choose "Draft Content from Prompt" or write something first.');
-                    return;
-                }
-                finalPrompt = "Improve the following text, making it more engaging and professional. Return HTML-ready content:\n\n" + currentContent;
-                if (promptText) {
-                    finalPrompt += "\n\nAdditional instructions: " + promptText;
-                }
-            } else if (preset === 'expand') {
-                if (!currentContent) {
-                    alert('There is no content to expand. Please write some initial text first.');
-                    return;
-                }
-                finalPrompt = "Expand and add professional details to the following content. Return HTML-ready content:\n\n" + currentContent;
-                if (promptText) {
-                    finalPrompt += "\n\nAdditional instructions: " + promptText;
-                }
-            } else if (preset === 'summarize') {
-                if (!currentContent) {
-                    alert('There is no content to summarize.');
-                    return;
-                }
-                finalPrompt = "Provide a concise summary of the following content:\n\n" + currentContent;
-            } else if (preset === 'seo') {
-                let contentToUse = currentContent || promptText;
-                if (!contentToUse) {
-                    alert('Please write some content or enter a prompt so I can suggest keywords.');
-                    return;
-                }
-                finalPrompt = "Based on this content, suggest 10 high-quality SEO keywords separated by commas:\n\n" + contentToUse;
-            }
-            
-            // Show loading spinner
-            $('#ai-spinner').show();
-            $('#ai-btn-text').text('Processing...');
-            $('#ai-generate-btn').prop('disabled', true);
-            $('#ai-status-msg').text('AI is thinking...');
-            $('#ai-response-container').hide();
-            
-            // Invoke the Zencoder AI generation endpoint
-            $.ajax({
-                url: '/ai/generate',
-                type: 'POST',
-                contentType: 'application/json',
-                data: JSON.stringify({
-                    prompt: finalPrompt,
-                    provider: 'ollama'
-                }),
-                success: function(data) {
-                    $('#ai-spinner').hide();
-                    $('#ai-btn-text').text('Generate with AI');
-                    $('#ai-generate-btn').prop('disabled', false);
-                    
-                    if (data && data.success && data.response) {
-                        $('#ai-response-text').text(data.response);
-                        $('#ai-response-container').slideDown(200);
-                        $('#ai-status-msg').text('Generated suggestion successfully!');
-                        
-                        // Autofill SEO keywords field if preset is SEO
-                        if (preset === 'seo') {
-                            const cleanKeywords = data.response.replace(/Keywords:?/i, '').trim();
-                            $('#keywords').val(cleanKeywords);
-                        }
-                    } else {
-                        $('#ai-status-msg').text('Failed to generate response.');
-                        alert('AI Assistance Error: ' + (data ? data.error : 'Unknown error'));
-                    }
+        const bodyTextarea = document.getElementById('body');
+        
+        // Define interceptor on textarea.value property so standard AI Form Assistant updates the WYSIWYG editor
+        if (bodyTextarea) {
+            const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
+            Object.defineProperty(bodyTextarea, 'value', {
+                get: function() {
+                    return descriptor.get.call(this);
                 },
-                error: function(xhr, status, error) {
-                    $('#ai-spinner').hide();
-                    $('#ai-btn-text').text('Generate with AI');
-                    $('#ai-generate-btn').prop('disabled', false);
-                    $('#ai-status-msg').text('Error calling AI service.');
-                    
-                    let errMsg = 'An error occurred while contacting the AI assistant service.';
-                    if (xhr.responseJSON && xhr.responseJSON.error) {
-                        errMsg += '\n\nDetails: ' + xhr.responseJSON.error;
+                set: function(val) {
+                    descriptor.set.call(this, val);
+                    // Synchronize value to CKEditor if it's running
+                    if (editorInstance) {
+                        editorInstance.setData(val);
                     }
-                    alert(errMsg);
+                    this.dispatchEvent(new Event('input', { bubbles: true }));
+                    this.dispatchEvent(new Event('change', { bubbles: true }));
                 }
             });
-        });
-
-        // Insert/Replace & Append handlers
-        $('#ai-insert-replace-btn').on('click', function() {
-            const aiText = $('#ai-response-text').text();
-            if (editorInstance) {
-                editorInstance.setData(aiText);
-            } else {
-                $('#body').val(aiText);
+            
+            // Function to initialize CKEditor 5 Classic
+            function initCKEditor() {
+                if (editorInstance) return Promise.resolve(editorInstance);
+                
+                return ClassicEditor
+                    .create(bodyTextarea, {
+                        toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
+                    })
+                    .then(editor => {
+                        editorInstance = editor;
+                        
+                        // Keep textarea value perfectly in sync with CKEditor in real-time
+                        editor.model.document.on('change:data', () => {
+                            const data = editor.getData();
+                            descriptor.set.call(bodyTextarea, data);
+                        });
+                        
+                        return editor;
+                    })
+                    .catch(error => {
+                        console.error('CKEditor 5 initialization error:', error);
+                    });
             }
-            $('#ai-response-container').slideUp(200);
-            $('#ai-status-msg').text('Replaced body with AI suggestion.');
-        });
-
-        $('#ai-insert-append-btn').on('click', function() {
-            const aiText = $('#ai-response-text').text();
-            if (editorInstance) {
-                const currentData = editorInstance.getData();
-                editorInstance.setData(currentData + '\n' + aiText);
-            } else {
-                const currentVal = $('#body').val();
-                $('#body').val(currentVal + '\n' + aiText);
-            }
-            $('#ai-response-container').slideUp(200);
-            $('#ai-status-msg').text('Appended AI suggestion to body.');
-        });
-
-        $('#ai-discard-btn').on('click', function() {
-            $('#ai-response-container').slideUp(200);
-            $('#ai-status-msg').text('Suggestion discarded.');
-        });
+            
+            // Initial load starts in WYSIWYG mode
+            initCKEditor();
+            
+            // Handle Toggle button click
+            $('#toggle-editor-mode').on('click', function() {
+                if (editorInstance) {
+                    // WYSIWYG mode -> Raw HTML mode
+                    const data = editorInstance.getData();
+                    editorInstance.destroy()
+                        .then(() => {
+                            editorInstance = null;
+                            $(bodyTextarea).show();
+                            $('#wysiwyg-status-badge')
+                                .text('Source HTML Mode')
+                                .removeClass('label-success')
+                                .addClass('label-warning');
+                        });
+                } else {
+                    // Raw HTML mode -> WYSIWYG mode
+                    const data = $(bodyTextarea).val();
+                    initCKEditor().then(editor => {
+                        if (editor) {
+                            editor.setData(data);
+                            $('#wysiwyg-status-badge')
+                                .text('Rich Text Mode')
+                                .removeClass('label-warning')
+                                .addClass('label-success');
+                        }
+                    });
+                }
+            });
+            
+            // Form submit helper to ensure editor state is saved
+            $('form').on('submit', function() {
+                if (editorInstance) {
+                    descriptor.set.call(bodyTextarea, editorInstance.getData());
+                }
+            });
+        }
     });
 </script>
 [% END %]
