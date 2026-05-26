@@ -295,24 +295,11 @@
     $(document).ready(function() {
         let editorInstance = null;
         const bodyTextarea = document.getElementById('body');
+        const toggleBtn = document.getElementById('toggle-editor-mode');
+        const statusBadge = document.getElementById('wysiwyg-status-badge');
         
-        // Define interceptor on textarea.value property so standard AI Form Assistant updates the WYSIWYG editor
         if (bodyTextarea) {
-            const descriptor = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value');
-            Object.defineProperty(bodyTextarea, 'value', {
-                get: function() {
-                    return descriptor.get.call(this);
-                },
-                set: function(val) {
-                    descriptor.set.call(this, val);
-                    // Synchronize value to CKEditor if it's running
-                    if (editorInstance) {
-                        editorInstance.setData(val);
-                    }
-                    this.dispatchEvent(new Event('input', { bubbles: true }));
-                    this.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            });
+            let lastSyncValue = bodyTextarea.value;
             
             // Function to initialize CKEditor 5 Classic
             function initCKEditor() {
@@ -328,7 +315,8 @@
                         // Keep textarea value perfectly in sync with CKEditor in real-time
                         editor.model.document.on('change:data', () => {
                             const data = editor.getData();
-                            descriptor.set.call(bodyTextarea, data);
+                            bodyTextarea.value = data;
+                            lastSyncValue = data; // Prevent loop
                         });
                         
                         return editor;
@@ -341,41 +329,64 @@
             // Initial load starts in WYSIWYG mode
             initCKEditor();
             
-            // Handle Toggle button click
-            $('#toggle-editor-mode').on('click', function() {
-                if (editorInstance) {
-                    // WYSIWYG mode -> Raw HTML mode
-                    const data = editorInstance.getData();
-                    editorInstance.destroy()
-                        .then(() => {
-                            editorInstance = null;
-                            $(bodyTextarea).show();
-                            $('#wysiwyg-status-badge')
-                                .text('Source HTML Mode')
-                                .removeClass('label-success')
-                                .addClass('label-warning');
-                        });
-                } else {
-                    // Raw HTML mode -> WYSIWYG mode
-                    const data = $(bodyTextarea).val();
-                    initCKEditor().then(editor => {
-                        if (editor) {
-                            editor.setData(data);
-                            $('#wysiwyg-status-badge')
-                                .text('Rich Text Mode')
-                                .removeClass('label-warning')
-                                .addClass('label-success');
-                        }
-                    });
+            // Poller to detect external programmatic updates (e.g. from standard AI Form Fill)
+            setInterval(function() {
+                const currentVal = bodyTextarea.value;
+                if (currentVal !== lastSyncValue) {
+                    lastSyncValue = currentVal;
+                    if (editorInstance) {
+                        editorInstance.setData(currentVal);
+                    }
                 }
-            });
+            }, 300);
             
-            // Form submit helper to ensure editor state is saved
-            $('form').on('submit', function() {
-                if (editorInstance) {
-                    descriptor.set.call(bodyTextarea, editorInstance.getData());
-                }
-            });
+            // Handle Toggle button click with pure vanilla JS
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    if (editorInstance) {
+                        // WYSIWYG mode -> Raw HTML mode
+                        const data = editorInstance.getData();
+                        editorInstance.destroy()
+                            .then(() => {
+                                editorInstance = null;
+                                bodyTextarea.style.display = 'block';
+                                bodyTextarea.value = data;
+                                lastSyncValue = data;
+                                if (statusBadge) {
+                                    statusBadge.textContent = 'Source HTML Mode';
+                                    statusBadge.className = 'label label-warning';
+                                }
+                            })
+                            .catch(err => {
+                                console.error('Error destroying editor:', err);
+                            });
+                    } else {
+                        // Raw HTML mode -> WYSIWYG mode
+                        const data = bodyTextarea.value;
+                        initCKEditor().then(editor => {
+                            if (editor) {
+                                editor.setData(data);
+                                lastSyncValue = data;
+                                if (statusBadge) {
+                                    statusBadge.textContent = 'Rich Text Mode';
+                                    statusBadge.className = 'label label-success';
+                                }
+                            }
+                        });
+                    }
+                });
+            }
+            
+            // Form submit helper to ensure editor state is saved on submit
+            const form = bodyTextarea.closest('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    if (editorInstance) {
+                        bodyTextarea.value = editorInstance.getData();
+                    }
+                });
+            }
         }
     });
 </script>
