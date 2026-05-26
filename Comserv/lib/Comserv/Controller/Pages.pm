@@ -484,16 +484,23 @@ sub pages :Path('/admin/pages') :Args(0) {
     my $error_msg;
     my $success_msg;
     
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    
     if ($action eq 'create') {
         $c->stash(
             show_form => 'create',
-            page_item => {},
+            page_item => { sitename => $current_sitename },
         );
     }
     elsif ($action eq 'edit') {
         my $id = $c->req->param('id');
         my $page_item = $db_ency->resultset('Page')->find($id);
         if ($page_item) {
+            if ($current_sitename ne 'CSC' && $page_item->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied. Page belongs to a different site.";
+                $c->response->redirect($c->uri_for('/admin/pages'));
+                return;
+            }
             $c->stash(
                 show_form => 'edit',
                 page_item => $page_item,
@@ -516,6 +523,11 @@ sub pages :Path('/admin/pages') :Args(0) {
         my $link_order = $c->req->param('link_order') || 0;
         my $status = $c->req->param('status') || 'active';
         my $roles = $c->req->param('roles') || 'public';
+        
+        # Enforce current site if not CSC
+        if ($current_sitename ne 'CSC') {
+            $sitename = $current_sitename;
+        }
         
         if ($page_code eq '' || $title eq '' || $body eq '') {
             $error_msg = "Page Code, Title, and Body are required fields.";
@@ -569,6 +581,9 @@ sub pages :Path('/admin/pages') :Args(0) {
                 eval {
                     if ($id) {
                         my $page_item = $db_ency->resultset('Page')->find($id);
+                        if ($current_sitename ne 'CSC' && $page_item->sitename ne $current_sitename) {
+                            die "Access denied: cannot edit page belonging to another site.";
+                        }
                         $page_item->update({
                             sitename    => $sitename,
                             menu        => $menu,
@@ -631,12 +646,16 @@ sub pages :Path('/admin/pages') :Args(0) {
         my $id = $c->req->param('id');
         my $page_item = $db_ency->resultset('Page')->find($id);
         if ($page_item) {
-            eval {
-                $page_item->delete;
-                $c->flash->{success_msg} = "Page deleted successfully.";
-            };
-            if ($@) {
-                $c->flash->{error_msg} = "Failed to delete page: $@";
+            if ($current_sitename ne 'CSC' && $page_item->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied. Page belongs to a different site.";
+            } else {
+                eval {
+                    $page_item->delete;
+                    $c->flash->{success_msg} = "Page deleted successfully.";
+                };
+                if ($@) {
+                    $c->flash->{error_msg} = "Failed to delete page: $@";
+                }
             }
         } else {
             $c->flash->{error_msg} = "Page not found.";
@@ -657,7 +676,9 @@ sub pages :Path('/admin/pages') :Args(0) {
                 { page_code => { like => "%$search%" } },
             ];
         }
-        if ($filter_site) {
+        if ($current_sitename ne 'CSC') {
+            $search_cond{sitename} = $current_sitename;
+        } elsif ($filter_site) {
             $search_cond{sitename} = $filter_site;
         }
         if ($filter_status) {
@@ -668,17 +689,22 @@ sub pages :Path('/admin/pages') :Args(0) {
             order_by => ['sitename', 'menu', 'link_order']
         })->all;
         
-        my @sites = $db_ency->resultset('Page')->search({}, {
-            select => ['sitename'],
-            distinct => 1,
-        })->all;
-        my @site_names = map { $_->sitename } @sites;
+        my @site_names;
+        if ($current_sitename ne 'CSC') {
+            push @site_names, $current_sitename;
+        } else {
+            my @sites = $db_ency->resultset('Page')->search({}, {
+                select => ['sitename'],
+                distinct => 1,
+            })->all;
+            @site_names = map { $_->sitename } @sites;
+        }
         
         $c->stash(
             pages         => \@pages,
             site_names    => \@site_names,
             search        => $search,
-            filter_site   => $filter_site,
+            filter_site   => $current_sitename ne 'CSC' ? $current_sitename : $filter_site,
             filter_status => $filter_status,
         );
     }
@@ -687,6 +713,7 @@ sub pages :Path('/admin/pages') :Args(0) {
         template => 'admin/pages.tt',
         success_msg => $c->flash->{success_msg} || $c->stash->{success_msg},
         error_msg => $c->flash->{error_msg} || $c->stash->{error_msg},
+        current_site  => $current_sitename,
     );
 }
 
