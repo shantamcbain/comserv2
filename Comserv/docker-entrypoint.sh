@@ -203,7 +203,6 @@ cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
     dateext
     rotate 7
     compress
-    delaycompress
     missingok
     notifempty
     maxsize 100M
@@ -224,7 +223,6 @@ cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
     weekly
     rotate 4
     compress
-    delaycompress
     missingok
     notifempty
 }

@@ -10076,7 +10076,9 @@ PYSCRIPT
     close $sfh;
 
     my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
-    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    require Comserv::Util::NfsPath;
+    my $nfs_util       = Comserv::Util::NfsPath->new();
+    my $nfs_base       = $nfs_util->get_nfs_root() || $c->config->{workshop_upload_dir} || '/data/nfs';
     my $audio_nfs      = "${nfs_base}/bmaster/audio";
     my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
     my $timestamp      = time();
@@ -10084,6 +10086,7 @@ PYSCRIPT
     my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
     my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
     my $upload_size    = $upload->size;
+    my $bg_log_file    = $c->path_to('root', 'log', 'whisper_bg.log')->stringify;
 
     {
         open(my $sf, '>', $status_file) or do { };
@@ -10106,7 +10109,7 @@ PYSCRIPT
             POSIX::setsid();
             open(STDIN,  '<', '/dev/null');
             open(STDOUT, '>', '/dev/null');
-            open(STDERR, '>>', '/tmp/whisper_bg.log');
+            open(STDERR, '>>', $bg_log_file);
 
             my $json_out = '';
             eval {
