@@ -93,6 +93,17 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Symlink ${CATALYST_HOME}/logs to ${CATALYST_HOME}/root/log so logs write to persistent volume
+if [ ! -L "${CATALYST_HOME}/logs" ]; then
+    if [ -d "${CATALYST_HOME}/logs" ]; then
+        echo "Moving existing logs to persistent volume directory..."
+        cp -a ${CATALYST_HOME}/logs/. "${CATALYST_HOME}/root/log/" 2>/dev/null || true
+        rm -rf "${CATALYST_HOME}/logs"
+    fi
+    ln -s "${CATALYST_HOME}/root/log" "${CATALYST_HOME}/logs"
+    echo "✓ Symlinked ${CATALYST_HOME}/logs to ${CATALYST_HOME}/root/log"
+fi
+
 # Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
 # COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
 SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
@@ -187,16 +198,29 @@ fi
 echo "Configuring log rotation..."
 cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
 /opt/comserv/root/log/*.log {
+    su comserv comserv
     daily
+    dateext
     rotate 7
     compress
     delaycompress
     missingok
     notifempty
     maxsize 100M
+    create 0644 comserv comserv
+    sharedscripts
+    postrotate
+        supervisorctl status > /dev/null 2>&1 || true
+        NFS_ARCHIVE=/data/nfs/logs/archive
+        [ -d "/data/nfs" ] || NFS_ARCHIVE=/home/shanta/nfs/logs/archive
+        [ -d "$NFS_ARCHIVE" ] || mkdir -p "$NFS_ARCHIVE" 2>/dev/null || true
+        find /opt/comserv/root/log -name "*.log-*.gz" -mmin -5 \
+            -exec cp -p {} "$NFS_ARCHIVE/" \; 2>/dev/null || true
+    endscript
 }
 
 /opt/comserv/root/Documentation/session_history/*.log {
+    su comserv comserv
     weekly
     rotate 4
     compress
