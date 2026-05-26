@@ -718,13 +718,15 @@ function startWorkGcal(btn, recordId) {
                     popup.onclick = function() { closeLogWithNotesGcal(popup, recordId); };
                 }
             }
-            var subject = btn.getAttribute('data-subject') || '';
-            var desc    = btn.getAttribute('data-desc') || '';
-            var site    = btn.getAttribute('data-site') || '';
-            var project = btn.getAttribute('data-project') || '';
-            var clip = 'TODO: ' + subject + '\nSite: ' + site + '\nProject: ' + project + (desc ? '\n\n' + desc : '');
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(clip).catch(function(){});
+            if (!d.already_open) {
+                var subject = btn.getAttribute('data-subject') || '';
+                var desc    = btn.getAttribute('data-desc') || '';
+                var site    = btn.getAttribute('data-site') || '';
+                var project = btn.getAttribute('data-project') || '';
+                var clip = 'TODO: ' + subject + '\nSite: ' + site + '\nProject: ' + project + (desc ? '\n\n' + desc : '');
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(clip).catch(function(){});
+                }
             }
         } else {
             btn.disabled = false;
