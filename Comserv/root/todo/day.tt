@@ -690,6 +690,29 @@ function _gcalNotesModal(title, placeholder, onConfirm, onCancel) {
     input.addEventListener('keydown', doKey);
 }
 
+function _gcalShowClipboardFallback(text) {
+    var modal = document.getElementById('gcal-notes-modal');
+    var titleEl = document.getElementById('gcal-notes-modal-title');
+    var input = document.getElementById('gcal-notes-input');
+    var confirmBtn = document.getElementById('gcal-notes-confirm');
+    var cancelBtn = document.getElementById('gcal-notes-cancel');
+    titleEl.textContent = 'Copy this to your AI assistant:';
+    input.value = text;
+    input.readOnly = true;
+    input.rows = 6;
+    modal.style.display = 'flex';
+    setTimeout(function() { input.select(); }, 50);
+    function close() {
+        modal.style.display = 'none';
+        input.readOnly = false;
+        input.rows = 4;
+        confirmBtn.removeEventListener('click', close);
+        cancelBtn.removeEventListener('click', close);
+    }
+    confirmBtn.addEventListener('click', close);
+    cancelBtn.addEventListener('click', close);
+}
+
 function startWorkGcal(btn, recordId) {
     btn.disabled = true;
     var origText = btn.textContent.trim();
@@ -724,8 +747,12 @@ function startWorkGcal(btn, recordId) {
                 var site    = btn.getAttribute('data-site') || '';
                 var project = btn.getAttribute('data-project') || '';
                 var clip = 'TODO: ' + subject + '\nSite: ' + site + '\nProject: ' + project + (desc ? '\n\n' + desc : '');
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(clip).catch(function(){});
+                if (navigator.clipboard && navigator.clipboard.writeText) {
+                    navigator.clipboard.writeText(clip).catch(function() {
+                        _gcalShowClipboardFallback(clip);
+                    });
+                } else {
+                    _gcalShowClipboardFallback(clip);
                 }
             }
         } else {
