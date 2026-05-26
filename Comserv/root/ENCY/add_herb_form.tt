@@ -33,9 +33,52 @@
 [% PROCESS 'ENCY/partials/AiFormFill.tt' %]
     <label for="botanical_name">Botanical Name:</label><br>
     <input type="text" id="botanical_name" name="botanical_name" value="[% prefill_botanical | html %]" required><br>
+    <input type="hidden" id="ncbi_tax_id" name="ncbi_tax_id" value="" />
+    <div style="margin:0.4em 0 0.8em 0;">
+      <button type="button" onclick="addFormNcbiLookup()" style="font-size:0.9em;">Look up NCBI Taxonomy</button>
+    </div>
+    <div id="add-ncbi-panel" style="display:none;border:1px solid #b0c4de;border-radius:5px;padding:0.8em;margin-bottom:0.8em;background:#f4f8ff;">
+      <strong>NCBI Taxonomy Result</strong>
+      <div id="add-ncbi-body" style="margin-top:0.5em;"></div>
+    </div>
+    <script>
+    function addFormNcbiLookup() {
+      var name = document.getElementById('botanical_name').value.trim();
+      if (!name) { alert('Enter a botanical name first.'); return; }
+      var panel = document.getElementById('add-ncbi-panel');
+      var body  = document.getElementById('add-ncbi-body');
+      body.innerHTML = 'Searching NCBI\u2026';
+      panel.style.display = 'block';
+      fetch('/ENCY/ncbi_lookup_by_name?botanical_name=' + encodeURIComponent(name))
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+          if (!d.ok) { body.innerHTML = '<span style="color:red;">' + d.error + '</span>'; return; }
+          var n = d.ncbi;
+          document.getElementById('ncbi_tax_id').value = n.ncbi_tax_id || '';
+          var html = '<table style="border-collapse:collapse;">';
+          [
+            ['Scientific Name', n.scientific_name],
+            ['Common Name',     n.common_name],
+            ['Kingdom',         n.kingdom],
+            ['Phylum',          n.phylum],
+            ['Class',           n.class_name],
+            ['Order',           n.order_name],
+            ['Family',          n.family_name],
+            ['Genus',           n.genus],
+            ['NCBI Tax ID',     n.ncbi_tax_id ? '<a href="https://www.ncbi.nlm.nih.gov/Taxonomy/Browser/wwwtax.cgi?id='+n.ncbi_tax_id+'" target="_blank">'+n.ncbi_tax_id+'</a>' : ''],
+          ].forEach(function(row){
+            if (row[1]) html += '<tr><td style="font-weight:bold;padding:2px 8px 2px 0;">' + row[0] + '</td><td>' + row[1] + '</td></tr>';
+          });
+          html += '</table>';
+          if (n.ncbi_tax_id) html += '<p style="color:green;margin-top:0.5em;">&#10003; Taxonomy will be linked automatically when you save.</p>';
+          body.innerHTML = html;
+        })
+        .catch(function(e){ body.innerHTML = '<span style="color:red;">Lookup failed: ' + e + '</span>'; });
+    }
+    </script>
 
     <label for="common_names">Common Names:</label><br>
-    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]" required><br>
+    <input type="text" id="common_names" name="common_names" value="[% prefill_common | html %]"><br>
 
     <label for="key_name">Key Name:</label><br>
     <input type="text" id="key_name" name="key_name" maxlength="255"><br>
@@ -53,13 +96,13 @@
 
     <label for="medical_uses">Medical Uses:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <textarea id="medical_uses" name="medical_uses" required></textarea><br>
+    <textarea id="medical_uses" name="medical_uses"></textarea><br>
 
     <label for="homiopathic">Homeopathic Uses:</label><br>
     <textarea id="homiopathic" name="homiopathic"></textarea><br>
 
     <label for="ident_character">Identifying Character:</label><br>
-    <textarea id="ident_character" name="ident_character" required></textarea><br>
+    <textarea id="ident_character" name="ident_character"></textarea><br>
 
     <label for="image">Image:</label><br>
     [% ency_img_picker('image', '') %]<br>
@@ -83,39 +126,39 @@
     <textarea id="taste" name="taste"></textarea><br>
 
     <label for="odour">Odour:</label><br>
-    <input type="text" id="odour" name="odour" maxlength="100" required><br>
+    <input type="text" id="odour" name="odour" maxlength="100"><br>
 
     <label for="distribution">Distribution:</label><br>
-    <input type="text" id="distribution" name="distribution" maxlength="100" required><br>
+    <input type="text" id="distribution" name="distribution" maxlength="100"><br>
 
     <label for="url">URL:</label><br>
     <input type="text" id="url" name="url" maxlength="255"><br>
 
-<label for="nectar">Nectar:</label><br>
-    <select id="nectar" name="nectar" required>
+    <label for="nectar">Nectar:</label><br>
+    <select id="nectar" name="nectar">
         <option value="0">No</option>
         <option value="1">Yes</option>
     </select><br>
-   <div>
+    <div>
         <label for="nectarnotes">Nectar Notes:</label><br>
-        <textarea id="nectarnotes" name="nectarnotes" required></textarea>
+        <textarea id="nectarnotes" name="nectarnotes"></textarea>
     </div>
 
     <label for="pollinator">Pollinator:</label><br>
     <textarea id="pollinator" name="pollinator"></textarea><br>
 
     <label for="pollen">Pollen:</label><br>
-    <select id="pollen" name="pollen" required>
+    <select id="pollen" name="pollen">
         <option value="0">No</option>
         <option value="1">Yes</option>
     </select><br>
     <div>
         <label for="pollennotes">Pollen Notes:</label>
-        <textarea id="pollennotes" name="pollennotes" required></textarea>
+        <textarea id="pollennotes" name="pollennotes"></textarea>
     </div>
-     <div>
-        <label for="apis">Apis (Honeybee):</label>
-        <select id="apis" name="apis" required>
+    <div>
+        <label for="apis">Apis (honeybee forage):</label>
+        <select id="apis" name="apis">
             <option value="0">No</option>
             <option value="1">Yes</option>
         </select>
@@ -125,7 +168,7 @@
     <textarea id="constituents" name="constituents"></textarea><br>
 
     <label for="solvents">Solvents:</label><br>
-    <input type="text" id="solvents" name="solvents" maxlength="100" required><br>
+    <input type="text" id="solvents" name="solvents" maxlength="100"><br>
 
     <label for="chinese">Chinese:</label><br>
     <textarea id="chinese" name="chinese"></textarea><br>
@@ -133,9 +176,9 @@
     <label for="culinary">Culinary Uses:</label><br>
     <textarea id="culinary" name="culinary"></textarea><br>
 
-    <label for="contra_indications">Contra Indications:</label>
+    <label for="contra_indications">Contraindications:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <input type="text" id="contra_indications" name="contra_indications" maxlength="150" required><br>
+    <input type="text" id="contra_indications" name="contra_indications" maxlength="150"><br>
 
     <label for="dosage">Dosage:</label><br>
     <textarea id="dosage" name="dosage"></textarea><br>
@@ -154,7 +197,7 @@
 
     <label for="sister_plants">Sister Plants:</label>
     [% PROCESS 'ENCY/partials/MarkerLegend.tt' %]
-    <input type="text" id="sister_plants" name="sister_plants" maxlength="100" required><br>
+    <input type="text" id="sister_plants" name="sister_plants" maxlength="100"><br>
 
     <label for="harvest">Harvest:</label><br>
     <textarea id="harvest" name="harvest"></textarea><br>
@@ -168,14 +211,14 @@
     <label for="reference">Reference:</label><br>
     <textarea id="reference" name="reference"></textarea><br>
 
-    <!-- New fields -->
     <div>
         <label for="share">Share:</label>
-          <select id="share" name="share">
+        <select id="share" name="share">
             <option value="0">Public</option>
             <option value="1">Private</option>
         </select>
- </div>
+    </div>
+
     <label for="preparation">Preparation:</label><br>
     <textarea id="preparation" name="preparation"></textarea><br>
 

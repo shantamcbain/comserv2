@@ -205,31 +205,32 @@ function closeDayModal() {
 }
 document.addEventListener('keydown', function(e) { if (e.key === 'Escape') closeDayModal(); });
 
+var _weekDragged = null;
 function initWeekColDragDrop() {
     var GRID_START = 5 * 60;
+
+    document.querySelectorAll('.gcal-events-area-col .gcal-ev').forEach(function(el) {
+        el.setAttribute('draggable', 'true');
+        el.addEventListener('dragstart', function(e) {
+            if (e.target.closest('.gcal-ev-actions')) { e.preventDefault(); return; }
+            _weekDragged = this;
+            this.classList.add('dragging');
+            e.dataTransfer.effectAllowed = 'move';
+        });
+        el.addEventListener('dragend', function() {
+            this.classList.remove('dragging');
+            document.querySelectorAll('.gcal-drop-target-line').forEach(function(l) { l.style.display = 'none'; });
+            _weekDragged = null;
+        });
+    });
+
     document.querySelectorAll('.gcal-events-area-col').forEach(function(area) {
         var colDate = area.getAttribute('data-date') || '';
         var dropLine = area.querySelector('.gcal-drop-target-line');
-        var dragged = null;
-
-        area.querySelectorAll('.gcal-ev').forEach(function(el) {
-            el.setAttribute('draggable', 'true');
-            el.addEventListener('dragstart', function(e) {
-                if (e.target.closest('.gcal-ev-actions')) { e.preventDefault(); return; }
-                dragged = this;
-                this.classList.add('dragging');
-                e.dataTransfer.effectAllowed = 'move';
-            });
-            el.addEventListener('dragend', function() {
-                this.classList.remove('dragging');
-                if (dropLine) dropLine.style.display = 'none';
-                dragged = null;
-            });
-        });
 
         area.addEventListener('dragover', function(e) {
             e.preventDefault();
-            if (!dragged) return;
+            if (!_weekDragged) return;
             var relY = e.clientY - area.getBoundingClientRect().top;
             var snapped = Math.round(relY / 15) * 15;
             if (dropLine) { dropLine.style.top = snapped + 'px'; dropLine.style.display = 'block'; }
@@ -240,21 +241,23 @@ function initWeekColDragDrop() {
         area.addEventListener('drop', function(e) {
             e.preventDefault();
             if (dropLine) dropLine.style.display = 'none';
-            if (!dragged) return;
+            if (!_weekDragged) return;
             var relY = e.clientY - area.getBoundingClientRect().top;
             var snapped = Math.round(relY / 15) * 15;
             var totalMin = GRID_START + Math.max(0, snapped);
             var nh = Math.min(23, Math.floor(totalMin / 60));
             var nm = totalMin % 60;
             var newTime = String(nh).padStart(2,'0') + ':' + String(nm).padStart(2,'0') + ':00';
-            var todoId = dragged.getAttribute('data-todo-id');
-            var isRec  = dragged.getAttribute('data-is-recurring') === '1';
+            var todoId = _weekDragged.getAttribute('data-todo-id');
+            var isRec  = _weekDragged.getAttribute('data-is-recurring') === '1';
+            if (!todoId) { _weekDragged = null; return; }
             if (isRec) {
                 showRecurringDropDialog(todoId, newTime, colDate, true);
             } else {
                 updateTodoTimeAndDate(todoId, newTime, colDate);
-                dragged.style.top = Math.max(0, snapped) + 'px';
+                _weekDragged.style.top = Math.max(0, snapped) + 'px';
             }
+            _weekDragged = null;
         });
     });
 }
@@ -285,7 +288,41 @@ document.addEventListener('DOMContentLoaded', initWeekColDragDrop);
         <a href="/todo[% url_hash %]">Back to Todo List</a>
         <a href="/todo/week/[% next_week_date %][% url_hash %]">Next Week ▶</a>
     </div>
+    [% IF ap_all_sitenames.size > 0 %]
+    <div style="display:flex;align-items:center;gap:6px;flex-wrap:nowrap;padding:4px 0 8px 0;">
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">Site:</span>
+        <select id="week-site-filter" onchange="weekApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH sname IN ap_all_sitenames %]
+            <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
+            [% END %]
+        </select>
+        <span style="font-size:0.82em;color:var(--text-muted-color,#70757a);white-space:nowrap;">User:</span>
+        <select id="week-user-filter" onchange="weekApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;">
+            <option value="">All</option>
+            [% FOREACH uname IN ap_all_usernames %]
+            <option value="[% uname %]"[% IF cal_filter_user == uname %] selected[% END %]>[% uname %]</option>
+            [% END %]
+        </select>
+    </div>
+    [% END %]
 [% END %]
+
+<script>
+function weekApplyFilters() {
+    var siteSel = document.getElementById('week-site-filter');
+    var userSel = document.getElementById('week-user-filter');
+    var filterSite = siteSel ? siteSel.value : '';
+    var filterUser = userSel ? userSel.value : '';
+    var newUrl = window.location.pathname + '?site=' + encodeURIComponent(filterSite) + '&user=' + encodeURIComponent(filterUser);
+    fetch('/planning/set_filter', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ site: filterSite, user: filterUser })
+    }).then(function() { window.location.href = newUrl; }).catch(function() { window.location.href = newUrl; });
+}
+</script>
 
 [%# Use pre-built todos_by_date from Perl controller if available (recurrence rules applied).
     Perl correctly handles weekly/biweekly/monthly/yearly recurrence — TT2 cannot compute day-of-week.

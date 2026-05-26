@@ -277,6 +277,25 @@ sub auto :Private {
                                 role      => { -like => 'admin' },
                                 is_active => 1,
                             })->count;
+                            unless ($site_admin_count) {
+                                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                                    sitename => $site_name_check,
+                                }, { rows => 1 })->single;
+                                if ($hosting && $hosting->contact_email) {
+                                    my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
+                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                        $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
+                                            user_id   => $user_id,
+                                            site_id   => $site_obj->id,
+                                            role      => 'admin',
+                                        }, {
+                                            key => 'user_site_role_unique',
+                                            values => { granted_by => 1, is_active => 1 },
+                                        });
+                                        $site_admin_count = 1;
+                                    }
+                                }
+                            }
                             if ($site_admin_count) {
                                 $is_admin = 1;
                                 $c->session->{is_admin} = 1;
@@ -911,10 +930,8 @@ sub index :Path('/') :Args(0) {
                 # Forward to the controller's index action
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Forwarding to $ControllerName controller's index action");
 
-                # Use a standard redirect to the controller's path
-                # This is a more reliable approach that works for all controllers
-                $c->response->redirect("/$ControllerName");
-                return 1;  # Return after redirect, do not detach (causes catalyst_detach exception)
+                eval { $c->forward($c->controller($ControllerName)->action_for('index')) };
+                return 1 unless $@;
             } else {
                 # Log the error and fall back to Root's index template
                 $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'index',
@@ -1022,14 +1039,14 @@ sub fetch_and_set {
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Extracted domain: $domain");
 
         my $site_domain = $c->model('Site')->get_site_domain($c, $domain);
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . Dumper($site_domain));
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site domain retrieved: " . ($site_domain ? Dumper({ $site_domain->get_columns }) : 'undef'));
 
         if ($site_domain) {
             my $site_id = $site_domain->site_id;
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site ID: $site_id");
 
             my $site = $c->model('Site')->get_site_details($c, $site_id);
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . Dumper($site));
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'fetch_and_set', "Site details retrieved: " . ($site ? Dumper({ $site->get_columns }) : 'undef'));
 
             if ($site) {
                 $value = $site->name;
@@ -1502,19 +1519,13 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            eval { $self->site_setup($c, $SiteName) };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
-                    "site_setup('CSC') failed in domain_error handler: $@");
-            }
+            $self->site_setup($c, $SiteName);
 
             # Set flash error message to ensure it's displayed
             $c->flash->{error_msg} = "Domain Error: $error_msg";
 
-            # Send email notification to admin — only for non-bot traffic
-            my $ua = $c->req->user_agent // '';
-            my $is_likely_bot = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua eq '' || $ua =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
-            if (!$is_likely_bot && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
+            # Send email notification to admin
+            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1569,11 +1580,9 @@ sub setup_site {
             # Detach to the error template and stop processing
             $c->detach($c->view('TT')); # Clean exit - no forward() to avoid infinite loop
         } else {
-            # Generic error case — unknown domain (commonly bots/scanners hitting a raw IP)
+            # Generic error case (should not happen with our improved error handling)
             my $error_msg = "DOMAIN ERROR: '$domain' not found in sitedomain table";
-            my $_ua_chk = $c->req->user_agent // '';
-            my $_log_level = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $_ua_chk eq '' || $_ua_chk =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i) ? 'warn' : 'error';
-            $self->logging->log_with_details($c, $_log_level, __FILE__, __LINE__, 'setup_site', $error_msg);
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site', $error_msg);
 
             # Add to debug_errors if not already there
             unless (grep { $_ eq $error_msg } @{$c->stash->{debug_errors}}) {
@@ -1590,16 +1599,10 @@ sub setup_site {
             $c->session->{ControllerName} = 'Root';
 
             # Set up site basics to get admin email
-            eval { $self->site_setup($c, $SiteName) };
-            if ($@) {
-                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
-                    "site_setup('CSC') failed in generic domain-missing handler: $@");
-            }
+            $self->site_setup($c, $SiteName);
 
-            # Send email notification to admin — skip for bots/scanners hitting raw IPs
-            my $ua_generic  = $c->req->user_agent // '';
-            my $is_bot_req  = ($domain =~ /^\d+\.\d+\.\d+\.\d+$/ || $ua_generic eq '' || $ua_generic =~ /bot|spider|scan|curl|python|nmap|masscan|zgrab|shodan/i);
-            if (!$is_bot_req && (my $mail_to_admin = $c->stash->{mail_to_admin})) {
+            # Send email notification to admin
+            if (my $mail_to_admin = $c->stash->{mail_to_admin}) {
                 my $email_params = {
                     to      => $mail_to_admin,
                     from    => $mail_to_admin,
@@ -1615,18 +1618,12 @@ sub setup_site {
                                "This is a configuration error that needs to be fixed for proper site operation."
                 };
 
-                eval {
-                    if ($self->send_email($c, $email_params)) {
-                        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
-                            "Sent admin notification email about domain error for $domain");
-                    } else {
-                        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
-                            "Failed to send admin email notification about domain error for $domain");
-                    }
-                };
-                if ($@) {
-                    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'setup_site',
-                        "Exception sending admin email for domain_missing ($domain): $@");
+                if ($self->send_email($c, $email_params)) {
+                    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'setup_site',
+                        "Sent admin notification email about domain error for $domain");
+                } else {
+                    $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'setup_site',
+                        "Failed to send admin email notification about domain error for $domain");
                 }
             }
 

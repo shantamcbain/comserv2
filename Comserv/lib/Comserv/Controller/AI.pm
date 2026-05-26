@@ -157,8 +157,10 @@ sub index :Path :Args(0) {
                         push @external_models, { name => $id, provider => 'grok', label => $label };
                     }
                 } else {
-                    push @external_models, { name => 'grok-4.3',               provider => 'grok', label => 'Grok 4.3 (xAI)' };
-                    push @external_models, { name => 'grok-4.20-non-reasoning', provider => 'grok', label => 'Grok 4.20 Fast (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-reasoning',     provider => 'grok', label => 'Grok 4 Fast Reasoning (xAI)' };
+                    push @external_models, { name => 'grok-4-fast-non-reasoning', provider => 'grok', label => 'Grok 4 Fast (xAI)' };
+                    push @external_models, { name => 'grok-3',                    provider => 'grok', label => 'Grok 3 (xAI)' };
+                    push @external_models, { name => 'grok-3-mini',               provider => 'grok', label => 'Grok 3 Mini (xAI)' };
                 }
             }
         } catch {
@@ -562,7 +564,7 @@ sub generate :Local :Args(0) {
             'generate', "ENCY agent: injected system prompt");
     }
 
-    if (lc($normalized_agent_type) =~ /^beemaster$/ && !$system) {
+    if (lc($normalized_agent_type) =~ /^bmaster$/ && !$system) {
         $system = $self->_build_bmaster_system_prompt($c);
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
             'generate', "BMaster agent: injected system prompt");
@@ -670,7 +672,7 @@ sub generate :Local :Args(0) {
     # Planning agent already injects project list via _build_planning_system_prompt;
     # force a keyword override so _get_module_data always runs for planning/ency/bmaster.
     my $inject_prompt = $prompt;
-    if ($normalized_agent_type =~ /^(planning|ency|beemaster)$/i) {
+    if ($normalized_agent_type =~ /^(planning|ency|bmaster)$/i) {
         $inject_prompt = "project todo $prompt";
     }
     if ($normalized_agent_type =~ /^accounting$/i) {
@@ -764,20 +766,9 @@ sub generate :Local :Args(0) {
             $grok->api_key($grok_api_key);
             # Hardcoded list of known-dead Grok models (410 Gone) — always substitute regardless of DB state
             # Only add models here that are confirmed permanently retired by xAI
-            my %GROK_DEAD = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-fast-non-reasoning
-                grok-4-1-fast-non-reasoning
-                grok-4-0709
-                grok-3
-                grok-4.3
             );
-            my %GROK_DEAD_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
-                grok-4-fast-reasoning
-                grok-4-1-fast-reasoning
-            );
-            %GROK_DEAD = (%GROK_DEAD, %GROK_DEAD_REASON);
-            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'generate', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD{$model}'");
@@ -814,12 +805,12 @@ sub generate :Local :Args(0) {
                     if ($key_obj) {
                         my $meta       = $key_obj->get_metadata() || {};
                         my $deprecated = $meta->{deprecated_models} || {};
-                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} } && !$GROK_DEAD{ $meta->{last_working_model} }) {
+                        if ($meta->{last_working_model} && !$deprecated->{ $meta->{last_working_model} }) {
                             $grok->model($meta->{last_working_model});
                         } else {
                             my $synced = $meta->{available_models} || [];
                             my ($first) = grep {
-                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} } && !$GROK_DEAD{ $_->{id} }
+                                $_->{id} && $_->{id} !~ /imagine|video/i && !$deprecated->{ $_->{id} }
                             } @$synced;
                             $grok->model($first->{id}) if $first && $first->{id};
                         }
@@ -877,16 +868,11 @@ sub generate :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
-                                         && !$GROK_DEAD{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            # Prefer numeric-version models (grok-4, grok-3...) over
-                            # alphabetic-named ones (grok-code-*, grok-beta) then reverse-sort
-                            my ($best) = sort {
-                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                $bn <=> $an || $b->{id} cmp $a->{id}
-                            } @live;
+                            # Prefer newer models: use reverse-alphabetical sort as heuristic
+                            # (grok-3-mini > grok-2-mini > grok-2 etc.)
+                            my ($best) = sort { $b->{id} cmp $a->{id} } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -976,7 +962,7 @@ sub generate :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_gen) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $force_large = (!$is_guest && !$manual_model &&
-                $normalized_agent_type =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
+                $normalized_agent_type =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
             my $use_model = $manual_model || ($force_large ? $tier_large : $tier_small);
 
             push @trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
@@ -991,9 +977,17 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "Ollama Tier-1 host=$current_host model=$use_model agent=$agent_id");
 
-            # Fast availability check (3-second timeout) before committing
-            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 3);
-            unless ($fast_check && $fast_check->check_connection()) {
+            # Fast availability check (5-second timeout) with 3 retries before committing
+            my $fast_check = Comserv::Model::Ollama->new(host => $current_host, port => $current_port || 11434, timeout => 5);
+            my $connected = 0;
+            for (1..3) {
+                if ($fast_check && $fast_check->check_connection()) {
+                    $connected = 1;
+                    last;
+                }
+                sleep 1;
+            }
+            unless ($connected) {
                 die "Ollama is not reachable at $current_host. Please select an external AI model (Grok) or try again later.";
             }
 
@@ -1069,7 +1063,7 @@ sub generate :Local :Args(0) {
                     push @trace, sprintf("🔀 Cold-start fallback: %s not in memory → routing to Grok", $use_model);
                     my $fb_grok = $c->model('Grok');
                     $fb_grok->api_key($fallback_key);
-                    $fb_grok->model('grok-4.20-non-reasoning');
+                    $fb_grok->model('grok-3-fast');
                     my @fb_msgs = ({ role => 'system', content => $system || 'You are a helpful assistant.' });
                     push @fb_msgs, { role => 'user', content => $prompt };
                     my $fb_resp = $fb_grok->chat(messages => \@fb_msgs);
@@ -1080,7 +1074,7 @@ sub generate :Local :Args(0) {
                         $c->res->body(encode_json({
                             success        => 1,
                             response       => $fb_resp,
-                            model          => 'grok-4.20-non-reasoning (cold-start fallback)',
+                            model          => 'grok-3-fast (cold-start fallback)',
                             provider       => 'grok',
                             trace          => $trace_txt,
                             thinking_trace => \@trace,
@@ -1189,10 +1183,10 @@ sub generate :Local :Args(0) {
                 $_gr = [split /,/, $_gr] unless ref $_gr;
                 grep { /^(admin|developer|editor)$/i } @$_gr;
             };
-            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency beemaster 3dprint accounting)) ? 20_000
+            my $BUDGET_CHARS  = (grep { $normalized_agent_type eq $_ } qw(planning ency bmaster 3dprint accounting)) ? 20_000
                               : $_gen_is_admin ? 14_000
                               : 8_000;
-            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|beemaster)$/)        ? 16_000
+            my $SYS_MAX_CHARS = ($normalized_agent_type =~ /^(ency|bmaster)$/)        ? 16_000
                                : ($normalized_agent_type =~ /^(planning|accounting)$/) ? 12_000
                                : $_gen_is_admin                                         ? 10_000
                                : 6_000;
@@ -1267,46 +1261,25 @@ sub generate :Local :Args(0) {
             }
 
             # ── Tier 1 query ─────────────────────────────────────────────────
-            # Hard wall-clock timeout via alarm() — LWP timeout only covers socket
-            # idle time, so a slowly-streaming Ollama response can block forever.
-            my $query_start  = time();
-            my $_alarm_secs  = $timeout_secs + 30;
-            my $_alarm_fired = 0;
-            my $_tier1_err   = '';
+            my $query_start = time();
             if (@$history_items || $system) {
                 push @trace, sprintf("📡 Tier-1 /api/chat to %s — model=%s %d msgs (system + %d history + prompt)",
                     $current_host, $use_model, scalar(@ollama_msgs), scalar(@$history_items));
                 $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__,
                     'generate', "Tier-1 chat API: " . scalar(@ollama_msgs) . " messages");
+                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                eval {
-                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
-                    alarm($_alarm_secs);
-                    $response = $ollama->chat(messages => \@ollama_msgs);
-                    alarm(0);
-                };
-                alarm(0);
-                $_tier1_err = $@ if $@;
+                $response = $ollama->chat(messages => \@ollama_msgs);
             } else {
                 push @trace, sprintf("📡 Tier-1 /api/generate to %s — model=%s single-turn",
                     $current_host, $use_model);
+                # Flush trace to progress file before blocking call so JS poller can read it
                 $self->_flush_progress($gen_progress_file, \@trace, 0);
-                eval {
-                    local $SIG{ALRM} = sub { $_alarm_fired = 1; die "timeout\n"; };
-                    alarm($_alarm_secs);
-                    $response = $ollama->query(
-                        prompt => $prompt,
-                        format => $format eq 'json' ? 'json' : undef,
-                        system => $system || undef
-                    );
-                    alarm(0);
-                };
-                alarm(0);
-                $_tier1_err = $@ if $@;
-            }
-            if ($_alarm_fired || $_tier1_err) {
-                $ollama->last_error("Wall-clock timeout after ${_alarm_secs}s") if $_alarm_fired;
-                $response = undef;
+                $response = $ollama->query(
+                    prompt => $prompt,
+                    format => $format eq 'json' ? 'json' : undef,
+                    system => $system || undef
+                );
             }
             my $query_elapsed = time() - $query_start;
 
@@ -1416,7 +1389,7 @@ sub generate :Local :Args(0) {
         # Log success metrics
         my $response_length = length($response->{response} || '');
         $model_used = $response->{model} || $model_used;
-        my $ai_response = $self->_sanitize_ai_urls($response->{response} || '');
+        my $ai_response = $response->{response} || '';
         # Capture token count: Grok returns usage.total_tokens; Ollama returns eval_count
         my $tokens_used = ($response->{usage} && $response->{usage}{total_tokens})
             ? $response->{usage}{total_tokens}
@@ -2067,9 +2040,7 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
-    my $req_audio_file_id      = $json_data->{audio_file_id}      || undef;
-    my $req_transcript_file_id = $json_data->{transcript_file_id} || undef;
-
+    
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
@@ -2165,7 +2136,7 @@ sub chat :Local :Args(0) {
     if (lc($chat_agent_id) eq 'ency' && !$chat_agent_system) {
         $chat_agent_system = $self->_build_ency_system_prompt($c);
     }
-    if (lc($chat_agent_id) =~ /^beemaster$/ && !$chat_agent_system) {
+    if (lc($chat_agent_id) =~ /^bmaster$/ && !$chat_agent_system) {
         $chat_agent_system = $self->_build_bmaster_system_prompt($c);
     }
 
@@ -2216,7 +2187,7 @@ sub chat :Local :Args(0) {
 
     # Fetch live module data — force inject for agents that always need project/todo data
     my $chat_inject_prompt = $prompt;
-    if ($chat_agent_id =~ /^(planning|ency|beemaster)$/i) {
+    if ($chat_agent_id =~ /^(planning|ency|bmaster)$/i) {
         $chat_inject_prompt = "project todo $prompt";
     }
     my $module_data = $self->_get_module_data($c, $chat_inject_prompt, $chat_agent_id);
@@ -2324,20 +2295,9 @@ sub chat :Local :Args(0) {
 
             $grok->api_key($grok_api_key);
             # Hardcoded known-dead Grok models — substitute before any API call
-            my %GROK_DEAD_CHAT = map { $_ => 'grok-4.20-non-reasoning' } qw(
+            my %GROK_DEAD_CHAT = map { $_ => 'grok-4-fast-non-reasoning' } qw(
                 grok-code-fast-1
-                grok-4-fast-non-reasoning
-                grok-4-1-fast-non-reasoning
-                grok-4-0709
-                grok-3
-                grok-4.3
             );
-            my %GROK_DEAD_CHAT_REASON = map { $_ => 'grok-4.20-non-reasoning' } qw(
-                grok-4-fast-reasoning
-                grok-4-1-fast-reasoning
-            );
-            %GROK_DEAD_CHAT = (%GROK_DEAD_CHAT, %GROK_DEAD_CHAT_REASON);
-            $grok->model('grok-4.20-non-reasoning');
             if ($model && $GROK_DEAD_CHAT{$model}) {
                 $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
                     'chat', "Model '$model' is hardcoded-deprecated; substituting '$GROK_DEAD_CHAT{$model}'");
@@ -2377,14 +2337,9 @@ sub chat :Local :Args(0) {
                             my $mdata = eval { decode_json($resp->content) } || {};
                             my @live  = grep {
                                 $_->{id} && $_->{id} ne $failed_model
-                                         && !$GROK_DEAD_CHAT{$_->{id}}
                                          && $_->{id} !~ /imagine|video/i
                             } @{ $mdata->{data} || [] };
-                            my ($best) = sort {
-                                my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
-                                $bn <=> $an || $b->{id} cmp $a->{id}
-                            } @live;
+                            my ($best) = sort { $a->{id} cmp $b->{id} } @live;
                             if ($best) {
                                 $fallback = $best->{id};
                                 my $schema  = $c->model('DBEncy')->schema;
@@ -2471,7 +2426,7 @@ sub chat :Local :Args(0) {
             my $manual_model = ($model && $can_select_model_perm) ? $model : '';
             # Planning/ENCY/BMaster agents require multi-step reasoning — always use large tier
             my $chat_force_large = (!$is_guest && !$manual_model &&
-                $chat_agent_id =~ /^(planning|ency|beemaster)$/i) ? 1 : 0;
+                $chat_agent_id =~ /^(planning|ency|bmaster)$/i) ? 1 : 0;
 
             push @chat_trace, sprintf("🔍 Tier selection: small=%s large=%s → using=%s%s",
                 $tier_small, $tier_large,
@@ -2531,7 +2486,7 @@ sub chat :Local :Args(0) {
             # Pass 2: strip page_content.  Pass 3: hard-cap system prompt.
             # Planning/ENCY/BMaster agents have large injected system prompts — raise limits.
             # Admin users have larger nav guides — raise limits so admin links are not truncated.
-            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency beemaster 3dprint)) ? 16_000
+            my $BUDGET_CHARS  = (grep { lc($chat_agent_id) eq $_ } qw(planning ency bmaster 3dprint)) ? 16_000
                               : $can_select_model_perm ? 14_000
                               : 8_000;
             my $SYS_MAX_CHARS_CHAT = lc($chat_agent_id) eq 'planning'   ? 12_000
@@ -2709,8 +2664,6 @@ sub chat :Local :Args(0) {
                 'chat', "Chat successful for user '$username' - Model: $model_used, Response length: " . length($ai_response) . " chars");
         }
 
-        $ai_response = $self->_sanitize_ai_urls($ai_response);
-
         # Save conversation to database
         my $final_conversation_id = $conversation_id;
         try {
@@ -2784,14 +2737,6 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
                 'chat', "Saving user message to conversation: $final_conversation_id");
             
-            my %_user_meta = (
-                system_prompt    => '',
-                format           => 'text',
-                is_guest         => $is_guest ? 1 : 0,
-                guest_session_id => $guest_session_id,
-            );
-            $_user_meta{audio_file_id}      = $req_audio_file_id      + 0 if $req_audio_file_id;
-            $_user_meta{transcript_file_id} = $req_transcript_file_id + 0 if $req_transcript_file_id;
             $schema->resultset('AiMessage')->create({
                 conversation_id => $final_conversation_id,
                 user_id => $user_id,
@@ -2799,7 +2744,12 @@ sub chat :Local :Args(0) {
                 content => $prompt,
                 agent_type => 'documentation',
                 model_used => $model_used,
-                metadata => encode_json(\%_user_meta),
+                metadata => encode_json({
+                    system_prompt => '',
+                    format => 'text',
+                    is_guest => $is_guest ? 1 : 0,
+                    guest_session_id => $guest_session_id
+                }),
                 ip_address => $c->request->address,
                 user_role => $c->session->{roles} ? join(',', @{$c->session->{roles}}) : 'normal'
             });
@@ -4001,7 +3951,7 @@ context so it automatically respects the current user's session / role.
 
   $c        - Catalyst context
   $prompt   - the user's raw query text
-  $agent_id - agent id string (e.g. 'beemaster', 'csc')
+  $agent_id - agent id string (e.g. 'bmaster', 'csc')
 
 Returns a string of data context, or empty string when nothing relevant found.
 
@@ -4271,67 +4221,6 @@ sub _get_module_data {
             '_get_module_data', "ENCY herb fetch error: $@") if $@;
     }
 
-    # --- ENCY Entity verified references ---
-    # When user is on a specific ENCY entity page, fetch linked Reference records via
-    # EntityReference. Injecting these (or an explicit "none exist") prevents the AI from
-    # fabricating citations from training data.
-    if ($is_ency_agent) {
-        eval {
-            my $ency_schema = eval { $c->model('ENCYModel')->ency_schema };
-            if ($ency_schema) {
-                my ($entity_type, $entity_id);
-                if    ($page_path_req =~ m{/ENCY/Formula/(\d+)}i)                          { ($entity_type,$entity_id) = ('formula',     $1) }
-                elsif ($page_path_req =~ m{/ENCY/herb_detail.*?record_id=(\d+)}i)          { ($entity_type,$entity_id) = ('herb',        $1) }
-                elsif ($page_path_req =~ m{/ENCY/Constituent/edit.*?record_id=(\d+)}i)     { ($entity_type,$entity_id) = ('constituent', $1) }
-                elsif ($page_path_req =~ m{/ENCY/Constituent/(\d+)}i)                      { ($entity_type,$entity_id) = ('constituent', $1) }
-                elsif ($page_path_req =~ m{/ENCY/InsectDetail/(\d+)}i)                     { ($entity_type,$entity_id) = ('insect',      $1) }
-                elsif ($page_path_req =~ m{/ENCY/OrganismDetail/(\d+)}i)                   { ($entity_type,$entity_id) = ('organism',    $1) }
-                elsif ($page_path_req =~ m{/ENCY/ReferenceDetail/(\d+)}i)                  { ($entity_type,$entity_id) = ('reference',   $1) }
-
-                if ($entity_type && $entity_id) {
-                    my @entity_refs = $ency_schema->resultset('Ency::EntityReference')->search(
-                        { entity_type => $entity_type, entity_id => $entity_id }
-                    )->all;
-
-                    if (@entity_refs) {
-                        my @ref_lines;
-                        for my $er (@entity_refs) {
-                            my $ref = $er->reference;
-                            next unless $ref;
-                            my $line = '';
-                            $line .= '"' . $ref->title . '"'          if $ref->title;
-                            $line .= ' — ' . $ref->author             if $ref->author;
-                            $line .= ' (' . $ref->publication_date . ')' if $ref->publication_date;
-                            $line .= ', ' . $ref->publisher           if $ref->publisher;
-                            $line .= ' [ISBN: ' . $ref->isbn . ']'    if $ref->isbn;
-                            $line .= ' URL: ' . $ref->url             if $ref->url;
-                            my $bias = $ref->source_bias_rating;
-                            $line .= ' [bias: ' . $bias . '/5]'       if defined $bias;
-                            $line .= "\n    Notes: " . $ref->notes    if $ref->notes;
-                            push @ref_lines, "• $line" if $line;
-                        }
-                        if (@ref_lines) {
-                            push @sections,
-                                "VERIFIED ENCY REFERENCES for this $entity_type (id=$entity_id) — "
-                                . "cite ONLY these, never invent additional sources:\n"
-                                . join("\n", @ref_lines);
-                        }
-                    } else {
-                        push @sections,
-                            "ENCY REFERENCE STATUS: No verified references are recorded in the ENCY "
-                            . "reference system for this $entity_type (id=$entity_id). "
-                            . "Do NOT generate, invent, or fabricate any citations, author names, "
-                            . "book titles, journal names, or URLs from training data. "
-                            . "If the user asks for sources, tell them none are yet linked in ENCY "
-                            . "and suggest adding them via the Reference section.";
-                    }
-                }
-            }
-        };
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__,
-            '_get_module_data', "ENCY entity reference fetch error: $@") if $@;
-    }
-
     # --- Constituent live data ---
     # Inject when the ENCY agent is active and the prompt mentions constituents or a todo with constituent#N
     my $is_ency_constituent = $is_ency_agent
@@ -4419,7 +4308,7 @@ sub _get_module_data {
 
     # --- BMaster / Apiary live data ---
     # Always inject for bmaster agent; also inject on hive/bee/apiary keyword match
-    my $is_bmaster_agent = lc($agent_id) =~ /^beemaster$/;
+    my $is_bmaster_agent = lc($agent_id) =~ /^bmaster$/;
     if ($is_bmaster_agent || $prompt =~ /hive|apiary|yard|queen|varroa|swarm|inspect|honey|harvest|brood|beekeeper|bee\s*keep/i) {
         eval {
             my $schema = $c->model('DBEncy')->schema;
@@ -4574,13 +4463,6 @@ Poor indicators:
 
 =cut
 
-sub _sanitize_ai_urls {
-    my ($self, $text) = @_;
-    return $text unless defined $text && length $text;
-    $text =~ s{https?://(?:example\.com|localhost(?::\d+)?)((?:/[^\s"')\]>]*)?)}{$1 || '/'}ge;
-    return $text;
-}
-
 sub _assess_response_quality {
     my ($self, $response, $prompt) = @_;
     $response //= '';
@@ -4616,7 +4498,7 @@ Small = tinyllama or smallest by name; Large = llama3.1 or largest by name.
 # a formatted context string ready to inject into the model prompt.
 #
 # Provider priority (per agent):
-#   ency / beemaster  →  brave (if key) → searxng (if configured) → ddg
+#   ency / bmaster  →  brave (if key) → searxng (if configured) → ddg
 #   all others      →  ollama-cloud (if key) → ddg → brave → searxng
 #
 # Returns: (context_string, provider_used) or ('', '') on failure.
@@ -4657,7 +4539,7 @@ sub _do_web_search {
     };
 
     # ── determine provider order ──
-    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|beemaster|bmast|usbm|accounting)$/i) ? 1 : 0;
+    my $is_precise_agent = ($agent_id && $agent_id =~ /^(ency|bmaster|bmast|usbm|accounting)$/i) ? 1 : 0;
     my @order = $is_precise_agent
         ? ('brave', 'searxng', 'ollama_cloud', 'ddg')
         : ('ollama_cloud', 'ddg', 'brave', 'searxng');
@@ -4829,7 +4711,7 @@ sub _pick_ollama_tier {
         'mistral'    => 7, 'mixtral'  => 47,
         'qwen2.5'    => 7, 'qwen2'    => 7, 'qwen'   => 7,
         'phi4'       => 14, 'phi3'    => 4, 'phi'    => 4,
-        'gemma4'     => 12, 'gemma3'  => 4, 'gemma2' => 9, 'gemma' => 7,
+        'gemma3'     => 4, 'gemma2'   => 9, 'gemma'  => 7,
         'deepseek'   => 7, 'command'  => 7,
         'kimi-k2'    => 232, 'kimi'   => 72,
     );
@@ -4993,7 +4875,6 @@ ACTION
              . "SECURITY — STRICT RULE: You MUST ONLY provide URLs that appear in the navigation guide below. "
              . "NEVER mention /admin, /admin/*, or any administrative URL. "
              . "NEVER use your training knowledge to guess application URLs — only use the navigation guide. "
-             . "If a user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
              . "If a user asks about the admin panel or any admin feature, say: "
              . "'That section requires administrator privileges. Please log in with an admin account or contact your system administrator.' "
              . "SUPPORT ESCALATION: If you genuinely cannot help, add [SUPPORT_NEEDED] on its own line at the very end of your response so the user can be connected with support staff."
@@ -5018,7 +4899,6 @@ ACTION
          . "SECURITY — STRICT RULE: You MUST ONLY provide URLs from the navigation guide. "
          . "NEVER guess or invent application URLs using your training knowledge. "
          . "NEVER provide /admin URLs to users who do not have admin role. "
-         . "If the user asks to navigate somewhere that is NOT in the navigation guide, ask them to clarify what they are looking for — do NOT guess a URL. "
          . "If the user asks about admin features and admin URLs are not in the navigation guide for their role, "
          . "say: 'That section requires administrator privileges.'"
          . $no_internet
@@ -5358,93 +5238,78 @@ sub _build_page_navigation_hint {
 
 Choose the best installed Ollama model for a given agent/page context.
 
-  chat / helpdesk / ency / beemaster  → prefer llama3.1 (instruction-tuned chat)
+  chat / helpdesk / ency / bmaster  → prefer llama3.1 (instruction-tuned chat)
   code / developer / docker         → prefer starcoder2 or qwen-coder
   fallback                          → first installed model, then hardcoded default
 
 =cut
 
-sub _score_ollama_model {
-    my ($name, $ctx) = @_;
-    $ctx //= 'general';
-    my $lname = lc($name);
-
-    my %fq = (
-        'gemma4'        => 90,
-        'deepseek-r1'   => 85,
-        'phi4'          => 82,
-        'qwen2.5-coder' => 80,
-        'starcoder2'    => 78,
-        'qwen2.5'       => 78,
-        'llama3.1'      => 75,
-        'llama3.2'      => 74,
-        'gemma3'        => 73,
-        'mistral-small' => 72,
-        'qwen2'         => 70,
-        'llama3'        => 68,
-        'mistral'       => 68,
-        'codellama'     => 67,
-        'phi3'          => 65,
-        'gemma2'        => 63,
-        'gemma'         => 55,
-        'llama2'        => 50,
-        'phi'           => 50,
-    );
-
-    my $score = 50;
-    for my $fam (sort { length($b) <=> length($a) } keys %fq) {
-        if (index($lname, $fam) == 0) { $score = $fq{$fam}; last; }
-    }
-
-    my $params = 0;
-    $params = $1 + 0 if $lname =~ /[:\-](\d+(?:\.\d+)?)b/i;
-    $score += $params >= 30 ? 20
-            : $params >= 20 ? 16
-            : $params >= 12 ? 12
-            : $params >=  7 ?  8
-            : $params >=  3 ?  4
-            :                  0;
-
-    $score += 15 if $lname =~ /-cloud\b/;
-
-    $score += 20 if $ctx eq 'code' && $lname =~ /coder|starcoder|codellama/i;
-
-    return $score;
-}
-
 sub _select_model_for_context {
     my ($self, $agent_id, $page_context, $installed_models, $default_model) = @_;
 
-    $agent_id         //= 'general';
-    $page_context     //= 'general';
+    $agent_id    //= 'general';
+    $page_context //= 'general';
     $installed_models //= [];
 
+    # Filter out non-chat models (embeddings, rerankers, etc.) to avoid 400 errors
     my $is_chat_model = sub {
         my ($n) = @_;
         return $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
     };
 
-    my %seen;
-    my @chat_names;
+    # Build a quick lookup: short name → full model name (chat models only)
+    my %installed;
     for my $m (@$installed_models) {
         my $name = ref($m) ? ($m->{name} || '') : ($m || '');
-        next unless $name && !$seen{$name}++ && $is_chat_model->($name);
-        push @chat_names, $name;
+        next unless $name;
+        next unless $is_chat_model->($name);
+        $installed{$name} = $name;
+        (my $short = $name) =~ s/:.*$//;
+        $installed{$short} = $name;
     }
 
-    unless (@chat_names) {
-        return $default_model if $default_model && $is_chat_model->($default_model);
-        return 'llama3.1:latest';
-    }
+    # Preferred models per context (ordered: first match wins).
+    # tinyllama intentionally excluded — too small for reliable answers.
+    my %context_prefs = (
+        chat        => ['llama3.1', 'llama3', 'deepseek-r1', 'mistral'],
+        helpdesk    => ['llama3.1', 'llama3', 'mistral'],
+        ency        => ['phi4', 'llama3.1', 'llama3', 'mistral'],
+        bmaster     => ['phi4', 'llama3.1', 'llama3', 'mistral'],
+        csc         => ['llama3.1', 'llama3', 'mistral'],
+        general     => ['llama3.1', 'llama3', 'mistral'],
+        navigation  => ['llama3.1', 'llama3'],
+        simple      => ['llama3.1', 'llama3'],
+        code        => ['starcoder2', 'qwen2.5-coder', 'qwen-coder', 'codellama', 'llama3.1'],
+        developer   => ['starcoder2', 'qwen2.5-coder', 'codellama', 'llama3.1'],
+        docker      => ['starcoder2', 'qwen2.5-coder', 'llama3.1'],
+    );
 
     my $ctx = lc($agent_id);
-    $ctx = 'code' if $ctx =~ /code|developer|starcoder|docker/;
+    $ctx = 'helpdesk'   if $ctx =~ /helpdesk/;
+    $ctx = 'code'       if $ctx =~ /code|developer|starcoder/;
+    $ctx = 'bmaster'    if $ctx =~ /bmast|beekeep|apiar/;
+    $ctx = 'csc'        if $ctx =~ /^csc$/;
+    $ctx = 'ency'       if $ctx =~ /^ency$/;
+    $ctx = 'docker'     if $ctx =~ /docker/;
+    $ctx = 'general'    unless exists $context_prefs{$ctx};
 
-    my @ranked = sort {
-        _score_ollama_model($b, $ctx) <=> _score_ollama_model($a, $ctx)
-    } @chat_names;
+    my $prefs = $context_prefs{$ctx} || $context_prefs{general};
 
-    return $ranked[0];
+    for my $pref (@$prefs) {
+        for my $key (keys %installed) {
+            if ($key =~ /\Q$pref\E/i) {
+                return $installed{$key};
+            }
+        }
+    }
+
+    # Fall back: default_model if installed and is chat-capable, else first available chat model, else hardcoded
+    if ($default_model && $is_chat_model->($default_model)) {
+        return $default_model if $installed{$default_model} || grep { $_ eq $default_model } values %installed;
+    }
+    my @chat_values = values %installed;
+    return $chat_values[0] if @chat_values;
+    return 'llama3.1:latest';
 }
 
 =head2 _get_current_ollama_config
@@ -6621,8 +6486,10 @@ sub get_user_providers :Local :Args(0) {
                 # Fallback to hardcoded Grok models if none stored in metadata
                 if (!@$models && $key->service eq 'grok') {
                     $models = [
-                        { id => 'grok-4.3' },
-                        { id => 'grok-4.20-non-reasoning' },
+                        { id => 'grok-4-fast-reasoning' },
+                        { id => 'grok-4-fast-non-reasoning' },
+                        { id => 'grok-3' },
+                        { id => 'grok-3-mini' },
                     ];
                 }
 
@@ -6801,32 +6668,16 @@ sub sync_models :Local :Args(0) {
         }
 
         # Extract model list (OpenAI-compatible format: data[].id)
-        my %SYNC_DEAD = map { $_ => 1 } qw(
-            grok-code-fast-1
-            grok-4-fast-non-reasoning
-            grok-4-1-fast-non-reasoning
-            grok-4-0709
-            grok-3
-            grok-4-fast-reasoning
-            grok-4-1-fast-reasoning
-            grok-4.3
-        );
         my @models;
         if ($data->{data} && ref($data->{data}) eq 'ARRAY') {
             foreach my $m (@{$data->{data}}) {
                 next unless $m->{id};
-                next if $SYNC_DEAD{$m->{id}};
-                next if $m->{id} =~ /imagine|video/i;
                 push @models, { id => $m->{id}, owned_by => $m->{owned_by} || '' };
             }
         }
 
-        # Sort models: numeric-version first (grok-4, grok-3...) then alphabetic, reverse within groups
-        @models = sort {
-            my $an = ($a->{id} =~ /^grok-(\d)/) ? 1 : 0;
-            my $bn = ($b->{id} =~ /^grok-(\d)/) ? 1 : 0;
-            $bn <=> $an || $b->{id} cmp $a->{id}
-        } @models;
+        # Sort models alphabetically
+        @models = sort { $a->{id} cmp $b->{id} } @models;
 
         # Store model list in metadata of the key record
         my $existing_meta = $key_obj->get_metadata() || {};
@@ -6849,133 +6700,6 @@ sub sync_models :Local :Args(0) {
             'sync_models', "Error syncing models: $_");
         $c->response->body(encode_json({ success => JSON::false, error => "Sync failed: $_" }));
     };
-}
-
-=head2 auto_sync_models
-
-Pull all recommended Ollama models that are not yet installed and remove
-explicitly deprecated models across all configured Ollama servers.
-Admin/developer only.  Returns JSON with per-server results.
-
-=cut
-
-sub auto_sync_models :Local :Args(0) {
-    my ($self, $c) = @_;
-    $c->response->content_type('application/json');
-
-    unless ($c->session->{username}) {
-        $c->response->status(401);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Login required' }));
-        return;
-    }
-
-    my $user_roles = $c->session->{roles} || [];
-    $user_roles = [split(/\s*,\s*/, $user_roles)] unless ref($user_roles);
-    my $is_admin = ref($user_roles) eq 'ARRAY'
-        ? grep { /^(admin|developer)$/i } @$user_roles : 0;
-
-    unless ($is_admin) {
-        $c->response->status(403);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Admin access required' }));
-        return;
-    }
-
-    my $ollama_cfg    = $c->config->{Ollama} || {};
-    my $primary_host  = $ollama_cfg->{host}          || 'localhost';
-    my $fallback_host = $ollama_cfg->{fallback_host} || $primary_host;
-    my $port          = $ollama_cfg->{port}           || 11434;
-
-    my @server_hosts = ($primary_host);
-    push @server_hosts, $fallback_host if $fallback_host ne $primary_host;
-
-    my $ollama = $c->model('Ollama');
-    unless ($ollama) {
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => 'Ollama model unavailable' }));
-        return;
-    }
-
-    my $catalog    = $ollama->list_available_models();
-    my @recommended = grep { $_->{recommended} } @$catalog;
-    my $deprecated  = $ollama->deprecated_models();
-
-    my @results;
-    for my $host (@server_hosts) {
-        my %sr = (
-            host    => $host,
-            port    => $port,
-            pulled  => [],
-            skipped => [],
-            removed => [],
-            errors  => [],
-        );
-
-        $ollama->host($host);
-        $ollama->port($port);
-        $ollama->clear_endpoint;
-
-        unless ($ollama->check_connection()) {
-            $sr{error} = "Cannot connect to $host:$port";
-            push @results, \%sr;
-            next;
-        }
-
-        my $installed = $ollama->list_models() || [];
-        my %inst_set;
-        for my $m (@$installed) {
-            my $n = ref($m) ? ($m->{name} || '') : ($m || '');
-            $inst_set{$n} = 1;
-            (my $base = $n) =~ s/:.*$//;
-            $inst_set{$base} = 1;
-        }
-
-        for my $model (@recommended) {
-            my $name = $model->{name};
-            (my $base = $name) =~ s/:.*$//;
-            if ($inst_set{$name} || $inst_set{$base}) {
-                push @{ $sr{skipped} }, "$name (already installed)";
-                next;
-            }
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'auto_sync_models', "Pulling recommended model: $name on $host:$port");
-            my $result = $ollama->pull_model(model => $name);
-            if ($result && $result->{success}) {
-                push @{ $sr{pulled} }, $name;
-            } else {
-                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
-                push @{ $sr{errors} }, "$name: $err";
-            }
-        }
-
-        for my $dep (@$deprecated) {
-            next unless $inst_set{$dep};
-            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-                'auto_sync_models', "Removing deprecated model: $dep on $host:$port");
-            my $result = $ollama->remove_model(model => $dep);
-            if ($result && $result->{success}) {
-                push @{ $sr{removed} }, $dep;
-            } else {
-                my $err = ($result ? $result->{error} : undef) || $ollama->last_error || 'unknown';
-                push @{ $sr{errors} }, "remove $dep: $err";
-            }
-        }
-
-        push @results, \%sr;
-    }
-
-    my ($total_pulled, $total_removed) = (0, 0);
-    $total_pulled  += scalar @{ $_->{pulled}  } for @results;
-    $total_removed += scalar @{ $_->{removed} } for @results;
-
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
-        'auto_sync_models', "Auto-sync complete: pulled=$total_pulled removed=$total_removed");
-
-    $c->response->body(encode_json({
-        success       => JSON::true,
-        servers       => \@results,
-        total_pulled  => $total_pulled,
-        total_removed => $total_removed,
-    }));
 }
 
 =head2 project_conversations
@@ -7709,23 +7433,25 @@ sub action :Local :Args(0) {
         my $log_row;
         eval {
             $log_row = $schema->resultset('Log')->create({
-                todo_record_id => $todo_id || undef,
-                owner          => $current_user,
-                sitename       => $sitename,
-                start_date     => $today,
-                abstract       => $abstract,
-                details        => $details,
-                start_time     => '00:00',
-                end_time       => '00:00',
-                time           => 0,
+                todo_record_id  => $todo_id || undef,
+                username        => $current_user,
+                sitename        => $sitename,
+                start_date      => $today,
+                due_date        => $today,
+                project_code    => 'PLANNING',
+                abstract        => $abstract,
+                details         => $details,
+                start_time      => '00:00:00',
+                end_time        => '00:00:00',
+                time            => '00:00:00',
                 group_of_poster => do {
                     my $roles = $c->session->{roles} || [];
                     ref $roles eq 'ARRAY' ? join(',', @$roles) : ($roles || 'default');
                 },
-                status        => 1,
-                priority      => 2,
-                last_mod_by   => $current_user,
-                last_mod_date => $today,
+                status          => 1,
+                priority        => 2,
+                last_mod_by     => $current_user,
+                last_mod_date   => $today,
             });
         };
         if ($@ || !$log_row) {
@@ -8773,7 +8499,7 @@ sub support_send :Local :Args(1) {
 
 =head2 _build_bmaster_system_prompt
 
-Builds a BeeMaster beekeeping-aware system prompt for the AI when agent_id is 'beemaster'.
+Builds a BMaster beekeeping-aware system prompt for the AI when agent_id is 'bmaster'.
 Bee-welfare philosophy: not agribiz-driven, always answers with the bees' best interests first.
 Includes full apiary schema, seasonal calendar, editor workflow, and cross-context awareness.
 
@@ -8806,33 +8532,6 @@ EDITOR
 
     return <<END_PROMPT;
 You are the expert BMaster beekeeping assistant for $site_name.
-
-NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
-- BMaster dashboard: /BMaster
-- Apiary overview: /Apiary
-- Hive management: /Apiary/HiveManagement
-- Queen rearing: /Apiary/QueenRearing
-- Bee health: /Apiary/BeeHealth
-- Bee forage / bee pasture / forage plants: /ENCY/BeePastureView
-- Honey production: /BMaster/honey
-- Environment / habitat: /BMaster/environment
-- Education: /BMaster/education
-- ENCY herb/plant search: /ENCY/search?q=TERM
-- Herbs / plants list: /ENCY/herbs
-- Glossary (beekeeping & herbal terms): /ENCY/glossary
-- Diseases list: /ENCY/diseases
-- Symptoms list: /ENCY/symptoms
-- Insects: /ENCY/insects
-- Constituents list: /ENCY/Constituent
-- Formulas / recipes: /ENCY/formula
-- Therapeutic actions: /ENCY/therapeutic_actions
-- Workshops (local beekeeping events): /workshop
-- Membership: /membership
-
-When the user asks to "open", "show", "go to", "list", "browse", or "take me to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
-[ACTION: {"action": "navigate", "url": "/ENCY/BeePastureView"}]
-Do NOT just describe the page or give a link — always emit the ACTION so the browser navigates automatically.
-If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT invent or guess a URL.
 
 PHILOSOPHY — This system is NOT driven by agribusiness profits. It is designed around
 what is best for the bees and healthy, sustainable apiculture:
@@ -8879,6 +8578,20 @@ DATABASE SCHEMA — BMaster / Apiary tables:
 - HiveConfiguration: hive setup templates
 - HiveFrame: linked to Box (frame-level detail)
 
+NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
+- BMaster dashboard: /BMaster
+- Apiary overview: /Apiary
+- Hive management: /Apiary/HiveManagement
+- Queen rearing: /Apiary/QueenRearing
+- Bee health: /Apiary/BeeHealth
+- Bee pasture / forage plants: /BMaster/bee_pasture  (→ /ENCY/BeePastureView)
+- Honey production: /BMaster/honey
+- Environment / habitat: /BMaster/environment
+- Education: /BMaster/education
+- ENCY herb/plant search: /ENCY/search?q=TERM
+- ENCY bee forage view: /ENCY/BeePastureView
+- Workshops (local beekeeping events): /workshop
+- Membership: /membership
 $editor_section
 VOICE INSPECTION TIP (share this when the user asks how to record an inspection):
 You can record a hive inspection by voice directly in this chat widget:
@@ -9231,46 +8944,25 @@ DATABASE SCHEMA — ENCY tables you can reference:
 
 NAVIGATION URLS (use ONLY these relative URLs — never invent URLs):
 - ENCY home: /ENCY
-- Herbs list (browse all herbs): /ENCY/herbs
-- Search herbs: /ENCY/search?q=TERM
-- Botanical name index (A-Z): /ENCY/BotanicalNameView
+- Search herbs: /ENCY/search?q=TERM  or  /ENCY/BotanicalNameView
 - Bee pasture / forage plants: /ENCY/BeePastureView
 - View herb detail: /ENCY/herb_detail?record_id=ID
 - Plants section: /ENCY/plants
 - Pollinators: /ENCY/pollinators
 - Insects: /ENCY/insects
-- Animals: /ENCY/animals
 - Constituent list: /ENCY/Constituent
 - Constituent detail: /ENCY/Constituent/ID
 - Add constituent: /ENCY/Constituent/add
 - Edit constituent: /ENCY/Constituent/edit?record_id=ID
-- Diseases list: /ENCY/diseases
-- Symptoms list: /ENCY/symptoms
 - Therapeutic actions: /ENCY/therapeutic_actions
 - Drug-herb interactions: /ENCY/drug_herb_interactions
-- Formulas / Recipes: /ENCY/formula
-- Glossary: /ENCY/glossary
-
-When the user asks to "open", "show", "list", "browse", or "go to" any of the above sections, emit a navigate ACTION on its own line, e.g.:
-[ACTION: {"action": "navigate", "url": "/ENCY/herbs"}]
-Do NOT just describe the page — always emit the ACTION so the browser navigates there automatically.
-If the user asks to navigate somewhere NOT in this list, ask them to clarify — do NOT guess a URL.
+- Formulas: /ENCY/formula
+- Recipes: /ENCY/recipes
 $editor_section
 DATA ALREADY INJECTED:
 The server automatically injects LIVE ENCY HERB/PLANT DATA and LIVE ENCY CONSTITUENT DATA below
 when relevant records are found. ALWAYS use this live data to answer questions — do not ask the
 user to paste records.
-
-CITATION RULES — CRITICAL, NO EXCEPTIONS:
-- NEVER invent, fabricate, or guess URLs, book titles, author names, journal names, DOIs, ISBNs,
-  or any citation details from your training data.
-- The ENCY Reference system is the SOLE authority on what is verified. Only cite sources that
-  appear in the "VERIFIED ENCY REFERENCES" block injected into the context below.
-- If no verified references are injected (or the status says "No verified references"), tell
-  the user: "No references are currently recorded in the ENCY system for this topic." Do NOT
-  supplement with training-data citations.
-- You MAY summarise what the ENCY database fields say (description, notes, constituents, etc.)
-  — that is verified DB content. You may NOT add facts or sources beyond what the DB supplies.
 
 GUIDELINES:
 - For health questions, always note: "This is educational information only — consult a healthcare provider."
@@ -9868,55 +9560,28 @@ journal entries, and pre-fill data-entry forms. You do NOT post actual GL entrie
 records, or execute any accounting transaction directly — all financial records must be created by
 a human through the appropriate form.
 
-PERMITTED ACTIONS (the ONLY actions you may emit):
-- navigate_and_fill — to open and pre-fill a form (supplier invoice OR account transfer)
-
-FORBIDDEN ACTIONS (never emit these, no matter what the user asks):
-- create_gl_entry — direct the user to /Accounting/gl/new instead
-- create_todo — tell the user to add it manually in /todo
-- update_todo_status, reschedule_todo, add_todo_comment, create_log_entry — not your domain
-- Any action that writes to the database directly
-
-When the user asks you to "create a todo", "add a reminder", "log this", or similar:
-Respond with plain text only — describe what todo they should add, then tell them to go to /todo
-to add it manually. Do NOT emit any ACTION block.
+Do NOT emit create_gl_entry or any action that writes directly to accounting tables. Instead,
+explain the correct journal entry (DR/CR accounts, amounts, reference) and direct the user to
+/Accounting/gl/new to enter it manually.
 
 ## PRE-FILL FORM ACTIONS
+You may open and pre-fill data-entry forms so the user can review and submit them:
 
-### Automatic form opening (NO explicit request needed)
-When the user pastes ANY financial document — a bill, invoice, receipt, payment confirmation,
-deposit notification, account refill email, or subscription renewal — you MUST immediately open
-and pre-fill the correct form WITHOUT waiting to be asked. Do NOT give step-by-step instructions.
-Do NOT ask the user to navigate manually.
+To open the supplier invoice form and pre-fill it from a bill the user has pasted:
+Parse the bill text, then emit ONE navigate_and_fill action on its own line:
 
-### Supplier invoices / bills (goods or services received, pay later)
-Use the supplier invoice form. Parse the document then emit ONE navigate_and_fill action:
+[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION e.g. Freedom Mobile autopay Apr 2026", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT", "auto_pay": "1", "auto_pay_method": "PAYMENT_METHOD if autopay"}}]
 
-[ACTION: {"action": "navigate_and_fill", "url": "/Inventory/invoice/new", "fields": {"invoice_number": "INVOICE_OR_REF_NO", "invoice_date": "YYYY-MM-DD", "due_date": "YYYY-MM-DD", "notes": "DESCRIPTION", "tax_amount": "0.00", "shipping_amount": "0.00", "description_0": "LINE DESCRIPTION", "quantity_0": "1", "unit_cost_0": "AMOUNT"}}]
-
-Rules for invoice entries:
-- supplier_id is a dropdown — tell the user which supplier to select. If missing, open
-  /Inventory/supplier/add?popup=1, add the supplier, then return to select it.
+Rules for navigate_and_fill invoice entry:
+- supplier_id is a dropdown — tell the user the supplier name and ask them to select it after the form opens.
+- If the supplier does not exist, suggest they go to /Inventory/supplier/add first.
 - Put all tax (GST/HST/PST) in tax_amount, NOT as a line item.
-- auto_pay / auto_pay_method: fill only if the document shows "Auto Pay".
-- After the action, list the extracted values so the user can verify before saving.
+- If the bill shows "$22.40 total, tax included" with no breakdown, set tax_amount to 0 and unit_cost_0 to the full amount.
+- auto_pay_method and auto_pay: fill both only if the bill shows "Auto Pay" or similar (e.g. "Visa Auto Pay"); omit both if not autopay.
+- After the action line, briefly list the values you used so the user can verify before saving.
 
-### Deposit / account refill / prepaid top-up emails
-These are confirmations that money was transferred FROM one of your payment accounts INTO a
-prepaid vendor balance (PayPal reseller credit, HostGator prepaid, eNom prepaid, etc.).
-This is NOT a supplier invoice — it is an asset transfer. Use the Transfer form:
-
-[ACTION: {"action": "navigate_and_fill", "url": "/Accounting/transfer/new", "fields": {"entry_type": "prepaid_topup", "amount": "DEPOSIT_AMOUNT", "post_date": "YYYY-MM-DD", "reference": "REFERENCE_NO", "notes": "e.g. PayPal → eNom prepaid top-up shantahostgator May 2026", "fee_amount": "CONVENIENCE_FEE_IF_ANY"}}]
-
-After the action, tell the user:
-- Which "From" account to select (e.g. "1010 PayPal Account" if paid via PayPal)
-- Which "To" account to select (e.g. "1021 HostGator Prepaid Balance")
-- If a fee was charged, the fee account (default: "6720 PayPal / Stripe Convenience Fees")
-- Transaction type: select "Prepaid Top-Up" tab
-
-Signals this is a deposit/refill (not an invoice):
-"Amount Deposited", "Account Balance", "Account Refill", "Refill Convenience Charge",
-"adding funds", "Reference No" with no line-item products.
+Only use actions when the user explicitly requests a data change.  Always confirm
+the details before executing.
 
 $editor_section
 The current user is: $username
@@ -10306,28 +9971,6 @@ sub transcribe :Local :Args(0) {
         return;
     }
 
-    my $safe_user_early = $username; $safe_user_early =~ s/[^a-zA-Z0-9_-]/_/g;
-    my $nfs_base_early       = $c->config->{workshop_upload_dir} || '/data/nfs';
-    my $audio_nfs_early      = "${nfs_base_early}/bmaster/audio";
-    my $transcript_nfs_early = "${nfs_base_early}/bmaster/transcripts";
-    my $timestamp_early      = time();
-    my $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
-    my $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
-    my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
-    my $upload_size_early = $upload->size;
-
-    eval {
-        require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
-        require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
-            or die "copy to NFS failed: $!";
-    };
-    if ($@) {
-        unlink $tmp_file;
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS: $@" }));
-        return;
-    }
-
     my $worktree  = $c->path_to('..')->stringify;
     my $app_root  = $c->path_to('.')->stringify;
     my @python_candidates = (
@@ -10360,17 +10003,10 @@ sub transcribe :Local :Args(0) {
 
     unless ($python_bin) {
         unlink $tmp_file;
+        $c->response->status(503);
         $c->response->body(encode_json({
-            success              => JSON::true,
-            audio_saved          => JSON::true,
-            transcription_status => 'whisper_unavailable',
-            audio_nfs_path       => $nfs_audio_file_early,
-            message              => 'Audio saved. Whisper not available — install openai-whisper to enable transcription.',
-            orig_name            => $orig_name,
-            file_size            => $upload_size_early,
-            sitename             => $sitename_early,
-            username             => $username,
-            ext                  => $ext,
+            success => JSON::false,
+            error   => 'Whisper not available. Run: pip install openai-whisper (in Comserv/speechfire or Comserv/venv)',
         }));
         return;
     }
@@ -10447,14 +10083,15 @@ PYSCRIPT
     print $sfh $whisper_script;
     close $sfh;
 
-    my $safe_user           = $safe_user_early;
-    my $audio_nfs           = $audio_nfs_early;
-    my $transcript_nfs      = $transcript_nfs_early;
-    my $timestamp           = $timestamp_early;
-    my $nfs_audio_file      = $nfs_audio_file_early;
-    my $nfs_transcript_file = $nfs_transcript_file_early;
-    my $sitename            = $sitename_early;
-    my $upload_size         = $upload_size_early;
+    my $safe_user      = $username; $safe_user =~ s/[^a-zA-Z0-9_-]/_/g;
+    my $nfs_base       = $c->config->{workshop_upload_dir} || '/data/nfs';
+    my $audio_nfs      = "${nfs_base}/bmaster/audio";
+    my $transcript_nfs = "${nfs_base}/bmaster/transcripts";
+    my $timestamp      = time();
+    my $nfs_audio_file      = "${audio_nfs}/${safe_user}_${timestamp}_$$.${ext}";
+    my $nfs_transcript_file = "${transcript_nfs}/${safe_user}_${timestamp}_$$.json";
+    my $sitename       = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
+    my $upload_size    = $upload->size;
 
     {
         open(my $sf, '>', $status_file) or do { };
@@ -10493,24 +10130,26 @@ PYSCRIPT
 
             if ($@ || !$json_out) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@", audio_nfs_path => $nfs_audio_file }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => "Whisper failed: $@" }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $result = eval { decode_json($json_out) };
             unless ($result && $result->{transcript}) {
                 unlink $tmp_file;
-                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript', audio_nfs_path => $nfs_audio_file }); close $sf;
+                open(my $sf, '>', $status_file); print $sf encode_json({ status => 'error', error => 'Empty transcript' }); close $sf;
                 POSIX::_exit(0);
             }
 
             my $model_used = $result->{model} || $whisper_model;
             my $segments   = $result->{segments} || [];
 
+            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
+            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
             unlink $tmp_file;
 
-            my $transcript_ok = 1;
-            {
+            my $nfs_ok = !$@;
+            if ($nfs_ok) {
                 my $transcript_json = encode_json({
                     transcript => $result->{transcript},
                     segments   => $segments,
@@ -10518,9 +10157,7 @@ PYSCRIPT
                     recorded_by => $username,
                     original_filename => $orig_name,
                 });
-                open(my $tfh, '>:utf8', $nfs_transcript_file) or ($transcript_ok = 0);
-                print $tfh $transcript_json if $transcript_ok;
-                close $tfh if $transcript_ok;
+                { open(my $tfh, '>:utf8', $nfs_transcript_file) or ($nfs_ok = 0); print $tfh $transcript_json if $nfs_ok; close $tfh if $nfs_ok; }
             }
 
             open(my $rf, '>', $result_file);
@@ -10530,8 +10167,8 @@ PYSCRIPT
                 model_used         => $model_used,
                 segments           => $segments,
                 diarized           => $has_diarizer ? JSON::true : JSON::false,
-                audio_nfs_path     => $nfs_audio_file,
-                transcript_nfs_path=> $transcript_ok ? $nfs_transcript_file : undef,
+                audio_nfs_path     => $nfs_ok ? $nfs_audio_file    : undef,
+                transcript_nfs_path=> $nfs_ok ? $nfs_transcript_file : undef,
                 orig_name          => $orig_name,
                 file_size          => $upload_size,
                 sitename           => $sitename,
