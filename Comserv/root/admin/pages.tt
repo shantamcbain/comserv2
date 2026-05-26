@@ -300,6 +300,7 @@
         
         if (bodyTextarea) {
             let lastSyncValue = bodyTextarea.value;
+            let isWysiwygMode = true;
             
             // Function to initialize CKEditor 5 Classic
             function initCKEditor() {
@@ -334,46 +335,51 @@
                 const currentVal = bodyTextarea.value;
                 if (currentVal !== lastSyncValue) {
                     lastSyncValue = currentVal;
-                    if (editorInstance) {
+                    if (editorInstance && isWysiwygMode) {
                         editorInstance.setData(currentVal);
                     }
                 }
             }, 300);
             
-            // Handle Toggle button click with pure vanilla JS
+            // Handle Toggle button click by toggling container visibility (extremely fast and bulletproof)
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    if (editorInstance) {
-                        // WYSIWYG mode -> Raw HTML mode
-                        const data = editorInstance.getData();
-                        editorInstance.destroy()
-                            .then(() => {
-                                editorInstance = null;
-                                bodyTextarea.style.display = 'block';
-                                bodyTextarea.value = data;
-                                lastSyncValue = data;
-                                if (statusBadge) {
-                                    statusBadge.textContent = 'Source HTML Mode';
-                                    statusBadge.className = 'label label-warning';
-                                }
-                            })
-                            .catch(err => {
-                                console.error('Error destroying editor:', err);
-                            });
+                    
+                    const ckEditorContainer = bodyTextarea.nextElementSibling;
+                    
+                    if (isWysiwygMode) {
+                        // Switch from WYSIWYG to Raw HTML
+                        if (editorInstance) {
+                            bodyTextarea.value = editorInstance.getData();
+                            lastSyncValue = bodyTextarea.value;
+                        }
+                        if (ckEditorContainer) {
+                            ckEditorContainer.style.display = 'none';
+                        }
+                        bodyTextarea.style.display = 'block';
+                        isWysiwygMode = false;
+                        
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Source HTML Mode';
+                            statusBadge.className = 'label label-warning';
+                        }
                     } else {
-                        // Raw HTML mode -> WYSIWYG mode
-                        const data = bodyTextarea.value;
-                        initCKEditor().then(editor => {
-                            if (editor) {
-                                editor.setData(data);
-                                lastSyncValue = data;
-                                if (statusBadge) {
-                                    statusBadge.textContent = 'Rich Text Mode';
-                                    statusBadge.className = 'label label-success';
-                                }
-                            }
-                        });
+                        // Switch from Raw HTML to WYSIWYG
+                        if (editorInstance) {
+                            editorInstance.setData(bodyTextarea.value);
+                            lastSyncValue = bodyTextarea.value;
+                        }
+                        bodyTextarea.style.display = 'none';
+                        if (ckEditorContainer) {
+                            ckEditorContainer.style.display = 'block';
+                        }
+                        isWysiwygMode = true;
+                        
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Rich Text Mode';
+                            statusBadge.className = 'label label-success';
+                        }
                     }
                 });
             }
@@ -382,7 +388,7 @@
             const form = bodyTextarea.closest('form');
             if (form) {
                 form.addEventListener('submit', function() {
-                    if (editorInstance) {
+                    if (editorInstance && isWysiwygMode) {
                         bodyTextarea.value = editorInstance.getData();
                     }
                 });
