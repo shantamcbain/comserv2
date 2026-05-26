@@ -165,7 +165,7 @@
                 data.providers.forEach(function(p) {
                     if (p.service === 'ollama' && p.models) {
                         p.models.filter(function(m) {
-                            return m.id && !m.id.match(/embed|rerank/i);
+                            return m.id && !m.id.match(/embed|rerank|:cloud$/i);
                         }).forEach(function(m) {
                             opts.push({ val: m.id + '|ollama', label: m.id + ' (Ollama)' });
                         });

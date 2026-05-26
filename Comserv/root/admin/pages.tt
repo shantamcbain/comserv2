@@ -163,6 +163,12 @@
                                 <a href="[% c.uri_for('/admin/pages') %]" class="btn btn-default">Cancel</a>
                             </div>
                         </form>
+
+                        [% PROCESS 'ai/partials/ai_form_assistant.tt'
+                           ai_form_entity_label = 'page'
+                           ai_form_context      = 'web page management'
+                           ai_form_fields       = 'sitename, menu, page_code, title, link_order, body, description, keywords, status, roles'
+                        %]
                     </div>
                 </div>
             [% ELSE %]
@@ -176,15 +182,17 @@
                             <input type="text" name="search" id="search" class="form-control" value="[% search %]" placeholder="Title or Code...">
                         </div>
 
+                        [% IF current_site == 'CSC' %]
                         <div class="form-group" style="margin-right: 15px;">
                             <label for="filter_site" style="margin-right: 5px;">Site:</label>
                             <select name="filter_site" id="filter_site" class="form-control">
                                 <option value="">-- All Sites --</option>
-                                [% FORE0 = 1; FOREACH site IN site_names %]
+                                [% FOREACH site IN site_names %]
                                     <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site %]</option>
                                 [% END %]
                             </select>
                         </div>
+                        [% END %]
 
                         <div class="form-group" style="margin-right: 15px;">
                             <label for="filter_status" style="margin-right: 5px;">Status:</label>
@@ -224,7 +232,6 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                [% IF pages && pages.size > 0 %]
                                 [% IF pages.size > 0 %]
                                     [% FOREACH page IN pages %]
                                         <tr>
@@ -288,6 +295,148 @@
         </div>
     </div>
 </div>
+
+[% IF show_form %]
+<!-- CKEditor 5 Classic Build CDN -->
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+
+<style>
+    /* Ensure the WYSIWYG editor is sufficiently tall */
+    .ck-editor__editable_inline {
+        min-height: 350px !important;
+    }
+    /* AI Assistant styling */
+    .btn-purple {
+        background-color: #6f42c1 !important;
+        border-color: #6f42c1 !important;
+        color: #fff !important;
+    }
+    .btn-purple:hover, .btn-purple:focus, .btn-purple:active {
+        background-color: #59359a !important;
+        border-color: #59359a !important;
+        color: #fff !important;
+    }
+</style>
+
+<script>
+    function openAIFormAssistant() {
+        var panel = document.getElementById('ai-form-assistant-panel');
+        if (panel) {
+            panel.scrollIntoView({ behavior: 'smooth' });
+            var inp = document.getElementById('ai-form-entity-name');
+            if (inp) {
+                inp.focus();
+                inp.style.outline = '2px solid #6f42c1';
+                setTimeout(() => { inp.style.outline = ''; }, 1500);
+            }
+        }
+    }
+
+    $(document).ready(function() {
+        let editorInstance = null;
+        const bodyTextarea = document.getElementById('body');
+        const toggleBtn = document.getElementById('toggle-editor-mode');
+        const statusBadge = document.getElementById('wysiwyg-status-badge');
+
+        if (bodyTextarea) {
+            let lastSyncValue = bodyTextarea.value;
+            let isWysiwygMode = true;
+
+            // Function to initialize CKEditor 5 Classic
+            function initCKEditor() {
+                if (editorInstance) return Promise.resolve(editorInstance);
+
+                return ClassicEditor
+                    .create(bodyTextarea, {
+                        toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
+                    })
+                    .then(editor => {
+                        editorInstance = editor;
+
+                        // Keep textarea value perfectly in sync with CKEditor in real-time
+                        editor.model.document.on('change:data', () => {
+                            const data = editor.getData();
+                            bodyTextarea.value = data;
+                            lastSyncValue = data; // Prevent loop
+                        });
+
+                        return editor;
+                    })
+                    .catch(error => {
+                        console.error('CKEditor 5 initialization error:', error);
+                    });
+            }
+
+            // Initial load starts in WYSIWYG mode
+            initCKEditor();
+
+            // Poller to detect external programmatic updates (e.g. from standard AI Form Fill)
+            setInterval(function() {
+                const currentVal = bodyTextarea.value;
+                if (currentVal !== lastSyncValue) {
+                    lastSyncValue = currentVal;
+                    if (editorInstance && isWysiwygMode) {
+                        editorInstance.setData(currentVal);
+                    }
+                }
+            }, 300);
+
+            // Handle Toggle button click by toggling container visibility (extremely fast and bulletproof)
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+
+                    const ckEditorContainer = bodyTextarea.nextElementSibling;
+
+                    if (isWysiwygMode) {
+                        // Switch from WYSIWYG to Raw HTML
+                        if (editorInstance) {
+                            bodyTextarea.value = editorInstance.getData();
+                            lastSyncValue = bodyTextarea.value;
+                        }
+                        if (ckEditorContainer) {
+                            ckEditorContainer.style.display = 'none';
+                        }
+                        bodyTextarea.style.display = 'block';
+                        isWysiwygMode = false;
+
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Source HTML Mode';
+                            statusBadge.className = 'label label-warning';
+                        }
+                    } else {
+                        // Switch from Raw HTML to WYSIWYG
+                        if (editorInstance) {
+                            editorInstance.setData(bodyTextarea.value);
+                            lastSyncValue = bodyTextarea.value;
+                        }
+                        bodyTextarea.style.display = 'none';
+                        if (ckEditorContainer) {
+                            ckEditorContainer.style.display = 'block';
+                        }
+                        isWysiwygMode = true;
+
+                        if (statusBadge) {
+                            statusBadge.textContent = 'Rich Text Mode';
+                            statusBadge.className = 'label label-success';
+                        }
+                    }
+                });
+            }
+
+            // Form submit helper to ensure editor state is saved on submit
+            const form = bodyTextarea.closest('form');
+            if (form) {
+                form.addEventListener('submit', function() {
+                    if (editorInstance && isWysiwygMode) {
+                        bodyTextarea.value = editorInstance.getData();
+                    }
+                });
+            }
+        }
+    });
+</script>
+[% END %]
 
 <script>
 document.addEventListener('DOMContentLoaded', function() {
