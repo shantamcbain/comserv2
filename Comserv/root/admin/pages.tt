@@ -90,7 +90,64 @@
                             </div>
 
                             <div class="form-group">
-                                <label for="body">Page Body (HTML/Text) <span class="text-danger">*</span></label>
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <label for="body" style="margin: 0; font-weight: bold;">Page Body (HTML/Text) <span class="text-danger">*</span></label>
+                                    <button type="button" class="btn btn-xs btn-purple" id="ai-assist-btn" style="background: #6f42c1; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;">
+                                        <i class="fa fa-magic"></i> AI Assistant
+                                    </button>
+                                </div>
+                                
+                                <!-- AI Assistant Inline Panel -->
+                                <div id="ai-assist-panel" class="panel panel-default" style="display: none; margin-bottom: 15px; border-color: #6f42c1; background-color: #fcfaff; box-shadow: 0 2px 8px rgba(111, 66, 193, 0.1);">
+                                    <div class="panel-heading" style="background-color: #f3ebff; border-color: #6f42c1; color: #512da8; font-weight: bold; display: flex; justify-content: space-between; align-items: center; padding: 8px 15px;">
+                                        <span><i class="fa fa-robot"></i> AI Writing Assistant</span>
+                                        <button type="button" class="close" id="ai-assist-close" style="color: #512da8; opacity: 0.8; line-height: 1;">&times;</button>
+                                    </div>
+                                    <div class="panel-body" style="padding: 15px;">
+                                        <div class="row">
+                                            <div class="col-md-8">
+                                                <div class="form-group" style="margin-bottom: 10px;">
+                                                    <label class="control-label" style="font-size: 12px; color: #512da8; font-weight: bold;">What should the AI do?</label>
+                                                    <input type="text" id="ai-prompt" class="form-control input-sm" placeholder="e.g. Write a welcome page for Icehorse with site-creation setup steps...">
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="form-group" style="margin-bottom: 10px;">
+                                                    <label class="control-label" style="font-size: 12px; color: #512da8; font-weight: bold;">Action Preset</label>
+                                                    <select id="ai-preset" class="form-control input-sm">
+                                                        <option value="write">Draft Content from Prompt</option>
+                                                        <option value="improve">Improve Current Content</option>
+                                                        <option value="expand">Expand / Add Details</option>
+                                                        <option value="summarize">Summarize Content</option>
+                                                        <option value="seo">Suggest SEO Keywords</option>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        
+                                        <div class="row" style="margin-top: 5px;">
+                                            <div class="col-md-12" style="display: flex; align-items: center; gap: 10px;">
+                                                <button type="button" class="btn btn-sm btn-purple" id="ai-generate-btn" style="background-color: #6f42c1; color: white; font-weight: bold; border: none; padding: 6px 12px; border-radius: 4px;">
+                                                    <i class="fa fa-cog fa-spin" id="ai-spinner" style="display: none; margin-right: 5px;"></i>
+                                                    <span id="ai-btn-text">Generate with AI</span>
+                                                </button>
+                                                <span id="ai-status-msg" style="font-size: 12px; color: #666; font-style: italic;"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- AI Response Preview / Insert -->
+                                        <div id="ai-response-container" style="display: none; margin-top: 15px; padding: 12px; background: white; border: 1px dashed #6f42c1; border-radius: 4px;">
+                                            <h5 style="margin-top: 0; color: #512da8; font-weight: bold; font-size: 13px; margin-bottom: 8px;">AI Suggestion:</h5>
+                                            <div id="ai-response-text" style="font-size: 13px; line-height: 1.5; white-space: pre-wrap; margin-bottom: 12px; max-height: 250px; overflow-y: auto; padding: 8px; background: #fafafa; border: 1px solid #eee; border-radius: 4px;"></div>
+                                            <div style="display: flex; gap: 10px;">
+                                                <button type="button" class="btn btn-xs btn-success" id="ai-insert-replace-btn" style="font-weight: bold;">Replace Body</button>
+                                                <button type="button" class="btn btn-xs btn-info" id="ai-insert-append-btn" style="font-weight: bold;">Append to Body</button>
+                                                <button type="button" class="btn btn-xs btn-default" id="ai-discard-btn">Discard</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <textarea name="body" id="body" rows="12" class="form-group form-control" placeholder="Enter HTML or text content for the page" required>[% page_item.body %]</textarea>
                             </div>
 
@@ -236,3 +293,188 @@
         </div>
     </div>
 </div>
+
+[% IF show_form %]
+<!-- CKEditor 5 Classic Build CDN -->
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+
+<style>
+    /* Ensure the WYSIWYG editor is sufficiently tall */
+    .ck-editor__editable_inline {
+        min-height: 350px !important;
+    }
+    /* AI Assistant styling */
+    .btn-purple {
+        background-color: #6f42c1 !important;
+        border-color: #6f42c1 !important;
+        color: #fff !important;
+    }
+    .btn-purple:hover, .btn-purple:focus, .btn-purple:active {
+        background-color: #59359a !important;
+        border-color: #59359a !important;
+        color: #fff !important;
+    }
+</style>
+
+<script>
+    $(document).ready(function() {
+        let editorInstance = null;
+
+        // Initialize CKEditor 5 Classic editor on the page body textarea
+        ClassicEditor
+            .create(document.querySelector('#body'), {
+                toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
+            })
+            .then(editor => {
+                editorInstance = editor;
+            })
+            .catch(error => {
+                console.error('CKEditor 5 initialization error:', error);
+            });
+
+        // Toggle AI Assistant Panel
+        $('#ai-assist-btn').on('click', function() {
+            $('#ai-assist-panel').slideToggle(200);
+        });
+
+        $('#ai-assist-close').on('click', function() {
+            $('#ai-assist-panel').slideUp(200);
+        });
+
+        // Handle AI Content Generation
+        $('#ai-generate-btn').on('click', function() {
+            const promptText = $('#ai-prompt').val().trim();
+            const preset = $('#ai-preset').val();
+            let finalPrompt = '';
+            
+            // Read current content from CKEditor or fallback textarea
+            let currentContent = '';
+            if (editorInstance) {
+                currentContent = editorInstance.getData();
+            } else {
+                currentContent = $('#body').val();
+            }
+            
+            // Build the AI instruction prompt
+            if (preset === 'write') {
+                if (!promptText) {
+                    alert('Please enter a prompt describing what you want written.');
+                    return;
+                }
+                finalPrompt = promptText;
+            } else if (preset === 'improve') {
+                if (!currentContent) {
+                    alert('There is no content to improve. Please choose "Draft Content from Prompt" or write something first.');
+                    return;
+                }
+                finalPrompt = "Improve the following text, making it more engaging and professional. Return HTML-ready content:\n\n" + currentContent;
+                if (promptText) {
+                    finalPrompt += "\n\nAdditional instructions: " + promptText;
+                }
+            } else if (preset === 'expand') {
+                if (!currentContent) {
+                    alert('There is no content to expand. Please write some initial text first.');
+                    return;
+                }
+                finalPrompt = "Expand and add professional details to the following content. Return HTML-ready content:\n\n" + currentContent;
+                if (promptText) {
+                    finalPrompt += "\n\nAdditional instructions: " + promptText;
+                }
+            } else if (preset === 'summarize') {
+                if (!currentContent) {
+                    alert('There is no content to summarize.');
+                    return;
+                }
+                finalPrompt = "Provide a concise summary of the following content:\n\n" + currentContent;
+            } else if (preset === 'seo') {
+                let contentToUse = currentContent || promptText;
+                if (!contentToUse) {
+                    alert('Please write some content or enter a prompt so I can suggest keywords.');
+                    return;
+                }
+                finalPrompt = "Based on this content, suggest 10 high-quality SEO keywords separated by commas:\n\n" + contentToUse;
+            }
+            
+            // Show loading spinner
+            $('#ai-spinner').show();
+            $('#ai-btn-text').text('Processing...');
+            $('#ai-generate-btn').prop('disabled', true);
+            $('#ai-status-msg').text('AI is thinking...');
+            $('#ai-response-container').hide();
+            
+            // Invoke the Zencoder AI generation endpoint
+            $.ajax({
+                url: '/ai/generate',
+                type: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({
+                    prompt: finalPrompt,
+                    provider: 'ollama'
+                }),
+                success: function(data) {
+                    $('#ai-spinner').hide();
+                    $('#ai-btn-text').text('Generate with AI');
+                    $('#ai-generate-btn').prop('disabled', false);
+                    
+                    if (data && data.success && data.response) {
+                        $('#ai-response-text').text(data.response);
+                        $('#ai-response-container').slideDown(200);
+                        $('#ai-status-msg').text('Generated suggestion successfully!');
+                        
+                        // Autofill SEO keywords field if preset is SEO
+                        if (preset === 'seo') {
+                            const cleanKeywords = data.response.replace(/Keywords:?/i, '').trim();
+                            $('#keywords').val(cleanKeywords);
+                        }
+                    } else {
+                        $('#ai-status-msg').text('Failed to generate response.');
+                        alert('AI Assistance Error: ' + (data ? data.error : 'Unknown error'));
+                    }
+                },
+                error: function(xhr, status, error) {
+                    $('#ai-spinner').hide();
+                    $('#ai-btn-text').text('Generate with AI');
+                    $('#ai-generate-btn').prop('disabled', false);
+                    $('#ai-status-msg').text('Error calling AI service.');
+                    
+                    let errMsg = 'An error occurred while contacting the AI assistant service.';
+                    if (xhr.responseJSON && xhr.responseJSON.error) {
+                        errMsg += '\n\nDetails: ' + xhr.responseJSON.error;
+                    }
+                    alert(errMsg);
+                }
+            });
+        });
+
+        // Insert/Replace & Append handlers
+        $('#ai-insert-replace-btn').on('click', function() {
+            const aiText = $('#ai-response-text').text();
+            if (editorInstance) {
+                editorInstance.setData(aiText);
+            } else {
+                $('#body').val(aiText);
+            }
+            $('#ai-response-container').slideUp(200);
+            $('#ai-status-msg').text('Replaced body with AI suggestion.');
+        });
+
+        $('#ai-insert-append-btn').on('click', function() {
+            const aiText = $('#ai-response-text').text();
+            if (editorInstance) {
+                const currentData = editorInstance.getData();
+                editorInstance.setData(currentData + '\n' + aiText);
+            } else {
+                const currentVal = $('#body').val();
+                $('#body').val(currentVal + '\n' + aiText);
+            }
+            $('#ai-response-container').slideUp(200);
+            $('#ai-status-msg').text('Appended AI suggestion to body.');
+        });
+
+        $('#ai-discard-btn').on('click', function() {
+            $('#ai-response-container').slideUp(200);
+            $('#ai-status-msg').text('Suggestion discarded.');
+        });
+    });
+</script>
+[% END %]
