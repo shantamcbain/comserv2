@@ -1987,6 +1987,15 @@ sub day :Path('/todo/day') :Args {
         }
     };
 
+    my %active_todos;
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+        my $rows = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+        );
+        %active_todos = map { $_ => 1 } @$rows if $rows;
+    };
+
     $c->stash(
         todos                  => \@today_todos,
         overdue_todos          => \@overdue_todos,
@@ -2001,6 +2010,7 @@ sub day :Path('/todo/day') :Args {
         ap_all_usernames       => \@day_all_usernames,
         cal_filter_site        => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
         cal_filter_user        => ($c->session->{cal_filter_user} // ''),
+        active_todos           => \%active_todos,
         template               => 'todo/day.tt',
     );
 
@@ -3125,8 +3135,6 @@ sub open_log :Path('open_log') :Args(0) {
             undef, $record_id
         );
         if ($existing_open) {
-            $todo->update({ status => 5, last_mod_by => $username, last_mod_date => $today })
-                if ($todo->status ne '5');
             $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
             return;
         }
@@ -3157,12 +3165,6 @@ sub open_log :Path('open_log') :Args(0) {
             $priority_val, $username, $today, $group_val, $comments_val
         );
         my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
-
-        $todo->update({
-            status        => 5,
-            last_mod_by   => $username,
-            last_mod_date => $today,
-        });
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
             "Log opened for todo $record_id by $username (log_id=$new_log_id) via raw SQL");
@@ -3227,11 +3229,6 @@ sub close_log :Path('close_log') :Args(0) {
             'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
             undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
         );
-
-        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        if ($todo && ($todo->status // 0) == 5) {
-            $todo->update({ status => 2, last_mod_by => $username, last_mod_date => $today });
-        }
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
             "Closed log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
