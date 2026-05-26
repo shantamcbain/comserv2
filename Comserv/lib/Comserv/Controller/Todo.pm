@@ -3124,7 +3124,12 @@ sub open_log :Path('open_log') :Args(0) {
             "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
             undef, $record_id
         );
-        die "Log already open for this todo\n" if $existing_open;
+        if ($existing_open) {
+            $todo->update({ status => 2, last_mod_by => $username, last_mod_date => $today })
+                if ($todo->status // 0) != 2;
+            $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
+            return;
+        }
 
         my $proj_code = '';
         if ($todo->project_id) {
