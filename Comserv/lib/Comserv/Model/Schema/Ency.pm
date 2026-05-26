@@ -97,5 +97,11 @@ __PACKAGE__->register_class('TicketMessage', 'Comserv::Model::Schema::Ency::Resu
 # Register schedule settings for time-block planner
 __PACKAGE__->register_class('UserScheduleSettings', 'Comserv::Model::Schema::Ency::Result::UserScheduleSettings');
 
+# Register centralized app secrets (Cloudflare token, etc.)
+__PACKAGE__->register_class('AppSecret', 'Comserv::Model::Schema::Ency::Result::AppSecret');
+
+# Register Hosting / Site Provisioning classes
+__PACKAGE__->register_class('Accounting::HostingAccount', 'Comserv::Model::Schema::Ency::Result::Accounting::HostingAccount');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

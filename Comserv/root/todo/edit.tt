@@ -167,12 +167,12 @@ function syncDur() {
     <form action="/todo/modify/[% record.get_column('record_id') %]" method="post" onsubmit="syncDur()">
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
-            [% IF is_csc && sites && sites.size %]
+            [% IF sites && sites.size > 1 %]
                 [% INCLUDE 'todo/site_list.tt' selected_sitename=todo_sitename %]
             [% ELSE %]
                 <label for="sitename">Site Name:</label>
-                <input type="hidden" name="sitename" value="[% record.get_column('sitename') %]">
-                <input type="text" id="sitename" value="[% record.get_column('sitename') %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
+                <input type="hidden" name="sitename" value="[% todo_sitename %]">
+                <input type="text" id="sitename" value="[% todo_sitename %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
             [% END %]
         </div>
         
@@ -285,6 +285,12 @@ function syncDur() {
                 <option value="event"       [% IF _tt == 'event'       %]selected[% END %]>🎂 Event</option>
                 <option value="reminder"    [% IF _tt == 'reminder'    %]selected[% END %]>🔔 Reminder</option>
             </select>
+        </div>
+        <div class="form-group" id="is-fixed-row">
+            <label for="is_fixed">Fixed Time:</label>
+            <input type="checkbox" id="is_fixed" name="is_fixed" value="1"
+                   [% IF record.get_column('is_fixed') %]checked[% END %]>
+            <small style="color:var(--text-muted-color,#666);margin-left:6px;">Fixed events are never moved by reschedule.</small>
         </div>
         <div class="form-group" id="recurring-row">
             <label>Repeats:</label>

@@ -146,13 +146,19 @@ sub get_all_todos_for_calendar {
         },
     ] };
 
+    my @user_conds;
+    if ($username) {
+        push @user_conds, { 'me.developer'          => $username };
+        push @user_conds, { 'me.username_of_poster' => $username };
+    }
+
     my @todos = $rs->search(
         {
             -and => [
                 $status_cond,
                 { -or => [
                     $site_cond,
-                    ($username ? { 'me.developer' => $username } : ()),
+                    @user_conds,
                 ] },
             ],
         },

@@ -37,9 +37,19 @@
     <a href="/planning/daily" class="dropbtn"><i class="icon-calendar"></i>Planning</a>
     <div class="dropdown-content">
 
-        [%# Core planning links %]
-        <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
-        <a href="/todo"><i class="icon-check-square"></i>Todo System</a>
+        [%# Planning calendar tabs %]
+        <a href="/planning/daily#today-work"><i class="icon-check-square"></i>Daily Priorities</a>
+        <a href="/planning/daily#daily-schedule"><i class="icon-calendar"></i>Daily Schedule</a>
+        <a href="/planning/daily#weekly-view"><i class="icon-calendar"></i>Week View</a>
+        <a href="/planning/daily#month-view"><i class="icon-calendar"></i>Month View</a>
+        <a href="/planning/daily#planning"><i class="icon-planning"></i>Planning Board</a>
+        <a href="/planning/daily#gantt-view"><i class="icon-list"></i>Gantt View</a>
+        <a href="/planning/daily#resources-view"><i class="icon-file"></i>Resources</a>
+
+        <div class="dropdown-divider"></div>
+
+        [%# Todo &amp; Logs %]
+        <a href="/todo"><i class="icon-check-square"></i>Todo List</a>
         <a href="/log"><i class="icon-log"></i>Logs</a>
 
         <div class="dropdown-divider"></div>

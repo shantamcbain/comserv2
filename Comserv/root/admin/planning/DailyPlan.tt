@@ -246,6 +246,7 @@
                 [% END %]
                 <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
+                <button onclick="openDeployModal()" style="padding:4px 12px;border:1px solid #dc3545;border-radius:4px;background:transparent;font-size:0.82em;color:#dc3545;cursor:pointer;" title="Deploy system updates (Production or Local)">🚀 Deploy</button>
                 [% END %]
             </div>
 
@@ -369,14 +370,18 @@
                     </details>
                     [% END %]
 
-                    [%# Site multi-select (CSC only) — all sites from site table %]
-                    [% IF is_csc && ap_all_sitenames && ap_all_sitenames.size %]
+                    [%# Site filter — shown to any user with access to more than one site %]
+                    [% IF ap_all_sitenames && ap_all_sitenames.size > 1 %]
                     <details class="ap-dropdown" style="position:relative;display:inline-block;">
-                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: All ▾</summary>
+                        <summary id="site-summary" style="font-size:0.78em;padding:3px 8px;border:1px solid var(--border-color);border-radius:4px;cursor:pointer;list-style:none;background:var(--bg-color);color:var(--text-color);user-select:none;white-space:nowrap;">Site: [% cal_filter_site || 'All' %] ▾</summary>
                         <div style="position:absolute;z-index:500;background:var(--bg-color);border:1px solid var(--border-color);border-radius:4px;padding:6px 10px;min-width:130px;top:calc(100% + 2px);left:0;box-shadow:0 2px 8px rgba(0,0,0,0.15);">
+                            <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
+                                <input type="checkbox" class="site-cb" value="" [% UNLESS cal_filter_site %]checked[% END %] onchange="applyAllFilters()">
+                                All Sites
+                            </label>
                             [% FOREACH sname IN ap_all_sitenames %]
                             <label style="display:flex;align-items:center;gap:5px;font-size:0.82em;padding:3px 0;cursor:pointer;white-space:nowrap;">
-                                <input type="checkbox" class="site-cb" value="[% sname %]" checked onchange="applyAllFilters()">
+                                <input type="checkbox" class="site-cb" value="[% sname %]" [% IF !cal_filter_site || cal_filter_site == sname %]checked[% END %] onchange="applyAllFilters()">
                                 [% sname %]
                             </label>
                             [% END %]
@@ -586,6 +591,17 @@
                 var countEl = document.getElementById('ap-visible-count');
                 if (countEl) countEl.textContent = visible;
                 _updateDropdownSummaries();
+
+                var checkedSiteVals = Array.from(document.querySelectorAll('.site-cb:checked'))
+                                           .map(function(cb){ return cb.value; })
+                                           .filter(function(v){ return v !== ''; });
+                var sessionSite = (checkedSiteVals.length === 1) ? checkedSiteVals[0] : '';
+                fetch('/planning/set_filter', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ site: sessionSite })
+                }).catch(function(){});
             }
 
             function onProjectParentChange(cb) {
@@ -794,10 +810,9 @@
             'planning-system-continue-from-pl-bdac'    => 4001,
             'aichatsystem-ef4e'                        => 4010,
             'schema-managment-system-7eb3'             => 4002,
-            'new-task-9cf1'                            => 4003,
+            'infrastructuremanagement-d133'             => 4003,
             'workshops-7d21'                           => 4004,
             'users-e5b8'                               => 4005,
-            'set-up-project-config-d327'               => 3000,
             'new-task-bb05'                            => 4006,
             'unified-mail-system-site-managed-2c53'    => 4007,
             'membership-1304'                          => 4008,
@@ -815,7 +830,7 @@
             'inventory-system-104a'                    => 4021,
             '3dprinting-use-this-as-the-branc-41f3'    => 4030,
             'developer-time-logging-points-ba-542a'    => 4022,
-            'infrastructuremanagement-d133'            => 4033,
+            'page-management-system-implement-41a1'    => 4023,
         } %]
 
         [%# All known branch servers for the overview panel %]
@@ -824,10 +839,9 @@
             { name => 'planning-system-continue-from-pl-bdac',  port => 4001, label => 'PlanningSystem',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/planning-system-continue-from-pl-bdac/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4001 -r' },
             { name => 'aichatsystem-ef4e',                      port => 4010, label => 'AIChatSystem',        url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/aichatsystem-ef4e/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4010 -r' },
             { name => 'schema-managment-system-7eb3',           port => 4002, label => 'SchemaManagement',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/schema-managment-system-7eb3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4002 -r' },
-            { name => 'new-task-9cf1',                          port => 4003, label => 'InfrastructureHA',    url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-9cf1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
+            { name => 'infrastructuremanagement-d133',           port => 4003, label => 'InfrastructureMgmt', url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4003 -r' },
             { name => 'workshops-7d21',                         port => 4004, label => 'WorkShops',           url => '/workshop',       cmd => 'cd /home/shanta/.zenflow/worktrees/workshops-7d21/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4004 -r' },
             { name => 'users-e5b8',                             port => 4005, label => 'Users',               url => '/user/dashboard', cmd => 'cd /home/shanta/.zenflow/worktrees/users-e5b8/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4005 -r' },
-            { name => 'set-up-project-config-d327',             port => 3000, label => 'ProjectConfig',       url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/set-up-project-config-d327/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 3000 -r' },
             { name => 'new-task-bb05',                          port => 4006, label => 'FileManagement',      url => '/admin/planning', cmd => 'cd /home/shanta/.zenflow/worktrees/new-task-bb05/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4006 -r' },
             { name => 'unified-mail-system-site-managed-2c53',  port => 4007, label => 'UnifiedMail',         url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/unified-mail-system-site-managed-2c53/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4007 -r' },
             { name => 'membership-1304',                        port => 4008, label => 'Membership',          url => '/membership',     cmd => 'cd /home/shanta/.zenflow/worktrees/membership-1304/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4008 -r' },
@@ -845,7 +859,7 @@
             { name => 'inventory-system-104a',                  port => 4021, label => 'InventorySystem',     url => '/Inventory',      cmd => 'cd /home/shanta/.zenflow/worktrees/inventory-system-104a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4021 -r' },
             { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4030 -r' },
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4022 -r' },
-            { name => 'infrastructuremanagement-d133',          port => 4033, label => 'InfraMgmt',            url => '/admin/infrastructure', cmd => 'cd /home/shanta/.zenflow/worktrees/infrastructuremanagement-d133/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4033 -r' },
+            { name => 'page-management-system-implement-41a1',  port => 4023, label => 'PageManagement',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/page-management-system-implement-41a1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4023 -r' },
         ] %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
@@ -1678,4 +1692,314 @@ function saveLogNotes(entryId) {
         if (statusEl) { statusEl.textContent = '❌ Request failed'; statusEl.style.color = '#9b0000'; }
     });
 }
+
+// --- Deployment Control Center Modal JS ---
+let deployPollingInterval = null;
+let deployLastLogLength = 0;
+
+function openDeployModal() {
+    document.getElementById('deploy-modal').style.display = 'flex';
+    document.getElementById('deploy-progress-container').style.display = 'none';
+    document.getElementById('deploy-output-box').textContent = '';
+    document.getElementById('deploy-start-btn').disabled = false;
+    document.getElementById('deploy-cancel-btn').disabled = false;
+    
+    // Attempt to load saved credentials
+    fetch('/admin/docker-load-credentials')
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                if (data.ssh_target) {
+                    document.getElementById('deploy-ssh-target').value = data.ssh_target;
+                }
+                if (data.ssh_password) {
+                    document.getElementById('deploy-ssh-password').value = data.ssh_password;
+                }
+            }
+        })
+        .catch(err => console.log('Failed to load credentials:', err));
+}
+
+function closeDeployModal() {
+    if (deployPollingInterval) {
+        clearInterval(deployPollingInterval);
+        deployPollingInterval = null;
+    }
+    document.getElementById('deploy-modal').style.display = 'none';
+}
+
+function toggleDeployForm() {
+    const selected = document.querySelector('input[name="deploy_method"]:checked').value;
+    const settings = document.getElementById('production-deploy-settings');
+    if (selected === 'production') {
+        settings.style.display = 'flex';
+    } else {
+        settings.style.display = 'none';
+    }
+}
+
+function startDeploymentAction() {
+    const method = document.querySelector('input[name="deploy_method"]:checked').value;
+    const startBtn = document.getElementById('deploy-start-btn');
+    const cancelBtn = document.getElementById('deploy-cancel-btn');
+    const progressContainer = document.getElementById('deploy-progress-container');
+    const outputBox = document.getElementById('deploy-output-box');
+    const spinner = document.getElementById('deploy-status-spinner');
+    
+    startBtn.disabled = true;
+    cancelBtn.disabled = true;
+    progressContainer.style.display = 'flex';
+    outputBox.textContent = 'Initializing deployment...\n';
+    spinner.style.display = 'flex';
+    
+    if (method === 'production') {
+        const sshTarget = document.getElementById('deploy-ssh-target').value.trim();
+        const sshPassword = document.getElementById('deploy-ssh-password').value;
+        
+        outputBox.textContent += `Starting background Docker Hub deployment to ${sshTarget}...\n`;
+        
+        fetch('/admin/docker-deploy-to-production', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword)
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                outputBox.textContent += `✅ Background deploy process successfully started.\n`;
+                outputBox.textContent += `Log file: ${data.log_file || 'n/a'}\n`;
+                outputBox.textContent += `Streaming status output below:\n\n`;
+                
+                // Start polling status
+                deployLastLogLength = 0;
+                pollDeploymentProgress();
+            } else {
+                outputBox.textContent += `❌ FAILED: ${data.error || 'Unknown error'}\n`;
+                startBtn.disabled = false;
+                cancelBtn.disabled = false;
+                spinner.style.display = 'none';
+            }
+        })
+        .catch(err => {
+            outputBox.textContent += `❌ REQUEST ERROR: ${err.message}\n`;
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        });
+    } else {
+        outputBox.textContent += `Triggering synchronous local workstation deployment (this will pull and restart local dev/prod containers)...\n`;
+        outputBox.textContent += `Please wait, output will display upon completion (takes about 5-15 seconds)...\n\n`;
+        
+        fetch('/admin/docker/deploy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) {
+                outputBox.textContent += `✅ LOCAL DEPLOY COMPLETED SUCCESSFULLY!\n\n`;
+                outputBox.textContent += data.output || '';
+            } else {
+                outputBox.textContent += `❌ LOCAL DEPLOY HAD ERRORS:\n\n`;
+                outputBox.textContent += data.output || data.message || 'Unknown error';
+            }
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        })
+        .catch(err => {
+            outputBox.textContent += `❌ REQUEST ERROR: ${err.message}\n`;
+            startBtn.disabled = false;
+            cancelBtn.disabled = false;
+            spinner.style.display = 'none';
+        });
+    }
+}
+
+function pollDeploymentProgress() {
+    if (deployPollingInterval) clearInterval(deployPollingInterval);
+    
+    deployPollingInterval = setInterval(() => {
+        fetch('/admin/docker-deploy-status')
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    if (data.output && data.output.length > deployLastLogLength) {
+                        const newText = data.output.substring(deployLastLogLength);
+                        const outputBox = document.getElementById('deploy-output-box');
+                        outputBox.textContent += newText;
+                        outputBox.scrollTop = outputBox.scrollHeight;
+                        deployLastLogLength = data.output.length;
+                    }
+                    
+                    if (!data.is_running) {
+                        clearInterval(deployPollingInterval);
+                        deployPollingInterval = null;
+                        
+                        const outputBox = document.getElementById('deploy-output-box');
+                        outputBox.textContent += `\n
+
+=========================================================================\n`;
+                        outputBox.textContent += `✅ DEPLOYMENT FINISHED AT ${new Date().toLocaleTimeString()}\n`;
+                        outputBox.textContent += `================================================================================\n`;
+                        outputBox.scrollTop = outputBox.scrollHeight;
+                        
+                        document.getElementById('deploy-start-btn').disabled = false;
+                        document.getElementById('deploy-cancel-btn').disabled = false;
+                        document.getElementById('deploy-status-spinner').style.display = 'none';
+                    }
+                }
+            })
+            .catch(err => console.log('Error polling status:', err));
+    }, 2000);
+=======
+function startWorkTodoCard(btn, recordId) {
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/todo/open_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.textContent = '▶ Active';
+            btn.style.background = '#fd7e14';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#fd7e14';
+            btn.disabled = false;
+            btn.title = 'Log started — click Done when finished';
+            var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+            if (card) card.style.background = 'color-mix(in srgb,#0d6efd 8%,var(--bg-color,#fff))';
+        } else if (d.error && d.error.indexOf('already open') !== -1) {
+            btn.textContent = '▶ Active';
+            btn.style.background = '#fd7e14';
+            btn.style.color = '#fff';
+            btn.style.borderColor = '#fd7e14';
+            btn.disabled = false;
+            btn.title = 'Log already open — click Done when finished';
+        } else {
+            btn.disabled = false;
+            btn.textContent = '▶ Start';
+            alert('Could not start: ' + (d.error || 'unknown error'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = '▶ Start';
+        alert('Error: ' + e);
+    });
+}
+
+function closeLogTodoCard(btn, recordId) {
+    btn.disabled = true;
+    fetch('/todo/close_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.disabled = false;
+            btn.textContent = '▶ Start';
+            btn.style.border = '1px solid #6c757d';
+            btn.style.background = 'transparent';
+            btn.style.color = '#6c757d';
+            var startBtn = btn.previousElementSibling;
+            if (startBtn) {
+                startBtn.textContent = '▶ Start';
+                startBtn.style.background = 'transparent';
+                startBtn.style.color = '#0d6efd';
+                startBtn.style.borderColor = '#0d6efd';
+            }
+        } else {
+            btn.disabled = false;
+            alert('Could not close log: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        alert('Error: ' + e);
+    });
+}
 </script>
+
+<!-- Deploy Control Center Modal HTML -->
+<div id="deploy-modal" style="display:none; position:fixed; z-index:10000; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.6); align-items:center; justify-content:center; padding: 20px; box-sizing: border-box;">
+    <div style="background:var(--bg-secondary, #f8f9fa); color:var(--text-color, #333); border:1px solid var(--border-color, #dee2e6); border-radius:8px; max-width:650px; width:100%; padding:20px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:flex; flex-direction:column; gap:15px; box-sizing: border-box;">
+        
+        <!-- Header -->
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color, #dee2e6); padding-bottom:10px; margin-bottom:5px;">
+            <h3 style="margin:0; font-size:1.25em; display:flex; align-items:center; gap:8px;">
+                <span>🚀 Deploy Control Center</span>
+            </h3>
+            <button onclick="closeDeployModal()" style="background:none; border:none; font-size:1.5em; color:var(--text-muted-color, #6c757d); cursor:pointer; padding:0; line-height:1;">&times;</button>
+        </div>
+
+        <!-- Description -->
+        <p style="margin:0; font-size:0.9em; color:var(--text-muted-color, #6c757d);">
+            Select a deployment method. <strong>Docker Hub Production</strong> is the primary choice, which builds the image, pushes it to Docker Hub, and triggers a pull on the production server.
+        </p>
+
+        <!-- Form Options -->
+        <div style="display:flex; flex-direction:column; gap:10px;">
+            <!-- Option 1: Hub Production -->
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border-color, #dee2e6); border-radius:6px; cursor:pointer; background:var(--bg-color, #fff);">
+                <input type="radio" name="deploy_method" value="production" checked onchange="toggleDeployForm()" style="margin-top:3px; cursor:pointer;">
+                <div>
+                    <strong style="display:block; font-size:0.95em; color:var(--primary-color, #007bff);">Docker Hub Production Deploy (Primary)</strong>
+                    <span style="font-size:0.82em; color:var(--text-muted-color, #6c757d);">Builds production image, pushes to Docker Hub, and SSH-triggers pull on the server ubuntu@192.168.1.126.</span>
+                </div>
+            </label>
+
+            <!-- Option 2: Local Workstation -->
+            <label style="display:flex; align-items:flex-start; gap:10px; padding:12px; border:1px solid var(--border-color, #dee2e6); border-radius:6px; cursor:pointer; background:var(--bg-color, #fff);">
+                <input type="radio" name="deploy_method" value="local" onchange="toggleDeployForm()" style="margin-top:3px; cursor:pointer;">
+                <div>
+                    <strong style="display:block; font-size:0.95em; color:var(--text-color, #333);">Local Workstation Deploy</strong>
+                    <span style="font-size:0.82em; color:var(--text-muted-color, #6c757d);">Performs a git pull and rebuilds/recreates the local workstation containers.</span>
+                </div>
+            </label>
+        </div>
+
+        <!-- Production Deploy Settings -->
+        <div id="production-deploy-settings" style="display:flex; flex-direction:column; gap:10px; padding:12px; background:var(--bg-color, #fff); border:1px solid var(--border-color, #dee2e6); border-radius:6px; box-sizing: border-box;">
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:10px;">
+                <div>
+                    <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Target:</label>
+                    <input type="text" id="deploy-ssh-target" value="ubuntu@192.168.1.126" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Password:</label>
+                    <input type="password" id="deploy-ssh-password" placeholder="Saved password will be used" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                </div>
+            </div>
+            <div style="font-size:0.75em; color:var(--text-muted-color, #6c757d);">
+                Saved credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> will be loaded automatically if present.
+            </div>
+        </div>
+
+        <!-- Progress Log -->
+        <div id="deploy-progress-container" style="display:none; flex-direction:column; gap:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <strong style="font-size:0.85em; color:var(--text-color);">Console Log Output:</strong>
+                <span id="deploy-status-spinner" style="font-size:0.85em; color:var(--primary-color); display:flex; align-items:center; gap:5px;">
+                    <span style="display:inline-block; width:10px; height:10px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation: spin 1s linear infinite;"></span>
+                    Deploying...
+                </span>
+            </div>
+            <pre id="deploy-output-box" style="background:#1e1e1e; color:#d4d4d4; padding:12px; border-radius:6px; font-family:'Courier New', monospace; font-size:0.82em; max-height:200px; overflow-y:auto; margin:0; border:1px solid #333; white-space:pre-wrap;"></pre>
+        </div>
+
+        <!-- Footer Actions -->
+        <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color, #dee2e6); padding-top:10px; margin-top:5px;">
+            <button onclick="closeDeployModal()" id="deploy-cancel-btn" style="padding:6px 14px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; background:transparent; color:var(--text-color, #333); cursor:pointer; font-size:0.88em;">Cancel</button>
+            <button onclick="startDeploymentAction()" id="deploy-start-btn" style="padding:6px 16px; border:none; border-radius:4px; background:var(--primary-color, #007bff); color:#fff; cursor:pointer; font-size:0.88em; font-weight:bold;">Start Deploy</button>
+        </div>
+
+    </div>
+</div>
+
+<style>
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+</style>

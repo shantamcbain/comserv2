@@ -255,6 +255,13 @@ h6.section-subhead {
                 ↻ Sync Recommended Models
             </button>
             <span style="font-size:0.85em;color:var(--text-color,#555);">Pulls all ★ recommended models &amp; removes old deprecated ones from every server.</span>
+            [% IF is_csc_admin %]
+            <button id="upgrade-ollama-btn" class="btn btn-warning" style="margin-left:auto;"
+                    onclick="upgradeOllama()"
+                    title="Run the official Ollama installer script to upgrade the Ollama binary to the latest version">
+                ⬆ Upgrade Ollama
+            </button>
+            [% END %]
         </div>
         <div id="sync-log" style="display:none;margin:8px 0;padding:10px 14px;background:var(--background-color,#fff);border:1px solid var(--border-color,#ccc);border-radius:4px;font-size:0.82em;font-family:monospace;white-space:pre-wrap;max-height:260px;overflow-y:auto;"></div>
         [% END %]
@@ -584,6 +591,40 @@ function unloadModel(model, host, port, serverIndex) {
         }
     })
     .catch(function() { alert('Unload request failed.'); });
+}
+
+function upgradeOllama() {
+    var btn = document.getElementById('upgrade-ollama-btn');
+    var log = document.getElementById('sync-log');
+    if (!btn || !log) return;
+    if (!confirm('This will run the official Ollama installer script (curl -fsSL https://ollama.com/install.sh | sh) on the local server.\n\nThe server may restart briefly. Continue?')) return;
+    btn.disabled = true;
+    btn.textContent = '\u23f3 Upgrading\u2026';
+    log.style.display = '';
+    log.textContent = 'Running Ollama upgrade\u2026\n';
+    fetch('/ai/upgrade_ollama', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({})
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+        btn.disabled = false;
+        btn.textContent = '\u2b06 Upgrade Ollama';
+        if (!data.success) {
+            log.textContent += '\u2717 Error: ' + (data.error || 'unknown') + '\n';
+            return;
+        }
+        log.textContent = 'Before: ' + (data.version_before || '?') + '\n'
+                        + 'After:  ' + (data.version_after  || '?') + '\n\n'
+                        + (data.output || '') + '\n\nUpgrade complete.';
+    })
+    .catch(function(err) {
+        btn.disabled = false;
+        btn.textContent = '\u2b06 Upgrade Ollama';
+        log.textContent += 'Request failed: ' + err + '\n';
+    });
 }
 
 function syncRecommendedModels() {

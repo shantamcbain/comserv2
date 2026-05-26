@@ -133,6 +133,8 @@ sub index :Path :Args(0) {
     }
 
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+    my $user_id    = $c->session->{user_id};
+    my $user_site_memberships = $self->_get_user_site_memberships($c, $user_id);
 
     $c->stash(
         template           => 'membership/Index.tt',
@@ -146,6 +148,7 @@ sub index :Path :Args(0) {
         csc_hosting_plans  => $csc_hosting_plans,
         hosting_account    => $hosting_account,
         csc_not_registered => $csc_not_registered,
+        user_site_memberships => $user_site_memberships,
     );
     $c->forward($c->view('TT'));
 }
@@ -285,10 +288,14 @@ sub plans :Local :Args(0) {
             "Could not load membership plans: $@");
     }
 
+    my $user_id = $c->session->{user_id};
+    my $user_site_memberships = $self->_get_user_site_memberships($c, $user_id);
+
     $c->stash(
         template  => 'membership/Plans.tt',
         plans     => $plans,
         site_name => $site_name,
+        user_site_memberships => $user_site_memberships,
     );
     $c->forward($c->view('TT'));
 }
@@ -583,12 +590,14 @@ sub upgrade :Local :Args(0) {
     }
 
     my $patreon_cfg = $self->_get_patreon_config($c, $site_name);
+    my $user_site_memberships = $self->_get_user_site_memberships($c, $user_id);
 
     $c->stash(
         template           => 'membership/Upgrade.tt',
         plans              => $plans,
         current_membership => $current_membership,
         patreon_cfg        => $patreon_cfg,
+        user_site_memberships => $user_site_memberships,
     );
     $c->forward($c->view('TT'));
 }
@@ -671,6 +680,88 @@ sub _get_patreon_config {
         }
     };
     return keys %cfg ? \%cfg : undef;
+}
+
+sub _get_user_site_memberships {
+    my ($self, $c, $user_id) = @_;
+    return [] unless $user_id;
+
+    my @site_info;
+    eval {
+        my @memberships = $c->model('DBEncy')->resultset('UserMembership')->search(
+            { 'me.user_id' => $user_id },
+            { prefetch => ['site', 'plan'] }
+        )->all;
+
+        my @user_roles = $c->model('DBEncy')->resultset('UserSiteRole')->search(
+            { 'me.user_id' => $user_id },
+            { prefetch => 'site' }
+        )->all;
+
+        my %sites_seen;
+
+        for my $ur (@user_roles) {
+            my $site = $ur->site;
+            next unless $site;
+            my $sname = $site->name;
+            my $role  = $ur->role || '';
+            
+            $sites_seen{$sname} ||= {
+                site_name       => $sname,
+                display_name    => $site->site_display_name || $sname,
+                site_id         => $site->id,
+                personal_plan   => 'Free',
+                personal_status => 'active',
+                is_admin        => 0,
+                roles           => [],
+            };
+            
+            push @{ $sites_seen{$sname}->{roles} }, $role;
+            if (lc($role) eq 'admin' || lc($role) eq 'site_admin') {
+                $sites_seen{$sname}->{is_admin} = 1;
+            }
+        }
+
+        for my $m (@memberships) {
+            my $site = $m->site;
+            next unless $site;
+            my $sname = $site->name;
+            
+            $sites_seen{$sname} ||= {
+                site_name       => $sname,
+                display_name    => $site->site_display_name || $sname,
+                site_id         => $site->id,
+                is_admin        => 0,
+                roles           => [],
+            };
+            
+            $sites_seen{$sname}->{personal_plan}   = $m->plan ? $m->plan->name : 'Free';
+            $sites_seen{$sname}->{personal_status} = $m->status;
+        }
+
+        for my $sname (keys %sites_seen) {
+            my $site_info = $sites_seen{$sname};
+            
+            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+                { sitename => $sname },
+                { rows => 1 }
+            )->single;
+
+            if ($hosting) {
+                $site_info->{hosting_plan}   = $hosting->plan_slug;
+                $site_info->{hosting_status} = $hosting->status;
+                $site_info->{hosting_cost}   = $hosting->monthly_cost;
+            }
+        }
+
+        @site_info = sort { $a->{display_name} cmp $b->{display_name} } values %sites_seen;
+    };
+    if ($@) {
+        my $err = $@;
+        $c->log->error("Error in _get_user_site_memberships: $err");
+    }
+
+    return \@site_info;
 }
 
 __PACKAGE__->meta->make_immutable;

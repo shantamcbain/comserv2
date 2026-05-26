@@ -172,7 +172,8 @@
 .gcal-ev {
     position: absolute; border-radius: 4px; padding: 2px 5px;
     font-size: 0.77em; overflow: hidden; box-sizing: border-box;
-    color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.25);
+    color: #fff; background: var(--gcal-ev-color, #1a73e8); border-left: 3px solid var(--gcal-ev-color, #1a73e8);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.25);
     cursor: grab; z-index: 3; transition: box-shadow 0.12s, opacity 0.12s;
     min-height: 18px;
 }
@@ -475,7 +476,33 @@
         min-width: 300px;
         max-width: 420px;
         white-space: normal;
-        pointer-events: none;
+        pointer-events: auto;
+    }
+    .todo-popup .popup-actions {
+        display: flex; gap: 6px; margin-top: 10px; flex-wrap: wrap;
+    }
+    .todo-popup .popup-action-btn {
+        font-size: 0.82em; padding: 3px 10px; border-radius: 4px; cursor: pointer;
+        border: 1px solid var(--primary-color, #4CAF50);
+        background: var(--primary-color, #4CAF50); color: #fff;
+        text-decoration: none; white-space: nowrap; line-height: 1.6;
+    }
+    .todo-popup .popup-action-btn:hover { opacity: 0.85; }
+    .todo-popup .popup-action-btn.btn-done {
+        background: #43a047; border-color: #43a047;
+    }
+    .todo-popup .popup-action-btn.btn-log {
+        background: #1a73e8; border-color: #1a73e8;
+    }
+    .todo-popup .popup-action-btn.btn-view {
+        background: #757575; border-color: #757575;
+    }
+    .todo-popup .popup-action-btn.btn-start {
+        background: #0d6efd; border-color: #0d6efd;
+    }
+    .gcal-ev-btn-active {
+        background: rgba(253,126,20,0.9) !important;
+        font-weight: bold;
     }
 
     /* Responsive design */
@@ -596,6 +623,7 @@ function markDoneCalendar(btn, recordId) {
 }
 
 function markDoneGcal(btn, recordId) {
+    btn.disabled = true;
     fetch('/todo/update_status', {
         method: 'POST',
         credentials: 'same-origin',
@@ -606,16 +634,89 @@ function markDoneGcal(btn, recordId) {
             var ev = btn.closest('.gcal-ev');
             if (ev) {
                 ev.classList.add('is-done');
-                btn.remove();
                 var title = ev.querySelector('.gcal-ev-title');
                 if (title && !title.textContent.trim().startsWith('✓')) {
                     title.textContent = '✓ ' + title.textContent.trim();
                 }
             }
+            if (typeof _rescheduleAndReload === 'function') {
+                _rescheduleAndReload();
+            } else {
+                fetch('/todo/reschedule', { method: 'POST', credentials: 'same-origin' })
+                    .finally(function() { window.location.reload(); });
+            }
         } else {
+            btn.disabled = false;
             alert('Could not mark done: ' + (d.error || 'unknown'));
         }
-    }).catch(function(e){ alert('Error: ' + e); });
+    }).catch(function(e){ btn.disabled = false; alert('Error: ' + e); });
+}
+
+function startWorkGcal(btn, recordId) {
+    btn.disabled = true;
+    var origText = btn.textContent.trim();
+    btn.textContent = '…';
+    fetch('/todo/open_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.textContent = '▶ Active';
+            btn.classList.add('gcal-ev-btn-active');
+            btn.disabled = false;
+            btn.title = 'Log started — click Done when finished';
+            var ev = btn.closest('.gcal-ev');
+            if (ev) {
+                ev.style.outline = '2px solid #fd7e14';
+                var popup = ev.querySelector('.todo-popup .btn-start');
+                if (popup) { popup.textContent = '▶ Active'; popup.style.background = '#fd7e14'; popup.style.borderColor = '#fd7e14'; }
+            }
+        } else {
+            btn.disabled = false;
+            btn.textContent = origText;
+            if (d.error && d.error.indexOf('already open') !== -1) {
+                btn.textContent = '▶ Active';
+                btn.classList.add('gcal-ev-btn-active');
+                btn.title = 'Log already open — click Done when finished';
+            } else {
+                alert('Could not start: ' + (d.error || 'unknown error'));
+            }
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = origText;
+        alert('Error: ' + e);
+    });
+}
+
+function closeLogTodoCard(btn, recordId) {
+    btn.disabled = true;
+    fetch('/todo/close_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ record_id: recordId })
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            btn.disabled = false;
+            var startBtn = btn.previousElementSibling;
+            if (startBtn) {
+                startBtn.textContent = '▶ Start';
+                startBtn.style.background = 'transparent';
+                startBtn.style.color = '#0d6efd';
+                startBtn.style.borderColor = '#0d6efd';
+            }
+            btn.remove();
+        } else {
+            btn.disabled = false;
+            alert('Could not close log: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        alert('Error: ' + e);
+    });
 }
 
 function _updateDaySiteSummary() {
@@ -630,13 +731,18 @@ function _updateDaySiteSummary() {
 
 /* ── Google Calendar layout helpers ── */
 
-var GCAL_PALETTE = [
-    '#1e88e5','#43a047','#8e24aa','#e53935','#fb8c00',
-    '#00897b','#6d4c41','#1565c0','#558b2f','#c62828','#00838f','#4527a0'
-];
+var GCAL_PALETTE = [];
 var _gcalSiteColors = {};
 var _gcalColorIdx = 0;
+function _buildGcalPalette() {
+    var s = getComputedStyle(document.documentElement);
+    var accent  = s.getPropertyValue('--accent-color').trim()  || '#FB8C00';
+    var info    = s.getPropertyValue('--info-color').trim()    || '#00897B';
+    var success = s.getPropertyValue('--success-color').trim() || '#43A047';
+    return [info, accent, success, '#8e24aa', '#e53935', '#1565c0', '#6d4c41', '#558b2f', '#c62828', '#00838f', '#4527a0'];
+}
 function gcalSiteColor(site) {
+    if (!GCAL_PALETTE.length) GCAL_PALETTE = _buildGcalPalette();
     if (!site) return '#757575';
     if (!_gcalSiteColors[site]) {
         _gcalSiteColors[site] = GCAL_PALETTE[_gcalColorIdx % GCAL_PALETTE.length];
@@ -741,6 +847,14 @@ function gcalApplyFilters() {
         var userOk = !filterUser || user === filterUser;
         el.style.display = (siteOk && userOk) ? '' : 'none';
     });
+    if (window.self === window.top) {
+        fetch('/planning/set_filter', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ site: filterSite, user: filterUser })
+        }).catch(function(){});
+    }
 }
 
 function gcalNavigateDay(dir) {
@@ -894,6 +1008,7 @@ document.addEventListener('DOMContentLoaded', function() {
     setInterval(gcalUpdateNowLine, 60000);
     initGcalDragDrop();
     gcalPopulateUserFilter();
+    gcalApplyFilters();
     if (typeof initDayViewDragAndDrop === 'function') {
         initDayViewDragAndDrop();
     }
@@ -905,12 +1020,14 @@ document.addEventListener('DOMContentLoaded', function() {
     function attachPopupListeners() {
         document.querySelectorAll('.todo-item-day:not([data-popup-init]), .gcal-ev:not([data-popup-init])').forEach(function(item) {
             item.setAttribute('data-popup-init', '1');
+            var _popupTimer = null;
             item.addEventListener('mouseenter', function() {
+                if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
                 const popup = this.querySelector('.todo-popup');
                 if (!popup) return;
                 const rect = this.getBoundingClientRect();
                 const vw = window.innerWidth, vh = window.innerHeight;
-                const pw = 360, ph = 220;
+                const pw = 380, ph = 260;
                 let left = (rect.right + pw + 10 < vw) ? rect.right + 10
                          : (rect.left - pw - 10 > 0)   ? rect.left - pw - 10
                          : Math.max(10, (vw - pw) / 2);
@@ -918,10 +1035,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 popup.style.left = left + 'px';
                 popup.style.top  = top  + 'px';
                 popup.style.display = 'block';
+                popup.addEventListener('mouseenter', function() {
+                    if (_popupTimer) { clearTimeout(_popupTimer); _popupTimer = null; }
+                }, { once: false });
+                popup.addEventListener('mouseleave', function() {
+                    _popupTimer = setTimeout(function() { popup.style.display = 'none'; }, 150);
+                }, { once: false });
             });
             item.addEventListener('mouseleave', function() {
                 const popup = this.querySelector('.todo-popup');
-                if (popup) popup.style.display = 'none';
+                if (!popup) return;
+                _popupTimer = setTimeout(function() { popup.style.display = 'none'; }, 150);
             });
         });
     }
@@ -1062,7 +1186,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <select id="gcal-site-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH sname IN ap_all_sitenames %]
-        <option value="[% sname %]">[% sname %]</option>
+        <option value="[% sname %]"[% IF cal_filter_site == sname %] selected[% END %]>[% sname %]</option>
         [% END %]
     </select>
     [% END %]
@@ -1070,7 +1194,7 @@ document.addEventListener('DOMContentLoaded', function() {
     <select id="gcal-user-filter" onchange="gcalApplyFilters()" style="font-size:0.82em;padding:2px 4px;border:1px solid #dadce0;border-radius:4px;background:#fff;color:#3c4043;width:auto;flex-shrink:0;">
         <option value="">All</option>
         [% FOREACH uname IN ap_all_usernames %]
-        <option value="[% uname %]">[% uname %]</option>
+        <option value="[% uname %]"[% IF cal_filter_user == uname %] selected[% END %]>[% uname %]</option>
         [% END %]
     </select>
 </div>
@@ -1134,7 +1258,7 @@ document.addEventListener('DOMContentLoaded', function() {
             [% SET tpx      = stm - 300 %]
             [% IF tpx < 0 %][% SET tpx = 0 %][% END %]
             [% IF tpx > 1000 %][% SET tpx = 1000 %][% END %]
-            [% SET tht      = test < 30 ? 30 : test %]
+            [% SET tht      = test < 15 ? 15 : test %]
             [% IF tht > 900 %][% SET tht = 900 %][% END %]
             [% SET tlbl     = todstr.substr(0, 5) %]
             [% END %]
@@ -1164,13 +1288,21 @@ document.addEventListener('DOMContentLoaded', function() {
                         </select>
                         <a class="gcal-ev-btn" draggable="false" href="/todo/details?record_id=[% todo.record_id %]">View</a>
                         <a class="gcal-ev-btn" draggable="false" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
-                        [% UNLESS tdone %]<button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>[% END %]
+                        [% UNLESS tdone %]
+                        [% SET _tis_inprog = (todo.status == 2) %]
+                        <button class="gcal-ev-btn[% IF _tis_inprog %] gcal-ev-btn-active[% END %]" draggable="false"
+                            onclick="startWorkGcal(this,[% todo.record_id %])"
+                            title="[% IF _tis_inprog %]In progress — log open[% ELSE %]Start working on this todo[% END %]">
+                            [% IF _tis_inprog %]▶ Active[% ELSE %]▶ Start[% END %]
+                        </button>
+                        <button class="gcal-ev-btn" draggable="false" onclick="markDoneGcal(this,[% todo.record_id %])">Done</button>
+                        [% END %]
                     </div>
                 </div>
                 <div class="todo-popup">
                     <div class="popup-subject">[% todo.subject | html %]</div>
                     [% SET pd = todo.description | trim %]
-                    [% IF pd %]<div class="popup-description" style="margin:4px 0;font-size:0.88em;color:#555;max-height:120px;overflow-y:auto;">[% pd | html %]</div>[% END %]
+                    [% IF pd %]<div class="popup-description" style="margin:4px 0;font-size:0.88em;color:#555;max-height:100px;overflow-y:auto;">[% pd | html %]</div>[% END %]
                     <div class="popup-details">
                         <div><strong>Time:</strong> [% tlbl %]</div>
                         [% IF ts %]<div><strong>Site:</strong> [% ts %]</div>[% END %]
@@ -1183,6 +1315,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         [% IF test > 0 %]<div><strong>Est:</strong> [% test %] min</div>[% END %]
                         [% IF isrec %]<div><strong>Recurring:</strong> [% todo.recurrence_rule || 'yes' %]</div>[% END %]
                         [% IF ttype AND ttype != 'task' %]<div><strong>Type:</strong> [% ttype %]</div>[% END %]
+                    </div>
+                    <div class="popup-actions">
+                        <a class="popup-action-btn btn-view" href="/todo/details?record_id=[% todo.record_id %]">View</a>
+                        <a class="popup-action-btn btn-log" href="/log/log_form?todo_record_id=[% todo.record_id %]">Log</a>
+                        [% UNLESS tdone %]
+                        <button class="popup-action-btn btn-start" onclick="startWorkGcal(this,[% todo.record_id %])">▶ Start</button>
+                        <button class="popup-action-btn btn-done" onclick="markDoneGcal(this,[% todo.record_id %]);this.closest('.todo-popup').style.display='none';">Done</button>
+                        [% END %]
                     </div>
                 </div>
             </div>
