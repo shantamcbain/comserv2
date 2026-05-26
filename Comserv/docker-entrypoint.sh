@@ -140,20 +140,22 @@ fi
 
 # Bootstrap whisper_venv on named volume if not yet installed — runs in background
 # so it does not block app startup or health checks
-if [ ! -f "/opt/comserv/whisper_venv/bin/python3" ]; then
-  echo "Whisper venv not found — bootstrapping in background (first-run only)..."
+if [ ! -f "/opt/comserv/whisper_venv/bin/python3" ] || ! /opt/comserv/whisper_venv/bin/python3 -c "import whisper" &>/dev/null; then
+  echo "Whisper venv not found or incomplete — bootstrapping in background (first-run only)..."
   (
     if command -v python3 &>/dev/null; then
       python3 -m venv /opt/comserv/whisper_venv >> /tmp/whisper_install.log 2>&1 && \
       /opt/comserv/whisper_venv/bin/pip install --no-cache-dir \
         torch --index-url https://download.pytorch.org/whl/cpu \
         openai-whisper >> /tmp/whisper_install.log 2>&1 && \
+      chown -R comserv:comserv /opt/comserv/whisper_venv && \
       echo "✓ Whisper install complete" >> /tmp/whisper_install.log || \
       echo "⚠ Whisper install failed — check /tmp/whisper_install.log" >> /tmp/whisper_install.log
     fi
   ) &
   echo "  Whisper install started in background — see /tmp/whisper_install.log"
 else
+  chown -R comserv:comserv /opt/comserv/whisper_venv
   echo "✓ Whisper venv ready at /opt/comserv/whisper_venv"
 fi
 

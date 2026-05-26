@@ -10324,16 +10324,30 @@ sub transcribe :Local :Args(0) {
     my $sitename_early  = $c->session->{SiteName} || $c->session->{sitename} || 'BMaster';
     my $upload_size_early = $upload->size;
 
+    my $source_type = 'nfs';
     eval {
         require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
         require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
             or die "copy to NFS failed: $!";
     };
     if ($@) {
-        unlink $tmp_file;
-        $c->response->status(500);
-        $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS: $@" }));
-        return;
+        my $local_base = $c->path_to('root', 'uploads')->stringify;
+        $audio_nfs_early = "${local_base}/bmaster/audio";
+        $transcript_nfs_early = "${local_base}/bmaster/transcripts";
+        $nfs_audio_file_early = "${audio_nfs_early}/${safe_user_early}_${timestamp_early}_$$.${ext}";
+        $nfs_transcript_file_early = "${transcript_nfs_early}/${safe_user_early}_${timestamp_early}_$$.json";
+        $source_type = 'local';
+        eval {
+            require File::Path; File::Path::make_path($audio_nfs_early, $transcript_nfs_early);
+            require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file_early)
+                or die "copy to local fallback failed: $!";
+        };
+        if ($@) {
+            unlink $tmp_file;
+            $c->response->status(500);
+            $c->response->body(encode_json({ success => JSON::false, error => "Failed to save audio to NFS and local fallback: $@" }));
+            return;
+        }
     }
 
     my $audio_file_id = undef;
@@ -10345,7 +10359,7 @@ sub transcribe :Local :Args(0) {
             file_type   => 'audio',
             file_format => 'audio/' . $ext,
             file_size   => $upload_size_early,
-            source_type => 'nfs',
+            source_type => $source_type,
             sitename    => $sitename_early,
             description => "Hive inspection audio recorded by " . ($username || ''),
             user_id     => undef,
@@ -10566,6 +10580,7 @@ PYSCRIPT
                 sitename           => $sitename,
                 username           => $username,
                 ext                => $ext,
+                source_type        => $source_type,
             });
             close $rf;
 
@@ -10625,7 +10640,7 @@ sub transcribe_status :Local :Args(0) {
                         file_type   => 'audio',
                         file_format => 'audio/' . ($result->{ext} || 'wav'),
                         file_size   => $result->{file_size} || 0,
-                        source_type => 'nfs',
+                        source_type => $result->{source_type} || 'nfs',
                         sitename    => $sitename,
                         description => "Hive inspection audio recorded by " . ($result->{username} || ''),
                         user_id     => undef,
@@ -10640,7 +10655,7 @@ sub transcribe_status :Local :Args(0) {
                             file_name   => ($result->{orig_name} || 'transcript') . '.json',
                             nfs_path    => $result->{transcript_nfs_path},
                             file_format => 'application/json',
-                            source_type => 'nfs',
+                            source_type => $result->{source_type} || 'nfs',
                             sitename    => $sitename,
                             description => "Whisper transcript for " . ($result->{orig_name} || ''),
                             user_id     => undef,
