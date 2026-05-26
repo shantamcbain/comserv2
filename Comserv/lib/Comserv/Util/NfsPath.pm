@@ -28,7 +28,7 @@ has 'host_nfs_path' => (
     isa     => 'Maybe[Str]',
     lazy    => 1,
     default => sub {
-        return $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
+        return $ENV{COMSERV_HOST_NFS_PATH} || $ENV{HOST_NFS_PATH} || $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
     },
 );
 

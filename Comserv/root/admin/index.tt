@@ -662,7 +662,7 @@
             </a>
 
             [%# ── Local Disk Usage ── %]
-            <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="stat-item stat-item-link"
+            <a href="[% c.uri_for('/admin/hardware_monitor/disk_diagnose', { hostname => 'workstation', path => '/' }) %]" class="stat-item stat-item-link"
                title="[% stats.disk_used %] used of [% stats.disk_total %] — click to manage disk space">
                 [% SET dlevel = stats.disk_level || 'ok' %]
                 <div class="stat-value stat-disk-[% dlevel %]">
@@ -678,7 +678,7 @@
             </a>
 
             [%# ── NFS Disk Usage ── %]
-            <a href="[% c.uri_for('/admin/hardware_monitor/disk_health') %]" class="stat-item stat-item-link"
+            <a href="[% c.uri_for('/admin/hardware_monitor/disk_diagnose', { hostname => 'workstation', path => '/data/nfs' }) %]" class="stat-item stat-item-link"
                title="NFS storage: [% stats.nfs_used %] used of [% stats.nfs_total %] — click to manage">
                 [% SET nlevel = stats.nfs_level || 'ok' %]
                 [% IF stats.nfs_pct > 0 %]

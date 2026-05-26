@@ -357,7 +357,7 @@ sub get_system_stats {
 
     eval {
         my $df = `df -P -BM . 2>/dev/null | tail -1`;
-        if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+        if ($df =~ /\s+(\d+)[MG]?\s+(\d+)[MG]?\s+(\d+)[MG]?\s+(\d+)%/) {
             my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
             $stats->{disk_pct}   = $pct;
             $stats->{disk_used}  = $used >= 1024 ? sprintf('%.1f GB', $used/1024) : "${used} MB";
@@ -371,7 +371,7 @@ sub get_system_stats {
         my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
         if (-d $nfs_root) {
             my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
-            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+            if ($df =~ /\s+(\d+)[MG]?\s+(\d+)[MG]?\s+(\d+)[MG]?\s+(\d+)%/) {
                 my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
                 $stats->{nfs_pct}   = $pct;
                 $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
