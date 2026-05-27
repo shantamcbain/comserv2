@@ -280,7 +280,7 @@ eval {
     my $start_cmd = "sudo docker run -d --name $container_name --restart unless-stopped"
         . " -p $port_map"
         . " --log-opt max-size=50m --log-opt max-file=5"
-        . " -e WORKSHOP_RESOURCES_PATH=/data/nfs"
+        . " -e NFS_DATA_PATH=/data/nfs"
         . " -e COMSERV_SESSION_DIR=/tmp/comserv/session"
         . " -e COMSERV_SESSION_COOKIE=comserv_session"
         . " -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro"

@@ -1623,7 +1623,7 @@ sub download :Local :Args(1) {
 }
 
 sub _nfs_root {
-    my $configured = $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
+    my $configured = $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
     return $configured if -d $configured;
 
     # Fallback for dev environments where NFS is not mounted:
