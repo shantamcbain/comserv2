@@ -3027,7 +3027,6 @@ sub result_name_to_table_name {
         'Log' => 'log',
         'MailDomain' => 'mail_domains',
         'NetworkDevice' => 'network_devices',
-        'PageTb' => 'page_tb',
         'Pallet' => 'pallets',
         'ProjectSite' => 'project_sites',
         'Queen' => 'queens',
@@ -7144,11 +7143,14 @@ sub _preview_page_migration {
         push @issues, "Missing menu" unless $f_page->menu;
         push @issues, "Missing page_code" unless $f_page->page_code;
         
-        # Check duplicate page_code in Ency.pages_content
+        # Check duplicate page_code in Ency.page for the same site.
         if ($f_page->page_code) {
-            my $exists = $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code });
+            my $exists = $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
             if ($exists) {
-                push @issues, "Page code already exists in destination";
+                push @issues, "Page code already exists in destination for site " . ($f_page->sitename || 'CSC');
             }
         }
         
@@ -7188,10 +7190,15 @@ sub _perform_page_migration {
         }
         
         # Safety checks
-        my $exists = eval { $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code }) };
+        my $exists = eval {
+            $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+        };
         if ($exists) {
             $skipped_count++;
-            push @migration_log, "Skipped duplicate: " . $f_page->page_code;
+            push @migration_log, "Skipped duplicate: " . ($f_page->sitename || 'CSC') . "/" . $f_page->page_code;
             next;
         }
         
