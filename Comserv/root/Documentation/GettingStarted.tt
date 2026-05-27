@@ -29,6 +29,7 @@
         <ol>
             <li>Log in to your account using your credentials</li>
             <li>Explore the dashboard to get familiar with the interface</li>
+            <li><strong>Add pages</strong> — go to <a href="[% c.uri_for('/admin/pages') %]">Admin › Pages</a> and create pages for your site.</li>
             <li>Check your profile settings and update if necessary</li>
             <li>Review available documentation for specific features</li>
         </ol>

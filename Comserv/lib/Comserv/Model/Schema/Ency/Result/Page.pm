@@ -5,7 +5,7 @@ use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp', 'EncodedColumn');
-__PACKAGE__->table('pages_content');
+__PACKAGE__->table('page');
 
 __PACKAGE__->add_columns(
     'id' => {
@@ -79,7 +79,7 @@ __PACKAGE__->add_columns(
 );
 
 __PACKAGE__->set_primary_key('id');
-__PACKAGE__->add_unique_constraint(['page_code']);
+__PACKAGE__->add_unique_constraint('unique_sitename_page_code' => ['sitename', 'page_code']);
 
 # Add indexes for common queries
 __PACKAGE__->resultset_attributes({

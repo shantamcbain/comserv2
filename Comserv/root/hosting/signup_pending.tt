@@ -1,0 +1,33 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Application Received!</h1>
+</div>
+
+<div class="content-container">
+<div class="content-primary">
+
+<div class="app-section">
+    <h2>Thank you!</h2>
+    <p>Your hosting application for <strong>[% site_name | html %]</strong> (<code>[% domain_name | html %]</code>) has been received and is pending review by our team.</p>
+    <p>A confirmation has been sent to <strong>[% email | html %]</strong>.</p>
+</div>
+
+<div class="app-section">
+    <h3>What happens next?</h3>
+    <ol>
+        <li>Our admin team reviews your application (usually within 1 business day).</li>
+        <li>We create your site and configure the DNS.</li>
+        <li>You will receive an email when your site is live at <code>[% domain_name | html %]</code>.</li>
+        <li>Log in with username <strong>[% username | html %]</strong> to manage your site.</li>
+    </ol>
+</div>
+
+<div class="form-actions">
+    <a href="[% c.uri_for('/') %]" class="btn btn-primary">Return to Home</a>
+</div>
+
+</div>
+</div>
+
+</div>
