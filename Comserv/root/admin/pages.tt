@@ -271,54 +271,40 @@
                                     <th>Sort Order</th>
                                     <th>Status</th>
                                     <th>Roles</th>
-                                    <th style="width: 150px; text-align: right;">Actions</th>
-                                    <th>Actions</th>
+                                    <th style="width: 180px; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 [% IF pages && pages.size > 0 %]
-                                [% IF pages.size > 0 %]
                                     [% FOREACH page IN pages %]
                                         <tr>
                                             <td>[% page.sitename | html %]</td>
                                             <td>[% page.menu | html %]</td>
                                             <td><code>[% page.page_code | html %]</code></td>
                                             <td>[% page.title | html %]</td>
-                                            <td><span class="label label-info">[% page.sitename %]</span></td>
-                                            <td>[% page.menu %]</td>
-                                            <td><code>[% page.page_code %]</code></td>
-                                            <td>[% page.title %]</td>
                                             <td>[% page.link_order %]</td>
                                             <td>
                                                 [% IF page.status == 'active' %]
                                                     <span class="label label-success">Active</span>
-                                                    <span class="label label-success badge bg-success">Active</span>
-                                                [% ELIF page.status == 'draft' %]
-                                                    <span class="label label-warning badge bg-warning">Draft</span>
-                                                [% ELSE %]
+                                                [% ELSIF page.status == 'inactive' %]
                                                     <span class="label label-default">Inactive</span>
-                                                    <span class="label label-default badge bg-secondary">[% page.status | html %]</span>
+                                                [% ELSE %]
+                                                    <span class="label label-warning">[% page.status | html %]</span>
                                                 [% END %]
                                             </td>
-                                            <td><span class="label label-warning">[% page.roles %]</span></td>
-                                            <td style="text-align: right;">
-                                                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit">
-                                                    <i class="fa fa-edit"></i>
                                             <td><code>[% page.roles | html %]</code></td>
-                                            <td>
-                                                <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-xs btn-sm btn-info" target="_blank" title="View Page">
+                                            <td style="text-align: right;">
+                                                <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-xs btn-info" target="_blank" title="View Page">
                                                     <i class="fa fa-eye"></i> View
                                                 </a>
-                                                <a href="[% c.uri_for('/pages/edit', page.page_code) %]" class="btn btn-xs btn-sm btn-primary" title="Edit Page">
+                                                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit Page">
                                                     <i class="fa fa-edit"></i> Edit
                                                 </a>
                                                 <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]"
-                                                   class="btn btn-xs btn-sm btn-danger delete-page-btn"
+                                                   class="btn btn-xs btn-danger delete-page-btn"
                                                    title="Delete Page"
                                                    data-code="[% page.page_code | html %]">
                                                     <i class="fa fa-trash"></i> Delete
-                                                <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]" class="btn btn-xs btn-danger" title="Delete" onclick="return confirm('Are you sure you want to delete this page? This action cannot be undone.');">
-                                                    <i class="fa fa-trash"></i>
                                                 </a>
                                             </td>
                                         </tr>
@@ -326,9 +312,8 @@
                                 [% ELSE %]
                                     <tr>
                                         <td colspan="8" class="text-center text-muted" style="padding: 20px;">
-                                            No pages found matching the active criteria.
+                                            No pages found in the system. Use "Create New Page" or "Migrate Legacy Pages" to add content.
                                         </td>
-                                        <td colspan="7" class="text-center">No pages found in the system. Use "Create New Page" or "Migrate Legacy Pages" to add content.</td>
                                     </tr>
                                 [% END %]
                             </tbody>
