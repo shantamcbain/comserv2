@@ -3135,8 +3135,9 @@ sub open_log :Path('open_log') :Args(0) {
             undef, $record_id
         );
         if ($existing_open) {
-            $todo->update({ status => 5, last_mod_by => $username, last_mod_date => $today })
-                if (($todo->status // 0) != 5);
+            my $cur_status = $dbh->selectrow_array("SELECT status FROM todo WHERE record_id=?", undef, $record_id) // 0;
+            $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+                undef, $username, $today, $record_id) if $cur_status != 5;
             $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
             return;
         }
@@ -3168,7 +3169,8 @@ sub open_log :Path('open_log') :Args(0) {
         );
         my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
 
-        $todo->update({ status => 5, last_mod_by => $username, last_mod_date => $today });
+        $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
             "Log opened for todo $record_id by $username (log_id=$new_log_id) via raw SQL");
@@ -3234,10 +3236,8 @@ sub close_log :Path('close_log') :Args(0) {
             undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
         );
 
-        my $todo_cl = $c->model('DBEncy')->resultset('Todo')->find($record_id);
-        if ($todo_cl && (($todo_cl->status // 0) == 5)) {
-            $todo_cl->update({ status => 2, last_mod_by => $username, last_mod_date => $today });
-        }
+        $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
+            undef, $username, $today, $record_id);
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
             "Closed log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
@@ -3330,7 +3330,8 @@ sub done_with_log :Path('done_with_log') :Args(0) {
             );
         }
 
-        $todo->update({ status => 3, last_mod_by => $username, last_mod_date => $today });
+        $dbh->do("UPDATE todo SET status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
             "Todo $record_id marked done by $username");
