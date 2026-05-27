@@ -35,7 +35,8 @@
     OR _tc_status == 'DONE' OR _tc_status == 'Completed'
     OR _tc_status == 'completed' OR _tc_status == 'Closed'
     OR _tc_status == 'closed' OR _tc_status == 'Done') -%]
-[% SET _tc_is_active = (_tc_status == 5 OR active_todos.${tc.record_id}) -%]
+[% SET _tc_rid = tc.record_id -%]
+[% SET _tc_is_active = (_tc_status == 5 OR active_todos.$_tc_rid) -%]
 [% SET _tc_opacity = (_tc_is_done OR tc_is_blocked) ? '0.6' : '1' -%]
 [%# Compute border color %]
 [% IF tc_is_audit_root -%]
