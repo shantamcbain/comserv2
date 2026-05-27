@@ -472,7 +472,7 @@
                 toggleBtn.addEventListener('click', function(e) {
                     e.preventDefault();
                     
-                    const ckEditorContainer = bodyTextarea.nextElementSibling;
+                    const ckEditorContainer = bodyTextarea.parentNode.querySelector('.ck-editor') || bodyTextarea.nextElementSibling;
                     
                     if (isWysiwygMode) {
                         // Switch from WYSIWYG to Raw HTML
