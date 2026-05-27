@@ -68,22 +68,19 @@
                             <div class="row">
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="sitename">Site Name <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Specifies the site context. Mapped inside the Theme system and Site setup to load site-specific stylesheets and navigation menus. AI Suggestion: Enter 'CSC' for global/base pages, or 'Icehorse' to restrict this page to your specific site."></i></label>
-                                        <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || 'CSC' %]" required [% IF current_site != 'CSC' %]readonly[% END %]>
-                                        [% IF current_site != 'CSC' %]
-                                            <span class="help-block">This page is locked to [% current_site %].</span>
-                                        [% END %]
+                                        <label for="sitename">Site Name <span class="text-danger">*</span></label>
+                                        <input type="text" name="sitename" id="sitename" class="form-group form-control" value="[% page_item.sitename || 'CSC' %]" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="menu">Menu Section <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Determines which menu layout group the page belongs to. Mapped in the theme's navbar template to render navigation links. AI Suggestion: Usually 'main' for header navigation, or 'footer' for footer links."></i></label>
+                                        <label for="menu">Menu Section <span class="text-danger">*</span></label>
                                         <input type="text" name="menu" id="menu" class="form-group form-control" value="[% page_item.menu || 'main' %]" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="page_code">Page Code <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The unique URL slug identifier (e.g. '/page/[page_code]'). Used by the routing system to locate the page record in the database. AI Suggestion: Use short, lowercase names with underscores, like 'about_us' or 'get_started'."></i></label>
+                                        <label for="page_code">Page Code <span class="text-danger">*</span></label>
                                         <input type="text" name="page_code" id="page_code" class="form-group form-control" value="[% page_item.page_code %]" placeholder="e.g. home, about_us" required [% IF show_form == 'edit' %]readonly[% END %]>
                                         [% IF show_form == 'edit' %]<span class="help-block">Page Code cannot be modified after creation.</span>[% END %]
                                     </div>
@@ -93,47 +90,33 @@
                             <div class="row">
                                 <div class="col-md-8">
                                     <div class="form-group">
-                                        <label for="title">Page Title <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Page Title is dynamically integrated into the main Site Layout: it populates the browser tab &lt;title&gt; tag, renders as the primary &lt;h1&gt; content header on the page, generates breadcrumbs, and sets OpenGraph social media tags. AI Suggestion: Write a concise, human-friendly title, such as 'Forager Legacy Import' or 'Getting Started Guide'."></i></label>
+                                        <label for="title">Page Title <span class="text-danger">*</span></label>
                                         <input type="text" name="title" id="title" class="form-group form-control" value="[% page_item.title %]" placeholder="Enter friendly title for page" required>
                                     </div>
                                 </div>
                                 <div class="col-md-4">
                                     <div class="form-group">
-                                        <label for="link_order">Link/Sort Order <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The numeric order in which this link is sorted in menus. Mapped in the theme layout's menu loop to order navbar links (ascending). AI Suggestion: Use '10' for first, '20' for second to allow easy insertion of links later."></i></label>
+                                        <label for="link_order">Link/Sort Order</label>
                                         <input type="number" name="link_order" id="link_order" class="form-group form-control" value="[% page_item.link_order || 0 %]">
                                     </div>
                                 </div>
                             </div>
 
                             <div class="form-group">
-                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
-                                    <div>
-                                        <label for="body" style="margin: 0; font-weight: bold;">Page Body (HTML/Text) <span class="text-danger">*</span> <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="The core content of the page, editable in Rich Text (WYSIWYG) or raw HTML. It is rendered as the main page body inside the theme content block. AI Suggestion: Draft standard HTML layout with sections and paragraphs. You can use the AI Assistant popup to write, rewrite, or style this content."></i></label>
-                                        <span id="wysiwyg-status-badge" class="label label-success" style="margin-left: 8px;">Rich Text Mode</span>
-                                    </div>
-                                    <div style="display: flex; gap: 8px;">
-                                        <button type="button" class="btn btn-xs btn-warning" id="toggle-editor-mode" style="font-weight: bold;">
-                                            <i class="fa fa-code"></i> Toggle HTML / Rich Text
-                                        </button>
-                                        <button type="button" class="btn btn-xs btn-purple" onclick="openAIFormAssistant()" style="background: #6f42c1; color: white; border: none; padding: 4px 10px; border-radius: 4px; font-weight: bold; display: inline-flex; align-items: center; gap: 4px; transition: background 0.2s;">
-                                            <i class="fa fa-robot"></i> Help Edit Page with AI (Standard Form Fill)
-                                        </button>
-                                    </div>
-                                </div>
-
+                                <label for="body">Page Body (HTML/Text) <span class="text-danger">*</span></label>
                                 <textarea name="body" id="body" rows="12" class="form-group form-control" placeholder="Enter HTML or text content for the page" required>[% page_item.body %]</textarea>
                             </div>
 
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="description">SEO Description <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Meta description tag rendered in the HTML head wrapper as &lt;meta name='description' content='[% page.description %]'&gt; to improve search relevance. AI Suggestion: Write a concise 150-160 character summary of the page."></i></label>
+                                        <label for="description">SEO Description</label>
                                         <textarea name="description" id="description" rows="3" class="form-group form-control" placeholder="Meta description for search engines">[% page_item.description %]</textarea>
                                     </div>
                                 </div>
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="keywords">SEO Keywords <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Meta keywords tag rendered in the HTML head wrapper as &lt;meta name='keywords' content='[% page.keywords %]'&gt; for search engines. AI Suggestion: Use 5-10 comma-separated terms relevant to your page content."></i></label>
+                                        <label for="keywords">SEO Keywords</label>
                                         <input type="text" name="keywords" id="keywords" class="form-group form-control" value="[% page_item.keywords %]" placeholder="comma, separated, keywords">
                                     </div>
                                 </div>
@@ -142,7 +125,7 @@
                             <div class="row">
                                 <div class="col-md-6">
                                     <div class="form-group">
-                                        <label for="status">Status <i class="fa fa-question-circle text-info" style="cursor: help; margin-left: 4px;" title="Active pages are published and accessible. Inactive pages return a Page Not Found (404) or Access Denied error for non-admins. AI Suggestion: Keep as 'Inactive' while drafting, and set to 'Active' to publish."></i></label>
+                                        <label for="status">Status</label>
                                         <select name="status" id="status" class="form-group form-control">
                                             <option value="active" [% IF page_item.status == 'active' %]selected[% END %]>Active</option>
                                             <option value="inactive" [% IF page_item.status == 'inactive' %]selected[% END %]>Inactive</option>
@@ -270,9 +253,11 @@
                                             <td>[% page.link_order %]</td>
                                             <td>
                                                 [% IF page.status == 'active' %]
-                                                    <span class="label label-success">Active</span>
+                                                    <span class="label label-success badge bg-success">Active</span>
                                                 [% ELSIF page.status == 'inactive' %]
-                                                    <span class="label label-default">Inactive</span>
+                                                    <span class="label label-default badge bg-secondary">Inactive</span>
+                                                [% ELSIF page.status == 'draft' %]
+                                                    <span class="label label-warning badge bg-warning">Draft</span>
                                                 [% ELSE %]
                                                     <span class="label label-warning">[% page.status | html %]</span>
                                                 [% END %]
@@ -411,39 +396,39 @@
         const bodyTextarea = document.getElementById('body');
         const toggleBtn = document.getElementById('toggle-editor-mode');
         const statusBadge = document.getElementById('wysiwyg-status-badge');
-        
+
         if (bodyTextarea) {
             let lastSyncValue = bodyTextarea.value;
             let isWysiwygMode = true;
-            
+
             // Function to initialize CKEditor 5 Classic
             function initCKEditor() {
                 if (editorInstance) return Promise.resolve(editorInstance);
-                
+
                 return ClassicEditor
                     .create(bodyTextarea, {
                         toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
                     })
                     .then(editor => {
                         editorInstance = editor;
-                        
+
                         // Keep textarea value perfectly in sync with CKEditor in real-time
                         editor.model.document.on('change:data', () => {
                             const data = editor.getData();
                             bodyTextarea.value = data;
                             lastSyncValue = data; // Prevent loop
                         });
-                        
+
                         return editor;
                     })
                     .catch(error => {
                         console.error('CKEditor 5 initialization error:', error);
                     });
             }
-            
+
             // Initial load starts in WYSIWYG mode
             initCKEditor();
-            
+
             // Poller to detect external programmatic updates (e.g. from standard AI Form Fill)
             setInterval(function() {
                 const currentVal = bodyTextarea.value;
@@ -454,14 +439,12 @@
                     }
                 }
             }, 300);
-            
+
             // Handle Toggle button click by toggling container visibility (extremely fast and bulletproof)
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', function(e) {
                     e.preventDefault();
-                    
                     const ckEditorContainer = bodyTextarea.parentNode.querySelector('.ck-editor') || bodyTextarea.nextElementSibling;
-                    
                     if (isWysiwygMode) {
                         // Switch from WYSIWYG to Raw HTML
                         if (editorInstance) {
@@ -473,7 +456,7 @@
                         }
                         bodyTextarea.style.display = 'block';
                         isWysiwygMode = false;
-                        
+
                         if (statusBadge) {
                             statusBadge.textContent = 'Source HTML Mode';
                             statusBadge.className = 'label label-warning';
@@ -489,7 +472,7 @@
                             ckEditorContainer.style.display = 'block';
                         }
                         isWysiwygMode = true;
-                        
+
                         if (statusBadge) {
                             statusBadge.textContent = 'Rich Text Mode';
                             statusBadge.className = 'label label-success';
@@ -497,7 +480,7 @@
                     }
                 });
             }
-            
+
             // Form submit helper to ensure editor state is saved on submit
             const form = bodyTextarea.closest('form');
             if (form) {
