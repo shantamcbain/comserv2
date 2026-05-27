@@ -7376,9 +7376,13 @@ sub pages :Path('/admin/pages') :Args(0) {
         if ($current_sitename eq 'CSC') {
             @pages = $c->model('DBEncy')->resultset('Page')->all;
         } else {
-            # Regular site admins only see their own pages
+            # Regular site admins see their own pages + shared pages
             @pages = $c->model('DBEncy')->resultset('Page')->search({
-                sitename => $current_sitename
+                '-or' => [
+                    { sitename => $current_sitename },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$current_sitename%" } }
+                ]
             })->all;
         }
     };

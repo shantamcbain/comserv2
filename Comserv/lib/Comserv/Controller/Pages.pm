@@ -737,16 +737,33 @@ sub pages :Path('/admin/pages') :Args(0) {
         my $filter_status = $c->req->param('filter_status') || '';
         
         my %search_cond;
-        if ($search) {
-            $search_cond{'-or'} = [
-                { title     => { like => "%$search%" } },
-                { page_code => { like => "%$search%" } },
-            ];
-        }
         if ($current_sitename ne 'CSC') {
-            $search_cond{sitename} = $current_sitename;
-        } elsif ($filter_site) {
-            $search_cond{sitename} = $filter_site;
+            # Show pages belonging to this site OR pages shared with this site
+            $search_cond{'-or'} = [
+                { sitename => $current_sitename },
+                { share_with => 'all' },
+                { share_with => { 'like' => "%$current_sitename%" } }
+            ];
+            if ($search) {
+                $search_cond{'-and'} = [
+                    { '-or' => delete $search_cond{'-or'} },
+                    { '-or' => [
+                        { title     => { like => "%$search%" } },
+                        { page_code => { like => "%$search%" } }
+                    ]}
+                ];
+            }
+        } else {
+            # CSC admin - can filter by site
+            if ($filter_site) {
+                $search_cond{sitename} = $filter_site;
+            }
+            if ($search) {
+                $search_cond{'-or'} = [
+                    { title     => { like => "%$search%" } },
+                    { page_code => { like => "%$search%" } },
+                ];
+            }
         }
         if ($filter_status) {
             $search_cond{status} = $filter_status;
