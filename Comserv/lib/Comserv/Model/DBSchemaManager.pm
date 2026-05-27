@@ -296,12 +296,12 @@ sub create_table_from_sql {
     };
 }
 
-# Create pages_content table specifically
+# Create page table specifically
 sub create_pages_table {
     my ($self, $c) = @_;
-    
-    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_pages_table', 
-        "Starting pages_content table creation");
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'create_pages_table',
+        "Starting page table creation");
     
     # Find the SQL file path
     my $sql_file_path;

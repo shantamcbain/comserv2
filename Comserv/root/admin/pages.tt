@@ -47,6 +47,7 @@
                     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                     <strong>Success:</strong> [% success_msg %]
                 </div>
+            [% END %]
             </div>
 
             [% IF c.flash.success_msg %]
@@ -248,7 +249,7 @@
                                                 [% IF page.status == 'active' %]
                                                     <span class="label label-success">Active</span>
                                                     <span class="label label-success badge bg-success">Active</span>
-                                                [% ELIF page.status == 'draft' %]
+                                                [% ELSIF page.status == 'draft' %]
                                                     <span class="label label-warning badge bg-warning">Draft</span>
                                                 [% ELSE %]
                                                     <span class="label label-default">Inactive</span>
