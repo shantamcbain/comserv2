@@ -47,7 +47,7 @@
                     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
                     <strong>Success:</strong> [% success_msg %]
                 </div>
-            </div>
+            [% END %]
 
             [% IF c.flash.success_msg %]
                 <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
