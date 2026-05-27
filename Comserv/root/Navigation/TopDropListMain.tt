@@ -111,7 +111,7 @@
             <span class="submenu-header"><i class="icon-globe"></i>Public Links</span>
             <div class="submenu">
                 <!-- Dynamic Page-based links for Main menu from new page system -->
-                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (menu = 'Main' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'main' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
                     <a href="/page/[% link.page_code %]" name="Contact" target="_self" title="[% link.title | html %]">[% link.title | html %]</a>
                     [% IF c.session.roles.grep('admin').size %]
                         <a href="/admin/pages?action=edit&amp;id=[% link.id %]" class="edit-link">Edit</a>
@@ -119,7 +119,7 @@
                 [% END %]
                 
                 <!-- Legacy Page-based links for Main menu -->
-                [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Main' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'main' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
                     [%# Check if page is already in the new page system to avoid duplicates %]
                     [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
                     [% IF is_migrated == 0 %]
