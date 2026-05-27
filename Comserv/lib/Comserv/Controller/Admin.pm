@@ -7245,19 +7245,25 @@ sub pages :Path('/admin/pages') :Args(0) {
     }
     
     my $action = $c->req->param('action') || '';
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     
     # Handle deletion
     if ($action eq 'delete') {
         my $id = $c->req->param('id');
         my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
         if ($page) {
-            my $code = $page->page_code;
-            eval {
-                $page->delete;
-                $c->flash->{success_msg} = "Page '$code' deleted successfully.";
-            };
-            if ($@) {
-                $c->flash->{error_msg} = "Failed to delete page: $@";
+            # Site isolation check: non-CSC admins can only delete pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only delete pages belonging to your own site.";
+            } else {
+                my $code = $page->page_code;
+                eval {
+                    $page->delete;
+                    $c->flash->{success_msg} = "Page '$code' deleted successfully.";
+                };
+                if ($@) {
+                    $c->flash->{error_msg} = "Failed to delete page: $@";
+                }
             }
         } else {
             $c->flash->{error_msg} = "Page not found for deletion.";
@@ -7266,19 +7272,154 @@ sub pages :Path('/admin/pages') :Args(0) {
         return;
     }
     
-    # Fetch all pages in Ency
+    my $show_form = undef;
+    my $page_item = {};
+    
+    if ($action eq 'create') {
+        $show_form = 'create';
+        $page_item = {
+            sitename => $current_sitename,
+            menu => 'Main',
+            status => 'active',
+            roles => 'public',
+        };
+    }
+    elsif ($action eq 'edit') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only edit pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only edit pages belonging to your own site.";
+            } else {
+                $show_form = 'edit';
+                $page_item = $page;
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for editing.";
+        }
+    }
+    elsif ($action eq 'save') {
+        my $params = $c->req->params;
+        my $id = $params->{id};
+        
+        # Site isolation check: non-CSC admins can only assign to their own site
+        my $target_sitename = $params->{sitename} || $current_sitename;
+        if ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
+            $c->stash(error_msg => "Access denied: You can only save pages belonging to your own site.");
+            $show_form = $id ? 'edit' : 'create';
+            $page_item = $params;
+        } else {
+            my $page_data = {
+                sitename => $target_sitename,
+                menu => $params->{menu} || 'Main',
+                page_code => $params->{page_code},
+                title => $params->{title},
+                body => $params->{body} || '',
+                description => $params->{description},
+                keywords => $params->{keywords},
+                link_order => $params->{link_order} || 0,
+                status => $params->{status} || 'active',
+                roles => $params->{roles} || 'public',
+                share_with => $params->{share_with} || '',
+            };
+            
+            my $success = 0;
+            if ($id) {
+                # Editing existing page
+                my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+                if ($page) {
+                    if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                        $c->stash(error_msg => "Access denied: You can only modify pages belonging to your own site.");
+                        $show_form = 'edit';
+                        $page_item = $params;
+                    } else {
+                        eval {
+                            $page->update($page_data);
+                            $c->flash->{success_msg} = "Page updated successfully.";
+                            $success = 1;
+                        };
+                        if ($@) {
+                            $c->stash(error_msg => "Error updating page: $@");
+                            $show_form = 'edit';
+                            $page_item = $params;
+                        }
+                    }
+                } else {
+                    $c->stash(error_msg => "Page not found to update.");
+                }
+            } else {
+                # Creating new page
+                $page_data->{created_by} = $c->session->{username} || 'admin';
+                eval {
+                    $c->model('DBEncy')->resultset('Page')->create($page_data);
+                    $c->flash->{success_msg} = "Page created successfully.";
+                    $success = 1;
+                };
+                if ($@) {
+                    $c->stash(error_msg => "Error creating page: $@");
+                    $show_form = 'create';
+                    $page_item = $params;
+                }
+            }
+            
+            if ($success) {
+                $c->response->redirect($c->uri_for('/admin/pages'));
+                return;
+            }
+        }
+    }
+    
+    # Fetch pages according to site context for list display
     my @pages;
     eval {
-        @pages = $c->model('DBEncy')->resultset('Page')->all;
+        if ($current_sitename eq 'CSC') {
+            @pages = $c->model('DBEncy')->resultset('Page')->all;
+        } else {
+            # Regular site admins only see their own pages
+            @pages = $c->model('DBEncy')->resultset('Page')->search({
+                sitename => $current_sitename
+            })->all;
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pages', 
             "Error fetching Ency pages: $@");
-        $c->stash(error_msg => "Error fetching pages: $@");
+        $c->stash(error_msg => "Error fetching pages: $@") unless $c->stash->{error_msg};
     }
+    
+    # Standard roles drop down
+    my @available_roles = ('public', 'member', 'coop', 'it', 'helpdesk', 'admin');
+    # Fetch site-specific custom roles
+    eval {
+        my $roles_rs = $c->model('DBEncy')->resultset('SiteRole')->search({
+            sitename => [ $current_sitename, 'All' ]
+        });
+        while (my $r = $roles_rs->next) {
+            push @available_roles, $r->role_name;
+        }
+    };
+    
+    # Unique roles list
+    my %seen;
+    @available_roles = grep { !$seen{$_}++ } @available_roles;
+    
+    # Fetch all sites for the dropdown check list (Cross-Site Page Sharing)
+    my @sites_list;
+    eval {
+        my $sites_rs = $c->model('DBEncy')->resultset('Site')->all;
+        while (my $s = $sites_rs->next) {
+            push @sites_list, $s->name;
+        }
+    };
     
     $c->stash(
         pages => \@pages,
+        show_form => $show_form,
+        page_item => $page_item,
+        current_site => $current_sitename,
+        available_roles => \@available_roles,
+        sites_list => \@sites_list,
         template => 'admin/pages.tt'
     );
 }
