@@ -5,7 +5,7 @@ use warnings;
 use base 'DBIx::Class::Core';
 
 __PACKAGE__->load_components('InflateColumn::DateTime', 'TimeStamp', 'EncodedColumn');
-__PACKAGE__->table('pages_content');
+__PACKAGE__->table('page');
 
 __PACKAGE__->add_columns(
     'id' => {
