@@ -965,6 +965,32 @@ sub auto_link_herb_data {
                split /[,;\n]+/, $text;
     };
 
+    my $_lookup_medical = sub {
+        my ($term) = @_;
+        my $rec = eval {
+            $self->ency_schema->resultset('Ency::Disease')->search(
+                { -or => [ common_name => { like => "%$term%" }, scientific_name => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'disease' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Symptom')->search(
+                { name => { like => "%$term%" } },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'symptom' if $rec;
+        $rec = eval {
+            $self->ency_schema->resultset('Ency::Glossary')->search(
+                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
+                { rows => 1, order_by => 'record_id' }
+            )->first;
+        };
+        return 'glossary' if $rec;
+        return undef;
+    };
+
     # --- constituents text → HerbConstituent junctions ---
     my $sitename = ($c && blessed($c) && $c->can('stash') && $c->stash) ? ($c->stash->{SiteName} || 'ENCY') : 'ENCY';
     my $username = ($c && blessed($c) && $c->can('session') && $c->session) ? ($c->session->{username} || 'system') : 'system';
@@ -1021,14 +1047,18 @@ sub auto_link_herb_data {
         next if scalar(split /\s+/, $lookup) > 3;
         next if $lookup =~ /^(?:and|or|but|with|for|of|in|to|a|an|the)\b/i;
         next if $lookup =~ /^\w+ing\s/i;
-        my $rec = eval {
-            $self->ency_schema->resultset('Ency::Glossary')->search(
-                { -or => [ term => { like => "%$lookup%" }, alternate_terms => { like => "%$lookup%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        unless ($rec) {
-            push @todos, { field => 'therapeutic_action', term => $lookup };
+        my $found = $_lookup_medical->($lookup);
+        unless ($found) {
+            my $lookup_type;
+            if ($lookup =~ /\b(?:extract|tincture|infusion|decoction|poultice|compress|tea|capsule|tablet|salve|ointment|cream|oil|syrup|powder|fluid|dose|drops?|preparation|liniment|fomentation|suppository|enema|wash|lotion|plaster|bolus)\b/i) {
+                $lookup_type = 'glossary';
+            } elsif ($lookup =~ /^(?:anti|pro|non|re|de|pre|post|hyper|hypo|chrono|auto|pseudo)\w/i
+                     || $lookup =~ /(?:ic|ive|ant|ent|ary|ory|ous|tic)\b/i) {
+                $lookup_type = 'glossary';
+            } else {
+                $lookup_type = 'disease';
+            }
+            push @todos, { field => 'therapeutic_action', term => $lookup, lookup_type => $lookup_type };
         }
     }
 
@@ -1107,33 +1137,6 @@ sub auto_link_herb_data {
         $t =~ s/^(?:used?\s+(?:for|in|as)|treats?\s*|for\s+|in\s+cases?\s+of\s*|as\s+(?:a\s+)?)\s*//i;
         $t =~ s/^\s+|\s+$//g;
         return $t;
-    };
-
-    # shared helper: look up a term in Disease, Symptom, Glossary; return found type or undef
-    my $_lookup_medical = sub {
-        my ($term) = @_;
-        my $rec = eval {
-            $self->ency_schema->resultset('Ency::Disease')->search(
-                { -or => [ common_name => { like => "%$term%" }, scientific_name => { like => "%$term%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'disease' if $rec;
-        $rec = eval {
-            $self->ency_schema->resultset('Ency::Symptom')->search(
-                { name => { like => "%$term%" } },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'symptom' if $rec;
-        $rec = eval {
-            $self->ency_schema->resultset('Ency::Glossary')->search(
-                { -or => [ term => { like => "%$term%" }, alternate_terms => { like => "%$term%" } ] },
-                { rows => 1, order_by => 'record_id' }
-            )->first;
-        };
-        return 'glossary' if $rec;
-        return undef;
     };
 
     # --- medical_uses terms → Disease, Symptom, Glossary lookup ---
@@ -1734,10 +1737,14 @@ sub update_formula {
     my ($self, $c, $id, $data) = @_;
     my $record = $self->ency_schema->resultset('Ency::Formula')->find($id);
     return (0, "Formula $id not found.") unless $record;
+    my $herbs_raw = $data->{herbs_raw};
     eval { $record->update($data); } or do {
         my $error = $@ || 'Unknown error';
         return (0, "Failed to update formula $id: $error");
     };
+    if (defined $herbs_raw) {
+        $self->sync_formula_herbs($c, $id, $herbs_raw);
+    }
     return (1, "Formula $id updated.");
 }
 
@@ -1761,8 +1768,9 @@ sub list_formulas {
         1;
     } or do {
         my $err = $@ || 'unknown';
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'list_formulas', "Error: $err");
-        die $err;
+        my $level = ($err =~ /Unknown column/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'list_formulas', "Error: $err");
+        return [];
     };
     return \@results;
 }
@@ -1805,6 +1813,93 @@ sub get_formula_with_herbs {
         1;
     } or do {};
     return ($formula, \@herb_links, \@disease_links);
+}
+
+sub _parse_herbs_raw {
+    my ($self, $herbs_raw) = @_;
+    return () unless $herbs_raw && $herbs_raw =~ /\S/;
+    my @entries;
+    for my $line (split /\n/, $herbs_raw) {
+        $line =~ s/^\s+|\s+$//g;
+        next unless length($line) > 2;
+        next if $line =~ /^Formula\s+#/i;
+        next if $line =~ /^\d+\s*$/;
+        next if $line =~ /^[;,\.\s]+$/;
+        my %h;
+        if ($line =~ s/^(\d+(?:\.\d+)?(?:\s*(?:tsp\.?|tbsp\.?|oz\.?|parts?|g\b|ml|drops?|cups?|ounces?|lbs?|kg|dram|dr\.?))?)\s+//i) {
+            $h{quantity} = $1;
+        }
+        $line =~ s/\s*[;]\s*$//;
+        if ($line =~ /^([A-Z][a-z]+(?:\s+[a-zA-Z]+){0,4})\s*\(\s*([^)]+?)\s*\)\s*(.*)$/) {
+            my ($first, $second, $rest) = ($1, $2, $3);
+            if ($first =~ /^[A-Z][a-z]+\s+[a-z]/) {
+                $h{botanical_name_raw} = $first;
+                $h{herb_name_raw}      = $second;
+            } else {
+                $h{herb_name_raw}      = $first;
+                $h{botanical_name_raw} = $second;
+            }
+            $h{plant_part} = $rest if $rest =~ /\S/;
+        } else {
+            if ($line =~ /^[A-Z][a-z]+\s+[a-z]/) {
+                $h{botanical_name_raw} = $line;
+            } else {
+                $h{herb_name_raw} = $line;
+            }
+        }
+        push @entries, \%h if $h{botanical_name_raw} || $h{herb_name_raw};
+    }
+    return @entries;
+}
+
+sub sync_formula_herbs {
+    my ($self, $c, $formula_id, $herbs_raw) = @_;
+    return unless $formula_id;
+    my $rs = $self->ency_schema->resultset('Ency::FormulaHerb');
+    eval { $rs->search({ formula_id => $formula_id })->delete; } or do {};
+    return unless $herbs_raw && $herbs_raw =~ /\S/;
+    my @parsed = $self->_parse_herbs_raw($herbs_raw);
+    for my $h (@parsed) {
+        my $herb_id = undef;
+        my $search_name = $h->{botanical_name_raw} || $h->{herb_name_raw} || '';
+        if ($search_name && length($search_name) > 2) {
+            my $hit;
+            eval {
+                $hit = $self->ency_schema->resultset('Ency::Herb')->search(
+                    { -or => [
+                        botanical_name => { like => '%' . $search_name . '%' },
+                        key_name       => { like => '%' . $search_name . '%' },
+                        common_names   => { like => '%' . $search_name . '%' },
+                    ]},
+                    { rows => 1 }
+                )->first;
+            } or do {};
+            $herb_id = $hit ? $hit->record_id : undef;
+        }
+        eval {
+            $rs->create({
+                formula_id         => $formula_id,
+                herb_id            => $herb_id,
+                herb_name_raw      => $h->{herb_name_raw}      || undef,
+                botanical_name_raw => $h->{botanical_name_raw} || undef,
+                quantity           => $h->{quantity}           || undef,
+                plant_part         => $h->{plant_part}         || undef,
+            });
+        } or do {};
+    }
+}
+
+sub get_herb_formulas {
+    my ($self, $c, $herb_id) = @_;
+    return [] unless $herb_id;
+    my @rows;
+    eval {
+        @rows = $self->ency_schema->resultset('Ency::FormulaHerb')->search(
+            { herb_id => $herb_id },
+            { prefetch => 'formula', order_by => 'formula.formula_number' }
+        )->all;
+    } or do {};
+    return \@rows;
 }
 
 sub find_herb_by_name {
