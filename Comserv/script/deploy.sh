@@ -10,6 +10,35 @@ HOSTNAME_VAL=$(hostname)
 
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
+# ── Detect NFS and configure paths ───────────────────────────────────────────
+NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
+NFS_LOCAL_DIR=""
+for candidate in $NFS_MOUNT_CANDIDATES; do
+    if mount | grep -q " on ${candidate} type nfs"; then
+        NFS_LOCAL_DIR="$candidate"
+        break
+    fi
+done
+
+COMSERV_LOGS_DIR="/home/ubuntu/comserv-logs"
+NFS_DEPLOY_LOG=""
+
+if [ -n "$NFS_LOCAL_DIR" ]; then
+    echo "NFS detected at $NFS_LOCAL_DIR"
+    COMSERV_LOGS_DIR="$NFS_LOCAL_DIR/comserv-logs"
+    mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
+    echo "   Routing container logs to NFS: $COMSERV_LOGS_DIR"
+    
+    # Configure NFS Deployment Log archive path
+    NFS_LOG_DIR="$NFS_LOCAL_DIR/logs"
+    mkdir -p "$NFS_LOG_DIR" 2>/dev/null || true
+    if [ -d "$NFS_LOG_DIR" ] && [ -w "$NFS_LOG_DIR" ]; then
+        NFS_DEPLOY_LOG="${NFS_LOG_DIR}/comserv-deploy.log"
+    fi
+else
+    echo "NFS not mounted — using local fallbacks"
+fi
+
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk before: $DISK_BEFORE"
@@ -17,10 +46,12 @@ echo "Disk before: $DISK_BEFORE"
 # ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
 echo "Running routine Docker cleanup..."
 docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
-docker image prune -f                          2>&1 | grep -v "^$" || true
+# Aggressively prune ALL unused images older than 1h to reclaim major space
+docker image prune -a -f --filter "until=1h"   2>&1 | grep -v "^$" || true
 docker volume prune -f                         2>&1 | grep -v "^$" || true
 docker network prune -f                        2>&1 | grep -v "^$" || true
-docker builder prune -f --keep-storage 2GB     2>&1 | grep -v "^$" || true
+# Completely purge build cache since server only pulls pre-built production images
+docker builder prune -a -f                     2>&1 | grep -v "^$" || true
 
 DISK_AFTER_CLEANUP=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after cleanup: $DISK_AFTER_CLEANUP"
@@ -49,18 +80,57 @@ LOG_TRIM_TARGET_BYTES=10485760   # 10 MB kept after trim
 echo "Checking container log sizes..."
 for CNAME in $(docker ps --format '{{.Names}}' 2>/dev/null); do
     LOG_FILE=$(docker inspect --format='{{.LogPath}}' "$CNAME" 2>/dev/null || true)
-    [ -z "$LOG_FILE" ] || [ ! -f "$LOG_FILE" ] && continue
-    LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
-    LOG_SIZE_MB=${LOG_SIZE_MB:-0}
-    echo "  $CNAME: ${LOG_SIZE_MB}MB"
-    if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
-        echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
-        tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
-            && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
-            && echo "  => Done." \
-            || echo "  => WARNING: trim failed for $CNAME"
+    [ -z "$LOG_FILE" ] && continue
+    
+    # Check if we can write to the log file (docker logs are owned by root)
+    if [ ! -w "$LOG_FILE" ]; then
+        if command -v sudo >/dev/null 2>&1; then
+            LOG_SIZE_MB=$(sudo du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+            LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+            echo "  $CNAME: ${LOG_SIZE_MB}MB (requires sudo)"
+            if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+                echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB) via sudo..."
+                sudo tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "/tmp/${CNAME}_log.tmp" \
+                    && sudo mv "/tmp/${CNAME}_log.tmp" "$LOG_FILE" \
+                    && sudo chmod 640 "$LOG_FILE" \
+                    && echo "  => Done." \
+                    || echo "  => WARNING: sudo trim failed for $CNAME"
+            fi
+        else
+            echo "  $CNAME: Cannot access $LOG_FILE (permission denied, sudo not available)"
+        fi
+    else
+        LOG_SIZE_MB=$(du -m "$LOG_FILE" 2>/dev/null | cut -f1)
+        LOG_SIZE_MB=${LOG_SIZE_MB:-0}
+        echo "  $CNAME: ${LOG_SIZE_MB}MB"
+        if [ "$LOG_SIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+            echo "  => Trimming $CNAME log (${LOG_SIZE_MB}MB -> 10MB)..."
+            tail -c "$LOG_TRIM_TARGET_BYTES" "$LOG_FILE" > "${LOG_FILE}.tmp" \
+                && mv "${LOG_FILE}.tmp" "$LOG_FILE" \
+                && echo "  => Done." \
+                || echo "  => WARNING: trim failed for $CNAME"
+        fi
     fi
 done
+
+# ── Application log trimming (on host) ───────────────────────────────────────
+echo "Checking application log sizes in $COMSERV_LOGS_DIR..."
+if [ -d "$COMSERV_LOGS_DIR" ]; then
+    find "$COMSERV_LOGS_DIR" -name "*.log" -type f 2>/dev/null | while read -r ALOG; do
+        ASIZE_MB=$(du -m "$ALOG" 2>/dev/null | cut -f1)
+        ASIZE_MB=${ASIZE_MB:-0}
+        echo "  $ALOG: ${ASIZE_MB}MB"
+        if [ "$ASIZE_MB" -gt "$LOG_TRIM_THRESHOLD_MB" ]; then
+            echo "  => Trimming application log $ALOG (${ASIZE_MB}MB -> 10MB)..."
+            tail -c "$LOG_TRIM_TARGET_BYTES" "$ALOG" > "${ALOG}.tmp" \
+                && mv "${ALOG}.tmp" "$ALOG" \
+                && chmod 664 "$ALOG" 2>/dev/null || true
+        fi
+    done
+    # Also delete any rotated logs older than 7 days on the host
+    echo "Pruning rotated application logs older than 7 days..."
+    find "$COMSERV_LOGS_DIR" \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
+fi
 
 # ── Check for compose file ───────────────────────────────────────────────────
 if [ ! -f "$COMPOSE_FILE" ]; then
@@ -104,20 +174,12 @@ docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "3. Starting new container..."
-NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
-NFS_LOCAL_DIR=""
-for candidate in $NFS_MOUNT_CANDIDATES; do
-    if mount | grep -q " on ${candidate} type nfs"; then
-        NFS_LOCAL_DIR="$candidate"
-        echo "   NFS detected at $candidate — using as /data/nfs"
-        break
-    fi
-done
+
 if [ -z "$NFS_LOCAL_DIR" ]; then
     NFS_LOCAL_DIR="/home/ubuntu/comserv-workshop"
     echo "   NFS not mounted — using local fallback $NFS_LOCAL_DIR"
 fi
-WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 
 echo "3b. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
@@ -147,6 +209,8 @@ SEARXNG_EOF
     fi
     docker run -d \
         --name searxng \
+        --log-opt max-size=10m \
+        --log-opt max-file=3 \
         -p 127.0.0.1:8080:8080 \
         --restart unless-stopped \
         -v "$SEARXNG_CONFIG_DIR:/etc/searxng:ro" \
@@ -170,8 +234,8 @@ while [ $ATTEMPT -lt 45 ]; do
     [ $((ATTEMPT % 5)) -eq 0 ] && echo "  ...waiting ($((ATTEMPT * 2))s)"
 done
 
-echo "5. Post-deploy cleanup (remove now-dangling old image layers)..."
-docker image prune -f 2>&1 | grep -v "^$" || true
+echo "5. Post-deploy cleanup (remove unused and dangling old image layers)..."
+docker image prune -a -f --filter "until=1h" 2>&1 | grep -v "^$" || true
 
 DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after deploy: $DISK_FINAL"
@@ -192,4 +256,12 @@ if command -v mail >/dev/null 2>&1; then
     echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}\nDisk      : $DISK_FINAL" \
         | mail -s "$SUBJECT" "$EMAIL"
     echo "Notification sent to $EMAIL"
+fi
+
+# ── Archive the deployment log to the NFS drive (if available) ───────────────
+if [ -n "$NFS_DEPLOY_LOG" ] && [ -f "$DEPLOY_LOG" ]; then
+    echo "=== Deployment Run at $(date) ===" >> "$NFS_DEPLOY_LOG"
+    tail -n 1000 "$DEPLOY_LOG" >> "$NFS_DEPLOY_LOG" 2>/dev/null || true
+    echo -e "\n\n" >> "$NFS_DEPLOY_LOG"
+    echo "Full deployment log archived to NFS: $NFS_DEPLOY_LOG"
 fi

@@ -34,8 +34,16 @@ sub view :Path('/page') :Args(1) {
         return;
     }
     
-    # Check site access: CSC can view any page, others only their own site's pages
-    if ($sitename ne 'CSC' && $page->sitename ne $sitename) {
+    # Check site access: CSC can view any page, others only their own site's pages, unless shared
+    my $is_shared = 0;
+    if ($page->can('share_with') && $page->share_with) {
+        my $shared_str = $page->share_with;
+        if ($shared_str eq 'all' || grep { $_ eq $sitename } split(/\s*,\s*/, $shared_str)) {
+            $is_shared = 1;
+        }
+    }
+    
+    if ($sitename ne 'CSC' && $page->sitename ne $sitename && !$is_shared) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view', 
             "Site access denied: User from site '$sitename' trying to access page from site '" . $page->sitename . "'");
         $c->response->status(403);
@@ -103,12 +111,16 @@ sub list :Path('/pages') :Args(0) {
             "CSC user - found pages for sites: " . join(', ', keys %$pages_by_site));
         
     } else {
-        # Other sites see only their own pages
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list', "Non-CSC user - fetching pages for site: $sitename");
+        # Other sites see their own pages and pages shared with them
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'list', "Non-CSC user - fetching pages for site: $sitename (including shared pages)");
         
         my @pages = $c->model('DBEncy')->resultset('Page')->search(
             {
-                sitename => $sitename,
+                '-or' => [
+                    { sitename => $sitename },
+                    { share_with => { 'like' => "%$sitename%" } },
+                    { share_with => 'all' },
+                ],
                 menu => $menu,
                 status => 'active'
             },
@@ -171,6 +183,7 @@ sub create :Path('/pages/create') :Args(0) {
                 link_order => $params->{link_order} || 0,
                 status => $params->{status} || 'active',
                 roles => $params->{roles} || 'public',
+                share_with => $params->{share_with} || '',
                 created_by => $c->session->{username} || 'admin'
             };
             
@@ -265,7 +278,8 @@ sub edit :Path('/pages/edit') :Args(1) {
                     keywords => $params->{keywords},
                     link_order => $params->{link_order},
                     status => $params->{status},
-                    roles => $params->{roles}
+                    roles => $params->{roles},
+                    share_with => $params->{share_with} || ''
                 });
                 
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'edit', "Page updated: $page_code");
@@ -486,6 +500,48 @@ sub pages :Path('/admin/pages') :Args(0) {
     
     my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     
+    # Get available roles for the current site
+    my @site_roles_db = ();
+    eval {
+        @site_roles_db = $db_ency->resultset('SiteRole')->search(
+            { sitename => $current_sitename },
+            { order_by => 'role_name' }
+        )->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pages', "Error fetching site roles: $@");
+    }
+    
+    my %seen_roles = map { $_ => 1 } qw(public normal member editor developer admin WorkshopLeader);
+    my @available_roles = qw(public normal member editor developer admin WorkshopLeader);
+    
+    foreach my $r (@site_roles_db) {
+        my $name = $r->role_name;
+        unless ($seen_roles{$name}) {
+            $seen_roles{$name} = 1;
+            push @available_roles, $name;
+        }
+    }
+    $c->stash(available_roles => \@available_roles);
+    
+    # Get all sites for sharing options
+    my @all_sites_list = ();
+    eval {
+        @all_sites_list = $db_ency->resultset('Site')->search({}, { order_by => 'name' })->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'pages', "Error fetching sites: $@");
+    }
+    my @site_names_all = map { $_->name } @all_sites_list;
+    my %seen_sites = map { $_ => 1 } @site_names_all;
+    foreach my $s (qw(CSC HelpDesk Apiary Weather ENCY Workshops Planning)) {
+        unless ($seen_sites{$s}) {
+            push @site_names_all, $s;
+            $seen_sites{$s} = 1;
+        }
+    }
+    $c->stash(all_sites => \@site_names_all);
+    
     if ($action eq 'create') {
         $c->stash(
             show_form => 'create',
@@ -500,6 +556,11 @@ sub pages :Path('/admin/pages') :Args(0) {
                 $c->flash->{error_msg} = "Access denied. Page belongs to a different site.";
                 $c->response->redirect($c->uri_for('/admin/pages'));
                 return;
+            }
+            my $page_role = $page_item->roles || '';
+            if ($page_role && !$seen_roles{$page_role}) {
+                $seen_roles{$page_role} = 1;
+                push @available_roles, $page_role;
             }
             $c->stash(
                 show_form => 'edit',
@@ -523,6 +584,7 @@ sub pages :Path('/admin/pages') :Args(0) {
         my $link_order = $c->req->param('link_order') || 0;
         my $status = $c->req->param('status') || 'active';
         my $roles = $c->req->param('roles') || 'public';
+        my $share_with = $c->req->param('share_with') || '';
         
         # Enforce current site if not CSC
         if ($current_sitename ne 'CSC') {
@@ -543,6 +605,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                 link_order => $link_order,
                 status => $status,
                 roles => $roles,
+                share_with => $share_with,
             };
             $c->stash(
                 show_form => $id ? 'edit' : 'create',
@@ -570,6 +633,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                     link_order => $link_order,
                     status => $status,
                     roles => $roles,
+                    share_with => $share_with,
                 };
                 $c->stash(
                     show_form => $id ? 'edit' : 'create',
@@ -595,6 +659,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                             link_order  => $link_order,
                             status      => $status,
                             roles       => $roles,
+                            share_with  => $share_with,
                         });
                         $c->flash->{success_msg} = "Page updated successfully.";
                     } else {
@@ -610,6 +675,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                             link_order  => $link_order,
                             status      => $status,
                             roles       => $roles,
+                            share_with  => $share_with,
                             created_by  => $current_user,
                         });
                         $c->flash->{success_msg} = "Page created successfully.";
@@ -629,6 +695,7 @@ sub pages :Path('/admin/pages') :Args(0) {
                         link_order => $link_order,
                         status => $status,
                         roles => $roles,
+                        share_with => $share_with,
                     };
                     $c->stash(
                         show_form => $id ? 'edit' : 'create',
