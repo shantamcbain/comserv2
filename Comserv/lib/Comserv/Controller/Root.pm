@@ -326,6 +326,9 @@ sub auto :Private {
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
 
+        # Restore backward compatibility for c.stash.dbi
+        $c->stash->{dbi} = Comserv::Util::LegacyDBIWrapper->new($c);
+
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
         $c->stash->{member_pages} = [];
@@ -2222,5 +2225,37 @@ sub default :Path {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+1;
+
+package Comserv::Util::LegacyDBIWrapper;
+
+sub new {
+    my ($class, $c) = @_;
+    return bless { c => $c }, $class;
+}
+
+sub query {
+    my ($self, $sql, @bind) = @_;
+    my $c = $self->{c};
+    return [] unless $c && $sql;
+    my $results = [];
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        if ($dbh) {
+            my $sth = $dbh->prepare($sql);
+            if ($sth) {
+                $sth->execute(@bind);
+                while (my $row = $sth->fetchrow_hashref) {
+                    push @$results, $row;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $c->log->error("LegacyDBIWrapper error executing query [$sql]: $@");
+    }
+    return $results;
+}
 
 1;
