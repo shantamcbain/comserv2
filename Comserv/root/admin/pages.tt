@@ -28,31 +28,23 @@
                 </div>
             </div>
 
-            [% IF error_msg %]
+            [% SET display_error = error_msg || c.flash.error_msg %]
+            [% IF display_error %]
                 <div class="alert alert-danger alert-dismissible" role="alert">
                     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <strong>Error:</strong> [% error_msg %]
+                    <strong>Error:</strong> [% display_error %]
                     <a href="[% c.uri_for('/admin/migrate_pages') %]" class="btn btn-info">
                         <i class="fa fa-database"></i> Migrate Legacy Pages
                     </a>
                 </div>
             [% END %]
 
-            [% IF success_msg %]
+            [% SET display_success = success_msg || c.flash.success_msg %]
+            [% IF display_success %]
                 <div class="alert alert-success alert-dismissible" role="alert">
                     <button type="button" class="close" data-dismiss="alert" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-                    <strong>Success:</strong> [% success_msg %]
+                    <strong>Success:</strong> [% display_success %]
                 </div>
-            [% END %]
-
-            [% IF c.flash.success_msg %]
-                <div class="alert alert-success">[% c.flash.success_msg | html %]</div>
-            [% END %]
-            [% IF c.flash.error_msg %]
-                <div class="alert alert-danger">[% c.flash.error_msg | html %]</div>
-            [% END %]
-            [% IF error_msg %]
-                <div class="alert alert-danger">[% error_msg | html %]</div>
             [% END %]
 
             [% IF show_form %]
@@ -290,15 +282,19 @@
                                                 <a href="[% c.uri_for('/page', page.page_code) %]" class="btn btn-xs btn-info" target="_blank" title="View Page">
                                                     <i class="fa fa-eye"></i> View
                                                 </a>
-                                                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit Page">
-                                                    <i class="fa fa-edit"></i> Edit
-                                                </a>
-                                                <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]"
-                                                   class="btn btn-xs btn-danger delete-page-btn"
-                                                   title="Delete Page"
-                                                   data-code="[% page.page_code | html %]">
-                                                    <i class="fa fa-trash"></i> Delete
-                                                </a>
+                                                [% IF current_site == 'CSC' || page.sitename == current_site %]
+                                                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-primary" title="Edit Page">
+                                                        <i class="fa fa-edit"></i> Edit
+                                                    </a>
+                                                    <a href="[% c.uri_for('/admin/pages', { action => 'delete', id => page.id }) %]"
+                                                       class="btn btn-xs btn-danger delete-page-btn"
+                                                       title="Delete Page"
+                                                       data-code="[% page.page_code | html %]">
+                                                        <i class="fa fa-trash"></i> Delete
+                                                    </a>
+                                                [% ELSE %]
+                                                    <span class="label label-default" style="margin-left: 5px; padding: 4px 8px;">Shared (Read-Only)</span>
+                                                [% END %]
                                             </td>
                                         </tr>
                                     [% END %]
