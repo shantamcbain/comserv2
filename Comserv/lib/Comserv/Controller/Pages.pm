@@ -618,7 +618,7 @@ sub pages :Path('/admin/pages') :Args(0) {
             if ($id) {
                 $exists_cond->{id} = { '!=' => $id };
             }
-            my $exists = $db_ency->resultset('Page')->find($exists_cond);
+            my $exists = $db_ency->resultset('Page')->search($exists_cond)->first;
             if ($exists) {
                 $error_msg = "Duplicate page code '$page_code'. Page Code must be unique.";
                 my $page_data = {
