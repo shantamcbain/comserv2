@@ -21,34 +21,74 @@
 
             <div class="form-section">
                 <h3>Recipients</h3>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="all" checked onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'all')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="all" [% IF !group || group == 'all' %]checked[% END %] onchange="updateCount(this)">
                         All site users <strong>([% user_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — everyone with a role on this site</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 30px; top: 100%; margin-top: 5px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">All Site Users:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="paid" onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'paid')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="paid" [% IF group == 'paid' %]checked[% END %] onchange="updateCount(this)">
                         Paid / active members <strong>([% paid_count %])</strong>
                         <small style="color: var(--text-muted-color, #666);"> — active or grace-period memberships</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 30px; top: 100%; margin-top: 5px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Paid / Active Members:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
-                <div class="form-group">
-                    <label><input type="radio" name="group" value="custom" onchange="updateCount(this)">
+                <div class="form-group" style="position: relative;">
+                    <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, 'custom')" onmouseleave="hideListPreview(this)">
+                        <input type="radio" name="group" value="custom" [% IF group == 'custom' %]checked[% END %] onchange="updateCount(this)">
                         Custom addresses only
                         <small style="color: var(--text-muted-color, #666);"> — use the field below, no DB users</small>
                     </label>
+                    <!-- Hover Preview Card -->
+                    <div class="list-preview-card" style="display:none; position:absolute; left: 30px; top: 100%; margin-top: 5px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                        <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                        <div class="preview-content" style="display: none;">
+                            <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Custom Addresses:</strong>
+                            <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                            </ul>
+                        </div>
+                    </div>
                 </div>
 
                 [% IF mailing_lists.size %]
                 <div style="margin-top:8px;padding:10px;background:#f0f4ff;border:1px solid #c5d0e8;border-radius:4px;">
                     <strong style="display:block;margin-bottom:4px;">Named Mailing Lists <small style="font-weight:normal;color: var(--text-muted-color, #666);">(check any to add their members)</small>:</strong>
                     [% FOREACH list IN mailing_lists %]
-                    <div class="form-group" style="margin:4px 0;">
-                        <label><input type="checkbox" name="list_ids" value="[% list.id %]" onchange="updateListCount()"> 
+                    <div class="form-group" style="margin:4px 0; position: relative;">
+                        <label style="cursor: pointer; display: inline-block;" onmouseenter="showListPreview(this, '[% list.id %]')" onmouseleave="hideListPreview(this)">
+                            <input type="checkbox" name="list_ids" value="[% list.id %]" [% IF selected_list_ids.${list.id} %]checked[% END %] onchange="updateListCount()"> 
                             [% list.name | html %] <strong>([% list.count %])</strong>
                             <small style="color: var(--text-muted-color, #666);"> — named mailing list subscribers</small>
                         </label>
+                        <!-- Hover Preview Card -->
+                        <div class="list-preview-card" style="display:none; position:absolute; left: 30px; top: 100%; margin-top: 5px; width: 320px; max-height: 250px; overflow-y: auto; background: #ffffff; border: 1px solid #c5d0e8; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 9999; padding: 12px; font-size: 12px; color: #333;">
+                            <div class="preview-loading" style="color: #666; font-style: italic;">Loading preview...</div>
+                            <div class="preview-content" style="display: none;">
+                                <strong style="display: block; border-bottom: 1px solid #c5d0e8; padding-bottom: 4px; margin-bottom: 6px; color: #0d6efd;">Subscribers in list:</strong>
+                                <ul style="list-style: none; padding: 0; margin: 0;" class="preview-list">
+                                </ul>
+                            </div>
+                        </div>
                     </div>
                     [% END %]
                 </div>
@@ -58,9 +98,20 @@
                     <label for="custom_addresses">Additional / Custom Addresses:</label>
                     <textarea name="custom_addresses" id="custom_addresses" rows="3"
                               placeholder="extra@example.com, another@example.com"
-                              style="width:100%;padding:6px;"></textarea>
+                              style="width:100%;padding:6px;">[% custom_addresses | html %]</textarea>
                     <small style="color: var(--text-muted-color, #666);">Comma, semicolon or space-separated. Added on top of the selected group (or used alone for Custom mode).</small>
                 </div>
+
+                <div class="form-group" style="margin-top:14px; display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                    <button type="button" class="btn" onclick="openRecipientModal()" style="background:#0d6efd;color:#fff;padding:6px 14px;border:none;border-radius:4px;cursor:pointer;">
+                        &#128065; View/Edit Recipient List
+                    </button>
+                    <span id="excluded-summary" style="font-size:13px; font-weight:bold; color:var(--text-muted-color,#666);"></span>
+                    <small style="display:block; width:100%; color: var(--text-muted-color, #666); margin-top:2px;">
+                        Click above to view all recipients from your selections and selectively uncheck anyone you do not want to mail.
+                    </small>
+                </div>
+                <input type="hidden" name="excluded_emails" id="excluded_emails" value="">
             </div>
 
             <div class="form-section" style="margin-top:20px;">
@@ -73,6 +124,7 @@
                 <div class="form-group">
                     <label for="subject">Subject <span style="color:red;">*</span></label>
                     <input type="text" name="subject" id="subject" required
+                           value="[% subject | html %]"
                            style="width:100%;padding:6px;" placeholder="Your subject line">
                 </div>
                 <div class="form-group" style="margin-top:10px;">
@@ -110,7 +162,7 @@
                         <!-- Visual editor panel -->
                         <div id="panel-visual">
                             <div id="body-editor" contenteditable="true"
-                                 style="min-height:280px;padding:10px;background: rgba(255,255,255,0.88);outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;"></div>
+                                 style="min-height:280px;padding:10px;background: rgba(255,255,255,0.88);outline:none;overflow-y:auto;font-family:Arial,sans-serif;font-size:14px;line-height:1.5;">[% body %]</div>
                         </div>
 
                         <!-- HTML source panel -->
@@ -125,12 +177,12 @@
                                 <button type="button" onclick="applySource()" class="btn btn-primary" style="padding:4px 16px;">
                                     Apply HTML &#10003;
                                 </button>
-                                <button type="button" onclick="switchTab('visual')" style="padding:4px 12px;">Cancel</button>
+                                <button type="button" onclick="cancelSource()" style="padding:4px 12px;">Cancel</button>
                             </div>
                         </div>
                     </div>
 
-                    <input type="hidden" name="body" id="body-hidden">
+                    <input type="hidden" name="body" id="body-hidden" value="[% body | html %]">
                     <small style="color: var(--text-muted-color, #666);margin-top:4px;display:block;">
                         Personalisation tags: <code>[FIRST_NAME]</code> <code>[LAST_NAME]</code>
                         <code>[EMAIL]</code> <code>[USERNAME]</code> — replaced per recipient.
@@ -184,10 +236,10 @@
 </div>
 
 <script>
-var counts = { all: [% user_count %], paid: [% paid_count %], custom: 0 };
+var counts = { all: [% user_count || 0 %], paid: [% paid_count || 0 %], custom: 0 };
 
 // ── Editor tab switching ──────────────────────────────────────
-function switchTab(tab) {
+function switchTabDirect(tab) {
     var isVisual = tab === 'visual';
     document.getElementById('panel-visual').style.display = isVisual ? '' : 'none';
     document.getElementById('panel-source').style.display = isVisual ? 'none' : '';
@@ -198,6 +250,18 @@ function switchTab(tab) {
     document.getElementById('tab-source').style.borderBottom = isVisual ? '2px solid transparent' : '2px solid #0d6efd';
     document.getElementById('tab-source').style.background   = isVisual ? 'transparent' : '#fff';
     document.getElementById('tab-source').style.fontWeight   = isVisual ? 'normal' : 'bold';
+}
+
+function switchTab(tab) {
+    var isVisual = tab === 'visual';
+    if (isVisual) {
+        // Automatically apply HTML source to visual editor when returning to visual tab
+        var src = document.getElementById('source-editor').value.trim();
+        if (src) {
+            setBodyHtml(src);
+        }
+    }
+    switchTabDirect(tab);
     if (!isVisual) {
         // Mirror current visual content into source textarea when switching to source
         document.getElementById('source-editor').value =
@@ -211,7 +275,12 @@ function applySource() {
     if (src) {
         setBodyHtml(src);
     }
-    switchTab('visual');
+    switchTabDirect('visual');
+}
+
+function cancelSource() {
+    document.getElementById('source-editor').value = document.getElementById('body-hidden').value;
+    switchTabDirect('visual');
 }
 
 // ── Inline HTML editor helpers ────────────────────────────────
@@ -238,17 +307,37 @@ document.getElementById('body-editor').addEventListener('input', syncBody);
 
 // Allow external code (e.g. AI assistant) to set the editor content as rendered HTML
 function setBodyHtml(html) {
-    // Strip full document wrapper if present — email clients only need inner HTML
-    html = html.replace(/^[\s\S]*?<body[^>]*>/i, '').replace(/<\/body>[\s\S]*$/i, '');
-    // Strip <!DOCTYPE> and <html> lines that may remain
-    html = html.replace(/<!DOCTYPE[^>]*>/gi, '').replace(/<\/?html[^>]*>/gi, '')
-               .replace(/<head>[\s\S]*?<\/head>/gi, '').trim();
-    document.getElementById('body-editor').innerHTML = html;
+    // Extract any <style>...</style> blocks before stripping container elements
+    var styles = "";
+    var styleMatches = html.match(/<style[^>]*>[\s\S]*?<\/style>/gi);
+    if (styleMatches) {
+        styles = styleMatches.join("\n") + "\n";
+    }
+
+    var inner = html;
+    var bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    if (bodyMatch) {
+        inner = bodyMatch[1];
+    } else {
+        // Strip out the head if there is one but no explicit body tag
+        inner = inner.replace(/<head>[\s\S]*?<\/head>/gi, '');
+    }
+
+    // Strip out container/document-level wrappers
+    inner = inner.replace(/<!DOCTYPE[^>]*>/gi, '')
+                 .replace(/<\/?html[^>]*>/gi, '')
+                 .replace(/<\/?head[^>]*>/gi, '')
+                 .replace(/<\/?body[^>]*>/gi, '')
+                 .trim();
+
+    // Prepend the styles back so they render in the editor and mail out properly
+    var finalHtml = styles + inner;
+    document.getElementById('body-editor').innerHTML = finalHtml;
     syncBody();
 }
 
 // Watch for changes to the hidden body field (AI assistant writes here) and mirror to editor
-var _bodyHiddenLast = '';
+var _bodyHiddenLast = document.getElementById('body-hidden') ? document.getElementById('body-hidden').value : '';
 setInterval(function() {
     var hidden = document.getElementById('body-hidden');
     if (hidden && hidden.value !== _bodyHiddenLast) {
@@ -262,8 +351,7 @@ setInterval(function() {
 
 // ── Recipient count ───────────────────────────────────────────
 function updateCount(radio) {
-    var n = counts[radio.value] !== undefined ? counts[radio.value] : '?';
-    document.getElementById('recipient-count').textContent = n;
+    document.getElementById('excluded_emails').value = '';
     updateListCount();
 }
 function updateListCount() {
@@ -276,8 +364,35 @@ function updateListCount() {
     document.querySelectorAll('input[name="list_ids"]:checked').forEach(function(cb) {
         extra += parseInt(cb.parentElement.querySelector('strong').textContent.replace(/[()]/g, '')) || 0;
     });
-    document.getElementById('recipient-count').textContent = base + extra;
+
+    // Subtract any excluded emails that are actually part of the compiled total
+    var exclVal = document.getElementById('excluded_emails').value.trim();
+    var exclCount = exclVal ? exclVal.split(',').length : 0;
+
+    var finalCount = Math.max(0, base + extra - exclCount);
+    document.getElementById('recipient-count').textContent = finalCount;
+
+    var summary = document.getElementById('excluded-summary');
+    if (summary) {
+        if (exclCount > 0) {
+            summary.textContent = "(" + exclCount + " recipient(s) deselected)";
+        } else {
+            summary.textContent = "";
+        }
+    }
 }
+
+// Clear exclusions when options change
+document.querySelectorAll('input[name="list_ids"]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+        document.getElementById('excluded_emails').value = '';
+        updateListCount();
+    });
+});
+document.getElementById('custom_addresses').addEventListener('input', function() {
+    document.getElementById('excluded_emails').value = '';
+    updateListCount();
+});
 
 // ── Confirm checkbox enables Send button ──────────────────────
 document.getElementById('confirm_send').addEventListener('change', function() {
@@ -349,4 +464,309 @@ function sendTestPreview() {
         alert('Test send error: ' + err);
     });
 }
+</script>
+
+<!-- Recipient Selector Modal -->
+<div id="recipient-modal" style="display:none; position:fixed; z-index:9999; left:0; top:0; width:100%; height:100%; overflow:auto; background-color:rgba(0,0,0,0.5); align-items:center; justify-content:center;">
+    <div style="background-color:#ffffff; margin:auto; padding:20px; border:1px solid #888; width:90%; max-width:650px; border-radius:8px; box-shadow:0 4px 15px rgba(0,0,0,0.2); max-height:85vh; display:flex; flex-direction:column; box-sizing:border-box; color:#333;">
+        <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #eee; padding-bottom:10px; margin-bottom:14px;">
+            <h3 style="margin:0;">Select Recipients</h3>
+            <span onclick="closeRecipientModal()" style="color:#aaa; float:right; font-size:28px; font-weight:bold; cursor:pointer; line-height:20px;">&times;</span>
+        </div>
+        
+        <!-- Search and Select Controls -->
+        <div style="display:flex; gap:10px; margin-bottom:12px; align-items:center;">
+            <input type="text" id="modal-search" placeholder="Search by name or email..." oninput="filterModalRecipients()" style="flex:1; padding:6px; border:1px solid #ccc; border-radius:4px; box-sizing:border-box;">
+            <button type="button" onclick="toggleAllModal(true)" style="padding:6px 12px; font-size:12px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f8f9fa;">Select All</button>
+            <button type="button" onclick="toggleAllModal(false)" style="padding:6px 12px; font-size:12px; cursor:pointer; border:1px solid #ccc; border-radius:4px; background:#f8f9fa;">Deselect All</button>
+        </div>
+
+        <div style="overflow-y:auto; flex:1; border:1px solid #eee; border-radius:4px; padding:6px; background:#fafafa; min-height:200px;">
+            <table style="width:100%; border-collapse:collapse;" id="modal-table">
+                <thead>
+                    <tr style="border-bottom:2px solid #ddd; text-align:left; font-size:13px; color:#555; background:#eee;">
+                        <th style="padding:8px; width:30px;"><input type="checkbox" id="modal-check-all" onclick="toggleAllModal(this.checked)"></th>
+                        <th style="padding:8px;">Name</th>
+                        <th style="padding:8px;">Email</th>
+                        <th style="padding:8px;">Username</th>
+                    </tr>
+                </thead>
+                <tbody id="modal-recipients-body" style="font-size:13px;">
+                    <!-- Filled dynamically via JS -->
+                </tbody>
+            </table>
+            <div id="modal-loading" style="text-align:center; padding:20px; font-weight:bold; color:#666;">
+                Loading recipient list...
+            </div>
+            <div id="modal-empty" style="text-align:center; padding:20px; color:#888; display:none;">
+                No matching recipients.
+            </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid #eee; padding-top:14px; margin-top:14px;">
+            <span id="modal-summary" style="font-size:13px; font-weight:bold; color:#444;">0 selected</span>
+            <div style="display:flex; gap:10px;">
+                <button type="button" class="btn btn-secondary" onclick="closeRecipientModal()" style="padding:6px 16px;">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="saveRecipientModal()" style="padding:6px 20px; background:#0d6efd; color:#fff; border:none; border-radius:4px; cursor:pointer; font-weight:bold;">Apply Selection</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// ── Recipient Modal management ───────────────────────────────
+var modalRecipients = [];
+
+function openRecipientModal() {
+    var modal = document.getElementById('recipient-modal');
+    modal.style.display = 'flex';
+    
+    document.getElementById('modal-loading').style.display = 'block';
+    document.getElementById('modal-table').style.display = 'none';
+    document.getElementById('modal-empty').style.display = 'none';
+    document.getElementById('modal-recipients-body').innerHTML = '';
+    document.getElementById('modal-search').value = '';
+
+    // Gather form parameters safely
+    var groupEl = document.querySelector('input[name="group"]:checked');
+    var group = groupEl ? groupEl.value : 'all';
+    var customEl = document.getElementById('custom_addresses');
+    var custom_addresses = customEl ? customEl.value : '';
+    
+    var data = new URLSearchParams();
+    data.append('group', group);
+    data.append('custom_addresses', custom_addresses);
+    
+    document.querySelectorAll('input[name="list_ids"]:checked').forEach(function(cb) {
+        data.append('list_ids', cb.value);
+    });
+
+    fetch('[% c.uri_for('/mail/get_recipients') %]', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: data.toString()
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(json) {
+        document.getElementById('modal-loading').style.display = 'none';
+        if (json.ok) {
+            modalRecipients = json.recipients || [];
+            if (modalRecipients.length === 0) {
+                document.getElementById('modal-empty').style.display = 'block';
+                document.getElementById('modal-summary').textContent = '0 selected';
+                return;
+            }
+
+            var excludedString = document.getElementById('excluded_emails').value;
+            var excludedMap = {};
+            if (excludedString) {
+                excludedString.split(',').forEach(function(em) {
+                    excludedMap[em.trim().toLowerCase()] = true;
+                });
+            }
+
+            var tbody = document.getElementById('modal-recipients-body');
+            tbody.innerHTML = '';
+            
+            modalRecipients.forEach(function(r) {
+                var isChecked = !excludedMap[r.email.toLowerCase()];
+                var tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid #eee';
+                
+                var tdCheck = document.createElement('td');
+                tdCheck.style.padding = '8px';
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.className = 'modal-recip-check';
+                cb.value = r.email;
+                cb.checked = isChecked;
+                cb.onchange = updateModalSummary;
+                tdCheck.appendChild(cb);
+                tr.appendChild(tdCheck);
+
+                var tdName = document.createElement('td');
+                tdName.style.padding = '8px';
+                tdName.textContent = (r.first_name || '') + ' ' + (r.last_name || '');
+                tr.appendChild(tdName);
+
+                var tdEmail = document.createElement('td');
+                tdEmail.style.padding = '8px';
+                tdEmail.textContent = r.email;
+                tr.appendChild(tdEmail);
+
+                var tdUser = document.createElement('td');
+                tdUser.style.padding = '8px';
+                tdUser.textContent = r.username || '';
+                tr.appendChild(tdUser);
+
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('modal-table').style.display = 'table';
+            updateModalSummary();
+        } else {
+            alert('Error loading list: ' + (json.error || 'Unknown error'));
+            closeRecipientModal();
+        }
+    })
+    .catch(function(err) {
+        document.getElementById('modal-loading').style.display = 'none';
+        alert('Fetch error: ' + err);
+        closeRecipientModal();
+    });
+}
+
+function closeRecipientModal() {
+    document.getElementById('recipient-modal').style.display = 'none';
+}
+
+function updateModalSummary() {
+    var total = document.querySelectorAll('.modal-recip-check').length;
+    var checked = document.querySelectorAll('.modal-recip-check:checked').length;
+    document.getElementById('modal-summary').textContent = checked + ' of ' + total + ' selected';
+    document.getElementById('modal-check-all').checked = (checked === total && total > 0);
+}
+
+function toggleAllModal(checked) {
+    document.querySelectorAll('.modal-recip-check').forEach(function(cb) {
+        cb.checked = checked;
+    });
+    updateModalSummary();
+}
+
+function filterModalRecipients() {
+    var search = document.getElementById('modal-search').value.toLowerCase().trim();
+    var tbody = document.getElementById('modal-recipients-body');
+    var rows = tbody.getElementsByTagName('tr');
+    var matchCount = 0;
+
+    for (var i = 0; i < rows.length; i++) {
+        var tr = rows[i];
+        var name = tr.cells[1].textContent.toLowerCase();
+        var email = tr.cells[2].textContent.toLowerCase();
+        var username = tr.cells[3].textContent.toLowerCase();
+
+        if (name.indexOf(search) > -1 || email.indexOf(search) > -1 || username.indexOf(search) > -1) {
+            tr.style.display = '';
+            matchCount++;
+        } else {
+            tr.style.display = 'none';
+        }
+    }
+
+    document.getElementById('modal-empty').style.display = (matchCount === 0) ? 'block' : 'none';
+    document.getElementById('modal-table').style.display = (matchCount === 0) ? 'none' : 'table';
+}
+
+function saveRecipientModal() {
+    var excluded = [];
+    document.querySelectorAll('.modal-recip-check').forEach(function(cb) {
+        if (!cb.checked) {
+            excluded.push(cb.value);
+        }
+    });
+    document.getElementById('excluded_emails').value = excluded.join(',');
+    closeRecipientModal();
+    updateListCount();
+}
+
+// ── Hover Preview management ──────────────────────────────────
+var listPreviewCache = {};
+
+function showListPreview(element, listId) {
+    var container = element.closest('.form-group');
+    var card = container.querySelector('.list-preview-card');
+    if (!card) return;
+    
+    card.style.display = 'block';
+    
+    if (listPreviewCache[listId]) {
+        renderListPreview(card, listPreviewCache[listId]);
+        return;
+    }
+    
+    var loading = card.querySelector('.preview-loading');
+    var content = card.querySelector('.preview-content');
+    loading.style.display = 'block';
+    content.style.display = 'none';
+    
+    fetch('/mail/get_list_subscribers/' + listId)
+        .then(function(r) { return r.json(); })
+        .then(function(json) {
+            if (json.ok) {
+                listPreviewCache[listId] = json.subscribers || [];
+                renderListPreview(card, listPreviewCache[listId]);
+            } else {
+                loading.textContent = 'Error loading preview.';
+            }
+        })
+        .catch(function(err) {
+            loading.textContent = 'Error loading preview.';
+        });
+}
+
+function hideListPreview(element) {
+    var container = element.closest('.form-group');
+    var card = container.querySelector('.list-preview-card');
+    if (card) {
+        card.style.display = 'none';
+    }
+}
+
+function renderListPreview(card, subscribers) {
+    var loading = card.querySelector('.preview-loading');
+    var content = card.querySelector('.preview-content');
+    var list = card.querySelector('.preview-list');
+    
+    loading.style.display = 'none';
+    content.style.display = 'block';
+    list.innerHTML = '';
+    
+    if (subscribers.length === 0) {
+        list.innerHTML = '<li style="color: #888; font-style: italic; padding: 3px 0;">No subscribers</li>';
+        return;
+    }
+    
+    var limit = 10;
+    var displayed = subscribers.slice(0, limit);
+    displayed.forEach(function(sub) {
+        var li = document.createElement('li');
+        li.style.borderBottom = '1px solid #eee';
+        li.style.padding = '4px 0';
+        li.style.whiteSpace = 'nowrap';
+        li.style.overflow = 'hidden';
+        li.style.textOverflow = 'ellipsis';
+        
+        var strong = document.createElement('strong');
+        strong.textContent = sub.name || 'No Name';
+        strong.style.display = 'block';
+        strong.style.color = '#333';
+        
+        var span = document.createElement('span');
+        span.textContent = sub.email;
+        span.style.color = '#666';
+        span.style.fontSize = '11px';
+        
+        li.appendChild(strong);
+        li.appendChild(span);
+        list.appendChild(li);
+    });
+    
+    if (subscribers.length > limit) {
+        var liMore = document.createElement('li');
+        liMore.style.color = '#0d6efd';
+        liMore.style.fontWeight = 'bold';
+        liMore.style.paddingTop = '6px';
+        liMore.style.fontSize = '11px';
+        liMore.textContent = '+ ' + (subscribers.length - limit) + ' more subscriber(s)';
+        list.appendChild(liMore);
+    }
+}
+
+window.addEventListener('click', function(e) {
+    var modal = document.getElementById('recipient-modal');
+    if (e.target === modal) {
+        closeRecipientModal();
+    }
+});
 </script>

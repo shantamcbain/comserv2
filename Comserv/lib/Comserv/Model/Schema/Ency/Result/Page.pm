@@ -62,6 +62,11 @@ __PACKAGE__->add_columns(
         is_nullable => 1,
         default_value => 'public',
     },
+    'share_with' => {
+        data_type   => 'varchar',
+        size        => 255,
+        is_nullable => 1,
+    },
     'created_by' => {
         data_type => 'varchar',
         size => 255,
