@@ -16,13 +16,9 @@
         <div class="col-md-12">
             <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 25px; padding-bottom: 10px; border-bottom: 2px solid #eee;">
                 <h2 style="margin: 0;">Page Management System</h2>
-            <div class="d-flex justify-content-between align-items-center mb-3" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h2>Admin Page Management</h2>
                 <div>
                     <a href="[% c.uri_for('/admin') %]" class="btn btn-default">
                         <i class="fa fa-arrow-left"></i> Back to Dashboard
-                    <a href="[% c.uri_for('/pages/create') %]" class="btn btn-success">
-                        <i class="fa fa-plus"></i> Create New Page
                     </a>
                     [% UNLESS show_form %]
                         <a href="[% c.uri_for('/admin/pages', { action => 'create' }) %]" class="btn btn-primary">
@@ -58,10 +54,6 @@
             [% IF error_msg %]
                 <div class="alert alert-danger">[% error_msg | html %]</div>
             [% END %]
-
-            <div class="card panel panel-default">
-                <div class="card-header panel-heading">
-                    <strong class="panel-title">Site Pages</strong>
 
             [% IF show_form %]
                 <div class="panel panel-primary">
