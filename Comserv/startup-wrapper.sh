@@ -4,7 +4,7 @@
 
 CATALYST_HOME=${CATALYST_HOME:-/opt/comserv}
 PLACK_ENV="${PLACK_ENV:-${CATALYST_ENV:-deployment}}"
-PORT="${WEB_PORT:-3000}"
+PORT="${WEB_PORT:-5000}"
 WORKERS="${STARMAN_WORKERS:-5}"
 
 set -u
@@ -77,8 +77,7 @@ else
   echo "[startup-wrapper] Production mode — starting Starman on :$PORT with $WORKERS workers"
   exec perl -S starman \
     --env "$PLACK_ENV" \
-    --listen ":$PORT" \
-    --host 0.0.0.0 \
+    --listen "0.0.0.0:$PORT" \
     --workers "$WORKERS" \
     --max-requests 1000 \
     --max-requests-jitter 100 \
