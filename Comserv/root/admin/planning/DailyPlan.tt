@@ -1786,13 +1786,14 @@ function startDeploymentAction() {
     if (method === 'production') {
         const sshTarget = document.getElementById('deploy-ssh-target').value.trim();
         const sshPassword = document.getElementById('deploy-ssh-password').value;
+        const deployMode = document.getElementById('deploy-mode-select').value;
         
-        outputBox.textContent += `Starting background Docker Hub deployment to ${sshTarget}...\n`;
+        outputBox.textContent += `Starting background Docker Hub deployment [mode: ${deployMode}] to ${sshTarget}...\n`;
         
         fetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword)
+            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword) + '&deploy_mode=' + encodeURIComponent(deployMode)
         })
         .then(r => r.json())
         .then(data => {
@@ -2003,6 +2004,17 @@ function closeLogTodoCard(btn, recordId) {
                     <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Password:</label>
                     <input type="password" id="deploy-ssh-password" placeholder="Saved password will be used" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
                 </div>
+            </div>
+            <div>
+                <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">Deployment Mode / Action:</label>
+                <select id="deploy-mode-select" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                    <option value="full" selected>🚀 FULL DEPLOY (Build/push local, remote pull, force stop, restart container)</option>
+                    <option value="quick">⚡ QUICK DEPLOY (Skip build/push, restart existing container on server)</option>
+                    <option value="pull_only">📥 DOWNLOAD CONTAINER ONLY (Pull latest image from Hub)</option>
+                    <option value="stop_all">🛑 STOP ALL SERVICES (Stop container, force-kill manual Starman)</option>
+                    <option value="git_pull">🐙 GIT UPDATE (Run git pull on production host)</option>
+                    <option value="manual_server">⚠️ EMERGENCY MANUAL SERVER (Start host Starman on port 5000)</option>
+                </select>
             </div>
             <div style="font-size:0.75em; color:var(--text-muted-color, #6c757d);">
                 Saved credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> will be loaded automatically if present.
