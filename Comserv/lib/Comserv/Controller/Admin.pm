@@ -6386,8 +6386,9 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $repo_dir     = "$home/PycharmProjects/comserv2";
-    my $comserv_dir  = "$repo_dir/Comserv";
+    my $comserv_dir  = $c->config->{home};
+    my $repo_dir     = $comserv_dir;
+    $repo_dir =~ s/\/Comserv$//;
     my $prod_compose = 'docker-compose.prod.yml';
     my $hub_image    = 'shantamcsbain/comserv-web-prod:latest';
 
