@@ -183,39 +183,39 @@ fi
 echo "   Version: $VERSION_INFO"
 
 echo "2. Stopping and removing old container..."
-docker stop "$CONTAINER"  2>/dev/null || true
-docker rm -f "$CONTAINER" 2>/dev/null || true
+docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
+docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
 # Stop host port 5000 processes to prevent "port already in use" binding errors in Docker
 HOST_PORT_OCCUPIED=0
 if command -v fuser &>/dev/null; then
-    HOST_PIDS=$(fuser 5000/tcp 2>/dev/null || true)
+    HOST_PIDS=$(sudo fuser 5000/tcp 2>/dev/null || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        fuser -k -15 5000/tcp 2>/dev/null || true
+        sudo fuser -k -15 5000/tcp 2>/dev/null || true
         sleep 2
-        fuser -k -9 5000/tcp 2>/dev/null || true
+        sudo fuser -k -9 5000/tcp 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 elif command -v lsof &>/dev/null; then
-    HOST_PIDS=$(lsof -t -i:5000 2>/dev/null || true)
+    HOST_PIDS=$(sudo lsof -t -i:5000 2>/dev/null || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        kill -15 $HOST_PIDS 2>/dev/null || true
+        sudo kill -15 $HOST_PIDS 2>/dev/null || true
         sleep 2
-        kill -9 $HOST_PIDS 2>/dev/null || true
+        sudo kill -9 $HOST_PIDS 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 else
     # Fallback using ss
-    HOST_PID=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    HOST_PID=$(sudo ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
     if [ -n "$HOST_PID" ]; then
         echo "   ⚠ Found host process ($HOST_PID) occupying port 5000. Terminating..."
-        kill -15 $HOST_PID 2>/dev/null || true
+        sudo kill -15 $HOST_PID 2>/dev/null || true
         sleep 2
-        kill -9 $HOST_PID 2>/dev/null || true
+        sudo kill -9 $HOST_PID 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 fi
