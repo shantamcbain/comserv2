@@ -273,18 +273,27 @@ else
     echo "  SearXNG already running — OK"
 fi
 
-echo "4. Waiting for health check (up to 90s)..."
+echo "4. Waiting for health check (up to 90s) & streaming startup logs..."
 ATTEMPT=0
 HEALTHY=0
+PREV_LINE_COUNT=0
 while [ $ATTEMPT -lt 45 ]; do
     sleep 2
     ATTEMPT=$((ATTEMPT + 1))
+    
+    # Live stream any new container logs
+    CURRENT_LOGS=$(docker logs "$CONTAINER" 2>&1 || true)
+    CURRENT_LINE_COUNT=$(echo "$CURRENT_LOGS" | wc -l)
+    if [ "$CURRENT_LINE_COUNT" -gt "$PREV_LINE_COUNT" ]; then
+        echo "$CURRENT_LOGS" | tail -n +$((PREV_LINE_COUNT + 1))
+        PREV_LINE_COUNT=$CURRENT_LINE_COUNT
+    fi
+    
     STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
     if [ "$STATUS" = "healthy" ]; then
         HEALTHY=1
         break
     fi
-    [ $((ATTEMPT % 5)) -eq 0 ] && echo "  ...waiting ($((ATTEMPT * 2))s)"
 done
 
 echo "5. Post-deploy cleanup (remove dangling old image layers)..."
@@ -357,6 +366,13 @@ else
         if [ -n "$HOST_APP_DIR" ] && [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
             echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
             cd "$HOST_APP_DIR"
+            
+            # Pull latest changes from git main branch to keep code fully up-to-date
+            echo "   [Emergency] Pulling latest changes from main branch..."
+            if command -v git &>/dev/null; then
+                git pull origin main || git pull || echo "   ⚠ Warning: git pull failed, starting with existing local files"
+            fi
+            
             export CATALYST_HOME="$HOST_APP_DIR"
             export CATALYST_ENV=production
             export COMSERV_LOG_DIR="$HOST_APP_DIR"
