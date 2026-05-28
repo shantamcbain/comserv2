@@ -46,8 +46,8 @@ echo "Disk before: $DISK_BEFORE"
 # ── Routine cleanup (runs every cron tick, not just on deploy) ───────────────
 echo "Running routine Docker cleanup..."
 docker container prune -f --filter "until=1h" 2>&1 | grep -v "^$" || true
-# Aggressively prune ALL unused images older than 1h to reclaim major space
-docker image prune -a -f --filter "until=1h"   2>&1 | grep -v "^$" || true
+# Prune ONLY dangling (untagged) images to protect tagged rollback/backup images
+docker image prune -f                          2>&1 | grep -v "^$" || true
 docker volume prune -f                         2>&1 | grep -v "^$" || true
 docker network prune -f                        2>&1 | grep -v "^$" || true
 # Completely purge build cache since server only pulls pre-built production images
@@ -159,6 +159,20 @@ fi
 
 echo "New version detected. Starting deployment..."
 
+# ── Rotate rollback/backup images ────────────────────────────────────────────
+echo "Rotating rollback/backup images..."
+# Remove oldest backup (backup-2) if it exists
+docker rmi shantamcsbain/comserv-web-prod:backup-2 2>/dev/null || true
+# Move backup-1 to backup-2
+if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+    docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:backup-2
+    docker rmi shantamcsbain/comserv-web-prod:backup-1 2>/dev/null || true
+fi
+# Move current latest to backup-1
+if docker image inspect shantamcsbain/comserv-web-prod:latest >/dev/null 2>&1; then
+    docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:backup-1
+fi
+
 echo "1. Pulling latest image..."
 docker compose -f "$COMPOSE_FILE" pull
 
@@ -234,27 +248,69 @@ while [ $ATTEMPT -lt 45 ]; do
     [ $((ATTEMPT % 5)) -eq 0 ] && echo "  ...waiting ($((ATTEMPT * 2))s)"
 done
 
-echo "5. Post-deploy cleanup (remove unused and dangling old image layers)..."
-docker image prune -a -f --filter "until=1h" 2>&1 | grep -v "^$" || true
+echo "5. Post-deploy cleanup (remove dangling old image layers)..."
+docker image prune -f 2>&1 | grep -v "^$" || true
 
 DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
 echo "Disk after deploy: $DISK_FINAL"
 
 docker ps --filter "name=$CONTAINER" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 
+DIAGNOSTICS_REPORT=""
 if [ $HEALTHY -eq 1 ]; then
     echo "=== Deployment Successful at $(date) ==="
     STATUS_MSG="SUCCESS"
-    SUBJECT="Comserv Production Updated Successfully"
+    SUBJECT="✅ Comserv Production Updated Successfully"
 else
-    echo "WARNING: Container did not reach healthy state within 90s"
-    STATUS_MSG="DEPLOYED (health check inconclusive)"
-    SUBJECT="Comserv Production Deployed - Health Check Timeout"
+    echo "❌ ERROR: Container did not reach healthy state within 90s"
+    STATUS_MSG="FAILURE (unhealthy/timeout)"
+    SUBJECT="❌ Comserv Production Deployment FAILURE"
+    
+    # Extract detailed diagnostics to make debugging easy for CSC admin
+    DIAGNOSTICS_REPORT="\n\n===========================================================\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}❌ COMSERV CONTAINER FAILURE DIAGNOSTICS REPORT\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}===========================================================\n"
+    
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[1] Container State:\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker inspect --format='Status: {{.State.Status}} | Running: {{.State.Running}} | Error: {{.State.Error}} | ExitCode: {{.State.ExitCode}} | OOMKilled: {{.State.OOMKilled}}' "$CONTAINER" 2>/dev/null)\n"
+    
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[2] Detailed Health Log:\n"
+    HEALTH_LOG=$(docker inspect --format='{{range .State.Health.Log}}{{.Start}} [Exit: {{.ExitCode}}]:\n{{.Output}}\n{{end}}' "$CONTAINER" 2>/dev/null)
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}${HEALTH_LOG:-'No health check logs found.'}\n"
+    
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[3] Last 150 Container Console Logs:\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker logs --tail 150 "$CONTAINER" 2>&1)\n"
+    
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[4] Supervisor Status (inside container):\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker exec "$CONTAINER" supervisorctl status 2>&1 || echo 'Could not execute supervisorctl')\n"
+    
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[5] Manual Copy-Pasteable Rollback Steps:\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}-----------------------------------------------------------\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}To manually roll back to the previous stable version (backup-1):\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  docker stop comserv2-web-prod && docker rm comserv2-web-prod\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}  COMSERV_LOGS_DIR=\"$COMSERV_LOGS_DIR\" WORKSHOP_LOCAL_DIR=\"$NFS_LOCAL_DIR\" docker compose -f \"$COMPOSE_FILE\" up -d --force-recreate\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}-----------------------------------------------------------\n"
+    
+    echo -e "$DIAGNOSTICS_REPORT"
 fi
 
 if command -v mail >/dev/null 2>&1; then
-    echo -e "Comserv Production Deployment Report\n\nServer    : $HOSTNAME_VAL\nTime      : $(date)\nImage     : $IMAGE\nContainer : $CONTAINER\nStatus    : $STATUS_MSG\nVersion   : $VERSION_INFO\nNew digest: ${REMOTE_DIGEST:0:72}\nDisk      : $DISK_FINAL" \
-        | mail -s "$SUBJECT" "$EMAIL"
+    MAIL_BODY="Comserv Production Deployment Report\n\n"
+    MAIL_BODY="${MAIL_BODY}Server    : $HOSTNAME_VAL\n"
+    MAIL_BODY="${MAIL_BODY}Time      : $(date)\n"
+    MAIL_BODY="${MAIL_BODY}Image     : $IMAGE\n"
+    MAIL_BODY="${MAIL_BODY}Container : $CONTAINER\n"
+    MAIL_BODY="${MAIL_BODY}Status    : $STATUS_MSG\n"
+    MAIL_BODY="${MAIL_BODY}Version   : $VERSION_INFO\n"
+    MAIL_BODY="${MAIL_BODY}New digest: ${REMOTE_DIGEST:0:72}\n"
+    MAIL_BODY="${MAIL_BODY}Disk      : $DISK_FINAL\n"
+    
+    if [ -n "$DIAGNOSTICS_REPORT" ]; then
+        MAIL_BODY="${MAIL_BODY}${DIAGNOSTICS_REPORT}"
+    fi
+    
+    echo -e "$MAIL_BODY" | mail -s "$SUBJECT" "$EMAIL"
     echo "Notification sent to $EMAIL"
 fi
 
