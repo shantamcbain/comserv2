@@ -24,7 +24,7 @@ safe_git() {
 }
 
 # ── Interactive Menu (when run manually from terminal) ────────────────────────
-if [ -t 0 ] || [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
+if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
     echo "=========================================================="
     echo "      🐳 COMSERV DEPLOYMENT & SERVICE CONTROL CENTER"
     echo "=========================================================="
