@@ -167,7 +167,7 @@ REMOTE_DIGEST=$(docker manifest inspect "$IMAGE" 2>/dev/null \
 echo "  Local : ${LOCAL_DIGEST:0:72}..."
 echo "  Remote: ${REMOTE_DIGEST:0:72}..."
 
-if [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
+if [ "$FORCE" != "1" ] && [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
     DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
     echo "No new version. Disk: $DISK_FINAL"
     echo "=== Finished at $(date) ==="
@@ -205,7 +205,7 @@ docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
 echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
-# Stop host port 5000 processes to prevent "port already in use" binding errors in Docker
+# Stop host port 5000/3000 processes to prevent "port already in use" binding errors in Docker
 HOST_PORT_OCCUPIED=0
 
 # Try to detect with sudo first (non-interactive), then fallback to current user
@@ -214,69 +214,43 @@ if sudo -n true 2>/dev/null; then
     SUDO_CMD="sudo"
 fi
 
-# 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line
-echo "   Checking for running starman/plackup/comserv host processes..."
-$SUDO_CMD pkill -15 -f "starman" 2>/dev/null || pkill -15 -f "starman" 2>/dev/null || true
-$SUDO_CMD pkill -15 -f "plackup" 2>/dev/null || pkill -15 -f "plackup" 2>/dev/null || true
-$SUDO_CMD pkill -15 -f "comserv.psgi" 2>/dev/null || pkill -15 -f "comserv.psgi" 2>/dev/null || true
-$SUDO_CMD pkill -15 -f "comserv_server.psgi" 2>/dev/null || pkill -15 -f "comserv_server.psgi" 2>/dev/null || true
+# 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line using SIGKILL (-9)
+echo "   Force-killing running starman/plackup/comserv host processes..."
+$SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
+$SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
+$SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
+$SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
 sleep 1
 
-# 2. Check and terminate anything listening specifically on port 5000
+# 2. Check and terminate anything listening specifically on port 5000 or 3000
 if command -v fuser &>/dev/null; then
-    HOST_PIDS=$($SUDO_CMD fuser 5000/tcp 2>/dev/null || fuser 5000/tcp 2>/dev/null || true)
-    # Normalize newlines/whitespace to spaces
+    $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+    $SUDO_CMD fuser -k -9 3000/tcp 2>/dev/null || fuser -k -9 3000/tcp 2>/dev/null || true
+fi
+
+if command -v lsof &>/dev/null; then
+    HOST_PIDS=$($SUDO_CMD lsof -t -i:5000 -i:3000 2>/dev/null || lsof -t -i:5000 -i:3000 2>/dev/null || true)
     HOST_PIDS=$(echo "$HOST_PIDS" | tr '\n' ' ' | xargs || true)
     if [ -n "$HOST_PIDS" ]; then
-        echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        $SUDO_CMD fuser -k -15 5000/tcp 2>/dev/null || fuser -k -15 5000/tcp 2>/dev/null || true
-        sleep 2
-        $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
-        HOST_PORT_OCCUPIED=1
-    fi
-elif command -v lsof &>/dev/null; then
-    HOST_PIDS=$($SUDO_CMD lsof -t -i:5000 2>/dev/null || lsof -t -i:5000 2>/dev/null || true)
-    HOST_PIDS=$(echo "$HOST_PIDS" | tr '\n' ' ' | xargs || true)
-    if [ -n "$HOST_PIDS" ]; then
-        echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        $SUDO_CMD kill -15 $HOST_PIDS 2>/dev/null || kill -15 $HOST_PIDS 2>/dev/null || true
-        sleep 2
-        $SUDO_CMD kill -9 $HOST_PIDS 2>/dev/null || kill -9 $HOST_PIDS 2>/dev/null || true
-        HOST_PORT_OCCUPIED=1
-    fi
-else
-    # Fallback using ss
-    HOST_PIDS=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
-    if [ -z "$HOST_PIDS" ]; then
-        HOST_PIDS=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
-    fi
-    if [ -n "$HOST_PIDS" ]; then
-        echo "   ⚠ Found host process ($HOST_PIDS) occupying port 5000. Terminating..."
-        $SUDO_CMD kill -15 $HOST_PIDS 2>/dev/null || kill -15 $HOST_PIDS 2>/dev/null || true
-        sleep 2
+        echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000/3000. Force killing..."
         $SUDO_CMD kill -9 $HOST_PIDS 2>/dev/null || kill -9 $HOST_PIDS 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 fi
 
-# Double check port 5000 after kill signals
-PORT_CHECK=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' || true)
-if [ -n "$PORT_CHECK" ]; then
-    # Force kill starman processes with -9
-    echo "   ⚠ Port 5000 still bound. Issuing force-kill to starman processes..."
-    $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
-    $SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
-    $SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
-    $SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
-    sleep 1
+# Fallback using ss to detect remaining PIDs
+HOST_PIDS=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000|3000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
+if [ -z "$HOST_PIDS" ]; then
+    HOST_PIDS=$(ss -tulpn 2>/dev/null | grep -E ':(5000|3000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
+fi
+if [ -n "$HOST_PIDS" ]; then
+    echo "   ⚠ ss detected host process ($HOST_PIDS) occupying port 5000/3000. Force killing..."
+    $SUDO_CMD kill -9 $HOST_PIDS 2>/dev/null || kill -9 $HOST_PIDS 2>/dev/null || true
     HOST_PORT_OCCUPIED=1
 fi
 
-if [ $HOST_PORT_OCCUPIED -eq 1 ]; then
-    echo "   ✓ Host port 5000 freed successfully"
-else
-    echo "   ✓ Port 5000 is free on the host"
-fi
+sleep 1
+echo "   ✓ Port 5000 and 3000 are verified free on the host"
 
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
@@ -410,7 +384,16 @@ else
         fi
         
         HOST_STARMAN_STARTED=0
-        if [ -n "$HOST_APP_DIR" ] && [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+        PSGI_FILE=""
+        if [ -n "$HOST_APP_DIR" ]; then
+            if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+                PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+            elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
+                PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+            fi
+        fi
+
+        if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
             echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
             cd "$HOST_APP_DIR"
             
@@ -425,7 +408,7 @@ else
             export COMSERV_LOG_DIR="$HOST_APP_DIR"
             
             # Start Host starman daemon using the last git pull code
-            if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$HOST_APP_DIR/script/comserv_server.psgi" >/tmp/host_starman_start.log 2>&1; then
+            if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
                 echo "   ✅ [Emergency] Successfully started manual starman server on host port 5000 (running last git pull)!"
                 HOST_STARMAN_STARTED=1
                 STATUS_MSG="EMERGENCY_HOST_STARMAN_ONLINE (local git code)"

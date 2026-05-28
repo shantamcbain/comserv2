@@ -6356,6 +6356,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
+    my $quick_deploy  = $c->req->params->{quick_deploy}  || 0;
 
     my $ssh_password = '';
     my $home     = $ENV{HOME} || '/home/shanta';
@@ -6447,104 +6448,107 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "Image     : $hub_image\n";
         print "SSH target: $ssh_target\n";
         print "Log file  : $log_file\n";
+        print "Mode      : " . ($quick_deploy ? "QUICK DEPLOY (Skip build/push)" : "FULL DEPLOY (Build + Push + Deploy)") . "\n";
         print "=" x 60 . "\n\n";
 
-        print "--- Pre-flight: Checking Docker Hub credentials ---\n";
+        unless ($quick_deploy) {
+            print "--- Pre-flight: Checking Docker Hub credentials ---\n";
 
-        my $logged_in     = 0;
-        my $creds_method  = 'unknown';
-        my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
-        if (open my $dcf, '<', $docker_cfg) {
-            local $/; my $raw = <$dcf>; close $dcf;
-            my $dcfg = eval { decode_json($raw) } || {};
-            my $creds_store = $dcfg->{credsStore} || '';
-            my $auths       = $dcfg->{auths}       || {};
+            my $logged_in     = 0;
+            my $creds_method  = 'unknown';
+            my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
+            if (open my $dcf, '<', $docker_cfg) {
+                local $/; my $raw = <$dcf>; close $dcf;
+                my $dcfg = eval { decode_json($raw) } || {};
+                my $creds_store = $dcfg->{credsStore} || '';
+                my $auths       = $dcfg->{auths}       || {};
 
-            if ($creds_store) {
-                $creds_method = "credential helper (credsStore: $creds_store)";
-                my $helper = "docker-credential-$creds_store";
-                my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
-                if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
-                    print "✅ Logged in via $creds_method as: $1\n\n";
+                if ($creds_store) {
+                    $creds_method = "credential helper (credsStore: $creds_store)";
+                    my $helper = "docker-credential-$creds_store";
+                    my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
+                    if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
+                        print "✅ Logged in via $creds_method as: $1\n\n";
+                        $logged_in = 1;
+                    } else {
+                        print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    }
+                } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
+                    $creds_method = 'config.json auth entry';
+                    print "✅ Docker Hub auth entry found in config.json\n\n";
                     $logged_in = 1;
                 } else {
-                    print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
                 }
-            } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
-                $creds_method = 'config.json auth entry';
-                print "✅ Docker Hub auth entry found in config.json\n\n";
-                $logged_in = 1;
             } else {
-                print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
+                print "⚠️  Cannot read $docker_cfg\n";
             }
-        } else {
-            print "⚠️  Cannot read $docker_cfg\n";
-        }
 
-        unless ($logged_in) {
-            print "   Push may fail — run: docker login -u shantamcsbain\n";
-            print "   (continuing anyway)\n";
-        }
-        print "\n";
+            unless ($logged_in) {
+                print "   Push may fail — run: docker login -u shantamcsbain\n";
+                print "   (continuing anyway)\n";
+            }
+            print "\n";
 
-        print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
-        if (-f "$comserv_dir/script/docker-cleanup.sh") {
-            print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
-            my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
-            $cleanup_exit >>= 8;
-            if ($cleanup_exit != 0) {
-                print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+            print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
+            if (-f "$comserv_dir/script/docker-cleanup.sh") {
+                print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
+                my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
+                $cleanup_exit >>= 8;
+                if ($cleanup_exit != 0) {
+                    print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+                } else {
+                    print "✅ Local cleanup completed successfully\n\n";
+                }
             } else {
-                print "✅ Local cleanup completed successfully\n\n";
+                print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
             }
-        } else {
-            print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
-        }
 
-        print "--- Step 1: Building production image ($hub_image) ---\n";
-        print "    compose: $comserv_dir/$prod_compose\n\n";
-        my $build_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'build', '--progress=plain');
-        $build_exit >>= 8;
-        if ($build_exit != 0) {
-            print "\n❌ BUILD FAILED (exit $build_exit)\n";
-            _exit(1);
-        }
-        print "\n✅ Build complete\n\n";
+            print "--- Step 1: Building production image ($hub_image) ---\n";
+            print "    compose: $comserv_dir/$prod_compose\n\n";
+            my $build_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'build', '--progress=plain');
+            $build_exit >>= 8;
+            if ($build_exit != 0) {
+                print "\n❌ BUILD FAILED (exit $build_exit)\n";
+                _exit(1);
+            }
+            print "\n✅ Build complete\n\n";
 
-        print "--- Step 1b: Stale-build check ---\n";
-        my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
-        chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
-        chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
-        my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
-        if ($new_commits > 0) {
-            print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
-            print "   Build captured: $git_commit\n";
-            print "   main is now at: $post_build_commit\n";
-            print "   The pushed image will NOT contain these commits:\n";
-            my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
-            print "$new_log\n";
-            print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
-            print "   Continuing push anyway (image is still valid, just not latest).\n\n";
-        } else {
-            print "✅ main has not advanced — build is current ($git_commit)\n\n";
-        }
+            print "--- Step 1b: Stale-build check ---\n";
+            my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
+            chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
+            chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
+            my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
+            if ($new_commits > 0) {
+                print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
+                print "   Build captured: $git_commit\n";
+                print "   main is now at: $post_build_commit\n";
+                print "   The pushed image will NOT contain these commits:\n";
+                my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
+                print "$new_log\n";
+                print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
+                print "   Continuing push anyway (image is still valid, just not latest).\n\n";
+            } else {
+                print "✅ main has not advanced — build is current ($git_commit)\n\n";
+            }
 
-        print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
-        my $push_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'push');
-        $push_exit >>= 8;
-        if ($push_exit != 0) {
-            print "\n❌ PUSH FAILED (exit $push_exit)\n";
-            print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
-            print "     then click Auto Deploy again\n";
-            _exit(1);
+            print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
+            my $push_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'push');
+            $push_exit >>= 8;
+            if ($push_exit != 0) {
+                print "\n❌ PUSH FAILED (exit $push_exit)\n";
+                print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
+                print "     then click Auto Deploy again\n";
+                _exit(1);
+            }
+            print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
         }
-        print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
 
         print "--- Step 3: Triggering deploy on $ssh_target ---\n";
         print "    Updating remote deploy.sh script with latest code...\n";
@@ -6563,11 +6567,15 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             'sudo cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && sudo chmod +x /opt/comserv/Comserv/deploy.sh');
 
         print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        my $ssh_cmd = $quick_deploy
+            ? 'FORCE=1 /opt/comserv/Comserv/deploy.sh'
+            : '/opt/comserv/Comserv/deploy.sh';
+
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             $ssh_target,
-            '/opt/comserv/Comserv/deploy.sh');
+            $ssh_cmd);
         $ssh_exit >>= 8;
         if ($ssh_exit != 0) {
             print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";

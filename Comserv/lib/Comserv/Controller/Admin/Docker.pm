@@ -171,23 +171,25 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
     my $log_id;
     eval {
         my %log_fields = (
-            abstract        => $title,
-            username        => $username,
-            sitename        => $sitename,
-            start_date      => $today,
-            due_date        => $today,
-            start_time      => $now_time,
-            end_time        => $now_time,
-            time            => '00:00:00',
-            status          => 1,
-            priority        => 3,
-            group_of_poster => 'admin',
-            last_mod_by     => $username,
-            last_mod_date   => $today,
-            project_code    => 'PLANNING',
-            details         => 'Hub deploy in progress\x{2026}',
+            abstract         => $title,
+            username         => $username,
+            sitename         => $sitename,
+            start_date       => $today,
+            due_date         => $today,
+            start_time       => $now_time,
+            end_time         => '00:00:00',
+            time             => 0,
+            status           => 1,
+            priority         => 3,
+            group_of_poster  => 'admin',
+            last_mod_by      => $username,
+            last_mod_date    => $today,
+            project_code     => 'PLANNING',
+            details          => 'Hub deploy in progress...',
+            todo_record_id   => $todo_record_id || 0,
+            comments         => '',
+            points_processed => 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id || undef;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
