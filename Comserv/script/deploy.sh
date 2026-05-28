@@ -11,6 +11,119 @@ CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 
+# ── Interactive Menu (when run manually from terminal) ────────────────────────
+if [ -t 0 ] || [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
+    echo "=========================================================="
+    echo "      🐳 COMSERV DEPLOYMENT & SERVICE CONTROL CENTER"
+    echo "=========================================================="
+    echo "Host: $HOSTNAME_VAL"
+    echo "Compose File: $COMPOSE_FILE"
+    echo "Container: $CONTAINER"
+    echo "=========================================================="
+    
+    while true; do
+        echo ""
+        echo "Please choose an action:"
+        echo "  1) FULL DEPLOY (Pull new container from Docker Hub, recreate container)"
+        echo "  2) QUICK DEPLOY (Force-recreate container using existing local image)"
+        echo "  3) DOWNLOAD CONTAINER ONLY (Pull latest from Docker Hub)"
+        echo "  4) STOP ALL SERVICES (Stop container AND aggressively kill host Starman/Plackup)"
+        echo "  5) GIT UPDATE (Run git pull on the host repository)"
+        echo "  6) EMERGENCY MANUAL SERVER (Start manual host-level Starman on port 5000)"
+        echo "  7) EXIT"
+        echo ""
+        read -p "Enter choice [1-7]: " CHOICE
+        
+        case "$CHOICE" in
+            1)
+                echo "Starting FULL DEPLOY..."
+                export FORCE=0
+                break # Break loop and run the standard deploy flow in the script
+                ;;
+            2)
+                echo "Starting QUICK DEPLOY..."
+                export FORCE=1
+                break # Break loop and run the standard deploy flow (with FORCE=1)
+                ;;
+            3)
+                echo "Pulling latest image from Docker Hub..."
+                docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+                ;;
+            4)
+                echo "Stopping all services..."
+                echo "1. Stopping container $CONTAINER..."
+                docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
+                docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
+                docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+                
+                echo "2. Force-killing host-level Starman/Plackup processes..."
+                SUDO_CMD=""
+                if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
+                $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
+                $SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
+                $SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
+                $SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
+                if command -v fuser &>/dev/null; then
+                    $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                    $SUDO_CMD fuser -k -9 3000/tcp 2>/dev/null || fuser -k -9 3000/tcp 2>/dev/null || true
+                fi
+                echo "Services stopped and ports 5000/3000 freed."
+                ;;
+            5)
+                echo "Updating host repository via Git Pull..."
+                HOST_APP_DIR=""
+                if [ -d "/opt/comserv/Comserv" ]; then HOST_APP_DIR="/opt/comserv/Comserv"; fi
+                if [ -n "$HOST_APP_DIR" ]; then
+                    cd "$HOST_APP_DIR"
+                    git pull origin main || git pull || echo "Git pull failed."
+                else
+                    echo "Could not locate host repository directory."
+                fi
+                ;;
+            6)
+                echo "Starting Emergency Manual Server on port 5000..."
+                HOST_APP_DIR=""
+                if [ -d "/opt/comserv/Comserv" ]; then HOST_APP_DIR="/opt/comserv/Comserv"; fi
+                PSGI_FILE=""
+                if [ -n "$HOST_APP_DIR" ]; then
+                    if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+                    elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+                    fi
+                fi
+                if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+                    SUDO_CMD=""
+                    if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
+                    $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
+                    if command -v fuser &>/dev/null; then
+                        $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                    fi
+                    cd "$HOST_APP_DIR"
+                    export CATALYST_HOME="$HOST_APP_DIR"
+                    export CATALYST_ENV=production
+                    export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
+                        echo "✅ Manual Starman started successfully on port 5000."
+                    else
+                        echo "❌ Failed to start manual Starman. Log:"
+                        cat /tmp/host_starman_start.log || true
+                    fi
+                else
+                    echo "Could not find Catalyst PSGI file on host."
+                fi
+                ;;
+            7)
+                echo "Exiting."
+                exit 0
+                ;;
+            *)
+                echo "Invalid choice. Please enter 1-7."
+                ;;
+        esac
+    done
+fi
+
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
 # ── Detect NFS and configure paths ───────────────────────────────────────────

@@ -293,6 +293,12 @@
                         <i class="fas fa-rocket"></i> Auto Deploy (Hub)
                     </button>
 
+                    <button onclick="deployToProduction(1)" 
+                        style="padding: 10px 20px; background-color: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="Bypass rebuild & push. Directly trigger deploy.sh on production server with FORCE=1 to free ports and restart existing container">
+                        <i class="fas fa-bolt"></i> Quick Deploy (No Rebuild)
+                    </button>
+
                     <button onclick="showDeploymentCommands()" 
                         style="padding: 10px 20px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
                         <i class="fas fa-code"></i> Show Commands
@@ -1599,11 +1605,20 @@
         appendOutput(`${'='.repeat(80)}\n\n`);
     }
 
-    function deployToProduction() {
+    function deployToProduction(isQuick) {
         const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
 
-        const confirmMsg =
+        const isQuickMode = isQuick === 1;
+
+        const confirmMsg = isQuickMode ?
+            `⚡ QUICK DEPLOY TO PRODUCTION (No local rebuild)\n\n` +
+            `This will:\n` +
+            `  1. Bypass compiling the container locally.\n` +
+            `  2. Bypass pushing to Docker Hub.\n` +
+            `  3. Immediately trigger /opt/comserv/Comserv/deploy.sh with FORCE=1 on the server.\n\n` +
+            `This will force-kill host processes (manual Starman) blocking port 5000 and restart the container.\n` +
+            `Continue?` :
             `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
             `This will run automatically:\n` +
             `  1. Build production image  (docker compose -f docker-compose.prod.yml build)\n` +
@@ -1616,17 +1631,26 @@
         if (!confirm(confirmMsg)) return;
 
         appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
+        appendOutput(isQuickMode ? `🚀 QUICK DEPLOY STARTED — Bypass build/push\n` : `🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Target: ${sshTarget}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(`Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
+        appendOutput(isQuickMode ? `Steps: SSH trigger deploy.sh with FORCE=1\n` : `Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
-        appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
+        if (!isQuickMode) {
+            appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
+        } else {
+            appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
+        }
+
+        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword };
+        if (isQuickMode) {
+            bodyParams.quick_deploy = 1;
+        }
 
         safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
-            body: new URLSearchParams({ ssh_target: sshTarget, ssh_password: sshPassword })
+            body: new URLSearchParams(bodyParams)
         })
             .then(response => response.json())
             .then(data => {
