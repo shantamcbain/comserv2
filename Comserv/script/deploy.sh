@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 
+# Ensure standard system bin paths are included in PATH (critical for non-interactive SSH)
+export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
+
 EMAIL="csc@computersystemconsulting.ca"
 COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
 IMAGE="shantamcsbain/comserv-web-prod:latest"
@@ -204,32 +207,42 @@ docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
 # Stop host port 5000 processes to prevent "port already in use" binding errors in Docker
 HOST_PORT_OCCUPIED=0
+
+# Try to detect with sudo first (non-interactive), then fallback to current user
+SUDO_CMD=""
+if sudo -n true 2>/dev/null; then
+    SUDO_CMD="sudo"
+fi
+
 if command -v fuser &>/dev/null; then
-    HOST_PIDS=$(sudo fuser 5000/tcp 2>/dev/null || true)
+    HOST_PIDS=$($SUDO_CMD fuser 5000/tcp 2>/dev/null || fuser 5000/tcp 2>/dev/null || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        sudo fuser -k -15 5000/tcp 2>/dev/null || true
+        $SUDO_CMD fuser -k -15 5000/tcp 2>/dev/null || fuser -k -15 5000/tcp 2>/dev/null || true
         sleep 2
-        sudo fuser -k -9 5000/tcp 2>/dev/null || true
+        $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 elif command -v lsof &>/dev/null; then
-    HOST_PIDS=$(sudo lsof -t -i:5000 2>/dev/null || true)
+    HOST_PIDS=$($SUDO_CMD lsof -t -i:5000 2>/dev/null || lsof -t -i:5000 2>/dev/null || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
-        sudo kill -15 $HOST_PIDS 2>/dev/null || true
+        $SUDO_CMD kill -15 $HOST_PIDS 2>/dev/null || kill -15 $HOST_PIDS 2>/dev/null || true
         sleep 2
-        sudo kill -9 $HOST_PIDS 2>/dev/null || true
+        $SUDO_CMD kill -9 $HOST_PIDS 2>/dev/null || kill -9 $HOST_PIDS 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 else
     # Fallback using ss
-    HOST_PID=$(sudo ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    HOST_PID=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    if [ -z "$HOST_PID" ]; then
+        HOST_PID=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    fi
     if [ -n "$HOST_PID" ]; then
         echo "   ⚠ Found host process ($HOST_PID) occupying port 5000. Terminating..."
-        sudo kill -15 $HOST_PID 2>/dev/null || true
+        $SUDO_CMD kill -15 $HOST_PID 2>/dev/null || kill -15 $HOST_PID 2>/dev/null || true
         sleep 2
-        sudo kill -9 $HOST_PID 2>/dev/null || true
+        $SUDO_CMD kill -9 $HOST_PID 2>/dev/null || kill -9 $HOST_PID 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
 fi
