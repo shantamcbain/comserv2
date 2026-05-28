@@ -11,6 +11,18 @@ CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 
+# Helper function to run Git operations safely as the repository owner
+safe_git() {
+    local DIR="$1"
+    shift
+    local OWNER=$(stat -c '%U' "$DIR" 2>/dev/null || echo "ubuntu")
+    if [ "$(id -u)" -eq 0 ] && [ "$OWNER" != "root" ]; then
+        sudo -u "$OWNER" git -C "$DIR" "$@"
+    else
+        git -C "$DIR" "$@"
+    fi
+}
+
 # ── Interactive Menu (when run manually from terminal) ────────────────────────
 if [ -t 0 ] || [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
     echo "=========================================================="
@@ -74,8 +86,7 @@ if [ -t 0 ] || [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 HOST_APP_DIR=""
                 if [ -d "/opt/comserv/Comserv" ]; then HOST_APP_DIR="/opt/comserv/Comserv"; fi
                 if [ -n "$HOST_APP_DIR" ]; then
-                    cd "$HOST_APP_DIR"
-                    git pull origin main || git pull || echo "Git pull failed."
+                    safe_git "$HOST_APP_DIR" pull origin main || safe_git "$HOST_APP_DIR" pull || echo "Git pull failed."
                 else
                     echo "Could not locate host repository directory."
                 fi
@@ -513,7 +524,7 @@ else
             # Pull latest changes from git main branch to keep code fully up-to-date
             echo "   [Emergency] Pulling latest changes from main branch..."
             if command -v git &>/dev/null; then
-                git pull origin main || git pull || echo "   ⚠ Warning: git pull failed, starting with existing local files"
+                safe_git "$HOST_APP_DIR" pull origin main || safe_git "$HOST_APP_DIR" pull || echo "   ⚠ Warning: git pull failed, starting with existing local files"
             fi
             
             export CATALYST_HOME="$HOST_APP_DIR"

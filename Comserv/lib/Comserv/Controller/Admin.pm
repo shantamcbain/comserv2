@@ -6553,6 +6553,9 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
         print "--- Step 3: Triggering deploy on $ssh_target ---\n";
         print "    Updating remote deploy.sh script with latest code...\n";
+        my $escaped_password = $ssh_password;
+        $escaped_password =~ s/'/'\\''/g;
+
         local $ENV{SSHPASS} = $ssh_password;
         system('sshpass', '-e', 'scp',
             '-o', 'StrictHostKeyChecking=no',
@@ -6565,12 +6568,12 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             $ssh_target,
-            'sudo cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && sudo chmod +x /opt/comserv/Comserv/deploy.sh');
+            "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh");
 
         print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         my $ssh_cmd = $quick_deploy
-            ? 'FORCE=1 /opt/comserv/Comserv/deploy.sh'
-            : '/opt/comserv/Comserv/deploy.sh';
+            ? "echo '$escaped_password' | sudo -S FORCE=1 /opt/comserv/Comserv/deploy.sh"
+            : "echo '$escaped_password' | sudo -S /opt/comserv/Comserv/deploy.sh";
 
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
