@@ -6553,7 +6553,14 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             "$comserv_dir/script/deploy.sh",
-            "$ssh_target:/opt/comserv/Comserv/deploy.sh");
+            "$ssh_target:/tmp/deploy.sh");
+
+        # Move to /opt/comserv/Comserv/deploy.sh with sudo to bypass write permission restrictions
+        system('sshpass', '-e', 'ssh',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            $ssh_target,
+            'sudo cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && sudo chmod +x /opt/comserv/Comserv/deploy.sh');
 
         print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         my $ssh_exit = system('sshpass', '-e', 'ssh',
