@@ -187,6 +187,45 @@ docker stop "$CONTAINER"  2>/dev/null || true
 docker rm -f "$CONTAINER" 2>/dev/null || true
 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
 
+echo "2b. Checking for host processes occupying port 5000/3000 outside Docker..."
+# Stop host port 5000 processes to prevent "port already in use" binding errors in Docker
+HOST_PORT_OCCUPIED=0
+if command -v fuser &>/dev/null; then
+    HOST_PIDS=$(fuser 5000/tcp 2>/dev/null || true)
+    if [ -n "$HOST_PIDS" ]; then
+        echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
+        fuser -k -15 5000/tcp 2>/dev/null || true
+        sleep 2
+        fuser -k -9 5000/tcp 2>/dev/null || true
+        HOST_PORT_OCCUPIED=1
+    fi
+elif command -v lsof &>/dev/null; then
+    HOST_PIDS=$(lsof -t -i:5000 2>/dev/null || true)
+    if [ -n "$HOST_PIDS" ]; then
+        echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
+        kill -15 $HOST_PIDS 2>/dev/null || true
+        sleep 2
+        kill -9 $HOST_PIDS 2>/dev/null || true
+        HOST_PORT_OCCUPIED=1
+    fi
+else
+    # Fallback using ss
+    HOST_PID=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    if [ -n "$HOST_PID" ]; then
+        echo "   ⚠ Found host process ($HOST_PID) occupying port 5000. Terminating..."
+        kill -15 $HOST_PID 2>/dev/null || true
+        sleep 2
+        kill -9 $HOST_PID 2>/dev/null || true
+        HOST_PORT_OCCUPIED=1
+    fi
+fi
+
+if [ $HOST_PORT_OCCUPIED -eq 1 ]; then
+    echo "   ✓ Host port 5000 freed successfully"
+else
+    echo "   ✓ Port 5000 is free on the host"
+fi
+
 echo "3. Starting new container..."
 
 if [ -z "$NFS_LOCAL_DIR" ]; then
@@ -263,8 +302,82 @@ if [ $HEALTHY -eq 1 ]; then
     SUBJECT="✅ Comserv Production Updated Successfully"
 else
     echo "❌ ERROR: Container did not reach healthy state within 90s"
-    STATUS_MSG="FAILURE (unhealthy/timeout)"
-    SUBJECT="❌ Comserv Production Deployment FAILURE"
+    
+    # 1. Automatic rollback to backup-1 (rollback container image)
+    echo "   Attempting automated rollback to backup-1..."
+    FALLBACK_HEALTHY=0
+    if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+        echo "   [Fallback] Found backup-1 image. Stopping and removing failed container..."
+        docker stop "$CONTAINER" 2>/dev/null || true
+        docker rm -f "$CONTAINER" 2>/dev/null || true
+        
+        echo "   [Fallback] Re-tagging backup-1 as latest..."
+        docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
+        
+        echo "   [Fallback] Launching container with rolled-back image..."
+        COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+        
+        echo "   [Fallback] Checking health of the backup container (up to 60s)..."
+        FALLBACK_ATTEMPT=0
+        while [ $FALLBACK_ATTEMPT -lt 30 ]; do
+            sleep 2
+            FALLBACK_ATTEMPT=$((FALLBACK_ATTEMPT + 1))
+            STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
+            if [ "$STATUS" = "healthy" ]; then
+                FALLBACK_HEALTHY=1
+                break
+            fi
+        done
+    fi
+    
+    # 2. Emergency fallback to Host-level manual server (latest git pull code)
+    if [ $FALLBACK_HEALTHY -eq 1 ]; then
+        echo "   ✅ [Fallback] Successfully rolled back to backup-1! Container is healthy."
+        STATUS_MSG="ROLLBACK_SUCCESS (backup-1 image)"
+        SUBJECT="⚠ Comserv Production Rolled Back to Backup-1 Image"
+    else
+        echo "   ❌ [Fallback] Rollback image failed or was not available."
+        echo "   [Emergency] Initiating Emergency host-level manual fallback..."
+        
+        # Stop any failed docker container first to free port 5000
+        docker stop "$CONTAINER" 2>/dev/null || true
+        docker rm -f "$CONTAINER" 2>/dev/null || true
+        
+        # Try to locate host git repository to run local git code
+        HOST_APP_DIR=""
+        if [ -d "/opt/comserv/Comserv" ]; then
+            HOST_APP_DIR="/opt/comserv/Comserv"
+        elif [ -d "/home/ubuntu/comserv" ]; then
+            HOST_APP_DIR="/home/ubuntu/comserv"
+        elif [ -d "/home/shanta/PycharmProjects/comserv2" ]; then
+            HOST_APP_DIR="/home/shanta/PycharmProjects/comserv2"
+        fi
+        
+        HOST_STARMAN_STARTED=0
+        if [ -n "$HOST_APP_DIR" ] && [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+            echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
+            cd "$HOST_APP_DIR"
+            export CATALYST_HOME="$HOST_APP_DIR"
+            export CATALYST_ENV=production
+            export COMSERV_LOG_DIR="$HOST_APP_DIR"
+            
+            # Start Host starman daemon using the last git pull code
+            if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$HOST_APP_DIR/script/comserv_server.psgi" >/tmp/host_starman_start.log 2>&1; then
+                echo "   ✅ [Emergency] Successfully started manual starman server on host port 5000 (running last git pull)!"
+                HOST_STARMAN_STARTED=1
+                STATUS_MSG="EMERGENCY_HOST_STARMAN_ONLINE (local git code)"
+                SUBJECT="⚠ Emergency: Host-level manual Starman started (Docker down)"
+            else
+                echo "   ❌ [Emergency] Failed to start manual starman on host. Log:"
+                cat /tmp/host_starman_start.log || true
+            fi
+        fi
+        
+        if [ $HOST_STARMAN_STARTED -ne 1 ]; then
+            STATUS_MSG="FAILURE (unhealthy container & rollback failed)"
+            SUBJECT="❌ Comserv Production Deployment FAILURE"
+        fi
+    fi
     
     # Extract detailed diagnostics to make debugging easy for CSC admin
     DIAGNOSTICS_REPORT="\n\n===========================================================\n"
@@ -272,17 +385,23 @@ else
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}===========================================================\n"
     
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[1] Container State:\n"
-    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker inspect --format='Status: {{.State.Status}} | Running: {{.State.Running}} | Error: {{.State.Error}} | ExitCode: {{.State.ExitCode}} | OOMKilled: {{.State.OOMKilled}}' "$CONTAINER" 2>/dev/null)\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker inspect --format='Status: {{.State.Status}} | Running: {{.State.Running}} | Error: {{.State.Error}} | ExitCode: {{.State.ExitCode}} | OOMKilled: {{.State.OOMKilled}}' "$CONTAINER" 2>/dev/null || echo 'Container not running')\n"
     
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[2] Detailed Health Log:\n"
     HEALTH_LOG=$(docker inspect --format='{{range .State.Health.Log}}{{.Start}} [Exit: {{.ExitCode}}]:\n{{.Output}}\n{{end}}' "$CONTAINER" 2>/dev/null)
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}${HEALTH_LOG:-'No health check logs found.'}\n"
     
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[3] Last 150 Container Console Logs:\n"
-    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker logs --tail 150 "$CONTAINER" 2>&1)\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker logs --tail 150 "$CONTAINER" 2>&1 || echo 'No container logs available')\n"
     
-    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[4] Supervisor Status (inside container):\n"
-    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}$(docker exec "$CONTAINER" supervisorctl status 2>&1 || echo 'Could not execute supervisorctl')\n"
+    DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[4] Fallback Status:\n"
+    if [ $FALLBACK_HEALTHY -eq 1 ]; then
+        DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}✓ Successfully rolled back to backup-1 image automatically.\n"
+    elif [ ${HOST_STARMAN_STARTED:-0} -eq 1 ]; then
+        DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}⚠ Automatically rolled back to emergency HOST manual starman server (local git code).\n"
+    else
+        DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}❌ Rollback to backup-1 image failed and Emergency host starman failed or was unavailable!\n"
+    fi
     
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}\n[5] Manual Copy-Pasteable Rollback Steps:\n"
     DIAGNOSTICS_REPORT="${DIAGNOSTICS_REPORT}-----------------------------------------------------------\n"
