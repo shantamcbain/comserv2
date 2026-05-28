@@ -2729,7 +2729,7 @@ sub table_name_to_result_name {
         'log' => 'Log',
         'mail_domains' => 'MailDomain',
         'network_devices' => 'NetworkDevice',
-        'pages_content' => 'Pages_content',
+        'page' => 'Page',
         'page_tb' => 'PageTb',
         'pallets' => 'Pallet',
         'participant' => 'Participant',
@@ -3022,13 +3022,11 @@ sub result_name_to_table_name {
         'Participant' => 'participants',
         'Herb' => 'ency_herb_tb',
         'Page' => 'page',
-        'Pages_content' => 'pages_content',
         'InternalLinksTb' => 'internal_links_tb',
         'Learned_data' => 'learned_data',
         'Log' => 'log',
         'MailDomain' => 'mail_domains',
         'NetworkDevice' => 'network_devices',
-        'PageTb' => 'page_tb',
         'Pallet' => 'pallets',
         'ProjectSite' => 'project_sites',
         'Queen' => 'queens',
@@ -7072,6 +7070,369 @@ sub get_result_file_path {
     my $result_file_path = File::Spec->catfile($base_path, "$class_name.pm");
     
     return $result_file_path;
+}
+
+# Page Migration action: Forager -> Ency
+sub migrate_pages :Path('/admin/migrate_pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_pages', 
+        "Starting migrate_pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'migrate_pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    
+    if ($action eq 'preview') {
+        my $preview_data = $self->_preview_page_migration($c);
+        $c->stash(
+            show_preview => 1,
+            preview_data => $preview_data,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    elsif ($action eq 'migrate') {
+        my @selected_ids = $c->req->param('selected_pages');
+        my $result = $self->_perform_page_migration($c, \@selected_ids);
+        $c->stash(
+            show_result => 1,
+            migration_result => $result,
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+    else {
+        $c->stash(
+            template => 'admin/migrate_pages.tt'
+        );
+    }
+}
+
+# Helper method to preview page migration
+sub _preview_page_migration {
+    my ($self, $c) = @_;
+    
+    my @forager_pages;
+    eval {
+        @forager_pages = $c->model('DBForager')->resultset('Page')->all;
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, '_preview_page_migration', 
+            "Error fetching Forager pages: $@");
+        return {
+            total_count => 0,
+            issues_count => 0,
+            mapping_issues => [{ error => "Failed to load Forager pages: $@" }],
+            forager_pages => []
+        };
+    }
+    
+    my $total_count = scalar @forager_pages;
+    my $issues_count = 0;
+    my @mapping_issues;
+    
+    foreach my $f_page (@forager_pages) {
+        my @issues;
+        
+        # Check required fields
+        push @issues, "Missing sitename" unless $f_page->sitename;
+        push @issues, "Missing menu" unless $f_page->menu;
+        push @issues, "Missing page_code" unless $f_page->page_code;
+        
+        # Check duplicate page_code in Ency.page for the same site.
+        if ($f_page->page_code) {
+            my $exists = $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+            if ($exists) {
+                push @issues, "Page code already exists in destination for site " . ($f_page->sitename || 'CSC');
+            }
+        }
+        
+        if (@issues) {
+            $issues_count++;
+            push @mapping_issues, {
+                page => $f_page,
+                issues => \@issues
+            };
+        }
+    }
+    
+    return {
+        total_count => $total_count,
+        issues_count => $issues_count,
+        mapping_issues => \@mapping_issues,
+        forager_pages => \@forager_pages
+    };
+}
+
+# Helper method to perform page migration
+sub _perform_page_migration {
+    my ($self, $c, $selected_ids) = @_;
+    
+    my $migrated_count = 0;
+    my $skipped_count = 0;
+    my $error_count = 0;
+    my @migration_log;
+    my @errors;
+    
+    foreach my $id (@$selected_ids) {
+        my $f_page = eval { $c->model('DBForager')->resultset('Page')->find({ record_id => $id }) };
+        unless ($f_page) {
+            $error_count++;
+            push @errors, "Could not find Forager page with record_id: $id";
+            next;
+        }
+        
+        # Safety checks
+        my $exists = eval {
+            $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+        };
+        if ($exists) {
+            $skipped_count++;
+            push @migration_log, "Skipped duplicate: " . ($f_page->sitename || 'CSC') . "/" . $f_page->page_code;
+            next;
+        }
+        
+        # Build page data
+        my $page_data = {
+            sitename => $f_page->sitename || 'CSC',
+            menu => $f_page->menu || 'Main',
+            page_code => $f_page->page_code,
+            title => $f_page->app_title || $f_page->page_code,
+            body => $f_page->body || '',
+            description => $f_page->description,
+            keywords => $f_page->keywords,
+            link_order => $f_page->link_order || 0,
+            status => $f_page->status || 'active',
+            roles => 'public', # default
+            created_by => $f_page->username_of_poster || 'migrated',
+        };
+        
+        eval {
+            $c->model('DBEncy')->resultset('Page')->create($page_data);
+            $migrated_count++;
+            push @migration_log, "Successfully migrated: " . $f_page->page_code;
+        };
+        if ($@) {
+            $error_count++;
+            push @errors, "Failed to migrate " . $f_page->page_code . ": $@";
+        }
+    }
+    
+    return {
+        migrated_count => $migrated_count,
+        skipped_count => $skipped_count,
+        error_count => $error_count,
+        migration_log => \@migration_log,
+        errors => \@errors
+    };
+}
+
+# Admin: Page Management UI
+sub pages :Path('/admin/pages') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'pages', 
+        "Starting admin pages action");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'pages')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+    
+    my $action = $c->req->param('action') || '';
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    
+    # Handle deletion
+    if ($action eq 'delete') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only delete pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only delete pages belonging to your own site.";
+            } else {
+                my $code = $page->page_code;
+                eval {
+                    $page->delete;
+                    $c->flash->{success_msg} = "Page '$code' deleted successfully.";
+                };
+                if ($@) {
+                    $c->flash->{error_msg} = "Failed to delete page: $@";
+                }
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for deletion.";
+        }
+        $c->response->redirect($c->uri_for('/admin/pages'));
+        return;
+    }
+    
+    my $show_form = undef;
+    my $page_item = {};
+    
+    if ($action eq 'create') {
+        $show_form = 'create';
+        $page_item = {
+            sitename => $current_sitename,
+            menu => 'Main',
+            status => 'active',
+            roles => 'public',
+        };
+    }
+    elsif ($action eq 'edit') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only edit pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only edit pages belonging to your own site.";
+            } else {
+                $show_form = 'edit';
+                $page_item = $page;
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for editing.";
+        }
+    }
+    elsif ($action eq 'save') {
+        my $params = $c->req->params;
+        my $id = $params->{id};
+        
+        # Site isolation check: non-CSC admins can only assign to their own site
+        my $target_sitename = $params->{sitename} || $current_sitename;
+        if ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
+            $c->stash(error_msg => "Access denied: You can only save pages belonging to your own site.");
+            $show_form = $id ? 'edit' : 'create';
+            $page_item = $params;
+        } else {
+            my $page_data = {
+                sitename => $target_sitename,
+                menu => $params->{menu} || 'Main',
+                page_code => $params->{page_code},
+                title => $params->{title},
+                body => $params->{body} || '',
+                description => $params->{description},
+                keywords => $params->{keywords},
+                link_order => $params->{link_order} || 0,
+                status => $params->{status} || 'active',
+                roles => $params->{roles} || 'public',
+                share_with => $params->{share_with} || '',
+            };
+            
+            my $success = 0;
+            if ($id) {
+                # Editing existing page
+                my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+                if ($page) {
+                    if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                        $c->stash(error_msg => "Access denied: You can only modify pages belonging to your own site.");
+                        $show_form = 'edit';
+                        $page_item = $params;
+                    } else {
+                        eval {
+                            $page->update($page_data);
+                            $c->flash->{success_msg} = "Page updated successfully.";
+                            $success = 1;
+                        };
+                        if ($@) {
+                            $c->stash(error_msg => "Error updating page: $@");
+                            $show_form = 'edit';
+                            $page_item = $params;
+                        }
+                    }
+                } else {
+                    $c->stash(error_msg => "Page not found to update.");
+                }
+            } else {
+                # Creating new page
+                $page_data->{created_by} = $c->session->{username} || 'admin';
+                eval {
+                    $c->model('DBEncy')->resultset('Page')->create($page_data);
+                    $c->flash->{success_msg} = "Page created successfully.";
+                    $success = 1;
+                };
+                if ($@) {
+                    $c->stash(error_msg => "Error creating page: $@");
+                    $show_form = 'create';
+                    $page_item = $params;
+                }
+            }
+            
+            if ($success) {
+                $c->response->redirect($c->uri_for('/admin/pages'));
+                return;
+            }
+        }
+    }
+    
+    # Fetch pages according to site context for list display
+    my @pages;
+    eval {
+        if ($current_sitename eq 'CSC') {
+            @pages = $c->model('DBEncy')->resultset('Page')->all;
+        } else {
+            # Regular site admins see their own pages + shared pages
+            @pages = $c->model('DBEncy')->resultset('Page')->search({
+                '-or' => [
+                    { sitename => $current_sitename },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$current_sitename%" } }
+                ]
+            })->all;
+        }
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pages', 
+            "Error fetching Ency pages: $@");
+        $c->stash(error_msg => "Error fetching pages: $@") unless $c->stash->{error_msg};
+    }
+    
+    # Standard roles drop down
+    my @available_roles = ('public', 'member', 'coop', 'it', 'helpdesk', 'admin');
+    # Fetch site-specific custom roles
+    eval {
+        my $roles_rs = $c->model('DBEncy')->resultset('SiteRole')->search({
+            sitename => [ $current_sitename, 'All' ]
+        });
+        while (my $r = $roles_rs->next) {
+            push @available_roles, $r->role_name;
+        }
+    };
+    
+    # Unique roles list
+    my %seen;
+    @available_roles = grep { !$seen{$_}++ } @available_roles;
+    
+    # Fetch all sites for the dropdown check list (Cross-Site Page Sharing)
+    my @sites_list;
+    eval {
+        my $sites_rs = $c->model('DBEncy')->resultset('Site')->all;
+        while (my $s = $sites_rs->next) {
+            push @sites_list, $s->name;
+        }
+    };
+    
+    $c->stash(
+        pages => \@pages,
+        show_form => $show_form,
+        page_item => $page_item,
+        current_site => $current_sitename,
+        available_roles => \@available_roles,
+        sites_list => \@sites_list,
+        template => 'admin/pages.tt'
+    );
 }
 
 =head1 AUTHOR

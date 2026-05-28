@@ -6415,7 +6415,8 @@ sub get_user_providers :Local :Args(0) {
             my $installed = $ollama->list_models() || [];
             my @chat_models = grep {
                 my $n = $_->{name} || '';
-                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
+                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
+                   && $n !~ /:cloud$/i;
             } @$installed;
 
             # Build servers list for admins (used by widget server-switcher)
@@ -10136,11 +10137,26 @@ PYSCRIPT
             my $model_used = $result->{model} || $whisper_model;
             my $segments   = $result->{segments} || [];
 
-            eval { require File::Path; File::Path::make_path($audio_nfs, $transcript_nfs) };
-            eval { require File::Copy; File::Copy::copy($tmp_file, $nfs_audio_file) };
-            unlink $tmp_file;
+            my $nfs_ok = 1;
+            eval {
+                require File::Path;
+                File::Path::make_path($audio_nfs, $transcript_nfs);
+            };
+            if ($@) {
+                my $err = "$@";
+                $nfs_ok = 0;
+                print STDERR "NFS error: Failed to create directories $audio_nfs, $transcript_nfs: $err\n";
+            }
 
-            my $nfs_ok = !$@;
+            if ($nfs_ok) {
+                require File::Copy;
+                unless (File::Copy::copy($tmp_file, $nfs_audio_file)) {
+                    my $err = $!;
+                    $nfs_ok = 0;
+                    print STDERR "NFS error: Failed to copy audio file from $tmp_file to $nfs_audio_file: $err\n";
+                }
+            }
+            unlink $tmp_file;
             if ($nfs_ok) {
                 my $transcript_json = encode_json({
                     transcript => $result->{transcript},

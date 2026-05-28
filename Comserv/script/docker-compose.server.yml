@@ -10,13 +10,13 @@ services:
       CATALYST_DEBUG: 0
       WEB_PORT: 3000
       TZ: UTC
-      WORKSHOP_RESOURCES_PATH: /data/nfs
+      NFS_DATA_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
     volumes:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
-      - ${COMSERV_LOGS_DIR:-/home/ubuntu/comserv-logs}:/opt/comserv/root/log
-      - ${WORKSHOP_LOCAL_DIR:-/home/ubuntu/comserv-workshop}:/data/nfs:rw
+      - ${COMSERV_LOGS_DIR:-/var/log/comserv}:/opt/comserv/root/log
+      - ${NFS_DATA_DIR:-/var/lib/comserv/data}:/data/nfs:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]

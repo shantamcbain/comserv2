@@ -7,7 +7,7 @@ set -e
 
 NFS_HOST="${NFS_SERVER:-192.168.1.175}"
 NFS_EXPORT="${NFS_WORKSHOP_PATH:-/mnt/data/comserv}"
-WORKSHOP_LOCAL_DIR="${WORKSHOP_LOCAL_DIR:-/home/shanta/comserv-workshop}"
+NFS_HOST_PATH="${NFS_HOST_PATH:-/home/shanta/nfs}"
 COMPOSE_DIR="/home/shanta/PycharmProjects/comserv2"
 MAX_WAIT=60
 
@@ -16,7 +16,7 @@ log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 log "=== Comserv Docker Boot Startup ==="
 
 # Ensure the local workshop directory exists
-mkdir -p "$WORKSHOP_LOCAL_DIR"
+mkdir -p "$NFS_HOST_PATH"
 
 # Check if NFS server is reachable on port 2049
 log "Checking NFS server ${NFS_HOST}:2049 (up to ${MAX_WAIT}s)..."
@@ -34,12 +34,12 @@ done
 
 # Mount NFS on the host directory if available and not already mounted
 if [ $NFS_OK -eq 1 ]; then
-    if mountpoint -q "$WORKSHOP_LOCAL_DIR"; then
-        log "NFS already mounted at ${WORKSHOP_LOCAL_DIR}"
+    if mountpoint -q "$NFS_HOST_PATH"; then
+        log "NFS already mounted at ${NFS_HOST_PATH}"
     else
-        log "Mounting NFS ${NFS_HOST}:${NFS_EXPORT} -> ${WORKSHOP_LOCAL_DIR}"
+        log "Mounting NFS ${NFS_HOST}:${NFS_EXPORT} -> ${NFS_HOST_PATH}"
         if mount -t nfs -o "rw,noatime,nfsvers=3,soft,timeo=14" \
-            "${NFS_HOST}:${NFS_EXPORT}" "$WORKSHOP_LOCAL_DIR" 2>&1; then
+            "${NFS_HOST}:${NFS_EXPORT}" "$NFS_HOST_PATH" 2>&1; then
             log "NFS mounted successfully"
         else
             log "WARNING: NFS mount failed — containers will start without workshop files"

@@ -336,10 +336,6 @@
                         <i class="fas fa-exchange-alt"></i>
                         <span>Migrate Schema</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
-                        <i class="fas fa-file-export"></i>
-                        <span>Migrate Pages (Forager → Ency)</span>
-                    </a>
                     <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
                         <i class="fas fa-key"></i>
                         <span>DB Connection Passwords</span>
@@ -402,6 +398,14 @@
                     <a href="[% c.uri_for('/admin/theme') %]" class="admin-link">
                         <i class="fas fa-palette"></i>
                         <span>Theme Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/pages') %]" class="admin-link">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Page Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
+                        <i class="fas fa-file-export"></i>
+                        <span>Migrate Legacy Pages</span>
                     </a>
                     <a href="[% c.uri_for('/admin/view_log') %]" class="admin-link">
                         <i class="fas fa-file-alt"></i>

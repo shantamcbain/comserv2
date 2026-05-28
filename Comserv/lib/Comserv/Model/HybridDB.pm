@@ -2211,7 +2211,6 @@ sub _table_has_share_field {
     my %tables_with_share = (
         'todo' => 1,
         'workshop' => 1,
-        'page_tb' => 1,
     );
     
     return $tables_with_share{$table_name} || 0;
@@ -2492,12 +2491,6 @@ sub _get_share_field_config {
             shared_values => ['public'],   # share='public' means shared
             private_values => ['private'], # share='private' means private
         },
-        'page_tb' => {
-            field => 'share',
-            type => 'varchar',
-            shared_values => ['public', '1'], # flexible values for shared
-            private_values => ['private', '0'], # flexible values for private
-        },
     );
     
     return $share_configs{$table_name} || {
@@ -2559,7 +2552,7 @@ sub _get_date_column_for_table {
     my %date_columns = (
         'todo' => 'last_mod_date',
         'workshop' => 'created_at',
-        'page_tb' => 'last_modified',
+        'page' => 'updated_at',
     );
     
     return $date_columns{$table_name} || 'created_at'; # fallback to common column name
@@ -2716,7 +2709,7 @@ sub _get_primary_key_for_table {
     my %primary_keys = (
         'todo' => 'record_id',
         'workshop' => 'id',
-        'page_tb' => 'record_id',
+        'page' => 'id',
     );
     
     return $primary_keys{$table_name} || 'id'; # fallback to common column name
@@ -3116,9 +3109,7 @@ sub _convert_camelcase_to_snake_case {
         'ApisInventoryTb' => 'apis_inventory_tb',
         'ApisYardsTb' => 'apis_yards_tb',
         'ApisQueensTb' => 'apis_queens_tb',
-        'PageTb' => 'page_tb',
         'InternalLinksTb' => 'internal_links_tb',
-        'Pages_content' => 'pages_content',
         'Learned_data' => 'learned_data',
     );
     

@@ -354,7 +354,7 @@ sub model_download :Path('/3d/model_download') :Args(1) {
 
     my $path = $model->nfs_path;
     unless (-f $path && -r $path) {
-        my $nfs_root = $ENV{WORKSHOP_RESOURCES_PATH} || '/home/shanta/comserv-workshop';
+        my $nfs_root = $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
         (my $alt = $path) =~ s{^/data/nfs}{$nfs_root};
         $path = $alt if -f $alt && -r $alt;
     }
