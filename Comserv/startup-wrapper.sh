@@ -77,8 +77,7 @@ else
   echo "[startup-wrapper] Production mode — starting Starman on :$PORT with $WORKERS workers"
   exec perl -S starman \
     --env "$PLACK_ENV" \
-    --listen ":$PORT" \
-    --host 0.0.0.0 \
+    --listen "0.0.0.0:$PORT" \
     --workers "$WORKERS" \
     --max-requests 1000 \
     --max-requests-jitter 100 \

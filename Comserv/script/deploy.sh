@@ -23,6 +23,106 @@ safe_git() {
     fi
 }
 
+# ── Non-interactive Deploy Mode ──────────────────────────────────────────────
+if [ -n "${DEPLOY_MODE:-}" ]; then
+    echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
+    case "$DEPLOY_MODE" in
+        "full")
+            export FORCE=0
+            # Continue to standard full deploy
+            ;;
+        "quick")
+            export FORCE=1
+            # Continue to standard quick deploy
+            ;;
+        "pull_only")
+            echo "Pulling latest image from Docker Hub..."
+            docker compose -f "$COMPOSE_FILE" pull || echo "Pull failed!"
+            exit 0
+            ;;
+        "stop_all")
+            echo "Stopping all services..."
+            echo "1. Stopping container $CONTAINER..."
+            docker stop "$CONTAINER" comserv-web-prod 2>/dev/null || true
+            docker rm -f "$CONTAINER" comserv-web-prod 2>/dev/null || true
+            docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
+            
+            echo "2. Force-killing host-level Starman/Plackup processes..."
+            SUDO_CMD=""
+            if [ "$(id -u)" -eq 0 ]; then
+                SUDO_CMD="sudo"
+            elif sudo -n true 2>/dev/null; then
+                SUDO_CMD="sudo"
+            fi
+            $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
+            $SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
+            COMSERV_PIDS=$($SUDO_CMD pgrep -f "comserv.*psgi" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
+            if [ -n "$COMSERV_PIDS" ]; then
+                $SUDO_CMD kill -9 $COMSERV_PIDS 2>/dev/null || kill -9 $COMSERV_PIDS 2>/dev/null || true
+            fi
+            if command -v fuser &>/dev/null; then
+                $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                $SUDO_CMD fuser -k -9 3000/tcp 2>/dev/null || fuser -k -9 3000/tcp 2>/dev/null || true
+            fi
+            echo "Services stopped and ports 5000/3000 freed."
+            exit 0
+            ;;
+        "git_pull")
+            echo "Updating host repository via Git Pull..."
+            HOST_APP_DIR=""
+            if [ -d "/opt/comserv/Comserv" ]; then HOST_APP_DIR="/opt/comserv/Comserv"; fi
+            if [ -n "$HOST_APP_DIR" ]; then
+                safe_git "$HOST_APP_DIR" pull origin main || safe_git "$HOST_APP_DIR" pull || echo "Git pull failed."
+            else
+                echo "Could not locate host repository directory."
+            fi
+            exit 0
+            ;;
+        "manual_server")
+            echo "Starting Emergency Manual Server on port 5000..."
+            HOST_APP_DIR=""
+            if [ -d "/opt/comserv/Comserv" ]; then HOST_APP_DIR="/opt/comserv/Comserv"; fi
+            PSGI_FILE=""
+            if [ -n "$HOST_APP_DIR" ]; then
+                if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+                    PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+                elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
+                    PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+                fi
+            fi
+            if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+                SUDO_CMD=""
+                if [ "$(id -u)" -eq 0 ]; then
+                    SUDO_CMD="sudo"
+                elif sudo -n true 2>/dev/null; then
+                    SUDO_CMD="sudo"
+                fi
+                $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
+                if command -v fuser &>/dev/null; then
+                    $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                fi
+                cd "$HOST_APP_DIR"
+                export CATALYST_HOME="$HOST_APP_DIR"
+                export CATALYST_ENV=production
+                export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
+                    echo "✅ Manual Starman started successfully on port 5000."
+                else
+                    echo "❌ Failed to start manual Starman. Log:"
+                    cat /tmp/host_starman_start.log || true
+                fi
+            else
+                echo "Could not find Catalyst PSGI file on host."
+            fi
+            exit 0
+            ;;
+        *)
+            echo "Unknown DEPLOY_MODE: $DEPLOY_MODE"
+            exit 1
+            ;;
+    esac
+fi
+
 # ── Interactive Menu (when run manually from terminal) ────────────────────────
 if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
     echo "=========================================================="
@@ -70,11 +170,17 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 
                 echo "2. Force-killing host-level Starman/Plackup processes..."
                 SUDO_CMD=""
-                if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
-                $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
-                $SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
-                $SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
-                $SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
+                if [ "$(id -u)" -eq 0 ]; then
+                    SUDO_CMD="sudo"
+                elif sudo -n true 2>/dev/null; then
+                    SUDO_CMD="sudo"
+                fi
+                $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
+                $SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
+                COMSERV_PIDS=$($SUDO_CMD pgrep -f "comserv.*psgi" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
+                if [ -n "$COMSERV_PIDS" ]; then
+                    $SUDO_CMD kill -9 $COMSERV_PIDS 2>/dev/null || kill -9 $COMSERV_PIDS 2>/dev/null || true
+                fi
                 if command -v fuser &>/dev/null; then
                     $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
                     $SUDO_CMD fuser -k -9 3000/tcp 2>/dev/null || fuser -k -9 3000/tcp 2>/dev/null || true
@@ -150,16 +256,18 @@ for candidate in $NFS_MOUNT_CANDIDATES; do
 done
 
 # Default paths (local fallback if NFS not mounted)
-COMSERV_LOGS_DIR="/var/log/comserv"
+COMSERV_LOGS_DIR="$HOME/comserv-logs"
 NFS_DATA_DIR="/var/lib/comserv/data"
 NFS_DEPLOY_LOG=""
 
 if [ -n "$NFS_MOUNT_DIR" ]; then
     echo "NFS detected at $NFS_MOUNT_DIR"
-    COMSERV_LOGS_DIR="$NFS_MOUNT_DIR/comserv-logs"
+    # Keep application logs local to avoid NFS flock/getattr latency hangs!
+    # The application itself (Logging.pm) asynchronously copies archived/rotated logs to NFS.
+    COMSERV_LOGS_DIR="$HOME/comserv-logs"
     NFS_DATA_DIR="$NFS_MOUNT_DIR"
     mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
-    echo "   Container logs: $COMSERV_LOGS_DIR"
+    echo "   Container logs: $COMSERV_LOGS_DIR (local path to avoid NFS locking hangs)"
     echo "   NFS data dir:   $NFS_DATA_DIR"
     
     # Configure NFS Deployment Log archive path
@@ -170,6 +278,7 @@ if [ -n "$NFS_MOUNT_DIR" ]; then
     fi
 else
     echo "NFS not mounted — using local fallbacks"
+    COMSERV_LOGS_DIR="$HOME/comserv-logs"
     echo "   Container logs: $COMSERV_LOGS_DIR"
     echo "   Data dir:       $NFS_DATA_DIR"
     mkdir -p "$COMSERV_LOGS_DIR" "$NFS_DATA_DIR" 2>/dev/null || true
