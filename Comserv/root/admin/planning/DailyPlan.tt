@@ -1612,8 +1612,39 @@ function dailyLogAction(action) {
 }
 
 function openDeployPopup(todoId) {
+    var choice = prompt(
+        "Choose Deployment Method:\n\n" +
+        "Type [1] for FULL DEPLOY (Primary Choice):\n" +
+        "  - Rebuilds and pushes a new image to Docker Hub, then restarts the production server container.\n\n" +
+        "Type [2] for QUICK DEPLOY:\n" +
+        "  - Bypasses compiling/uploading. Immediately triggers the deploy script to stop blocking host processes and restart the container.\n\n" +
+        "Type [C] or press [Cancel] to Abort.",
+        "1"
+    );
+    
+    if (choice === null) {
+        return; // User clicked Cancel
+    }
+    choice = choice.trim();
+    if (choice !== '1' && choice !== '2') {
+        alert("Action canceled.");
+        return;
+    }
+    
     var url = '/admin/docker/deploy_form';
-    if (todoId) { url += '?todo_record_id=' + encodeURIComponent(todoId); }
+    var params = [];
+    if (choice === '2') {
+        params.push('quick_deploy=1');
+    } else {
+        params.push('quick_deploy=0');
+    }
+    if (todoId) {
+        params.push('todo_record_id=' + encodeURIComponent(todoId));
+    }
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    
     var popup = window.open(
         url,
         'docker_deploy',
