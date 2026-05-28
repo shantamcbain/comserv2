@@ -25,7 +25,7 @@
     [% HostName = c.stash.HostName %] [%# HostName %]<!-- This is where you access the stashed HostName -->
     [% SiteName = c.session.SiteName %] [%# SiteName %]<!-- This is where you access the stashed SiteName -->
     [% favicon = c.stash.HostName _ "/images/favicon.ico" %]
-    [% page_title = "Default Home" %]
+    [% page_title = page_title || title || template.title || "Default Home" %]
     [% ScriptDisplayName = 'Catalyst' %]
 
     [% Catalyst.debug(obj) %]

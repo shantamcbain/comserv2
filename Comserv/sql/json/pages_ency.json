@@ -89,8 +89,8 @@
   "primary_key": ["id"],
   "unique_constraints": [
     {
-      "name": "unique_page_code",
-      "columns": ["page_code"]
+      "name": "unique_sitename_page_code",
+      "columns": ["sitename", "page_code"]
     }
   ],
   "indexes": [

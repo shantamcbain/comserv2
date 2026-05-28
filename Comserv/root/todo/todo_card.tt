@@ -35,6 +35,8 @@
     OR _tc_status == 'DONE' OR _tc_status == 'Completed'
     OR _tc_status == 'completed' OR _tc_status == 'Closed'
     OR _tc_status == 'closed' OR _tc_status == 'Done') -%]
+[% SET _tc_rid = tc.record_id -%]
+[% SET _tc_is_active = (_tc_status == 5 OR active_todos.$_tc_rid) -%]
 [% SET _tc_opacity = (_tc_is_done OR tc_is_blocked) ? '0.6' : '1' -%]
 [%# Compute border color %]
 [% IF tc_is_audit_root -%]
@@ -57,8 +59,8 @@
   [% SET _tc_bg = 'var(--bg-secondary)' -%]
 [% ELSIF tc_is_overdue -%]
   [% SET _tc_bg = 'color-mix(in srgb,#dc3545 6%,var(--bg-color))' -%]
-[% ELSIF _tc_status == 2 -%]
-  [% SET _tc_bg = 'color-mix(in srgb,var(--primary-color) 8%,var(--bg-color))' -%]
+[% ELSIF _tc_is_active -%]
+  [% SET _tc_bg = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color))' -%]
 [% ELSE -%]
   [% SET _tc_bg = 'var(--bg-color)' -%]
 [% END -%]
@@ -92,10 +94,11 @@
 
       [%# Status badge %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;
-          [% IF _tc_status == 2 %]background:#17a2b8;color:#fff
+          [% IF _tc_is_active %]background:#fd7e14;color:#fff
+          [% ELSIF _tc_status == 2 %]background:#17a2b8;color:#fff
           [% ELSIF _tc_is_done %]background:#28a745;color:#fff
           [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
-        [% IF _tc_status == 2 %]IN PROGRESS[% ELSIF _tc_is_done %]✓ DONE[% ELSE %]NEW[% END %]
+        [% IF _tc_is_active %]⏸ ACTIVE[% ELSIF _tc_status == 2 %]IN PROGRESS[% ELSIF _tc_is_done %]✓ DONE[% ELSE %]NEW[% END %]
       </span>
 
       [%# Audit ROOT badge %]
@@ -202,14 +205,14 @@
         <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
            style="font-size:0.68em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add time log">Log</a>
         [% IF tc_show_done && is_admin && !_tc_is_done %]
-          [% IF _tc_status == 2 %]
+          [% IF _tc_is_active %]
           <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="In progress — click Done to close log">▶ Active</button>
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Log is open — click to close log with notes (todo stays open)">⏸ Active</button>
           <button onclick="closeLogTodoCard(this,[% tc.record_id %])"
               style="font-size:0.68em;padding:2px 6px;border:1px solid #6c757d;border-radius:3px;background:transparent;color:#6c757d;cursor:pointer;white-space:nowrap;" title="Close log without marking done">⏹ End</button>
           [% ELSE %]
           <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — opens a time log">▶ Start</button>
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — creates a log entry, marks todo active">▶ Start</button>
           [% END %]
         <button onclick="[% tc_done_fn %]([% tc.record_id %])"
             style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>

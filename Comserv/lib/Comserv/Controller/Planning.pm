@@ -866,7 +866,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -in => [1, 2] },
+                    status  => { -in => [1, 2, 5] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
@@ -952,6 +952,18 @@ sub daily :Path('/planning/daily') :Args {
                 }
             };
             \@st;
+        },
+
+        active_todos => do {
+            my %at;
+            eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                my $rows = $dbh->selectcol_arrayref(
+                    "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+                );
+                %at = map { $_ => 1 } @$rows if $rows;
+            };
+            \%at;
         },
 
         template => 'admin/planning/DailyPlan.tt',

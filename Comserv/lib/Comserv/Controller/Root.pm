@@ -277,6 +277,25 @@ sub auto :Private {
                                 role      => { -like => 'admin' },
                                 is_active => 1,
                             })->count;
+                            unless ($site_admin_count) {
+                                my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                                    sitename => $site_name_check,
+                                }, { rows => 1 })->single;
+                                if ($hosting && $hosting->contact_email) {
+                                    my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
+                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                        $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
+                                            user_id   => $user_id,
+                                            site_id   => $site_obj->id,
+                                            role      => 'admin',
+                                        }, {
+                                            key => 'user_site_role_unique',
+                                            values => { granted_by => 1, is_active => 1 },
+                                        });
+                                        $site_admin_count = 1;
+                                    }
+                                }
+                            }
                             if ($site_admin_count) {
                                 $is_admin = 1;
                                 $c->session->{is_admin} = 1;
@@ -306,6 +325,9 @@ sub auto :Private {
         $c->stash->{user_roles} = $user_roles;
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
+
+        # Restore backward compatibility for c.stash.dbi
+        $c->stash->{dbi} = Comserv::Util::LegacyDBIWrapper->new($c);
 
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
@@ -2203,5 +2225,37 @@ sub default :Path {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+1;
+
+package Comserv::Util::LegacyDBIWrapper;
+
+sub new {
+    my ($class, $c) = @_;
+    return bless { c => $c }, $class;
+}
+
+sub query {
+    my ($self, $sql, @bind) = @_;
+    my $c = $self->{c};
+    return [] unless $c && $sql;
+    my $results = [];
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        if ($dbh) {
+            my $sth = $dbh->prepare($sql);
+            if ($sth) {
+                $sth->execute(@bind);
+                while (my $row = $sth->fetchrow_hashref) {
+                    push @$results, $row;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $c->log->error("LegacyDBIWrapper error executing query [$sql]: $@");
+    }
+    return $results;
+}
 
 1;

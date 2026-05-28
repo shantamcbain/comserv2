@@ -81,6 +81,15 @@
            title="Only these fields will be filled by AI. All others are untouched." />
   </div>
 
+  <div style="margin-top:0.5em;font-size:0.85em;color:#444;display:flex;align-items:center;">
+    <label title="Provide optional comments or feedback to guide the AI's review and correction process.">
+      <strong>Comment/Correction (optional)</strong>:
+    </label>
+    <input type="text" id="ai-form-user-comment"
+           placeholder="What needed to be fixed if a field is not right…"
+           style="flex:1;font-size:0.95em;margin-left:0.4em;padding:3px 6px;border:1px solid #ccc;border-radius:4px;" />
+  </div>
+
   <div style="margin-top:0.4em;font-size:0.82em;color: var(--text-muted-color, #666);display:flex;flex-wrap:wrap;gap:0.8em;align-items:center;">
     <label style="cursor:pointer;">
       <input type="checkbox" id="ai-form-override" style="vertical-align:middle;">
@@ -156,7 +165,7 @@
                 data.providers.forEach(function(p) {
                     if (p.service === 'ollama' && p.models) {
                         p.models.filter(function(m) {
-                            return m.id && !m.id.match(/embed|rerank/i);
+                            return m.id && !m.id.match(/embed|rerank|:cloud$/i);
                         }).forEach(function(m) {
                             opts.push({ val: m.id + '|ollama', label: m.id + ' (Ollama)' });
                         });
@@ -235,6 +244,7 @@
     document.getElementById('ai-form-ask-btn').addEventListener('click', function() {
         var name = document.getElementById('ai-form-entity-name').value.trim();
         if (!name) { alert('Please enter a description or name to look up.'); return; }
+        var userComment  = document.getElementById('ai-form-user-comment') ? document.getElementById('ai-form-user-comment').value.trim() : '';
         var statusEl     = document.getElementById('ai-form-status');
         var btn          = document.getElementById('ai-form-ask-btn');
         var overrideAll  = document.getElementById('ai-form-override').checked;
@@ -264,13 +274,18 @@
         var controller = new AbortController();
         var tid = setTimeout(function() { controller.abort(); }, timeoutMs);
 
+        var promptText = fieldInstruction + ' The subject is: ' + name + '.';
+        if (userComment) {
+            promptText += ' Additionally, take into account this user comment/feedback: "' + userComment + '".';
+        }
+
         fetch('/ai/generate', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',
             signal: controller.signal,
             body: JSON.stringify({
-                prompt:     fieldInstruction + ' The subject is: ' + name,
+                prompt:     promptText,
                 system:     SYSTEM,
                 provider:   mp.provider,
                 model:      mp.model,
@@ -356,6 +371,7 @@
     document.getElementById('ai-form-review-btn').addEventListener('click', function() {
         var name = document.getElementById('ai-form-entity-name').value.trim();
         if (!name) { alert('Please enter the entity name first so AI knows what it is reviewing.'); return; }
+        var userComment = document.getElementById('ai-form-user-comment') ? document.getElementById('ai-form-user-comment').value.trim() : '';
         var statusEl = document.getElementById('ai-form-status');
         var btn      = document.getElementById('ai-form-review-btn');
         var panel    = document.getElementById('ai-form-review-panel');
@@ -371,6 +387,19 @@
                 if (el.name && el.value && el.value.trim()) currentValues[el.name] = el.value.trim();
             });
 
+        var commentInstruction = '';
+        if (userComment) {
+            commentInstruction = 'The user has provided the following comment / correction instruction: "' + userComment + '". ';
+        }
+
+        var promptText = 'You are reviewing a ' + entityLabel + ' record named "' + name + '". '
+            + commentInstruction
+            + 'Current field values: ' + JSON.stringify(currentValues) + '. '
+            + 'Identify fields that are obviously incorrect, inconsistent, or wrong for this ' + entityLabel + ' (especially taking into account any comments/corrections requested by the user, if provided). '
+            + 'ONLY flag fields you are confident are wrong. '
+            + 'Return ONLY raw JSON: {"corrections":[{"field":"name","current":"val","suggested":"val","reason":"why"}]}. '
+            + 'If nothing is wrong return {"corrections":[]}.';
+
         var mp  = getModelAndProvider();
         var ctl = new AbortController();
         setTimeout(function() { ctl.abort(); }, 60000);
@@ -381,12 +410,7 @@
             credentials: 'include',
             signal: ctl.signal,
             body: JSON.stringify({
-                prompt: 'You are reviewing a ' + entityLabel + ' record named "' + name + '". '
-                    + 'Current field values: ' + JSON.stringify(currentValues) + '. '
-                    + 'Identify fields that are obviously incorrect, inconsistent, or wrong for this ' + entityLabel + '. '
-                    + 'ONLY flag fields you are confident are wrong. '
-                    + 'Return ONLY raw JSON: {"corrections":[{"field":"name","current":"val","suggested":"val","reason":"why"}]}. '
-                    + 'If nothing is wrong return {"corrections":[]}.',
+                prompt:     promptText,
                 system:     SYSTEM,
                 provider:   mp.provider,
                 model:      mp.model,

@@ -1152,13 +1152,22 @@ sub do_create_account :Local {
             my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $reg_sitename })->single;
             
             if ($site) {
+                my $role_to_grant = 'guest';
+                if (lc($reg_sitename) ne 'csc') {
+                    my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                        sitename => $reg_sitename,
+                    }, { rows => 1 })->single;
+                    if ($hosting && $hosting->contact_email && lc($hosting->contact_email) eq lc($email)) {
+                        $role_to_grant = 'admin';
+                    }
+                }
                 $c->model('DBEncy::UserSiteRole')->create({
                     user_id => $new_user->id,
                     site_id => $site->id,
-                    role    => 'guest',
+                    role    => $role_to_grant,
                 });
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'do_create_account',
-                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role 'normal'");
+                    "Created UserSiteRole for user " . $new_user->id . " on site $reg_sitename (site_id=" . $site->id . ") with role '$role_to_grant'");
             }
         };
         if ($@) {

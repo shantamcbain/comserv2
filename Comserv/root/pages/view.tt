@@ -4,12 +4,18 @@
 [% END %]
 
 <div class="page-content">
-    <h1>[% page.title %]</h1>
-    
-    [% IF c.session.roles.match('admin') %]
-    <div class="admin-controls">
-        <a href="/pages/edit/[% page.page_code %]" class="btn btn-primary">Edit Page</a>
-    </div>
+    [% IF !page.body.match('(?i)<h1') %]
+        <h1>[% page.title %]
+            [% IF c.session.roles.match('admin') || c.session.roles.match('editor') %]
+                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="margin-left: 10px; vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
+            [% END %]
+        </h1>
+    [% ELSE %]
+        [% IF c.session.roles.match('admin') || c.session.roles.match('editor') %]
+            <div style="float: right; margin-top: 10px; margin-bottom: 10px;">
+                <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
+            </div>
+        [% END %]
     [% END %]
     
     <div class="page-body">

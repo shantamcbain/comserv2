@@ -2,6 +2,6 @@
     <select id="sitename" name="sitename" required>
         [% SET _sel = selected_sitename || todo_sitename || form_data.sitename || project.sitename || SiteName %]
         [% FOREACH site IN sites %]
-            <option value="[% site.name %]" [% IF site.name eq _sel %]selected[% END %]>[% site.name %]</option>
+            <option value="[% site.name %]" [% IF site.name == _sel %]selected[% END %]>[% site.name %]</option>
         [% END %]
     </select>

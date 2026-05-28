@@ -11,33 +11,47 @@ HOSTNAME_VAL=$(hostname)
 echo "=== Comserv Production Deploy Check at $(date) ==="
 
 # ── Detect NFS and configure paths ───────────────────────────────────────────
-NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /mnt/nfs /mnt/data"
-NFS_LOCAL_DIR=""
+# Production server: /home/ubuntu/nfs (mounted from 192.168.1.175:/mnt/data)
+# Workstation:       /home/shanta/nfs (mounted from 192.168.1.175:/mnt/data)
+NFS_MOUNT_CANDIDATES="/home/ubuntu/nfs /home/shanta/nfs /mnt/nfs /mnt/data"
+NFS_MOUNT_DIR=""
 for candidate in $NFS_MOUNT_CANDIDATES; do
     if mount | grep -q " on ${candidate} type nfs"; then
-        NFS_LOCAL_DIR="$candidate"
+        NFS_MOUNT_DIR="$candidate"
         break
     fi
 done
 
-COMSERV_LOGS_DIR="/home/ubuntu/comserv-logs"
+# Default paths (local fallback if NFS not mounted)
+COMSERV_LOGS_DIR="/var/log/comserv"
+NFS_DATA_DIR="/var/lib/comserv/data"
 NFS_DEPLOY_LOG=""
 
-if [ -n "$NFS_LOCAL_DIR" ]; then
-    echo "NFS detected at $NFS_LOCAL_DIR"
-    COMSERV_LOGS_DIR="$NFS_LOCAL_DIR/comserv-logs"
+if [ -n "$NFS_MOUNT_DIR" ]; then
+    echo "NFS detected at $NFS_MOUNT_DIR"
+    COMSERV_LOGS_DIR="$NFS_MOUNT_DIR/comserv-logs"
+    NFS_DATA_DIR="$NFS_MOUNT_DIR"
     mkdir -p "$COMSERV_LOGS_DIR" 2>/dev/null || true
-    echo "   Routing container logs to NFS: $COMSERV_LOGS_DIR"
+    echo "   Container logs: $COMSERV_LOGS_DIR"
+    echo "   NFS data dir:   $NFS_DATA_DIR"
     
     # Configure NFS Deployment Log archive path
-    NFS_LOG_DIR="$NFS_LOCAL_DIR/logs"
+    NFS_LOG_DIR="$NFS_MOUNT_DIR/logs"
     mkdir -p "$NFS_LOG_DIR" 2>/dev/null || true
     if [ -d "$NFS_LOG_DIR" ] && [ -w "$NFS_LOG_DIR" ]; then
         NFS_DEPLOY_LOG="${NFS_LOG_DIR}/comserv-deploy.log"
     fi
 else
     echo "NFS not mounted — using local fallbacks"
+    echo "   Container logs: $COMSERV_LOGS_DIR"
+    echo "   Data dir:       $NFS_DATA_DIR"
+    mkdir -p "$COMSERV_LOGS_DIR" "$NFS_DATA_DIR" 2>/dev/null || true
 fi
+
+# ── Export environment variables for docker-compose ──────────────────────────
+# CRITICAL: Must export BEFORE any docker-compose commands (including pull)
+export COMSERV_LOGS_DIR
+export NFS_DATA_DIR
 
 # ── Disk space report ────────────────────────────────────────────────────────
 DISK_BEFORE=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
@@ -132,7 +146,7 @@ if [ -d "$COMSERV_LOGS_DIR" ]; then
     find "$COMSERV_LOGS_DIR" \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
 fi
 
-# ── Check for compose file ───────────────────────────────────────────────────
+# ── Check for compose file ─���───────────────────────────────────────────���─────
 if [ ! -f "$COMPOSE_FILE" ]; then
     echo "ERROR: $COMPOSE_FILE not found. Aborting." >&2
     exit 1
@@ -227,12 +241,7 @@ else
 fi
 
 echo "3. Starting new container..."
-
-if [ -z "$NFS_LOCAL_DIR" ]; then
-    NFS_LOCAL_DIR="/home/ubuntu/comserv-workshop"
-    echo "   NFS not mounted — using local fallback $NFS_LOCAL_DIR"
-fi
-COMSERV_LOGS_DIR="$COMSERV_LOGS_DIR" WORKSHOP_LOCAL_DIR="$NFS_LOCAL_DIR" docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate
 
 echo "3b. Ensuring SearXNG container is running..."
 SEARXNG_CONFIG_DIR="/opt/comserv/searxng-config"
