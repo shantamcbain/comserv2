@@ -214,8 +214,19 @@ if sudo -n true 2>/dev/null; then
     SUDO_CMD="sudo"
 fi
 
+# 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line
+echo "   Checking for running starman/plackup/comserv host processes..."
+$SUDO_CMD pkill -15 -f "starman" 2>/dev/null || pkill -15 -f "starman" 2>/dev/null || true
+$SUDO_CMD pkill -15 -f "plackup" 2>/dev/null || pkill -15 -f "plackup" 2>/dev/null || true
+$SUDO_CMD pkill -15 -f "comserv.psgi" 2>/dev/null || pkill -15 -f "comserv.psgi" 2>/dev/null || true
+$SUDO_CMD pkill -15 -f "comserv_server.psgi" 2>/dev/null || pkill -15 -f "comserv_server.psgi" 2>/dev/null || true
+sleep 1
+
+# 2. Check and terminate anything listening specifically on port 5000
 if command -v fuser &>/dev/null; then
     HOST_PIDS=$($SUDO_CMD fuser 5000/tcp 2>/dev/null || fuser 5000/tcp 2>/dev/null || true)
+    # Normalize newlines/whitespace to spaces
+    HOST_PIDS=$(echo "$HOST_PIDS" | tr '\n' ' ' | xargs || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
         $SUDO_CMD fuser -k -15 5000/tcp 2>/dev/null || fuser -k -15 5000/tcp 2>/dev/null || true
@@ -225,6 +236,7 @@ if command -v fuser &>/dev/null; then
     fi
 elif command -v lsof &>/dev/null; then
     HOST_PIDS=$($SUDO_CMD lsof -t -i:5000 2>/dev/null || lsof -t -i:5000 2>/dev/null || true)
+    HOST_PIDS=$(echo "$HOST_PIDS" | tr '\n' ' ' | xargs || true)
     if [ -n "$HOST_PIDS" ]; then
         echo "   ⚠ Found host process(es) ($HOST_PIDS) occupying port 5000 on the host. Terminating..."
         $SUDO_CMD kill -15 $HOST_PIDS 2>/dev/null || kill -15 $HOST_PIDS 2>/dev/null || true
@@ -234,17 +246,30 @@ elif command -v lsof &>/dev/null; then
     fi
 else
     # Fallback using ss
-    HOST_PID=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
-    if [ -z "$HOST_PID" ]; then
-        HOST_PID=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 || true)
+    HOST_PIDS=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
+    if [ -z "$HOST_PIDS" ]; then
+        HOST_PIDS=$(ss -tulpn 2>/dev/null | grep -E ':(5000) ' | grep -o -E 'pid=[0-9]+' | cut -d= -f2 | tr '\n' ' ' | xargs || true)
     fi
-    if [ -n "$HOST_PID" ]; then
-        echo "   ⚠ Found host process ($HOST_PID) occupying port 5000. Terminating..."
-        $SUDO_CMD kill -15 $HOST_PID 2>/dev/null || kill -15 $HOST_PID 2>/dev/null || true
+    if [ -n "$HOST_PIDS" ]; then
+        echo "   ⚠ Found host process ($HOST_PIDS) occupying port 5000. Terminating..."
+        $SUDO_CMD kill -15 $HOST_PIDS 2>/dev/null || kill -15 $HOST_PIDS 2>/dev/null || true
         sleep 2
-        $SUDO_CMD kill -9 $HOST_PID 2>/dev/null || kill -9 $HOST_PID 2>/dev/null || true
+        $SUDO_CMD kill -9 $HOST_PIDS 2>/dev/null || kill -9 $HOST_PIDS 2>/dev/null || true
         HOST_PORT_OCCUPIED=1
     fi
+fi
+
+# Double check port 5000 after kill signals
+PORT_CHECK=$($SUDO_CMD ss -tulpn 2>/dev/null | grep -E ':(5000) ' || true)
+if [ -n "$PORT_CHECK" ]; then
+    # Force kill starman processes with -9
+    echo "   ⚠ Port 5000 still bound. Issuing force-kill to starman processes..."
+    $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
+    $SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
+    $SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
+    $SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
+    sleep 1
+    HOST_PORT_OCCUPIED=1
 fi
 
 if [ $HOST_PORT_OCCUPIED -eq 1 ]; then
