@@ -1852,7 +1852,8 @@ function pollDeploymentProgress() {
             })
             .catch(err => console.log('Error polling status:', err));
     }, 2000);
-=======
+}
+
 function startWorkTodoCard(btn, recordId) {
     btn.disabled = true;
     btn.textContent = '…';
