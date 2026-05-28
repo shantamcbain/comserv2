@@ -6547,8 +6547,15 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
 
         print "--- Step 3: Triggering deploy on $ssh_target ---\n";
-        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        print "    Updating remote deploy.sh script with latest code...\n";
         local $ENV{SSHPASS} = $ssh_password;
+        system('sshpass', '-e', 'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            "$comserv_dir/script/deploy.sh",
+            "$ssh_target:/opt/comserv/Comserv/deploy.sh");
+
+        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
