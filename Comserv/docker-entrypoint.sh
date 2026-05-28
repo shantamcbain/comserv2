@@ -93,6 +93,12 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Ensure comserv_server.psgi is accessible in both script/ and the root directory
+if [ -f "${CATALYST_HOME}/script/comserv_server.psgi" ]; then
+    ln -sf "${CATALYST_HOME}/script/comserv_server.psgi" "${CATALYST_HOME}/comserv_server.psgi"
+    chown comserv:comserv "${CATALYST_HOME}/comserv_server.psgi" 2>/dev/null || true
+fi
+
 # Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
 # COMSERV_SESSION_DIR is the session FILES directory (e.g. /tmp/comserv/session).
 SESSION_DIR="${COMSERV_SESSION_DIR:-/tmp/comserv/session}"
