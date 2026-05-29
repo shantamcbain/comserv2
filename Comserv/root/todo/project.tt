@@ -132,6 +132,15 @@
 
 <!-- Filter Panel -->
 <div class="filter-panel mb-4">
+    <div class="form-group mb-2" style="display:flex;align-items:center;gap:8px;">
+        <label for="project_search" style="white-space:nowrap;margin:0;">🔍 Search:</label>
+        <input type="text" id="project_search" placeholder="Filter by name, code or description…"
+               class="form-control" style="max-width:340px;"
+               oninput="filterProjects(this.value)">
+        <button type="button" onclick="document.getElementById('project_search').value='';filterProjects('');"
+                class="btn btn-outline-secondary btn-sm">✕</button>
+        <span id="project_search_count" style="font-size:0.85em;color:var(--text-muted-color,#6c757d);white-space:nowrap;"></span>
+    </div>
     <form id="projectFilterForm" class="form-inline" method="GET" action="/project/project">
         <div class="form-group mb-2">
             <label for="project_filter" class="mr-2">Project:</label>
@@ -174,7 +183,8 @@
         <!-- Skip this project if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != project.priority %]
         
-        <div class="collapsible-card" id="project-[% project.id %]">
+        <div class="collapsible-card" id="project-[% project.id %]"
+             data-search="[% (project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '')).lower %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
@@ -789,6 +799,23 @@
         }
     }
     
+    // Real-time project search / filter
+    function filterProjects(query) {
+        const q = query.trim().toLowerCase();
+        const cards = document.querySelectorAll('.collapsible-card[data-search]');
+        let visible = 0;
+        cards.forEach(function(card) {
+            const text = card.getAttribute('data-search') || '';
+            const match = !q || text.indexOf(q) !== -1;
+            card.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        const countEl = document.getElementById('project_search_count');
+        if (countEl) {
+            countEl.textContent = q ? ('Showing ' + visible + ' of ' + cards.length) : '';
+        }
+    }
+
     // Clear filters button functionality
     document.getElementById('clearFilters').addEventListener('click', function() {
         document.getElementById('project_filter').value = '';
