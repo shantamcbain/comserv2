@@ -860,6 +860,7 @@
             { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4030 -r' },
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4022 -r' },
             { name => 'page-management-system-implement-41a1',  port => 4023, label => 'PageManagement',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/page-management-system-implement-41a1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4023 -r' },
+            { name => 'docker-5c15',                            port => 4024, label => 'Docker',               url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4024 -r' },
         ] %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
