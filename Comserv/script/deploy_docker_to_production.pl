@@ -6,8 +6,9 @@ use Getopt::Long;
 use File::Basename;
 use IPC::Run3;
 
-my $production_host = '192.168.1.126';
-my $service = 'web-prod';
+my $target = 'production1'; # default target: production1 or production2
+my $production_host;
+my $service;
 my $ssh_user = 'ubuntu';
 my $ssh_port = 22;
 my $production_directory = '~/PycharmProjects/comserv2';
@@ -19,6 +20,7 @@ my $nfs_workshop_path = $ENV{NFS_WORKSHOP_PATH} || '/';
 my $ssh_keyfile = $ENV{SSH_KEYFILE} || "$ENV{HOME}/.ssh/id_rsa";
 
 GetOptions(
+    'target=s'     => \$target,
     'host=s'       => \$production_host,
     'service=s'    => \$service,
     'user=s'       => \$ssh_user,
@@ -27,12 +29,21 @@ GetOptions(
     'keyfile=s'    => \$ssh_keyfile,
     'no-rollback'  => sub { $rollback_on_failure = 0 },
     'recreate-volumes' => \$recreate_volumes,
-) or die "Usage: $0 [--host=PRODUCTION_HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--keyfile=SSH_KEY] [--no-rollback] [--recreate-volumes]\n";
+) or die "Usage: $0 [--target=production1|production2] [--host=HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--keyfile=SSH_KEY] [--no-rollback] [--recreate-volumes]\n";
 
-die "ERROR: Production host required (--host=HOSTNAME)\n" unless $production_host;
+# Set target-specific default parameters if not overridden by explicit arguments
+if (lc($target) eq 'production2') {
+    $production_host //= '192.168.1.127'; # Production 2 Host IP (cloned environment)
+    $service //= 'web-prod2';
+} else {
+    $production_host //= '192.168.1.126'; # Production 1 Host IP (main live)
+    $service //= 'web-prod';
+}
+
+die "ERROR: Host required (--host=HOSTNAME or via --target)\n" unless $production_host;
 
 print "=" x 80 . "\n";
-print "Docker Production Deployment Script\n";
+print "Docker Deployment Script - Target: " . uc($target) . "\n";
 print "=" x 80 . "\n";
 print "Production Host: $production_host\n";
 print "Production Directory: $production_directory\n";
