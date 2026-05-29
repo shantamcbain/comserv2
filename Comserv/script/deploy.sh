@@ -23,6 +23,39 @@ safe_git() {
     fi
 }
 
+# Helper function to kill host processes by pattern safely, without killing the deploy script itself
+safe_pkill_f() {
+    local PATTERN="$1"
+    local SUDO_CMD=""
+    if [ "$(id -u)" -eq 0 ]; then
+        SUDO_CMD="sudo"
+    elif sudo -n true 2>/dev/null; then
+        SUDO_CMD="sudo"
+    fi
+    
+    echo "   Finding processes matching '$PATTERN' on the host..."
+    local PIDS
+    PIDS=$($SUDO_CMD pgrep -f "$PATTERN" 2>/dev/null || pgrep -f "$PATTERN" 2>/dev/null || true)
+    
+    for pid in $PIDS; do
+        [ -z "$pid" ] && continue
+        [ "$pid" -eq "$$" ] && continue
+        [ "$pid" -eq "$PPID" ] && continue
+        
+        # Check command line of the process to avoid self-killing
+        local CMDLINE
+        CMDLINE=$(cat /proc/$pid/cmdline 2>/dev/null | tr '\0' ' ' || true)
+        
+        if echo "$CMDLINE" | grep -E -q "deploy\.sh|deploy-logs"; then
+            echo "   [Skip] Skipping deploy script process: PID=$pid ($CMDLINE)"
+            continue
+        fi
+        
+        echo "   [Kill] Force-killing process PID=$pid: $CMDLINE"
+        $SUDO_CMD kill -9 "$pid" 2>/dev/null || kill -9 "$pid" 2>/dev/null || true
+    done
+}
+
 # ── Non-interactive Deploy Mode ──────────────────────────────────────────────
 if [ -n "${DEPLOY_MODE:-}" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
@@ -48,17 +81,16 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
             
             echo "2. Force-killing host-level Starman/Plackup processes..."
+            safe_pkill_f "starman"
+            safe_pkill_f "plackup"
+            safe_pkill_f "comserv.*psgi"
+            safe_pkill_f "comserv_server"
+            
             SUDO_CMD=""
             if [ "$(id -u)" -eq 0 ]; then
                 SUDO_CMD="sudo"
             elif sudo -n true 2>/dev/null; then
                 SUDO_CMD="sudo"
-            fi
-            $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
-            $SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
-            COMSERV_PIDS=$($SUDO_CMD pgrep -f "comserv.*psgi" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
-            if [ -n "$COMSERV_PIDS" ]; then
-                $SUDO_CMD kill -9 $COMSERV_PIDS 2>/dev/null || kill -9 $COMSERV_PIDS 2>/dev/null || true
             fi
             if command -v fuser &>/dev/null; then
                 $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
@@ -86,18 +118,29 @@ if [ -n "${DEPLOY_MODE:-}" ]; then
             if [ -n "$HOST_APP_DIR" ]; then
                 if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
                     PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+                elif [ -f "$HOST_APP_DIR/script/comserv.psgi" ]; then
+                    PSGI_FILE="$HOST_APP_DIR/script/comserv.psgi"
                 elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
                     PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+                elif [ -f "$HOST_APP_DIR/comserv.psgi" ]; then
+                    PSGI_FILE="$HOST_APP_DIR/comserv.psgi"
                 fi
             fi
             if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+                echo "Updating host repository via Git Pull before starting manual server..."
+                safe_git "$HOST_APP_DIR" pull origin main || safe_git "$HOST_APP_DIR" pull || echo "Git pull failed, starting with current files."
+                
+                safe_pkill_f "starman"
+                safe_pkill_f "plackup"
+                safe_pkill_f "comserv.*psgi"
+                safe_pkill_f "comserv_server"
+                
                 SUDO_CMD=""
                 if [ "$(id -u)" -eq 0 ]; then
                     SUDO_CMD="sudo"
                 elif sudo -n true 2>/dev/null; then
                     SUDO_CMD="sudo"
                 fi
-                $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
                 if command -v fuser &>/dev/null; then
                     $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
                 fi
@@ -169,17 +212,16 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 docker compose -f "$COMPOSE_FILE" down --remove-orphans 2>/dev/null || true
                 
                 echo "2. Force-killing host-level Starman/Plackup processes..."
+                safe_pkill_f "starman"
+                safe_pkill_f "plackup"
+                safe_pkill_f "comserv.*psgi"
+                safe_pkill_f "comserv_server"
+                
                 SUDO_CMD=""
                 if [ "$(id -u)" -eq 0 ]; then
                     SUDO_CMD="sudo"
                 elif sudo -n true 2>/dev/null; then
                     SUDO_CMD="sudo"
-                fi
-                $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
-                $SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
-                COMSERV_PIDS=$($SUDO_CMD pgrep -f "comserv.*psgi" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
-                if [ -n "$COMSERV_PIDS" ]; then
-                    $SUDO_CMD kill -9 $COMSERV_PIDS 2>/dev/null || kill -9 $COMSERV_PIDS 2>/dev/null || true
                 fi
                 if command -v fuser &>/dev/null; then
                     $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
@@ -205,18 +247,25 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 if [ -n "$HOST_APP_DIR" ]; then
                     if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
                         PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+                    elif [ -f "$HOST_APP_DIR/script/comserv.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/script/comserv.psgi"
                     elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
                         PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+                    elif [ -f "$HOST_APP_DIR/comserv.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/comserv.psgi"
                     fi
                 fi
                 if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+                    echo "Updating host repository via Git Pull before starting manual server..."
+                    safe_git "$HOST_APP_DIR" pull origin main || safe_git "$HOST_APP_DIR" pull || echo "Git pull failed, starting with current files."
+                    
+                    safe_pkill_f "starman"
+                    safe_pkill_f "plackup"
+                    safe_pkill_f "comserv.*psgi"
+                    safe_pkill_f "comserv_server"
+                    
                     SUDO_CMD=""
                     if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
-                    $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
-                    STARMAN_PIDS=$($SUDO_CMD pgrep -f "starman" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
-                    if [ -n "$STARMAN_PIDS" ]; then
-                        $SUDO_CMD kill -9 $STARMAN_PIDS 2>/dev/null || kill -9 $STARMAN_PIDS 2>/dev/null || true
-                    fi
                     if command -v fuser &>/dev/null; then
                         $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
                     fi
@@ -395,40 +444,45 @@ fi
 cd "$(dirname "$COMPOSE_FILE")"
 
 # ── Version check ────────────────────────────────────────────────────────────
-echo "Checking for new image on Docker Hub..."
+if [ "${DEPLOY_MODE:-}" = "quick" ]; then
+    echo "Mode: QUICK DEPLOY — Skipping remote version check and image pulling from Docker Hub."
+    echo "Using existing local image: $IMAGE"
+else
+    echo "Checking for new image on Docker Hub..."
 
-LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "none")
-REMOTE_DIGEST=$(docker manifest inspect "$IMAGE" 2>/dev/null \
-    | grep -o '"digest":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "none")
+    LOCAL_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' "$IMAGE" 2>/dev/null || echo "none")
+    REMOTE_DIGEST=$(docker manifest inspect "$IMAGE" 2>/dev/null \
+        | grep -o '"digest":"[^"]*"' | head -1 | cut -d'"' -f4 || echo "none")
 
-echo "  Local : ${LOCAL_DIGEST:0:72}..."
-echo "  Remote: ${REMOTE_DIGEST:0:72}..."
+    echo "  Local : ${LOCAL_DIGEST:0:72}..."
+    echo "  Remote: ${REMOTE_DIGEST:0:72}..."
 
-if [ "$FORCE" != "1" ] && [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
-    DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
-    echo "No new version. Disk: $DISK_FINAL"
-    echo "=== Finished at $(date) ==="
-    exit 0
+    if [ "$FORCE" != "1" ] && [ "$LOCAL_DIGEST" = "$REMOTE_DIGEST" ] && [ "$LOCAL_DIGEST" != "none" ]; then
+        DISK_FINAL=$(df -h / | awk 'NR==2 {print $3 " used / " $2 " (" $5 ")"}')
+        echo "No new version. Disk: $DISK_FINAL"
+        echo "=== Finished at $(date) ==="
+        exit 0
+    fi
+
+    echo "New version detected. Starting deployment..."
+
+    # ── Rotate rollback/backup images ────────────────────────────────────────────
+    echo "Rotating rollback/backup images..."
+    # Remove oldest backup (backup-2) if it exists
+    docker rmi shantamcsbain/comserv-web-prod:backup-2 2>/dev/null || true
+    # Move backup-1 to backup-2
+    if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+        docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:backup-2
+        docker rmi shantamcsbain/comserv-web-prod:backup-1 2>/dev/null || true
+    fi
+    # Move current latest to backup-1
+    if docker image inspect shantamcsbain/comserv-web-prod:latest >/dev/null 2>&1; then
+        docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:backup-1
+    fi
+
+    echo "1. Pulling latest image..."
+    docker compose -f "$COMPOSE_FILE" pull
 fi
-
-echo "New version detected. Starting deployment..."
-
-# ── Rotate rollback/backup images ────────────────────────────────────────────
-echo "Rotating rollback/backup images..."
-# Remove oldest backup (backup-2) if it exists
-docker rmi shantamcsbain/comserv-web-prod:backup-2 2>/dev/null || true
-# Move backup-1 to backup-2
-if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
-    docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:backup-2
-    docker rmi shantamcsbain/comserv-web-prod:backup-1 2>/dev/null || true
-fi
-# Move current latest to backup-1
-if docker image inspect shantamcsbain/comserv-web-prod:latest >/dev/null 2>&1; then
-    docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:backup-1
-fi
-
-echo "1. Pulling latest image..."
-docker compose -f "$COMPOSE_FILE" pull
 
 VERSION_INFO=$(docker inspect --format='{{index .Config.Labels "app.version"}}' "$IMAGE" 2>/dev/null || true)
 if [ -z "$VERSION_INFO" ]; then
@@ -453,14 +507,10 @@ fi
 
 # 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line using SIGKILL (-9)
 echo "   Force-killing running starman/plackup/comserv host processes..."
-$SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
-$SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
-
-# Find PIDs matching patterns and kill them safely, excluding current script ($$) and its parent ($PPID)
-SAFE_PIDS=$($SUDO_CMD pgrep -f "(starman|plackup|comserv.*psgi)" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
-if [ -n "$SAFE_PIDS" ]; then
-    $SUDO_CMD kill -9 $SAFE_PIDS 2>/dev/null || kill -9 $SAFE_PIDS 2>/dev/null || true
-fi
+safe_pkill_f "starman"
+safe_pkill_f "plackup"
+safe_pkill_f "comserv.*psgi"
+safe_pkill_f "comserv_server"
 sleep 1
 
 # 2. Check and terminate anything listening specifically on port 5000 or 3000
@@ -629,8 +679,12 @@ else
         if [ -n "$HOST_APP_DIR" ]; then
             if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
                 PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+            elif [ -f "$HOST_APP_DIR/script/comserv.psgi" ]; then
+                PSGI_FILE="$HOST_APP_DIR/script/comserv.psgi"
             elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
                 PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+            elif [ -f "$HOST_APP_DIR/comserv.psgi" ]; then
+                PSGI_FILE="$HOST_APP_DIR/comserv.psgi"
             fi
         fi
 
