@@ -48,7 +48,7 @@ services:
       # NFS root mount for workshop files (shared storage)
       - workshop-files-nfs:/data/nfs:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
       interval: 10s
       timeout: 5s
       retries: 3

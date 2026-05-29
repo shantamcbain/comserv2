@@ -19,7 +19,7 @@ services:
       - ${NFS_DATA_DIR:-/var/lib/comserv/data}:/data/nfs:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/health || curl -f http://127.0.0.1:3000/health || curl -g -6 -f http://[::1]:3000/health"]
       interval: 10s
       timeout: 5s
       retries: 3
