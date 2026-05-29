@@ -535,11 +535,11 @@ else
     echo "  SearXNG already running — OK"
 fi
 
-echo "4. Waiting for health check (up to 90s) & streaming startup logs..."
+echo "4. Waiting for health check (up to 120s) & streaming startup logs..."
 ATTEMPT=0
 HEALTHY=0
 PREV_LINE_COUNT=0
-while [ $ATTEMPT -lt 45 ]; do
+while [ $ATTEMPT -lt 60 ]; do
     sleep 2
     ATTEMPT=$((ATTEMPT + 1))
     
@@ -572,7 +572,7 @@ if [ $HEALTHY -eq 1 ]; then
     STATUS_MSG="SUCCESS"
     SUBJECT="✅ Comserv Production Updated Successfully"
 else
-    echo "❌ ERROR: Container did not reach healthy state within 90s"
+    echo "❌ ERROR: Container did not reach healthy state within 120s"
     
     # 1. Automatic rollback to backup-1 (rollback container image)
     echo "   Attempting automated rollback to backup-1..."

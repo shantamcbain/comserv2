@@ -25,10 +25,10 @@ services:
       - /home/shanta/comserv-workshop:/data/nfs:rw
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging:
       driver: "json-file"
       options:
