@@ -262,40 +262,53 @@ sub get_system_identifier {
         $p;
     };
 
+    my $identifier = '';
+
     # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
-    my $identifier = $ENV{SYSTEM_IDENTIFIER};
-    if ($identifier && $identifier ne '') {
-        # Append port when it adds useful info (i.e. not already encoded in the name)
-        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
-        return $identifier;
-    }
-
-    # 2. Map known IP addresses to friendly names.
-    # Use a UDP connect (no packets sent) to find which local IP the OS would
-    # use when routing outbound — the most reliable way to get the primary LAN IP.
-    my %IP_NAMES = (
-        '192.168.1.126' => 'production',
-        '192.168.1.199' => 'workstation',
-    );
-    eval {
-        require Socket;
-        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
-            or die "socket: $!";
-        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
-            or die "connect: $!";
-        my $local = getsockname($sock);
-        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
-        my $ip = Socket::inet_ntoa($local_ip_packed);
-        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
-    };
-
-    # 3. Fall back to plain hostname
-    unless ($identifier && $identifier ne '') {
-        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
-        $identifier //= 'unknown';
+    if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
+        $identifier = $ENV{SYSTEM_IDENTIFIER};
+    } else {
+        # Check if we are inside a Docker container
+        my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+        
+        if ($is_docker) {
+            my $env = $ENV{CATALYST_ENV} || 'production';
+            if ($env eq 'development') {
+                $identifier = 'workstation-container';
+            } else {
+                $identifier = 'production-container';
+            }
+        } else {
+            # Outside container: resolve by LAN IP
+            my %IP_NAMES = (
+                '192.168.1.126' => 'production-host',
+                '192.168.1.199' => 'workstation-host',
+            );
+            eval {
+                require Socket;
+                socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0) or die;
+                connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8'))) or die;
+                my $local = getsockname($sock);
+                my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+                my $ip = Socket::inet_ntoa($local_ip_packed);
+                if (exists $IP_NAMES{$ip}) {
+                    $identifier = $IP_NAMES{$ip};
+                }
+            };
+            
+            # Fallback to hostname if IP-based lookup failed or wasn't mapped
+            unless ($identifier) {
+                eval {
+                    require Sys::Hostname;
+                    $identifier = Sys::Hostname::hostname();
+                };
+                $identifier //= 'unknown-host';
+            }
+        }
     }
 
     # Append port to disambiguate multiple dev servers on the same host
+    $port //= '3000';
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;

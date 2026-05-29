@@ -287,16 +287,22 @@
                         <i class="fas fa-save"></i> Save Image
                     </button>
                     
-                    <button onclick="deployToProduction()" 
-                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
-                        title="Build image → Push to Docker Hub → SSH trigger deploy.sh on production server">
-                        <i class="fas fa-rocket"></i> Auto Deploy (Hub)
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <label for="dashboard-deploy-mode-select" style="font-weight: bold; font-size: 0.9em; white-space: nowrap;">Deployment Action:</label>
+                        <select id="dashboard-deploy-mode-select" style="padding: 10px; border: 1px solid var(--border-color, #ddd); border-radius: 4px; font-weight: bold; background: white; max-width: 350px;">
+                            <option value="full" selected>🚀 FULL DEPLOY (Build/push local, remote pull, force stop, restart container)</option>
+                            <option value="quick">⚡ QUICK DEPLOY (Skip build/push, restart existing container on server)</option>
+                            <option value="pull_only">📥 DOWNLOAD CONTAINER ONLY (Pull latest image from Hub)</option>
+                            <option value="stop_all">🛑 STOP ALL SERVICES (Stop container, force-kill manual Starman)</option>
+                            <option value="git_pull">🐙 GIT UPDATE (Run git pull on production host)</option>
+                            <option value="manual_server">⚠️ EMERGENCY MANUAL SERVER (Start host Starman on port 5000)</option>
+                        </select>
+                    </div>
 
-                    <button onclick="deployToProduction(1)" 
-                        style="padding: 10px 20px; background-color: #ff9800; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
-                        title="Bypass rebuild & push. Directly trigger deploy.sh on production server with FORCE=1 to free ports and restart existing container">
-                        <i class="fas fa-bolt"></i> Quick Deploy (No Rebuild)
+                    <button onclick="deployToProduction(document.getElementById('dashboard-deploy-mode-select').value)" 
+                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="Execute the selected deployment action on production server">
+                        <i class="fas fa-rocket"></i> Execute Deployment
                     </button>
 
                     <button onclick="showDeploymentCommands()" 
@@ -1605,48 +1611,39 @@
         appendOutput(`${'='.repeat(80)}\n\n`);
     }
 
-    function deployToProduction(isQuick) {
+    function deployToProduction(deployMode) {
         const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
 
-        const isQuickMode = isQuick === 1;
+        if (deployMode === undefined || deployMode === null) {
+            deployMode = 'full';
+        } else if (deployMode === 1) {
+            deployMode = 'quick';
+        }
 
-        const confirmMsg = isQuickMode ?
-            `⚡ QUICK DEPLOY TO PRODUCTION (No local rebuild)\n\n` +
-            `This will:\n` +
-            `  1. Bypass compiling the container locally.\n` +
-            `  2. Bypass pushing to Docker Hub.\n` +
-            `  3. Immediately trigger /opt/comserv/Comserv/deploy.sh with FORCE=1 on the server.\n\n` +
-            `This will force-kill host processes (manual Starman) blocking port 5000 and restart the container.\n` +
-            `Continue?` :
-            `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
-            `This will run automatically:\n` +
-            `  1. Build production image  (docker compose -f docker-compose.prod.yml build)\n` +
-            `  2. Push to Docker Hub       (shantamcsbain/comserv-web-prod:latest)\n` +
-            `  3. SSH trigger deploy.sh    (${sshTarget})\n\n` +
-            `The production server will pull the new image and restart the container.\n` +
-            `Email notification sent to csc@computersystemconsulting.ca on completion.\n\n` +
-            `Continue?`;
+        const isFullMode = deployMode === 'full';
+
+        const confirmMsg = `⚠️ EXECUTE PRODUCTION DEPLOYMENT\n\n` +
+            `Selected Action: ${deployMode.toUpperCase()}\n` +
+            `Target Server  : ${sshTarget}\n\n` +
+            `Are you sure you want to proceed?`;
 
         if (!confirm(confirmMsg)) return;
 
         appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(isQuickMode ? `🚀 QUICK DEPLOY STARTED — Bypass build/push\n` : `🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
+        appendOutput(`🚀 DEPLOYMENT ACTION: ${deployMode.toUpperCase()} STARTED\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Target: ${sshTarget}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(isQuickMode ? `Steps: SSH trigger deploy.sh with FORCE=1\n` : `Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
+        appendOutput(`Action: ${deployMode}\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
-        if (!isQuickMode) {
-            appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
+        if (isFullMode) {
+            appendOutput(`⏳ Building & pushing... this may take several minutes. Output will stream below.\n\n`);
         } else {
             appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
         }
 
-        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword };
-        if (isQuickMode) {
-            bodyParams.quick_deploy = 1;
-        }
+        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword, deploy_mode: deployMode };
 
         safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
