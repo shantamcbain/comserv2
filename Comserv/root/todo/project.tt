@@ -183,8 +183,9 @@
         <!-- Skip this project if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != project.priority %]
         
+        [% SET proj_search_text = project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
         <div class="collapsible-card" id="project-[% project.id %]"
-             data-search="[% (project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '')).lower %]">
+             data-search="[% proj_search_text.lower %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
