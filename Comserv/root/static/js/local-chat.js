@@ -3301,6 +3301,38 @@
                 map.push({ label, url });
             }
         }
+
+        // 3. Extract all links (<a> elements with href) on the current page DOM (or window.opener if popup)
+        try {
+            const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+                ? window.opener.document
+                : document;
+            if (targetDoc) {
+                targetDoc.querySelectorAll('a[href]').forEach(function(el) {
+                    const href = el.getAttribute('href');
+                    if (!href) return;
+                    const trimmedHref = href.trim();
+                    if (!trimmedHref || trimmedHref.startsWith('#') || /^(javascript|mailto|tel|sms):/i.test(trimmedHref)) return;
+                    
+                    const label = (el.textContent || el.innerText || '').trim().replace(/\s+/g, ' ').toLowerCase();
+                    if (!label || label.length < 2 || label.length > 80) return;
+                    if (/^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) return;
+                    
+                    try {
+                        const urlObj = new URL(trimmedHref, targetDoc.baseURI || window.location.href);
+                        const resolvedUrl = urlObj.href;
+                        if (!map.some(function(e) { return e.label === label; })) {
+                            map.push({ label: label, url: resolvedUrl });
+                        }
+                    } catch(urlErr) {
+                        // ignore malformed URLs
+                    }
+                });
+            }
+        } catch(docErr) {
+            // ignore security/permission issues when accessing window.opener
+        }
+
         return map;
     }
 
