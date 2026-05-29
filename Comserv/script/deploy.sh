@@ -212,7 +212,11 @@ if [ "$1" = "--interactive" ] || [ "$1" = "-i" ]; then
                 if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
                     SUDO_CMD=""
                     if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
-                    $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
+                    $SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
+                    STARMAN_PIDS=$($SUDO_CMD pgrep -f "starman" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
+                    if [ -n "$STARMAN_PIDS" ]; then
+                        $SUDO_CMD kill -9 $STARMAN_PIDS 2>/dev/null || kill -9 $STARMAN_PIDS 2>/dev/null || true
+                    fi
                     if command -v fuser &>/dev/null; then
                         $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
                     fi
@@ -449,10 +453,14 @@ fi
 
 # 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line using SIGKILL (-9)
 echo "   Force-killing running starman/plackup/comserv host processes..."
-$SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
-$SUDO_CMD pkill -9 -f "plackup" 2>/dev/null || pkill -9 -f "plackup" 2>/dev/null || true
-$SUDO_CMD pkill -9 -f "comserv.psgi" 2>/dev/null || pkill -9 -f "comserv.psgi" 2>/dev/null || true
-$SUDO_CMD pkill -9 -f "comserv_server.psgi" 2>/dev/null || pkill -9 -f "comserv_server.psgi" 2>/dev/null || true
+$SUDO_CMD pkill -9 -x "starman" 2>/dev/null || pkill -9 -x "starman" 2>/dev/null || true
+$SUDO_CMD pkill -9 -x "plackup" 2>/dev/null || pkill -9 -x "plackup" 2>/dev/null || true
+
+# Find PIDs matching patterns and kill them safely, excluding current script ($$) and its parent ($PPID)
+SAFE_PIDS=$($SUDO_CMD pgrep -f "(starman|plackup|comserv.*psgi)" 2>/dev/null | grep -v "^$$$" | grep -v "^$PPID$" || true)
+if [ -n "$SAFE_PIDS" ]; then
+    $SUDO_CMD kill -9 $SAFE_PIDS 2>/dev/null || kill -9 $SAFE_PIDS 2>/dev/null || true
+fi
 sleep 1
 
 # 2. Check and terminate anything listening specifically on port 5000 or 3000
