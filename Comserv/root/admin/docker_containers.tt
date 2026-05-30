@@ -160,48 +160,59 @@
                     </h4>
                 </div>
                 <div id="production-deployment" class="compact-card-body collapsible-content">
-                    <div class="compact-form-grid" style="margin-bottom: 8px;">
-                        <div class="compact-form-group">
-                            <label for="deploy-service-select" title="Select whether to deploy web-prod (optimized production container) or web-dev (debug container)." style="cursor: help;">Service to Deploy:</label>
-                            <select id="deploy-service-select">
-                                <option value="web-prod">web-prod (Production)</option>
-                                <option value="web-dev">web-dev (Development)</option>
-                            </select>
+                    <!-- Collapsible Connection Settings (Normally Closed) -->
+                    <div class="compact-card" style="margin-bottom: 12px; border: 1px dashed #ffeaa7;">
+                        <div class="compact-card-header collapsible-header" onclick="toggleSection('deploy-connection-settings')" style="background-color: #fff9db; padding: 6px 10px;">
+                            <span style="font-size: 11px; font-weight: bold; color: #856404; display: flex; align-items: center; gap: 4px;">
+                                <i class="fas fa-chevron-right chevron-icon" id="chevron-deploy-connection-settings"></i>
+                                <i class="fas fa-sliders-h"></i> Target Connection & SSH Settings (Click to expand)
+                            </span>
                         </div>
-                        <div class="compact-form-group">
-                            <label for="ssh-target-select" title="Select a preconfigured SSH target profile to automatically fill host and port values." style="cursor: help;">SSH Target:</label>
-                            <select id="ssh-target-select" onchange="updateSSHTarget()">
-                                <option value="custom">Custom...</option>
-                                <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
-                                <option value="shanta@workstation.local">shanta@workstation.local</option>
-                            </select>
-                        </div>
-                        <div class="compact-form-group">
-                            <label for="production-host" title="The hostname or IP address of the remote host (e.g., Production 1 or Production 2)." style="cursor: help;">Production Server:</label>
-                            <input type="text" id="production-host" value="ubuntu@192.168.1.126">
-                        </div>
-                        <div class="compact-form-group">
-                            <label for="ssh-port" title="The secure shell port of the remote host (default is 22)." style="cursor: help;">SSH Port:</label>
-                            <input type="number" id="ssh-port" value="22" min="1" max="65535">
-                        </div>
-                        <div class="compact-form-group">
-                            <label for="ssh-password" title="SSH authentication password (not saved on disk, processed securely in memory)." style="cursor: help;">SSH Password:</label>
-                            <div style="position: relative;">
-                                <input type="password" id="ssh-password" placeholder="SSH password" style="width: 100%; padding-right: 32px;">
-                                <button onclick="togglePasswordVisibility()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; font-size: 11px; padding: 0;">
-                                    <i id="password-eye-icon" class="fas fa-eye"></i>
-                                </button>
+                        <div id="deploy-connection-settings" class="compact-card-body collapsible-content" style="padding: 10px; background-color: #fafdf6;">
+                            <div class="compact-form-grid" style="margin-bottom: 8px;">
+                                <div class="compact-form-group">
+                                    <label for="deploy-service-select" title="Select whether to deploy web-prod (optimized production container) or web-dev (debug container)." style="cursor: help;">Service to Deploy:</label>
+                                    <select id="deploy-service-select">
+                                        <option value="web-prod">web-prod (Production)</option>
+                                        <option value="web-dev">web-dev (Development)</option>
+                                    </select>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-target-select" title="Select a preconfigured SSH target profile to automatically fill host and port values." style="cursor: help;">SSH Target:</label>
+                                    <select id="ssh-target-select" onchange="updateSSHTarget()">
+                                        <option value="custom">Custom...</option>
+                                        <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
+                                        <option value="shanta@workstation.local">shanta@workstation.local</option>
+                                    </select>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="production-host" title="The hostname or IP address of the remote host (e.g., Production 1 or Production 2)." style="cursor: help;">Production Server:</label>
+                                    <input type="text" id="production-host" value="ubuntu@192.168.1.126">
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-port" title="The secure shell port of the remote host (default is 22)." style="cursor: help;">SSH Port:</label>
+                                    <input type="number" id="ssh-port" value="22" min="1" max="65535">
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="ssh-password" title="SSH authentication password (not saved on disk, processed securely in memory)." style="cursor: help;">SSH Password:</label>
+                                    <div style="position: relative;">
+                                        <input type="password" id="ssh-password" placeholder="SSH password" style="width: 100%; padding-right: 32px;">
+                                        <button onclick="togglePasswordVisibility()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; font-size: 11px; padding: 0;">
+                                            <i id="password-eye-icon" class="fas fa-eye"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="compact-form-group">
+                                    <label for="production-directory" title="Absolute directory path on the remote production server where comserv application is located." style="cursor: help;">Production Dir:</label>
+                                    <input type="text" id="production-directory" value="/opt/comserv/Comserv">
+                                </div>
+                            </div>
+
+                            <div style="margin-bottom: 5px; font-size: 11px; color: #dc3545; display: flex; align-items: center; gap: 5px;">
+                                <input type="checkbox" id="recreate-volumes" style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
+                                <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; margin: 0; color: #dc3545;">Recreate NFS Volumes (CAUTION: Removes logs & workshop data)</label>
                             </div>
                         </div>
-                        <div class="compact-form-group">
-                            <label for="production-directory" title="Absolute directory path on the remote production server where comserv application is located." style="cursor: help;">Production Dir:</label>
-                            <input type="text" id="production-directory" value="/opt/comserv/Comserv">
-                        </div>
-                    </div>
-
-                    <div style="margin-bottom: 10px; font-size: 11px; color: #dc3545; display: flex; align-items: center; gap: 5px;">
-                        <input type="checkbox" id="recreate-volumes" style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
-                        <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; margin: 0; color: #dc3545;">Recreate NFS Volumes (CAUTION: Removes logs & workshop data)</label>
                     </div>
 
                     <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
@@ -453,43 +464,43 @@
                         </thead>
                         <tbody>
                             <tr>
-                                <td style="padding: 4px;"><strong title="comserv_server.psgi: Core PSGI Catalyst server launcher script for Starman." style="cursor: help;">comserv_server.psgi</strong></td>
+                                <td style="padding: 4px;"><strong title="comserv_server.psgi: Catalyst PSGI entry point for Starman. Executed inside the container, this script enables ReverseProxy to pass correct headers (Client IP, SSL status) forward from the OPNsense / HAProxy gateway, preventing routing collisions." style="cursor: help;">comserv_server.psgi</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/script/comserv_server.psgi</code></td>
                                 <td style="padding: 4px;" title="Catalyst entry point executed by Starman within the container.">Core PSGI start wrapper.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="deploy.sh: Remote host recovery and orchestration script." style="cursor: help;">deploy.sh</strong></td>
+                                <td style="padding: 4px;"><strong title="deploy.sh: Remote server orchestration script. When triggered, it stops bare-metal host starman.service, backs up running containers (keeping last 2), pulls the new image, starts it, runs health checks, and on failure automatically rolls back to backup and restarts host services, sending log notifications to the admin." style="cursor: help;">deploy.sh</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/script/deploy.sh</code></td>
                                 <td style="padding: 4px;" title="Automates remote server port freeing, database file splitting, and starting docker.">Remote host recovery/orchestration.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="deploy_docker_to_production.pl: Local SSH wrapper script." style="cursor: help;">deploy_docker_to_production.pl</strong></td>
+                                <td style="padding: 4px;"><strong title="deploy_docker_to_production.pl: Workstation SSH wrapper script. Steps: 1. Compiles the 'web-prod' image locally. 2. Pushes image to Docker Hub. 3. Copies deploy.sh and docker-compose.server.yml to the remote host. 4. Executes deploy.sh over SSH. 5. Streams all stdout/stderr logs live to the workstation dashboard." style="cursor: help;">deploy_docker_to_production.pl</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/script/deploy_docker_to_production.pl</code></td>
                                 <td style="padding: 4px;" title="Perl SSH wrapper that compiles, builds, and pushes Docker images to the production server.">Local SSH deployment wrapper.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="Dockerfile: Two-stage packaging blueprint." style="cursor: help;">Dockerfile</strong></td>
+                                <td style="padding: 4px;"><strong title="Dockerfile: Two-stage container build spec. Stage 1 compiles external CPAN dependencies using native development tools. Stage 2 copies the compiled binaries, sets up the restricted 'comserv' system user, and configures the container to execute Starman in a fully secured, isolated sandbox environment." style="cursor: help;">Dockerfile</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/Dockerfile</code></td>
                                 <td style="padding: 4px;" title="Blueprint for building the application's multi-stage Docker container with runtime Perl environment.">Two-stage packaging blueprint.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="docker-compose.prod.yml: Compose file for building and pushing image layers from workstation." style="cursor: help;">docker-compose.prod.yml</strong></td>
+                                <td style="padding: 4px;"><strong title="docker-compose.prod.yml: Workstation build configuration. Dictates the precise build arguments, target platforms, and environment tags required to package comserv-web-prod locally on development machines before pushing the verified image layers to the centralized Docker Hub." style="cursor: help;">docker-compose.prod.yml</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/docker-compose.prod.yml</code></td>
                                 <td style="padding: 4px;" title="Configuration used on workstations to compile and push production-ready containers.">Compose build/push blueprint.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="docker-compose.server.yml: Compose configuration file for running on the servers." style="cursor: help;">docker-compose.server.yml</strong></td>
+                                <td style="padding: 4px;"><strong title="docker-compose.server.yml: Production server compose runtime. Binds the container's isolated port 5000 directly to the host network interface, mounts active NFS volumes to persist user uploads, workshop assets, and system logs, and enforces automated, multi-attempt restart policies." style="cursor: help;">docker-compose.server.yml</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/script/docker-compose.server.yml</code></td>
                                 <td style="padding: 4px;" title="Configuration used on production servers to orchestrate containers and map port 5000.">Compose schema for running on servers.</td>
                             </tr>
                             <tr>
-                                <td style="padding: 4px;"><strong title="docker_containers.tt: The interactive deployment control and monitoring dashboard." style="cursor: help;">docker_containers.tt</strong></td>
+                                <td style="padding: 4px;"><strong title="docker_containers.tt: The management dashboard template. It provides real-time WebSockets SSH terminal feeds, triggers compilation/deployment REST endpoints, visualizes active container health checks, and lists strategic and manual recovery roadmap guides." style="cursor: help;">docker_containers.tt</strong></td>
                                 <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
                                 <td style="padding: 4px;"><code>./Comserv/root/admin/docker_containers.tt</code></td>
                                 <td style="padding: 4px;" title="Template of this interactive deployment panel providing deployment, logging, and status tracking.">Interactive deployment dashboard.</td>
