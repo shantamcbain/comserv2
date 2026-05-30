@@ -438,7 +438,12 @@
                 </div>
             </div>
         </div>
-    </div><script>
+    </div>
+
+    [% END %]
+</div>
+
+<script>
     // Toggle collapsible sections
     function toggleSection(sectionId) {
         const content = document.getElementById(sectionId);
