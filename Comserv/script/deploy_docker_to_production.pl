@@ -6,8 +6,9 @@ use Getopt::Long;
 use File::Basename;
 use IPC::Run3;
 
-my $production_host = '192.168.1.126';
-my $service = 'web-prod';
+my $target = 'production1'; # default target: production1 or production2
+my $production_host;
+my $service;
 my $ssh_user = 'ubuntu';
 my $ssh_port = 22;
 my $production_directory = '~/PycharmProjects/comserv2';
@@ -19,6 +20,7 @@ my $nfs_workshop_path = $ENV{NFS_WORKSHOP_PATH} || '/';
 my $ssh_keyfile = $ENV{SSH_KEYFILE} || "$ENV{HOME}/.ssh/id_rsa";
 
 GetOptions(
+    'target=s'     => \$target,
     'host=s'       => \$production_host,
     'service=s'    => \$service,
     'user=s'       => \$ssh_user,
@@ -27,12 +29,21 @@ GetOptions(
     'keyfile=s'    => \$ssh_keyfile,
     'no-rollback'  => sub { $rollback_on_failure = 0 },
     'recreate-volumes' => \$recreate_volumes,
-) or die "Usage: $0 [--host=PRODUCTION_HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--keyfile=SSH_KEY] [--no-rollback] [--recreate-volumes]\n";
+) or die "Usage: $0 [--target=production1|production2] [--host=HOST] [--service=SERVICE] [--user=USER] [--port=PORT] [--directory=DIRECTORY] [--keyfile=SSH_KEY] [--no-rollback] [--recreate-volumes]\n";
 
-die "ERROR: Production host required (--host=HOSTNAME)\n" unless $production_host;
+# Set target-specific default parameters if not overridden by explicit arguments
+if (lc($target) eq 'production2') {
+    $production_host //= '192.168.1.127'; # Production 2 Host IP (cloned environment)
+    $service //= 'web-prod2';
+} else {
+    $production_host //= '192.168.1.126'; # Production 1 Host IP (main live)
+    $service //= 'web-prod';
+}
+
+die "ERROR: Host required (--host=HOSTNAME or via --target)\n" unless $production_host;
 
 print "=" x 80 . "\n";
-print "Docker Production Deployment Script\n";
+print "Docker Deployment Script - Target: " . uc($target) . "\n";
 print "=" x 80 . "\n";
 print "Production Host: $production_host\n";
 print "Production Directory: $production_directory\n";
@@ -100,6 +111,7 @@ sub run_remote {
     print "CMD: $cmd\n";
     my $output = `$ssh_cmd 2>&1`;
     my $exit_code = $? >> 8;
+    $output =~ s/\[sudo\] password for \w+:\s*//g;
     print $output if $output;
     die "FAILED: $description\n" if $exit_code != 0;
     return $output;
@@ -125,7 +137,9 @@ sub ssh_exec {
         $ssh_cmd = qq(ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o IdentitiesOnly=yes $ssh_user\@$production_host "$cmd");
     }
     
-    return `$ssh_cmd 2>&1`;
+    my $output = `$ssh_cmd 2>&1`;
+    $output =~ s/\[sudo\] password for \w+:\s*//g;
+    return $output;
 }
 
 eval {
@@ -161,6 +175,18 @@ eval {
     print "\n" . "=" x 40 . "\n";
     print "PHASE 2: CLEANUP OLD STATE\n";
     print "=" x 40 . "\n";
+    
+    # Stop and disable host systemd starman service if running to free up port 5000
+    print "[CLEANUP] Stopping and disabling host-level systemd starman service if active...\n";
+    ssh_exec("sudo systemctl stop starman.service 2>/dev/null || true");
+    ssh_exec("sudo systemctl disable starman.service 2>/dev/null || true");
+    
+    # Force-kill any stray starman/plackup host processes to ensure port 5000 is free
+    print "[CLEANUP] Killing stray starman/plackup host processes...\n";
+    ssh_exec("sudo pkill -9 -f 'starman' 2>/dev/null || true");
+    ssh_exec("sudo pkill -9 -f 'plackup' 2>/dev/null || true");
+    ssh_exec("sudo pkill -9 -f 'comserv_server.psgi' 2>/dev/null || true");
+    ssh_exec("sudo fuser -k -9 5000/tcp 2>/dev/null || true");
     
     print "[CLEANUP] Removing old containers and images...\n";
     
@@ -259,6 +285,31 @@ eval {
     print "\n" . "=" x 40 . "\n";
     print "PHASE 4: EXECUTION\n";
     print "=" x 40 . "\n";
+    
+    # Step 5c: Populate database secrets on production from legacy db_config.json if missing
+    print "[SECRETS SETUP] Checking and populating database secrets on production host...\n";
+    ssh_exec("mkdir -p /home/ubuntu/.comserv/secrets/dbi");
+    my $secrets_out = ssh_exec("if [ -f '/opt/comserv/Comserv/db_config.json' ]; then "
+             . "perl -MJSON::PP -e ' "
+             . "  my \$file = \"/opt/comserv/Comserv/db_config.json\"; "
+             . "  open my \$fh, \"<\", \$file or die \$!; "
+             . "  local \$/; "
+             . "  my \$data = decode_json(<\$fh>); "
+             . "  close \$fh; "
+             . "  for my \$key (keys %\$data) { "
+             . "    my \$profile = {\$key => \$data->{\$key}}; "
+             . "    open my \$out, \">\", \"/home/ubuntu/.comserv/secrets/dbi/\$key.json\" or die \$!; "
+             . "    print \$out encode_json(\$profile); "
+             . "    close \$out; "
+             . "  } "
+             . "'; "
+             . "chmod -R 755 /home/ubuntu/.comserv; "
+             . "chown -R ubuntu:ubuntu /home/ubuntu/.comserv; "
+             . "echo '✓ Secrets successfully populated on production'; "
+             . "else "
+             . "echo '⚠ Warning: /opt/comserv/Comserv/db_config.json not found'; "
+             . "fi");
+    print "  $secrets_out\n";
     
     # Step 5b: Ensure NFS volumes exist on production
     print "[NFS SETUP] Verifying NFS volumes...\n";

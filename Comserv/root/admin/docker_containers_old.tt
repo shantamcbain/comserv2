@@ -38,10 +38,10 @@
 
 <div class="app-container" style="margin: 20px auto; max-width: 1200px;">
     <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">
-        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management</h1>
+        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management (Old View)</h1>
         <div>
-            <a href="/admin/docker-containers-old" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 6px 12px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.2s;">
-                <i class="fas fa-history"></i> Switch to Old View (Scrolling Layout)
+            <a href="/admin/docker-containers" class="btn btn-primary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 6px 12px; background-color: #007bff; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.2s;">
+                <i class="fas fa-th-large"></i> Switch to New Grid Layout Dashboard
             </a>
         </div>
     </div>
@@ -57,474 +57,488 @@
     </div>
     [% ELSE %]
     
-    <div class="dashboard-grid">
-        <!-- Left Column: Container Info, Controls & Deployment Tools -->
-        <div class="dashboard-col-left">
-            <!-- Container Status Overview -->
-            <div class="compact-card">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('container-status')" style="background-color: #f8f9fa;">
-                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 8px;"></i>
-                            <i class="icon-list" style="margin-right: 8px; color: #0066cc;"></i>
-                            Container Status Overview
-                        </span>
-                        <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
-                            <i class="icon-refresh"></i> Refresh
-                        </button>
-                    </h4>
-                </div>
-                <div id="container-status" class="compact-card-body collapsible-content">
-                    <div id="containers-list" style="display: flex; flex-direction: column; gap: 8px;">
-                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading container information...</p>
-                    </div>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('container-status')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-container-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="icon-list" style="margin-right: 10px;"></i>
+                        Container Status Overview
+                    </span>
+                    <button onclick="event.stopPropagation(); refreshContainers();" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </h3>
+            </div>
+            <div id="container-status" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="containers-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Volume Status Overview -->
-            <div class="compact-card">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('volumes-status')" style="background-color: #f8f9fa;">
-                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 8px;"></i>
-                            <i class="icon-storage" style="margin-right: 8px; color: #17a2b8;"></i>
-                            Volume Status Overview
-                        </span>
-                        <button class="compact-btn" onclick="event.stopPropagation(); refreshVolumes();" style="background-color: #6c757d; color: white;">
-                            <i class="icon-refresh"></i> Refresh
-                        </button>
-                    </h4>
-                </div>
-                <div id="volumes-status" class="compact-card-body collapsible-content">
-                    <div id="volumes-list" style="display: flex; flex-direction: column; gap: 8px;">
-                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading volume information...</p>
-                    </div>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('volumes-status')"
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-volumes-status" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="icon-storage" style="margin-right: 10px;"></i>
+                        Volume Status Overview
+                    </span>
+                    <button onclick="event.stopPropagation(); refreshVolumes();" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        <i class="icon-refresh"></i> Refresh
+                    </button>
+                </h3>
+            </div>
+            <div id="volumes-status" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="volumes-list" style="display: flex; flex-direction: column; gap: 10px;">
+                    <p style="color: var(--text-muted-color, #666); text-align: center;">Loading volume information...</p>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- Container Controls -->
-            <div class="compact-card">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('container-controls')" style="background-color: #f8f9fa;">
-                    <h4 style="margin: 0; display: flex; align-items: center; font-size: 13px; color: var(--text-color, #333);">
-                        <i class="fas fa-chevron-right chevron-icon" id="chevron-container-controls" style="margin-right: 8px;"></i>
-                        <i class="icon-tools" style="margin-right: 8px; color: #ffc107;"></i>
-                        Container Controls
-                    </h4>
-                </div>
-                <div id="container-controls" class="compact-card-body collapsible-content">
-                    <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
-                        <div style="flex: 1 1 150px;">
-                            <label for="service-select" style="font-size: 11px; font-weight: bold; display: block; margin-bottom: 2px;">Select Service:</label>
-                            <select id="service-select" style="width:100%; padding: 4px; font-size: 12px; border-radius: 4px; border: 1px solid #ccc; height: 28px;">
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('container-controls')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-container-controls" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="icon-tools" style="margin-right: 10px;"></i>
+                    Container Controls
+                </h3>
+            </div>
+            <div id="container-controls" class="card-body collapsible-content" style="padding: 20px;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px;">
+                        <div>
+                            <label for="service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Select Service:
+                            </label>
+                            <select id="service-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                                 <option value="">-- Select a service --</option>
                                 <option value="all">All Services</option>
                             </select>
                         </div>
-                        <div style="display: flex; gap: 6px; flex-wrap: wrap; align-items: center;">
-                            <button id="restart-btn" onclick="restartContainer()" class="compact-btn" style="background-color: #0066cc; color: white;">
-                                <i class="icon-refresh"></i> Restart
-                            </button>
-                            <button id="rebuild-btn" onclick="rebuildContainer()" class="compact-btn" style="background-color: #ffc107; color: #333;">
-                                🔨 Rebuild
-                            </button>
-                            <button id="logs-btn" onclick="viewLogs()" class="compact-btn" style="background-color: #17a2b8; color: white;">
-                                <i class="icon-log"></i> Logs
-                            </button>
-                            <button id="prune-btn" onclick="pruneDockerSystem()" class="compact-btn" style="background-color: #dc3545; color: white;">
-                                🗑️ Prune
-                            </button>
-                            <button id="disk-usage-btn" onclick="showDiskUsage()" class="compact-btn" style="background-color: #6c757d; color: white;">
-                                💾 Disk
-                            </button>
-                        </div>
-                    </div>
-                    <div style="margin-top: 8px;">
-                        <label for="force-restart" style="display: inline-flex; align-items: center; gap: 6px; font-size: 11px; cursor: pointer; margin: 0;">
-                            <input type="checkbox" id="force-restart" style="width: 14px; height: 14px; margin: 0;">
-                            <span>Force restart (down/up cycle)</span>
-                        </label>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Production Deployment -->
-            <div class="compact-card" style="border: 1px solid #ffeaa7;">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('production-deployment')" style="background-color: #fff3cd; border-bottom: 1px solid #ffeaa7;">
-                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: #856404;">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-production-deployment" style="margin-right: 8px;"></i>
-                            <i class="fas fa-rocket" style="margin-right: 8px; color: #dc3545;"></i>
-                            Production Deployment Panel
-                        </span>
-                        <span style="font-size: 9px; background-color: #dc3545; color: white; padding: 1px 5px; border-radius: 3px; font-weight: bold;">CAUTION</span>
-                    </h4>
-                </div>
-                <div id="production-deployment" class="compact-card-body collapsible-content">
-                    <!-- Collapsible Connection Settings (Normally Closed) -->
-                    <div class="compact-card" style="margin-bottom: 12px; border: 1px dashed #ffeaa7;">
-                        <div class="compact-card-header collapsible-header" onclick="toggleSection('deploy-connection-settings')" style="background-color: #fff9db; padding: 6px 10px;">
-                            <span style="font-size: 11px; font-weight: bold; color: #856404; display: flex; align-items: center; gap: 4px;">
-                                <i class="fas fa-chevron-right chevron-icon" id="chevron-deploy-connection-settings"></i>
-                                <i class="fas fa-sliders-h"></i> Target Connection & SSH Settings (Click to expand)
-                            </span>
-                        </div>
-                        <div id="deploy-connection-settings" class="compact-card-body collapsible-content" style="padding: 10px; background-color: #fafdf6;">
-                            <div class="compact-form-grid" style="margin-bottom: 8px;">
-                                <div class="compact-form-group">
-                                    <label for="deploy-service-select" title="Select whether to deploy web-prod (optimized production container) or web-dev (debug container)." style="cursor: help;">Service to Deploy:</label>
-                                    <select id="deploy-service-select">
-                                        <option value="web-prod">web-prod (Production)</option>
-                                        <option value="web-dev">web-dev (Development)</option>
-                                    </select>
-                                </div>
-                                <div class="compact-form-group">
-                                    <label for="ssh-target-select" title="Select a preconfigured SSH target profile to automatically fill host and port values." style="cursor: help;">SSH Target:</label>
-                                    <select id="ssh-target-select" onchange="updateSSHTarget()">
-                                        <option value="custom">Custom...</option>
-                                        <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
-                                        <option value="shanta@workstation.local">shanta@workstation.local</option>
-                                    </select>
-                                </div>
-                                <div class="compact-form-group">
-                                    <label for="production-host" title="The hostname or IP address of the remote host (e.g., Production 1 or Production 2)." style="cursor: help;">Production Server:</label>
-                                    <input type="text" id="production-host" value="ubuntu@192.168.1.126">
-                                </div>
-                                <div class="compact-form-group">
-                                    <label for="ssh-port" title="The secure shell port of the remote host (default is 22)." style="cursor: help;">SSH Port:</label>
-                                    <input type="number" id="ssh-port" value="22" min="1" max="65535">
-                                </div>
-                                <div class="compact-form-group">
-                                    <label for="ssh-password" title="SSH authentication password (not saved on disk, processed securely in memory)." style="cursor: help;">SSH Password:</label>
-                                    <div style="position: relative;">
-                                        <input type="password" id="ssh-password" placeholder="SSH password" style="width: 100%; padding-right: 32px;">
-                                        <button onclick="togglePasswordVisibility()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; font-size: 11px; padding: 0;">
-                                            <i id="password-eye-icon" class="fas fa-eye"></i>
-                                        </button>
-                                    </div>
-                                </div>
-                                <div class="compact-form-group">
-                                    <label for="production-directory" title="Absolute directory path on the remote production server where comserv application is located." style="cursor: help;">Production Dir:</label>
-                                    <input type="text" id="production-directory" value="/opt/comserv/Comserv">
-                                </div>
-                            </div>
-
-                            <div style="margin-bottom: 5px; font-size: 11px; color: #dc3545; display: flex; align-items: center; gap: 5px;">
-                                <input type="checkbox" id="recreate-volumes" style="width: 14px; height: 14px; margin: 0; cursor: pointer;">
-                                <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; margin: 0; color: #dc3545;">Recreate NFS Volumes (CAUTION: Removes logs & workshop data)</label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px;">
-                        <button onclick="openSSHTerminal()" class="compact-btn" style="background-color: #0066cc; color: white;">
-                            <i class="fas fa-terminal"></i> Terminal
-                        </button>
-                        <button onclick="testSSHConnection()" class="compact-btn" style="background-color: #6c757d; color: white;">
-                            <i class="fas fa-network-wired"></i> Test Connect
-                            <span id="ssh-status-indicator" style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background-color: #ccc; border: 1px solid #999; margin-left: 2px;"></span>
-                        </button>
-                        <button onclick="saveDockerImage()" class="compact-btn" style="background-color: #17a2b8; color: white;">
-                            <i class="fas fa-save"></i> Save Image
-                        </button>
-                        <button onclick="deployToProduction()" class="compact-btn" style="background-color: #dc3545; color: white;">
-                            <i class="fas fa-rocket"></i> Auto Deploy (Hub)
-                        </button>
-                        <button onclick="deployToProduction(1)" class="compact-btn" style="background-color: #ff9800; color: white;" title="Bypass Rebuild & Push">
-                            <i class="fas fa-bolt"></i> Quick Deploy
-                        </button>
-                        <button onclick="showDeploymentCommands()" class="compact-btn" style="background-color: #28a745; color: white;">
-                            <i class="fas fa-code"></i> Show Commands
-                        </button>
-                    </div>
-
-                    <!-- Hidden Collapsible Commands View -->
-                    <div id="quick-commands" style="display: none; font-size: 11px; font-family: monospace; background-color: #222; color: #00ff00; padding: 10px; border-radius: 4px; max-height: 200px; overflow-y: auto; margin-top: 10px;">
-                        <div style="margin-bottom: 6px; font-weight: bold; color: #ffc107;">→ Workstation Compilation & Hub Push Commands</div>
-                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Build & Run Local Dev:</div>
-                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('docker compose build web-dev && docker compose up -d --force-recreate web-dev')">
-                            docker compose build web-dev && docker compose up -d --force-recreate web-dev
-                        </div>
-                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Build Prod Container:</div>
-                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('cd Comserv && docker compose -f docker-compose.prod.yml build')">
-                            cd Comserv && docker compose -f docker-compose.prod.yml build
-                        </div>
-                        <div style="margin-left: 10px; margin-bottom: 4px; color: #ccc;">Push Container to Hub:</div>
-                        <div style="margin-left: 10px; margin-bottom: 6px; background-color:#111; padding: 4px; cursor: pointer;" onclick="copyToClipboard('docker compose -f docker-compose.prod.yml push')">
-                            docker compose -f docker-compose.prod.yml push
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Embedded SSH Terminal -->
-            <div class="compact-card" style="border: 1px solid #444;">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('ssh-terminal-section')" style="background-color: #1e1e1e; color: #00ff00;">
-                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px;">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 8px;"></i>
-                            <i class="fas fa-terminal" style="margin-right: 8px;"></i>
-                            Interactive SSH Terminal
-                        </span>
-                        <span class="badge-pill" style="background-color: #00ff00; color: #1e1e1e;">EMBEDDED</span>
-                    </h4>
-                </div>
-                <div id="ssh-terminal-section" class="compact-card-body collapsible-content" style="padding: 10px; background-color: #111;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
                         <div>
-                            <label style="font-size: 10px; font-weight: bold; color: #00ff00; display: block; margin-bottom: 2px;">SSH Target:</label>
-                            <input type="text" id="ssh-terminal-target" value="ubuntu@192.168.1.126" style="width: 100%; padding: 4px 6px; font-size: 11px; background: #000; border: 1px solid #333; color: #00ff00; border-radius: 4px; height: 24px;">
-                        </div>
-                        <div>
-                            <label style="font-size: 10px; font-weight: bold; color: #00ff00; display: block; margin-bottom: 2px;">SSH Password:</label>
-                            <div style="position: relative;">
-                                <input type="password" id="ssh-terminal-password" placeholder="Password" style="width: 100%; padding: 4px 6px; padding-right: 30px; font-size: 11px; background: #000; border: 1px solid #333; color: #00ff00; border-radius: 4px; height: 24px;">
-                                <button onclick="toggleSSHTerminalPassword()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #00ff00; font-size: 10px; padding: 0;">
-                                    <i id="ssh-terminal-password-eye" class="fas fa-eye"></i>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Actions:
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="restart-btn" onclick="restartContainer()" 
+                                    style="padding: 8px 16px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <i class="icon-refresh"></i> Restart
+                                </button>
+                                <button id="rebuild-btn" onclick="rebuildContainer()" 
+                                    style="padding: 8px 16px; background-color: #ffc107; color: var(--text-color, #333); border: none; border-radius: 4px; cursor: pointer;">
+                                    🔨 Rebuild
+                                </button>
+                                <button id="logs-btn" onclick="viewLogs()" 
+                                    style="padding: 8px 16px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    <i class="icon-log"></i> View Logs
                                 </button>
                             </div>
                         </div>
-                    </div>
-                    <div style="display: flex; gap: 8px; margin-bottom: 8px; align-items: center;">
-                        <button id="ssh-connect-btn" onclick="connectSSHTerminal()" class="compact-btn" style="background-color: #28a745; color: white; height: 24px; padding: 2px 10px; font-size: 11px;">Connect</button>
-                        <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled class="compact-btn" style="background-color: #dc3545; color: white; height: 24px; padding: 2px 10px; font-size: 11px;">Disconnect</button>
-                        <span id="ssh-connection-status" style="color: #ccc; font-size: 11px; display: inline-flex; align-items: center; gap: 4px;">
-                            <i class="fas fa-circle" style="color: #6c757d;"></i> Offline
-                        </span>
-                    </div>
-                    <div id="ssh-terminal-container" style="background-color: #000; border: 1px solid #333; border-radius: 4px; height: 300px; padding: 5px;">
-                        <div id="ssh-xterm-terminal"></div>
-                    </div>
-                </div>
-            </div>
 
-            <!-- Output Console -->
-            <div class="compact-card">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('output-console-section')" style="background-color: #f8f9fa;">
-                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-output-console-section" style="margin-right: 8px;"></i>
-                            <i class="icon-log" style="margin-right: 8px; color: #6c757d;"></i>
-                            Output / Terminal Logs
-                        </span>
-                        <button onclick="event.stopPropagation(); clearOutput();" class="compact-btn" style="background-color: #6c757d; color: white;">Clear</button>
-                    </h4>
-                </div>
-                <div id="output-console-section" class="compact-card-body collapsible-content">
-                    <div id="last-deploy-banner" style="display:none; margin-bottom: 8px; padding: 4px 8px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 11px; font-family: monospace;">
-                        <strong>Last log:</strong> <span id="last-deploy-file"></span>
-                        <button onclick="loadHistoryIntoOutput()" style="margin-left: 8px; padding: 1px 4px; font-size: 10px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Load</button>
-                    </div>
-                    <div id="output-box" style="background-color: #222; border: 1px solid #333; border-radius: 4px; padding: 8px; 
-                        font-family: monospace; font-size: 11px; max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word; color: #fff;">
-                        Ready...
+                        <div>
+                            <label style="display: block; margin-bottom: 8px; font-weight: bold;">
+                                Cleanup:
+                            </label>
+                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                                <button id="prune-btn" onclick="pruneDockerSystem()" 
+                                    style="padding: 8px 16px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    🗑️ Prune Unused
+                                </button>
+                                <button id="disk-usage-btn" onclick="showDiskUsage()" 
+                                    style="padding: 8px 16px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                                    💾 Disk Usage
+                                </button>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="force-restart" style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                <input type="checkbox" id="force-restart" style="width: 18px; height: 18px;">
+                                <span>Force restart (down/up cycle)</span>
+                            </label>
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- Right Column: Strategic Deployment Plan & File Tracking Matrix -->
-        <div class="dashboard-col-right">
-            <!-- Strategic Plan Card (Normally Closed) -->
-            <div class="compact-card" style="border: 2px solid #0056b3;">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('strategic-roadmap')" style="background-color: #e8f4fd; border-bottom: 1px solid #b3d7ff; display: flex; align-items: center; justify-content: space-between;">
-                    <h4 style="margin: 0; font-size: 13px; color: #0056b3; display: flex; align-items: center; gap: 6px; font-weight: bold;">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-strategic-roadmap" style="margin-right: 8px;"></i>
-                            <i class="fas fa-map-marked-alt"></i> Strategic Deployment Roadmap & Steps
-                        </span>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('production-deployment')" 
+                 style="background-color: #fff3cd; padding: 15px; border: 2px solid #ffc107; border-bottom: 1px solid var(--border-color, #ddd);">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-production-deployment" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="fas fa-rocket" style="margin-right: 10px; color: #dc3545;"></i>
+                    Production Deployment
+                    <span style="margin-left: 10px; background-color: var(--danger-color, #dc3545); color: white; padding: 2px 8px; border-radius: 3px; font-size: 0.8em;">CAUTION</span>
+                </h3>
+            </div>
+            <div id="production-deployment" class="card-body collapsible-content" style="padding: 20px;">
+                <div style="background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 15px; margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 10px 0; color: #856404;">
+                        <i class="fas fa-exclamation-triangle"></i> Production Deployment Workflow
                     </h4>
-                    <span class="badge-pill" style="background-color: #0056b3;">ACTIVE PIPELINE</span>
-                </div>
-                <div id="strategic-roadmap" class="compact-card-body collapsible-content" style="padding: 10px 12px;">
-                    <p style="margin: 0 0 10px 0; font-size: 11px; line-height: 1.4; color: #555;">
-                        This system transitions the Catalyst web server away from fragile bare-metal processes into an isolated, self-healing, multi-node configuration.
+                    <p style="margin: 0; color: #856404;">
+                        This will export the Docker container, copy it to production server via SSH, stop the running container,
+                        load the new image, and start it. Always verify the image ID matches the local :latest tag before restart.
+                        Automatic rollback on failure.
                     </p>
+                    <p style="margin: 8px 0 0 0; color: #856404;">
+                        Reminder: On production, always <strong>cd /opt/comserv/Comserv</strong> before running any
+                        <code>docker compose</code> commands so the correct compose file and mounts are used.
+                    </p>
+                </div>
 
-                    <!-- Step 1 -->
-                    <div class="pipeline-step healthy">
-                        <div class="pipeline-step-header">
-                            <span style="color: #1e5a1e;"><i class="fas fa-check-circle"></i> Step 1: Starman-in-Docker Configuration</span>
-                            <span class="badge-pill badge-healthy">HEALTHY</span>
-                        </div>
-                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
-                            <strong>Goal:</strong> Standardize environment. Starman runs natively <em>inside</em> the Docker container, isolating libraries from host system scripts.
-                            <br><strong>Verification:</strong> Station container listens on port 3000, separating runtime execution from host.
-                        </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin-bottom: 20px;">
+                    <div>
+                        <label for="deploy-service-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Service to Deploy:
+                        </label>
+                        <select id="deploy-service-select" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                            <option value="web-prod">web-prod (Production)</option>
+                            <option value="web-dev">web-dev (Development)</option>
+                        </select>
                     </div>
 
-                    <!-- Step 2 -->
-                    <div class="pipeline-step progress">
-                        <div class="pipeline-step-header">
-                            <span style="color: #856404;"><i class="fas fa-spinner fa-spin"></i> Step 2: Automated Deployment & Host Migration</span>
-                            <span class="badge-pill badge-progress" style="background-color: #ffc107; color: #333; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: bold;">TESTING PENDING</span>
-                        </div>
-                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
-                            <strong>Goal:</strong> Zero port collision. Remote <code>deploy.sh</code> stops host systemd <code>starman.service</code>, parses database connections, and splits secrets into <code>/home/ubuntu/.comserv/secrets/dbi/*.json</code>.
-                            <br><strong>Verification:</strong> Run "Quick Deploy" or "Auto Deploy (Hub)" to target server, verifying zero-downtime startup. (Note: Currently running pre-docker code from Feb 4, testing is pending).
-                        </div>
+                    <div>
+                        <label for="ssh-target-select" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Target:
+                        </label>
+                        <select id="ssh-target-select" onchange="updateSSHTarget()" style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                            <option value="custom">Custom...</option>
+                            <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
+                            <option value="shanta@workstation.local">shanta@workstation.local</option>
+                        </select>
                     </div>
 
-                    <!-- Step 3 -->
-                    <div class="pipeline-step progress">
-                        <div class="pipeline-step-header">
-                            <span style="color: #856404;"><i class="fas fa-spinner fa-spin"></i> Step 3: Clone Production 2 VM on Proxmox 710</span>
-                            <span class="badge-pill badge-progress">50% DONE</span>
-                        </div>
-                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
-                            <strong>Goal:</strong> Create a full-cloned testing playground VM. Production 2 mirrors Prod 1 but remains independent.
-                            <br><strong>Verification:</strong> Allocate discrete IP/NIC inside Dell Proxmox VE, then test deploying the container directly onto Production 2 first.
-                        </div>
+                    <div>
+                        <label for="production-host" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Production Server:
+                        </label>
+                        <input type="text" id="production-host" value="ubuntu@192.168.1.126" 
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                        <small style="color: var(--text-muted-color, #666);">Format: user@hostname or user@IP</small>
                     </div>
 
-                    <!-- Step 4 -->
-                    <div class="pipeline-step planned">
-                        <div class="pipeline-step-header">
-                            <span style="color: #0f6674;"><i class="fas fa-route"></i> Step 4: Dynamic OPNsense Traffic Redirection</span>
-                            <span class="badge-pill badge-planned">PLANNED</span>
-                        </div>
-                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
-                            <strong>Goal:</strong> Setup OPNsense gateway load-balancing. Public traffic goes to Production 1, while newly-updated staging containers are tested on Production 2.
-                            <br><strong>Verification:</strong> HAProxy continuously probes <code>http://[IP]:5000/health</code>, performing instant failover to Production 2 (or workstation) if Prod 1 returns an error.
-                        </div>
+                    <div>
+                        <label for="ssh-port" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Port:
+                        </label>
+                        <input type="number" id="ssh-port" value="22" min="1" max="65535"
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
                     </div>
 
-                    <!-- Step 5 -->
-                    <div class="pipeline-step k8s">
-                        <div class="pipeline-step-header">
-                            <span style="color: #4c118e;"><i class="fas fa-dharmachakra"></i> Step 5: Kubernetes (K8s) Cluster Integration Node</span>
-                            <span class="badge-pill badge-k8s">K8s ROADMAP</span>
+                    <div>
+                        <label for="ssh-password" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-password" placeholder="Enter SSH password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                            <button onclick="togglePasswordVisibility()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: var(--text-muted-color, #666);">
+                                <i id="password-eye-icon" class="fas fa-eye"></i>
+                            </button>
                         </div>
-                        <div style="font-size: 11px; line-height: 1.35; color: #444;">
-                            <strong>Goal:</strong> <strong>Optimal K8s Integration Point:</strong> Once single-container setups on Prod 1 & 2 are validated, deploy lightweight <strong>K3s / MicroK8s</strong> on our Proxmox nodes. Wrap Compose setups into Helm charts.
-                            <br><strong>Verification:</strong> K8s natively manages high-availability replication, self-healing liveness probes, automated rollbacks, and centralized secret vault sync.
-                        </div>
+                        <small style="color: var(--text-muted-color, #666);">Stored securely in ~/.comserv/secrets/ssh_credentials.json</small>
+                    </div>
+
+                    <div>
+                        <label for="production-directory" style="display: block; margin-bottom: 8px; font-weight: bold;">
+                            Production Directory:
+                        </label>
+                        <input type="text" id="production-directory" value="/opt/comserv/Comserv" 
+                               style="width: 100%; padding: 8px; border: 1px solid var(--border-color, #ddd); border-radius: 4px;">
+                        <small style="color: var(--text-muted-color, #666);">Path where docker-compose.yml is located on production server</small>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 10px; grid-column: 1 / -1;">
+                        <input type="checkbox" id="recreate-volumes" style="width: 18px; height: 18px; cursor: pointer;">
+                        <label for="recreate-volumes" style="font-weight: bold; cursor: pointer; color: #dc3545;">
+                            Recreate NFS Volumes (CAUTION: Removes and recreates log and workshop volumes)
+                        </label>
                     </div>
                 </div>
-            </div>
 
-            <!-- Manual Step-by-Step Setup Guide (Normally Closed) -->
-            <div class="compact-card" style="border: 1px solid #28a745;">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('manual-setup-guide')" style="background-color: #e8f5e9; border-bottom: 1px solid #c8e6c9; display: flex; align-items: center; justify-content: space-between;">
-                    <h4 style="margin: 0; font-size: 13px; color: #1b5e20; display: flex; align-items: center; gap: 6px; font-weight: bold;">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-manual-setup-guide" style="margin-right: 8px;"></i>
-                            <i class="fas fa-list-ol"></i> Manual Step-by-Step Setup Guide
-                        </span>
-                    </h4>
-                    <span class="badge-pill" style="background-color: #28a745; color: white;">MANUAL SETUP</span>
-                </div>
-                <div id="manual-setup-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
-                    <p style="margin: 0 0 10px 0; color: #555;">Follow these exact manual steps to deploy the Docker container to Production if the automated script fails.</p>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                    <button onclick="openSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-terminal"></i> Open SSH Terminal
+                    </button>
+
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <button onclick="testSSHConnection()" 
+                            style="padding: 10px 20px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                            <i class="fas fa-network-wired"></i> Test Connection
+                        </button>
+                        <div id="ssh-status-indicator" style="width: 16px; height: 16px; border-radius: 50%; background-color: #ccc; border: 2px solid #999;" 
+                             title="Not tested"></div>
+                    </div>
+
+                    <button onclick="saveDockerImage()" 
+                        style="padding: 10px 20px; background-color: #17a2b8; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="Saves image to local tar file for manual backup">
+                        <i class="fas fa-save"></i> Save Image
+                    </button>
                     
-                    <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
-                        <li>
-                            <strong>Build Container Locally</strong>: Compile the production Docker image on the Workstation.
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && docker compose -f docker-compose.prod.yml build</pre>
-                        </li>
-                        <li>
-                            <strong>Push Image to Docker Hub</strong>: Upload the compiled layers to the shared hub.
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">docker compose -f docker-compose.prod.yml push</pre>
-                        </li>
-                        <li>
-                            <strong>Stop Host-Side Services on Server</strong>: SSH to remote host and free up port 5000.
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl stop starman.service && sudo systemctl disable starman.service"</pre>
-                        </li>
-                        <li>
-                            <strong>Pull Image on Server</strong>: Fetch the latest image from Docker Hub on the remote server.
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml pull"</pre>
-                        </li>
-                        <li>
-                            <strong>Launch Container on Server</strong>: Start the production container in detached mode.
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml up -d --force-recreate"</pre>
-                        </li>
-                    </ol>
+                    <button onclick="deployToProduction()" 
+                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;"
+                        title="Build image → Push to Docker Hub → SSH trigger deploy.sh on production server">
+                        <i class="fas fa-rocket"></i> Auto Deploy (Hub)
+                    </button>
+
+                    <button onclick="showDeploymentCommands()" 
+                        style="padding: 10px 20px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-code"></i> Show Commands
+                    </button>
+                </div>
+
+                <div style="margin-top: 15px; padding: 10px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px;">
+                    <h5 style="margin: 0 0 8px 0;">
+                        <i class="fas fa-info-circle"></i> Manual Deployment Commands (Copy to SSH Terminal):
+                    </h5>
+                    <div id="quick-commands" style="font-size: 13px; font-family: monospace; background-color: #2d2d2d; color: #00ff00; padding: 12px; border-radius: 4px; margin-top: 10px;">
+
+                        <div style="margin-bottom: 12px; padding: 10px; background-color: #1a3a1a; border: 2px solid #28a745; border-radius: 4px; color: #fff;">
+                            <div style="color: #28a745; font-weight: bold; font-size: 1.05em; margin-bottom: 6px;">
+                                ℹ️ Deployment Workflow: Build → Push to Docker Hub → Production auto-pulls via cron
+                            </div>
+                            <div style="color: #ccc; font-size: 0.9em;">
+                                All changes (templates, Perl, CSS) are baked into the image on the workstation, pushed to
+                                <strong style="color:#7ec8e3">hub.docker.com/r/shantamcsbain/comserv-web-prod</strong>,
+                                then the production server's <code>deploy.sh</code> cron checks every 10 minutes and pulls automatically.
+                                <br><strong style="color:#ffc107">Step 0 (local rebuild + push) is REQUIRED whenever any file has changed.</strong>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom: 8px; color: #28a745; font-weight: bold;">→ Step 0: LOCAL REBUILD + PUSH — Run on Workstation</div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">1. Build and test dev container first:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2 && docker compose build web-dev && docker compose up -d --force-recreate web-dev')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2 &amp;&amp; docker compose build web-dev &amp;&amp; docker compose up -d --force-recreate web-dev
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; color: #ccc; font-size: 0.88em;">
+                            Test at <strong>http://workstation.local:3000</strong> — verify pages, login, etc.
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">2. Once dev confirmed working, build prod image and push to Docker Hub:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml build')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.prod.yml build
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">3. Login to Docker Hub (one time — token stored by Docker):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('docker login')" title="Click to copy">
+                            docker login  # username: shantamcsbain — use access token not password
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">4. Push to Docker Hub:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('cd /home/shanta/PycharmProjects/comserv2/Comserv && docker compose -f docker-compose.prod.yml push')" title="Click to copy">
+                            cd /home/shanta/PycharmProjects/comserv2/Comserv &amp;&amp; docker compose -f docker-compose.prod.yml push
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 8px; color: #28a745; font-size: 11px;">
+                            ✅ After push, the production cron will detect the new digest within 10 minutes and auto-deploy.
+                            Email notification sent to csc@computersystemconsulting.ca on successful deployment.
+                        </div>
+
+                        <div style="margin: 14px 0 8px 0; padding: 8px; background-color: #1a1a3a; border: 1px solid #5588cc; border-radius: 4px; color: #aad4ff; font-size: 12px;">
+                            <strong>One-time setup on production server</strong> (only needed once per server):
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">Copy deploy files to server (run from workstation):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;sudo mkdir -p /opt/comserv/Comserv&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "sudo mkdir -p /opt/comserv/Comserv"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('scp /home/shanta/PycharmProjects/comserv2/Comserv/script/docker-compose.server.yml ubuntu@192.168.1.126:/opt/comserv/Comserv/docker-compose.prod.yml')" title="Click to copy">
+                            scp Comserv/script/docker-compose.server.yml ubuntu@192.168.1.126:/opt/comserv/Comserv/docker-compose.prod.yml
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('scp /home/shanta/PycharmProjects/comserv2/Comserv/script/deploy.sh ubuntu@192.168.1.126:/opt/comserv/Comserv/deploy.sh')" title="Click to copy">
+                            scp Comserv/script/deploy.sh ubuntu@192.168.1.126:/opt/comserv/Comserv/deploy.sh
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 4px; color: #ccc; font-size: 0.88em;">On production server — make executable, install mail, add cron:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('chmod +x /opt/comserv/Comserv/deploy.sh && sudo apt install -y mailutils')" title="Click to copy">
+                            chmod +x /opt/comserv/Comserv/deploy.sh &amp;&amp; sudo apt install -y mailutils
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('( crontab -l 2>/dev/null; echo &quot;*/10 * * * * /opt/comserv/Comserv/deploy.sh >> /var/log/comserv-deploy.log 2>&1&quot; ) | crontab -')" title="Click to copy">
+                            ( crontab -l 2>/dev/null; echo "*/10 * * * * /opt/comserv/Comserv/deploy.sh >> /var/log/comserv-deploy.log 2>&1" ) | crontab -
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #aad4ff; font-size: 11px;">
+                            Production server pulls from <strong>hub.docker.com/r/shantamcsbain/comserv-web-prod</strong>.
+                            No docker save/load needed. Log: <code>tail -f /var/log/comserv-deploy.log</code>
+                        </div>
+
+                        <div style="margin-bottom: 8px; color: #fff; font-weight: bold;">→ Production - Check Disk Space</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('df -h /')" title="Click to copy">
+                            df -h /
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df')" title="Click to copy">
+                            sudo docker system df
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system df -v')" title="Click to copy">
+                            sudo docker system df -v  # Verbose: shows container sizes
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Manual Trigger (force immediate deploy)</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;/opt/comserv/Comserv/deploy.sh&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "/opt/comserv/Comserv/deploy.sh"
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('ssh ubuntu@192.168.1.126 &quot;tail -50 /var/log/comserv-deploy.log&quot;')" title="Click to copy">
+                            ssh ubuntu@192.168.1.126 "tail -50 /var/log/comserv-deploy.log"  # view deploy log
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 10px; color: #ffaa00; font-size: 11px;">
+                            ⚠ Do NOT run docker system prune -v — it removes named volumes (logs/workshop data)
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Verify Container Status</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker ps')" title="Click to copy">
+                            sudo docker ps
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker inspect --format=&quot;{{.State.Health.Status}}&quot; comserv2-web-prod')" title="Click to copy">
+                            sudo docker inspect --format="{{.State.Health.Status}}" comserv2-web-prod
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker images | grep shantamcsbain')" title="Click to copy">
+                            sudo docker images | grep shantamcsbain
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Production - Cleanup Old Images</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker image prune -f')" title="Click to copy">
+                            sudo docker image prune -f  # Remove dangling images only (safe)
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker rm $(sudo docker ps -a -q -f status=exited) 2>/dev/null || echo &quot;No stopped containers&quot;')" title="Click to copy">
+                            sudo docker rm $(sudo docker ps -a -q -f status=exited) 2>/dev/null || echo "No stopped containers"
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #ff5555; font-weight: bold;">→ ROLLBACK (If New Container Fails):</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:backup-prev')" title="Click to copy">
+                            sudo docker stop comserv2-web-prod 2>/dev/null; sudo docker rm comserv2-web-prod 2>/dev/null; sudo docker run -d --name comserv2-web-prod --restart unless-stopped -p 5000:3000 -e COMSERV_SESSION_COOKIE=comserv_session -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro -v /home/ubuntu/comserv-logs:/opt/comserv/root/log -v /home/ubuntu/comserv-workshop:/data/nfs comserv-web-prod:backup-prev
+                        </div>
+
+                        <div style="margin: 12px 0 8px 0; color: #fff; font-weight: bold;">→ Quick Commands:</div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker restart comserv2-web-prod')" title="Click to copy">
+                            sudo docker restart comserv2-web-prod  # Restart without rebuild
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker logs --tail 100 comserv2-web-prod')" title="Click to copy">
+                            sudo docker logs --tail 100 comserv2-web-prod  # Last 100 log lines
+                        </div>
+                        <div style="margin-left: 15px; margin-bottom: 5px; cursor: pointer; padding: 5px; background-color: #1e1e1e;" onclick="copyToClipboard('sudo docker system prune -f')" title="Click to copy">
+                            sudo docker system prune -f  # Cleanup dangling images/stopped containers
+                        </div>
+
+                        <div style="margin-top: 10px; color: #ffc107; font-size: 12px;">
+                            💡 Click any command to copy it to clipboard, then paste in SSH terminal
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
+    </div>
 
-            <!-- File and Directory Reference Card (Normally Closed) -->
-            <div class="compact-card" style="border: 1px solid #17a2b8;">
-                <div class="compact-card-header collapsible-header" onclick="toggleSection('file-reference-map')" style="background-color: #e3f2fd; border-bottom: 1px solid #bbeeeb; display: flex; align-items: center; justify-content: space-between;">
-                    <h4 style="margin: 0; font-size: 13px; color: #0c5460; display: flex; align-items: center; gap: 6px; font-weight: bold;">
-                        <span>
-                            <i class="fas fa-chevron-right chevron-icon" id="chevron-file-reference-map" style="margin-right: 8px;"></i>
-                            <i class="fas fa-folder-open"></i> File Tracking & Reference Map
-                        </span>
-                    </h4>
-                    <span class="badge-pill" style="background-color: #17a2b8;">FILE SYSTEM</span>
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('ssh-terminal-section')" 
+                 style="background-color: #1e1e1e; padding: 15px; border-bottom: 1px solid #444; color: #00ff00;">
+                <h3 style="margin: 0; display: flex; align-items: center; justify-content: space-between;">
+                    <span>
+                        <i class="fas fa-chevron-right chevron-icon" id="chevron-ssh-terminal-section" style="margin-right: 10px; font-size: 0.8em;"></i>
+                        <i class="fas fa-terminal" style="margin-right: 10px;"></i>
+                        SSH Terminal (Embedded)
+                    </span>
+                    <span style="font-size: 14px; background-color: #00ff00; color: #1e1e1e; padding: 4px 10px; border-radius: 3px;">
+                        INTERACTIVE
+                    </span>
+                </h3>
+            </div>
+            <div id="ssh-terminal-section" class="card-body collapsible-content" style="padding: 20px; background-color: #1e1e1e;">
+                <div id="ssh-terminal-info" style="background-color: #17a2b8; border: 1px solid #138496; border-radius: 4px; padding: 15px; margin-bottom: 15px; color: white;">
+                    <p style="margin: 0; font-size: 14px; font-weight: bold;">
+                        ℹ️ Interactive SSH Terminal
+                    </p>
+                    <p style="margin: 10px 0 0 0; font-size: 13px;">
+                        Enter SSH credentials below or use saved credentials from "Test Connection" above.
+                    </p>
                 </div>
-                <div id="file-reference-map" class="compact-card-body collapsible-content" style="padding: 6px 10px;">
-                    <table class="file-table" style="width: 100%; font-size: 11px; border-collapse: collapse;">
-                        <thead>
-                            <tr style="border-bottom: 1px solid #ddd; text-align: left;">
-                                <th style="padding: 4px;">File / Asset</th>
-                                <th style="padding: 4px;">Git Tracking</th>
-                                <th style="padding: 4px;">Path & Location</th>
-                                <th style="padding: 4px;">Purpose / Role</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="comserv_server.psgi: Catalyst PSGI entry point for Starman. Executed inside the container, this script enables ReverseProxy to pass correct headers (Client IP, SSL status) forward from the OPNsense / HAProxy gateway, preventing routing collisions." style="cursor: help;">comserv_server.psgi</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/script/comserv_server.psgi</code></td>
-                                <td style="padding: 4px;" title="Catalyst entry point executed by Starman within the container.">Core PSGI start wrapper.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="deploy.sh: Remote server orchestration script. When triggered, it stops bare-metal host starman.service, backs up running containers (keeping last 2), pulls the new image, starts it, runs health checks, and on failure automatically rolls back to backup and restarts host services, sending log notifications to the admin." style="cursor: help;">deploy.sh</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/script/deploy.sh</code></td>
-                                <td style="padding: 4px;" title="Automates remote server port freeing, database file splitting, and starting docker.">Remote host recovery/orchestration.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="deploy_docker_to_production.pl: Workstation SSH wrapper script. Steps: 1. Compiles the 'web-prod' image locally. 2. Pushes image to Docker Hub. 3. Copies deploy.sh and docker-compose.server.yml to the remote host. 4. Executes deploy.sh over SSH. 5. Streams all stdout/stderr logs live to the workstation dashboard." style="cursor: help;">deploy_docker_to_production.pl</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/script/deploy_docker_to_production.pl</code></td>
-                                <td style="padding: 4px;" title="Perl SSH wrapper that compiles, builds, and pushes Docker images to the production server.">Local SSH deployment wrapper.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="Dockerfile: Two-stage container build spec. Stage 1 compiles external CPAN dependencies using native development tools. Stage 2 copies the compiled binaries, sets up the restricted 'comserv' system user, and configures the container to execute Starman in a fully secured, isolated sandbox environment." style="cursor: help;">Dockerfile</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/Dockerfile</code></td>
-                                <td style="padding: 4px;" title="Blueprint for building the application's multi-stage Docker container with runtime Perl environment.">Two-stage packaging blueprint.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="docker-compose.prod.yml: Workstation build configuration. Dictates the precise build arguments, target platforms, and environment tags required to package comserv-web-prod locally on development machines before pushing the verified image layers to the centralized Docker Hub." style="cursor: help;">docker-compose.prod.yml</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/docker-compose.prod.yml</code></td>
-                                <td style="padding: 4px;" title="Configuration used on workstations to compile and push production-ready containers.">Compose build/push blueprint.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="docker-compose.server.yml: Production server compose runtime. Binds the container's isolated port 5000 directly to the host network interface, mounts active NFS volumes to persist user uploads, workshop assets, and system logs, and enforces automated, multi-attempt restart policies." style="cursor: help;">docker-compose.server.yml</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/script/docker-compose.server.yml</code></td>
-                                <td style="padding: 4px;" title="Configuration used on production servers to orchestrate containers and map port 5000.">Compose schema for running on servers.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="docker_containers.tt: The management dashboard template. It provides real-time WebSockets SSH terminal feeds, triggers compilation/deployment REST endpoints, visualizes active container health checks, and lists strategic and manual recovery roadmap guides." style="cursor: help;">docker_containers.tt</strong></td>
-                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/root/admin/docker_containers.tt</code></td>
-                                <td style="padding: 4px;" title="Template of this interactive deployment panel providing deployment, logging, and status tracking.">Interactive deployment dashboard.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="db_config.json: Host-side raw database connections (not committed)." style="cursor: help;">db_config.json</strong></td>
-                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
-                                <td style="padding: 4px;"><code>/opt/comserv/Comserv/db_config.json</code></td>
-                                <td style="padding: 4px;" title="Host-side secrets file containing database connection details.">Host raw DB connections.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title="ssh_credentials.json: Workstation deployment secrets & SSH credentials." style="cursor: help;">ssh_credentials.json</strong></td>
-                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Local)</span></td>
-                                <td style="padding: 4px;"><code>~/.comserv/secrets/ssh_credentials.json</code></td>
-                                <td style="padding: 4px;" title="Local workstation deployment configurations and server passwords.">Workstation SSH deployment secrets.</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 4px;"><strong title=".env: Contains runtime environment variables, ports, and feature flags." style="cursor: help;">.env</strong></td>
-                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
-                                <td style="padding: 4px;"><code>./Comserv/.env</code></td>
-                                <td style="padding: 4px;" title="Environment variables file managing host-side overrides.">Runtime environment variables.</td>
-                            </tr>
-                        </tbody>
-                    </table>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px;">
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Target:
+                        </label>
+                        <input type="text" id="ssh-terminal-target" value="ubuntu@192.168.1.126" 
+                               style="width: 100%; padding: 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
+                    </div>
+                    <div>
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold; color: #00ff00;">
+                            SSH Password:
+                        </label>
+                        <div style="position: relative;">
+                            <input type="password" id="ssh-terminal-password" placeholder="Enter password" 
+                                   style="width: 100%; padding: 8px 40px 8px 8px; border: 1px solid #00ff00; border-radius: 4px; background-color: #000; color: #00ff00;">
+                            <button onclick="toggleSSHTerminalPassword()" type="button"
+                                    style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #00ff00;">
+                                <i id="ssh-terminal-password-eye" class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <small style="color: #ccc;">Leave blank to use saved credentials</small>
+                    </div>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: center;">
+                    <button id="ssh-connect-btn" onclick="connectSSHTerminal()" 
+                        style="padding: 10px 20px; background-color: var(--success-color, #28a745); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">
+                        <i class="fas fa-play"></i> Connect
+                    </button>
+                    <button id="ssh-disconnect-btn" onclick="disconnectSSHTerminal()" disabled
+                        style="padding: 10px 20px; background-color: var(--danger-color, #dc3545); color: white; border: none; border-radius: 4px; cursor: not-allowed; font-weight: bold; opacity: 0.5;">
+                        <i class="fas fa-stop"></i> Disconnect
+                    </button>
+                    <div id="ssh-connection-status" style="margin-left: 10px; color: #ccc; font-size: 14px;">
+                        <i class="fas fa-circle" style="color: var(--text-muted-color, #6c757d);"></i> Disconnected
+                    </div>
+                </div>
+
+                <div id="ssh-terminal-container" style="background-color: #000; border: 2px solid #00ff00; border-radius: 4px; height: 500px; padding: 10px;">
+                    <div id="ssh-xterm-terminal"></div>
+                </div>
+
+                <div style="margin-top: 15px; padding: 12px; background-color: #2d2d2d; border-radius: 4px; color: #ccc; font-family: monospace; font-size: 13px;">
+                    <div style="margin-bottom: 10px; color: #00ff00;"><strong>Alternative - Use PyCharm Terminal:</strong></div>
+                    <div>1. PyCharm → Tools → Start SSH Session</div>
+                    <div>2. Enter: <code style="color: #ff0;">ubuntu@192.168.1.126</code></div>
+                    <div>3. Enter password when prompted</div>
+                    <div>4. Copy commands from "Manual Deployment Commands" section above</div>
+                    <div style="margin-top: 10px; color: #ff0;">Or click "Auto Deploy" for fully automated deployment</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="content-section" style="margin-bottom: 20px;">
+        <div class="card">
+            <div class="card-header collapsible-header" onclick="toggleSection('output-console-section')" 
+                 style="background-color: #f5f5f5; padding: 15px; border-bottom: 1px solid var(--border-color, #ddd);">
+                <h3 style="margin: 0; display: flex; align-items: center;">
+                    <i class="fas fa-chevron-right chevron-icon" id="chevron-output-console-section" style="margin-right: 10px; font-size: 0.8em;"></i>
+                    <i class="icon-log" style="margin-right: 10px;"></i>
+                    Output/Logs
+                </h3>
+            </div>
+            <div id="output-console-section" class="card-body collapsible-content" style="padding: 20px;">
+                <div id="last-deploy-banner" style="display:none; margin-bottom: 10px; padding: 8px 12px; background-color: #e7f3ff; border: 1px solid #b3d9ff; border-radius: 4px; font-size: 12px; font-family: monospace;">
+                    <strong>Last deploy log:</strong> <span id="last-deploy-file" style="color: var(--text-color, #333);"></span>
+                    <button onclick="loadHistoryIntoOutput()" style="margin-left: 12px; padding: 2px 8px; font-size: 11px; background-color:#0066cc; color:white; border:none; border-radius:3px; cursor:pointer;">Show in Output</button>
+                </div>
+                <div id="output-box" style="background-color: #f5f5f5; border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 15px; 
+                    font-family: monospace; font-size: 12px; max-height: 400px; overflow-y: auto; white-space: pre-wrap; word-wrap: break-word;">
+                    Ready for commands...
+                </div>
+                <div style="margin-top: 10px;">
+                    <button onclick="clearOutput()" style="padding: 6px 12px; background-color: var(--secondary-color, #6c757d); color: white; border: none; border-radius: 4px; cursor: pointer;">
+                        Clear Output
+                    </button>
                 </div>
             </div>
         </div>
@@ -545,7 +559,21 @@
         }
     }
 
-
+    // Auto-expand Container Status and Volume Status on page load
+    window.addEventListener('DOMContentLoaded', function() {
+        const statusSection = document.getElementById('container-status');
+        const statusChevron = document.getElementById('chevron-container-status');
+        if (statusSection && statusChevron) {
+            statusSection.classList.add('expanded');
+            statusChevron.classList.add('expanded');
+        }
+        const volSection = document.getElementById('volumes-status');
+        const volChevron = document.getElementById('chevron-volumes-status');
+        if (volSection && volChevron) {
+            volSection.classList.add('expanded');
+            volChevron.classList.add('expanded');
+        }
+    });
 </script>
 
 <script>
@@ -1575,43 +1603,34 @@
         appendOutput(`${'='.repeat(80)}\n\n`);
     }
 
-    function deployToProduction(deployMode) {
+    function deployToProduction() {
         const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
 
-        if (deployMode === undefined || deployMode === null) {
-            deployMode = 'full';
-        } else if (deployMode === 1) {
-            deployMode = 'quick';
-        }
-
-        const isFullMode = deployMode === 'full';
-
-        const confirmMsg = `⚠️ EXECUTE PRODUCTION DEPLOYMENT\n\n` +
-            `Selected Action: ${deployMode.toUpperCase()}\n` +
-            `Target Server  : ${sshTarget}\n\n` +
-            `Are you sure you want to proceed?`;
+        const confirmMsg =
+            `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
+            `This will run automatically:\n` +
+            `  1. Build production image  (docker compose -f docker-compose.prod.yml build)\n` +
+            `  2. Push to Docker Hub       (shantamcsbain/comserv-web-prod:latest)\n` +
+            `  3. SSH trigger deploy.sh    (${sshTarget})\n\n` +
+            `The production server will pull the new image and restart the container.\n` +
+            `Email notification sent to csc@computersystemconsulting.ca on completion.\n\n` +
+            `Continue?`;
 
         if (!confirm(confirmMsg)) return;
 
         appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 DEPLOYMENT ACTION: ${deployMode.toUpperCase()} STARTED\n`);
+        appendOutput(`🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Target: ${sshTarget}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(`Action: ${deployMode}\n`);
+        appendOutput(`Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
-        if (isFullMode) {
-            appendOutput(`⏳ Building & pushing... this may take several minutes. Output will stream below.\n\n`);
-        } else {
-            appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
-        }
-
-        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword, deploy_mode: deployMode };
+        appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
 
         safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
-            body: new URLSearchParams(bodyParams)
+            body: new URLSearchParams({ ssh_target: sshTarget, ssh_password: sshPassword })
         })
             .then(response => response.json())
             .then(data => {
