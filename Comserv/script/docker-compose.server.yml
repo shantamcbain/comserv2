@@ -4,11 +4,11 @@ services:
     container_name: comserv2-web-prod
     restart: unless-stopped
     ports:
-      - "5000:3000"
+      - "5000:5000"
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
-      WEB_PORT: 3000
+      WEB_PORT: 5000
       TZ: UTC
       NFS_DATA_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
@@ -19,11 +19,11 @@ services:
       - ${NFS_DATA_DIR:-/var/lib/comserv/data}:/data/nfs:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging:
       driver: "json-file"
       options:

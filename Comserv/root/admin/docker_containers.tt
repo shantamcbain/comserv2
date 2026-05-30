@@ -1575,34 +1575,43 @@
         appendOutput(`${'='.repeat(80)}\n\n`);
     }
 
-    function deployToProduction() {
+    function deployToProduction(deployMode) {
         const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
         const sshPassword = document.getElementById('ssh-password').value;
 
-        const confirmMsg =
-            `⚠️ AUTO DEPLOY TO PRODUCTION\n\n` +
-            `This will run automatically:\n` +
-            `  1. Build production image  (docker compose -f docker-compose.prod.yml build)\n` +
-            `  2. Push to Docker Hub       (shantamcsbain/comserv-web-prod:latest)\n` +
-            `  3. SSH trigger deploy.sh    (${sshTarget})\n\n` +
-            `The production server will pull the new image and restart the container.\n` +
-            `Email notification sent to csc@computersystemconsulting.ca on completion.\n\n` +
-            `Continue?`;
+        if (deployMode === undefined || deployMode === null) {
+            deployMode = 'full';
+        } else if (deployMode === 1) {
+            deployMode = 'quick';
+        }
+
+        const isFullMode = deployMode === 'full';
+
+        const confirmMsg = `⚠️ EXECUTE PRODUCTION DEPLOYMENT\n\n` +
+            `Selected Action: ${deployMode.toUpperCase()}\n` +
+            `Target Server  : ${sshTarget}\n\n` +
+            `Are you sure you want to proceed?`;
 
         if (!confirm(confirmMsg)) return;
 
         appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 AUTO DEPLOY STARTED — Docker Hub workflow\n`);
+        appendOutput(`🚀 DEPLOYMENT ACTION: ${deployMode.toUpperCase()} STARTED\n`);
         appendOutput(`${'='.repeat(80)}\n`);
         appendOutput(`Target: ${sshTarget}\n`);
         appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(`Steps: Build → Push to Docker Hub → SSH trigger deploy.sh\n`);
+        appendOutput(`Action: ${deployMode}\n`);
         appendOutput(`${'='.repeat(80)}\n\n`);
-        appendOutput(`⏳ Building... this may take several minutes. Output will stream below.\n\n`);
+        if (isFullMode) {
+            appendOutput(`⏳ Building & pushing... this may take several minutes. Output will stream below.\n\n`);
+        } else {
+            appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
+        }
+
+        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword, deploy_mode: deployMode };
 
         safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
-            body: new URLSearchParams({ ssh_target: sshTarget, ssh_password: sshPassword })
+            body: new URLSearchParams(bodyParams)
         })
             .then(response => response.json())
             .then(data => {

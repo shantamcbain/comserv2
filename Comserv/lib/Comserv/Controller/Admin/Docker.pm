@@ -93,8 +93,10 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             last_mod_date   => $today,
             project_code    => 'PLANNING',
             details         => 'Deploy in progress…',
+            comments        => '',
+            points_processed => 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id || undef;
+        $log_fields{todo_record_id} = $todo_record_id || 0;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
