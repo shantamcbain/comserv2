@@ -125,7 +125,11 @@ sub get_pages {
         my $rs = $c->model('DBEncy')->resultset('Page')->search({
             menu     => $menu,
             status   => 'active',
-            sitename => [ $site_name, 'CSC' ],
+            '-or' => [
+                { sitename => [ $site_name, 'CSC', 'All' ] },
+                { share_with => 'all' },
+                { share_with => { 'like' => "%$site_name%" } }
+            ]
         }, {
             order_by => { -asc => 'link_order' }
         });
@@ -157,7 +161,11 @@ sub get_admin_pages {
         my $rs = $c->model('DBEncy')->resultset('Page')->search({
             menu     => 'Admin',
             status   => 'active',
-            sitename => [ $site_name, 'CSC' ],
+            '-or' => [
+                { sitename => [ $site_name, 'CSC', 'All' ] },
+                { share_with => 'all' },
+                { share_with => { 'like' => "%$site_name%" } }
+            ]
         }, {
             order_by => { -asc => 'link_order' }
         });
@@ -170,9 +178,9 @@ sub get_admin_pages {
             # Get the database handle from the DBEncy model
             my $dbh = $c->model('DBEncy')->schema->storage->dbh;
 
-            my $query = "SELECT * FROM page WHERE menu = 'Admin' AND status = 'active' AND (sitename = ? OR sitename = 'CSC') ORDER BY link_order";
+            my $query = "SELECT * FROM page WHERE menu = 'Admin' AND status = 'active' AND (sitename = ? OR sitename = 'CSC' OR share_with = 'all' OR share_with LIKE ?) ORDER BY link_order";
             my $sth = $dbh->prepare($query);
-            $sth->execute($site_name);
+            $sth->execute($site_name, "%$site_name%");
             
             # Fetch all results
             while (my $row = $sth->fetchrow_hashref) {

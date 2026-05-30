@@ -30,9 +30,17 @@ sub view :Path('/page') :Args(1) {
         { rows => 1 }
     )->single;
 
-    if (!$page && $sitename eq 'CSC') {
+    if (!$page) {
+        # Fallback to shared pages or CSC pages
         $page = $c->model('DBEncy')->resultset('Page')->search(
-            { page_code => $page_code },
+            {
+                page_code => $page_code,
+                '-or' => [
+                    { sitename => 'CSC' },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$sitename%" } }
+                ]
+            },
             { rows => 1 }
         )->single;
     }
