@@ -111,6 +111,7 @@ sub run_remote {
     print "CMD: $cmd\n";
     my $output = `$ssh_cmd 2>&1`;
     my $exit_code = $? >> 8;
+    $output =~ s/\[sudo\] password for \w+:\s*//g;
     print $output if $output;
     die "FAILED: $description\n" if $exit_code != 0;
     return $output;
@@ -136,7 +137,9 @@ sub ssh_exec {
         $ssh_cmd = qq(ssh -p $ssh_port -o ConnectTimeout=10 -o StrictHostKeyChecking=no -o IdentitiesOnly=yes $ssh_user\@$production_host "$cmd");
     }
     
-    return `$ssh_cmd 2>&1`;
+    my $output = `$ssh_cmd 2>&1`;
+    $output =~ s/\[sudo\] password for \w+:\s*//g;
+    return $output;
 }
 
 eval {
@@ -172,6 +175,18 @@ eval {
     print "\n" . "=" x 40 . "\n";
     print "PHASE 2: CLEANUP OLD STATE\n";
     print "=" x 40 . "\n";
+    
+    # Stop and disable host systemd starman service if running to free up port 5000
+    print "[CLEANUP] Stopping and disabling host-level systemd starman service if active...\n";
+    ssh_exec("sudo systemctl stop starman.service 2>/dev/null || true");
+    ssh_exec("sudo systemctl disable starman.service 2>/dev/null || true");
+    
+    # Force-kill any stray starman/plackup host processes to ensure port 5000 is free
+    print "[CLEANUP] Killing stray starman/plackup host processes...\n";
+    ssh_exec("sudo pkill -9 -f 'starman' 2>/dev/null || true");
+    ssh_exec("sudo pkill -9 -f 'plackup' 2>/dev/null || true");
+    ssh_exec("sudo pkill -9 -f 'comserv_server.psgi' 2>/dev/null || true");
+    ssh_exec("sudo fuser -k -9 5000/tcp 2>/dev/null || true");
     
     print "[CLEANUP] Removing old containers and images...\n";
     
@@ -270,6 +285,31 @@ eval {
     print "\n" . "=" x 40 . "\n";
     print "PHASE 4: EXECUTION\n";
     print "=" x 40 . "\n";
+    
+    # Step 5c: Populate database secrets on production from legacy db_config.json if missing
+    print "[SECRETS SETUP] Checking and populating database secrets on production host...\n";
+    ssh_exec("mkdir -p /home/ubuntu/.comserv/secrets/dbi");
+    my $secrets_out = ssh_exec("if [ -f '/opt/comserv/Comserv/db_config.json' ]; then "
+             . "perl -MJSON::PP -e ' "
+             . "  my \$file = \"/opt/comserv/Comserv/db_config.json\"; "
+             . "  open my \$fh, \"<\", \$file or die \$!; "
+             . "  local \$/; "
+             . "  my \$data = decode_json(<\$fh>); "
+             . "  close \$fh; "
+             . "  for my \$key (keys %\$data) { "
+             . "    my \$profile = {\$key => \$data->{\$key}}; "
+             . "    open my \$out, \">\", \"/home/ubuntu/.comserv/secrets/dbi/\$key.json\" or die \$!; "
+             . "    print \$out encode_json(\$profile); "
+             . "    close \$out; "
+             . "  } "
+             . "'; "
+             . "chmod -R 755 /home/ubuntu/.comserv; "
+             . "chown -R ubuntu:ubuntu /home/ubuntu/.comserv; "
+             . "echo '✓ Secrets successfully populated on production'; "
+             . "else "
+             . "echo '⚠ Warning: /opt/comserv/Comserv/db_config.json not found'; "
+             . "fi");
+    print "  $secrets_out\n";
     
     # Step 5b: Ensure NFS volumes exist on production
     print "[NFS SETUP] Verifying NFS volumes...\n";
