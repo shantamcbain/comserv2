@@ -6378,7 +6378,11 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
-    my $quick_deploy  = $c->req->params->{quick_deploy}  || 0;
+    my $deploy_mode   = $c->req->params->{deploy_mode}   || 'full';
+    if ($c->req->params->{quick_deploy}) {
+        $deploy_mode = 'quick';
+    }
+    my $quick_deploy  = ($deploy_mode ne 'full') ? 1 : 0;
 
     my $ssh_password = '';
     my $home     = $ENV{HOME} || '/home/shanta';
@@ -6593,9 +6597,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh");
 
         print "    Running: /opt/comserv/Comserv/deploy.sh\n";
-        my $ssh_cmd = $quick_deploy
-            ? "echo '$escaped_password' | sudo -S FORCE=1 /opt/comserv/Comserv/deploy.sh"
-            : "echo '$escaped_password' | sudo -S /opt/comserv/Comserv/deploy.sh";
+        my $ssh_cmd = "echo '$escaped_password' | sudo -S DEPLOY_MODE='$deploy_mode' /opt/comserv/Comserv/deploy.sh";
 
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',

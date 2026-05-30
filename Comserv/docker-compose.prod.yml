@@ -9,7 +9,7 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
-      WEB_PORT: 3000
+      WEB_PORT: 5000
       TZ: UTC
       NFS_DATA_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
@@ -18,17 +18,17 @@ services:
       DB_PORT: ${DB_PORT:-3306}
       DB_NAME: ${DB_NAME:-ency}
     ports:
-      - "5000:3000"
+      - "5000:5000"
     volumes:
       - ~/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - /home/shanta/comserv-logs:/opt/comserv/root/log
       - /home/shanta/comserv-workshop:/data/nfs:rw
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 60s
+      test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     logging:
       driver: "json-file"
       options:
