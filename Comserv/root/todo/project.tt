@@ -132,45 +132,31 @@
 
 <!-- Filter Panel -->
 <div class="filter-panel mb-4">
-    <div class="form-group mb-2" style="display:flex;align-items:center;gap:8px;">
-        <label for="project_search" style="white-space:nowrap;margin:0;">🔍 Search:</label>
-        <input type="text" id="project_search" placeholder="Filter by name, code or description…"
-               class="form-control" style="max-width:340px;"
+    <form id="projectFilterForm" class="form-inline" style="flex-wrap:wrap;gap:6px;align-items:center;" method="GET" action="/project/project">
+        <label for="project_search" style="white-space:nowrap;margin:0;">🔍</label>
+        <input type="text" id="project_search" placeholder="Search name / code / description…"
+               class="form-control" style="width:260px;"
                oninput="filterProjects(this.value)">
-        <button type="button" onclick="document.getElementById('project_search').value='';filterProjects('');"
-                class="btn btn-outline-secondary btn-sm">✕</button>
-        <span id="project_search_count" style="font-size:0.85em;color:var(--text-muted-color,#6c757d);white-space:nowrap;"></span>
-    </div>
-    <form id="projectFilterForm" class="form-inline" method="GET" action="/project/project">
-        <div class="form-group mb-2">
-            <label for="project_filter" class="mr-2">Project:</label>
-            <select id="project_filter" name="project_id" class="form-control">
+        <span id="project_search_count" style="font-size:0.82em;color:var(--text-muted-color,#6c757d);white-space:nowrap;min-width:80px;"></span>
+        <label for="project_filter" class="mr-2" style="white-space:nowrap;margin:0;">Project:</label>
+        <select id="project_filter" name="project_id" class="form-control" style="width:auto;">
                 <option value="">All Projects</option>
                 [% FOREACH project IN projects.sort('name') %]
-                    <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>
-                        [% project.name %]
-                    </option>
+                    <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>[% project.name %]</option>
                     [% FOREACH subproject IN project.sub_projects.sort('name') %]
-                        <option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]>
-                            &nbsp;&nbsp;└─ [% subproject.name %]
-                        </option>
+                        <option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]>&nbsp;&nbsp;└─ [% subproject.name %]</option>
                     [% END %]
                 [% END %]
             </select>
-        </div>
-        
-        <div class="form-group mb-2 ml-3">
-            <label for="priority_filter" class="mr-2">Priority:</label>
-            <select id="priority_filter" name="priority" class="form-control">
-                <option value="">All Priorities</option>
-                <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
-                <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
-                <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
-            </select>
-        </div>
-        
-        <button type="submit" class="btn btn-primary mb-2 ml-3">Apply Filters</button>
-        <button type="button" id="clearFilters" class="btn btn-outline-secondary mb-2 ml-2">Clear Filters</button>
+        <label for="priority_filter" style="white-space:nowrap;margin:0;">Priority:</label>
+        <select id="priority_filter" name="priority" class="form-control" style="width:auto;">
+            <option value="">All</option>
+            <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
+            <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
+            <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
     </form>
 </div>
 
