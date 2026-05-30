@@ -279,6 +279,9 @@
                                                     </a>
                                                 [% ELSE %]
                                                     <span class="label label-default" style="margin-left: 5px; padding: 4px 8px;">Shared (Read-Only)</span>
+                                                    <a href="[% c.uri_for('/admin/pages', { action => 'create', clone_id => page.id }) %]" class="btn btn-xs btn-success" title="Clone / Copy this page to My Site" style="margin-left: 5px;">
+                                                        <i class="fa fa-copy"></i> Clone to My Site
+                                                    </a>
                                                 [% END %]
                                             </td>
                                         </tr>
