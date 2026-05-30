@@ -5,11 +5,19 @@ set -e
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 EMAIL="csc@computersystemconsulting.ca"
-COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+# Detect correct compose file location (either root or script directory)
+if [ -f "/opt/comserv/Comserv/docker-compose.server.yml" ]; then
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+elif [ -f "/opt/comserv/Comserv/script/docker-compose.server.yml" ]; then
+    COMPOSE_FILE="/opt/comserv/Comserv/script/docker-compose.server.yml"
+else
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+fi
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
+export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-$HOSTNAME_VAL}"
 
 # Verify host prerequisites
 if ! command -v docker &>/dev/null; then
@@ -55,6 +63,31 @@ safe_git() {
         git -C "$DIR" "$@"
     fi
 }
+
+# Locate host git repository
+GLOBAL_HOST_APP_DIR=""
+if [ -d "/opt/comserv/Comserv" ]; then
+    GLOBAL_HOST_APP_DIR="/opt/comserv/Comserv"
+elif [ -d "/home/ubuntu/comserv" ]; then
+    GLOBAL_HOST_APP_DIR="/home/ubuntu/comserv"
+elif [ -d "/home/shanta/PycharmProjects/comserv2" ]; then
+    GLOBAL_HOST_APP_DIR="/home/shanta/PycharmProjects/comserv2"
+fi
+
+# Run an early git pull to ensure we have the absolute latest code immediately.
+# This guarantees that if the container fails and we have to restart Starman on the host,
+# it is already running the current software from this synchronized state.
+if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
+    echo "--- Early Git Repository Synchronization ---"
+    echo "Updating local host repository at $GLOBAL_HOST_APP_DIR..."
+    safe_git "$GLOBAL_HOST_APP_DIR" fetch origin main 2>/dev/null || safe_git "$GLOBAL_HOST_APP_DIR" fetch 2>/dev/null || true
+    if safe_git "$GLOBAL_HOST_APP_DIR" pull origin main || safe_git "$GLOBAL_HOST_APP_DIR" pull; then
+        echo "✅ Host repository successfully synchronized with origin/main."
+    else
+        echo "⚠️  Warning: Early git pull failed, using existing repository state."
+    fi
+    echo "--------------------------------------------"
+fi
 
 # Helper function to kill host processes by pattern safely, without killing the deploy script itself
 safe_pkill_f() {
