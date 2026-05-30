@@ -338,6 +338,11 @@ if sudo -n true 2>/dev/null; then
     SUDO_CMD="sudo"
 fi
 
+# Stop and disable systemd starman service if active
+echo "   Stopping and disabling host-level systemd starman service..."
+$SUDO_CMD systemctl stop starman.service 2>/dev/null || true
+$SUDO_CMD systemctl disable starman.service 2>/dev/null || true
+
 # 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line using SIGKILL (-9)
 echo "   Force-killing running starman/plackup/comserv host processes..."
 $SUDO_CMD pkill -9 -f "starman" 2>/dev/null || pkill -9 -f "starman" 2>/dev/null || true
@@ -375,6 +380,32 @@ fi
 
 sleep 1
 echo "   ✓ Port 5000 and 3000 are verified free on the host"
+
+echo "2c. Checking and populating database secrets for Docker..."
+# If /opt/comserv/Comserv/db_config.json exists, extract individual profile json files 
+# into /home/ubuntu/.comserv/secrets/dbi to ensure the container starts healthy with loaded secrets.
+if [ -f "/opt/comserv/Comserv/db_config.json" ]; then
+    echo "   Found host-level db_config.json. Populating container secrets directory..."
+    mkdir -p /home/ubuntu/.comserv/secrets/dbi
+    perl -MJSON::PP -e '
+        my $file = "/opt/comserv/Comserv/db_config.json";
+        open my $fh, "<", $file or die $!;
+        local $/;
+        my $data = decode_json(<$fh>);
+        close $fh;
+        for my $key (keys %$data) {
+            my $profile = {$key => $data->{$key}};
+            open my $out, ">", "/home/ubuntu/.comserv/secrets/dbi/$key.json" or die $!;
+            print $out encode_json($profile);
+            close $out;
+        }
+    ' 2>/dev/null
+    chmod -R 755 /home/ubuntu/.comserv 2>/dev/null || true
+    chown -R ubuntu:ubuntu /home/ubuntu/.comserv 2>/dev/null || true
+    echo "   ✓ Secrets directory populated and ready"
+else
+    echo "   ⚠ Warning: /opt/comserv/Comserv/db_config.json not found on host"
+fi
 
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
