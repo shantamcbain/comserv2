@@ -7284,12 +7284,32 @@ sub pages :Path('/admin/pages') :Args(0) {
     
     if ($action eq 'create') {
         $show_form = 'create';
-        $page_item = {
-            sitename => $current_sitename,
-            menu => 'Main',
-            status => 'active',
-            roles => 'public',
-        };
+        my $clone_id = $c->req->param('clone_id');
+        if ($clone_id) {
+            my $cloned = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $clone_id }) };
+            if ($cloned) {
+                $page_item = {
+                    sitename    => $current_sitename,
+                    menu        => $cloned->menu || 'Main',
+                    page_code   => $cloned->page_code,
+                    title       => $cloned->title . ' (Copy)',
+                    body        => $cloned->body,
+                    description => $cloned->description,
+                    keywords    => $cloned->keywords,
+                    link_order  => $cloned->link_order || 0,
+                    status      => 'active',
+                    roles       => $cloned->roles || 'public',
+                };
+            }
+        }
+        unless (keys %$page_item) {
+            $page_item = {
+                sitename => $current_sitename,
+                menu => 'Main',
+                status => 'active',
+                roles => 'public',
+            };
+        }
     }
     elsif ($action eq 'edit') {
         my $id = $c->req->param('id');
