@@ -158,14 +158,14 @@
                 <div id="production-deployment" class="compact-card-body collapsible-content">
                     <div class="compact-form-grid" style="margin-bottom: 8px;">
                         <div class="compact-form-group">
-                            <label for="deploy-service-select">Service to Deploy:</label>
+                            <label for="deploy-service-select" title="Select whether to deploy web-prod (optimized production container) or web-dev (debug container)." style="cursor: help;">Service to Deploy:</label>
                             <select id="deploy-service-select">
                                 <option value="web-prod">web-prod (Production)</option>
                                 <option value="web-dev">web-dev (Development)</option>
                             </select>
                         </div>
                         <div class="compact-form-group">
-                            <label for="ssh-target-select">SSH Target:</label>
+                            <label for="ssh-target-select" title="Select a preconfigured SSH target profile to automatically fill host and port values." style="cursor: help;">SSH Target:</label>
                             <select id="ssh-target-select" onchange="updateSSHTarget()">
                                 <option value="custom">Custom...</option>
                                 <option value="ubuntu@192.168.1.126" selected>ubuntu@192.168.1.126 (Production)</option>
@@ -173,15 +173,15 @@
                             </select>
                         </div>
                         <div class="compact-form-group">
-                            <label for="production-host">Production Server:</label>
+                            <label for="production-host" title="The hostname or IP address of the remote host (e.g., Production 1 or Production 2)." style="cursor: help;">Production Server:</label>
                             <input type="text" id="production-host" value="ubuntu@192.168.1.126">
                         </div>
                         <div class="compact-form-group">
-                            <label for="ssh-port">SSH Port:</label>
+                            <label for="ssh-port" title="The secure shell port of the remote host (default is 22)." style="cursor: help;">SSH Port:</label>
                             <input type="number" id="ssh-port" value="22" min="1" max="65535">
                         </div>
                         <div class="compact-form-group">
-                            <label for="ssh-password">SSH Password:</label>
+                            <label for="ssh-password" title="SSH authentication password (not saved on disk, processed securely in memory)." style="cursor: help;">SSH Password:</label>
                             <div style="position: relative;">
                                 <input type="password" id="ssh-password" placeholder="SSH password" style="width: 100%; padding-right: 32px;">
                                 <button onclick="togglePasswordVisibility()" type="button" style="position: absolute; right: 5px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; color: #666; font-size: 11px; padding: 0;">
@@ -190,7 +190,7 @@
                             </div>
                         </div>
                         <div class="compact-form-group">
-                            <label for="production-directory">Production Dir:</label>
+                            <label for="production-directory" title="Absolute directory path on the remote production server where comserv application is located." style="cursor: help;">Production Dir:</label>
                             <input type="text" id="production-directory" value="/opt/comserv/Comserv">
                         </div>
                     </div>
@@ -384,54 +384,87 @@
                 </div>
             </div>
 
-            <!-- File and Directory Reference Card -->
+            <!-- File and Directory Reference Card (Normally Closed) -->
             <div class="compact-card" style="border: 1px solid #17a2b8;">
-                <div class="compact-card-header" style="background-color: #e3f2fd; border-bottom: 1px solid #bbeeeb; display: flex; align-items: center; justify-content: space-between;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('file-reference-map')" style="background-color: #e3f2fd; border-bottom: 1px solid #bbeeeb; display: flex; align-items: center; justify-content: space-between;">
                     <h4 style="margin: 0; font-size: 13px; color: #0c5460; display: flex; align-items: center; gap: 6px; font-weight: bold;">
-                        <i class="fas fa-folder-open"></i> File Tracking & Reference Map
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-file-reference-map" style="margin-right: 8px;"></i>
+                            <i class="fas fa-folder-open"></i> File Tracking & Reference Map
+                        </span>
                     </h4>
                     <span class="badge-pill" style="background-color: #17a2b8;">FILE SYSTEM</span>
                 </div>
-                <div class="compact-card-body" style="padding: 6px 10px;">
-                    <table class="file-table">
+                <div id="file-reference-map" class="compact-card-body collapsible-content" style="padding: 6px 10px;">
+                    <table class="file-table" style="width: 100%; font-size: 11px; border-collapse: collapse;">
                         <thead>
-                            <tr>
-                                <th>File / Asset</th>
-                                <th>Git Tracking</th>
-                                <th>Path & Location</th>
-                                <th>Purpose / Role</th>
+                            <tr style="border-bottom: 1px solid #ddd; text-align: left;">
+                                <th style="padding: 4px;">File / Asset</th>
+                                <th style="padding: 4px;">Git Tracking</th>
+                                <th style="padding: 4px;">Path & Location</th>
+                                <th style="padding: 4px;">Purpose / Role</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
-                                <td><strong>comserv_server.psgi</strong></td>
-                                <td><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td><code>./Comserv/script/comserv_server.psgi</code></td>
-                                <td>Main PSGI Catalyst server launcher script for Starman.</td>
+                                <td style="padding: 4px;"><strong title="comserv_server.psgi: Core PSGI Catalyst server launcher script for Starman." style="cursor: help;">comserv_server.psgi</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/comserv_server.psgi</code></td>
+                                <td style="padding: 4px;" title="Catalyst entry point executed by Starman within the container.">Core PSGI start wrapper.</td>
                             </tr>
                             <tr>
-                                <td><strong>deploy.sh</strong></td>
-                                <td><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td><code>./Comserv/script/deploy.sh</code></td>
-                                <td>Frees host port 5000, auto-splits credentials, starts docker.</td>
+                                <td style="padding: 4px;"><strong title="deploy.sh: Remote host recovery and orchestration script." style="cursor: help;">deploy.sh</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/deploy.sh</code></td>
+                                <td style="padding: 4px;" title="Automates remote server port freeing, database file splitting, and starting docker.">Remote host recovery/orchestration.</td>
                             </tr>
                             <tr>
-                                <td><strong>db_config.json</strong></td>
-                                <td><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
-                                <td><code>/opt/comserv/Comserv/db_config.json</code></td>
-                                <td>Host-side raw database connections (not committed).</td>
+                                <td style="padding: 4px;"><strong title="deploy_docker_to_production.pl: Local SSH wrapper script." style="cursor: help;">deploy_docker_to_production.pl</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/deploy_docker_to_production.pl</code></td>
+                                <td style="padding: 4px;" title="Perl SSH wrapper that compiles, builds, and pushes Docker images to the production server.">Local SSH deployment wrapper.</td>
                             </tr>
                             <tr>
-                                <td><strong>ssh_credentials.json</strong></td>
-                                <td><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Local)</span></td>
-                                <td><code>~/.comserv/secrets/ssh_credentials.json</code></td>
-                                <td>Workstation deployment secrets & SSH credentials.</td>
+                                <td style="padding: 4px;"><strong title="Dockerfile: Two-stage packaging blueprint." style="cursor: help;">Dockerfile</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/Dockerfile</code></td>
+                                <td style="padding: 4px;" title="Blueprint for building the application's multi-stage Docker container with runtime Perl environment.">Two-stage packaging blueprint.</td>
                             </tr>
                             <tr>
-                                <td><strong>docker-compose.server.yml</strong></td>
-                                <td><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
-                                <td><code>./Comserv/script/docker-compose.server.yml</code></td>
-                                <td>Docker Compose schema for mounting volumes & mapping port 5000.</td>
+                                <td style="padding: 4px;"><strong title="docker-compose.prod.yml: Compose file for building and pushing image layers from workstation." style="cursor: help;">docker-compose.prod.yml</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/docker-compose.prod.yml</code></td>
+                                <td style="padding: 4px;" title="Configuration used on workstations to compile and push production-ready containers.">Compose build/push blueprint.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="docker-compose.server.yml: Compose configuration file for running on the servers." style="cursor: help;">docker-compose.server.yml</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/script/docker-compose.server.yml</code></td>
+                                <td style="padding: 4px;" title="Configuration used on production servers to orchestrate containers and map port 5000.">Compose schema for running on servers.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="docker_containers.tt: The interactive deployment control and monitoring dashboard." style="cursor: help;">docker_containers.tt</strong></td>
+                                <td style="padding: 4px;"><span style="color:#28a745; font-weight:bold;">🟢 Tracked</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/root/admin/docker_containers.tt</code></td>
+                                <td style="padding: 4px;" title="Template of this interactive deployment panel providing deployment, logging, and status tracking.">Interactive deployment dashboard.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="db_config.json: Host-side raw database connections (not committed)." style="cursor: help;">db_config.json</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
+                                <td style="padding: 4px;"><code>/opt/comserv/Comserv/db_config.json</code></td>
+                                <td style="padding: 4px;" title="Host-side secrets file containing database connection details.">Host raw DB connections.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title="ssh_credentials.json: Workstation deployment secrets & SSH credentials." style="cursor: help;">ssh_credentials.json</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Local)</span></td>
+                                <td style="padding: 4px;"><code>~/.comserv/secrets/ssh_credentials.json</code></td>
+                                <td style="padding: 4px;" title="Local workstation deployment configurations and server passwords.">Workstation SSH deployment secrets.</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 4px;"><strong title=".env: Contains runtime environment variables, ports, and feature flags." style="cursor: help;">.env</strong></td>
+                                <td style="padding: 4px;"><span style="color:#dc3545; font-weight:bold;">🔴 Secret (Host)</span></td>
+                                <td style="padding: 4px;"><code>./Comserv/.env</code></td>
+                                <td style="padding: 4px;" title="Environment variables file managing host-side overrides.">Runtime environment variables.</td>
                             </tr>
                         </tbody>
                     </table>
