@@ -5,7 +5,14 @@ set -e
 export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:$PATH"
 
 EMAIL="csc@computersystemconsulting.ca"
-COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+# Detect correct compose file location (either root or script directory)
+if [ -f "/opt/comserv/Comserv/docker-compose.server.yml" ]; then
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+elif [ -f "/opt/comserv/Comserv/script/docker-compose.server.yml" ]; then
+    COMPOSE_FILE="/opt/comserv/Comserv/script/docker-compose.server.yml"
+else
+    COMPOSE_FILE="/opt/comserv/Comserv/docker-compose.server.yml"
+fi
 IMAGE="shantamcsbain/comserv-web-prod:latest"
 CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
