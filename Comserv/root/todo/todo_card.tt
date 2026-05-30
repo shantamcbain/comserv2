@@ -29,44 +29,44 @@
   Outer-scope variables used automatically: is_admin, is_csc
 %]
 [% tc_done_fn = tc_done_fn || 'quickClose' -%]
-[% SET _tc_p = tc.priority || 9 -%]
-[% SET _tc_status = tc.status -%]
-[% SET _tc_is_done = (_tc_status == 3 OR _tc_status == 4
-    OR _tc_status == 'DONE' OR _tc_status == 'Completed'
-    OR _tc_status == 'completed' OR _tc_status == 'Closed'
-    OR _tc_status == 'closed' OR _tc_status == 'Done') -%]
-[% SET _tc_rid = tc.record_id -%]
-[% SET _tc_is_active = (_tc_status == 5 OR active_todos.$_tc_rid) -%]
-[% SET _tc_opacity = (_tc_is_done OR tc_is_blocked) ? '0.6' : '1' -%]
+[% SET tci_p = tc.priority || 9 -%]
+[% SET tci_status = tc.status -%]
+[% SET tci_is_done = (tci_status == 3 OR tci_status == 4
+    OR tci_status == 'DONE' OR tci_status == 'Completed'
+    OR tci_status == 'completed' OR tci_status == 'Closed'
+    OR tci_status == 'closed' OR tci_status == 'Done') -%]
+[% SET tci_rid = tc.record_id -%]
+[% SET tci_is_active = (tci_status == 5 OR active_todos.$tci_rid) -%]
+[% SET tci_opacity = (tci_is_done OR tc_is_blocked) ? '0.6' : '1' -%]
 [%# Compute border color %]
 [% IF tc_is_audit_root -%]
-  [% SET _tc_bc = '#c45d00' -%]
+  [% SET tci_bc = '#c45d00' -%]
 [% ELSIF tc_is_blocked -%]
-  [% SET _tc_bc = 'var(--border-color)' -%]
+  [% SET tci_bc = 'var(--border-color)' -%]
 [% ELSIF tc_is_overdue -%]
-  [% SET _tc_bc = '#dc3545' -%]
+  [% SET tci_bc = '#dc3545' -%]
 [% ELSIF tc_due_today -%]
-  [% SET _tc_bc = '#ffc107' -%]
+  [% SET tci_bc = '#ffc107' -%]
 [% ELSIF tc_is_stale -%]
-  [% SET _tc_bc = '#fd7e14' -%]
+  [% SET tci_bc = '#fd7e14' -%]
 [% ELSE -%]
-  [% SET _tc_bc = 'var(--border-color)' -%]
+  [% SET tci_bc = 'var(--border-color)' -%]
 [% END -%]
 [%# Compute background color %]
 [% IF tc_is_audit_root -%]
-  [% SET _tc_bg = 'color-mix(in srgb,#c45d00 8%,var(--bg-color))' -%]
+  [% SET tci_bg = 'color-mix(in srgb,#c45d00 8%,var(--bg-color))' -%]
 [% ELSIF tc_is_blocked -%]
-  [% SET _tc_bg = 'var(--bg-secondary)' -%]
+  [% SET tci_bg = 'var(--bg-secondary)' -%]
 [% ELSIF tc_is_overdue -%]
-  [% SET _tc_bg = 'color-mix(in srgb,#dc3545 6%,var(--bg-color))' -%]
-[% ELSIF _tc_is_active -%]
-  [% SET _tc_bg = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color))' -%]
+  [% SET tci_bg = 'color-mix(in srgb,#dc3545 6%,var(--bg-color))' -%]
+[% ELSIF tci_is_active -%]
+  [% SET tci_bg = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color))' -%]
 [% ELSE -%]
-  [% SET _tc_bg = 'var(--bg-color)' -%]
+  [% SET tci_bg = 'var(--bg-color)' -%]
 [% END -%]
 <div [% IF tc_wrapper_id %]id="[% tc_wrapper_id %]"[% END %]
      [% tc_wrapper_extra_data %]
-     style="display:flex;align-items:flex-start;gap:5px;padding:6px 8px;margin-bottom:5px;border-radius:5px;box-sizing:border-box;border:1px solid [% _tc_bc %];background:[% _tc_bg %];opacity:[% _tc_opacity %];min-width:0;">
+     style="display:flex;align-items:flex-start;gap:5px;padding:6px 8px;margin-bottom:5px;border-radius:5px;box-sizing:border-box;border:1px solid [% tci_bc %];background:[% tci_bg %];opacity:[% tci_opacity %];min-width:0;">
 
   [%# Col 1: icon/rank badge (fixed small width) %]
   [% IF tc_rank || tc_icon_char %]
@@ -87,18 +87,18 @@
 
       [%# Priority badge %]
       <span style="flex-shrink:0;font-size:0.68em;font-weight:bold;padding:1px 4px;border-radius:3px;
-          [% IF _tc_p <= 2 %]background:var(--danger-color,#dc3545);color:#fff
-          [% ELSIF _tc_p <= 4 %]background:#fd7e14;color:#fff
-          [% ELSIF _tc_p <= 6 %]background:#ffc107;color:var(--text-color,#333)
-          [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">P[% _tc_p %]</span>
+          [% IF tci_p <= 2 %]background:var(--danger-color,#dc3545);color:#fff
+          [% ELSIF tci_p <= 4 %]background:#fd7e14;color:#fff
+          [% ELSIF tci_p <= 6 %]background:#ffc107;color:var(--text-color,#333)
+          [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">P[% tci_p %]</span>
 
       [%# Status badge %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;
-          [% IF _tc_is_active %]background:#fd7e14;color:#fff
-          [% ELSIF _tc_status == 2 %]background:#17a2b8;color:#fff
-          [% ELSIF _tc_is_done %]background:#28a745;color:#fff
+          [% IF tci_is_active %]background:#fd7e14;color:#fff
+          [% ELSIF tci_status == 2 %]background:#17a2b8;color:#fff
+          [% ELSIF tci_is_done %]background:#28a745;color:#fff
           [% ELSE %]background:var(--secondary-color,#6c757d);color:#fff[% END %]">
-        [% IF _tc_is_active %]⏸ ACTIVE[% ELSIF _tc_status == 2 %]IN PROGRESS[% ELSIF _tc_is_done %]✓ DONE[% ELSE %]NEW[% END %]
+        [% IF tci_is_active %]⏸ ACTIVE[% ELSIF tci_status == 2 %]IN PROGRESS[% ELSIF tci_is_done %]✓ DONE[% ELSE %]NEW[% END %]
       </span>
 
       [%# Audit ROOT badge %]
@@ -107,20 +107,20 @@
       [% END %]
 
       [%# Todo type badge (appointment / meeting / event / reminder) %]
-      [% SET _tc_type = tc.todo_type || 'task' %]
-      [% IF _tc_type == 'appointment' %]
+      [% SET tci_type = tc.todo_type || 'task' %]
+      [% IF tci_type == 'appointment' %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#0d6efd;color:#fff;" title="Appointment">📌</span>
-      [% ELSIF _tc_type == 'meeting' %]
+      [% ELSIF tci_type == 'meeting' %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#6610f2;color:#fff;" title="Meeting">🤝</span>
-      [% ELSIF _tc_type == 'event' %]
+      [% ELSIF tci_type == 'event' %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#d63384;color:#fff;" title="Event">🎂</span>
-      [% ELSIF _tc_type == 'reminder' %]
+      [% ELSIF tci_type == 'reminder' %]
       <span style="flex-shrink:0;font-size:0.68em;padding:1px 4px;border-radius:3px;background:#fd7e14;color:#fff;" title="Reminder">🔔</span>
       [% END %]
 
       [%# Recurring badge — DB flag authoritative, fall back to subject keyword %]
-      [% SET _tc_subj_l = tc.subject.lower %]
-      [% IF tc.is_recurring OR _tc_subj_l.match('lunch') OR _tc_subj_l.match('break') OR _tc_subj_l.match('standup') %]
+      [% SET tci_subj_l = tc.subject.lower %]
+      [% IF tc.is_recurring OR tci_subj_l.match('lunch') OR tci_subj_l.match('break') OR tci_subj_l.match('standup') %]
       <span style="flex-shrink:0;font-size:0.72em;" title="[% tc.recurrence_rule || 'recurring' %]">🔁</span>
       [% END %]
 
@@ -159,7 +159,7 @@
       [%# Subject link — flex:1 with min-width:0 allows truncation; title=full text on hover %]
       <a href="/todo/details?record_id=[% tc.record_id %]"
          title="[% tc.subject | html %]"
-         style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:bold;font-size:0.88em;color:[% IF tc_is_blocked || _tc_is_done %]var(--text-muted-color)[% ELSE %]var(--text-color)[% END %];text-decoration:[% IF _tc_is_done %]line-through[% ELSE %]none[% END %];">
+         style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:bold;font-size:0.88em;color:[% IF tc_is_blocked || tci_is_done %]var(--text-muted-color)[% ELSE %]var(--text-color)[% END %];text-decoration:[% IF tci_is_done %]line-through[% ELSE %]none[% END %];">
         [% tc.subject || '(No subject)' %]
       </a>
     </div>
@@ -181,19 +181,19 @@
           [% ELSE %] · ⏱ [% tc_est_mins %]m[% END %]
         [% END %]
         [%# Error source info — parsed from comments or description %]
-        [% SET _tc_subj_l = tc.subject || '' %]
-        [% IF _tc_subj_l.match('^\[Error\]') || _tc_subj_l.match('^\[AUDIT\]') %]
-          [% SET _tc_cmt = tc.comments || '' %]
-          [% SET _tc_desc = tc.description || '' %]
-          [% SET _tc_src_server = '' %][% SET _tc_src_branch = '' %]
-          [% IF _tc_cmt.match('Server:') %]
-            [% FOREACH _cl IN _tc_cmt.split('\n') %]
-              [% IF _cl.match('^Server:') %][% SET _tc_src_server = _cl.replace('^Server:\s*','') %][% END %]
-              [% IF _cl.match('^Branch:') %][% SET _tc_src_branch = _cl.replace('^Branch:\s*','') %][% END %]
+        [% SET tci_subj_l = tc.subject || '' %]
+        [% IF tci_subj_l.match('^\[Error\]') || tci_subj_l.match('^\[AUDIT\]') %]
+          [% SET tci_cmt = tc.comments || '' %]
+          [% SET tci_desc = tc.description || '' %]
+          [% SET tci_src_server = '' %][% SET tci_src_branch = '' %]
+          [% IF tci_cmt.match('Server:') %]
+            [% FOREACH cl_line IN tci_cmt.split('\n') %]
+              [% IF cl_line.match('^Server:') %][% SET tci_src_server = cl_line.replace('^Server:\s*','') %][% END %]
+              [% IF cl_line.match('^Branch:') %][% SET tci_src_branch = cl_line.replace('^Branch:\s*','') %][% END %]
             [% END %]
           [% END %]
-          [% IF _tc_src_server %] · 🖥 [% _tc_src_server | html %][% END %]
-          [% IF _tc_src_branch %] · 🌿 [% _tc_src_branch | html %][% END %]
+          [% IF tci_src_server %] · 🖥 [% tci_src_server | html %][% END %]
+          [% IF tci_src_branch %] · 🌿 [% tci_src_branch | html %][% END %]
         [% END %]
         [% tc_meta_extra %]
       </div>
@@ -204,8 +204,8 @@
            style="font-size:0.68em;padding:2px 6px;border:1px solid var(--primary-color);border-radius:3px;text-decoration:none;color:var(--primary-color);white-space:nowrap;">View</a>
         <a href="/log/log_form?todo_record_id=[% tc.record_id %]"
            style="font-size:0.68em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add time log">Log</a>
-        [% IF tc_show_done && is_admin && !_tc_is_done %]
-          [% IF _tc_is_active %]
+        [% IF tc_show_done && is_admin && !tci_is_done %]
+          [% IF tci_is_active %]
           <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
               style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Log is open — click to close log with notes (todo stays open)">⏸ Active</button>
           <button onclick="closeLogTodoCard(this,[% tc.record_id %])"
