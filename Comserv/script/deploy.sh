@@ -11,6 +11,19 @@ CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 
+# Verify host prerequisites
+if ! command -v docker &>/dev/null; then
+    echo "❌ ERROR: Docker is not installed on this remote server ($HOSTNAME_VAL)."
+    echo "   Please install Docker first (e.g., 'sudo apt-get update && sudo apt-get install -y docker.io')."
+    exit 1
+fi
+
+if ! docker compose version &>/dev/null; then
+    echo "❌ ERROR: Docker Compose is not available on this remote server ($HOSTNAME_VAL)."
+    echo "   Please install the Docker Compose plugin (e.g., 'sudo apt-get install -y docker-compose-v2')."
+    exit 1
+fi
+
 # Helper function to run Git operations safely as the repository owner
 safe_git() {
     local DIR="$1"
