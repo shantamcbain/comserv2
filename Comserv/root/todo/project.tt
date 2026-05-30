@@ -666,8 +666,8 @@
                                     [% FOREACH todo IN subproject.todos %]
                                     <tr>
                                         <td>
-                                            <a href="/todo/details/[% todo.id %]" class="text-decoration-none">
-                                                [% todo.todo_text.substr(0, 50) %][% IF todo.todo_text.length > 50 %]...[% END %]
+                                            <a href="/todo/details?record_id=[% todo.record_id %]" class="text-decoration-none">
+                                                [% todo.subject.substr(0, 50) %][% IF todo.subject.length > 50 %]...[% END %]
                                             </a>
                                         </td>
                                         <td>
@@ -682,8 +682,8 @@
                                             [% INCLUDE todo/priority_display.tt priority_value=todo.priority %]
                                         </td>
                                         <td>
-                                            [% IF todo.end_date %]
-                                                [% todo.end_date %]
+                                            [% IF todo.due_date %]
+                                                [% todo.due_date %]
                                             [% ELSE %]
                                                 <span class="text-muted">No due date</span>
                                             [% END %]

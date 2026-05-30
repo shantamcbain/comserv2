@@ -11,6 +11,39 @@ CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
 
+# Verify host prerequisites
+if ! command -v docker &>/dev/null; then
+    echo "❌ ERROR: Docker is not installed on this remote server ($HOSTNAME_VAL)."
+    echo "   Please install Docker first (e.g., 'sudo apt-get update && sudo apt-get install -y docker.io')."
+    exit 1
+fi
+
+if ! docker compose version &>/dev/null; then
+    echo "❌ ERROR: Docker Compose is not available on this remote server ($HOSTNAME_VAL)."
+    echo "   Please install the Docker Compose plugin (e.g., 'sudo apt-get install -y docker-compose-v2')."
+    exit 1
+fi
+
+# Check Target OS update and reboot status
+echo "--- Host OS Update & Reboot Status ---"
+if [ -f "/var/lib/update-notifier/updates-available" ]; then
+    cat "/var/lib/update-notifier/updates-available"
+elif command -v apt-get &>/dev/null; then
+    PENDING_UPDATES=$(apt-get -s dist-upgrade 2>/dev/null | grep -E "^[0-9]+ upgraded" || true)
+    if [ -n "$PENDING_UPDATES" ]; then
+        echo "⚠️  Pending host updates: $PENDING_UPDATES"
+    else
+        echo "✅ Host OS packages are up to date."
+    fi
+fi
+
+if [ -f "/var/run/reboot-required" ]; then
+    echo "⚠️  CRITICAL: A system reboot is REQUIRED on $HOSTNAME_VAL to complete pending security updates."
+else
+    echo "✅ No pending system reboots."
+fi
+echo "----------------------------------------"
+
 # Helper function to run Git operations safely as the repository owner
 safe_git() {
     local DIR="$1"
@@ -505,6 +538,11 @@ if sudo -n true 2>/dev/null; then
     SUDO_CMD="sudo"
 fi
 
+# Stop and disable systemd starman service if active
+echo "   Stopping and disabling host-level systemd starman service..."
+$SUDO_CMD systemctl stop starman.service 2>/dev/null || true
+$SUDO_CMD systemctl disable starman.service 2>/dev/null || true
+
 # 1. Terminate any manual Starman or Plackup processes aggressively by process name/command line using SIGKILL (-9)
 echo "   Force-killing running starman/plackup/comserv host processes..."
 safe_pkill_f "starman"
@@ -542,6 +580,32 @@ fi
 
 sleep 1
 echo "   ✓ Port 5000 and 3000 are verified free on the host"
+
+echo "2c. Checking and populating database secrets for Docker..."
+# If /opt/comserv/Comserv/db_config.json exists, extract individual profile json files 
+# into /home/ubuntu/.comserv/secrets/dbi to ensure the container starts healthy with loaded secrets.
+if [ -f "/opt/comserv/Comserv/db_config.json" ]; then
+    echo "   Found host-level db_config.json. Populating container secrets directory..."
+    mkdir -p /home/ubuntu/.comserv/secrets/dbi
+    perl -MJSON::PP -e '
+        my $file = "/opt/comserv/Comserv/db_config.json";
+        open my $fh, "<", $file or die $!;
+        local $/;
+        my $data = decode_json(<$fh>);
+        close $fh;
+        for my $key (keys %$data) {
+            my $profile = {$key => $data->{$key}};
+            open my $out, ">", "/home/ubuntu/.comserv/secrets/dbi/$key.json" or die $!;
+            print $out encode_json($profile);
+            close $out;
+        }
+    ' 2>/dev/null
+    chmod -R 755 /home/ubuntu/.comserv 2>/dev/null || true
+    chown -R ubuntu:ubuntu /home/ubuntu/.comserv 2>/dev/null || true
+    echo "   ✓ Secrets directory populated and ready"
+else
+    echo "   ⚠ Warning: /opt/comserv/Comserv/db_config.json not found on host"
+fi
 
 echo "3. Starting new container..."
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
