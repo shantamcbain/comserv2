@@ -78,6 +78,11 @@ sub index :Path('/shop') :Args(0) {
     my ($self, $c) = @_;
 
     my $sitename = $self->_sitename($c);
+    if (!$sitename || $sitename eq 'none') {
+        $c->res->status(404);
+        $c->stash(template => 'error.tt', error_msg => 'Shop not found.');
+        return;
+    }
     my $schema   = $self->_schema($c);
     my $params   = $c->req->query_parameters;
     my $category = $params->{category} || '';
@@ -109,20 +114,11 @@ sub index :Path('/shop') :Args(0) {
                  : $sort eq 'price_desc' ? { -desc => 'unit_price' }
                  :                         { -asc  => 'name' };
 
-    my @_shop_cols = qw(
-        id sitename sku name description category item_origin
-        unit_of_measure unit_price unit_cost currency barcode image_path
-        discount_percent shop_options show_in_shop hide_stock_count accepts_points
-        is_consumable is_reusable status notes
-        filament_color filament_type print_time_hours requires_printing
-        condition created_at updated_at
-    );
-
     my (@items, @categories);
     eval {
         @items = $schema->resultset('Accounting::InventoryItem')->search(
             \%where,
-            { prefetch => 'stock_levels', columns => \@_shop_cols, order_by => $order_by }
+            { prefetch => 'stock_levels', order_by => $order_by }
         )->all;
         @categories = $schema->resultset('Accounting::InventoryItem')->search(
             { sitename => $sitename, status => 'active', show_in_shop => 1, category => { '!=' => undef } },
@@ -161,20 +157,11 @@ sub item :Path('/shop/item') :Args(1) {
     my $schema   = $self->_schema($c);
     my $sitename = $self->_sitename($c);
 
-    my @_item_cols = qw(
-        id sitename sku name description category item_origin
-        unit_of_measure unit_price unit_cost currency barcode image_path
-        discount_percent shop_options show_in_shop hide_stock_count accepts_points
-        is_consumable is_reusable is_assemblable status notes
-        filament_color filament_type print_time_hours requires_printing
-        condition created_at updated_at
-    );
-
     my $item;
     eval {
         $item = $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename, status => 'active', show_in_shop => 1 },
-            { prefetch => 'stock_levels', columns => \@_item_cols }
+            { prefetch => 'stock_levels' }
         );
         $item ||= $schema->resultset('Accounting::InventoryItem')->find(
             { id => $id, sitename => $sitename },
