@@ -24,6 +24,26 @@ if ! docker compose version &>/dev/null; then
     exit 1
 fi
 
+# Check Target OS update and reboot status
+echo "--- Host OS Update & Reboot Status ---"
+if [ -f "/var/lib/update-notifier/updates-available" ]; then
+    cat "/var/lib/update-notifier/updates-available"
+elif command -v apt-get &>/dev/null; then
+    PENDING_UPDATES=$(apt-get -s dist-upgrade 2>/dev/null | grep -E "^[0-9]+ upgraded" || true)
+    if [ -n "$PENDING_UPDATES" ]; then
+        echo "⚠️  Pending host updates: $PENDING_UPDATES"
+    else
+        echo "✅ Host OS packages are up to date."
+    fi
+fi
+
+if [ -f "/var/run/reboot-required" ]; then
+    echo "⚠️  CRITICAL: A system reboot is REQUIRED on $HOSTNAME_VAL to complete pending security updates."
+else
+    echo "✅ No pending system reboots."
+fi
+echo "----------------------------------------"
+
 # Helper function to run Git operations safely as the repository owner
 safe_git() {
     local DIR="$1"
