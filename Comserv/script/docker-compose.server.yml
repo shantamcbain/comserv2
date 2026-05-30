@@ -13,6 +13,7 @@ services:
       NFS_DATA_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
+      SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-production1}
     volumes:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${COMSERV_LOGS_DIR:-/var/log/comserv}:/opt/comserv/root/log

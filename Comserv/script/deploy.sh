@@ -17,6 +17,7 @@ IMAGE="shantamcsbain/comserv-web-prod:latest"
 CONTAINER="comserv2-web-prod"
 DEPLOY_LOG="/var/log/comserv-deploy.log"
 HOSTNAME_VAL=$(hostname)
+export SYSTEM_IDENTIFIER="${SYSTEM_IDENTIFIER:-$HOSTNAME_VAL}"
 
 # Verify host prerequisites
 if ! command -v docker &>/dev/null; then
