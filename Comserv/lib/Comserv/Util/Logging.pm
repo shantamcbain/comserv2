@@ -307,6 +307,17 @@ sub get_system_identifier {
         }
     }
 
+    # Detect runtime environments (Docker, Starman, Standalone)
+    my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+    my $is_starman = exists $INC{'Starman.pm'} || exists $INC{'Starman/Server.pm'} || ($ENV{SERVER_SOFTWARE} && $ENV{SERVER_SOFTWARE} =~ /Starman/i) || ($0 =~ /starman/i);
+
+    my @tags;
+    push @tags, 'Docker' if $is_docker;
+    push @tags, $is_starman ? 'Starman' : 'Standalone';
+
+    my $tag_str = join('/', @tags);
+    $identifier .= " ($tag_str)" if $tag_str;
+
     # Append port to disambiguate multiple dev servers on the same host
     $port //= '3000';
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
