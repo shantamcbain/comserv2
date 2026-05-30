@@ -134,7 +134,10 @@ sub psgi_app {
     my $self = shift;
 
     my $app = $self->SUPER::psgi_app(@_);
-    my $request_count = 0;
+    my $request_count  = 0;
+    my $last_alert_mb  = 0;   # track last alerted RSS level (in MB)
+    my $alert_threshold_mb  = 1024;  # first alert at 1 GB
+    my $alert_step_mb       = 256;   # re-alert every additional 256 MB
 
     return sub {
         my $env = shift;
@@ -142,22 +145,25 @@ sub psgi_app {
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-        # Periodic memory monitoring (every 100 requests)
+        # Periodic memory monitoring (every 500 requests)
         $request_count++;
-        if ($request_count % 100 == 0) {
+        if ($request_count % 500 == 0) {
             eval {
                 if (-f "/proc/self/status") {
                     open my $fh, '<', "/proc/self/status";
                     while (<$fh>) {
                         if (/^VmRSS:\s+(\d+)\s+kB/) {
-                            my $rss_kb = $1;
-                            # If RSS > 512MB, log an ERROR to notify admins
-                            if ($rss_kb > 512 * 1024) {
-                                my $rss_mb = sprintf("%.2f", $rss_kb / 1024);
+                            my $rss_mb = $1 / 1024;
+                            # Only alert when we cross a new threshold band
+                            my $next_alert = $last_alert_mb
+                                ? $last_alert_mb + $alert_step_mb
+                                : $alert_threshold_mb;
+                            if ($rss_mb >= $next_alert) {
+                                $last_alert_mb = int($rss_mb / $alert_step_mb) * $alert_step_mb;
                                 Comserv::Util::Logging->instance->log_with_details(
                                     undef, 'ERROR', __FILE__, __LINE__, 'psgi_app_monitor',
-                                    "CRITICAL MEMORY ALERT: Worker process $$ using $rss_mb MB RSS. " .
-                                    "Requests handled: $request_count. Starman will soon recycle this worker."
+                                    sprintf("MEMORY ALERT: Worker %d using %.0f MB RSS (requests: %d).",
+                                        $$, $rss_mb, $request_count)
                                 );
                             }
                             last;
