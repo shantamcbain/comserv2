@@ -37,9 +37,13 @@
 </style>
 
 <div class="app-container" style="margin: 20px auto; max-width: 1200px;">
-    <div class="page-header">
-        <h1><i class="icon-docker"></i> Docker Container Management</h1>
-        <hr>
+    <div class="page-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ccc; padding-bottom: 10px; margin-bottom: 20px;">
+        <h1 style="margin: 0;"><i class="icon-docker"></i> Docker Container Management</h1>
+        <div>
+            <a href="/admin/docker-containers-old" class="btn btn-secondary btn-sm" style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; padding: 6px 12px; background-color: #6c757d; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; transition: background-color 0.2s;">
+                <i class="fas fa-history"></i> Switch to Old View (Scrolling Layout)
+            </a>
+        </div>
     </div>
 
     [% IF !docker_available %]
@@ -309,15 +313,18 @@
 
         <!-- Right Column: Strategic Deployment Plan & File Tracking Matrix -->
         <div class="dashboard-col-right">
-            <!-- Strategic Plan Card -->
+            <!-- Strategic Plan Card (Normally Closed) -->
             <div class="compact-card" style="border: 2px solid #0056b3;">
-                <div class="compact-card-header" style="background-color: #e8f4fd; border-bottom: 1px solid #b3d7ff; display: flex; align-items: center; justify-content: space-between;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('strategic-roadmap')" style="background-color: #e8f4fd; border-bottom: 1px solid #b3d7ff; display: flex; align-items: center; justify-content: space-between;">
                     <h4 style="margin: 0; font-size: 13px; color: #0056b3; display: flex; align-items: center; gap: 6px; font-weight: bold;">
-                        <i class="fas fa-map-marked-alt"></i> Strategic Deployment Roadmap & Steps
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-strategic-roadmap" style="margin-right: 8px;"></i>
+                            <i class="fas fa-map-marked-alt"></i> Strategic Deployment Roadmap & Steps
+                        </span>
                     </h4>
                     <span class="badge-pill" style="background-color: #0056b3;">ACTIVE PIPELINE</span>
                 </div>
-                <div class="compact-card-body" style="padding: 10px 12px;">
+                <div id="strategic-roadmap" class="compact-card-body collapsible-content" style="padding: 10px 12px;">
                     <p style="margin: 0 0 10px 0; font-size: 11px; line-height: 1.4; color: #555;">
                         This system transitions the Catalyst web server away from fragile bare-metal processes into an isolated, self-healing, multi-node configuration.
                     </p>
@@ -335,14 +342,14 @@
                     </div>
 
                     <!-- Step 2 -->
-                    <div class="pipeline-step healthy">
+                    <div class="pipeline-step progress">
                         <div class="pipeline-step-header">
-                            <span style="color: #1e5a1e;"><i class="fas fa-check-circle"></i> Step 2: Automated Deployment & Host Migration</span>
-                            <span class="badge-pill badge-healthy">HEALTHY</span>
+                            <span style="color: #856404;"><i class="fas fa-spinner fa-spin"></i> Step 2: Automated Deployment & Host Migration</span>
+                            <span class="badge-pill badge-progress" style="background-color: #ffc107; color: #333; font-size: 9px; padding: 1px 5px; border-radius: 3px; font-weight: bold;">TESTING PENDING</span>
                         </div>
                         <div style="font-size: 11px; line-height: 1.35; color: #444;">
                             <strong>Goal:</strong> Zero port collision. Remote <code>deploy.sh</code> stops host systemd <code>starman.service</code>, parses database connections, and splits secrets into <code>/home/ubuntu/.comserv/secrets/dbi/*.json</code>.
-                            <br><strong>Verification:</strong> Run "Quick Deploy" or "Auto Deploy (Hub)" to target server, verifying zero-downtime startup.
+                            <br><strong>Verification:</strong> Run "Quick Deploy" or "Auto Deploy (Hub)" to target server, verifying zero-downtime startup. (Note: Currently running pre-docker code from Feb 4, testing is pending).
                         </div>
                     </div>
 
@@ -381,6 +388,45 @@
                             <br><strong>Verification:</strong> K8s natively manages high-availability replication, self-healing liveness probes, automated rollbacks, and centralized secret vault sync.
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Manual Step-by-Step Setup Guide (Normally Closed) -->
+            <div class="compact-card" style="border: 1px solid #28a745;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('manual-setup-guide')" style="background-color: #e8f5e9; border-bottom: 1px solid #c8e6c9; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #1b5e20; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-manual-setup-guide" style="margin-right: 8px;"></i>
+                            <i class="fas fa-list-ol"></i> Manual Step-by-Step Setup Guide
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #28a745; color: white;">MANUAL SETUP</span>
+                </div>
+                <div id="manual-setup-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
+                    <p style="margin: 0 0 10px 0; color: #555;">Follow these exact manual steps to deploy the Docker container to Production if the automated script fails.</p>
+                    
+                    <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        <li>
+                            <strong>Build Container Locally</strong>: Compile the production Docker image on the Workstation.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && docker compose -f docker-compose.prod.yml build</pre>
+                        </li>
+                        <li>
+                            <strong>Push Image to Docker Hub</strong>: Upload the compiled layers to the shared hub.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">docker compose -f docker-compose.prod.yml push</pre>
+                        </li>
+                        <li>
+                            <strong>Stop Host-Side Services on Server</strong>: SSH to remote host and free up port 5000.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl stop starman.service && sudo systemctl disable starman.service"</pre>
+                        </li>
+                        <li>
+                            <strong>Pull Image on Server</strong>: Fetch the latest image from Docker Hub on the remote server.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml pull"</pre>
+                        </li>
+                        <li>
+                            <strong>Launch Container on Server</strong>: Start the production container in detached mode.
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml up -d --force-recreate"</pre>
+                        </li>
+                    </ol>
                 </div>
             </div>
 
@@ -488,21 +534,7 @@
         }
     }
 
-    // Auto-expand Container Status and Volume Status on page load
-    window.addEventListener('DOMContentLoaded', function() {
-        const statusSection = document.getElementById('container-status');
-        const statusChevron = document.getElementById('chevron-container-status');
-        if (statusSection && statusChevron) {
-            statusSection.classList.add('expanded');
-            statusChevron.classList.add('expanded');
-        }
-        const volSection = document.getElementById('volumes-status');
-        const volChevron = document.getElementById('chevron-volumes-status');
-        if (volSection && volChevron) {
-            volSection.classList.add('expanded');
-            volChevron.classList.add('expanded');
-        }
-    });
+
 </script>
 
 <script>
