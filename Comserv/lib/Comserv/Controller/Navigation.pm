@@ -843,6 +843,10 @@ sub populate_navigation_data {
             $nav_data->{private_links} = $self->get_private_links($c, $username, $site_name);
         }
         
+        # Cap cache size to prevent unbounded memory growth (max 50 entries)
+        if (scalar(keys %{$self->_navigation_cache}) >= 50) {
+            $self->_navigation_cache({});
+        }
         # Cache the data
         $self->_navigation_cache->{$cache_key} = $nav_data;
         $self->_cache_timestamp($current_time);

@@ -835,24 +835,45 @@ sub list_models {
     try {
         $response = $self->ua->request($req);
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "HTTP API failed: $_, attempting shell fallback");
-        return $self->list_models_shell();
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "HTTP API failed: $_, attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->last_error("HTTP API failed: $_");
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'list_models',
+                "HTTP API failed: $_ (no use_docker configured, skipping shell fallback)");
+            return undef;
+        }
     };
     
     unless ($response->is_success) {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "HTTP API returned " . $response->status_line . ", attempting shell fallback");
-        return $self->list_models_shell();
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "HTTP API returned " . $response->status_line . ", attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->last_error("HTTP API returned " . $response->status_line);
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'list_models',
+                "HTTP API returned " . $response->status_line . " (no use_docker configured, skipping shell fallback)");
+            return undef;
+        }
     }
     
     my $data;
     try {
         $data = decode_json($response->content);
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "Failed to parse HTTP response: $_, attempting shell fallback");
-        return $self->list_models_shell();
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "Failed to parse HTTP response: $_, attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->last_error("Failed to parse HTTP response: $_");
+            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'list_models',
+                "Failed to parse HTTP response: $_ (no use_docker configured, skipping shell fallback)");
+            return undef;
+        }
     };
     
     my @models;
@@ -939,9 +960,13 @@ sub pull_model {
             "Request payload: $json_payload");
     } catch {
         $self->last_error("Failed to encode JSON payload: $_");
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "Failed to encode JSON: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "Failed to encode JSON: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            return { success => 0, error => "Failed to encode JSON payload: $_" };
+        }
     };
     
     my $req = HTTP::Request->new(POST => $endpoint);
@@ -959,9 +984,14 @@ sub pull_model {
         $response = $self->ua->request($req);
     } catch {
         $self->ua->timeout($original_timeout);
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "HTTP request failed: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "HTTP request failed: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->last_error("HTTP request failed: $_");
+            return { success => 0, error => "HTTP request failed: $_" };
+        }
     };
     
     $self->ua->timeout($original_timeout);
@@ -971,9 +1001,14 @@ sub pull_model {
     
     unless ($response->is_success) {
         my $error_msg = $response->status_line;
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "HTTP API returned $error_msg, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "HTTP API returned $error_msg, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->last_error("HTTP API returned $error_msg");
+            return { success => 0, error => "HTTP API returned $error_msg" };
+        }
     }
     
     my $content_preview = substr($response->content, 0, 500);
@@ -1001,9 +1036,14 @@ sub pull_model {
             };
         }
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "Failed to parse HTTP response: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($self->use_docker) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "Failed to parse HTTP response: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->last_error("Failed to parse HTTP response: $_");
+            return { success => 0, error => "Failed to parse HTTP response: $_" };
+        }
     };
     
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model',
@@ -1595,7 +1635,8 @@ sub _exec_docker {
     if ($exit_code != 0) {
         my $error = "Docker command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_docker',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_docker',
             $error);
         return undef;
     }
@@ -1637,7 +1678,8 @@ sub _exec_podman {
     if ($exit_code != 0) {
         my $error = "Podman command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_podman',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_podman',
             $error);
         return undef;
     }
@@ -1673,7 +1715,8 @@ sub list_models_shell {
     }
     
     unless ($output) {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models_shell',
             "Failed to execute list command: " . $self->last_error);
         return undef;
     }
@@ -1746,7 +1789,8 @@ sub pull_model_shell {
     
     unless ($output) {
         my $error = "Failed to pull model: " . $self->last_error;
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'pull_model_shell',
             $error);
         return {
             success => 0,

@@ -93,6 +93,16 @@ mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME
 chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
 chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
+# Ensure comserv_server.psgi is accessible in both script/ and the root directory
+mkdir -p "${CATALYST_HOME}/script"
+if [ -f "${CATALYST_HOME}/script/comserv_server.psgi" ]; then
+    ln -sf "${CATALYST_HOME}/script/comserv_server.psgi" "${CATALYST_HOME}/comserv_server.psgi"
+    chown comserv:comserv "${CATALYST_HOME}/comserv_server.psgi" 2>/dev/null || true
+elif [ -f "${CATALYST_HOME}/comserv_server.psgi" ]; then
+    ln -sf "${CATALYST_HOME}/comserv_server.psgi" "${CATALYST_HOME}/script/comserv_server.psgi"
+    chown comserv:comserv "${CATALYST_HOME}/script/comserv_server.psgi" 2>/dev/null || true
+fi
+
 # Symlink ${CATALYST_HOME}/logs to ${CATALYST_HOME}/root/log so logs write to persistent volume
 if [ ! -L "${CATALYST_HOME}/logs" ]; then
     if [ -d "${CATALYST_HOME}/logs" ]; then

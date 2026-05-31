@@ -132,36 +132,31 @@
 
 <!-- Filter Panel -->
 <div class="filter-panel mb-4">
-    <form id="projectFilterForm" class="form-inline" method="GET" action="/project/project">
-        <div class="form-group mb-2">
-            <label for="project_filter" class="mr-2">Project:</label>
-            <select id="project_filter" name="project_id" class="form-control">
+    <form id="projectFilterForm" class="form-inline" style="flex-wrap:wrap;gap:6px;align-items:center;" method="GET" action="/project/project">
+        <label for="project_search" style="white-space:nowrap;margin:0;">🔍</label>
+        <input type="text" id="project_search" placeholder="Search name / code / description…"
+               class="form-control" style="width:260px;"
+               oninput="filterProjects(this.value)">
+        <span id="project_search_count" style="font-size:0.82em;color:var(--text-muted-color,#6c757d);white-space:nowrap;min-width:80px;"></span>
+        <label for="project_filter" class="mr-2" style="white-space:nowrap;margin:0;">Project:</label>
+        <select id="project_filter" name="project_id" class="form-control" style="width:auto;">
                 <option value="">All Projects</option>
                 [% FOREACH project IN projects.sort('name') %]
-                    <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>
-                        [% project.name %]
-                    </option>
+                    <option value="[% project.id %]" [% IF project_filter == project.id %]selected[% END %]>[% project.name %]</option>
                     [% FOREACH subproject IN project.sub_projects.sort('name') %]
-                        <option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]>
-                            &nbsp;&nbsp;└─ [% subproject.name %]
-                        </option>
+                        <option value="[% subproject.id %]" [% IF project_filter == subproject.id %]selected[% END %]>&nbsp;&nbsp;└─ [% subproject.name %]</option>
                     [% END %]
                 [% END %]
             </select>
-        </div>
-        
-        <div class="form-group mb-2 ml-3">
-            <label for="priority_filter" class="mr-2">Priority:</label>
-            <select id="priority_filter" name="priority" class="form-control">
-                <option value="">All Priorities</option>
-                <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
-                <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
-                <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
-            </select>
-        </div>
-        
-        <button type="submit" class="btn btn-primary mb-2 ml-3">Apply Filters</button>
-        <button type="button" id="clearFilters" class="btn btn-outline-secondary mb-2 ml-2">Clear Filters</button>
+        <label for="priority_filter" style="white-space:nowrap;margin:0;">Priority:</label>
+        <select id="priority_filter" name="priority" class="form-control" style="width:auto;">
+            <option value="">All</option>
+            <option value="1" [% IF priority_filter == '1' %]selected[% END %]>High</option>
+            <option value="2" [% IF priority_filter == '2' %]selected[% END %]>Medium</option>
+            <option value="3" [% IF priority_filter == '3' %]selected[% END %]>Low</option>
+        </select>
+        <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        <button type="button" id="clearFilters" class="btn btn-outline-secondary btn-sm">Clear</button>
     </form>
 </div>
 
@@ -174,7 +169,9 @@
         <!-- Skip this project if filtering by priority and it doesn't match -->
         [% NEXT IF priority_filter && priority_filter != project.priority %]
         
-        <div class="collapsible-card" id="project-[% project.id %]">
+        [% SET proj_search_text = project.name _ ' ' _ (project.project_code || '') _ ' ' _ (project.description || '') _ ' ' _ (project.sitename || '') %]
+        <div class="collapsible-card" id="project-[% project.id %]"
+             data-search="[% proj_search_text.lower %]">
             <div class="card">
                 <!-- Card header with priority badge, project summary, and collapse toggle -->
                 <div class="card-header" onclick="toggleCollapse('project-body-[% project.id %]')" aria-expanded="false">
@@ -669,8 +666,8 @@
                                     [% FOREACH todo IN subproject.todos %]
                                     <tr>
                                         <td>
-                                            <a href="/todo/details/[% todo.id %]" class="text-decoration-none">
-                                                [% todo.todo_text.substr(0, 50) %][% IF todo.todo_text.length > 50 %]...[% END %]
+                                            <a href="/todo/details?record_id=[% todo.record_id %]" class="text-decoration-none">
+                                                [% todo.subject.substr(0, 50) %][% IF todo.subject.length > 50 %]...[% END %]
                                             </a>
                                         </td>
                                         <td>
@@ -685,8 +682,8 @@
                                             [% INCLUDE todo/priority_display.tt priority_value=todo.priority %]
                                         </td>
                                         <td>
-                                            [% IF todo.end_date %]
-                                                [% todo.end_date %]
+                                            [% IF todo.due_date %]
+                                                [% todo.due_date %]
                                             [% ELSE %]
                                                 <span class="text-muted">No due date</span>
                                             [% END %]
@@ -789,6 +786,23 @@
         }
     }
     
+    // Real-time project search / filter
+    function filterProjects(query) {
+        const q = query.trim().toLowerCase();
+        const cards = document.querySelectorAll('.collapsible-card[data-search]');
+        let visible = 0;
+        cards.forEach(function(card) {
+            const text = card.getAttribute('data-search') || '';
+            const match = !q || text.indexOf(q) !== -1;
+            card.style.display = match ? '' : 'none';
+            if (match) visible++;
+        });
+        const countEl = document.getElementById('project_search_count');
+        if (countEl) {
+            countEl.textContent = q ? ('Showing ' + visible + ' of ' + cards.length) : '';
+        }
+    }
+
     // Clear filters button functionality
     document.getElementById('clearFilters').addEventListener('click', function() {
         document.getElementById('project_filter').value = '';
