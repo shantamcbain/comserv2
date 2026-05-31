@@ -1761,7 +1761,7 @@ sub site_setup {
     my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url =~ /^https?:/i) {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);

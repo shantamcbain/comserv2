@@ -738,6 +738,16 @@ sub pages :Path('/admin/pages') :Args(0) {
     
     my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     
+    # Fetch site display names for mapping
+    my %site_display_map;
+    eval {
+        my @all_sites_db = $db_ency->resultset('Site')->all;
+        foreach my $s (@all_sites_db) {
+            $site_display_map{$s->name} = $s->site_display_name || $s->name;
+        }
+    };
+    $c->stash(site_display_map => \%site_display_map);
+    
     # Get available roles for the current site
     my @site_roles_db = ();
     eval {
@@ -779,6 +789,15 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
     }
     $c->stash(all_sites => \@site_names_all);
+    
+    # Determine available sites for this admin
+    my @available_sites_list;
+    if ($current_sitename eq 'CSC') {
+        @available_sites_list = @site_names_all;
+    } else {
+        @available_sites_list = ($current_sitename);
+    }
+    $c->stash(available_sites => \@available_sites_list);
     
     if ($action eq 'create') {
         $c->stash(
@@ -1026,11 +1045,12 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
         
         $c->stash(
-            pages         => \@pages,
-            site_names    => \@site_names,
-            search        => $search,
-            filter_site   => $current_sitename ne 'CSC' ? $current_sitename : $filter_site,
-            filter_status => $filter_status,
+            pages            => \@pages,
+            site_names       => \@site_names,
+            site_display_map => $c->stash->{site_display_map},
+            search           => $search,
+            filter_site      => $current_sitename ne 'CSC' ? $current_sitename : $filter_site,
+            filter_status    => $filter_status,
         );
     }
     
