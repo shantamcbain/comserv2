@@ -81,6 +81,27 @@
                 </div>
             </div>
 
+            <!-- Available Recovery Backups -->
+            <div class="compact-card">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('backups-status')" style="background-color: #f8f9fa;">
+                    <h4 style="margin: 0; display: flex; align-items: center; justify-content: space-between; font-size: 13px; color: var(--text-color, #333);">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-backups-status" style="margin-right: 8px;"></i>
+                            <i class="fas fa-history" style="margin-right: 8px; color: #6c757d;"></i>
+                            Available Recovery Backups
+                        </span>
+                        <button class="compact-btn" onclick="event.stopPropagation(); refreshContainers();" style="background-color: #6c757d; color: white;">
+                            <i class="icon-refresh"></i> Refresh
+                        </button>
+                    </h4>
+                </div>
+                <div id="backups-status" class="compact-card-body collapsible-content">
+                    <div id="backups-list" style="display: flex; flex-direction: column; gap: 8px;">
+                        <p style="color: #666; text-align: center; font-size: 11px; margin: 5px 0;">Loading backup information...</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Volume Status Overview -->
             <div class="compact-card">
                 <div class="compact-card-header collapsible-header" onclick="toggleSection('volumes-status')" style="background-color: #f8f9fa;">
@@ -682,11 +703,33 @@
 
                 containersData = data.containers;
                 displayContainers(data.containers, data.host);
+                displayBackups(data.backups);
                 updateServiceDropdown(data.containers);
             })
             .catch(error => {
                 containersList.innerHTML = `<p style="color: #dc3545; text-align: center;">Error loading containers: ${error.message}</p>`;
             });
+    }
+
+    function displayBackups(backups) {
+        const backupsList = document.getElementById('backups-list');
+        if (!backupsList) return;
+        if (!backups || backups.length === 0) {
+            backupsList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center; font-size: 11px; margin: 5px 0;">No backups found</p>';
+            return;
+        }
+
+        let html = '';
+        backups.forEach(backup => {
+            html += `
+                <div style="border: 1px solid var(--border-color, #ddd); border-radius: 4px; padding: 10px; background-color: rgba(255,255,255,0.88); display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                    <div style="font-size: 12px; color: var(--text-color, #333); font-family: monospace; display: flex; align-items: center; gap: 8px;">
+                        <i class="fas fa-archive" style="color: #6c757d;"></i>
+                        <strong>${backup}</strong>
+                    </div>
+                </div>`;
+        });
+        backupsList.innerHTML = html;
     }
 
     function refreshVolumes() {
