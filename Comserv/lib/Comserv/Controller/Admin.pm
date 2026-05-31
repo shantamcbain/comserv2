@@ -5668,7 +5668,20 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         };
     }
     
-    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    # Query available local backup images
+    my @backups;
+    my $images_output = `$denv $docker images --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>&1`;
+    my $images_exit = $? >> 8;
+    if ($images_exit == 0) {
+        foreach my $line (split /\n/, $images_output) {
+            if ($line =~ /:backup-/) {
+                $line =~ s/^(?:shantamcsbain\/)?comserv-web-prod://;
+                push @backups, $line;
+            }
+        }
+    }
+
+    $c->response->body(encode_json({ success => 1, containers => \@containers, backups => \@backups }));
     $c->response->content_type('application/json');
 }
 
