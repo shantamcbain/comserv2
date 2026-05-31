@@ -557,41 +557,73 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
         done
         
         if [ $RESTART_OK -eq 0 ]; then
-            echo "   ❌ [Recovery] All 3 restart attempts failed! Falling back to backup image..."
+            echo "   ❌ [Recovery] All 3 restart attempts failed! Falling back to backup images..."
             FALLBACK_HEALTHY=0
-            if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
-                echo "   [Fallback] Found backup-1 image. Stopping and removing failed container..."
+            
+            # Get the image ID of the currently running unhealthy container
+            CURRENT_IMAGE_ID=$(docker inspect --format='{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+            
+            # Find all available backup tags in sorted order (e.g. backup-1, backup-2...)
+            BACKUP_TAGS=$(docker images shantamcsbain/comserv-web-prod --format '{{.Tag}}' 2>/dev/null | grep -E '^backup-[0-9]+' | sort -V || true)
+            
+            # If no backup tags are found but backup-1 exists by inspect, seed it
+            if [ -z "$BACKUP_TAGS" ] && docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+                BACKUP_TAGS="backup-1"
+            fi
+            
+            ACTIVE_BACKUP=""
+            for B_TAG in $BACKUP_TAGS; do
+                B_IMAGE="shantamcsbain/comserv-web-prod:$B_TAG"
+                B_ID=$(docker image inspect "$B_IMAGE" --format='{{.Id}}' 2>/dev/null || true)
+                
+                # If this backup's image ID is already the one that failed, skip it
+                if [ -n "$CURRENT_IMAGE_ID" ] && [ "$B_ID" = "$CURRENT_IMAGE_ID" ]; then
+                    echo "   [Fallback] Skipping $B_TAG (image ID matches currently failed version)"
+                    continue
+                fi
+                
+                echo "   [Fallback] Attempting fallback to backup image: $B_TAG..."
+                ACTIVE_BACKUP="$B_TAG"
+                
                 docker stop "$CONTAINER" 2>/dev/null || true
                 docker rm -f "$CONTAINER" 2>/dev/null || true
                 
-                echo "   [Fallback] Re-tagging backup-1 as latest..."
-                docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
+                echo "   [Fallback] Re-tagging $B_TAG as latest..."
+                docker tag "$B_IMAGE" shantamcsbain/comserv-web-prod:latest
                 
                 echo "   [Fallback] Launching container with rolled-back image..."
                 docker compose -f "$COMPOSE_FILE" up -d --force-recreate
                 
-                echo "   [Fallback] Checking health of the backup container (up to 60s)..."
+                echo "   [Fallback] Checking health of the backup container $B_TAG (up to 60s)..."
+                B_HEALTHY=0
                 for SEC in $(seq 1 30); do
                     sleep 2
                     STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
                     RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
                     if [ "$RUNNING" = "true" ] && [ "$STATUS" = "healthy" ]; then
-                        FALLBACK_HEALTHY=1
+                        B_HEALTHY=1
                         break
                     fi
                 done
-            else
-                echo "   ❌ [Fallback] Backup-1 image is not available on host."
-            fi
+                
+                if [ $B_HEALTHY -eq 1 ]; then
+                    echo "   ✅ [Fallback] Successfully rolled back to $B_TAG! Container is healthy."
+                    FALLBACK_HEALTHY=1
+                    break
+                fi
+                
+                echo "   ❌ [Fallback] Backup $B_TAG failed to become healthy. Trying next backup..."
+                # Get the new failed image ID to prevent retrying this one too
+                CURRENT_IMAGE_ID=$(docker inspect --format='{{.Image}}' "$CONTAINER" 2>/dev/null || true)
+            done
             
             if [ $FALLBACK_HEALTHY -eq 1 ]; then
-                echo "   ✅ [Fallback] Successfully rolled back to backup-1! Container is healthy."
                 if command -v mail >/dev/null 2>&1; then
-                    echo -e "Container health recovery succeeded via fallback to backup-1 image.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
-                        | mail -s "⚠️  Container Recovered via backup-1 on $HOSTNAME_VAL" "$EMAIL"
+                    echo -e "Container health recovery succeeded via fallback to $ACTIVE_BACKUP image.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
+                        | mail -s "⚠️  Container Recovered via $ACTIVE_BACKUP on $HOSTNAME_VAL" "$EMAIL"
                 fi
             else
-                echo "   ❌ [Fallback] Rollback container failed to become healthy or backup-1 not available."
+                echo "   ❌ [Fallback] All backup images failed or no backups available."
                 echo "   [Emergency] Starting host-level Starman so service is not interrupted..."
                 
                 # Stop any failed docker container first to free port 5000
