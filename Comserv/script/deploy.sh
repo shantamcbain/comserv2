@@ -89,6 +89,21 @@ if [ -n "$GLOBAL_HOST_APP_DIR" ] && command -v git &>/dev/null; then
     echo "--------------------------------------------"
 fi
 
+# ── Self-Update Permanent Script Copy ─────────────────────────────────────────
+# If running as /tmp/deploy.sh, copy ourselves to the permanent script folder so that cron jobs use the latest script.
+CURRENT_SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
+if [ "$CURRENT_SCRIPT_PATH" = "/tmp/deploy.sh" ] && [ -n "$GLOBAL_HOST_APP_DIR" ]; then
+    TARGET_SCRIPT_DIR="$GLOBAL_HOST_APP_DIR/Comserv/script"
+    if [ -d "$TARGET_SCRIPT_DIR" ]; then
+        echo "--- Script Self-Updating ---"
+        echo "Copying /tmp/deploy.sh -> $TARGET_SCRIPT_DIR/deploy.sh"
+        cp -f "$CURRENT_SCRIPT_PATH" "$TARGET_SCRIPT_DIR/deploy.sh"
+        chmod +x "$TARGET_SCRIPT_DIR/deploy.sh"
+        echo "✅ Permanent script copy updated successfully."
+        echo "----------------------------"
+    fi
+fi
+
 # Helper function to kill host processes by pattern safely, without killing the deploy script itself
 safe_pkill_f() {
     local PATTERN="$1"
