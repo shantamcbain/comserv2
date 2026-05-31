@@ -532,15 +532,20 @@ else
 
     echo "New version detected. Starting deployment..."
 
-    # ── Rotate rollback/backup images ────────────────────────────────────────────
-    echo "Rotating rollback/backup images..."
-    # Remove oldest backup (backup-2) if it exists
-    docker rmi shantamcsbain/comserv-web-prod:backup-2 2>/dev/null || true
-    # Move backup-1 to backup-2
-    if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
-        docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:backup-2
-        docker rmi shantamcsbain/comserv-web-prod:backup-1 2>/dev/null || true
-    fi
+    # ── Rotate rollback/backup images (Keep 5 backups) ───────────────────────────
+    echo "Rotating rollback/backup images (keeping up to 5 backups)..."
+    # Remove oldest backup (backup-5) if it exists
+    docker rmi shantamcsbain/comserv-web-prod:backup-5 2>/dev/null || true
+    
+    # Shift existing backups down the line: 4 -> 5, 3 -> 4, 2 -> 3, 1 -> 2
+    for i in 4 3 2 1; do
+        NEXT=$((i + 1))
+        if docker image inspect shantamcsbain/comserv-web-prod:backup-$i >/dev/null 2>&1; then
+            docker tag shantamcsbain/comserv-web-prod:backup-$i shantamcsbain/comserv-web-prod:backup-$NEXT
+            docker rmi shantamcsbain/comserv-web-prod:backup-$i 2>/dev/null || true
+        fi
+    done
+    
     # Move current latest to backup-1
     if docker image inspect shantamcsbain/comserv-web-prod:latest >/dev/null 2>&1; then
         docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:backup-1
