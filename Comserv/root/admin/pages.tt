@@ -200,7 +200,7 @@
                             <select name="filter_site" id="filter_site" class="form-control">
                                 <option value="">-- All Sites --</option>
                                 [% FOREACH site IN site_names %]
-                                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site %]</option>
+                                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site_display_map.$site || site %]</option>
                                 [% END %]
                             </select>
                         </div>
@@ -246,7 +246,7 @@
                                 [% IF pages && pages.size > 0 %]
                                     [% FOREACH page IN pages %]
                                         <tr>
-                                            <td>[% page.sitename | html %]</td>
+                                            <td>[% site_display_map.${page.sitename} || page.sitename | html %]</td>
                                             <td>[% page.menu | html %]</td>
                                             <td><code>[% page.page_code | html %]</code></td>
                                             <td>[% page.title | html %]</td>
