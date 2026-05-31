@@ -675,7 +675,13 @@
         const mTitle = document.getElementById('modal-title');
         const mBody = document.getElementById('modal-body');
         if (modal && mTitle && mBody) {
-            mTitle.innerHTML = (isSuccess ? '🟢 ' : '🔴 ') + title;
+            let prefix = '🟢 ';
+            if (isSuccess === 'loading') {
+                prefix = '⏳ ';
+            } else if (!isSuccess) {
+                prefix = '🔴 ';
+            }
+            mTitle.innerHTML = prefix + title;
             mBody.textContent = content;
             modal.style.display = 'flex';
         } else {
@@ -1127,6 +1133,8 @@
 
     function createContainerDirect(service) {
         appendOutput(`Creating and starting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Create & Start ${service}`, `⏳ Creating and starting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-up/${service}`)
             .then(response => response.json())
@@ -1150,6 +1158,8 @@
 
     function startContainerDirect(service) {
         appendOutput(`Starting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Start ${service}`, `⏳ Starting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-start/${service}`)
             .then(response => response.json())
@@ -1177,6 +1187,8 @@
         }
 
         appendOutput(`Stopping ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Stop ${service}`, `⏳ Stopping ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-stop/${service}`)
             .then(response => response.json())
@@ -1204,6 +1216,8 @@
         }
 
         appendOutput(`Restarting ${service}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Restart ${service}`, `⏳ Restarting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-restart/${service}?force=0`)
             .then(response => response.json())
@@ -1230,6 +1244,8 @@
         if (lines === null) return;
 
         appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Logs for ${service}`, `⏳ Fetching last ${lines} lines of logs for ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`)
             .then(response => response.json())
@@ -1347,6 +1363,8 @@
         }
 
         appendOutput(`⏳ Cleaning up Docker system...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup("Docker System Cleanup", `⏳ Pruning unused Docker objects on target: ${target.toUpperCase()}...\n\nThis may take several seconds. Please wait.`, 'loading');
 
         safeFetch('/admin/docker-prune')
             .then(response => response.json())
@@ -1370,6 +1388,8 @@
 
     function showDiskUsage() {
         appendOutput(`⏳ Fetching Docker disk usage...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup("Docker Disk Usage", `⏳ Querying Docker df stats on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch('/admin/docker-system-df')
             .then(response => response.json())
@@ -1397,6 +1417,8 @@
         if (!service) return;
 
         appendOutput(`Checking status for: ${service}`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Status for ${service}`, `⏳ Checking container status on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         const url = service === 'all' ? '/admin/docker-status/all' : `/admin/docker-status/${service}`;
 
@@ -1404,13 +1426,18 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
-                    appendOutput('Status output:\n' + (data.output || data.stdout || 'No output'));
+                    const out = data.output || data.stdout || 'No output';
+                    appendOutput('Status output:\n' + out);
+                    showResultPopup(`Status for ${service}`, out, true);
                 } else {
-                    appendOutput('Error: ' + (data.error || data.stderr || 'Unknown error'));
+                    const err = data.error || data.stderr || 'Unknown error';
+                    appendOutput('Error: ' + err);
+                    showResultPopup(`Status for ${service} Failed`, `Error:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1425,6 +1452,8 @@
         }
 
         appendOutput(`Restarting ${service}${force ? ' (force mode)' : ''}...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Restart ${service}`, `⏳ Restarting ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         const url = `/admin/docker-restart/${service}?force=${force ? 1 : 0}`;
 
@@ -1456,6 +1485,8 @@
         if (lines === null) return;
 
         appendOutput(`Getting logs for ${service} (last ${lines} lines)...`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Logs for ${service}`, `⏳ Fetching last ${lines} lines of logs for ${service} on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         const url = `/admin/docker-logs/${service}?lines=${parseInt(lines) || 50}`;
 
@@ -1488,6 +1519,8 @@
         }
 
         appendOutput(`⏳ Saving Docker image: ${service}...\n`);
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        showResultPopup(`Save Docker Image`, `⏳ Exporting ${service} image to tar archive on target: ${target.toUpperCase()}...\n\nPlease wait.`, 'loading');
 
         safeFetch(`/admin/docker-save-image/${service}`)
             .then(response => response.json())
@@ -1496,12 +1529,16 @@
                     appendOutput(`✓ Image saved successfully!\n`);
                     appendOutput(`Location: ${data.tar_file}\n`);
                     appendOutput(data.output || '');
+                    showResultPopup(`Save Docker Image`, `✓ Image saved successfully!\n\nLocation: ${data.tar_file}\n\n${data.output || ''}`, true);
                 } else {
-                    appendOutput(`✗ Failed to save image:\n${data.error || data.output || 'Unknown error'}\n`);
+                    const err = data.error || data.output || 'Unknown error';
+                    appendOutput(`✗ Failed to save image:\n${err}\n`);
+                    showResultPopup(`Save Docker Image Failed`, `✗ Failed to save image:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
