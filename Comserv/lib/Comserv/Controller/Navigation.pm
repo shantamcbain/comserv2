@@ -122,22 +122,45 @@ sub get_pages {
     
     # Use eval to catch any database errors
     eval {
+        # Fetch active and inactive to let local overrides fully eclipse shared pages
         my $rs = $c->model('DBEncy')->resultset('Page')->search({
-            menu     => $menu,
-            status   => 'active',
             '-or' => [
                 { sitename => [ $site_name, 'CSC', 'All' ] },
                 { share_with => 'all' },
                 { share_with => { 'like' => "%$site_name%" } }
             ]
-        }, {
-            order_by => { -asc => 'link_order' }
         });
 
+        my %pages_by_code;
         while (my $row = $rs->next) {
-            push @results, { $row->get_columns };
+            my $code = $row->page_code;
+            my $site = $row->sitename;
+            
+            # Priority: 3 = Local Site override, 2 = CSC/All fallback, 1 = Shared
+            my $priority = 1;
+            if ($site eq $site_name) {
+                $priority = 3;
+            } elsif ($site eq 'CSC' || $site eq 'All') {
+                $priority = 2;
+            }
+            
+            if (!exists $pages_by_code{$code} || $pages_by_code{$code}->{_priority} < $priority) {
+                my $page_data = { $row->get_columns };
+                $page_data->{_priority} = $priority;
+                $pages_by_code{$code} = $page_data;
+            }
         }
 
+        # Filter by active status and requested menu
+        my @filtered;
+        for my $code (keys %pages_by_code) {
+            my $p = $pages_by_code{$code};
+            if ($p->{status} eq 'active' && lc($p->{menu}) eq lc($menu)) {
+                push @filtered, $p;
+            }
+        }
+
+        @results = sort { ($a->{link_order} || 0) <=> ($b->{link_order} || 0) } @filtered;
         $c->log->debug("Found " . scalar(@results) . " pages");
     };
     if ($@) {
@@ -159,20 +182,43 @@ sub get_admin_pages {
     # Use eval to catch any database errors
     eval {
         my $rs = $c->model('DBEncy')->resultset('Page')->search({
-            menu     => 'Admin',
-            status   => 'active',
             '-or' => [
                 { sitename => [ $site_name, 'CSC', 'All' ] },
                 { share_with => 'all' },
                 { share_with => { 'like' => "%$site_name%" } }
             ]
-        }, {
-            order_by => { -asc => 'link_order' }
         });
 
+        my %pages_by_code;
         while (my $row = $rs->next) {
-            push @results, { $row->get_columns };
+            my $code = $row->page_code;
+            my $site = $row->sitename;
+            
+            # Priority: 3 = Local Site override, 2 = CSC/All fallback, 1 = Shared
+            my $priority = 1;
+            if ($site eq $site_name) {
+                $priority = 3;
+            } elsif ($site eq 'CSC' || $site eq 'All') {
+                $priority = 2;
+            }
+            
+            if (!exists $pages_by_code{$code} || $pages_by_code{$code}->{_priority} < $priority) {
+                my $page_data = { $row->get_columns };
+                $page_data->{_priority} = $priority;
+                $pages_by_code{$code} = $page_data;
+            }
         }
+
+        # Filter by active status and requested menu
+        my @filtered;
+        for my $code (keys %pages_by_code) {
+            my $p = $pages_by_code{$code};
+            if ($p->{status} eq 'active' && lc($p->{menu}) eq 'admin') {
+                push @filtered, $p;
+            }
+        }
+
+        @results = sort { ($a->{link_order} || 0) <=> ($b->{link_order} || 0) } @filtered;
 
         if (!@results) {
             # Get the database handle from the DBEncy model
