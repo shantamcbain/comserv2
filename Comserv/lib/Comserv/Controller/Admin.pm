@@ -5554,16 +5554,14 @@ sub _docker_bin {
     return 'docker';
 }
 
-sub _run_docker_on_target {
-    my ($self, $c, $docker_cmd, $target) = @_;
+sub _run_host_cmd_on_target {
+    my ($self, $c, $host_cmd, $target) = @_;
     
     $target //= $c->req->params->{target} || 'workstation';
     $target = lc($target);
     
     if ($target eq 'workstation') {
-        my $denv  = _docker_env();
-        my $docker = _docker_bin();
-        my $output = `$denv $docker $docker_cmd 2>&1`;
+        my $output = `$host_cmd 2>&1`;
         my $exit_code = $? >> 8;
         return ($output, $exit_code);
     }
@@ -5605,16 +5603,89 @@ sub _run_docker_on_target {
     $ssh_port = int($ssh_port);
     $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
     
-    # Escape single quotes in docker_cmd
-    my $escaped_cmd = $docker_cmd;
+    # Escape single quotes in host_cmd
+    my $escaped_cmd = $host_cmd;
     $escaped_cmd =~ s/'/'\\''/g;
     
     local $ENV{SSHPASS} = $ssh_password;
-    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host "docker $escaped_cmd" 2>&1);
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host "$escaped_cmd" 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
     return ($output, $exit_code);
+}
+
+sub _run_docker_on_target {
+    my ($self, $c, $docker_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $denv  = _docker_env();
+        my $docker = _docker_bin();
+        return $self->_run_host_cmd_on_target($c, "$denv $docker $docker_cmd", $target);
+    } else {
+        return $self->_run_host_cmd_on_target($c, "docker $docker_cmd", $target);
+    }
+}
+
+sub _query_system_diagnostics {
+    my ($self, $c, $target) = @_;
+    
+    # 1. Docker Compose status
+    my ($compose_out, $compose_code) = $self->_run_host_cmd_on_target($c, "docker compose version 2>&1 || docker-compose version 2>&1 || echo 'Not installed'", $target);
+    chomp($compose_out);
+    
+    # 2. Starman process status
+    my ($starman_out, $starman_code) = $self->_run_host_cmd_on_target($c, "ps aux | grep -i starman | grep -v grep || echo 'No starman processes found'", $target);
+    
+    # 3. Port bindings
+    my ($ports_out, $ports_code) = $self->_run_host_cmd_on_target($c, "ss -tln || netstat -tln || echo 'Network utilities not available'", $target);
+    my @active_ports;
+    for my $line (split(/\n/, $ports_out)) {
+        if ($line =~ /(?:^|[\s:])(5000|3000|3001)(?:\s|$|:)/) {
+            push @active_ports, $1 unless grep { $_ eq $1 } @active_ports;
+        }
+    }
+    
+    # 4. Git status & log
+    my $git_cmd = '';
+    if ($target eq 'workstation') {
+        $git_cmd = "git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s'";
+    } else {
+        $git_cmd = "cd /opt/comserv/Comserv 2>/dev/null && git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s' || echo 'Directory /opt/comserv/Comserv not found or not a git repo'";
+    }
+    my ($git_out, $git_code) = $self->_run_host_cmd_on_target($c, $git_cmd, $target);
+    
+    # 5. Backup images list
+    my ($backups_out, $backups_code) = $self->_run_host_cmd_on_target($c, "docker images --format '{{.Repository}}:{{.Tag}} ({{.ID}})' | grep shantamcsbain/comserv-web-prod || echo 'No images found'", $target);
+    my @backups;
+    for my $line (split(/\n/, $backups_out)) {
+        chomp($line);
+        if ($line =~ /comserv-web-prod/i && $line !~ /latest/i) {
+            push @backups, $line;
+        }
+    }
+    
+    # 6. Host stats
+    my ($disk_out) = $self->_run_host_cmd_on_target($c, "df -h / | tail -n 1", $target);
+    chomp($disk_out);
+    my ($mem_out) = $self->_run_host_cmd_on_target($c, "free -m | grep Mem", $target);
+    chomp($mem_out);
+    my ($uptime_out) = $self->_run_host_cmd_on_target($c, "uptime", $target);
+    chomp($uptime_out);
+    
+    return {
+        compose_status  => $compose_out,
+        starman_status  => $starman_out,
+        active_ports    => \@active_ports,
+        git_status      => $git_out,
+        backups         => \@backups,
+        disk            => $disk_out,
+        memory          => $mem_out,
+        uptime          => $uptime_out,
+    };
 }
 
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
@@ -6227,6 +6298,39 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
         success => $exit_code == 0 ? \1 : \0,
         output => $output,
         exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_diagnostics :Path('/admin/docker-diagnostics') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_diagnostics',
+        "Docker system diagnostics requested");
+        
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_diagnostics')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'workstation';
+    my $diagnostics = $self->_query_system_diagnostics($c, $target);
+    
+    my $result = {
+        success     => \1,
+        diagnostics => $diagnostics,
+        target      => $target
     };
     
     $c->response->body(encode_json($result));
