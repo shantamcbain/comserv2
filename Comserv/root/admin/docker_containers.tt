@@ -567,6 +567,58 @@
                     </table>
                 </div>
             </div>
+
+            <!-- Docker Diagnostics & Central Fallback Status (Normally Closed) -->
+            <div class="compact-card" style="border: 2px solid #28a745; margin-top: 15px;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('docker-diagnostics-card')" style="background-color: #e8f5e9; border-bottom: 1px solid #c8e6c9; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #1b5e20; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-docker-diagnostics-card" style="margin-right: 8px;"></i>
+                            <i class="fas fa-heartbeat"></i> Diagnostics & Central Fallback Status
+                        </span>
+                    </h4>
+                    <button class="compact-btn" onclick="event.stopPropagation(); loadDiagnostics();" style="background-color: #28a745; color: white;">
+                        <i class="fas fa-sync-alt"></i> Refresh
+                    </button>
+                </div>
+                <div id="docker-diagnostics-card" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px;">
+                    <div id="diagnostics-loader" style="text-align: center; color: #666; padding: 15px 0;">
+                        <i class="fas fa-spinner fa-spin"></i> Loading system diagnostics...
+                    </div>
+                    <div id="diagnostics-content" style="display: none;">
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                            <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                                <strong style="color: #333;"><i class="fas fa-dharmachakra"></i> Docker Compose Status:</strong>
+                                <div id="diag-compose" style="margin-top: 4px; font-family: monospace; white-space: pre-wrap; word-break: break-all;"></div>
+                            </div>
+                            <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                                <strong style="color: #333;"><i class="fas fa-plug"></i> Starman Service / Port Binding:</strong>
+                                <div id="diag-starman" style="margin-top: 4px; font-family: monospace; font-size: 10px; max-height: 80px; overflow-y: auto; white-space: pre-wrap;"></div>
+                                <div style="margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap;" id="diag-ports"></div>
+                            </div>
+                        </div>
+                        
+                        <div style="margin-bottom: 10px; background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-code-branch"></i> Git Repository Status:</strong>
+                            <div id="diag-git" style="margin-top: 4px; font-family: monospace; white-space: pre-wrap; max-height: 100px; overflow-y: auto; background-color: #222; color: #00ff00; padding: 6px; border-radius: 4px;"></div>
+                        </div>
+
+                        <div style="margin-bottom: 10px; background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-history"></i> Available Recovery Backups (comserv-web-prod):</strong>
+                            <div id="diag-backups" style="margin-top: 4px; display: flex; flex-direction: column; gap: 4px;"></div>
+                        </div>
+
+                        <div style="background-color: #f8f9fa; padding: 6px 10px; border-radius: 4px; border: 1px solid #ddd;">
+                            <strong style="color: #333;"><i class="fas fa-hdd"></i> Host System Resources:</strong>
+                            <table style="width: 100%; margin-top: 4px; font-family: monospace;">
+                                <tr><td style="width: 80px; color:#555;">Disk Space:</td><td id="diag-disk" style="word-break: break-all;"></td></tr>
+                                <tr><td style="color:#555;">Memory:</td><td id="diag-mem" style="word-break: break-all;"></td></tr>
+                                <tr><td style="color:#555;">Uptime:</td><td id="diag-uptime" style="word-break: break-all;"></td></tr>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -705,6 +757,94 @@
             .catch(() => {});
     }
 
+    function loadDiagnostics() {
+        const loader = document.getElementById('diagnostics-loader');
+        const content = document.getElementById('diagnostics-content');
+        if (loader) loader.style.display = 'block';
+        if (content) content.style.display = 'none';
+
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        safeFetch(`/admin/docker-diagnostics?target=${target}`)
+            .then(r => r.json())
+            .then(data => {
+                if (loader) loader.style.display = 'none';
+                if (!data || !data.success || !data.diagnostics) {
+                    if (content) {
+                        content.style.display = 'block';
+                        content.innerHTML = `<div style="color: #dc3545; padding: 10px; text-align: center;">Error loading diagnostics: ${data?.error || 'Unknown error'}</div>`;
+                    }
+                    return;
+                }
+
+                const d = data.diagnostics;
+                if (content) content.style.display = 'block';
+
+                // 1. Docker Compose
+                const compEl = document.getElementById('diag-compose');
+                if (compEl) {
+                    const isInstalled = d.compose_status && d.compose_status.indexOf('Not installed') === -1 && d.compose_status.indexOf('ERROR') === -1;
+                    compEl.innerHTML = `<span style="color: ${isInstalled ? '#28a745' : '#dc3545'}; font-weight: bold;">${isInstalled ? '🟢 Installed & Active' : '🔴 Not Detected / Error'}</span><br><span style="color: #666; font-size: 10px;">${d.compose_status || 'Unknown'}</span>`;
+                }
+
+                // 2. Starman Process Status
+                const starEl = document.getElementById('diag-starman');
+                if (starEl) {
+                    starEl.textContent = d.starman_status || 'No starman processes found';
+                }
+
+                // 3. Ports
+                const portsEl = document.getElementById('diag-ports');
+                if (portsEl) {
+                    portsEl.innerHTML = '';
+                    const monitored = ['3000', '3001', '5000'];
+                    monitored.forEach(port => {
+                        const active = d.active_ports && d.active_ports.includes(port);
+                        portsEl.innerHTML += `<span style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border-radius: 3px; font-size: 10px; background-color: ${active ? '#d4edda' : '#f8d7da'}; color: ${active ? '#155724' : '#721c24'}; border: 1px solid ${active ? '#c3e6cb' : '#f5c6cb'};">
+                            <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background-color: ${active ? '#28a745' : '#dc3545'};"></span>
+                            Port ${port}: ${active ? 'Bound' : 'Closed'}
+                        </span>`;
+                    });
+                }
+
+                // 4. Git
+                const gitEl = document.getElementById('diag-git');
+                if (gitEl) {
+                    gitEl.textContent = d.git_status || 'Unknown';
+                }
+
+                // 5. Backups
+                const backupsEl = document.getElementById('diag-backups');
+                if (backupsEl) {
+                    backupsEl.innerHTML = '';
+                    if (d.backups && d.backups.length > 0) {
+                        d.backups.forEach(backup => {
+                            backupsEl.innerHTML += `<div style="font-family: monospace; font-size: 10px; background: #e9ecef; padding: 4px 8px; border-radius: 3px; border: 1px solid #ddd; display: flex; justify-content: space-between; align-items: center;">
+                                <span>📦 ${backup}</span>
+                                <span class="badge-pill" style="background-color: #17a2b8; font-size: 9px; padding: 1px 4px; border-radius: 2px; color: white;">ROLLBACK TARGET</span>
+                            </div>`;
+                        });
+                    } else {
+                        backupsEl.innerHTML = '<div style="color: #666; font-style: italic;">No recovery backup images found.</div>';
+                    }
+                }
+
+                // 6. Host Resources
+                const diskEl = document.getElementById('diag-disk');
+                if (diskEl) diskEl.textContent = d.disk || 'N/A';
+                const memEl = document.getElementById('diag-mem');
+                if (memEl) memEl.textContent = d.memory || 'N/A';
+                const uptimeEl = document.getElementById('diag-uptime');
+                if (uptimeEl) uptimeEl.textContent = d.uptime || 'N/A';
+            })
+            .catch(err => {
+                if (loader) loader.style.display = 'none';
+                if (content) {
+                    content.style.display = 'block';
+                    content.innerHTML = `<div style="color: #dc3545; padding: 10px; text-align: center;">Network/Server error loading diagnostics: ${err.message}</div>`;
+                }
+            });
+    }
+
     function onTargetChange() {
         const targetSelect = document.getElementById('docker-target-select');
         const targetText = targetSelect ? targetSelect.options[targetSelect.selectedIndex].text : 'Workstation';
@@ -716,6 +856,7 @@
         appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
         
         refreshContainers();
+        loadDiagnostics();
         
         const volSection = document.getElementById('volumes-status');
         if (volSection && volSection.classList.contains('expanded')) {
@@ -1843,6 +1984,7 @@
         refreshVolumes();
         loadSavedCredentials();
         loadDeployHistory();
+        loadDiagnostics();
 
         // Auto-check SSH terminal service status
         checkSSHTerminalService();
