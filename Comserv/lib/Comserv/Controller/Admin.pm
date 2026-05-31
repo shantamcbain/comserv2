@@ -5554,6 +5554,69 @@ sub _docker_bin {
     return 'docker';
 }
 
+sub _run_docker_on_target {
+    my ($self, $c, $docker_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $denv  = _docker_env();
+        my $docker = _docker_bin();
+        my $output = `$denv $docker $docker_cmd 2>&1`;
+        my $exit_code = $? >> 8;
+        return ($output, $exit_code);
+    }
+    
+    # Remote target via SSH
+    my $ssh_host = '';
+    my $ssh_user = 'ubuntu';
+    my $ssh_port = 22;
+    if ($target eq 'production2') {
+        $ssh_host = '192.168.1.127';
+    } else {
+        # Default to production1
+        $ssh_host = '192.168.1.126';
+    }
+    
+    # Load SSH password from file
+    my $ssh_password = '';
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds) {
+            $ssh_password = $creds->{ssh_password} || '';
+            $ssh_port = $creds->{ssh_port} || 22;
+        }
+    }
+    
+    if (!$ssh_password) {
+        return ("ERROR: SSH password required. Use Test Connection to save credentials first.", 1);
+    }
+    
+    # Validate SSH parameters
+    unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
+        return ("ERROR: Invalid host format", 1);
+    }
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    
+    # Escape single quotes in docker_cmd
+    my $escaped_cmd = $docker_cmd;
+    $escaped_cmd =~ s/'/'\\''/g;
+    
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host "docker $escaped_cmd" 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    return ($output, $exit_code);
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
@@ -5626,14 +5689,11 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    my $denv  = _docker_env();
-    my $docker = _docker_bin();
-
-    my $output = `$denv $docker ps --all --format json 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "ps --all --format json", $target);
     
     if ($exit_code != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps on $target: $output" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5668,10 +5728,9 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         };
     }
     
-    # Query available local backup images
+    # Query available backup images on target
     my @backups;
-    my $images_output = `$denv $docker images --format "{{.Repository}}:{{.Tag}} ({{.Size}})" 2>&1`;
-    my $images_exit = $? >> 8;
+    my ($images_output, $images_exit) = $self->_run_docker_on_target($c, 'images --format "{{.Repository}}:{{.Tag}} ({{.Size}})"', $target);
     if ($images_exit == 0) {
         foreach my $line (split /\n/, $images_output) {
             if ($line =~ /:backup-/) {
@@ -5681,7 +5740,7 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         }
     }
 
-    $c->response->body(encode_json({ success => 1, containers => \@containers, backups => \@backups }));
+    $c->response->body(encode_json({ success => 1, containers => \@containers, backups => \@backups, target => $target }));
     $c->response->content_type('application/json');
 }
 
@@ -5705,14 +5764,11 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $denv_v  = _docker_env();
-    my $docker_v = _docker_bin();
-
-    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
-    my $names_exit = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($names_out, $names_exit) = $self->_run_docker_on_target($c, "volume ls -q", $target);
 
     if ($names_exit != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes on $target: $names_out" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5720,14 +5776,13 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     my @names = grep { $_ ne '' } split /\n/, $names_out;
 
     if (!@names) {
-        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->body(encode_json({ success => 1, volumes => [], target => $target }));
         $c->response->content_type('application/json');
         return;
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
-    my $inspect_exit = $? >> 8;
+    my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "volume inspect $names_str", $target);
 
     my @volumes;
     eval {
@@ -5779,25 +5834,20 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $denv_r   = _docker_env();
-    my $docker_r = _docker_bin();
-    my $home_r   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
-
-    my ($output, $exit_code);
+    my $docker_cmd;
     if ($service eq 'all') {
-        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
-        $exit_code = $? >> 8;
-    } else {
-        $output = `$denv_r $docker_r restart '$service' 2>&1`;
-        $exit_code = $? >> 8;
-        if ($exit_code != 0) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
-                "docker restart $service failed (exit $exit_code): $output");
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml restart";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml restart";
         }
+    } else {
+        $docker_cmd = "restart '$service'";
     }
-    $output //= "(no output captured — docker socket not found)";
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5829,17 +5879,20 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_s   = _docker_env();
-    my $docker_s = _docker_bin();
-    my $home_s   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
-        : "$denv_s $docker_s start '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml start";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml start";
+        }
+    } else {
+        $docker_cmd = "start '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5871,17 +5924,20 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_st   = _docker_env();
-    my $docker_st = _docker_bin();
-    my $home_st   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
-        : "$denv_st $docker_st stop '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml stop";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml stop";
+        }
+    } else {
+        $docker_cmd = "stop '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5913,20 +5969,24 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    my $compose_target = $service eq 'all' ? '' : $service;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml up -d $compose_target";
+    } else {
+        $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml up -d $compose_target";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5954,17 +6014,22 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     my $lines = int($c->req->params->{lines} || 100);
     $lines = 100 unless $lines > 0 && $lines <= 10000;
     
-    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml logs --tail=$lines $service";
+    } else {
+        $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml logs --tail=$lines $service";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $result = {
+    $c->response->body(encode_json({
         success => $exit_code == 0 ? \1 : \0,
-        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        output => $output,
         exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -6138,22 +6203,25 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
         return;
     }
     
-    # Prune stopped containers, dangling images, and unused networks
+    my $target = $c->req->params->{target} || 'workstation';
     my $output = '';
     
     # Remove stopped containers
     $output .= "=== Removing stopped containers ===\n";
-    $output .= `docker container prune -f 2>&1`;
+    my ($o1, $e1) = $self->_run_docker_on_target($c, "container prune -f", $target);
+    $output .= $o1;
     
     # Remove dangling images
     $output .= "\n=== Removing dangling images ===\n";
-    $output .= `docker image prune -f 2>&1`;
+    my ($o2, $e2) = $self->_run_docker_on_target($c, "image prune -f", $target);
+    $output .= $o2;
     
     # Remove unused networks
     $output .= "\n=== Removing unused networks ===\n";
-    $output .= `docker network prune -f 2>&1`;
+    my ($o3, $e3) = $self->_run_docker_on_target($c, "network prune -f", $target);
+    $output .= $o3;
     
-    my $exit_code = $? >> 8;
+    my $exit_code = ($e1 || $e2 || $e3) ? 1 : 0;
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
@@ -6185,8 +6253,8 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
         return;
     }
     
-    my $output = `docker system df 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "system df", $target);
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
