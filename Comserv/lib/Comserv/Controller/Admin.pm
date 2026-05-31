@@ -5608,7 +5608,7 @@ sub _run_host_cmd_on_target {
     $escaped_cmd =~ s/'/'\\''/g;
     
     local $ENV{SSHPASS} = $ssh_password;
-    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host "$escaped_cmd" 2>&1);
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_cmd' 2>&1);
     my $output = `$cmd`;
     my $exit_code = $? >> 8;
     
@@ -6091,7 +6091,7 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     if ($target eq 'workstation') {
         $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml logs --tail=$lines $service";
     } else {
-        $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml logs --tail=$lines $service";
+        $docker_cmd = "logs --tail=$lines $service";
     }
 
     my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
