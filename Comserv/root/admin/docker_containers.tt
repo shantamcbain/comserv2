@@ -57,6 +57,25 @@
     </div>
     [% ELSE %]
     
+    <!-- Docker Host System Selector -->
+    <div class="compact-card" style="margin-bottom: 15px; border-left: 4px solid #0066cc;">
+        <div class="compact-card-body" style="padding: 12px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; background-color: #f8f9fa;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <label for="docker-target-select" style="font-weight: bold; font-size: 13px; color: var(--text-color, #333); margin-bottom: 0; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fas fa-server" style="color: #0066cc;"></i> Docker System Target:
+                </label>
+                <select id="docker-target-select" class="form-control" style="width: auto; display: inline-block; font-size: 12px; padding: 4px 10px; height: 30px; border-radius: 4px; border: 1px solid #ccc;" onchange="onTargetChange()">
+                    <option value="workstation" selected>Workstation (Local Host)</option>
+                    <option value="production1">Production 1 (192.168.1.126)</option>
+                    <option value="production2">Production 2 (192.168.1.127)</option>
+                </select>
+            </div>
+            <div id="target-info-display" style="font-size: 11px; color: #666; font-style: italic;">
+                Active System: <strong>Workstation (Local Host)</strong>
+            </div>
+        </div>
+    </div>
+    
     <div class="dashboard-grid">
         <!-- Left Column: Container Info, Controls & Deployment Tools -->
         <div class="dashboard-col-left">
@@ -583,6 +602,10 @@
     // Wrapper for all admin AJAX calls.
     // Handles: session expiry (302 → login page HTML), server errors (5xx HTML), network errors.
     function safeFetch(url, options) {
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
+        if (url.indexOf('target=') === -1) {
+            url += (url.indexOf('?') === -1 ? '?' : '&') + 'target=' + encodeURIComponent(target);
+        }
         const opts = Object.assign({ credentials: 'same-origin', redirect: 'manual' }, options || {});
         return fetch(url, opts).then(function(response) {
             if (response.type === 'opaqueredirect' || response.status === 0 ||
@@ -682,10 +705,29 @@
             .catch(() => {});
     }
 
+    function onTargetChange() {
+        const targetSelect = document.getElementById('docker-target-select');
+        const targetText = targetSelect ? targetSelect.options[targetSelect.selectedIndex].text : 'Workstation';
+        const display = document.getElementById('target-info-display');
+        if (display) {
+            display.innerHTML = `Active System: <strong>${targetText}</strong>`;
+        }
+        
+        appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
+        
+        refreshContainers();
+        
+        const volSection = document.getElementById('volumes-status');
+        if (volSection && volSection.classList.contains('expanded')) {
+            refreshVolumes();
+        }
+    }
+
     function refreshContainers() {
         containersList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading container information...</p>';
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
 
-        fetch('/admin/docker-list', { credentials: 'same-origin', redirect: 'manual' })
+        fetch(`/admin/docker-list?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
                 if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
                     containersList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
@@ -735,8 +777,9 @@
     function refreshVolumes() {
         const volumesList = document.getElementById('volumes-list');
         volumesList.innerHTML = '<p style="color: var(--text-muted-color, #666); text-align: center;">Loading volume information...</p>';
+        const target = document.getElementById('docker-target-select')?.value || 'workstation';
 
-        fetch('/admin/docker-volumes', { credentials: 'same-origin', redirect: 'manual' })
+        fetch(`/admin/docker-volumes?target=${target}`, { credentials: 'same-origin', redirect: 'manual' })
             .then(function(response) {
                 if (response.type === 'opaqueredirect' || response.status === 0 || (response.status >= 300 && response.status < 400)) {
                     volumesList.innerHTML = '<p style="color: #dc3545; text-align: center;">Session expired — please <a href="/user/login">log in again</a>.</p>';
