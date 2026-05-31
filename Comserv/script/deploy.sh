@@ -123,7 +123,7 @@ safe_pkill_f() {
 }
 
 # ── Non-interactive Deploy Mode ──────────────────────────────────────────────
-if [ -n "${DEPLOY_MODE:-}" ]; then
+if [ -n "${DEPLOY_MODE:-}" ] && [ "$DEPLOY_MODE" != "monitor" ]; then
     echo "Non-interactive Deploy Mode requested: $DEPLOY_MODE"
     case "$DEPLOY_MODE" in
         "full")
@@ -512,7 +512,7 @@ cd "$(dirname "$COMPOSE_FILE")"
 # ── Container Viability & Auto-Recovery Check ─────────────────────────────────
 # If the container is dead or unhealthy during a routine check, we restart it.
 # If restarts fail, we roll back to backup-1. If rollback fails, we fall back to host Starman.
-if [ -z "${DEPLOY_MODE:-}" ]; then
+if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
     echo "Checking container viability for $CONTAINER..."
     CONTAINER_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
     CONTAINER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unhealthy")
@@ -645,6 +645,11 @@ if [ -z "${DEPLOY_MODE:-}" ]; then
     else
         echo "   ✓ Container $CONTAINER is running and healthy."
     fi
+fi
+
+if [ "${DEPLOY_MODE:-}" = "monitor" ]; then
+    echo "Viability check completed in monitor mode."
+    exit 0
 fi
 
 # ── Version check ────────────────────────────────────────────────────────────
