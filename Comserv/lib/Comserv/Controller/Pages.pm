@@ -86,8 +86,33 @@ sub view :Path('/page') :Args(1) {
         return;
     }
     
+    my $body = $page->body || '';
+    my $title = $page->title;
+    
+    if ($body =~ m{<html}i) {
+        if ($body =~ m{<title>(.*?)</title>}is) {
+            my $extracted_title = $1;
+            $extracted_title =~ s/<[^>]*>//g;
+            $extracted_title =~ s/^\s+|\s+$//g;
+            if ($extracted_title && (!$title || $title eq $page->page_code)) {
+                $title = $extracted_title;
+            }
+        }
+        
+        if ($body =~ m{<body[^>]*>(.*?)</body>}is) {
+            $body = $1;
+        } else {
+            $body =~ s{<html[^>]*>}{}gi;
+            $body =~ s{</html>}{}gi;
+            $body =~ s{<head[^>]*>.*?</head>}{}gis;
+        }
+    }
+
     $c->stash(
         page => $page,
+        rendered_body => $body,
+        page_title => $title,
+        ScriptDisplayName => 'Page',
         template => 'pages/view.tt'
     );
 }
@@ -163,6 +188,8 @@ sub list :Path('/pages') :Args(0) {
         sitename => $sitename,
         menu => $menu,
         is_csc => ($sitename eq 'CSC'),
+        page_title => 'Pages List',
+        ScriptDisplayName => 'Pages',
         template => 'pages/list.tt'
     );
 }
@@ -567,7 +594,11 @@ sub migrate_pages :Path('/admin/migrate_pages') :Args(0) {
         }
     }
     
-    $c->stash(template => 'admin/migrate_pages.tt');
+    $c->stash(
+        template => 'admin/migrate_pages.tt',
+        page_title => 'Migrate Legacy Pages',
+        ScriptDisplayName => 'Admin',
+    );
 }
 
 # Import a single Forager page with optional field overrides (Edit & Import)
@@ -1008,6 +1039,8 @@ sub pages :Path('/admin/pages') :Args(0) {
         success_msg => $c->flash->{success_msg} || $c->stash->{success_msg},
         error_msg => $c->flash->{error_msg} || $c->stash->{error_msg},
         current_site  => $current_sitename,
+        page_title => 'Page Management',
+        ScriptDisplayName => 'Admin',
     );
 }
 
