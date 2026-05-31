@@ -119,11 +119,11 @@ sub rotate_log {
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
-    return if $file_size < $MAX_LOG_SIZE;
+    _print_log("Current log file size: $file_size bytes, rotation threshold: $ROTATION_THRESHOLD bytes");
+    return if $file_size < $ROTATION_THRESHOLD;
 
     # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
+    _print_log("Log file size ($file_size bytes) exceeds rotation threshold ($ROTATION_THRESHOLD bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -311,11 +311,13 @@ sub get_system_identifier {
     my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
     my $is_starman = exists $INC{'Starman.pm'} || exists $INC{'Starman/Server.pm'} || ($ENV{SERVER_SOFTWARE} && $ENV{SERVER_SOFTWARE} =~ /Starman/i) || ($0 =~ /starman/i);
 
-    my @tags;
-    push @tags, 'Docker' if $is_docker;
-    push @tags, $is_starman ? 'Starman' : 'Standalone';
+    my $tag_str;
+    if ($is_docker) {
+        $tag_str = 'Docker';
+    } else {
+        $tag_str = $is_starman ? 'Starman' : 'Standalone';
+    }
 
-    my $tag_str = join('/', @tags);
     $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
