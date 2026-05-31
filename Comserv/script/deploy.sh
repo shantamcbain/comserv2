@@ -509,6 +509,144 @@ fi
 
 cd "$(dirname "$COMPOSE_FILE")"
 
+# ── Container Viability & Auto-Recovery Check ─────────────────────────────────
+# If the container is dead or unhealthy during a routine check, we restart it.
+# If restarts fail, we roll back to backup-1. If rollback fails, we fall back to host Starman.
+if [ -z "${DEPLOY_MODE:-}" ]; then
+    echo "Checking container viability for $CONTAINER..."
+    CONTAINER_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+    CONTAINER_HEALTH=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unhealthy")
+    
+    if [ "$CONTAINER_RUNNING" != "true" ] || [ "$CONTAINER_HEALTH" = "unhealthy" ]; then
+        echo "⚠️  CRITICAL: Container $CONTAINER is dead or unhealthy! (Running: $CONTAINER_RUNNING, Health: $CONTAINER_HEALTH)"
+        echo "   Initiating automatic recovery procedure..."
+        
+        RESTART_OK=0
+        for ATTEMPT in 1 2 3; do
+            echo "   [Recovery] Attempt $ATTEMPT of 3: restarting container $CONTAINER..."
+            docker restart "$CONTAINER" >/dev/null 2>&1 || docker compose -f "$COMPOSE_FILE" restart "$CONTAINER" >/dev/null 2>&1 || true
+            sleep 5
+            
+            # Wait up to 30 seconds for container to become healthy
+            echo "   [Recovery] Waiting for container to become healthy..."
+            for SEC in $(seq 1 15); do
+                sleep 2
+                STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
+                RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+                if [ "$RUNNING" = "true" ] && [ "$STATUS" = "healthy" ]; then
+                    echo "   ✅ Container $CONTAINER successfully recovered and is healthy!"
+                    RESTART_OK=1
+                    break 2
+                fi
+            done
+        done
+        
+        if [ $RESTART_OK -eq 0 ]; then
+            echo "   ❌ [Recovery] All 3 restart attempts failed! Falling back to backup image..."
+            FALLBACK_HEALTHY=0
+            if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+                echo "   [Fallback] Found backup-1 image. Stopping and removing failed container..."
+                docker stop "$CONTAINER" 2>/dev/null || true
+                docker rm -f "$CONTAINER" 2>/dev/null || true
+                
+                echo "   [Fallback] Re-tagging backup-1 as latest..."
+                docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
+                
+                echo "   [Fallback] Launching container with rolled-back image..."
+                docker compose -f "$COMPOSE_FILE" up -d --force-recreate
+                
+                echo "   [Fallback] Checking health of the backup container (up to 60s)..."
+                for SEC in $(seq 1 30); do
+                    sleep 2
+                    STATUS=$(docker inspect --format='{{.State.Health.Status}}' "$CONTAINER" 2>/dev/null || echo "unknown")
+                    RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+                    if [ "$RUNNING" = "true" ] && [ "$STATUS" = "healthy" ]; then
+                        FALLBACK_HEALTHY=1
+                        break
+                    fi
+                done
+            else
+                echo "   ❌ [Fallback] Backup-1 image is not available on host."
+            fi
+            
+            if [ $FALLBACK_HEALTHY -eq 1 ]; then
+                echo "   ✅ [Fallback] Successfully rolled back to backup-1! Container is healthy."
+                if command -v mail >/dev/null 2>&1; then
+                    echo -e "Container health recovery succeeded via fallback to backup-1 image.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
+                        | mail -s "⚠️  Container Recovered via backup-1 on $HOSTNAME_VAL" "$EMAIL"
+                fi
+            else
+                echo "   ❌ [Fallback] Rollback container failed to become healthy or backup-1 not available."
+                echo "   [Emergency] Starting host-level Starman so service is not interrupted..."
+                
+                # Stop any failed docker container first to free port 5000
+                docker stop "$CONTAINER" 2>/dev/null || true
+                docker rm -f "$CONTAINER" 2>/dev/null || true
+                
+                # Free ports
+                SUDO_CMD=""
+                if sudo -n true 2>/dev/null; then SUDO_CMD="sudo"; fi
+                if command -v fuser &>/dev/null; then
+                    $SUDO_CMD fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                fi
+                
+                # Find host application directory
+                HOST_APP_DIR=""
+                if [ -d "/opt/comserv/Comserv" ]; then
+                    HOST_APP_DIR="/opt/comserv/Comserv"
+                elif [ -d "/home/ubuntu/comserv" ]; then
+                    HOST_APP_DIR="/home/ubuntu/comserv"
+                elif [ -d "/home/shanta/PycharmProjects/comserv2" ]; then
+                    HOST_APP_DIR="/home/shanta/PycharmProjects/comserv2"
+                fi
+                
+                PSGI_FILE=""
+                if [ -n "$HOST_APP_DIR" ]; then
+                    if [ -f "$HOST_APP_DIR/script/comserv_server.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/script/comserv_server.psgi"
+                    elif [ -f "$HOST_APP_DIR/script/comserv.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/script/comserv.psgi"
+                    elif [ -f "$HOST_APP_DIR/comserv_server.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/comserv_server.psgi"
+                    elif [ -f "$HOST_APP_DIR/comserv.psgi" ]; then
+                        PSGI_FILE="$HOST_APP_DIR/comserv.psgi"
+                    fi
+                fi
+                
+                if [ -n "$HOST_APP_DIR" ] && [ -n "$PSGI_FILE" ]; then
+                    echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
+                    cd "$HOST_APP_DIR"
+                    
+                    # Start Host starman daemon using local git code
+                    export CATALYST_HOME="$HOST_APP_DIR"
+                    export CATALYST_ENV=production
+                    export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                    
+                    safe_pkill_f "starman"
+                    safe_pkill_f "plackup"
+                    safe_pkill_f "comserv.*psgi"
+                    safe_pkill_f "comserv_server"
+                    
+                    if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_start.log 2>&1; then
+                        echo "   ✅ [Emergency] Successfully started manual starman server on host port 5000 to prevent interruption!"
+                        if command -v mail >/dev/null 2>&1; then
+                            echo -e "Emergency Fallback: Container died and failed 3 restarts & image rollback. Started host-level Starman on port 5000.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
+                                | mail -s "🚨 Emergency: Host Starman Started (Docker Dead) on $HOSTNAME_VAL" "$EMAIL"
+                        fi
+                    else
+                        echo "   ❌ [Emergency] Failed to start manual starman on host. Log:"
+                        cat /tmp/host_starman_start.log || true
+                    fi
+                else
+                    echo "   ❌ [Emergency] Could not find host Catalyst PSGI file on host."
+                fi
+            fi
+        fi
+    else
+        echo "   ✓ Container $CONTAINER is running and healthy."
+    fi
+fi
+
 # ── Version check ────────────────────────────────────────────────────────────
 if [ "${DEPLOY_MODE:-}" = "quick" ]; then
     echo "Mode: QUICK DEPLOY — Skipping remote version check and image pulling from Docker Hub."

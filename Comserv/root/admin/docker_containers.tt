@@ -595,6 +595,11 @@
                                 <strong style="color: #333;"><i class="fas fa-plug"></i> Starman Service / Port Binding:</strong>
                                 <div id="diag-starman" style="margin-top: 4px; font-family: monospace; font-size: 10px; max-height: 80px; overflow-y: auto; white-space: pre-wrap;"></div>
                                 <div style="margin-top: 4px; display: flex; gap: 6px; flex-wrap: wrap;" id="diag-ports"></div>
+                                <div style="margin-top: 10px; border-top: 1px dashed #ccc; padding-top: 8px;">
+                                    <button class="btn btn-danger btn-xs" onclick="startHostStarman()" style="font-size: 10px; padding: 3px 8px; font-weight: bold; background-color: #dc3545; border: none; color: white; border-radius: 3px; cursor: pointer; display: inline-flex; align-items: center; gap: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#bd2130'" onmouseout="this.style.backgroundColor='#dc3545'">
+                                        <i class="fas fa-exclamation-triangle"></i> Emergency Fallback: Start Host Starman
+                                    </button>
+                                </div>
                             </div>
                         </div>
                         
@@ -891,6 +896,29 @@
                     content.style.display = 'block';
                     content.innerHTML = `<div style="color: #dc3545; padding: 10px; text-align: center;">Network/Server error loading diagnostics: ${err.message}</div>`;
                 }
+            });
+    }
+
+    function startHostStarman() {
+        const target = document.getElementById('docker-target-select')?.value || 'production1';
+        if (!confirm(`Are you sure you want to perform an Emergency Fallback and start Starman on host ${target}?\n\nThis will stop any running web container on port 5000 and run Starman on the host.`)) {
+            return;
+        }
+
+        showResultPopup('Starting Host Starman...', 'Connecting via SSH to host and triggering Starman startup sequence...\nThis may take up to 15 seconds.', 'loading');
+
+        fetch(`/admin/docker-start-starman?target=${target}`, { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showResultPopup('Success', 'Host Starman started successfully:\n\n' + (data.message || ''), true);
+                    loadDiagnostics();
+                } else {
+                    showResultPopup('Error Starting Starman', data.error || 'Unknown error occurred.', false);
+                }
+            })
+            .catch(err => {
+                showResultPopup('Network Error', err.message || 'Network connection failed.', false);
             });
     }
 

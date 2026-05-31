@@ -6512,6 +6512,85 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start_starman',
+        "Manual host Starman startup requested from application");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start_starman')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'production1';
+    
+    # Construct shell command to locate host code, stop failing container, and run daemonized Starman
+    my $start_cmd = q(
+        HOST_APP_DIR=""
+        for DIR in /opt/comserv/Comserv /home/ubuntu/comserv /home/shanta/PycharmProjects/comserv2; do
+            if [ -d "$DIR" ]; then
+                HOST_APP_DIR="$DIR"
+                break
+            fi
+        done
+
+        if [ -n "$HOST_APP_DIR" ]; then
+            cd "$HOST_APP_DIR"
+            PSGI_FILE=""
+            for FILE in script/comserv_server.psgi script/comserv.psgi comserv_server.psgi comserv.psgi; do
+                if [ -f "$FILE" ]; then
+                    PSGI_FILE="$FILE"
+                    break
+                fi
+            done
+            
+            if [ -n "$PSGI_FILE" ]; then
+                # Stop any container running on 5000 to free port
+                docker stop comserv2-web-prod 2>/dev/null || true
+                docker rm -f comserv2-web-prod 2>/dev/null || true
+                
+                # Kill existing starman/plackup on host
+                pkill -f starman 2>/dev/null || true
+                pkill -f plackup 2>/dev/null || true
+                pkill -f comserv.*psgi 2>/dev/null || true
+                
+                # Kill processes holding port 5000
+                if command -v fuser &>/dev/null; then
+                    sudo fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                fi
+                
+                export CATALYST_HOME="$HOST_APP_DIR"
+                export CATALYST_ENV=production
+                export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                
+                if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
+                    echo "SUCCESS: Host Starman service started on port 5000!"
+                else
+                    echo "ERROR: Failed to start host Starman. Log:"
+                    cat /tmp/host_starman_manual.log
+                fi
+            else
+                echo "ERROR: PSGI file not found under $HOST_APP_DIR"
+            fi
+        else
+            echo "ERROR: Host application directory not found."
+        fi
+    );
+    
+    my ($output, $exit_code) = $self->_run_host_cmd_on_target($c, $start_cmd, $target);
+    
+    if ($exit_code != 0 || $output =~ /ERROR:/) {
+        $c->response->body(encode_json({ success => \0, error => $output || "SSH command failed" }));
+    } else {
+        $c->response->body(encode_json({ success => \1, message => $output }));
+    }
+    $c->response->content_type('application/json');
+}
+
 sub docker_load_credentials :Path('/admin/docker-load-credentials') :Args(0) {
     my ($self, $c) = @_;
 
