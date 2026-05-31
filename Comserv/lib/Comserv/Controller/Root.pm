@@ -2090,6 +2090,22 @@ sub end : ActionClass('RenderView') {
         my @errors   = @{$c->error};
         my $err_text = join(' | ', map { defined $_ ? "$_" : 'UNDEF' } @errors);
 
+        # Noise/security patterns — do NOT log to HealthLogger (no todo created)
+        my $is_noise = (
+            $err_text =~ /invalid session id/i                  ||
+            $err_text =~ /Tried to set invalid session/i        ||
+            $err_text =~ /couldn't render template.*not found/i
+        );
+
+        if ($is_noise) {
+            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'end',
+                "Security/noise error (no todo): $err_text");
+            $c->clear_errors;
+            $c->response->status(400);
+            $c->response->body('Bad Request');
+            return;
+        }
+
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 

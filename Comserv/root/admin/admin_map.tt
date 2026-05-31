@@ -102,6 +102,7 @@
                 <a href="/admin/logging" class="map-link"><i class="icon-log"></i> Logging Administration</a>
                 <a href="/admin/logging/audit" class="map-link"><i class="icon-status"></i> Log Audit &amp; Health</a>
                 <a href="/admin/docker-containers" class="map-link"><i class="icon-docker"></i> Docker Containers</a>
+                <a href="/admin/docker-containers-old" class="map-link"><i class="icon-docker"></i> Docker Containers (Old)</a>
             </div>
         </div>
 
