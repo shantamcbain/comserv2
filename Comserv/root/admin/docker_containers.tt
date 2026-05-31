@@ -622,6 +622,21 @@
         </div>
     </div>
 
+    <!-- Custom Results Modal Popup -->
+    <div id="result-modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
+        <div style="background-color: #fff; margin: auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; max-height: 85vh;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+                <h3 id="modal-title" style="margin: 0; font-size: 16px; font-weight: bold; color: #333; display: flex; align-items: center; gap: 6px;">Action Status</h3>
+                <span onclick="closeResultModal()" style="color: #aaa; font-size: 24px; font-weight: bold; cursor: pointer; line-height: 1;" onmouseover="this.style.color='#000'" onmouseout="this.style.color='#aaa'">&times;</span>
+            </div>
+            <div id="modal-body" style="font-size: 12px; line-height: 1.4; overflow-y: auto; max-height: 50vh; white-space: pre-wrap; font-family: monospace; background-color: #1e1e1e; color: #f8f8f2; padding: 12px; border-radius: 4px; border: 1px solid #333; word-break: break-all;">
+            </div>
+            <div style="display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid #eee;">
+                <button onclick="closeResultModal()" style="padding: 6px 15px; font-size: 12px; font-weight: bold; border-radius: 4px; cursor: pointer; background-color: #0066cc; color: white; border: none;">Dismiss</button>
+            </div>
+        </div>
+    </div>
+
     [% END %]
 </div>
 
@@ -634,6 +649,16 @@
         if (content && chevron) {
             content.classList.toggle('expanded');
             chevron.classList.toggle('expanded');
+            
+            if (content.classList.contains('expanded')) {
+                if (sectionId === 'volumes-status') {
+                    refreshVolumes();
+                } else if (sectionId === 'container-status') {
+                    refreshContainers();
+                } else if (sectionId === 'docker-diagnostics-card') {
+                    loadDiagnostics();
+                }
+            }
         }
     }
 
@@ -644,6 +669,24 @@
     const outputBox = document.getElementById('output-box');
     const containersList = document.getElementById('containers-list');
     let containersData = [];
+
+    function showResultPopup(title, content, isSuccess) {
+        const modal = document.getElementById('result-modal');
+        const mTitle = document.getElementById('modal-title');
+        const mBody = document.getElementById('modal-body');
+        if (modal && mTitle && mBody) {
+            mTitle.innerHTML = (isSuccess ? '🟢 ' : '🔴 ') + title;
+            mBody.textContent = content;
+            modal.style.display = 'flex';
+        } else {
+            alert(title + ':\n' + content);
+        }
+    }
+
+    function closeResultModal() {
+        const modal = document.getElementById('result-modal');
+        if (modal) modal.style.display = 'none';
+    }
 
     function appendOutput(message) {
         const timestamp = new Date().toLocaleTimeString();
@@ -1089,14 +1132,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ ${service} created and started successfully!\n` + (data.stdout || ''));
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} created and started successfully!\n` + out);
+                    showResultPopup(`Create & Start ${service}`, `✓ ${service} created and started successfully!\n\n${out}`, true);
                     setTimeout(refreshContainers, 2000);
                 } else {
-                    appendOutput(`✗ Failed to create ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to create ${service}:\n` + err);
+                    showResultPopup(`Create & Start ${service} Failed`, `✗ Failed to create ${service}:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1107,14 +1155,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ ${service} started successfully!\n` + (data.stdout || ''));
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} started successfully!\n` + out);
+                    showResultPopup(`Start ${service}`, `✓ ${service} started successfully!\n\n${out}`, true);
                     setTimeout(refreshContainers, 1000);
                 } else {
-                    appendOutput(`✗ Failed to start ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to start ${service}:\n` + err);
+                    showResultPopup(`Start ${service} Failed`, `✗ Failed to start ${service}:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1129,14 +1182,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ ${service} stopped successfully!\n` + (data.stdout || ''));
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} stopped successfully!\n` + out);
+                    showResultPopup(`Stop ${service}`, `✓ ${service} stopped successfully!\n\n${out}`, true);
                     setTimeout(refreshContainers, 1000);
                 } else {
-                    appendOutput(`✗ Failed to stop ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to stop ${service}:\n` + err);
+                    showResultPopup(`Stop ${service} Failed`, `✗ Failed to stop ${service}:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1151,14 +1209,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput(`✓ ${service} restarted successfully!\n` + (data.stdout || ''));
+                    const out = data.stdout || '';
+                    appendOutput(`✓ ${service} restarted successfully!\n` + out);
+                    showResultPopup(`Restart ${service}`, `✓ ${service} restarted successfully!\n\n${out}`, true);
                     setTimeout(refreshContainers, 2000);
                 } else {
-                    appendOutput(`✗ Failed to restart ${service}:\n` + (data.stderr || data.error || 'Unknown error'));
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to restart ${service}:\n` + err);
+                    showResultPopup(`Restart ${service} Failed`, `✗ Failed to restart ${service}:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1172,15 +1235,20 @@
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
-                    appendOutput(`Logs for ${service}:\n` + (data.output || 'No logs available'));
+                    const out = data.output || 'No logs available';
+                    appendOutput(`Logs for ${service}:\n` + out);
+                    showResultPopup(`Logs for ${service} (Last ${lines} Lines)`, out, true);
                 } else if (data.error) {
                     appendOutput(`Error getting logs:\n` + data.error);
+                    showResultPopup(`Logs for ${service} Failed`, `Error getting logs:\n\n${data.error}`, false);
                 } else {
                     appendOutput('Unable to retrieve logs');
+                    showResultPopup(`Logs for ${service} Failed`, 'Unable to retrieve logs', false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1284,15 +1352,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
-                    appendOutput(`✓ Cleanup complete!\n\n`);
-                    appendOutput(data.output || 'No output\n');
+                    const out = data.output || 'No output';
+                    appendOutput(`✓ Cleanup complete!\n\n` + out);
+                    showResultPopup("Docker Cleanup Complete", `✓ Cleanup complete!\n\n${out}`, true);
                     setTimeout(refreshContainers, 1000);
                 } else {
-                    appendOutput(`✗ Cleanup failed:\n${data.error || 'Unknown error'}\n`);
+                    const err = data.error || 'Unknown error';
+                    appendOutput(`✗ Cleanup failed:\n${err}\n`);
+                    showResultPopup("Docker Cleanup Failed", `✗ Cleanup failed:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1303,16 +1375,20 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success || data.output) {
+                    const out = data.output || 'No data available';
                     appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
-                    appendOutput(`💾 Docker Disk Usage:\n\n`);
-                    appendOutput(data.output || 'No data available\n');
-                    appendOutput(`━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    appendOutput(`💾 Docker Disk Usage:\n\n` + out);
+                    appendOutput(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`);
+                    showResultPopup("Docker Disk Usage Status", out, true);
                 } else {
-                    appendOutput(`✗ Failed to get disk usage:\n${data.error || 'Unknown error'}\n`);
+                    const err = data.error || 'Unknown error';
+                    appendOutput(`✗ Failed to get disk usage:\n${err}\n`);
+                    showResultPopup("Fetch Disk Usage Failed", `✗ Failed to get disk usage:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput(`Error: ${error.message}\n`);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1356,14 +1432,19 @@
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    appendOutput('✓ Restart successful!\n' + (data.stdout || data.output || ''));
+                    const out = data.stdout || data.output || '';
+                    appendOutput('✓ Restart successful!\n' + out);
+                    showResultPopup(`Restart ${service}`, `✓ Restart successful!\n\n${out}`, true);
                     setTimeout(refreshContainers, 2000);
                 } else {
-                    appendOutput('✗ Restart failed:\n' + (data.stderr || data.error || 'Unknown error'));
+                    const err = data.stderr || data.error || 'Unknown error';
+                    appendOutput('✗ Restart failed:\n' + err);
+                    showResultPopup(`Restart ${service} Failed`, `✗ Restart failed:\n\n${err}`, false);
                 }
             })
             .catch(error => {
                 appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
             });
     }
 
@@ -1382,15 +1463,20 @@
             .then(response => response.json())
             .then(data => {
                 if (data.output || data.error === '') {
-                    appendOutput('Logs:\n' + (data.output || 'No logs available'));
+                    const out = data.output || 'No logs available';
+                    appendOutput('Logs:\n' + out);
+                    showResultPopup(`Logs for ${service} (Last ${lines} Lines)`, out, true);
                 } else if (data.error) {
                     appendOutput('Error getting logs:\n' + data.error);
+                    showResultPopup(`Logs for ${service} Failed`, `Error getting logs:\n\n${data.error}`, false);
                 } else {
                     appendOutput('Unable to retrieve logs');
+                    showResultPopup(`Logs for ${service} Failed`, 'Unable to retrieve logs', false);
                 }
             })
             .catch(error => {
                 appendOutput('Error: ' + error.message);
+                showResultPopup("Error", error.message, false);
             });
     }
 

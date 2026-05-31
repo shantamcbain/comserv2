@@ -251,6 +251,22 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
                 comments    => $notes,
                 last_mod_by => $c->session->{username} || 'system',
             });
+
+            # Append the entire log output to the comments of the linked Todo task
+            my $todo_record_id = $entry->todo_record_id;
+            if ($todo_record_id) {
+                my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_record_id);
+                if ($todo) {
+                    my $existing_comments = $todo->comments || '';
+                    my $timestamp = localtime();
+                    my $appended_comments = $existing_comments . "\n\n=== DEPLOYMENT LOG ($timestamp) ===\n" . $output;
+                    $todo->update({
+                        comments      => $appended_comments,
+                        last_mod_by   => $c->session->{username} || 'system',
+                        last_mod_date => $now->ymd,
+                    });
+                }
+            }
         }
     };
 
