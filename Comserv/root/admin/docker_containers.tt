@@ -493,22 +493,32 @@
                     <span class="badge-pill" style="background-color: #dc3545; color: white;">EMERGENCY BYPASS</span>
                 </div>
                 <div id="emergency-fallback-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
+                    <div style="background-color: #fdf2f2; border: 1px solid #f5c6cb; border-radius: 4px; padding: 10px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;">
+                        <div style="flex: 1 1 250px;">
+                            <strong style="color: #721c24; font-size: 12px;"><i class="fas fa-play"></i> Automated Fallback Action</strong>
+                            <p style="margin: 3px 0 0 0; color: #721c24; font-size: 11px;">Triggers the fallback sequence via SSH: stops the container, releases port 5000, updates symlinks, resets systemd counters, and starts Starman on the host.</p>
+                        </div>
+                        <button onclick="startHostStarman()" class="btn btn-danger btn-sm" style="background-color: #dc3545; border-color: #dc3545; color: white; font-weight: bold; padding: 6px 15px; cursor: pointer; border-radius: 4px;">
+                            <i class="fas fa-play"></i> Start Host Starman Service Now
+                        </button>
+                    </div>
+
                     <p style="margin: 0 0 10px 0; color: #555;">If the Docker container continuously becomes unhealthy or fails to recover, run these command-line steps to stop the container and switch back to the host-side Starman service.</p>
                     
                     <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
                         <li>
                             <strong>Stop & Remove the Docker Container</strong>:
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"</pre>
+                            <pre id="emergency-cmd-stop-compose" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"</pre>
                             Alternative direct docker force stop command if compose is stuck:
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "docker stop comserv2-web-prod && docker rm comserv2-web-prod"</pre>
+                            <pre id="emergency-cmd-stop-direct" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "docker stop comserv2-web-prod && docker rm comserv2-web-prod"</pre>
                         </li>
                         <li>
                             <strong>Reset Failed systemd Counters and Start Starman Service</strong>:
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"</pre>
+                            <pre id="emergency-cmd-start-starman" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"</pre>
                         </li>
                         <li>
                             <strong>Verify Host-side Starman Service Health</strong>:
-                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl status starman.service"</pre>
+                            <pre id="emergency-cmd-status-starman" style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl status starman.service"</pre>
                         </li>
                     </ol>
                 </div>
@@ -955,6 +965,51 @@
             });
     }
 
+    function updateEmergencyCommands(target) {
+        let ip = '192.168.1.126';
+        if (target === 'production2') {
+            ip = '192.168.1.127';
+        } else if (target === 'workstation') {
+            ip = 'localhost';
+        }
+        
+        const stopCompose = document.getElementById('emergency-cmd-stop-compose');
+        if (stopCompose) {
+            if (target === 'workstation') {
+                stopCompose.innerText = 'cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down';
+            } else {
+                stopCompose.innerText = `ssh ubuntu@${ip} "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"`;
+            }
+        }
+        
+        const stopDirect = document.getElementById('emergency-cmd-stop-direct');
+        if (stopDirect) {
+            if (target === 'workstation') {
+                stopDirect.innerText = 'docker stop comserv2-web-prod && docker rm comserv2-web-prod';
+            } else {
+                stopDirect.innerText = `ssh ubuntu@${ip} "docker stop comserv2-web-prod && docker rm comserv2-web-prod"`;
+            }
+        }
+        
+        const startStarman = document.getElementById('emergency-cmd-start-starman');
+        if (startStarman) {
+            if (target === 'workstation') {
+                startStarman.innerText = 'sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service';
+            } else {
+                startStarman.innerText = `ssh ubuntu@${ip} "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"`;
+            }
+        }
+        
+        const statusStarman = document.getElementById('emergency-cmd-status-starman');
+        if (statusStarman) {
+            if (target === 'workstation') {
+                statusStarman.innerText = 'sudo systemctl status starman.service';
+            } else {
+                statusStarman.innerText = `ssh ubuntu@${ip} "sudo systemctl status starman.service"`;
+            }
+        }
+    }
+
     function onTargetChange() {
         const targetSelect = document.getElementById('docker-target-select');
         const targetText = targetSelect ? targetSelect.options[targetSelect.selectedIndex].text : 'Workstation';
@@ -963,6 +1018,9 @@
             display.innerHTML = `Active System: <strong>${targetText}</strong>`;
         }
         
+        const targetVal = targetSelect ? targetSelect.value : 'workstation';
+        updateEmergencyCommands(targetVal);
+
         appendOutput(`\n📡 Switched active system target to: ${targetText}\n`);
         
         refreshContainers();
@@ -2164,6 +2222,11 @@
 
     // Initialize - load containers on page load
     document.addEventListener('DOMContentLoaded', function() {
+        // Initialize dynamic emergency fallback commands with default target
+        const targetSelect = document.getElementById('docker-target-select');
+        const defaultTarget = targetSelect ? targetSelect.value : 'workstation';
+        updateEmergencyCommands(defaultTarget);
+
         refreshContainers();
         refreshVolumes();
         loadSavedCredentials();

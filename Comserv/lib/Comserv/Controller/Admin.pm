@@ -6564,6 +6564,11 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
                 export PERL_LOCAL_LIB_ROOT="$HOST_APP_DIR/local"
                 export PERL5LIB="$HOST_APP_DIR/lib:$HOST_APP_DIR/local/lib/perl5:$PERL5LIB"
 
+                if [ -f "script/comserv_server.psgi" ]; then
+                    rm -f comserv.psgi 2>/dev/null || true
+                    ln -sf script/comserv_server.psgi comserv.psgi || cp -f script/comserv_server.psgi comserv.psgi || true
+                fi
+
                 echo "Attempting to reset and start systemd starman.service..."
                 sudo systemctl reset-failed starman.service 2>/dev/null || true
                 sudo systemctl enable starman.service 2>/dev/null || true
