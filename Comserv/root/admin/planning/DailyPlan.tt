@@ -443,6 +443,25 @@
                         style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
                 </div>
 
+                [% IF cross_blocker_count %]
+                <div id="cross-blocker-banner" style="background:color-mix(in srgb,#dc3545 10%,var(--bg-color));border:2px solid #dc3545;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-weight:600;color:#dc3545;font-size:0.95em;margin-bottom:6px;">
+                        <span>🚨</span>
+                        <span>[% cross_blocker_count %] Cross-Project Blocker[% IF cross_blocker_count != 1 %]s[% END %] — Resolve first to unblock other projects</span>
+                    </div>
+                    [% FOREACH ap IN active_priorities %]
+                    [% IF ap.is_cross_blocker %]
+                    <div style="display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:0.88em;">
+                        <span style="color:#dc3545;font-weight:700;">↳</span>
+                        <a href="/todo/details?record_id=[% ap.record_id %]" style="color:var(--text-color);text-decoration:none;font-weight:600;">[% ap.subject | html %]</a>
+                        <span style="color:var(--text-muted-color);">([% ap.project_name || ap.project_code || 'No project' %])</span>
+                        <span style="color:#dc3545;font-size:0.82em;">blocks: [% ap.blocking_names %]</span>
+                    </div>
+                    [% END %]
+                    [% END %]
+                </div>
+                [% END %]
+
                 [% IF active_priorities && active_priorities.size %]
                 <div id="priorities-list">
                 [% SET rank = 0 %]
