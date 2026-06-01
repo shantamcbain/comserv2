@@ -6415,8 +6415,7 @@ sub get_user_providers :Local :Args(0) {
             my $installed = $ollama->list_models() || [];
             my @chat_models = grep {
                 my $n = $_->{name} || '';
-                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i
-                   && $n !~ /:cloud$/i;
+                $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
             } @$installed;
 
             # Build servers list for admins (used by widget server-switcher)

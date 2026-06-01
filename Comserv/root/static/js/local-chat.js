@@ -41,6 +41,7 @@
             large:  null,   // largest Ollama model
             grok:   null    // Grok model (premium users)
         },
+        ollamaHost: null,
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
@@ -796,6 +797,7 @@
                                 wst.title = 'Enable web search for Grok requests (uses API credits)';
                             }
                         } else if (p.service === 'ollama') {
+                            state.ollamaHost = p.active_host;
                             // Update the default "Ollama (Local)" option label
                             const defaultOpt = sel.querySelector('option[value="ollama"]');
                             if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
@@ -1485,7 +1487,9 @@
             if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {
-                modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+                const host = state.ollamaHost || '';
+                const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+                modelDisplay = (isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote)') + (parts[1] ? ': ' + parts[1] : '');
             }
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
@@ -1699,8 +1703,11 @@
 
             data.providers.forEach(function(p) {
                 if (p.service === 'ollama') {
+                    state.ollamaHost = p.active_host;
                     const grp = document.createElement('optgroup');
-                    grp.label = 'Ollama (Local)';
+                    const host = p.active_host || '';
+                    const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+                    grp.label = isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote: ' + host + ')';
                     if (p.models && p.models.length > 0) {
                         // Build model tiers from chat-capable models only, sorted by size.
                         // Exclude sub-2B toy models from auto-selection.
