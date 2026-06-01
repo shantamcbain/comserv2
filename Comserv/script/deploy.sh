@@ -93,15 +93,39 @@ fi
 # If running as /tmp/deploy.sh, copy ourselves to the permanent script folder so that cron jobs use the latest script.
 CURRENT_SCRIPT_PATH=$(readlink -f "$0" 2>/dev/null || echo "$0")
 if [ "$CURRENT_SCRIPT_PATH" = "/tmp/deploy.sh" ] && [ -n "$GLOBAL_HOST_APP_DIR" ]; then
-    TARGET_SCRIPT_DIR="$GLOBAL_HOST_APP_DIR/Comserv/script"
-    if [ -d "$TARGET_SCRIPT_DIR" ]; then
-        echo "--- Script Self-Updating ---"
-        echo "Copying /tmp/deploy.sh -> $TARGET_SCRIPT_DIR/deploy.sh"
-        cp -f "$CURRENT_SCRIPT_PATH" "$TARGET_SCRIPT_DIR/deploy.sh"
-        chmod +x "$TARGET_SCRIPT_DIR/deploy.sh"
-        echo "✅ Permanent script copy updated successfully."
-        echo "----------------------------"
+    echo "--- Script Self-Updating ---"
+    UPDATED=0
+    
+    # 1. Update in Catalyst home directly (for cron/SSH /opt/comserv/Comserv/deploy.sh)
+    if [ -f "$GLOBAL_HOST_APP_DIR/deploy.sh" ] || [ "$GLOBAL_HOST_APP_DIR" = "/opt/comserv/Comserv" ]; then
+        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/deploy.sh"
+        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/deploy.sh"
+        chmod +x "$GLOBAL_HOST_APP_DIR/deploy.sh"
+        UPDATED=1
     fi
+    
+    # 2. Update nested Comserv/script/deploy.sh (workstation style)
+    if [ -d "$GLOBAL_HOST_APP_DIR/Comserv/script" ]; then
+        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
+        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
+        chmod +x "$GLOBAL_HOST_APP_DIR/Comserv/script/deploy.sh"
+        UPDATED=1
+    fi
+    
+    # 3. Update script/deploy.sh (standard server layout)
+    if [ -d "$GLOBAL_HOST_APP_DIR/script" ]; then
+        echo "Copying /tmp/deploy.sh -> $GLOBAL_HOST_APP_DIR/script/deploy.sh"
+        cp -f "$CURRENT_SCRIPT_PATH" "$GLOBAL_HOST_APP_DIR/script/deploy.sh"
+        chmod +x "$GLOBAL_HOST_APP_DIR/script/deploy.sh"
+        UPDATED=1
+    fi
+    
+    if [ $UPDATED -eq 1 ]; then
+        echo "✅ Permanent script copy updated successfully."
+    else
+        echo "⚠️  No valid script target directory found for self-update."
+    fi
+    echo "----------------------------"
 fi
 
 # Helper function to kill host processes by pattern safely, without killing the deploy script itself

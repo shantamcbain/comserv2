@@ -481,6 +481,39 @@
                 </div>
             </div>
 
+            <!-- Emergency Host Starman Fallback (Normally Closed) -->
+            <div class="compact-card" style="border: 1px solid #dc3545;">
+                <div class="compact-card-header collapsible-header" onclick="toggleSection('emergency-fallback-guide')" style="background-color: #fdf2f2; border-bottom: 1px solid #f5c6cb; display: flex; align-items: center; justify-content: space-between;">
+                    <h4 style="margin: 0; font-size: 13px; color: #721c24; display: flex; align-items: center; gap: 6px; font-weight: bold;">
+                        <span>
+                            <i class="fas fa-chevron-right chevron-icon" id="chevron-emergency-fallback-guide" style="margin-right: 8px;"></i>
+                            <i class="fas fa-exclamation-triangle"></i> Emergency Host Starman Fallback
+                        </span>
+                    </h4>
+                    <span class="badge-pill" style="background-color: #dc3545; color: white;">EMERGENCY BYPASS</span>
+                </div>
+                <div id="emergency-fallback-guide" class="compact-card-body collapsible-content" style="padding: 10px 12px; font-size: 11px; line-height: 1.4; color: #333;">
+                    <p style="margin: 0 0 10px 0; color: #555;">If the Docker container continuously becomes unhealthy or fails to recover, run these command-line steps to stop the container and switch back to the host-side Starman service.</p>
+                    
+                    <ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px;">
+                        <li>
+                            <strong>Stop & Remove the Docker Container</strong>:
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "cd /opt/comserv/Comserv && docker compose -f docker-compose.server.yml down"</pre>
+                            Alternative direct docker force stop command if compose is stuck:
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "docker stop comserv2-web-prod && docker rm comserv2-web-prod"</pre>
+                        </li>
+                        <li>
+                            <strong>Reset Failed systemd Counters and Start Starman Service</strong>:
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl reset-failed starman.service && sudo systemctl enable starman.service && sudo systemctl start starman.service"</pre>
+                        </li>
+                        <li>
+                            <strong>Verify Host-side Starman Service Health</strong>:
+                            <pre style="background: #f4f4f4; padding: 4px; border-radius: 3px; font-family: monospace; margin: 2px 0; white-space: pre-wrap; word-break: break-all;">ssh ubuntu@192.168.1.126 "sudo systemctl status starman.service"</pre>
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
             <!-- File and Directory Reference Card (Normally Closed) -->
             <div class="compact-card" style="border: 1px solid #17a2b8;">
                 <div class="compact-card-header collapsible-header" onclick="toggleSection('file-reference-map')" style="background-color: #e3f2fd; border-bottom: 1px solid #bbeeeb; display: flex; align-items: center; justify-content: space-between;">

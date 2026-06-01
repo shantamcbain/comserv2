@@ -863,7 +863,10 @@ sub health_detail :Path('/health/detail') :Args(0) {
     eval {
         my $sess_dir = $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session';
         $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
-        $ok = 0 unless $info{session_dir_ok};
+        my $using_dbic = ($c->config->{'Plugin::Session'} && $c->config->{'Plugin::Session'}{dbic_class}) ? 1 : 0;
+        if (!$info{session_dir_ok} && !$using_dbic) {
+            $ok = 0;
+        }
     };
 
     # 5. Quick DB ping (non-blocking, 2s timeout)
@@ -1941,13 +1944,14 @@ sub begin :Private {
     }
 
     eval {
-        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        my @ha = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { status => 'active' },
             { order_by => 'sitename' }
         )->all;
         $c->stash->{nav_hosting_accounts} = \@ha;
     };
     if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
         $c->stash->{nav_hosting_accounts} = [];
     }
 }
