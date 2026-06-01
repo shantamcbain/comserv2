@@ -332,9 +332,27 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
+    # ====================== TEMPORARY FILE LOG DISABLE ======================
+    # Disable file logging on Production server (or via environment variable)
+    my $system_id = __PACKAGE__->get_system_identifier();
+
+    if ($ENV{COMSERV_DISABLE_FILE_LOG} ||
+        $system_id =~ /production-host/i ||
+        $system_id =~ /192\.168\.1\.126/) {
+
+        $LOG_FH   = undef;
+        $LOG_FILE = undef;
+
+        # Only print to STDERR - do NOT call _print_log() here to avoid recursion
+        print STDERR "=== FILE LOGGING DISABLED on Production Server ===\n";
+        print STDERR "System ID: $system_id\n";
+        print STDERR "Logging to DB + STDERR only.\n";
+
+        return;   # Skip all file operations
+    }
+    # ========================================================================
+
     # Always write to the local log directory first — never NFS during startup.
-    # NFS is only used for archiving rotated logs (via rotate_log), not for live writes.
-    # This prevents the server from hanging in uninterruptible D-state when NFS is slow.
     my $log_file;
     my $log_dir;
 
@@ -344,47 +362,40 @@ sub init {
         my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
         $log_dir = File::Spec->catdir($base_dir, "logs");
     }
-    $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Using local log directory: $log_dir");
 
-    _print_log("Log file: $log_file");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+
+    print STDERR "Using local log directory: $log_dir\n";   # Safe fallback
+    print STDERR "Log file: $log_file\n";
 
     # Create the log directory if it doesn't exist
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+            print STDERR "[ERROR] Failed to create log directory $log_dir: $@\n";
             die "Failed to create log directory $log_dir: $@\n";
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
     # Open the log file for appending
     unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
         my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
+        print STDERR "[ERROR] $error_message\n";
         die $error_message;
     }
 
     # Ensure the file handle is auto-flushed
     select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
 
-    # Write a test entry to ensure the log file is created
     print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-    
+
     # Set global log file path for rotation
     $LOG_FILE = $log_file;
-    _print_log("Global log file path set to: $LOG_FILE");
 
-    # Log initialization message
-    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    # Now safe to use full logging
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+        "Logging system initialized with log file: $LOG_FILE");
 }
-
-# Constructor for creating a new instance
 sub new {
     my ($class) = @_;
     return bless {}, $class;
