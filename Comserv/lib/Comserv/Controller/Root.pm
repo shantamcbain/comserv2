@@ -1948,6 +1948,7 @@ sub begin :Private {
         $c->stash->{nav_hosting_accounts} = \@ha;
     };
     if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
         $c->stash->{nav_hosting_accounts} = [];
     }
 }

@@ -73,6 +73,7 @@ my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
 my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+my $_last_rotation_attempt_at = 0; # epoch time of last preemptive log rotation attempt
 
 my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
 my $ROTATION_THRESHOLD = 40 * 1024 * 1024; # Rotate at 40 MB
@@ -337,8 +338,12 @@ sub init {
     my $log_file;
     my $log_dir;
 
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    $log_dir  = File::Spec->catdir($base_dir, "logs");
+    if ($ENV{'COMSERV_LOG_DIR'}) {
+        $log_dir = $ENV{'COMSERV_LOG_DIR'};
+    } else {
+        my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir = File::Spec->catdir($base_dir, "logs");
+    }
     $log_file = File::Spec->catfile($log_dir, "application.log");
     _print_log("Using local log directory: $log_dir");
 
@@ -724,12 +729,19 @@ sub log_to_file {
     $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
+    # Only try to rotate once every 5 minutes to prevent infinite warning loops if rotation fails
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
-            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
-            eval { rotate_log() };
-            _print_log("Log rotation failed (non-fatal): $@") if $@;
+            my $now = time();
+            if ($now - $_last_rotation_attempt_at >= 300) {
+                $_last_rotation_attempt_at = $now;
+                _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+                eval { rotate_log() };
+                if ($@) {
+                    _print_log("Log rotation failed (non-fatal): $@");
+                }
+            }
         }
     }
 
