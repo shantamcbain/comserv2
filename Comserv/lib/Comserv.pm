@@ -92,7 +92,11 @@ __PACKAGE__->config(
                 }
                 $p;
             };
-            $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
+            my $dir = $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
+            require File::Path;
+            File::Path::make_path($dir) unless -d $dir;
+            require File::Spec;
+            File::Spec->catfile($dir, "comserv_sessions.mmap");
         },
         cookie_name => do {
             my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
@@ -109,7 +113,6 @@ __PACKAGE__->config(
         },
         cookie_secure => 0,
         cookie_httponly => 1,
-        storage => '/tmp/comserv/session/comserv_sessions.mmap',
     },
     'Model::ThemeConfig' => {
         # Theme configuration model

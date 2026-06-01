@@ -8,6 +8,7 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
+      COMSERV_LOG_MIN_LEVEL: INFO
       WEB_PORT: 5000
       TZ: UTC
       NFS_DATA_PATH: /data/nfs
@@ -19,6 +20,7 @@ services:
       - /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro
       - ${COMSERV_LOGS_DIR:-/var/log/comserv}:/opt/comserv/root/log
       - ${NFS_DATA_DIR:-/var/lib/comserv/data}:/data/nfs:rw
+      - /home/ubuntu/comserv-sessions:/tmp/comserv/session:rw
       - whisper-venv:/opt/comserv/whisper_venv:rw
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:5000/health || curl -f http://127.0.0.1:5000/health || curl -g -6 -f http://[::1]:5000/health"]
