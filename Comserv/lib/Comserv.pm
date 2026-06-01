@@ -19,7 +19,7 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
-    Session::Store::DBIC
+    Session::Store::File
     Authentication
 /;
 
@@ -273,24 +273,6 @@ __PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
     return length($id) >= 20 ? lc($id) : undef;
 });
 
-__PACKAGE__->meta->add_around_method_modifier('change_session_id', sub {
-    my ($orig, $c, @args) = @_;
-    my $res = $c->$orig(@args);
-    if ($c->can('_session_store_delegate')) {
-        $c->_session_store_delegate(undef);
-    }
-    return $res;
-});
-
-__PACKAGE__->meta->add_around_method_modifier('change_sessid', sub {
-    my ($orig, $c, @args) = @_;
-    my $res = $c->$orig(@args);
-    if ($c->can('_session_store_delegate')) {
-        $c->_session_store_delegate(undef);
-    }
-    return $res;
-});
-
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality
 # as the application uses db_config.json for database connections instead.
@@ -486,3 +468,245 @@ sub _initialize_session_schema {
     
     return 1;
 }
+
+# --- DUAL-BACKUP SELF-HEALING SESSION STORAGE SYSTEM ---
+# This custom implementation bypasses the static compile-time load requirements of
+# Session::Store::DBIC, preventing startup failures when database is down,
+# and automatically falls back to file-based sessions if the DB table is missing or down.
+
+my $last_db_check = 0;
+my $is_db_ok = 1;
+
+sub _is_db_session_operational {
+    my ($c) = @_;
+    
+    # Check at most once every 5 seconds to avoid database check overhead
+    my $now = time();
+    if ($now - $last_db_check < 5) {
+        return $is_db_ok;
+    }
+    $last_db_check = $now;
+    
+    eval {
+        my $schema = $c->model('DBEncy');
+        if ($schema && $schema->storage && $schema->storage->dbh) {
+            my $dbh = $schema->storage->dbh;
+            # Fast probe query to verify if the sessions table is available and readable
+            my $sth = $dbh->prepare("SELECT 1 FROM sessions LIMIT 1");
+            $sth->execute();
+            $sth->finish();
+            $is_db_ok = 1;
+        } else {
+            $is_db_ok = 0;
+        }
+    };
+    if ($@) {
+        $is_db_ok = 0;
+    }
+    return $is_db_ok;
+}
+
+sub _get_file_session_fallback_dir {
+    my $dir = $ENV{COMSERV_SESSION_FALLBACK_DIR} || '/tmp/comserv_sessions';
+    eval {
+        use File::Path qw(make_path);
+        make_path($dir) unless -d $dir;
+        chmod(0777, $dir); # Ensure all application worker processes can access
+    };
+    return $dir;
+}
+
+sub _get_file_session_data {
+    my ($key) = @_;
+    my $dir = _get_file_session_fallback_dir() or return undef;
+    my $safe_key = $key;
+    $safe_key =~ s/[^0-9a-fA-F_]//g;
+    return undef unless length($safe_key);
+    
+    use File::Spec;
+    my $file = File::Spec->catfile($dir, $safe_key);
+    return undef unless -f $file;
+    
+    use Storable qw(retrieve);
+    my $data = eval { retrieve($file) };
+    if ($@) {
+        warn "Failed to retrieve fallback session file $file: $@\n";
+        return undef;
+    }
+    
+    if (ref $data eq 'HASH' && exists $data->{expires}) {
+        if ($data->{expires} < time()) {
+            # Session expired, purge it
+            eval { unlink($file) };
+            return undef;
+        }
+        return $data->{session_data};
+    }
+    
+    return $data;
+}
+
+sub _store_file_session_data {
+    my ($key, $data) = @_;
+    my $dir = _get_file_session_fallback_dir() or return;
+    my $safe_key = $key;
+    $safe_key =~ s/[^0-9a-fA-F_]//g;
+    return unless length($safe_key);
+    
+    use File::Spec;
+    my $file = File::Spec->catfile($dir, $safe_key);
+    my $expires = time() + 86400; # 24 hours default expiry
+    
+    my $stored_obj = {
+        session_data => $data,
+        expires => $expires,
+    };
+    
+    use Storable qw(nstore);
+    eval { nstore($stored_obj, $file) };
+    if ($@) {
+        warn "Failed to store fallback session file $file: $@\n";
+    }
+}
+
+sub _delete_file_session_data {
+    my ($key) = @_;
+    my $dir = _get_file_session_fallback_dir() or return;
+    my $safe_key = $key;
+    $safe_key =~ s/[^0-9a-fA-F_]//g;
+    return unless length($safe_key);
+    
+    use File::Spec;
+    my $file = File::Spec->catfile($dir, $safe_key);
+    if (-f $file) {
+        eval { unlink($file) };
+    }
+}
+
+sub _cleanup_expired_file_sessions {
+    my $dir = _get_file_session_fallback_dir() or return;
+    eval {
+        opendir(my $dh, $dir) or return;
+        my $now = time();
+        use File::Spec;
+        use Storable qw(retrieve);
+        while (my $entry = readdir($dh)) {
+            next if $entry =~ /^\./;
+            my $file = File::Spec->catfile($dir, $entry);
+            next unless -f $file;
+            
+            my $data = eval { retrieve($file) };
+            if ($@ || (ref $data eq 'HASH' && exists $data->{expires} && $data->{expires} < $now)) {
+                unlink($file);
+            }
+        }
+        closedir($dh);
+    };
+}
+
+sub get_session_data {
+    my ($c, $key) = @_;
+    
+    if (_is_db_session_operational($c)) {
+        my $data = eval {
+            my $model = $c->model('DBEncy');
+            if ($model) {
+                my $rs = $model->resultset('Session');
+                if ($rs) {
+                    my $row = $rs->find($key);
+                    if ($row) {
+                        if (defined $row->expires && $row->expires < time()) {
+                            $row->delete();
+                            return undef;
+                        }
+                        return $row->session_data;
+                    }
+                }
+            }
+            return undef;
+        };
+        if (!$@) {
+            return $data;
+        }
+        warn "Database session retrieval failed for key '$key': $@. Falling back to file storage.\n";
+    }
+    
+    return _get_file_session_data($key);
+}
+
+sub store_session_data {
+    my ($c, $key, $data) = @_;
+    
+    if (_is_db_session_operational($c)) {
+        my $success = eval {
+            my $model = $c->model('DBEncy');
+            if ($model) {
+                my $rs = $model->resultset('Session');
+                if ($rs) {
+                    my $expires = time() + ($c->config->{'Plugin::Session'}{expires} || 86400);
+                    $rs->update_or_create({
+                        id           => $key,
+                        session_data => $data,
+                        expires      => $expires,
+                    });
+                    eval { _store_file_session_data($key, $data) };
+                    return 1;
+                }
+            }
+            return 0;
+        };
+        if ($success) {
+            return;
+        }
+        warn "Database session store failed for key '$key': $@. Falling back to file storage.\n";
+    }
+    
+    _store_file_session_data($key, $data);
+}
+
+sub delete_session_data {
+    my ($c, $key) = @_;
+    
+    if (_is_db_session_operational($c)) {
+        my $success = eval {
+            my $model = $c->model('DBEncy');
+            if ($model) {
+                my $rs = $model->resultset('Session');
+                if ($rs) {
+                    my $row = $rs->find($key);
+                    if ($row) {
+                        $row->delete();
+                    }
+                    eval { _delete_file_session_data($key) };
+                    return 1;
+                }
+            }
+            return 0;
+        };
+        if ($success) {
+            return;
+        }
+        warn "Database session delete failed for key '$key': $@. Falling back to file storage.\n";
+    }
+    
+    _delete_file_session_data($key);
+}
+
+sub delete_expired_sessions {
+    my ($c) = @_;
+    
+    if (_is_db_session_operational($c)) {
+        eval {
+            my $model = $c->model('DBEncy');
+            if ($model) {
+                my $rs = $model->resultset('Session');
+                if ($rs) {
+                    $rs->search({ expires => { '<' => time() } })->delete();
+                }
+            }
+        };
+    }
+    
+    _cleanup_expired_file_sessions();
+}
+
