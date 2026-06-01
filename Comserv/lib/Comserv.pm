@@ -134,7 +134,10 @@ sub psgi_app {
     my $self = shift;
 
     my $app = $self->SUPER::psgi_app(@_);
-    my $request_count = 0;
+    my $request_count  = 0;
+    my $last_alert_mb  = 0;   # track last alerted RSS level (in MB)
+    my $alert_threshold_mb  = 1024;  # first alert at 1 GB
+    my $alert_step_mb       = 256;   # re-alert every additional 256 MB
 
     return sub {
         my $env = shift;
@@ -142,22 +145,25 @@ sub psgi_app {
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-        # Periodic memory monitoring (every 100 requests)
+        # Periodic memory monitoring (every 500 requests)
         $request_count++;
-        if ($request_count % 100 == 0) {
+        if ($request_count % 500 == 0) {
             eval {
                 if (-f "/proc/self/status") {
                     open my $fh, '<', "/proc/self/status";
                     while (<$fh>) {
                         if (/^VmRSS:\s+(\d+)\s+kB/) {
-                            my $rss_kb = $1;
-                            # If RSS > 512MB, log an ERROR to notify admins
-                            if ($rss_kb > 512 * 1024) {
-                                my $rss_mb = sprintf("%.2f", $rss_kb / 1024);
+                            my $rss_mb = $1 / 1024;
+                            # Only alert when we cross a new threshold band
+                            my $next_alert = $last_alert_mb
+                                ? $last_alert_mb + $alert_step_mb
+                                : $alert_threshold_mb;
+                            if ($rss_mb >= $next_alert) {
+                                $last_alert_mb = int($rss_mb / $alert_step_mb) * $alert_step_mb;
                                 Comserv::Util::Logging->instance->log_with_details(
                                     undef, 'ERROR', __FILE__, __LINE__, 'psgi_app_monitor',
-                                    "CRITICAL MEMORY ALERT: Worker process $$ using $rss_mb MB RSS. " .
-                                    "Requests handled: $request_count. Starman will soon recycle this worker."
+                                    sprintf("MEMORY ALERT: Worker %d using %.0f MB RSS (requests: %d).",
+                                        $$, $rss_mb, $request_count)
                                 );
                             }
                             last;
@@ -181,6 +187,33 @@ sub psgi_app {
 # Catches exceptions that escape individual controller error handling
 around 'finalize_error' => sub {
     my ($orig, $c) = @_;
+
+    # Handle invalid session ID attacks (e.g. HTML entities injected into cookie)
+    # Treat as a security event — clear error, delete bad cookie, redirect to home
+    if ($c && $c->error && @{$c->error}) {
+        my $err0 = "${\($c->error->[0] // '')}";
+        if ($err0 =~ /invalid session ID/i) {
+            eval {
+                my $logger = Comserv::Util::Logging->instance;
+                my %req = Comserv::Util::Logging::extract_request_info($c);
+                $logger->log_with_details($c, 'warn', __FILE__, __LINE__, 'finalize_error',
+                    "[SECURITY] Invalid session ID rejected from IP:" . ($req{ip_address}//'?')
+                    . " UA:" . substr($req{user_agent}//'', 0, 80));
+            };
+            $c->clear_errors;
+            eval {
+                my $cookie_name = $c->config->{'Plugin::Session'}{cookie_name}
+                    || 'comserv_session_' . ($ENV{COMSERV_PORT} || 4001);
+                $c->res->cookies->{$cookie_name} = {
+                    value => '', expires => time() - 86400, path => '/'
+                };
+            };
+            $c->res->status(302);
+            $c->res->redirect($c->uri_for('/'));
+            $c->$orig();
+            return;
+        }
+    }
 
     # Log all unhandled errors with context
     eval {
@@ -237,6 +270,17 @@ around 'finalize_error' => sub {
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
 __PACKAGE__->_initialize_ai_chat_schema();
+
+# LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
+# that could be injected (e.g. HTML entities like &#39; from attackers).
+# Must be applied AFTER setup() so the session plugin has mixed in get_session_id.
+__PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
+    my ($orig, $c, @args) = @_;
+    my $id = eval { $c->$orig(@args) };
+    return undef if $@ || !defined $id;
+    $id =~ s/[^0-9a-fA-F]//g;
+    return length($id) >= 20 ? lc($id) : undef;
+});
 
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality

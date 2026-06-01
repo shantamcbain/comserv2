@@ -173,7 +173,20 @@ sub _get_user_accessible_sites {
         if ($is_csc) {
             my $site_model = $c->model('Site');
             my $all = $site_model->get_all_sites($c) || [];
-            @sites = map { $_->name } @$all;
+            my %seen;
+            for my $s (@$all) {
+                my $n = eval { $s->name } // '';
+                push @sites, $n if $n && !$seen{$n}++;
+            }
+            my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                { sitename => { '!=' => undef } },
+                { columns => ['sitename'], distinct => 1 }
+            )->all;
+            for my $r (@todo_sites) {
+                my $n = eval { $r->get_column('sitename') } // '';
+                push @sites, $n if $n && !$seen{$n}++;
+            }
+            @sites = sort @sites;
         } else {
             my $user_id = $c->session->{user_id};
             if ($user_id) {
@@ -194,6 +207,31 @@ sub _get_user_accessible_sites {
     };
     push @sites, $c->session->{SiteName} unless grep { $_ eq ($c->session->{SiteName} || '') } @sites;
     return @sites ? \@sites : [$c->session->{SiteName}];
+}
+
+sub _get_filtered_calendar_sites {
+    my ($self, $c, $all_sites) = @_;
+    my $session = $c->session;
+    my $filter_site;
+    if (!exists $session->{cal_filter_site}) {
+        $filter_site = $session->{SiteName} || '';
+    } else {
+        $filter_site = $session->{cal_filter_site} // '';
+    }
+    return $all_sites unless $filter_site && $filter_site ne '';
+    return (grep { $_ eq $filter_site } @$all_sites) ? [$filter_site] : $all_sites;
+}
+
+sub _apply_user_filter {
+    my ($self, $c, $todos) = @_;
+    my $filter_user = $c->session->{cal_filter_user} // '';
+    return $todos unless $filter_user && $filter_user ne '';
+    my @filtered = grep {
+        my $dev = eval { $_->developer }          // '';
+        my $uop = eval { $_->username_of_poster } // '';
+        $dev eq $filter_user || $uop eq $filter_user;
+    } @$todos;
+    return \@filtered;
 }
 
 # Apply restrictions to the entire controller
@@ -502,6 +540,25 @@ sub details :Path('/todo/details') :Args {
         my $current_status   = $self->normalize_status($todo->get_column('status'));
         my $current_priority = $todo->get_column('priority') // 5;
 
+        my %error_source = ();
+        my $subj = $todo->get_column('subject') // '';
+        if ($subj =~ /^\[(Error|AUDIT)\]/i) {
+            my $comments = $todo->get_column('comments') // '';
+            my $desc     = $todo->get_column('description') // '';
+            if ($comments =~ /^Server:/m) {
+                $error_source{server}   = ($comments =~ /^Server:\s*(.+)/m)   ? $1 : '';
+                $error_source{branch}   = ($comments =~ /^Branch:\s*(.+)/m)   ? $1 : '';
+                $error_source{file}     = ($comments =~ /^File:\s*(.+)/m)     ? $1 : '';
+                $error_source{function} = ($comments =~ /^Function:\s*(.+)/m) ? $1 : '';
+            } else {
+                ($error_source{server})   = $desc =~ /\[([a-zA-Z0-9._-]+:\d+)\]/;
+                ($error_source{branch})   = $desc =~ m{/worktrees/([^/]+)/};
+                ($error_source{file})     = $desc =~ m{(Comserv/[^\s\]]+\.pm(?::\d+)?)};
+                ($error_source{function}) = $desc =~ /\] (\S+) - /;
+            }
+            $_ = ($_ // '') =~ s/^\s+|\s+$//gr for values %error_source;
+        }
+
         # Add the todo, accumulative_time, projects, and interval history to the stash
         $c->stash(
             record            => $todo,
@@ -512,6 +569,7 @@ sub details :Path('/todo/details') :Args {
             projects          => $projects,
             todo_intervals    => \@intervals,
             ai_conversations  => \@ai_conversations,
+            error_source      => \%error_source,
             return_to         => $c->request->params->{return_to} || $c->request->headers->referer || $c->uri_for($self->action_for('todo')),
         );
 
@@ -1147,7 +1205,7 @@ sub create :Local {
     
     # Log the data being inserted for debugging
     my $insert_data = {
-        sitename => $c->session->{SiteName} || 'default_site',
+        sitename => $params->{sitename} || $c->session->{SiteName} || 'default_site',
         start_date => $start_date,
         parent_todo => $params->{parent_todo} || '',
         due_date => $due_date,
@@ -1435,8 +1493,9 @@ sub update_status :Path('/todo/update_status') :Args(0) {
         return;
     }
 
-    my $today   = DateTime->now->ymd;
-    my $now_hms = DateTime->now->strftime('%H:%M:%S');
+    my $_now_dt = DateTime->now(time_zone => 'local');
+    my $today   = $_now_dt->ymd;
+    my $now_hms = $_now_dt->strftime('%H:%M:%S');
 
     eval { $todo->update({ status => $status, last_mod_date => $today }) };
     if ($@) {
@@ -1451,112 +1510,95 @@ sub update_status :Path('/todo/update_status') :Args(0) {
     if ($status == 3 || $status eq 'DONE' || $status eq 'Done' || $status eq 'done') {
         eval {
             my $username  = $c->session->{username}  || 'system';
-            my $sitename  = $c->session->{SiteName}  || $todo->sitename || 'CSC';
-            my $group     = $c->session->{group}     || $c->session->{roles}[0] || 'user';
+            my $sitename  = $c->session->{SiteName}  || eval { $todo->sitename } || 'CSC';
+            my $group     = $c->session->{group}     || (ref($c->session->{roles}) eq 'ARRAY' ? $c->session->{roles}[0] : '') || 'user';
 
             my $start_date = $today;
-            if ($todo->start_date) {
+            if (eval { $todo->start_date }) {
                 my $sd = ref($todo->start_date) ? $todo->start_date->ymd : "${\$todo->start_date}";
                 $start_date = substr($sd, 0, 10) if length($sd) >= 10;
             }
 
-            my $schema = $c->model('DBEncy');
+            my $dbh = $c->model('DBEncy')->storage->dbh;
 
-            # 1. Look for an existing open log (end_time = midnight sentinel, not closed)
-            my $open_log = $schema->resultset('Log')->search({
-                todo_record_id => $record_id,
-                end_time       => '00:00:00',
-                status         => { '!=' => 3 },
-            }, { order_by => { -desc => 'record_id' } })->first;
+            # 1. Find an open log (end_time = sentinel 00:00:00, status != 3) using raw SQL
+            #    to bypass DBIx::Class TIME column inflator which corrupts time comparisons.
+            my $open_row = $dbh->selectrow_hashref(
+                "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+                undef, $record_id
+            );
 
-            my ($start_hms, $dur_mins, $log_entry);
+            my ($start_hms, $dur_mins);
 
-            if ($open_log) {
-                # Close the open log and derive actual duration from it
-                my $raw_start = $open_log->start_time // '09:00:00';
-                $raw_start = ref($raw_start)
-                    ? sprintf('%02d:%02d:%02d', $raw_start->hours//0, $raw_start->minutes//0, 0)
-                    : "$raw_start";
-                $start_hms = ($raw_start =~ /^\d{2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+            if ($open_row) {
+                my $raw_start = $open_row->{start_time} // '09:00:00';
+                $raw_start = "$raw_start";
+                $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? $raw_start : '09:00:00';
+                $start_hms = substr($start_hms, 0, 8);
 
-                my ($sh, $sm) = ($start_hms =~ /^(\d{2}):(\d{2})/);
+                my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
                 my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
                 $dur_mins = ($eh * 60 + $em) - ($sh * 60 + $sm);
                 $dur_mins = 1 if $dur_mins <= 0;
                 my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
 
-                $open_log->update({
-                    end_time      => $now_hms,
-                    time          => $dur_hms,
-                    status        => 3,
-                    last_mod_by   => $username,
-                    last_mod_date => $today,
-                    details       => 'Auto-closed when todo marked done',
-                });
-                $log_id = $open_log->record_id;
+                $dbh->do(
+                    'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, details=? WHERE record_id=?',
+                    undef, $now_hms, $dur_hms, $username, $today,
+                    'Auto-closed when todo marked done', $open_row->{record_id}
+                );
+                $log_id = $open_row->{record_id};
 
                 $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
-                    "Closed open log " . $open_log->record_id . " for todo $record_id: $dur_mins min");
+                    "Closed open log $log_id for todo $record_id: $dur_mins min (raw SQL)");
             } else {
-                # No open log — estimate duration intelligently
+                # No open log — estimate duration intelligently via raw SQL to avoid inflator
                 $dur_mins = undef;
 
                 # 2a. Average duration from past closed logs for this exact todo
-                my @same_logs = $schema->resultset('Log')->search({
-                    todo_record_id => $record_id,
-                    status         => 3,
-                    time           => { '!=' => '00:00:00' },
-                })->all;
-                if (@same_logs) {
-                    my $total = 0; my $count = 0;
-                    for my $lg (@same_logs) {
-                        my $t = $lg->time // '00:00:00';
-                        $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
-                        if ($t =~ /^(\d+):(\d+)/) {
-                            $total += $1 * 60 + $2;
-                            $count++;
-                        }
+                my $rows_a = $dbh->selectall_arrayref(
+                    "SELECT TIME_TO_SEC(time) AS secs FROM log WHERE todo_record_id=? AND status=3 AND time!='00:00:00'",
+                    { Slice => {} }, $record_id
+                );
+                if ($rows_a && @$rows_a) {
+                    my ($total, $count) = (0, 0);
+                    for my $r (@$rows_a) {
+                        my $s = $r->{secs} // 0;
+                        $total += $s; $count++;
                     }
-                    $dur_mins = int($total / $count) if $count > 0;
+                    $dur_mins = int($total / $count / 60) if $count > 0;
                 }
 
-                # 2b. Average from logs with similar abstract (first 40 chars of subject)
-                if (!$dur_mins && $todo->subject) {
+                # 2b. Average from logs with similar abstract
+                if (!$dur_mins && eval { $todo->subject }) {
                     my $kw = substr($todo->subject, 0, 40);
-                    $kw =~ s/[%_]//g;
-                    my @kw_logs = $schema->resultset('Log')->search({
-                        abstract => { 'like' => "%$kw%" },
-                        status   => 3,
-                        time     => { '!=' => '00:00:00' },
-                    }, { rows => 50 })->all;
-                    if (@kw_logs) {
-                        my $total = 0; my $count = 0;
-                        for my $lg (@kw_logs) {
-                            my $t = $lg->time // '00:00:00';
-                            $t = ref($t) ? sprintf('%02d:%02d:00', $t->hours//0, $t->minutes//0) : "$t";
-                            if ($t =~ /^(\d+):(\d+)/) {
-                                $total += $1 * 60 + $2;
-                                $count++;
-                            }
+                    $kw =~ s/[%_\\]//g;
+                    my $rows_b = $dbh->selectall_arrayref(
+                        "SELECT TIME_TO_SEC(time) AS secs FROM log WHERE abstract LIKE ? AND status=3 AND time!='00:00:00' LIMIT 50",
+                        { Slice => {} }, "%$kw%"
+                    );
+                    if ($rows_b && @$rows_b) {
+                        my ($total, $count) = (0, 0);
+                        for my $r (@$rows_b) {
+                            my $s = $r->{secs} // 0;
+                            $total += $s; $count++;
                         }
-                        $dur_mins = int($total / $count) if $count > 0;
+                        $dur_mins = int($total / $count / 60) if $count > 0;
                     }
                 }
 
-                # 2c. Use estimated_man_hours (stored in minutes) from the todo record
-                if (!$dur_mins && $todo->estimated_man_hours && $todo->estimated_man_hours > 0) {
-                    $dur_mins = $todo->estimated_man_hours;
+                # 2c. estimated_man_hours from todo record
+                if (!$dur_mins) {
+                    my $emh = eval { $todo->estimated_man_hours } // 0;
+                    $dur_mins = $emh if $emh > 0;
                 }
 
                 # 2d. Industry-standard defaults by todo_type
                 if (!$dur_mins) {
-                    my $ttype = lc($todo->todo_type // 'task');
+                    my $ttype = lc(eval { $todo->todo_type } // 'task');
                     my %type_defaults = (
-                        task        => 30,
-                        appointment => 60,
-                        meeting     => 60,
-                        event       => 120,
-                        reminder    => 5,
+                        task => 30, appointment => 60, meeting => 60,
+                        event => 120, reminder => 5,
                     );
                     $dur_mins = $type_defaults{$ttype} // 30;
                     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'update_status',
@@ -1564,35 +1606,33 @@ sub update_status :Path('/todo/update_status') :Args(0) {
                 }
 
                 # Derive start from scheduled time_of_day; end = now
-                my $start_raw = $todo->time_of_day // '';
+                my $start_raw = eval { $todo->time_of_day } // '';
                 $start_raw = ref($start_raw)
-                    ? sprintf('%02d:%02d:%02d', $start_raw->hours//0, $start_raw->minutes//0, 0)
+                    ? sprintf('%02d:%02d:00', $start_raw->hours//0, $start_raw->minutes//0)
                     : "$start_raw";
-                $start_hms = ($start_raw =~ /^\d{2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
+                $start_hms = ($start_raw =~ /^\d{1,2}:\d{2}/) ? substr($start_raw, 0, 8) : '09:00:00';
 
-                my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+                my $dur_hms  = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+                my $proj_code = eval {
+                    my $p = $c->model('DBEncy')->resultset('Project')->find(eval { $todo->project_id } // 0);
+                    $p ? ($p->project_code // '') : '';
+                } // '';
+                my $abstract = eval { $todo->subject } // 'Completed todo';
+                my $priority = eval { $todo->priority } // 5;
+                my $comments = eval { $todo->comments } // '';
 
-                $log_entry = $schema->resultset('Log')->create({
-                    todo_record_id  => $record_id,
-                    username        => $username,
-                    sitename        => $sitename,
-                    start_date      => $start_date,
-                    project_code    => $todo->project_id || 0,
-                    due_date        => $today,
-                    abstract        => ($todo->subject // 'Completed todo'),
-                    details         => "Auto-log: estimated $dur_mins min (no open log found)",
-                    start_time      => $start_hms,
-                    end_time        => $now_hms,
-                    time            => $dur_hms,
-                    group_of_poster => $group,
-                    status          => 3,
-                    priority        => $todo->priority || 5,
-                    last_mod_by     => $username,
-                    last_mod_date   => $today,
-                    comments        => '',
-                    points_processed => 0,
-                });
-                $log_id = $log_entry->record_id;
+                $dbh->do(
+                    'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, group_of_poster, status, priority, last_mod_by, last_mod_date, comments, points_processed) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,0)',
+                    undef,
+                    $record_id, $username, $sitename, $proj_code,
+                    $abstract,
+                    "Auto-log: estimated $dur_mins min (no open log found)",
+                    $start_date, $today,
+                    $start_hms, $now_hms, $dur_hms,
+                    $group,
+                    $priority, $username, $today, $comments
+                );
+                $log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
             }
         };
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'update_status',
@@ -1841,11 +1881,13 @@ sub day :Path('/todo/day') :Args {
     # Get the Todo model
     my $todo_model = $c->model('Todo');
 
-    my $calendar_sites = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites);
+    my $calendar_sites          = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites = $self->_get_filtered_calendar_sites($c, $calendar_sites);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 'day',
-        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$calendar_sites));
+        "Fetched " . scalar(@$todos) . " total todos for sites " . join(',', @$filtered_calendar_sites));
 
     # Filter todos for the given day using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $date, $date, 1);
@@ -1927,24 +1969,13 @@ sub day :Path('/todo/day') :Args {
     eval {
         if ($day_is_csc) {
             my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                { roles => { -like => '%admin%' } },
+                { roles => { '!=' => '', -not => undef } },
                 { columns => ['username'], order_by => 'username' }
             )->all;
             my %seen;
             for my $r (@urows) {
                 my $u = eval { $r->username } // '';
                 push @day_all_usernames, $u if $u && !$seen{$u}++;
-            }
-            unless (@day_all_usernames) {
-                my @all_urows = $c->model('DBEncy')->resultset('Users')->search(
-                    {},
-                    { columns => ['username'], order_by => 'username', rows => 200 }
-                )->all;
-                %seen = ();
-                for my $r (@all_urows) {
-                    my $u = eval { $r->username } // '';
-                    push @day_all_usernames, $u if $u && !$seen{$u}++;
-                }
             }
         } else {
             my %seen;
@@ -1954,6 +1985,15 @@ sub day :Path('/todo/day') :Args {
             }
             @day_all_usernames = sort @day_all_usernames;
         }
+    };
+
+    my %active_todos;
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+        my $rows = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+        );
+        %active_todos = map { $_ => 1 } @$rows if $rows;
     };
 
     $c->stash(
@@ -1968,6 +2008,9 @@ sub day :Path('/todo/day') :Args {
         is_csc                 => $day_is_csc,
         ap_all_sitenames       => \@day_all_sitenames,
         ap_all_usernames       => \@day_all_usernames,
+        cal_filter_site        => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_user        => ($c->session->{cal_filter_user} // ''),
+        active_todos           => \%active_todos,
         template               => 'todo/day.tt',
     );
 
@@ -2018,8 +2061,10 @@ sub week :Path('/todo/week') :Args {
         };
     }
 
-    my $calendar_sites_w = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_w);
+    my $calendar_sites_w         = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites_w = $self->_get_filtered_calendar_sites($c, $calendar_sites_w);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites_w);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     # Filter todos for the given week using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_week, $end_of_week, 1);
@@ -2082,6 +2127,29 @@ sub week :Path('/todo/week') :Args {
         }
     }
 
+    my $week_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+    my @week_all_usernames;
+    eval {
+        if ($week_is_csc) {
+            my @urows = $c->model('DBEncy')->resultset('Users')->search(
+                { roles => { '!=' => '', -not => undef } },
+                { columns => ['username'], order_by => 'username' }
+            )->all;
+            my %seen;
+            for my $r (@urows) {
+                my $u = eval { $r->username } // '';
+                push @week_all_usernames, $u if $u && !$seen{$u}++;
+            }
+        } else {
+            my %seen;
+            for my $t (@sorted_todos) {
+                my $u = eval { $t->developer || $t->username_of_poster || '' };
+                push @week_all_usernames, $u if $u && !$seen{$u}++;
+            }
+            @week_all_usernames = sort @week_all_usernames;
+        }
+    };
+
     # Add the todos to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -2094,6 +2162,11 @@ sub week :Path('/todo/week') :Args {
         next_week_date => $next_week_date,
         week_dates => \@week_dates,
         proj_name_map => \%week_proj_map,
+        ap_all_sitenames => $calendar_sites_w,
+        ap_all_usernames => \@week_all_usernames,
+        cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_user  => ($c->session->{cal_filter_user} // ''),
+        is_csc           => $week_is_csc,
         template => 'todo/week.tt',
     );
 
@@ -2125,8 +2198,10 @@ sub month :Path('/todo/month') :Args {
     my $prev_month_date = $dt->clone->subtract(months => 1)->set_day(1)->strftime('%Y-%m-%d');
     my $next_month_date = $dt->clone->add(months => 1)->set_day(1)->strftime('%Y-%m-%d');
 
-    my $calendar_sites_m = $self->_get_user_accessible_sites($c);
-    my $todos = $todo_model->get_all_todos_for_calendar($c, $calendar_sites_m);
+    my $calendar_sites_m          = $self->_get_user_accessible_sites($c);
+    my $filtered_calendar_sites_m = $self->_get_filtered_calendar_sites($c, $calendar_sites_m);
+    my $todos = $todo_model->get_all_todos_for_calendar($c, $filtered_calendar_sites_m);
+    $todos = $self->_apply_user_filter($c, $todos);
 
     # Filter todos for the given month using the shared method
     my $filtered_todos = $self->filter_todos_by_date_range($c, $todos, $start_of_month, $end_of_month, 1);
@@ -2174,6 +2249,8 @@ sub month :Path('/todo/month') :Args {
     # Get today's date for highlighting
     my $today = DateTime->now->ymd;
 
+    my $month_is_csc = (uc($c->session->{SiteName} || '') eq 'CSC') ? 1 : 0;
+
     # Add the todos and calendar to the stash
     $c->stash(
         todos => \@sorted_todos,
@@ -2186,6 +2263,10 @@ sub month :Path('/todo/month') :Args {
         prev_month_date => $prev_month_date,
         next_month_date => $next_month_date,
         today => $today,
+        ap_all_sitenames => $calendar_sites_m,
+        cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : ($c->session->{SiteName} // '')),
+        cal_filter_user  => ($c->session->{cal_filter_user} // ''),
+        is_csc           => $month_is_csc,
         template => 'todo/month.tt',
     );
 
@@ -2509,17 +2590,18 @@ sub quick_close :Path('quick_close') :Args(0) {
         return;
     }
 
-    my $today = DateTime->now->ymd;
+    my $now_dt     = DateTime->now(time_zone => 'local');
+    my $today      = $now_dt->ymd;
+    my $now_hms    = $now_dt->strftime('%H:%M:%S');
     eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
         die "Todo not found\n" unless $todo;
 
-        my $close_time = do { my @t = localtime; sprintf('%02d:%02d:%02d', $t[2], $t[1], $t[0]) };
         $todo->update({
             status        => 3,
             last_mod_by   => $username,
             last_mod_date => $today,
-            time_of_day   => $close_time,
         });
 
         my $proj_code = '';
@@ -2527,26 +2609,45 @@ sub quick_close :Path('quick_close') :Args(0) {
             my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
             $proj_code = $proj ? ($proj->project_code || '') : '';
         }
-        $c->model('DBEncy')->resultset('Log')->create({
-            todo_record_id  => $record_id,
-            username        => $username,
-            sitename        => $todo->sitename || $c->session->{SiteName},
-            project_code    => $proj_code,
-            abstract        => 'Quick-closed from Active Priorities panel',
-            details         => 'Marked done via quick-close button on DailyPlan by ' . $username,
-            start_date      => $today,
-            due_date        => $today,
-            start_time      => '00:00:00',
-            end_time        => '00:00:00',
-            time            => '00:00:00',
-            status          => 3,
-            priority        => $todo->priority || 5,
-            last_mod_by     => $username,
-            last_mod_date   => $today,
-            group_of_poster  => $c->session->{group} || '',
-            comments         => '',
-            points_processed => 0,
-        });
+        my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
+        my $priority_val = eval { $todo->priority } // 5;
+        my $group_val    = $c->session->{group} || '';
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+
+        if ($open_row) {
+            my $raw_start = $open_row->{start_time} // '09:00:00';
+            $raw_start = "$raw_start";
+            my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+            my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
+            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+            $dur_mins = 1 if $dur_mins <= 0;
+            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, details=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today,
+                'Closed via quick-close button on DailyPlan by ' . $username,
+                $open_row->{record_id}
+            );
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'quick_close',
+                "Closed open log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
+        } else {
+            my $abstract = eval { $todo->subject } // 'Quick-closed todo';
+            $dbh->do(
+                'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments, points_processed) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?,0)',
+                undef,
+                $record_id, $username, $sitename_val, $proj_code,
+                $abstract,
+                'Quick-closed from Active Priorities panel by ' . $username,
+                $today, $today, $now_hms, $now_hms, '00:01:00',
+                $priority_val, $username, $today, $group_val, ''
+            );
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'quick_close',
@@ -3019,20 +3120,27 @@ sub open_log :Path('open_log') :Args(0) {
         return;
     }
 
-    my $now   = DateTime->now;
+    my $now   = DateTime->now(time_zone => 'local');
     my $today = $now->ymd;
     my $time  = $now->hms;
 
     eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
         my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
         die "Todo not found\n" unless $todo;
 
-        my $existing_open = $c->model('DBEncy')->resultset('Log')->search({
-            todo_record_id => $record_id,
-            end_time       => '00:00:00',
-            status         => { '!=' => 3 },
-        })->first;
-        die "Log already open for this todo\n" if $existing_open;
+        # Use raw SQL to check for existing open log — avoids TIME inflator bug
+        my $existing_open = $dbh->selectrow_hashref(
+            "SELECT record_id FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 LIMIT 1",
+            undef, $record_id
+        );
+        if ($existing_open) {
+            my $cur_status = $dbh->selectrow_array("SELECT status FROM todo WHERE record_id=?", undef, $record_id) // 0;
+            $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+                undef, $username, $today, $record_id) if $cur_status != 5;
+            $c->response->body('{"ok":1,"already_open":1,"log_id":' . $existing_open->{record_id} . '}');
+            return;
+        }
 
         my $proj_code = '';
         if ($todo->project_id) {
@@ -3040,39 +3148,198 @@ sub open_log :Path('open_log') :Args(0) {
             $proj_code = $proj ? ($proj->project_code || '') : '';
         }
 
-        my $log = $c->model('DBEncy')->resultset('Log')->create({
-            todo_record_id  => $record_id,
-            username        => $username,
-            sitename        => $todo->sitename || $c->session->{SiteName},
-            project_code    => $proj_code,
-            abstract        => 'Started: ' . $todo->subject,
-            details         => 'Work begun on this step by ' . $username,
-            start_date      => $today,
-            due_date        => $todo->due_date || $today,
-            start_time      => $time,
-            end_time        => '00:00:00',
-            time            => '00:00:00',
-            status          => 2,
-            priority        => $todo->priority || 5,
-            last_mod_by     => $username,
-            last_mod_date   => $today,
-            group_of_poster => $c->session->{group} || '',
-            comments        => $todo->comments || '',
-        });
+        my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
+        my $due_date_val = eval {
+            my $dd = $todo->due_date;
+            $dd ? (ref($dd) ? $dd->ymd : substr("$dd", 0, 10)) : $today;
+        } // $today;
+        my $priority_val = eval { $todo->priority } // 5;
+        my $comments_val = eval { $todo->comments } // '';
+        my $group_val    = $c->session->{group} || '';
 
-        $todo->update({
-            status        => 2,
-            last_mod_by   => $username,
-            last_mod_date => $today,
-        });
+        # Use raw SQL INSERT to avoid DBIx::Class TIME column inflator
+        $dbh->do(
+            'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,"00:00:00","00:00:00",2,?,?,?,?,?)',
+            undef,
+            $record_id, $username, $sitename_val, $proj_code,
+            'Started: ' . ($todo->subject // ''),
+            'Work begun on this step by ' . $username,
+            $today, $due_date_val, $time,
+            $priority_val, $username, $today, $group_val, $comments_val
+        );
+        my $new_log_id = $dbh->last_insert_id(undef, undef, 'log', 'record_id');
+
+        $dbh->do("UPDATE todo SET status=5, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
 
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'open_log',
-            "Log opened for todo $record_id by $username (log_id=" . $log->record_id . ")");
-        $c->response->body('{"ok":1,"log_id":' . $log->record_id . '}');
+            "Log opened for todo $record_id by $username (log_id=$new_log_id) via raw SQL");
+        $c->response->body('{"ok":1,"log_id":' . ($new_log_id // 0) . '}');
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'open_log',
             "Failed open_log for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    }
+}
+
+sub close_log :Path('close_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Admin role required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $now_dt  = DateTime->now(time_zone => 'local');
+    my $today   = $now_dt->ymd;
+    my $now_hms = $now_dt->strftime('%H:%M:%S');
+
+    eval {
+        my $dbh = $c->model('DBEncy')->storage->dbh;
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+        die "No open log found for todo $record_id\n" unless $open_row;
+
+        my $raw_start = $open_row->{start_time} // '09:00:00';
+        $raw_start = "$raw_start";
+        my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+        my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
+        my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+        my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+        $dur_mins = 1 if $dur_mins <= 0;
+        my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+        my $notes = $data->{notes} // '';
+
+        $dbh->do(
+            'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
+            undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
+        );
+
+        $dbh->do("UPDATE todo SET status=2, last_mod_by=?, last_mod_date=? WHERE record_id=? AND status=5",
+            undef, $username, $today, $record_id);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'close_log',
+            "Closed log ${\$open_row->{record_id}} for todo $record_id ($dur_mins min)");
+        $c->response->body('{"ok":1,"duration_mins":' . $dur_mins . '}');
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'close_log',
+            "Failed close_log for todo $record_id: $@");
+        $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
+    }
+}
+
+sub done_with_log :Path('done_with_log') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    my $username = $c->session->{username} // '';
+    my $roles    = $c->session->{roles} || [];
+    my @rl       = ref($roles) eq 'ARRAY' ? @$roles : ($roles);
+    unless ($username && $username ne 'anonymous' && grep { /^(admin|developer|editor|devops|user|normal)$/i } @rl) {
+        $c->response->status(403);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { require JSON; $data = JSON::decode_json($body) if $body; };
+    my $record_id = $data->{record_id} if $data;
+    unless ($record_id) {
+        $c->response->status(400);
+        $c->response->body('{"ok":0,"error":"Missing record_id"}');
+        return;
+    }
+
+    my $notes    = $data->{notes} // '';
+    my $now_dt   = DateTime->now(time_zone => 'local');
+    my $today    = $now_dt->ymd;
+    my $now_hms  = $now_dt->strftime('%H:%M:%S');
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $todo = $c->model('DBEncy')->resultset('Todo')->find($record_id);
+        die "Todo not found\n" unless $todo;
+
+        my $open_row = $dbh->selectrow_hashref(
+            "SELECT record_id, start_time FROM log WHERE todo_record_id=? AND end_time='00:00:00' AND status!=3 ORDER BY record_id DESC LIMIT 1",
+            undef, $record_id
+        );
+
+        if ($open_row) {
+            my $raw_start = $open_row->{start_time} // '09:00:00';
+            $raw_start = "$raw_start";
+            my $start_hms = ($raw_start =~ /^\d{1,2}:\d{2}/) ? substr($raw_start, 0, 8) : '09:00:00';
+            my ($sh, $sm) = ($start_hms =~ /^(\d+):(\d+)/);
+            my ($eh, $em) = ($now_hms   =~ /^(\d{2}):(\d{2})/);
+            my $dur_mins  = ($eh * 60 + $em) - ($sh * 60 + $sm);
+            $dur_mins = 1 if $dur_mins <= 0;
+            my $dur_hms = sprintf('%02d:%02d:00', int($dur_mins / 60), $dur_mins % 60);
+
+            $dbh->do(
+                'UPDATE log SET end_time=?, time=?, status=3, last_mod_by=?, last_mod_date=?, comments=? WHERE record_id=?',
+                undef, $now_hms, $dur_hms, $username, $today, $notes, $open_row->{record_id}
+            );
+        } else {
+            my $proj_code    = '';
+            if ($todo->project_id) {
+                my $proj = eval { $c->model('DBEncy')->resultset('Project')->find($todo->project_id) };
+                $proj_code = $proj ? ($proj->project_code || '') : '';
+            }
+            my $sitename_val = eval { $todo->sitename } || $c->session->{SiteName} || '';
+            my $due_date_val = eval {
+                my $dd = $todo->due_date;
+                $dd ? (ref($dd) ? $dd->ymd : substr("$dd", 0, 10)) : $today;
+            } // $today;
+            my $priority_val = eval { $todo->priority } // 5;
+            my $group_val    = $c->session->{group} || '';
+            my $est_mins     = eval { $todo->estimated_time } // 15;
+            my $dur_hms      = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
+
+            $dbh->do(
+                'INSERT INTO log (todo_record_id, username, sitename, project_code, abstract, details, start_date, due_date, start_time, end_time, time, status, priority, last_mod_by, last_mod_date, group_of_poster, comments) VALUES (?,?,?,?,?,?,?,?,?,?,?,3,?,?,?,?,?)',
+                undef,
+                $record_id, $username, $sitename_val, $proj_code,
+                'Completed: ' . ($todo->subject // ''),
+                'Marked done by ' . $username,
+                $today, $due_date_val, $now_hms, $now_hms, $dur_hms,
+                $priority_val, $username, $today, $group_val, $notes
+            );
+        }
+
+        $dbh->do("UPDATE todo SET status=3, last_mod_by=?, last_mod_date=? WHERE record_id=?",
+            undef, $username, $today, $record_id);
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'done_with_log',
+            "Todo $record_id marked done by $username");
+        $c->response->body('{"ok":1}');
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'done_with_log',
+            "Failed done_with_log for todo $record_id: $@");
         $c->response->body('{"ok":0,"error":' . (JSON::encode_json("$@")) . '}');
     }
 }

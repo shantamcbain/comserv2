@@ -1,54 +1,55 @@
-[% META title = is_edit ? 'Edit Database Server' : 'Add Database Server' %]
 
-[% IF error_msg %]<div class="alert alert-danger">[% error_msg | html %]</div>[% END %]
+<div class="app-container">
 
-<h1>[% is_edit ? 'Edit' : 'Add' %] Database Server</h1>
-
-[% IF !is_edit %]
-<div class="alert alert-info" style="margin-bottom:1em;">
-    <strong>Tip:</strong> Not sure what to enter? Ask the AI assistant below the form for help.
-    Common defaults: MariaDB port 3306, MySQL (Docker) port 3307, PostgreSQL 5432, PostgreSQL (Docker) 5433.
+<div class="page-header">
+    <h1>[% is_edit ? 'Edit' : 'Add' %] Database Server</h1>
 </div>
-[% END %]
+
+[% IF success_msg %]<div class="success-message">[% success_msg | html %]</div>[% END %]
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="form-container">
 
 <form method="post"
       action="[% is_edit ? c.uri_for('/remotedb/edit') _ '/' _ conn_name : c.uri_for('/remotedb/add') %]"
-      style="max-width:700px;">
+      class="app-form">
 
-    <fieldset style="border:1px solid #ccc;padding:1em;border-radius:5px;margin-bottom:1.2em;">
-        <legend style="font-weight:bold;padding:0 0.5em;">Identity</legend>
+    <div class="form-section">
+        <h3>Identity</h3>
 
         [% UNLESS is_edit %]
-        <div style="margin-bottom:0.8em;">
-            <label for="conn_name"><strong>Connection Name *</strong></label>
-            <input type="text" id="conn_name" name="conn_name"
-                   value="[% form_data.conn_name | html %]"
-                   placeholder="e.g. db_production_mysql"
-                   pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscores only"
-                   required style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
-            <small style="color:#666;">Unique key — becomes the filename in secrets/dbi/. Lowercase, underscores.</small>
+        <div class="form-row">
+            <div class="form-field">
+                <label for="conn_name">Connection Name *</label>
+                <input type="text" id="conn_name" name="conn_name" class="form-input"
+                       value="[% form_data.conn_name | html %]"
+                       placeholder="e.g. db_production_mysql"
+                       pattern="[a-zA-Z0-9_]+" title="Letters, numbers, underscores only"
+                       required>
+                <small>Unique key — lowercase, underscores only.</small>
+            </div>
         </div>
         [% END %]
 
-        <div style="margin-bottom:0.8em;">
-            <label for="description"><strong>Description</strong></label>
-            <input type="text" id="description" name="description"
-                   value="[% form_data.description | html %]"
-                   placeholder="e.g. Production MariaDB on Dell R710"
-                   style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="description">Description</label>
+                <input type="text" id="description" name="description" class="form-input"
+                       value="[% form_data.description | html %]"
+                       placeholder="e.g. Production MariaDB on Dell R710">
+            </div>
         </div>
-    </fieldset>
+    </div>
 
-    <fieldset style="border:1px solid #ccc;padding:1em;border-radius:5px;margin-bottom:1.2em;">
-        <legend style="font-weight:bold;padding:0 0.5em;">Connection</legend>
+    <div class="form-section">
+        <h3>Connection</h3>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.8em;">
-
-            <div>
-                <label for="db_type"><strong>Database Type *</strong></label>
-                <select id="db_type" name="db_type" required
-                        style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;"
-                        onchange="setDefaultPort(this.value)">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="db_type">Database Type *</label>
+                <select id="db_type" name="db_type" class="form-input" required onchange="setDefaultPort(this.value)">
                     [% FOREACH t IN db_types %]
                     <option value="[% t | html %]"
                         [% IF form_data.db_type == t || (!form_data.db_type && t == 'mariadb') %]selected[% END %]>
@@ -57,67 +58,80 @@
                     [% END %]
                 </select>
             </div>
+        </div>
 
-            <div>
-                <label for="port"><strong>Port *</strong></label>
-                <input type="number" id="port" name="port"
-                       value="[% form_data.port || 3306 %]"
-                       min="1" max="65535" required
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
-                <small style="color:#666;">MariaDB/MySQL: 3306 · MySQL Docker: 3307 · PG: 5432 · PG Docker: 5433</small>
-            </div>
-
-            <div>
-                <label for="host"><strong>Host *</strong></label>
-                <input type="text" id="host" name="host"
+        <div class="form-row">
+            <div class="form-field">
+                <label for="host">Host *</label>
+                <input type="text" id="host" name="host" class="form-input"
                        value="[% form_data.host || 'localhost' %]"
-                       placeholder="192.168.1.x or hostname" required
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+                       placeholder="192.168.1.x or hostname" required>
             </div>
+        </div>
 
-            <div>
-                <label for="database"><strong>Database Name *</strong></label>
-                <input type="text" id="database" name="database"
+        <div class="form-row">
+            <div class="form-field">
+                <label for="port">Port *</label>
+                <input type="number" id="port" name="port" class="form-input"
+                       value="[% form_data.port || 3306 %]"
+                       min="1" max="65535" required>
+                <small>MariaDB/MySQL: 3306 &nbsp;&middot; MySQL Docker: 3307 &nbsp;&middot; PG: 5432 &nbsp;&middot; PG Docker: 5433</small>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="database">Database Name *</label>
+                <input type="text" id="database" name="database" class="form-input"
                        value="[% form_data.database | html %]"
-                       placeholder="e.g. ency" required
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+                       list="known_databases_list"
+                       placeholder="Type or choose from list"
+                       required>
+                <datalist id="known_databases_list">
+                    [% FOREACH db IN app_databases %]
+                    <option value="[% db | html %]">
+                    [% END %]
+                </datalist>
+                <small>Application databases: ency, shanta_forager, csc_accounting — or type a custom name.</small>
             </div>
+        </div>
 
-            <div>
-                <label for="username"><strong>Username *</strong></label>
-                <input type="text" id="username" name="username"
+        <div class="form-row">
+            <div class="form-field">
+                <label for="username">Username *</label>
+                <input type="text" id="username" name="username" class="form-input"
                        value="[% form_data.username | html %]"
-                       placeholder="e.g. root or shanta_forager" required
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+                       placeholder="e.g. root or shanta_forager" required>
             </div>
+        </div>
 
-            <div>
-                <label for="password"><strong>Password[% IF is_edit %] (leave blank to keep current)[% END %]</strong></label>
-                <input type="password" id="password" name="password"
+        <div class="form-row">
+            <div class="form-field">
+                <label for="password">Password[% IF is_edit %] (leave blank to keep current)[% END %]</label>
+                <input type="password" id="password" name="password" class="form-input"
                        placeholder="[% is_edit ? '(unchanged)' : 'Enter password' %]"
-                       [% UNLESS is_edit %]required[% END %]
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+                       [% UNLESS is_edit %]required[% END %]>
             </div>
-
         </div>
 
-        <div style="margin-top:0.8em;">
-            <label>
-                <input type="checkbox" name="localhost_override" value="1"
-                       [% IF form_data.localhost_override %]checked[% END %]>
-                <strong>Localhost Override</strong> — treat this server as "local" for fallback logic
-            </label>
+        <div class="form-row">
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="localhost_override" value="1"
+                           [% IF form_data.localhost_override %]checked[% END %]>
+                    Localhost Override — treat as local server for fallback logic
+                </label>
+            </div>
         </div>
-    </fieldset>
+    </div>
 
-    <fieldset style="border:1px solid #ccc;padding:1em;border-radius:5px;margin-bottom:1.2em;">
-        <legend style="font-weight:bold;padding:0 0.5em;">Classification</legend>
+    <div class="form-section">
+        <h3>Classification</h3>
 
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0.8em;">
-            <div>
-                <label for="environment"><strong>Environment</strong></label>
-                <select id="environment" name="environment"
-                        style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+        <div class="form-row">
+            <div class="form-field">
+                <label for="environment">Environment</label>
+                <select id="environment" name="environment" class="form-input">
                     [% FOREACH e IN environments %]
                     <option value="[% e | html %]"
                         [% IF form_data.environment == e || (!form_data.environment && e == 'production') %]selected[% END %]>
@@ -126,10 +140,12 @@
                     [% END %]
                 </select>
             </div>
-            <div>
-                <label for="role"><strong>Role</strong></label>
-                <select id="role" name="role"
-                        style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="role">Role</label>
+                <select id="role" name="role" class="form-input">
                     [% FOREACH r IN roles %]
                     <option value="[% r | html %]"
                         [% IF form_data.role == r || (!form_data.role && r == 'primary') %]selected[% END %]>
@@ -138,30 +154,38 @@
                     [% END %]
                 </select>
             </div>
-            <div>
-                <label for="priority"><strong>Priority</strong></label>
-                <input type="number" id="priority" name="priority"
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="priority">Priority</label>
+                <input type="number" id="priority" name="priority" class="form-input"
                        value="[% form_data.priority || 5 %]"
-                       min="1" max="999"
-                       style="width:100%;margin-top:4px;padding:6px;border:1px solid #ccc;border-radius:4px;">
-                <small style="color:#666;">1 = highest. App tries lowest number first.</small>
+                       min="1" max="999" style="width:100px;">
+                <small>1 = highest priority. App tries lowest number first.</small>
             </div>
         </div>
-    </fieldset>
+    </div>
 
-    <div style="display:flex;gap:0.5em;">
+    <div class="form-actions">
         <button type="submit" class="btn btn-primary">
             [% is_edit ? 'Save Changes' : 'Add Server' %]
         </button>
         <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">Cancel</a>
     </div>
+
 </form>
+</div>
+</div>
+</div>
+
+</div>
 
 <script>
 function setDefaultPort(dbType) {
     var portField = document.getElementById('port');
     var defaults = { mariadb: 3306, mysql: 3307, postgresql: 5432, sqlite: '' };
-    if (portField.value == 3306 || portField.value == 3307 || portField.value == 5432 || portField.value == '') {
+    if (!portField.value || portField.value == 3306 || portField.value == 3307 || portField.value == 5432) {
         portField.value = defaults[dbType] || 3306;
     }
 }

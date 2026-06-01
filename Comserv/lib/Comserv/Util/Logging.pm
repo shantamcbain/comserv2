@@ -119,11 +119,11 @@ sub rotate_log {
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
-    return if $file_size < $MAX_LOG_SIZE;
+    _print_log("Current log file size: $file_size bytes, rotation threshold: $ROTATION_THRESHOLD bytes");
+    return if $file_size < $ROTATION_THRESHOLD;
 
     # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
+    _print_log("Log file size ($file_size bytes) exceeds rotation threshold ($ROTATION_THRESHOLD bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -262,40 +262,66 @@ sub get_system_identifier {
         $p;
     };
 
+    my $identifier = '';
+
     # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
-    my $identifier = $ENV{SYSTEM_IDENTIFIER};
-    if ($identifier && $identifier ne '') {
-        # Append port when it adds useful info (i.e. not already encoded in the name)
-        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
-        return $identifier;
+    if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
+        $identifier = $ENV{SYSTEM_IDENTIFIER};
+    } else {
+        # Check if we are inside a Docker container
+        my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+        
+        if ($is_docker) {
+            my $env = $ENV{CATALYST_ENV} || 'production';
+            if ($env eq 'development') {
+                $identifier = 'workstation-container';
+            } else {
+                $identifier = 'production-container';
+            }
+        } else {
+            # Outside container: resolve by LAN IP
+            my %IP_NAMES = (
+                '192.168.1.126' => 'production-host',
+                '192.168.1.199' => 'workstation-host',
+            );
+            eval {
+                require Socket;
+                socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0) or die;
+                connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8'))) or die;
+                my $local = getsockname($sock);
+                my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+                my $ip = Socket::inet_ntoa($local_ip_packed);
+                if (exists $IP_NAMES{$ip}) {
+                    $identifier = $IP_NAMES{$ip};
+                }
+            };
+            
+            # Fallback to hostname if IP-based lookup failed or wasn't mapped
+            unless ($identifier) {
+                eval {
+                    require Sys::Hostname;
+                    $identifier = Sys::Hostname::hostname();
+                };
+                $identifier //= 'unknown-host';
+            }
+        }
     }
 
-    # 2. Map known IP addresses to friendly names.
-    # Use a UDP connect (no packets sent) to find which local IP the OS would
-    # use when routing outbound — the most reliable way to get the primary LAN IP.
-    my %IP_NAMES = (
-        '192.168.1.126' => 'production',
-        '192.168.1.199' => 'workstation',
-    );
-    eval {
-        require Socket;
-        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
-            or die "socket: $!";
-        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
-            or die "connect: $!";
-        my $local = getsockname($sock);
-        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
-        my $ip = Socket::inet_ntoa($local_ip_packed);
-        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
-    };
+    # Detect runtime environments (Docker, Starman, Standalone)
+    my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+    my $is_starman = exists $INC{'Starman.pm'} || exists $INC{'Starman/Server.pm'} || ($ENV{SERVER_SOFTWARE} && $ENV{SERVER_SOFTWARE} =~ /Starman/i) || ($0 =~ /starman/i);
 
-    # 3. Fall back to plain hostname
-    unless ($identifier && $identifier ne '') {
-        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
-        $identifier //= 'unknown';
+    my $tag_str;
+    if ($is_docker) {
+        $tag_str = 'Docker';
+    } else {
+        $tag_str = $is_starman ? 'Starman' : 'Standalone';
     }
+
+    $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
+    $port //= '3000';
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;
@@ -517,6 +543,25 @@ sub log_with_details {
 
                 my $effective_uid = defined($uid) ? $uid : 178;
 
+                my ($src_server, $src_branch, $src_file) = ('', '', '');
+                if ($log_message =~ /\[([^\]]+:\d+)\]/) {
+                    $src_server = $1;
+                }
+                if ($log_message =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                } elsif ($file && $file =~ m{/worktrees/([^/]+)/}) {
+                    $src_branch = $1;
+                }
+                if ($file) {
+                    ($src_file = $file) =~ s{.*/Comserv/}{Comserv/};
+                    $src_file .= ":$line" if $line;
+                }
+                my $source_comment = '';
+                $source_comment .= "Server: $src_server\n"  if $src_server;
+                $source_comment .= "Branch: $src_branch\n"  if $src_branch;
+                $source_comment .= "File:   $src_file\n"    if $src_file;
+                $source_comment .= "Function: $sub_name\n"  if $sub_name;
+
                 my %create_args = (
                     subject             => $todo_subject,
                     description         => "Automatic error todo from system log (level: $top_level).\n\n$log_message",
@@ -539,6 +584,7 @@ sub log_with_details {
                     group_of_poster     => 'admin',
                     project_code        => $matched_project_code,
                     share               => 0,
+                    comments            => $source_comment,
                 );
                 $c->model('DBEncy')->resultset('Todo')->create(\%create_args);
             }

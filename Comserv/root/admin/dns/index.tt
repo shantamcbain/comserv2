@@ -1,0 +1,80 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>DNS Management</h1>
+    <div class="form-actions">
+        [% IF is_csc_admin %]
+        <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]" class="btn btn-secondary">&#9881; Cloudflare Credentials</a>
+        [% END %]
+        <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
+    </div>
+</div>
+
+[% IF c.flash.error_msg %]
+<div class="error-message">[% c.flash.error_msg | html %]</div>
+[% END %]
+[% IF c.flash.success_msg %]
+<div class="success-message">[% c.flash.success_msg | html %]</div>
+[% END %]
+
+[% IF cf_error %]
+<div class="error-message">
+    <strong>Cloudflare API error:</strong> [% cf_error | html %]
+    [% IF is_csc_admin %]
+    &mdash; <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Check Cloudflare credentials</a>
+    [% END %]
+</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="data-container">
+
+[% IF zones.size %]
+<div class="table-container">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>Zone / Domain</th>
+            <th>Status</th>
+            <th>Plan</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    [% FOREACH zone IN zones %]
+        <tr>
+            <td><strong>[% zone.name | html %]</strong></td>
+            <td>
+                [% IF zone.status == 'active' %]
+                    <span class="status-badge status-active">Active</span>
+                [% ELSE %]
+                    <span class="status-badge status-pending">[% zone.status | html %]</span>
+                [% END %]
+            </td>
+            <td>[% zone.plan | html %]</td>
+            <td class="action-cell">
+                <a href="[% c.uri_for('/admin/dns/zone/' _ zone.name) %]" class="btn btn-sm btn-edit">Manage DNS Records</a>
+            </td>
+        </tr>
+    [% END %]
+    </tbody>
+</table>
+</div>
+[% ELSIF !cf_error %]
+<div class="empty-state">
+    <p>No Cloudflare zones found.
+    [% IF is_csc_admin %]
+    Ensure your <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]">Cloudflare credentials</a> are set correctly.
+    [% ELSE %]
+    Your site must own a root domain (not a subdomain) to manage DNS.
+    [% END %]
+    </p>
+</div>
+[% END %]
+
+</div>
+</div>
+</div>
+
+</div>

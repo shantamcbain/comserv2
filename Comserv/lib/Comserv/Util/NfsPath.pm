@@ -8,27 +8,29 @@ use File::Spec;
 # On workstation: /data/nfs must be a symlink → the actual NFS mount
 #   e.g.  sudo ln -s /home/shanta/nfs /data/nfs
 #
-# Override via env: WORKSHOP_RESOURCES_PATH=/data/nfs
-# Set in comserv.conf: workshop_upload_dir /data/nfs
+# Override via env: NFS_DATA_PATH=/data/nfs
+# Set in comserv.conf: nfs_data_path /data/nfs
 has 'nfs_root' => (
     is      => 'ro',
     isa     => 'Str',
     lazy    => 1,
     default => sub {
-        return $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
+        # Support both old and new variable names during transition
+        return $ENV{NFS_DATA_PATH} || $ENV{WORKSHOP_RESOURCES_PATH} || '/data/nfs';
     },
 );
 
 # Optional: path translation for any legacy DB records that were stored
 # with a different prefix before the symlink was in place.
-# Set WORKSHOP_HOST_NFS_PATH in the environment if you have such records.
+# Set NFS_HOST_PATH in the environment if you have such records.
 # Do NOT hardcode any username-specific paths here.
 has 'host_nfs_path' => (
     is      => 'ro',
     isa     => 'Maybe[Str]',
     lazy    => 1,
     default => sub {
-        return $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
+        # Support both old and new variable names during transition
+        return $ENV{NFS_HOST_PATH} || $ENV{WORKSHOP_HOST_NFS_PATH} || undef;
     },
 );
 
@@ -104,7 +106,7 @@ sub get_nfs_root {
     # in the DB to differ between workstation and Docker.
     unless (-d $root) {
         warn "NfsPath: configured NFS root '$root' does not exist. "
-           . "Create it or set WORKSHOP_RESOURCES_PATH. "
+           . "Create it or set NFS_DATA_PATH. "
            . "On this workstation: sudo ln -s /home/shanta/nfs $root\n";
     }
 

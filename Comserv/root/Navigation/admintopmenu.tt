@@ -24,6 +24,8 @@
             <div class="submenu">
                 <a href="/navigation/add_link?category=Admin_links&return_url=/admin" class="submenu-add-button"><i class="icon-add"></i>Add Admin Link</a>
                 <a href="/admin/site_modules"><i class="icon-settings"></i>Site Modules</a>
+                <a href="/admin/docker-containers"><i class="icon-docker"></i>Docker Containers</a>
+                <a href="/admin/docker-containers-old"><i class="icon-docker"></i>Docker Containers (Old)</a>
                 <a href="/planning/daily"><i class="icon-calendar"></i>Daily Plan</a>
                 <a href="/admin/git_pull"><i class="icon-git"></i>Git Pull</a>
                 <a href="/log"><i class="icon-log"></i>Open Log</a>
@@ -383,8 +385,18 @@
                 <!-- Dynamic Links -->
                 <div class="submenu-section">
                     <span class="submenu-section-title">Admin Links</span>
-                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (menu = 'Admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
-                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]">[% link.view_name %]</a>
+                    <!-- Dynamic Page-based links for Admin menu from new page system -->
+                    [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'admin' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                        <a href="/page/[% link.page_code %]" name="Contact" target="_self" title="[% link.title | html %]">[% link.title | html %]</a>
+                    [% END %]
+                    
+                    <!-- Legacy Page-based Admin Links -->
+                    [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'admin' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                        [%# Check if page is already in the new page system to avoid duplicates %]
+                        [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
+                        [% IF is_migrated == 0 %]
+                            <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" name="Contact" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]">[% legacy_link.view_name %]</a>
+                        [% END %]
                     [% END %]
                 </div>
                 

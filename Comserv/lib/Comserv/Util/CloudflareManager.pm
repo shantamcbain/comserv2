@@ -31,22 +31,41 @@ site and user roles from the Comserv2 database.
 has 'logger' => (
     is => 'ro',
     default => sub {
-        my $logger = Log::Log4perl->get_logger("CloudflareManager");
         unless (Log::Log4perl->initialized()) {
-            Log::Log4perl->init({
-                'log4perl.rootLogger' => 'INFO, LOGFILE',
-                'log4perl.appender.LOGFILE' => 'Log::Log4perl::Appender::File',
-                'log4perl.appender.LOGFILE.filename' => '/var/log/comserv2/cloudflare.log',
-                'log4perl.appender.LOGFILE.mode' => 'append',
-                'log4perl.appender.LOGFILE.layout' => 'Log::Log4perl::Layout::PatternLayout',
-                'log4perl.appender.LOGFILE.layout.ConversionPattern' => '%d [%p] %c - %m%n',
-            });
+            my $log_file = '/var/log/comserv2/cloudflare.log';
+            mkdir('/var/log/comserv2') unless -d '/var/log/comserv2';
+            my $fh_test;
+            my $can_write = open($fh_test, '>>', $log_file);
+            close($fh_test) if $can_write;
+            if ($can_write) {
+                Log::Log4perl->init({
+                    'log4perl.rootLogger'                              => 'INFO, LOGFILE',
+                    'log4perl.appender.LOGFILE'                        => 'Log::Log4perl::Appender::File',
+                    'log4perl.appender.LOGFILE.filename'               => $log_file,
+                    'log4perl.appender.LOGFILE.mode'                   => 'append',
+                    'log4perl.appender.LOGFILE.layout'                 => 'Log::Log4perl::Layout::PatternLayout',
+                    'log4perl.appender.LOGFILE.layout.ConversionPattern' => '%d [%p] %c - %m%n',
+                });
+            } else {
+                Log::Log4perl->init({
+                    'log4perl.rootLogger'                              => 'WARN, SCREEN',
+                    'log4perl.appender.SCREEN'                         => 'Log::Log4perl::Appender::Screen',
+                    'log4perl.appender.SCREEN.stderr'                  => 1,
+                    'log4perl.appender.SCREEN.layout'                  => 'Log::Log4perl::Layout::PatternLayout',
+                    'log4perl.appender.SCREEN.layout.ConversionPattern' => '[%p] CloudflareManager - %m%n',
+                });
+            }
         }
-        return $logger;
+        return Log::Log4perl->get_logger("CloudflareManager");
     }
 );
 
 # Configuration file path
+has 'dbh' => (
+    is      => 'ro',
+    default => undef,
+);
+
 has 'config_path' => (
     is => 'ro',
     default => sub {
@@ -100,7 +119,49 @@ sub _build_config {
     my ($self) = @_;
     
     my $config = {};
-    
+
+    # PRIORITY 0: read from app_secrets DB table — most secure, shared across all machines
+    if ($self->dbh) {
+        eval {
+            my $sth = $self->dbh->prepare(
+                "SELECT secret_key, secret_value FROM app_secrets WHERE secret_key IN (?,?,?)"
+            );
+            $sth->execute('cloudflare_api_token', 'cloudflare_email', 'cloudflare_api_key');
+            my %row;
+            while (my ($k,$v) = $sth->fetchrow_array) { $row{$k} = $v }
+            if ($row{cloudflare_api_token} || $row{cloudflare_api_key}) {
+                $config->{cloudflare} = {
+                    api_token => $row{cloudflare_api_token} || '',
+                    api_key   => $row{cloudflare_api_key}   || '',
+                    email     => $row{cloudflare_email}      || '',
+                };
+                $self->logger->info("Cloudflare credentials loaded from app_secrets DB table");
+            }
+        };
+        $self->logger->warn("DB secret lookup failed: $@") if $@;
+    }
+    return $config if $config->{cloudflare}{api_token} || $config->{cloudflare}{api_key};
+
+    # PRIORITY 1: check ~/.comserv/secrets/cloudflare.json — shared across all branches and Docker mounts
+    my $secrets_dir = $ENV{COMSERV_SECRETS_DIR}
+                   || File::Spec->catfile($ENV{HOME} || '/root', '.comserv', 'secrets');
+    my $shared_cf_path = File::Spec->catfile($secrets_dir, 'cloudflare.json');
+    try {
+        if (-f $shared_cf_path) {
+            open my $fh, '<:encoding(UTF-8)', $shared_cf_path
+                or die "Cannot open $shared_cf_path: $!";
+            my $json = do { local $/; <$fh> };
+            close $fh;
+            my $shared = decode_json($json);
+            $self->logger->info("Cloudflare credentials loaded from shared secrets: $shared_cf_path");
+            if ($shared->{cloudflare}) {
+                $config->{cloudflare} = { %{ $config->{cloudflare} || {} }, %{ $shared->{cloudflare} } };
+            }
+        }
+    } catch {
+        $self->logger->warn("Could not load shared CF secrets from $shared_cf_path: $_");
+    };
+
     # Try to load the api_credentials.json file
     my $base_dir = $ENV{CATALYST_HOME} || '.';
     my $api_creds_path = File::Spec->catfile($base_dir, 'config', 'api_credentials.json');
@@ -122,8 +183,12 @@ sub _build_config {
         $self->logger->error("Failed to load API credentials: $_");
     };
     
-    # Try to load the cloudflare_config.json file
+    # Try to load the cloudflare_config.json file — check multiple locations
     my $cloudflare_config_path = File::Spec->catfile($base_dir, 'config', 'cloudflare_config.json');
+    unless (-f $cloudflare_config_path) {
+        my $alt = File::Spec->catfile($base_dir, 'root', 'config', 'api', 'cloudflare_config.json');
+        $cloudflare_config_path = $alt if -f $alt;
+    }
     
     try {
         if (-f $cloudflare_config_path) {
@@ -168,6 +233,18 @@ sub _build_config {
         };
     }
     
+    # Override with real values from environment variables if the JSON has TT2 placeholders
+    my $cf = $config->{cloudflare} ||= {};
+    if (!$cf->{api_token} || $cf->{api_token} =~ /^\[%/) {
+        $cf->{api_token} = $ENV{CLOUDFLARE_API_TOKEN} || $ENV{CF_API_TOKEN} || '';
+    }
+    if (!$cf->{api_key} || $cf->{api_key} =~ /^\[%/) {
+        $cf->{api_key} = $ENV{CLOUDFLARE_API_KEY} || $ENV{CF_API_KEY} || '';
+    }
+    if (!$cf->{email} || $cf->{email} =~ /^\[%/) {
+        $cf->{email} = $ENV{CLOUDFLARE_EMAIL} || $ENV{CF_EMAIL} || '';
+    }
+
     return $config;
 }
 

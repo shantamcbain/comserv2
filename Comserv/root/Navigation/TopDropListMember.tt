@@ -63,24 +63,35 @@
         </div>
         [% END %]
         
-        <!-- Legacy Member Pages Support -->
-        [% IF member_pages.defined && member_pages.size %]
+        <!-- Member Pages (Dynamic & Legacy Support) -->
         <div class="dropdown-divider"></div>
         <div class="submenu-item">
             <span class="submenu-header"><i class="icon-pages"></i>Member Pages</span>
             <div class="submenu">
-                [% FOREACH link IN member_pages %]
-                    <a href="/page?site=[% SiteName %]&amp;session=[% session_string %]&amp;page=[% link.page_code %]" name="Contact" target="[% link.target %]" title="[% link.view_name %]" class="submenu-link">
-                        [% IF link.icon %]<i class="[% link.icon %]"></i>[% END %]
-                        [% link.view_name %]
+                <!-- Dynamic Page-based links for Member menu -->
+                [% FOREACH link = c.stash.dbi.query("SELECT * FROM page WHERE (LOWER(menu) = 'member' AND status = 'active') AND (sitename = '$SiteName' OR sitename = 'All' OR share_with = 'all' OR share_with LIKE '%$SiteName%') ORDER BY link_order") %]
+                    <a href="/page/[% link.page_code %]" target="_self" title="[% link.title | html %]" class="submenu-link">
+                        <i class="fas fa-file-alt"></i> [% link.title | html %]
                     </a>
-                    [% IF c.session.group == 'admin' %]
-                        <a href="/pages/edit?page_id=[% link.id %]" class="edit-link">Edit</a>
+                    [% IF c.session.roles.grep('admin').size %]
+                        <a href="/admin/pages?action=edit&amp;id=[% link.id %]" class="edit-link">Edit</a>
+                    [% END %]
+                [% END %]
+                
+                <!-- Legacy Page-based links for Member menu -->
+                [% FOREACH legacy_link = c.stash.dbi.query("SELECT * FROM page_tb WHERE (LOWER(menu) = 'member' AND status = 2) AND (sitename = '$SiteName' OR sitename = 'All') ORDER BY link_order") %]
+                    [% SET is_migrated = c.stash.dbi.query("SELECT COUNT(*) as cnt FROM page WHERE page_code = '" _ legacy_link.page_code _ "'").0.cnt %]
+                    [% IF is_migrated == 0 %]
+                        <a href="/cgi-bin/index.cgi?site=[% SiteName %]&amp;[% session_string %]&amp;page=[% legacy_link.page_code %]" target="[% legacy_link.target %]" title="[% legacy_link.view_name %]" class="submenu-link">
+                            <i class="fas fa-file-alt"></i> [% legacy_link.view_name %]
+                        </a>
+                        [% IF c.session.roles.grep('admin').size %]
+                            <a href="/pages/edit?page_id=[% legacy_link.id %]" class="edit-link">Edit</a>
+                        [% END %]
                     [% END %]
                 [% END %]
             </div>
         </div>
-        [% END %]
         
         <!-- Private Member Links for logged in users -->
         [% IF c.session.username && c.stash.private_links %]

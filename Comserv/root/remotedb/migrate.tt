@@ -1,0 +1,213 @@
+
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Database Migration</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">&#8592; Back to Servers</a>
+    </div>
+</div>
+
+[% IF error_msg %]<div class="error-message">[% error_msg | html %]</div>[% END %]
+
+[% IF migrate_done %]
+    [% IF migrate_ok %]
+    <div class="success-message">Migration completed: [% last_source | html %] &#8594; [% last_target | html %]</div>
+    [% ELSE %]
+    <div class="error-message">Migration failed: [% migrate_error | html %]</div>
+    [% END %]
+
+    [% IF migrate_results.size %]
+    <div class="content-container">
+    <div class="content-primary">
+    <div class="data-container">
+    <div class="form-section">
+        <h3>Migration Log</h3>
+        <div class="migrate-log">
+        [% FOREACH r IN migrate_results %]
+            <div class="migrate-log-entry[% r.error ? ' migrate-log-error' : ' migrate-log-ok' %]">
+                <span class="migrate-log-icon">[% r.error ? '&#10005;' : '&#10003;' %]</span>
+                <span class="migrate-log-table"><code>[% r.table | html %]</code></span>
+                <span class="migrate-log-rows">[% r.rows %] row(s)</span>
+                [% IF r.error %]<span class="migrate-log-msg">[% r.error | html %]</span>[% END %]
+            </div>
+        [% END %]
+        </div>
+        <div class="form-actions">
+            <a href="[% c.uri_for('/remotedb/migrate') %]" class="btn btn-primary">Run Another Migration</a>
+            <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">&#8592; Back to Servers</a>
+        </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    [% END %]
+[% END %]
+
+[% UNLESS migrate_done %]
+<div class="content-container">
+<div class="content-primary">
+<div class="form-container">
+
+<form method="post" action="[% c.uri_for('/remotedb/migrate') %]" class="app-form" id="migrate-form">
+
+    <div class="form-section">
+        <h3>Source &amp; Target</h3>
+        <p>Copies schema (and optionally data) from the source database server to the target. Both must be registered in the server list.</p>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="source">Source Server (copy FROM)</label>
+                <select id="source" name="source" class="form-input" required>
+                    <option value="">-- select source --</option>
+                    [% FOREACH name IN conn_keys %]
+                    [% SET cfg = connections.$name.config %]
+                    <option value="[% name | html %]"
+                        [% IF last_source == name %]selected[% END %]>
+                        [% name | html %] ([% cfg.host | html %]:[% cfg.port | html %] / [% cfg.database | html %])
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label for="target">Target Server (copy TO)</label>
+                <select id="target" name="target" class="form-input" required>
+                    <option value="">-- select target --</option>
+                    [% FOREACH name IN conn_keys %]
+                    [% SET cfg = connections.$name.config %]
+                    <option value="[% name | html %]"
+                        [% IF last_target == name %]selected[% END %]>
+                        [% name | html %] ([% cfg.host | html %]:[% cfg.port | html %] / [% cfg.database | html %])
+                    </option>
+                    [% END %]
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-section">
+        <h3>Options</h3>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="schema_only" value="1">
+                    Schema only — copy table structure but not data
+                </label>
+            </div>
+        </div>
+
+        <div class="form-row">
+            <div class="form-field">
+                <label>
+                    <input type="checkbox" name="truncate" value="1">
+                    Truncate target tables before copying data
+                    <small>(clears existing data on target — use with caution)</small>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-actions">
+        <button type="submit" id="migrate-btn" class="btn btn-primary">Run Migration</button>
+        <a href="[% c.uri_for('/remotedb') %]" class="btn btn-secondary">Cancel</a>
+    </div>
+
+</form>
+</div>
+</div>
+</div>
+[% END %]
+
+<div id="migrate-progress" class="migrate-progress-hidden">
+    <div class="content-container">
+    <div class="content-primary">
+    <div class="form-section">
+        <h3>Migration In Progress</h3>
+        <p id="migrate-progress-note">Do not close this page. The migration is running on the server.</p>
+        <div class="migrate-log" id="migrate-step-log">
+            <div class="migrate-log-entry migrate-log-waiting" id="step-source">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Connecting to source server&hellip;</span>
+                <span class="migrate-log-rows" id="elapsed-display"></span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-target">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Connecting to target server&hellip;</span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-createdb">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Creating target database (if needed)&hellip;</span>
+            </div>
+            <div class="migrate-log-entry migrate-log-pending" id="step-copy">
+                <span class="migrate-log-icon">&#9711;</span>
+                <span class="migrate-log-table">Copying tables and data&hellip;</span>
+            </div>
+        </div>
+    </div>
+    </div>
+    </div>
+</div>
+
+<style>
+.migrate-progress-hidden { display: none; }
+.migrate-log { border: 1px solid var(--border-color, #ccc); border-radius: 4px; overflow: hidden; }
+.migrate-log-entry { display: flex; align-items: baseline; gap: 0.75em; padding: 0.55em 0.9em; border-bottom: 1px solid var(--border-color, #eee); font-family: monospace; font-size: 0.92em; }
+.migrate-log-entry:last-child { border-bottom: none; }
+.migrate-log-ok   { background: rgba(0,128,0,0.08); }
+.migrate-log-error { background: rgba(200,0,0,0.08); }
+.migrate-log-waiting { background: rgba(25,118,210,0.08); }
+.migrate-log-pending { opacity: 0.4; }
+.migrate-log-icon { font-size: 1.1em; min-width: 1.2em; }
+.migrate-log-table { flex: 1; }
+.migrate-log-rows { color: var(--secondary-text-color, #666); font-size: 0.9em; white-space: nowrap; }
+.migrate-log-msg { color: var(--error-color, #c00); font-size: 0.88em; }
+</style>
+
+<script>
+(function() {
+    var form   = document.getElementById('migrate-form');
+    if (!form) return;
+    var btn    = document.getElementById('migrate-btn');
+    var prog   = document.getElementById('migrate-progress');
+    var elapsed = document.getElementById('elapsed-display');
+    var seconds = 0;
+    var timer;
+
+    var steps = [
+        { el: document.getElementById('step-source'),   after: 0  },
+        { el: document.getElementById('step-target'),   after: 6  },
+        { el: document.getElementById('step-createdb'), after: 12 },
+        { el: document.getElementById('step-copy'),     after: 18 }
+    ];
+
+    function activateStep(idx) {
+        var s = steps[idx];
+        if (!s || !s.el) return;
+        s.el.className = 'migrate-log-entry migrate-log-waiting';
+        s.el.querySelector('.migrate-log-icon').textContent = '\u25CB';
+    }
+
+    form.addEventListener('submit', function(e) {
+        if (!confirm('This will write data to the target server. Continue?')) {
+            e.preventDefault();
+            return;
+        }
+        btn.disabled = true;
+        btn.textContent = 'Migrating\u2026';
+        prog.className = '';
+        activateStep(0);
+
+        timer = setInterval(function() {
+            seconds++;
+            if (elapsed) elapsed.textContent = seconds + 's';
+            for (var i = 0; i < steps.length; i++) {
+                if (seconds >= steps[i].after) activateStep(i);
+            }
+        }, 1000);
+    });
+})();
+</script>

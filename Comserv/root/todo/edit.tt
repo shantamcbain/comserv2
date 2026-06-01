@@ -168,12 +168,11 @@ function syncDur() {
         <input type="hidden" name="return_to" value="[% return_to %]">
         <div class="form-group">
             [% IF sites && sites.size > 1 %]
-                [% SET _rec_site = record.get_column('sitename') || todo_sitename %]
-                [% INCLUDE 'todo/site_list.tt' selected_sitename=_rec_site %]
+                [% INCLUDE 'todo/site_list.tt' selected_sitename=todo_sitename %]
             [% ELSE %]
                 <label for="sitename">Site Name:</label>
-                <input type="hidden" name="sitename" value="[% record.get_column('sitename') %]">
-                <input type="text" id="sitename" value="[% record.get_column('sitename') %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
+                <input type="hidden" name="sitename" value="[% todo_sitename %]">
+                <input type="text" id="sitename" value="[% todo_sitename %]" readonly style="background:var(--bg-secondary,#f8f9fa);cursor:default;">
             [% END %]
         </div>
         
