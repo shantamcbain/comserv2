@@ -477,6 +477,42 @@ sub _initialize_session_schema {
 my $last_db_check = 0;
 my $is_db_ok = 1;
 
+use Storable qw(freeze thaw);
+use MIME::Base64 qw(encode_base64 decode_base64);
+
+sub _serialize_session {
+    my ($data) = @_;
+    return undef unless defined $data;
+    return $data unless ref $data; # If not a reference, return as-is
+    
+    my $frozen = eval { freeze($data) };
+    if ($@ || !defined $frozen) {
+        warn "Failed to freeze session data: $@\n";
+        return undef;
+    }
+    return encode_base64($frozen, ''); # '' disables newlines
+}
+
+sub _deserialize_session {
+    my ($serialized) = @_;
+    return undef unless defined $serialized;
+    return $serialized if ref $serialized; # Already deserialized reference
+    
+    # Return as-is if it's not a string or doesn't look like base64
+    return $serialized if $serialized =~ /^HASH\(/;
+    
+    my $decoded = eval { decode_base64($serialized) };
+    if ($@ || !defined $decoded || $decoded eq '') {
+        return $serialized;
+    }
+    
+    my $data = eval { thaw($decoded) };
+    if ($@ || !defined $data) {
+        return $serialized;
+    }
+    return $data;
+}
+
 sub _is_db_session_operational {
     my ($c) = @_;
     
@@ -608,7 +644,7 @@ sub get_session_data {
     my ($c, $key) = @_;
     
     if (_is_db_session_operational($c)) {
-        my $data = eval {
+        my $serialized = eval {
             my $model = $c->model('DBEncy');
             if ($model) {
                 my $rs = $model->resultset('Session');
@@ -625,17 +661,23 @@ sub get_session_data {
             }
             return undef;
         };
-        if (!$@) {
-            return $data;
+        if (!$@ && defined $serialized) {
+            return _deserialize_session($serialized);
         }
-        warn "Database session retrieval failed for key '$key': $@. Falling back to file storage.\n";
+        if ($@) {
+            warn "Database session retrieval failed for key '$key': $@. Falling back to file storage.\n";
+        }
     }
     
-    return _get_file_session_data($key);
+    my $serialized = _get_file_session_data($key);
+    return _deserialize_session($serialized);
 }
 
 sub store_session_data {
     my ($c, $key, $data) = @_;
+    
+    my $serialized = _serialize_session($data);
+    return unless defined $serialized;
     
     if (_is_db_session_operational($c)) {
         my $success = eval {
@@ -646,10 +688,10 @@ sub store_session_data {
                     my $expires = time() + ($c->config->{'Plugin::Session'}{expires} || 86400);
                     $rs->update_or_create({
                         id           => $key,
-                        session_data => $data,
+                        session_data => $serialized,
                         expires      => $expires,
                     });
-                    eval { _store_file_session_data($key, $data) };
+                    eval { _store_file_session_data($key, $serialized) };
                     return 1;
                 }
             }
@@ -661,7 +703,7 @@ sub store_session_data {
         warn "Database session store failed for key '$key': $@. Falling back to file storage.\n";
     }
     
-    _store_file_session_data($key, $data);
+    _store_file_session_data($key, $serialized);
 }
 
 sub delete_session_data {
