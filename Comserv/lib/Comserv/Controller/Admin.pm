@@ -6561,6 +6561,8 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
                 export CATALYST_HOME="$HOST_APP_DIR"
                 export CATALYST_ENV=production
                 export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                export PERL_LOCAL_LIB_ROOT="$HOST_APP_DIR/local"
+                export PERL5LIB="$HOST_APP_DIR/lib:$HOST_APP_DIR/local/lib/perl5:$PERL5LIB"
 
                 echo "Attempting to reset and start systemd starman.service..."
                 sudo systemctl reset-failed starman.service 2>/dev/null || true
@@ -6583,19 +6585,19 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
                     # Try launching via various known starman locations/methods
                     STARTED=0
                     if [ -x "/usr/local/bin/starman" ]; then
-                        if /usr/local/bin/starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
+                        if /usr/local/bin/starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
                             STARTED=1
                         fi
                     fi
                     
                     if [ "$STARTED" -eq 0 ]; then
-                        if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                        if perl -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
                             STARTED=1
                         fi
                     fi
                     
                     if [ "$STARTED" -eq 0 ]; then
-                        if starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                        if starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
                             STARTED=1
                         fi
                     fi
