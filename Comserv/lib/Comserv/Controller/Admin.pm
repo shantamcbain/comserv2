@@ -6550,13 +6550,17 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
             
             if [ -n "$PSGI_FILE" ]; then
                 # Stop any container running on 5000 to free port
-                docker stop comserv2-web-prod 2>/dev/null || true
-                docker rm -f comserv2-web-prod 2>/dev/null || true
+                sudo docker stop comserv2-web-prod 2>/dev/null || docker stop comserv2-web-prod 2>/dev/null || true
+                sudo docker rm -f comserv2-web-prod 2>/dev/null || docker rm -f comserv2-web-prod 2>/dev/null || true
                 
+                # Stop and disable systemd starman service if active to avoid restart conflicts
+                sudo systemctl stop starman.service 2>/dev/null || true
+                sudo systemctl disable starman.service 2>/dev/null || true
+
                 # Kill existing starman/plackup on host
-                pkill -f starman 2>/dev/null || true
-                pkill -f plackup 2>/dev/null || true
-                pkill -f comserv.*psgi 2>/dev/null || true
+                sudo pkill -f starman 2>/dev/null || pkill -f starman 2>/dev/null || true
+                sudo pkill -f plackup 2>/dev/null || pkill -f plackup 2>/dev/null || true
+                sudo pkill -f comserv.*psgi 2>/dev/null || pkill -f comserv.*psgi 2>/dev/null || true
                 
                 # Kill processes holding port 5000
                 if command -v fuser &>/dev/null; then

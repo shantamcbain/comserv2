@@ -44,7 +44,7 @@
             </div>
         </section>
 
-        [% IF c.session.group == 'admin' || c.session.site == 'SB' || c.session.group == 'csc_admin' %]
+        [% IF c.session.group == 'admin' or c.session.site == 'SB' or c.session.group == 'csc_admin' %]
         <section class="section admin-section">
             <h2 class="section-header">Administration</h2>
             <div class="admin-links">
