@@ -748,7 +748,7 @@ Type=simple
 User=$user
 Group=$group
 WorkingDirectory=$app_root
-Environment=PERL5LIB=$app_root/lib
+Environment=PERL5LIB=$app_root/lib:$app_root/local/lib/perl5:$app_root/local/lib/perl5/x86_64-linux-gnu-thread-multi:$app_root/local/lib/perl5/site_perl
 ExecStart=$starman_path --listen :$port --workers $workers $app_root/comserv.psgi
 ExecReload=/bin/kill -HUP \$MAINPID
 KillMode=mixed
