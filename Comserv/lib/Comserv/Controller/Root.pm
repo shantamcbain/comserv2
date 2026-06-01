@@ -1941,7 +1941,7 @@ sub begin :Private {
     }
 
     eval {
-        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        my @ha = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { status => 'active' },
             { order_by => 'sitename' }
         )->all;
