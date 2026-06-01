@@ -85,6 +85,17 @@ sub _build_backup_dirs {
     
     my $app_dir = $self->app_dir;
     
+    # If NFS mount is available and writable, route all archives/backups there to save local space
+    if (-d '/data/nfs' && -w '/data/nfs') {
+        my $nfs_backup_dir = '/data/nfs/backups';
+        unless (-d $nfs_backup_dir) {
+            eval { make_path($nfs_backup_dir, { mode => 0775 }) };
+        }
+        if (-d $nfs_backup_dir && -w $nfs_backup_dir) {
+            return [ $nfs_backup_dir ];
+        }
+    }
+    
     # If app_dir ends with /Comserv (Catalyst home), backup dirs are in that directory
     if ($app_dir =~ m{/Comserv$}) {
         return [

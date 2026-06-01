@@ -3124,7 +3124,7 @@
     var STATIC_FAQ = [
         {
             match: /\b(create|make|get|open|set.?up)\b.{0,20}\baccount\b|\bsign.?up\b|\bregister\b|\bhow.{0,20}\bjoin\b|\bnew.{0,10}\buser\b/i,
-            answer: 'Account creation is managed by the site administrator.\n\nTo request access, [submit a HelpDesk ticket](/HelpDesk) and an admin will set up your account. If a self-registration page is available on your site it will be linked on the login page.',
+            answer: 'You can create your own account using our self-registration process.\n\nSee the **[User Registration Guide](/Documentation/UserRegistrationGuide)** for step-by-step instructions.\n\nIf you have trouble or need an account set up by an administrator, [submit a HelpDesk ticket](/HelpDesk).',
         },
         {
             match: /\b(reset|forgot|forgotten|lost|change)\b.{0,15}\bpassword\b|\bpassword.{0,15}\b(reset|forgot|change|lost)\b/i,

@@ -48,6 +48,7 @@
 var logId         = null;
 var logOutput     = '';
 var todoRecordId  = (new URLSearchParams(window.location.search)).get('todo_record_id') || '';
+var quickDeploy   = (new URLSearchParams(window.location.search)).get('quick_deploy') || '0';
 var pollingTimer  = null;
 var lastContent   = '';
 
@@ -152,10 +153,14 @@ window.addEventListener('load', function() {
         appendLine('[' + new Date().toLocaleTimeString() + '] Log created — starting Hub deploy…', 'info');
         setStatus('running', 'Deploying…');
 
+        var bodyParams = [];
+        if (quickDeploy)  { bodyParams.push('quick_deploy=' + encodeURIComponent(quickDeploy)); }
+        if (todoRecordId) { bodyParams.push('todo_record_id=' + encodeURIComponent(todoRecordId)); }
+
         return safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: ''
+            body: bodyParams.join('&')
         });
     })
     .then(function(r) { return r.json(); })

@@ -160,7 +160,21 @@ sub daily :Path('/planning/daily') :Args {
                 };
                 push @_cal_sites, $sitename unless grep { $_ eq $sitename } @_cal_sites;
             }
-            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_cal_sites);
+            my $filter_site;
+            if (!exists $c->session->{cal_filter_site}) {
+                $filter_site = $sitename;
+            } else {
+                $filter_site = $c->session->{cal_filter_site} // '';
+            }
+            my @_filtered_sites = ($filter_site && grep { $_ eq $filter_site } @_cal_sites) ? ($filter_site) : @_cal_sites;
+            $all_todos_calendar = $todo_model->get_all_todos_for_calendar($c, \@_filtered_sites);
+            if (my $filter_user = $c->session->{cal_filter_user} // '') {
+                $all_todos_calendar = [grep {
+                    my $dev = eval { $_->developer }          // '';
+                    my $uop = eval { $_->username_of_poster } // '';
+                    $dev eq $filter_user || $uop eq $filter_user;
+                } @$all_todos_calendar];
+            }
             if ($all_todos_calendar && ref($all_todos_calendar) eq 'ARRAY') {
                 my $week_first_day = $week_dates[0]{date_str};
                 my $today_str = $current_date_str;
@@ -491,7 +505,7 @@ sub daily :Path('/planning/daily') :Args {
             next if ($h{is_recurring} // 0);
 
             my $st          = $h{status} // '';
-            my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
+            my $in_progress = ($st == 2 || $st == 5 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
             my $status_tier = $in_progress ? 0 : 1;
 
             my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
@@ -581,7 +595,20 @@ sub daily :Path('/planning/daily') :Args {
                 my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
                     {}, { order_by => 'name' }
                 )->all;
-                @ap_all_sitenames = sort map { $_->name } @site_rows;
+                my %seen;
+                for my $s (@site_rows) {
+                    my $n = eval { $s->name } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename => { '!=' => undef } },
+                    { columns => ['sitename'], distinct => 1 }
+                )->all;
+                for my $r (@todo_sites) {
+                    my $n = eval { $r->get_column('sitename') } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                @ap_all_sitenames = sort @ap_all_sitenames;
             };
         } else {
             eval {
@@ -608,8 +635,8 @@ sub daily :Path('/planning/daily') :Args {
         eval {
             if ($is_csc) {
                 my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                    {},
-                    { columns => ['username'], order_by => 'username', rows => 200 }
+                    { roles => { '!=' => '', -not => undef } },
+                    { columns => ['username'], order_by => 'username' }
                 )->all;
                 my %seen;
                 for my $r (@urows) {
@@ -632,6 +659,8 @@ sub daily :Path('/planning/daily') :Args {
             ap_user_roles    => $user_roles,
             ap_all_sitenames => \@ap_all_sitenames,
             ap_all_usernames => \@ap_all_usernames,
+            cal_filter_site  => (exists $c->session->{cal_filter_site} ? ($c->session->{cal_filter_site} // '') : $sitename),
+            cal_filter_user  => ($c->session->{cal_filter_user} // ''),
         );
     };
     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'daily',
@@ -837,7 +866,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -in => [1, 2] },
+                    status  => { -in => [1, 2, 5] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
@@ -925,6 +954,18 @@ sub daily :Path('/planning/daily') :Args {
             \@st;
         },
 
+        active_todos => do {
+            my %at;
+            eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                my $rows = $dbh->selectcol_arrayref(
+                    "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+                );
+                %at = map { $_ => 1 } @$rows if $rows;
+            };
+            \%at;
+        },
+
         template => 'admin/planning/DailyPlan.tt',
     );
 }
@@ -936,6 +977,32 @@ POST params: action=start|end
 Route: /planning/daily_log
 
 =cut
+
+sub set_filter :Path('/planning/set_filter') :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($c->session->{user_id}) {
+        $c->response->status(401);
+        $c->response->body('{"ok":0,"error":"Login required"}');
+        return;
+    }
+
+    my $body_fh = $c->req->body;
+    my $body    = $body_fh ? do { local $/; <$body_fh> } : '';
+    my $data;
+    eval { $data = JSON::decode_json($body) if $body };
+    $data //= {};
+
+    if (exists $data->{site}) {
+        $c->session->{cal_filter_site} = $data->{site} // '';
+    }
+    if (exists $data->{user}) {
+        $c->session->{cal_filter_user} = $data->{user} // '';
+    }
+
+    $c->response->body('{"ok":1}');
+}
 
 sub refresh_audit :Path('/planning/refresh_audit') :Args(0) {
     my ($self, $c) = @_;

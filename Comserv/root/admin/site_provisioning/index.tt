@@ -1,0 +1,73 @@
+<div class="app-container">
+
+<div class="page-header">
+    <h1>Site Provisioning</h1>
+    <div class="form-actions">
+        <a href="[% c.uri_for('/admin/site_provisioning/add') %]" class="btn btn-primary">+ Add Site Request</a>
+        <a href="[% c.uri_for('/admin/dns') %]" class="btn btn-secondary">&#127758; DNS Dashboard</a>
+        <a href="[% c.uri_for('/admin/site_provisioning/cf_settings') %]" class="btn btn-secondary">&#9881; Cloudflare Credentials</a>
+        <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary">&#8592; Admin</a>
+    </div>
+</div>
+
+[% IF c.flash.error_msg %]
+<div class="error-message">[% c.flash.error_msg | html %]</div>
+[% END %]
+[% IF c.flash.success_msg %]
+<div class="success-message">[% c.flash.success_msg | html %]</div>
+[% END %]
+
+<div class="content-container">
+<div class="content-primary">
+<div class="data-container">
+
+[% IF requests.size %]
+<div class="table-container">
+<table class="data-table">
+    <thead>
+        <tr>
+            <th>#</th>
+            <th>Site Name</th>
+            <th>Domain</th>
+            <th>Contact Email</th>
+            <th>Status</th>
+            <th>Requested</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+    [% FOREACH req IN requests %]
+        <tr>
+            <td>[% req.id | html %]</td>
+            <td><strong>[% req.sitename | html %]</strong></td>
+            <td><code>[% req.domain | html %]</code></td>
+            <td>[% req.contact_email | html %]</td>
+            <td>
+                [% IF req.status == 'pending' %]
+                    <span class="status-badge status-pending">Pending</span>
+                [% ELSIF req.status == 'active' %]
+                    <span class="status-badge status-active">Active</span>
+                [% ELSE %]
+                    <span class="status-badge">[% req.status | html %]</span>
+                [% END %]
+            </td>
+            <td>[% req.created_at | html %]</td>
+            <td class="action-cell">
+                <a href="[% c.uri_for('/admin/site_provisioning/review', req.id) %]" class="btn btn-sm btn-edit">Review</a>
+            </td>
+        </tr>
+    [% END %]
+    </tbody>
+</table>
+</div>
+[% ELSE %]
+<div class="empty-state">
+    <p>No hosting signup requests found.</p>
+</div>
+[% END %]
+
+</div>
+</div>
+</div>
+
+</div>

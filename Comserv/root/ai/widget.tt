@@ -235,6 +235,13 @@
         // Note: local-chat.js auto-opens the chat panel when AI_WIDGET_POPUP is true.
         // Do NOT click the chat button here — that would call detachToPopup() and loop.
 
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('tab') === 'formfill') {
+            setTimeout(function() {
+                widgetShowTab('formfill');
+            }, 150);
+        }
+
         document.addEventListener('click', function(e) {
             var anchor = e.target.closest('a[href]');
             if (!anchor) return;

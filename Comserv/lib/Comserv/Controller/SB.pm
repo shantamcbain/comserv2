@@ -48,7 +48,7 @@ sub base :Chained('/') :PathPart('shamanbotanicals') :CaptureArgs(0) {
 sub index :Chained('base') :PathPart('') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index', "Index method called");
-    $c->stash(template => 'shamanbotanicals/index.tt');
+    $c->stash(template => 'SB/index.tt');
     $c->forward($c->view('TT'));
 }
 
@@ -68,11 +68,11 @@ sub products :Chained('base') :PathPart('products') :Args(1) {
     my $template_name = $product_id;
 
     # Check if template exists, otherwise show error
-    if (-e $c->path_to('root', 'shamanbotanicals', 'products', "$template_name.tt")) {
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', "Template found: shamanbotanicals/products/$template_name.tt");
-        $c->stash(template => "shamanbotanicals/products/$template_name.tt");
+    if (-e $c->path_to('root', 'SB', 'products', "$template_name.tt")) {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'products', "Template found: SB/products/$template_name.tt");
+        $c->stash(template => "SB/products/$template_name.tt");
     } else {
-        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', "Template not found: shamanbotanicals/products/$template_name.tt");
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'products', "Template not found: SB/products/$template_name.tt");
         $c->stash(
             template => 'error.tt',
             error_msg => "The product page for '$product_id' could not be found. Return to <a href='/shamanbotanicals'>Product List</a>",
@@ -89,7 +89,7 @@ sub products :Chained('base') :PathPart('products') :Args(1) {
 sub documentation :Chained('base') :PathPart('documentation') :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'documentation', "Documentation method called");
-    $c->stash(template => 'shamanbotanicals/documentation.tt');
+    $c->stash(template => 'SB/documentation.tt');
     $c->forward($c->view('TT'));
 }
 
@@ -105,7 +105,7 @@ sub _get_available_products {
     my ($self, $c) = @_;
 
     my @product_files = ();
-    my $products_dir = $c->path_to('root', 'shamanbotanicals', 'products');
+    my $products_dir = $c->path_to('root', 'SB', 'products');
 
     if (-d $products_dir && opendir(my $dh, $products_dir)) {
         while (my $file = readdir($dh)) {

@@ -46,7 +46,7 @@
                     <form action="/ENCY/search" method="POST">
                         <div class="form-row">
                             <div class="form-field">
-                                <label for="search" class="form-label">Search our herbal Database:</label>
+                                <label for="search" class="form-label">Search our herbal database:</label>
                                 <div class="form-input-group">
                                     <input type="text" id="search" name="search_string" value="" class="form-input">
                                     <button type="submit" class="btn btn-primary">Search</button>

@@ -1673,7 +1673,8 @@ sub _exec_docker {
     if ($exit_code != 0) {
         my $error = "Docker command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_docker',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_docker',
             $error);
         return undef;
     }
@@ -1715,7 +1716,8 @@ sub _exec_podman {
     if ($exit_code != 0) {
         my $error = "Podman command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_podman',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_podman',
             $error);
         return undef;
     }
@@ -1751,7 +1753,8 @@ sub list_models_shell {
     }
     
     unless ($output) {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models_shell',
             "Failed to execute list command: " . $self->last_error);
         return undef;
     }
@@ -1824,7 +1827,8 @@ sub pull_model_shell {
     
     unless ($output) {
         my $error = "Failed to pull model: " . $self->last_error;
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'pull_model_shell',
             $error);
         return {
             success => 0,

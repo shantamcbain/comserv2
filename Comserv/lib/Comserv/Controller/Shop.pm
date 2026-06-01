@@ -78,6 +78,11 @@ sub index :Path('/shop') :Args(0) {
     my ($self, $c) = @_;
 
     my $sitename = $self->_sitename($c);
+    if (!$sitename || $sitename eq 'none') {
+        $c->res->status(404);
+        $c->stash(template => 'error.tt', error_msg => 'Shop not found.');
+        return;
+    }
     my $schema   = $self->_schema($c);
     my $params   = $c->req->query_parameters;
     my $category = $params->{category} || '';
