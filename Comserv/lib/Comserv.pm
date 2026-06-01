@@ -81,7 +81,7 @@ __PACKAGE__->config(
     },
     'Plugin::Session' => {
         expires        => 86400,
-        dbic_class     => 'Schema::Ency::Session',
+        dbic_class     => 'DBEncy::Session',
         expires_column => 'expires',
         id_column      => 'id',
         data_column    => 'session_data',
