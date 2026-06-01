@@ -273,6 +273,24 @@ __PACKAGE__->meta->add_around_method_modifier('get_session_id', sub {
     return length($id) >= 20 ? lc($id) : undef;
 });
 
+__PACKAGE__->meta->add_around_method_modifier('change_session_id', sub {
+    my ($orig, $c, @args) = @_;
+    my $res = $c->$orig(@args);
+    if ($c->can('_session_store_delegate')) {
+        $c->_session_store_delegate(undef);
+    }
+    return $res;
+});
+
+__PACKAGE__->meta->add_around_method_modifier('change_sessid', sub {
+    my ($orig, $c, @args) = @_;
+    my $res = $c->$orig(@args);
+    if ($c->can('_session_store_delegate')) {
+        $c->_session_store_delegate(undef);
+    }
+    return $res;
+});
+
 # DISABLED: ConfigDatabaseInit was causing segmentation faults during schema queries
 # The config-db initialization is not required for current functionality
 # as the application uses db_config.json for database connections instead.
