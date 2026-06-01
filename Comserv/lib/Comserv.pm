@@ -19,7 +19,7 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
-    Session::Store::FastMmap
+    Session::Store::DBIC
     Authentication
 /;
 
@@ -80,24 +80,11 @@ __PACKAGE__->config(
         },
     },
     'Plugin::Session' => {
-        expires => 86400,
-        storage => do {
-            my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
-                my $p = '3001';
-                for my $i (0 .. $#ARGV) {
-                    if ($ARGV[$i] =~ /^-p(\d+)$/)         { $p = $1; last }
-                    elsif ($ARGV[$i] eq '-p' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
-                    elsif ($ARGV[$i] =~ /^--port=(\d+)$/)  { $p = $1; last }
-                    elsif ($ARGV[$i] eq '--port' && $ARGV[$i+1] && $ARGV[$i+1] =~ /^\d+$/) { $p = $ARGV[$i+1]; last }
-                }
-                $p;
-            };
-            my $dir = $ENV{COMSERV_SESSION_DIR} || "/tmp/comserv/session_$port";
-            require File::Path;
-            File::Path::make_path($dir) unless -d $dir;
-            require File::Spec;
-            File::Spec->catfile($dir, "comserv_sessions.mmap");
-        },
+        expires        => 86400,
+        dbic_class     => 'Schema::Ency::Session',
+        expires_column => 'expires',
+        id_column      => 'id',
+        data_column    => 'session_data',
         cookie_name => do {
             my $port = $ENV{COMSERV_PORT} || $ENV{CATALYST_PORT} || do {
                 my $p = '3001';

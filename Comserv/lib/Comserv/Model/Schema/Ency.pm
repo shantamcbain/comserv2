@@ -104,5 +104,8 @@ __PACKAGE__->register_class('AppSecret', 'Comserv::Model::Schema::Ency::Result::
 __PACKAGE__->register_class('Accounting::HostingAccount', 'Comserv::Model::Schema::Ency::Result::Accounting::HostingAccount');
 __PACKAGE__->register_class('HostingAccount', 'Comserv::Model::Schema::Ency::Result::Accounting::HostingAccount');
 
+# Register Session store class
+__PACKAGE__->register_class('Session', 'Comserv::Model::Schema::Ency::Result::Session');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;
