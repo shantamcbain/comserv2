@@ -1944,32 +1944,33 @@ function startWorkTodoCard(btn, recordId) {
 }
 
 function closeLogTodoCard(btn, recordId) {
+    var notes = prompt('Close log — brief notes on what was done (optional):');
+    if (notes === null) return;
+    notes = notes || '';
     btn.disabled = true;
+    btn.textContent = '…';
     fetch('/todo/close_log', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId })
+        body: JSON.stringify({ record_id: recordId, notes: notes })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-            btn.disabled = false;
             btn.textContent = '▶ Start';
-            btn.style.border = '1px solid #6c757d';
+            btn.style.border = '1px solid #0d6efd';
             btn.style.background = 'transparent';
-            btn.style.color = '#6c757d';
-            var startBtn = btn.previousElementSibling;
-            if (startBtn) {
-                startBtn.textContent = '▶ Start';
-                startBtn.style.background = 'transparent';
-                startBtn.style.color = '#0d6efd';
-                startBtn.style.borderColor = '#0d6efd';
-            }
+            btn.style.color = '#0d6efd';
+            btn.title = 'Start working — creates a log entry, marks todo active on all servers';
+            btn.onclick = function() { startWorkTodoCard(btn, recordId); };
+            btn.disabled = false;
         } else {
             btn.disabled = false;
+            btn.textContent = '⏸ Active';
             alert('Could not close log: ' + (d.error || 'unknown'));
         }
     }).catch(function(e) {
         btn.disabled = false;
+        btn.textContent = '⏸ Active';
         alert('Error: ' + e);
     });
 }

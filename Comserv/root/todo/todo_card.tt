@@ -206,13 +206,11 @@
            style="font-size:0.68em;padding:2px 6px;border:1px solid #17a2b8;border-radius:3px;text-decoration:none;color:#17a2b8;white-space:nowrap;" title="Add time log">Log</a>
         [% IF tc_show_done && is_admin && !tci_is_done %]
           [% IF tci_is_active %]
-          <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Log is open — click to close log with notes (todo stays open)">⏸ Active</button>
           <button onclick="closeLogTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #6c757d;border-radius:3px;background:transparent;color:#6c757d;cursor:pointer;white-space:nowrap;" title="Close log without marking done">⏹ End</button>
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Session active — click to close log with notes (todo stays in-progress)">⏸ Active</button>
           [% ELSE %]
           <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — creates a log entry, marks todo active">▶ Start</button>
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — creates a log entry, marks todo active on all servers">▶ Start</button>
           [% END %]
         <button onclick="[% tc_done_fn %]([% tc.record_id %])"
             style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
