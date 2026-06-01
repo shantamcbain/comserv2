@@ -6553,16 +6553,7 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
                 sudo docker stop comserv2-web-prod 2>/dev/null || docker stop comserv2-web-prod 2>/dev/null || true
                 sudo docker rm -f comserv2-web-prod 2>/dev/null || docker rm -f comserv2-web-prod 2>/dev/null || true
                 
-                # Stop and disable systemd starman service if active to avoid restart conflicts
-                sudo systemctl stop starman.service 2>/dev/null || true
-                sudo systemctl disable starman.service 2>/dev/null || true
-
-                # Kill existing starman/plackup on host
-                sudo pkill -f starman 2>/dev/null || pkill -f starman 2>/dev/null || true
-                sudo pkill -f plackup 2>/dev/null || pkill -f plackup 2>/dev/null || true
-                sudo pkill -f comserv.*psgi 2>/dev/null || pkill -f comserv.*psgi 2>/dev/null || true
-                
-                # Kill processes holding port 5000
+                # Kill processes holding port 5000 to guarantee clean bind
                 if command -v fuser &>/dev/null; then
                     sudo fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
                 fi
@@ -6570,12 +6561,51 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
                 export CATALYST_HOME="$HOST_APP_DIR"
                 export CATALYST_ENV=production
                 export COMSERV_LOG_DIR="$HOST_APP_DIR"
+
+                echo "Attempting to reset and start systemd starman.service..."
+                sudo systemctl reset-failed starman.service 2>/dev/null || true
+                sudo systemctl enable starman.service 2>/dev/null || true
                 
-                if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
-                    echo "SUCCESS: Host Starman service started on port 5000!"
+                if sudo systemctl start starman.service 2>/dev/null && sleep 2 && sudo systemctl is-active starman.service &>/dev/null; then
+                    echo "SUCCESS: Host Starman systemd service started and verified active!"
                 else
-                    echo "ERROR: Failed to start host Starman. Log:"
-                    cat /tmp/host_starman_manual.log
+                    echo "systemd service failed to start or verify. Falling back to manual process execution..."
+                    
+                    # Stop and disable systemd starman service if active to avoid restart conflicts
+                    sudo systemctl stop starman.service 2>/dev/null || true
+                    sudo systemctl disable starman.service 2>/dev/null || true
+
+                    # Kill existing starman/plackup on host
+                    sudo pkill -f starman 2>/dev/null || pkill -f starman 2>/dev/null || true
+                    sudo pkill -f plackup 2>/dev/null || pkill -f plackup 2>/dev/null || true
+                    sudo pkill -f comserv.*psgi 2>/dev/null || pkill -f comserv.*psgi 2>/dev/null || true
+                    
+                    # Try launching via various known starman locations/methods
+                    STARTED=0
+                    if [ -x "/usr/local/bin/starman" ]; then
+                        if /usr/local/bin/starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if perl -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 1 ]; then
+                        echo "SUCCESS: Host Starman manual process started on port 5000!"
+                    else
+                        echo "ERROR: Failed to start host Starman using any method. Log:"
+                        cat /tmp/host_starman_manual.log 2>/dev/null || echo "No manual log file found."
+                    fi
                 fi
             else
                 echo "ERROR: PSGI file not found under $HOST_APP_DIR"

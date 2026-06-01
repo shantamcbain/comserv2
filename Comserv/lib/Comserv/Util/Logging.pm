@@ -428,7 +428,11 @@ sub log_with_details {
     }
 
     # Write to application log file and STDERR (filtered by COMSERV_LOG_MIN_LEVEL).
-    log_to_file($log_message, undef, $level);
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    if ($msg_prio >= $min_prio) {
+        log_to_file($log_message, undef, $level);
+    }
     _print_log($log_message, $level);
 
     # Log to database — only WARN and above to keep the table manageable.
