@@ -260,6 +260,7 @@ around 'finalize_error' => sub {
 __PACKAGE__->_initialize_database_config();
 __PACKAGE__->setup();
 __PACKAGE__->_initialize_ai_chat_schema();
+__PACKAGE__->_initialize_session_schema();
 
 # LAYER 2.5: Sanitize session ID from cookie — strip any non-hex characters
 # that could be injected (e.g. HTML entities like &#39; from attackers).
@@ -423,6 +424,46 @@ sub _initialize_ai_chat_schema {
     
     if ($@) {
         warn "Warning during AI Chat schema initialization: $@\n";
+    }
+    
+    return 1;
+}
+
+sub _initialize_session_schema {
+    my $class = shift;
+    
+    eval {
+        use Comserv::Util::Logging;
+        my $log = Comserv::Util::Logging->instance;
+        
+        my $schema = $class->model('DBEncy');
+        if ($schema && $schema->storage && $schema->storage->dbh) {
+            my $dbh = $schema->storage->dbh;
+            my $sth = $dbh->prepare("SHOW TABLES LIKE 'sessions'");
+            $sth->execute();
+            my $exists = $sth->fetchrow_arrayref();
+            
+            if (!$exists) {
+                $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_session_schema',
+                    "Sessions table 'sessions' not found in ENCY database. Creating it automatically...");
+                
+                my $sql = q{
+                    CREATE TABLE `sessions` (
+                        `id` VARCHAR(72) NOT NULL,
+                        `session_data` TEXT DEFAULT NULL,
+                        `expires` INT(11) DEFAULT NULL,
+                        PRIMARY KEY (`id`)
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+                };
+                
+                $dbh->do($sql);
+                $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_initialize_session_schema',
+                    "Sessions table 'sessions' created successfully.");
+            }
+        }
+    };
+    if ($@) {
+        warn "Warning: Could not auto-initialize sessions table: $@\n";
     }
     
     return 1;
