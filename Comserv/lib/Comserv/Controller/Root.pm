@@ -1954,6 +1954,18 @@ sub begin :Private {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
         $c->stash->{nav_hosting_accounts} = [];
     }
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $rows = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+        );
+        my %at = map { $_ => 1 } @{ $rows || [] };
+        $c->stash->{active_todos} = \%at;
+    };
+    if ($@) {
+        $c->stash->{active_todos} = {};
+    }
 }
 
 sub _port_label {
