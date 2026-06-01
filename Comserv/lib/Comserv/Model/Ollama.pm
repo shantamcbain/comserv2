@@ -81,6 +81,10 @@ has 'host' => (
     is => 'rw',
     isa => 'Str',
     default => '192.168.1.199',
+    trigger => sub {
+        my ($self) = @_;
+        $self->clear_endpoint if $self->can('clear_endpoint');
+    },
     documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
@@ -88,6 +92,10 @@ has 'port' => (
     is => 'rw',
     isa => 'Int',
     default => 11434,
+    trigger => sub {
+        my ($self) = @_;
+        $self->clear_endpoint if $self->can('clear_endpoint');
+    },
     documentation => 'Ollama server port'
 );
 
