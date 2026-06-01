@@ -498,8 +498,8 @@ sub _deserialize_session {
     return undef unless defined $serialized;
     return $serialized if ref $serialized; # Already deserialized reference
     
-    # Return as-is if it's not a string or doesn't look like base64
-    return $serialized if $serialized =~ /^HASH\(/;
+    # Reject legacy stringified hash references from previous versions (forces safe session recreate)
+    return undef if $serialized =~ /^HASH\(0x[0-9a-fA-F]+\)/;
     
     my $decoded = eval { decode_base64($serialized) };
     if ($@ || !defined $decoded || $decoded eq '') {
