@@ -26,6 +26,11 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
+# Set this in production docker-compose to prevent disk fill-up.
+# DB logging (WARN+) still works normally via log_with_details.
+my $FILE_LOGGING_DISABLED = ($ENV{DISABLE_FILE_LOGGING} // '') eq '1' ? 1 : 0;
+
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
     qr/googlebot/i,
@@ -116,6 +121,7 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
+    return if $FILE_LOGGING_DISABLED;
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
@@ -304,6 +310,13 @@ sub get_system_identifier {
 # Initialize the logging system
 sub init {
     my ($class) = @_;
+
+    if ($FILE_LOGGING_DISABLED) {
+        _print_log("DISABLE_FILE_LOGGING=1: file logging disabled, using STDERR + DB only");
+        __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+            "Logging system initialized (STDERR + DB only; file logging disabled)");
+        return;
+    }
 
     # Always write to the local log directory first — never NFS during startup.
     # NFS is only used for archiving rotated logs (via rotate_log), not for live writes.
@@ -668,7 +681,9 @@ sub send_error_notification {
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my ($message, $file_path, $level) = @_;
-    
+
+    return if $FILE_LOGGING_DISABLED;
+
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
     # This prevents creating files with the message as the filename

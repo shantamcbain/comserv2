@@ -14,6 +14,7 @@ services:
       CATALYST_DEBUG: 0
       WEB_PORT: 5000
       TZ: UTC
+      DISABLE_HEALTH_MONITOR: "1"
       # Database configuration for staging
       DB_HOST: ${DB_HOST_STAGING:-db-staging.example.com}
       DB_PORT: ${DB_PORT_STAGING:-3306}
