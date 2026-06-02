@@ -50,11 +50,8 @@
             <div class="admin-links">
                 <a href="/shamanbotanicals/documentation" class="btn-secondary">Controller Documentation</a>
                 <a href="https://shamanbotanicals.ca" target="_blank" class="btn-secondary">Visit Live Site</a>
-                <a href="/shamanbotanicals/documentation" target="_blank" class="btn-secondary">Visit Live Site</a>
             </div>
         </section>
         [% END %]
     </div>
-        [% END %]
-        </div>
 </div>
