@@ -865,14 +865,15 @@ sub health_detail :Path('/health/detail') :Args(0) {
         $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
         my $using_dbic = ($c->config->{'Plugin::Session'} && $c->config->{'Plugin::Session'}{dbic_class}) ? 1 : 0;
         if (!$info{session_dir_ok} && !$using_dbic) {
+            warn "[HEALTH_CHECK] CRITICAL: Session directory $sess_dir is not writable by current user! Check permissions on host folder.\n";
             $ok = 0;
         }
     };
 
-    # 5. Quick DB ping (non-blocking, 2s timeout)
+    # 5. Quick DB ping (non-blocking, 5s timeout)
     eval {
         local $SIG{ALRM} = sub { die "timeout\n" };
-        alarm(2);
+        alarm(5);
         my $schema = $c->model('DBEncy');
         $schema->storage->dbh->ping;
         alarm(0);
