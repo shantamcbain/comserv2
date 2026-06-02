@@ -5788,14 +5788,25 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
             if (my $ports_str = $container->{Ports}) {
                 @ports = grep { /\d+:\d+/ } split(/,\s*/, $ports_str);
             }
-            push @containers, {
+            my $state = $container->{State} || 'unknown';
+            my $container_info = {
                 name    => $name,
                 service => $service,
-                state   => $container->{State} || 'unknown',
+                state   => $state,
                 status  => $container->{Status} || '',
                 ports   => \@ports,
                 image   => $container->{Image} || ''
             };
+            if (lc($state) eq 'running' || lc($state) eq 'up' || ($container->{Status} && $container->{Status} =~ /Up/i)) {
+                my ($version_out, $version_exit) = $self->_run_docker_on_target($c, "exec $name cat /opt/comserv/version.json", $target);
+                if ($version_exit == 0 && $version_out =~ /^\{/) {
+                    my $ver_data = eval { decode_json($version_out) };
+                    if ($ver_data) {
+                        $container_info->{build_info} = $ver_data;
+                    }
+                }
+            }
+            push @containers, $container_info;
         };
     }
     
