@@ -73,6 +73,7 @@ my $_in_todo_create    = 0;  # recursion guard for auto-error-todo creation
 # Circuit breaker: if email send fails, stop trying for 5 minutes to prevent blocking workers.
 my $_email_failed_at = 0;  # epoch time of last email send failure
 my $_email_backoff_s = 300; # seconds to pause email sending after a failure
+my $_last_rotation_attempt_at = 0; # epoch time of last preemptive log rotation attempt
 
 my $MAX_LOG_SIZE = 50 * 1024 * 1024; # 50 MB max log size
 my $ROTATION_THRESHOLD = 40 * 1024 * 1024; # Rotate at 40 MB
@@ -119,11 +120,11 @@ sub rotate_log {
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
-    _print_log("Current log file size: $file_size bytes, max size: $MAX_LOG_SIZE bytes");
-    return if $file_size < $MAX_LOG_SIZE;
+    _print_log("Current log file size: $file_size bytes, rotation threshold: $ROTATION_THRESHOLD bytes");
+    return if $file_size < $ROTATION_THRESHOLD;
 
     # Log that we're rotating the file
-    _print_log("Log file size ($file_size bytes) exceeds maximum size ($MAX_LOG_SIZE bytes). Rotating log file.");
+    _print_log("Log file size ($file_size bytes) exceeds rotation threshold ($ROTATION_THRESHOLD bytes). Rotating log file.");
 
     # Generate timestamped filename
     my $timestamp = strftime("%Y%m%d_%H%M%S", localtime);
@@ -262,40 +263,66 @@ sub get_system_identifier {
         $p;
     };
 
+    my $identifier = '';
+
     # 1. Explicit override via environment variable (set in Docker compose / systemd unit)
-    my $identifier = $ENV{SYSTEM_IDENTIFIER};
-    if ($identifier && $identifier ne '') {
-        # Append port when it adds useful info (i.e. not already encoded in the name)
-        $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
-        return $identifier;
+    if ($ENV{SYSTEM_IDENTIFIER} && $ENV{SYSTEM_IDENTIFIER} ne '') {
+        $identifier = $ENV{SYSTEM_IDENTIFIER};
+    } else {
+        # Check if we are inside a Docker container
+        my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+        
+        if ($is_docker) {
+            my $env = $ENV{CATALYST_ENV} || 'production';
+            if ($env eq 'development') {
+                $identifier = 'workstation-container';
+            } else {
+                $identifier = 'production-container';
+            }
+        } else {
+            # Outside container: resolve by LAN IP
+            my %IP_NAMES = (
+                '192.168.1.126' => 'production-host',
+                '192.168.1.199' => 'workstation-host',
+            );
+            eval {
+                require Socket;
+                socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0) or die;
+                connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8'))) or die;
+                my $local = getsockname($sock);
+                my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
+                my $ip = Socket::inet_ntoa($local_ip_packed);
+                if (exists $IP_NAMES{$ip}) {
+                    $identifier = $IP_NAMES{$ip};
+                }
+            };
+            
+            # Fallback to hostname if IP-based lookup failed or wasn't mapped
+            unless ($identifier) {
+                eval {
+                    require Sys::Hostname;
+                    $identifier = Sys::Hostname::hostname();
+                };
+                $identifier //= 'unknown-host';
+            }
+        }
     }
 
-    # 2. Map known IP addresses to friendly names.
-    # Use a UDP connect (no packets sent) to find which local IP the OS would
-    # use when routing outbound — the most reliable way to get the primary LAN IP.
-    my %IP_NAMES = (
-        '192.168.1.126' => 'production',
-        '192.168.1.199' => 'workstation',
-    );
-    eval {
-        require Socket;
-        socket(my $sock, Socket::AF_INET(), Socket::SOCK_DGRAM(), 0)
-            or die "socket: $!";
-        connect($sock, Socket::sockaddr_in(53, Socket::inet_aton('8.8.8.8')))
-            or die "connect: $!";
-        my $local = getsockname($sock);
-        my (undef, $local_ip_packed) = Socket::sockaddr_in($local);
-        my $ip = Socket::inet_ntoa($local_ip_packed);
-        $identifier = $IP_NAMES{$ip} if exists $IP_NAMES{$ip};
-    };
+    # Detect runtime environments (Docker, Starman, Standalone)
+    my $is_docker = -f '/.dockerenv' || -f '/run/.containerenv' || ($ENV{container} && $ENV{container} eq 'docker');
+    my $is_starman = exists $INC{'Starman.pm'} || exists $INC{'Starman/Server.pm'} || ($ENV{SERVER_SOFTWARE} && $ENV{SERVER_SOFTWARE} =~ /Starman/i) || ($0 =~ /starman/i);
 
-    # 3. Fall back to plain hostname
-    unless ($identifier && $identifier ne '') {
-        eval { require Sys::Hostname; $identifier = Sys::Hostname::hostname() };
-        $identifier //= 'unknown';
+    my $tag_str;
+    if ($is_docker) {
+        $tag_str = 'Docker';
+    } else {
+        $tag_str = $is_starman ? 'Starman' : 'Standalone';
     }
+
+    $identifier .= " ($tag_str)" if $tag_str;
 
     # Append port to disambiguate multiple dev servers on the same host
+    $port //= '3000';
     $identifier .= ":$port" if $port && $identifier !~ /:\d+$/;
 
     return $identifier;
@@ -305,55 +332,70 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
+    # ====================== TEMPORARY FILE LOG DISABLE ======================
+    # Disable file logging on Production server (or via environment variable)
+    my $system_id = __PACKAGE__->get_system_identifier();
+
+    if ($ENV{COMSERV_DISABLE_FILE_LOG} ||
+        $system_id =~ /production-host/i ||
+        $system_id =~ /192\.168\.1\.126/) {
+
+        $LOG_FH   = undef;
+        $LOG_FILE = undef;
+
+        # Only print to STDERR - do NOT call _print_log() here to avoid recursion
+        print STDERR "=== FILE LOGGING DISABLED on Production Server ===\n";
+        print STDERR "System ID: $system_id\n";
+        print STDERR "Logging to DB + STDERR only.\n";
+
+        return;   # Skip all file operations
+    }
+    # ========================================================================
+
     # Always write to the local log directory first — never NFS during startup.
-    # NFS is only used for archiving rotated logs (via rotate_log), not for live writes.
-    # This prevents the server from hanging in uninterruptible D-state when NFS is slow.
     my $log_file;
     my $log_dir;
 
-    my $base_dir = $ENV{'COMSERV_LOG_DIR'} // File::Spec->catdir($FindBin::Bin, '..');
-    $log_dir  = File::Spec->catdir($base_dir, "logs");
-    $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Using local log directory: $log_dir");
+    if ($ENV{'COMSERV_LOG_DIR'}) {
+        $log_dir = $ENV{'COMSERV_LOG_DIR'};
+    } else {
+        my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
+        $log_dir = File::Spec->catdir($base_dir, "logs");
+    }
 
-    _print_log("Log file: $log_file");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+
+    print STDERR "Using local log directory: $log_dir\n";   # Safe fallback
+    print STDERR "Log file: $log_file\n";
 
     # Create the log directory if it doesn't exist
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+            print STDERR "[ERROR] Failed to create log directory $log_dir: $@\n";
             die "Failed to create log directory $log_dir: $@\n";
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
     # Open the log file for appending
     unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
         my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
+        print STDERR "[ERROR] $error_message\n";
         die $error_message;
     }
 
     # Ensure the file handle is auto-flushed
     select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
 
-    # Write a test entry to ensure the log file is created
     print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-    
+
     # Set global log file path for rotation
     $LOG_FILE = $log_file;
-    _print_log("Global log file path set to: $LOG_FILE");
 
-    # Log initialization message
-    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    # Now safe to use full logging
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+        "Logging system initialized with log file: $LOG_FILE");
 }
-
-# Constructor for creating a new instance
 sub new {
     my ($class) = @_;
     return bless {}, $class;
@@ -397,7 +439,11 @@ sub log_with_details {
     }
 
     # Write to application log file and STDERR (filtered by COMSERV_LOG_MIN_LEVEL).
-    log_to_file($log_message, undef, $level);
+    my $min_prio  = $LEVEL_PRIORITY{ uc($STDERR_LOG_MIN_LEVEL) } // 1;
+    my $msg_prio  = $LEVEL_PRIORITY{ uc($level)                } // 1;
+    if ($msg_prio >= $min_prio) {
+        log_to_file($log_message, undef, $level);
+    }
     _print_log($log_message, $level);
 
     # Log to database — only WARN and above to keep the table manageable.
@@ -698,12 +744,19 @@ sub log_to_file {
     $level //= 'INFO';
 
     # Check file size before writing to ensure we don't exceed max size
+    # Only try to rotate once every 5 minutes to prevent infinite warning loops if rotation fails
     if (defined $LOG_FILE && $file_path eq $LOG_FILE && -e $file_path) {
         my $file_size = -s $file_path;
         if ($file_size >= $ROTATION_THRESHOLD) {
-            _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
-            eval { rotate_log() };
-            _print_log("Log rotation failed (non-fatal): $@") if $@;
+            my $now = time();
+            if ($now - $_last_rotation_attempt_at >= 300) {
+                $_last_rotation_attempt_at = $now;
+                _print_log("Pre-emptive log rotation triggered: $file_size bytes >= $ROTATION_THRESHOLD bytes");
+                eval { rotate_log() };
+                if ($@) {
+                    _print_log("Log rotation failed (non-fatal): $@");
+                }
+            }
         }
     }
 

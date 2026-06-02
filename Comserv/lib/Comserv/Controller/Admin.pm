@@ -2729,7 +2729,7 @@ sub table_name_to_result_name {
         'log' => 'Log',
         'mail_domains' => 'MailDomain',
         'network_devices' => 'NetworkDevice',
-        'pages_content' => 'Pages_content',
+        'page' => 'Page',
         'page_tb' => 'PageTb',
         'pallets' => 'Pallet',
         'participant' => 'Participant',
@@ -3022,13 +3022,11 @@ sub result_name_to_table_name {
         'Participant' => 'participants',
         'Herb' => 'ency_herb_tb',
         'Page' => 'page',
-        'Pages_content' => 'pages_content',
         'InternalLinksTb' => 'internal_links_tb',
         'Learned_data' => 'learned_data',
         'Log' => 'log',
         'MailDomain' => 'mail_domains',
         'NetworkDevice' => 'network_devices',
-        'PageTb' => 'page_tb',
         'Pallet' => 'pallets',
         'ProjectSite' => 'project_sites',
         'Queen' => 'queens',
@@ -5556,6 +5554,140 @@ sub _docker_bin {
     return 'docker';
 }
 
+sub _run_host_cmd_on_target {
+    my ($self, $c, $host_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $output = `$host_cmd 2>&1`;
+        my $exit_code = $? >> 8;
+        return ($output, $exit_code);
+    }
+    
+    # Remote target via SSH
+    my $ssh_host = '';
+    my $ssh_user = 'ubuntu';
+    my $ssh_port = 22;
+    if ($target eq 'production2') {
+        $ssh_host = '192.168.1.127';
+    } else {
+        # Default to production1
+        $ssh_host = '192.168.1.126';
+    }
+    
+    # Load SSH password from file
+    my $ssh_password = '';
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds) {
+            $ssh_password = $creds->{ssh_password} || '';
+            $ssh_port = $creds->{ssh_port} || 22;
+        }
+    }
+    
+    if (!$ssh_password) {
+        return ("ERROR: SSH password required. Use Test Connection to save credentials first.", 1);
+    }
+    
+    # Validate SSH parameters
+    unless ($ssh_host =~ /^[a-zA-Z0-9_\-\.]+$/) {
+        return ("ERROR: Invalid host format", 1);
+    }
+    $ssh_port = int($ssh_port);
+    $ssh_port = 22 unless $ssh_port > 0 && $ssh_port <= 65535;
+    
+    # Escape single quotes in host_cmd
+    my $escaped_cmd = $host_cmd;
+    $escaped_cmd =~ s/'/'\\''/g;
+    
+    local $ENV{SSHPASS} = $ssh_password;
+    my $cmd = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=5 -o StrictHostKeyChecking=no $ssh_user\@$ssh_host '$escaped_cmd' 2>&1);
+    my $output = `$cmd`;
+    my $exit_code = $? >> 8;
+    
+    return ($output, $exit_code);
+}
+
+sub _run_docker_on_target {
+    my ($self, $c, $docker_cmd, $target) = @_;
+    
+    $target //= $c->req->params->{target} || 'workstation';
+    $target = lc($target);
+    
+    if ($target eq 'workstation') {
+        my $denv  = _docker_env();
+        my $docker = _docker_bin();
+        return $self->_run_host_cmd_on_target($c, "$denv $docker $docker_cmd", $target);
+    } else {
+        return $self->_run_host_cmd_on_target($c, "docker $docker_cmd", $target);
+    }
+}
+
+sub _query_system_diagnostics {
+    my ($self, $c, $target) = @_;
+    
+    # 1. Docker Compose status
+    my ($compose_out, $compose_code) = $self->_run_host_cmd_on_target($c, "docker compose version 2>&1 || docker-compose version 2>&1 || echo 'Not installed'", $target);
+    chomp($compose_out);
+    
+    # 2. Starman process status
+    my ($starman_out, $starman_code) = $self->_run_host_cmd_on_target($c, "ps aux | grep -i starman | grep -v grep || echo 'No starman processes found'", $target);
+    
+    # 3. Port bindings
+    my ($ports_out, $ports_code) = $self->_run_host_cmd_on_target($c, "ss -tln || netstat -tln || echo 'Network utilities not available'", $target);
+    my @active_ports;
+    for my $line (split(/\n/, $ports_out)) {
+        if ($line =~ /(?:^|[\s:])(5000|3000|3001)(?:\s|$|:)/) {
+            push @active_ports, $1 unless grep { $_ eq $1 } @active_ports;
+        }
+    }
+    
+    # 4. Git status & log
+    my $git_cmd = '';
+    if ($target eq 'workstation') {
+        $git_cmd = "git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s'";
+    } else {
+        $git_cmd = "cd /opt/comserv/Comserv 2>/dev/null && git status -sb && echo '---' && git log -1 --format='%h - %an, %ar : %s' || echo 'Directory /opt/comserv/Comserv not found or not a git repo'";
+    }
+    my ($git_out, $git_code) = $self->_run_host_cmd_on_target($c, $git_cmd, $target);
+    
+    # 5. Backup images list
+    my ($backups_out, $backups_code) = $self->_run_host_cmd_on_target($c, "docker images --format '{{.Repository}}:{{.Tag}} ({{.ID}})' | grep shantamcsbain/comserv-web-prod || echo 'No images found'", $target);
+    my @backups;
+    for my $line (split(/\n/, $backups_out)) {
+        chomp($line);
+        if ($line =~ /comserv-web-prod/i && $line !~ /latest/i) {
+            push @backups, $line;
+        }
+    }
+    
+    # 6. Host stats
+    my ($disk_out) = $self->_run_host_cmd_on_target($c, "df -h / | tail -n 1", $target);
+    chomp($disk_out);
+    my ($mem_out) = $self->_run_host_cmd_on_target($c, "free -m | grep Mem", $target);
+    chomp($mem_out);
+    my ($uptime_out) = $self->_run_host_cmd_on_target($c, "uptime", $target);
+    chomp($uptime_out);
+    
+    return {
+        compose_status  => $compose_out,
+        starman_status  => $starman_out,
+        active_ports    => \@active_ports,
+        git_status      => $git_out,
+        backups         => \@backups,
+        disk            => $disk_out,
+        memory          => $mem_out,
+        uptime          => $uptime_out,
+    };
+}
+
 sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     my ($self, $c) = @_;
 
@@ -5585,6 +5717,28 @@ sub docker_containers :Path('/admin/docker-containers') :Args(0) {
     );
 }
 
+sub docker_containers_old :Path('/admin/docker-containers-old') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_containers_old',
+        "Docker old containers management page accessed");
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_containers')) {
+        $c->flash->{error_msg} = "You need to be a CSC administrator to access Docker management.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $docker_available = ! -f '/.dockerenv';
+
+    $c->stash(
+        template => 'admin/docker_containers_old.tt',
+        docker_available => $docker_available,
+        authenticated => 1,
+    );
+}
+
 sub docker_list :Path('/admin/docker-list') :Args(0) {
     my ($self, $c) = @_;
     
@@ -5606,14 +5760,11 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
-    my $denv  = _docker_env();
-    my $docker = _docker_bin();
-
-    my $output = `$denv $docker ps --all --format json 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "ps --all --format json", $target);
     
     if ($exit_code != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps: $output" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to execute docker ps on $target: $output" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5648,7 +5799,19 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         };
     }
     
-    $c->response->body(encode_json({ success => 1, containers => \@containers }));
+    # Query available backup images on target
+    my @backups;
+    my ($images_output, $images_exit) = $self->_run_docker_on_target($c, 'images --format "{{.Repository}}:{{.Tag}} ({{.Size}})"', $target);
+    if ($images_exit == 0) {
+        foreach my $line (split /\n/, $images_output) {
+            if ($line =~ /:backup-/) {
+                $line =~ s/^(?:shantamcsbain\/)?comserv-web-prod://;
+                push @backups, $line;
+            }
+        }
+    }
+
+    $c->response->body(encode_json({ success => 1, containers => \@containers, backups => \@backups, target => $target }));
     $c->response->content_type('application/json');
 }
 
@@ -5672,14 +5835,11 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
         return;
     }
 
-    my $denv_v  = _docker_env();
-    my $docker_v = _docker_bin();
-
-    my $names_out = `$denv_v $docker_v volume ls -q 2>&1`;
-    my $names_exit = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($names_out, $names_exit) = $self->_run_docker_on_target($c, "volume ls -q", $target);
 
     if ($names_exit != 0) {
-        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes: $names_out" }));
+        $c->response->body(encode_json({ success => \0, error => "Failed to list Docker volumes on $target: $names_out" }));
         $c->response->content_type('application/json');
         return;
     }
@@ -5687,14 +5847,13 @@ sub docker_volumes :Path('/admin/docker-volumes') :Args(0) {
     my @names = grep { $_ ne '' } split /\n/, $names_out;
 
     if (!@names) {
-        $c->response->body(encode_json({ success => 1, volumes => [] }));
+        $c->response->body(encode_json({ success => 1, volumes => [], target => $target }));
         $c->response->content_type('application/json');
         return;
     }
 
     my $names_str = join(' ', map { quotemeta($_) } @names);
-    my $inspect_out = `$denv_v $docker_v volume inspect $names_str 2>&1`;
-    my $inspect_exit = $? >> 8;
+    my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "volume inspect $names_str", $target);
 
     my @volumes;
     eval {
@@ -5746,25 +5905,20 @@ sub docker_restart :Path('/admin/docker-restart') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $denv_r   = _docker_env();
-    my $docker_r = _docker_bin();
-    my $home_r   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_r = "$home_r/PycharmProjects/comserv2";
-
-    my ($output, $exit_code);
+    my $docker_cmd;
     if ($service eq 'all') {
-        $output = `$denv_r $docker_r compose -f '$compose_dir_r/docker-compose.yml' restart 2>&1`;
-        $exit_code = $? >> 8;
-    } else {
-        $output = `$denv_r $docker_r restart '$service' 2>&1`;
-        $exit_code = $? >> 8;
-        if ($exit_code != 0) {
-            $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'docker_restart',
-                "docker restart $service failed (exit $exit_code): $output");
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml restart";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml restart";
         }
+    } else {
+        $docker_cmd = "restart '$service'";
     }
-    $output //= "(no output captured — docker socket not found)";
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5796,17 +5950,20 @@ sub docker_start :Path('/admin/docker-start') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_s   = _docker_env();
-    my $docker_s = _docker_bin();
-    my $home_s   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_s = "$home_s/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_s $docker_s compose -f '$compose_dir_s/docker-compose.yml' start 2>&1"
-        : "$denv_s $docker_s start '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml start";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml start";
+        }
+    } else {
+        $docker_cmd = "start '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5838,17 +5995,20 @@ sub docker_stop :Path('/admin/docker-stop') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $denv_st   = _docker_env();
-    my $docker_st = _docker_bin();
-    my $home_st   = $ENV{HOME} || '/home/shanta';
-    my $compose_dir_st = "$home_st/PycharmProjects/comserv2";
-    my $cmd = $service eq 'all'
-        ? "$denv_st $docker_st compose -f '$compose_dir_st/docker-compose.yml' stop 2>&1"
-        : "$denv_st $docker_st stop '$service' 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
 
-    my $output    = `$cmd`;
-    $output //= "(no output captured — docker socket not found)";
-    my $exit_code = $? >> 8;
+    my $docker_cmd;
+    if ($service eq 'all') {
+        if ($target eq 'workstation') {
+            $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml stop";
+        } else {
+            $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml stop";
+        }
+    } else {
+        $docker_cmd = "stop '$service'";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
 
     $c->response->body(encode_json({
         success   => $exit_code == 0 ? \1 : \0,
@@ -5880,20 +6040,24 @@ sub docker_up :Path('/admin/docker-up') :Args(1) {
     }
     
     $service =~ s/[^a-zA-Z0-9_\-]//g;
-    my $cmd = $service eq 'all'
-        ? 'cd ~/PycharmProjects/comserv2 && docker compose up -d 2>&1'
-        : "cd ~/PycharmProjects/comserv2 && docker compose up -d $service 2>&1";
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    my $compose_target = $service eq 'all' ? '' : $service;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml up -d $compose_target";
+    } else {
+        $docker_cmd = "compose -f /opt/comserv/Comserv/docker-compose.server.yml up -d $compose_target";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
-    
-    my $result = {
-        success => $exit_code == 0 ? \1 : \0,
-        stdout => $output,
-        exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    $c->response->body(encode_json({
+        success   => $exit_code == 0 ? \1 : \0,
+        stdout    => $output,
+        exit_code => $exit_code,
+        ($exit_code != 0 ? (error => $output) : ()),
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -5921,17 +6085,22 @@ sub docker_logs :Path('/admin/docker-logs') :Args(1) {
     my $lines = int($c->req->params->{lines} || 100);
     $lines = 100 unless $lines > 0 && $lines <= 10000;
     
-    my $cmd = "cd ~/PycharmProjects/comserv2 && docker compose logs --tail=$lines $service 2>&1";
-    my $output = `$cmd`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+
+    my $docker_cmd;
+    if ($target eq 'workstation') {
+        $docker_cmd = "compose -f /home/shanta/PycharmProjects/comserv2/docker-compose.yml logs --tail=$lines $service";
+    } else {
+        $docker_cmd = "logs --tail=$lines $service";
+    }
+
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, $docker_cmd, $target);
     
-    my $result = {
+    $c->response->body(encode_json({
         success => $exit_code == 0 ? \1 : \0,
-        output => $output,  # Changed from 'logs' to 'output' to match template expectation
+        output => $output,
         exit_code => $exit_code
-    };
-    
-    $c->response->body(encode_json($result));
+    }));
     $c->response->content_type('application/json');
 }
 
@@ -6105,27 +6274,63 @@ sub docker_prune :Path('/admin/docker-prune') :Args(0) {
         return;
     }
     
-    # Prune stopped containers, dangling images, and unused networks
+    my $target = $c->req->params->{target} || 'workstation';
     my $output = '';
     
     # Remove stopped containers
     $output .= "=== Removing stopped containers ===\n";
-    $output .= `docker container prune -f 2>&1`;
+    my ($o1, $e1) = $self->_run_docker_on_target($c, "container prune -f", $target);
+    $output .= $o1;
     
     # Remove dangling images
     $output .= "\n=== Removing dangling images ===\n";
-    $output .= `docker image prune -f 2>&1`;
+    my ($o2, $e2) = $self->_run_docker_on_target($c, "image prune -f", $target);
+    $output .= $o2;
     
     # Remove unused networks
     $output .= "\n=== Removing unused networks ===\n";
-    $output .= `docker network prune -f 2>&1`;
+    my ($o3, $e3) = $self->_run_docker_on_target($c, "network prune -f", $target);
+    $output .= $o3;
     
-    my $exit_code = $? >> 8;
+    my $exit_code = ($e1 || $e2 || $e3) ? 1 : 0;
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
         output => $output,
         exit_code => $exit_code
+    };
+    
+    $c->response->body(encode_json($result));
+    $c->response->content_type('application/json');
+}
+
+sub docker_diagnostics :Path('/admin/docker-diagnostics') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_diagnostics',
+        "Docker system diagnostics requested");
+        
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_diagnostics')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    if (-f '/.dockerenv') {
+        $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'workstation';
+    my $diagnostics = $self->_query_system_diagnostics($c, $target);
+    
+    my $result = {
+        success     => \1,
+        diagnostics => $diagnostics,
+        target      => $target
     };
     
     $c->response->body(encode_json($result));
@@ -6152,8 +6357,8 @@ sub docker_system_df :Path('/admin/docker-system-df') :Args(0) {
         return;
     }
     
-    my $output = `docker system df 2>&1`;
-    my $exit_code = $? >> 8;
+    my $target = $c->req->params->{target} || 'workstation';
+    my ($output, $exit_code) = $self->_run_docker_on_target($c, "system df", $target);
     
     my $result = {
         success => $exit_code == 0 ? \1 : \0,
@@ -6307,6 +6512,121 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
+    my ($self, $c) = @_;
+    
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'docker_start_starman',
+        "Manual host Starman startup requested from application");
+    
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'docker_start_starman')) {
+        $c->response->status(403);
+        $c->response->body('{"success": false, "error": "Access denied: admin required"}');
+        $c->response->content_type('application/json');
+        return;
+    }
+    
+    my $target = $c->req->params->{target} || 'production1';
+    
+    # Construct shell command to locate host code, stop failing container, and run daemonized Starman
+    my $start_cmd = q(
+        HOST_APP_DIR=""
+        for DIR in /opt/comserv/Comserv /home/ubuntu/comserv /home/shanta/PycharmProjects/comserv2; do
+            if [ -d "$DIR" ]; then
+                HOST_APP_DIR="$DIR"
+                break
+            fi
+        done
+
+        if [ -n "$HOST_APP_DIR" ]; then
+            cd "$HOST_APP_DIR"
+            PSGI_FILE=""
+            for FILE in script/comserv_server.psgi script/comserv.psgi comserv_server.psgi comserv.psgi; do
+                if [ -f "$FILE" ]; then
+                    PSGI_FILE="$FILE"
+                    break
+                fi
+            done
+            
+            if [ -n "$PSGI_FILE" ]; then
+                # Stop any container running on 5000 to free port
+                sudo docker stop comserv2-web-prod 2>/dev/null || docker stop comserv2-web-prod 2>/dev/null || true
+                sudo docker rm -f comserv2-web-prod 2>/dev/null || docker rm -f comserv2-web-prod 2>/dev/null || true
+                
+                # Kill processes holding port 5000 to guarantee clean bind
+                if command -v fuser &>/dev/null; then
+                    sudo fuser -k -9 5000/tcp 2>/dev/null || fuser -k -9 5000/tcp 2>/dev/null || true
+                fi
+                
+                export CATALYST_HOME="$HOST_APP_DIR"
+                export CATALYST_ENV=production
+                export COMSERV_LOG_DIR="$HOST_APP_DIR"
+                export PERL_LOCAL_LIB_ROOT="$HOST_APP_DIR/local"
+                export PERL5LIB="$HOST_APP_DIR/lib:$HOST_APP_DIR/local/lib/perl5:$PERL5LIB"
+
+                echo "Attempting to reset and start systemd starman.service..."
+                sudo systemctl reset-failed starman.service 2>/dev/null || true
+                sudo systemctl enable starman.service 2>/dev/null || true
+                
+                if sudo systemctl start starman.service 2>/dev/null && sleep 2 && sudo systemctl is-active starman.service &>/dev/null; then
+                    echo "SUCCESS: Host Starman systemd service started and verified active!"
+                else
+                    echo "systemd service failed to start or verify. Falling back to manual process execution..."
+                    
+                    # Stop and disable systemd starman service if active to avoid restart conflicts
+                    sudo systemctl stop starman.service 2>/dev/null || true
+                    sudo systemctl disable starman.service 2>/dev/null || true
+
+                    # Kill existing starman/plackup on host
+                    sudo pkill -f starman 2>/dev/null || pkill -f starman 2>/dev/null || true
+                    sudo pkill -f plackup 2>/dev/null || pkill -f plackup 2>/dev/null || true
+                    sudo pkill -f comserv.*psgi 2>/dev/null || pkill -f comserv.*psgi 2>/dev/null || true
+                    
+                    # Try launching via various known starman locations/methods
+                    STARTED=0
+                    if [ -x "/usr/local/bin/starman" ]; then
+                        if /usr/local/bin/starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if perl -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" -Mlocal::lib=local -S starman --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 0 ]; then
+                        if starman -I"$HOST_APP_DIR/lib" -I"$HOST_APP_DIR/local/lib/perl5" --daemonize --listen ":5000" --workers 3 "$PSGI_FILE" >>/tmp/host_starman_manual.log 2>&1; then
+                            STARTED=1
+                        fi
+                    fi
+                    
+                    if [ "$STARTED" -eq 1 ]; then
+                        echo "SUCCESS: Host Starman manual process started on port 5000!"
+                    else
+                        echo "ERROR: Failed to start host Starman using any method. Log:"
+                        cat /tmp/host_starman_manual.log 2>/dev/null || echo "No manual log file found."
+                    fi
+                fi
+            else
+                echo "ERROR: PSGI file not found under $HOST_APP_DIR"
+            fi
+        else
+            echo "ERROR: Host application directory not found."
+        fi
+    );
+    
+    my ($output, $exit_code) = $self->_run_host_cmd_on_target($c, $start_cmd, $target);
+    
+    if ($exit_code != 0 || $output =~ /ERROR:/) {
+        $c->response->body(encode_json({ success => \0, error => $output || "SSH command failed" }));
+    } else {
+        $c->response->body(encode_json({ success => \1, message => $output }));
+    }
+    $c->response->content_type('application/json');
+}
+
 sub docker_load_credentials :Path('/admin/docker-load-credentials') :Args(0) {
     my ($self, $c) = @_;
 
@@ -6358,6 +6678,11 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
 
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
+    my $deploy_mode   = $c->req->params->{deploy_mode}   || 'full';
+    if ($c->req->params->{quick_deploy}) {
+        $deploy_mode = 'quick';
+    }
+    my $quick_deploy  = ($deploy_mode ne 'full') ? 1 : 0;
 
     my $ssh_password = '';
     my $home     = $ENV{HOME} || '/home/shanta';
@@ -6387,8 +6712,9 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
-    my $repo_dir     = "$home/PycharmProjects/comserv2";
-    my $comserv_dir  = "$repo_dir/Comserv";
+    my $comserv_dir  = $c->config->{home};
+    my $repo_dir     = $comserv_dir;
+    $repo_dir =~ s/\/Comserv$//;
     my $prod_compose = 'docker-compose.prod.yml';
     my $hub_image    = 'shantamcsbain/comserv-web-prod:latest';
 
@@ -6449,113 +6775,135 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         print "Image     : $hub_image\n";
         print "SSH target: $ssh_target\n";
         print "Log file  : $log_file\n";
+        print "Mode      : " . ($quick_deploy ? "QUICK DEPLOY (Skip build/push)" : "FULL DEPLOY (Build + Push + Deploy)") . "\n";
         print "=" x 60 . "\n\n";
 
-        print "--- Pre-flight: Checking Docker Hub credentials ---\n";
+        unless ($quick_deploy) {
+            print "--- Pre-flight: Checking Docker Hub credentials ---\n";
 
-        my $logged_in     = 0;
-        my $creds_method  = 'unknown';
-        my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
-        if (open my $dcf, '<', $docker_cfg) {
-            local $/; my $raw = <$dcf>; close $dcf;
-            my $dcfg = eval { decode_json($raw) } || {};
-            my $creds_store = $dcfg->{credsStore} || '';
-            my $auths       = $dcfg->{auths}       || {};
+            my $logged_in     = 0;
+            my $creds_method  = 'unknown';
+            my $docker_cfg    = ($ENV{HOME} || '/home/shanta') . '/.docker/config.json';
+            if (open my $dcf, '<', $docker_cfg) {
+                local $/; my $raw = <$dcf>; close $dcf;
+                my $dcfg = eval { decode_json($raw) } || {};
+                my $creds_store = $dcfg->{credsStore} || '';
+                my $auths       = $dcfg->{auths}       || {};
 
-            if ($creds_store) {
-                $creds_method = "credential helper (credsStore: $creds_store)";
-                my $helper = "docker-credential-$creds_store";
-                my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
-                if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
-                    print "✅ Logged in via $creds_method as: $1\n\n";
+                if ($creds_store) {
+                    $creds_method = "credential helper (credsStore: $creds_store)";
+                    my $helper = "docker-credential-$creds_store";
+                    my $cred_out = `echo 'https://index.docker.io/v1/' | $helper get 2>/dev/null`;
+                    if ($cred_out && $cred_out =~ /"Username"\s*:\s*"([^"]+)"/) {
+                        print "✅ Logged in via $creds_method as: $1\n\n";
+                        $logged_in = 1;
+                    } else {
+                        print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    }
+                } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
+                    $creds_method = 'config.json auth entry';
+                    print "✅ Docker Hub auth entry found in config.json\n\n";
                     $logged_in = 1;
                 } else {
-                    print "⚠️  Credential helper ($helper) did not return credentials\n";
+                    print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
                 }
-            } elsif (exists $auths->{'https://index.docker.io/v1/'}) {
-                $creds_method = 'config.json auth entry';
-                print "✅ Docker Hub auth entry found in config.json\n\n";
-                $logged_in = 1;
             } else {
-                print "⚠️  No Docker Hub credentials found in $docker_cfg\n";
+                print "⚠️  Cannot read $docker_cfg\n";
             }
-        } else {
-            print "⚠️  Cannot read $docker_cfg\n";
-        }
 
-        unless ($logged_in) {
-            print "   Push may fail — run: docker login -u shantamcsbain\n";
-            print "   (continuing anyway)\n";
-        }
-        print "\n";
+            unless ($logged_in) {
+                print "   Push may fail — run: docker login -u shantamcsbain\n";
+                print "   (continuing anyway)\n";
+            }
+            print "\n";
 
-        print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
-        if (-f "$comserv_dir/script/docker-cleanup.sh") {
-            print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
-            my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
-            $cleanup_exit >>= 8;
-            if ($cleanup_exit != 0) {
-                print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+            print "--- Step 0: Routine cleanup of local containers on Workstation ---\n";
+            if (-f "$comserv_dir/script/docker-cleanup.sh") {
+                print "    Running: $comserv_dir/script/docker-cleanup.sh\n\n";
+                my $cleanup_exit = system('bash', "$comserv_dir/script/docker-cleanup.sh");
+                $cleanup_exit >>= 8;
+                if ($cleanup_exit != 0) {
+                    print "⚠️  Local cleanup script exited with code $cleanup_exit\n\n";
+                } else {
+                    print "✅ Local cleanup completed successfully\n\n";
+                }
             } else {
-                print "✅ Local cleanup completed successfully\n\n";
+                print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
             }
-        } else {
-            print "⚠️  Local cleanup script not found at $comserv_dir/script/docker-cleanup.sh\n\n";
-        }
 
-        print "--- Step 1: Building production image ($hub_image) ---\n";
-        print "    compose: $comserv_dir/$prod_compose\n\n";
-        my $build_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'build', '--progress=plain');
-        $build_exit >>= 8;
-        if ($build_exit != 0) {
-            print "\n❌ BUILD FAILED (exit $build_exit)\n";
-            _exit(1);
-        }
-        print "\n✅ Build complete\n\n";
+            print "--- Step 1: Building production image ($hub_image) ---\n";
+            print "    compose: $comserv_dir/$prod_compose\n\n";
+            my $build_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'build', '--progress=plain');
+            $build_exit >>= 8;
+            if ($build_exit != 0) {
+                print "\n❌ BUILD FAILED (exit $build_exit)\n";
+                _exit(1);
+            }
+            print "\n✅ Build complete\n\n";
 
-        print "--- Step 1b: Stale-build check ---\n";
-        my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
-        chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
-        chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
-        my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
-        if ($new_commits > 0) {
-            print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
-            print "   Build captured: $git_commit\n";
-            print "   main is now at: $post_build_commit\n";
-            print "   The pushed image will NOT contain these commits:\n";
-            my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
-            print "$new_log\n";
-            print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
-            print "   Continuing push anyway (image is still valid, just not latest).\n\n";
-        } else {
-            print "✅ main has not advanced — build is current ($git_commit)\n\n";
-        }
+            print "--- Step 1b: Stale-build check ---\n";
+            my $fetch_out = `git -C "$repo_dir" fetch origin main 2>&1`;
+            chomp(my $post_build_commit = `git -C "$repo_dir" rev-parse origin/main 2>/dev/null`);
+            chomp(my $new_commits_raw   = `git -C "$repo_dir" rev-list --count "$git_commit"..origin/main 2>/dev/null`);
+            my $new_commits = ($new_commits_raw =~ /^\d+$/) ? $new_commits_raw + 0 : 0;
+            if ($new_commits > 0) {
+                print "⚠️  WARNING: $new_commits new commit(s) merged into main WHILE this build was running.\n";
+                print "   Build captured: $git_commit\n";
+                print "   main is now at: $post_build_commit\n";
+                print "   The pushed image will NOT contain these commits:\n";
+                my $new_log = `git -C "$repo_dir" log --oneline "$git_commit"..origin/main 2>/dev/null`;
+                print "$new_log\n";
+                print "   Recommendation: cancel, merge main, and re-run Auto Deploy.\n";
+                print "   Continuing push anyway (image is still valid, just not latest).\n\n";
+            } else {
+                print "✅ main has not advanced — build is current ($git_commit)\n\n";
+            }
 
-        print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
-        my $push_exit = system('docker', 'compose',
-            '-f', "$comserv_dir/$prod_compose",
-            '--project-directory', $comserv_dir,
-            'push');
-        $push_exit >>= 8;
-        if ($push_exit != 0) {
-            print "\n❌ PUSH FAILED (exit $push_exit)\n";
-            print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
-            print "     then click Auto Deploy again\n";
-            _exit(1);
+            print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
+            my $push_exit = system('docker', 'compose',
+                '-f', "$comserv_dir/$prod_compose",
+                '--project-directory', $comserv_dir,
+                'push');
+            $push_exit >>= 8;
+            if ($push_exit != 0) {
+                print "\n❌ PUSH FAILED (exit $push_exit)\n";
+                print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
+                print "     then click Auto Deploy again\n";
+                _exit(1);
+            }
+            print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
         }
-        print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
 
         print "--- Step 3: Triggering deploy on $ssh_target ---\n";
-        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        print "    Updating remote deploy.sh script with latest code...\n";
+        my $escaped_password = $ssh_password;
+        $escaped_password =~ s/'/'\\''/g;
+
         local $ENV{SSHPASS} = $ssh_password;
+        system('sshpass', '-e', 'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            "$comserv_dir/script/deploy.sh",
+            "$ssh_target:/tmp/deploy.sh");
+
+        # Move to /opt/comserv/Comserv/deploy.sh with sudo to bypass write permission restrictions
+        system('sshpass', '-e', 'ssh',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            $ssh_target,
+            "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh");
+
+        print "    Running: /opt/comserv/Comserv/deploy.sh\n";
+        my $ssh_cmd = "echo '$escaped_password' | sudo -S DEPLOY_MODE='$deploy_mode' /opt/comserv/Comserv/deploy.sh";
+
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             $ssh_target,
-            '/opt/comserv/Comserv/deploy.sh');
+            $ssh_cmd);
         $ssh_exit >>= 8;
         if ($ssh_exit != 0) {
             print "\n⚠️  SSH TRIGGER FAILED (exit $ssh_exit)\n";
@@ -7145,11 +7493,14 @@ sub _preview_page_migration {
         push @issues, "Missing menu" unless $f_page->menu;
         push @issues, "Missing page_code" unless $f_page->page_code;
         
-        # Check duplicate page_code in Ency.pages_content
+        # Check duplicate page_code in Ency.page for the same site.
         if ($f_page->page_code) {
-            my $exists = $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code });
+            my $exists = $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
             if ($exists) {
-                push @issues, "Page code already exists in destination";
+                push @issues, "Page code already exists in destination for site " . ($f_page->sitename || 'CSC');
             }
         }
         
@@ -7189,10 +7540,15 @@ sub _perform_page_migration {
         }
         
         # Safety checks
-        my $exists = eval { $c->model('DBEncy')->resultset('Page')->find({ page_code => $f_page->page_code }) };
+        my $exists = eval {
+            $c->model('DBEncy')->resultset('Page')->search({
+                sitename  => $f_page->sitename || 'CSC',
+                page_code => $f_page->page_code,
+            }, { rows => 1 })->single;
+        };
         if ($exists) {
             $skipped_count++;
-            push @migration_log, "Skipped duplicate: " . $f_page->page_code;
+            push @migration_log, "Skipped duplicate: " . ($f_page->sitename || 'CSC') . "/" . $f_page->page_code;
             next;
         }
         
@@ -7246,19 +7602,25 @@ sub pages :Path('/admin/pages') :Args(0) {
     }
     
     my $action = $c->req->param('action') || '';
+    my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     
     # Handle deletion
     if ($action eq 'delete') {
         my $id = $c->req->param('id');
         my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
         if ($page) {
-            my $code = $page->page_code;
-            eval {
-                $page->delete;
-                $c->flash->{success_msg} = "Page '$code' deleted successfully.";
-            };
-            if ($@) {
-                $c->flash->{error_msg} = "Failed to delete page: $@";
+            # Site isolation check: non-CSC admins can only delete pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only delete pages belonging to your own site.";
+            } else {
+                my $code = $page->page_code;
+                eval {
+                    $page->delete;
+                    $c->flash->{success_msg} = "Page '$code' deleted successfully.";
+                };
+                if ($@) {
+                    $c->flash->{error_msg} = "Failed to delete page: $@";
+                }
             }
         } else {
             $c->flash->{error_msg} = "Page not found for deletion.";
@@ -7267,19 +7629,178 @@ sub pages :Path('/admin/pages') :Args(0) {
         return;
     }
     
-    # Fetch all pages in Ency
+    my $show_form = undef;
+    my $page_item = {};
+    
+    if ($action eq 'create') {
+        $show_form = 'create';
+        my $clone_id = $c->req->param('clone_id');
+        if ($clone_id) {
+            my $cloned = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $clone_id }) };
+            if ($cloned) {
+                $page_item = {
+                    sitename    => $current_sitename,
+                    menu        => $cloned->menu || 'Main',
+                    page_code   => $cloned->page_code,
+                    title       => $cloned->title . ' (Copy)',
+                    body        => $cloned->body,
+                    description => $cloned->description,
+                    keywords    => $cloned->keywords,
+                    link_order  => $cloned->link_order || 0,
+                    status      => 'active',
+                    roles       => $cloned->roles || 'public',
+                };
+            }
+        }
+        unless (keys %$page_item) {
+            $page_item = {
+                sitename => $current_sitename,
+                menu => 'Main',
+                status => 'active',
+                roles => 'public',
+            };
+        }
+    }
+    elsif ($action eq 'edit') {
+        my $id = $c->req->param('id');
+        my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+        if ($page) {
+            # Site isolation check: non-CSC admins can only edit pages from their own site
+            if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                $c->flash->{error_msg} = "Access denied: You can only edit pages belonging to your own site.";
+            } else {
+                $show_form = 'edit';
+                $page_item = $page;
+            }
+        } else {
+            $c->flash->{error_msg} = "Page not found for editing.";
+        }
+    }
+    elsif ($action eq 'save') {
+        my $params = $c->req->params;
+        my $id = $params->{id};
+        
+        # Site isolation check: non-CSC admins can only assign to their own site
+        my $target_sitename = $params->{sitename} || $current_sitename;
+        if ($current_sitename ne 'CSC' && $target_sitename ne $current_sitename) {
+            $c->stash(error_msg => "Access denied: You can only save pages belonging to your own site.");
+            $show_form = $id ? 'edit' : 'create';
+            $page_item = $params;
+        } else {
+            my $page_data = {
+                sitename => $target_sitename,
+                menu => $params->{menu} || 'Main',
+                page_code => $params->{page_code},
+                title => $params->{title},
+                body => $params->{body} || '',
+                description => $params->{description},
+                keywords => $params->{keywords},
+                link_order => $params->{link_order} || 0,
+                status => $params->{status} || 'active',
+                roles => $params->{roles} || 'public',
+                share_with => $params->{share_with} || '',
+            };
+            
+            my $success = 0;
+            if ($id) {
+                # Editing existing page
+                my $page = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $id }) };
+                if ($page) {
+                    if ($current_sitename ne 'CSC' && $page->sitename ne $current_sitename) {
+                        $c->stash(error_msg => "Access denied: You can only modify pages belonging to your own site.");
+                        $show_form = 'edit';
+                        $page_item = $params;
+                    } else {
+                        eval {
+                            $page->update($page_data);
+                            $c->flash->{success_msg} = "Page updated successfully.";
+                            $success = 1;
+                        };
+                        if ($@) {
+                            $c->stash(error_msg => "Error updating page: $@");
+                            $show_form = 'edit';
+                            $page_item = $params;
+                        }
+                    }
+                } else {
+                    $c->stash(error_msg => "Page not found to update.");
+                }
+            } else {
+                # Creating new page
+                $page_data->{created_by} = $c->session->{username} || 'admin';
+                eval {
+                    $c->model('DBEncy')->resultset('Page')->create($page_data);
+                    $c->flash->{success_msg} = "Page created successfully.";
+                    $success = 1;
+                };
+                if ($@) {
+                    $c->stash(error_msg => "Error creating page: $@");
+                    $show_form = 'create';
+                    $page_item = $params;
+                }
+            }
+            
+            if ($success) {
+                $c->response->redirect($c->uri_for('/admin/pages'));
+                return;
+            }
+        }
+    }
+    
+    # Fetch pages according to site context for list display
     my @pages;
     eval {
-        @pages = $c->model('DBEncy')->resultset('Page')->all;
+        if ($current_sitename eq 'CSC') {
+            @pages = $c->model('DBEncy')->resultset('Page')->all;
+        } else {
+            # Regular site admins see their own pages + shared pages
+            @pages = $c->model('DBEncy')->resultset('Page')->search({
+                '-or' => [
+                    { sitename => $current_sitename },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$current_sitename%" } }
+                ]
+            })->all;
+        }
     };
     if ($@) {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'pages', 
             "Error fetching Ency pages: $@");
-        $c->stash(error_msg => "Error fetching pages: $@");
+        $c->stash(error_msg => "Error fetching pages: $@") unless $c->stash->{error_msg};
     }
+    
+    # Standard roles drop down
+    my @available_roles = ('public', 'member', 'coop', 'it', 'helpdesk', 'admin');
+    # Fetch site-specific custom roles
+    eval {
+        my $roles_rs = $c->model('DBEncy')->resultset('SiteRole')->search({
+            sitename => [ $current_sitename, 'All' ]
+        });
+        while (my $r = $roles_rs->next) {
+            push @available_roles, $r->role_name;
+        }
+    };
+    
+    # Unique roles list
+    my %seen;
+    @available_roles = grep { !$seen{$_}++ } @available_roles;
+    
+    # Fetch all sites for the dropdown check list (Cross-Site Page Sharing)
+    my @sites_list;
+    eval {
+        my $sites_rs = $c->model('DBEncy')->resultset('Site')->all;
+        while (my $s = $sites_rs->next) {
+            push @sites_list, $s->name;
+        }
+    };
     
     $c->stash(
         pages => \@pages,
+        show_form => $show_form,
+        page_item => $page_item,
+        current_site => $current_sitename,
+        available_roles => \@available_roles,
+        sites_list => \@sites_list,
         template => 'admin/pages.tt'
     );
 }
