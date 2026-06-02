@@ -81,6 +81,10 @@ has 'host' => (
     is => 'rw',
     isa => 'Str',
     default => '192.168.1.199',
+    trigger => sub {
+        my ($self) = @_;
+        $self->clear_endpoint if $self->can('clear_endpoint');
+    },
     documentation => 'Ollama server host (default: 192.168.1.199 — overridden by comserv.conf <Ollama> block)'
 );
 
@@ -88,6 +92,10 @@ has 'port' => (
     is => 'rw',
     isa => 'Int',
     default => 11434,
+    trigger => sub {
+        my ($self) = @_;
+        $self->clear_endpoint if $self->can('clear_endpoint');
+    },
     documentation => 'Ollama server port'
 );
 
@@ -203,6 +211,14 @@ Builds the Ollama API endpoint URL from host and port.
 sub _build_endpoint {
     my ($self) = @_;
     return 'http://' . $self->host . ':' . $self->port . '/api/generate';
+}
+
+sub _should_use_shell {
+    my ($self) = @_;
+    return 1 if $self->use_docker || $self->use_podman;
+    my $host = $self->host || '';
+    return 1 if $host eq '127.0.0.1' || $host eq 'localhost' || $host eq '0.0.0.0' || $host eq '::1';
+    return 0;
 }
 
 =head2 _build_ua
@@ -831,28 +847,50 @@ sub list_models {
     
     my $req = HTTP::Request->new(GET => $endpoint);
     
+    my $should_fallback = $self->_should_use_shell();
     my $response;
     try {
         $response = $self->ua->request($req);
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "HTTP API failed: $_, attempting shell fallback");
-        return $self->list_models_shell();
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "HTTP API failed: $_, attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+                "HTTP API failed: $_ (shell fallback disabled for remote host)");
+            $self->last_error("HTTP API failed: $_");
+            return undef;
+        }
     };
     
     unless ($response->is_success) {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "HTTP API returned " . $response->status_line . ", attempting shell fallback");
-        return $self->list_models_shell();
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "HTTP API returned " . $response->status_line . ", attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+                "HTTP API returned " . $response->status_line . " (shell fallback disabled for remote host)");
+            $self->last_error("HTTP API returned: " . $response->status_line);
+            return undef;
+        }
     }
     
     my $data;
     try {
         $data = decode_json($response->content);
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
-            "Failed to parse HTTP response: $_, attempting shell fallback");
-        return $self->list_models_shell();
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'list_models',
+                "Failed to parse HTTP response: $_, attempting shell fallback");
+            return $self->list_models_shell();
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+                "Failed to parse HTTP response: $_ (shell fallback disabled for remote host)");
+            $self->last_error("Failed to parse HTTP response: $_");
+            return undef;
+        }
     };
     
     my @models;
@@ -932,6 +970,7 @@ sub pull_model {
         stream => JSON::false,
     };
     
+    my $should_fallback = $self->_should_use_shell();
     my $json_payload;
     try {
         $json_payload = encode_json($payload);
@@ -939,9 +978,18 @@ sub pull_model {
             "Request payload: $json_payload");
     } catch {
         $self->last_error("Failed to encode JSON payload: $_");
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "Failed to encode JSON: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "Failed to encode JSON: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
+                "Failed to encode JSON: $_ (shell fallback disabled for remote host)");
+            return {
+                success => 0,
+                error => "Failed to encode JSON payload: $_"
+            };
+        }
     };
     
     my $req = HTTP::Request->new(POST => $endpoint);
@@ -959,9 +1007,19 @@ sub pull_model {
         $response = $self->ua->request($req);
     } catch {
         $self->ua->timeout($original_timeout);
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "HTTP request failed: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "HTTP request failed: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
+                "HTTP request failed: $_ (shell fallback disabled for remote host)");
+            $self->last_error("HTTP request failed: $_");
+            return {
+                success => 0,
+                error => "HTTP request failed: $_"
+            };
+        }
     };
     
     $self->ua->timeout($original_timeout);
@@ -971,9 +1029,19 @@ sub pull_model {
     
     unless ($response->is_success) {
         my $error_msg = $response->status_line;
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "HTTP API returned $error_msg, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "HTTP API returned $error_msg, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
+                "HTTP API returned $error_msg (shell fallback disabled for remote host)");
+            $self->last_error("HTTP API returned: $error_msg");
+            return {
+                success => 0,
+                error => "HTTP API returned: $error_msg"
+            };
+        }
     }
     
     my $content_preview = substr($response->content, 0, 500);
@@ -1001,9 +1069,19 @@ sub pull_model {
             };
         }
     } catch {
-        $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
-            "Failed to parse HTTP response: $_, attempting shell fallback");
-        return $self->pull_model_shell(model => $model_name);
+        if ($should_fallback) {
+            $self->logging->log_with_details(undef, 'warn', __FILE__, __LINE__, 'pull_model',
+                "Failed to parse HTTP response: $_, attempting shell fallback");
+            return $self->pull_model_shell(model => $model_name);
+        } else {
+            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model',
+                "Failed to parse HTTP response: $_ (shell fallback disabled for remote host)");
+            $self->last_error("Failed to parse HTTP response: $_");
+            return {
+                success => 0,
+                error => "Failed to parse HTTP response: $_"
+            };
+        }
     };
     
     $self->logging->log_with_details(undef, 'info', __FILE__, __LINE__, 'pull_model',
@@ -1595,7 +1673,8 @@ sub _exec_docker {
     if ($exit_code != 0) {
         my $error = "Docker command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_docker',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_docker',
             $error);
         return undef;
     }
@@ -1637,7 +1716,8 @@ sub _exec_podman {
     if ($exit_code != 0) {
         my $error = "Podman command failed with exit code $exit_code: $output";
         $self->last_error($error);
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, '_exec_podman',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, '_exec_podman',
             $error);
         return undef;
     }
@@ -1673,7 +1753,8 @@ sub list_models_shell {
     }
     
     unless ($output) {
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models_shell',
             "Failed to execute list command: " . $self->last_error);
         return undef;
     }
@@ -1746,7 +1827,8 @@ sub pull_model_shell {
     
     unless ($output) {
         my $error = "Failed to pull model: " . $self->last_error;
-        $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'pull_model_shell',
+        my $level = $self->use_docker ? 'error' : 'warn';
+        $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'pull_model_shell',
             $error);
         return {
             success => 0,

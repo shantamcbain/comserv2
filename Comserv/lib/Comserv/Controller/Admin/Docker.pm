@@ -93,8 +93,10 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             last_mod_date   => $today,
             project_code    => 'PLANNING',
             details         => 'Deploy in progress…',
+            comments        => '',
+            points_processed => 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id || undef;
+        $log_fields{todo_record_id} = $todo_record_id || 0;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
@@ -171,23 +173,25 @@ sub init_log :Path('/admin/docker/init_log') :Args(0) {
     my $log_id;
     eval {
         my %log_fields = (
-            abstract        => $title,
-            username        => $username,
-            sitename        => $sitename,
-            start_date      => $today,
-            due_date        => $today,
-            start_time      => $now_time,
-            end_time        => $now_time,
-            time            => '00:00:00',
-            status          => 1,
-            priority        => 3,
-            group_of_poster => 'admin',
-            last_mod_by     => $username,
-            last_mod_date   => $today,
-            project_code    => 'PLANNING',
-            details         => 'Hub deploy in progress\x{2026}',
+            abstract         => $title,
+            username         => $username,
+            sitename         => $sitename,
+            start_date       => $today,
+            due_date         => $today,
+            start_time       => $now_time,
+            end_time         => '00:00:00',
+            time             => 0,
+            status           => 1,
+            priority         => 3,
+            group_of_poster  => 'admin',
+            last_mod_by      => $username,
+            last_mod_date    => $today,
+            project_code     => 'PLANNING',
+            details          => 'Hub deploy in progress...',
+            todo_record_id   => $todo_record_id || 0,
+            comments         => '',
+            points_processed => 0,
         );
-        $log_fields{todo_record_id} = $todo_record_id || undef;
         my $entry = $c->model('DBEncy')->resultset('Log')->create(\%log_fields);
         $log_id = $entry->id;
     };
@@ -247,6 +251,22 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
                 comments    => $notes,
                 last_mod_by => $c->session->{username} || 'system',
             });
+
+            # Append the entire log output to the comments of the linked Todo task
+            my $todo_record_id = $entry->todo_record_id;
+            if ($todo_record_id) {
+                my $todo = $c->model('DBEncy')->resultset('Todo')->find($todo_record_id);
+                if ($todo) {
+                    my $existing_comments = $todo->comments || '';
+                    my $timestamp = localtime();
+                    my $appended_comments = $existing_comments . "\n\n=== DEPLOYMENT LOG ($timestamp) ===\n" . $output;
+                    $todo->update({
+                        comments      => $appended_comments,
+                        last_mod_by   => $c->session->{username} || 'system',
+                        last_mod_date => $now->ymd,
+                    });
+                }
+            }
         }
     };
 

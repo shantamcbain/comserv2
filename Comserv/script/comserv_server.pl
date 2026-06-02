@@ -40,14 +40,14 @@ BEGIN {
     } @INC;
     
     # STEP 2: Add main lib path to VERY BEGINNING of @INC via unshift (takes absolute priority)
-    unshift @INC, "$FindBin::Bin/../lib";
+    unshift @INC, $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib";
     
     # STEP 3: Also add project root for relative module loading
-    unshift @INC, "$FindBin::Bin/..";
+    unshift @INC, $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
     
     # Traditional use lib statements (for compatibility) - now comes AFTER unshift
-    use lib "$FindBin::Bin/../lib";
-    use lib "$FindBin::Bin/..";
+    use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib";
+    use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
     # Install local::lib if not already installed
     eval { require local::lib; }; # Check if local::lib is loaded

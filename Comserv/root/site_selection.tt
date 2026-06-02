@@ -2,7 +2,7 @@
     <option value="" disabled [% IF !form_data.sitename %]selected[% END %]>Select a site</option>
     [% FOREACH site IN sites %]
         <option value="[% site.name %]"
-                [% IF site.name eq current_site %]selected[% END %]>
+                [% IF site.name == current_site %]selected[% END %]>
             [% site.name %]
         </option>
     [% END %]

@@ -443,6 +443,25 @@
                         style="font-size:0.75em;color:var(--danger-color,#dc3545);margin-left:auto;text-decoration:none;">✕ Clear</a>
                 </div>
 
+                [% IF cross_blocker_count %]
+                <div id="cross-blocker-banner" style="background:color-mix(in srgb,#dc3545 10%,var(--bg-color));border:2px solid #dc3545;border-radius:6px;padding:8px 12px;margin-bottom:10px;">
+                    <div style="display:flex;align-items:center;gap:8px;font-weight:600;color:#dc3545;font-size:0.95em;margin-bottom:6px;">
+                        <span>🚨</span>
+                        <span>[% cross_blocker_count %] Cross-Project Blocker[% IF cross_blocker_count != 1 %]s[% END %] — Resolve first to unblock other projects</span>
+                    </div>
+                    [% FOREACH ap IN active_priorities %]
+                    [% IF ap.is_cross_blocker %]
+                    <div style="display:flex;align-items:baseline;gap:6px;padding:2px 0;font-size:0.88em;">
+                        <span style="color:#dc3545;font-weight:700;">↳</span>
+                        <a href="/todo/details?record_id=[% ap.record_id %]" style="color:var(--text-color);text-decoration:none;font-weight:600;">[% ap.subject | html %]</a>
+                        <span style="color:var(--text-muted-color);">([% ap.project_name || ap.project_code || 'No project' %])</span>
+                        <span style="color:#dc3545;font-size:0.82em;">blocks: [% ap.blocking_names %]</span>
+                    </div>
+                    [% END %]
+                    [% END %]
+                </div>
+                [% END %]
+
                 [% IF active_priorities && active_priorities.size %]
                 <div id="priorities-list">
                 [% SET rank = 0 %]
@@ -860,6 +879,7 @@
             { name => '3dprinting-use-this-as-the-branc-41f3',  port => 4030, label => '3DPrinting',          url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/3dprinting-use-this-as-the-branc-41f3/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4030 -r' },
             { name => 'developer-time-logging-points-ba-542a',  port => 4022, label => 'DevTimeLogging',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/developer-time-logging-points-ba-542a/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4022 -r' },
             { name => 'page-management-system-implement-41a1',  port => 4023, label => 'PageManagement',      url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/page-management-system-implement-41a1/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4023 -r' },
+            { name => 'docker-5c15',                            port => 4024, label => 'Docker',               url => '/planning/daily', cmd => 'cd /home/shanta/.zenflow/worktrees/docker-5c15/Comserv && CATALYST_DEBUG=1 perl script/comserv_server.pl -p 4024 -r' },
         ] %]
 
         [%# .local and .zero domains (dev machines) get full table; production domains get dropdown only %]
@@ -1612,8 +1632,39 @@ function dailyLogAction(action) {
 }
 
 function openDeployPopup(todoId) {
+    var choice = prompt(
+        "Choose Deployment Method:\n\n" +
+        "Type [1] for FULL DEPLOY (Primary Choice):\n" +
+        "  - Rebuilds and pushes a new image to Docker Hub, then restarts the production server container.\n\n" +
+        "Type [2] for QUICK DEPLOY:\n" +
+        "  - Bypasses compiling/uploading. Immediately triggers the deploy script to stop blocking host processes and restart the container.\n\n" +
+        "Type [C] or press [Cancel] to Abort.",
+        "1"
+    );
+    
+    if (choice === null) {
+        return; // User clicked Cancel
+    }
+    choice = choice.trim();
+    if (choice !== '1' && choice !== '2') {
+        alert("Action canceled.");
+        return;
+    }
+    
     var url = '/admin/docker/deploy_form';
-    if (todoId) { url += '?todo_record_id=' + encodeURIComponent(todoId); }
+    var params = [];
+    if (choice === '2') {
+        params.push('quick_deploy=1');
+    } else {
+        params.push('quick_deploy=0');
+    }
+    if (todoId) {
+        params.push('todo_record_id=' + encodeURIComponent(todoId));
+    }
+    if (params.length > 0) {
+        url += '?' + params.join('&');
+    }
+    
     var popup = window.open(
         url,
         'docker_deploy',
@@ -1755,13 +1806,14 @@ function startDeploymentAction() {
     if (method === 'production') {
         const sshTarget = document.getElementById('deploy-ssh-target').value.trim();
         const sshPassword = document.getElementById('deploy-ssh-password').value;
+        const deployMode = document.getElementById('deploy-mode-select').value;
         
-        outputBox.textContent += `Starting background Docker Hub deployment to ${sshTarget}...\n`;
+        outputBox.textContent += `Starting background Docker Hub deployment [mode: ${deployMode}] to ${sshTarget}...\n`;
         
         fetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword)
+            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword) + '&deploy_mode=' + encodeURIComponent(deployMode)
         })
         .then(r => r.json())
         .then(data => {
@@ -1852,7 +1904,8 @@ function pollDeploymentProgress() {
             })
             .catch(err => console.log('Error polling status:', err));
     }, 2000);
-=======
+}
+
 function startWorkTodoCard(btn, recordId) {
     btn.disabled = true;
     btn.textContent = '…';
@@ -1891,32 +1944,33 @@ function startWorkTodoCard(btn, recordId) {
 }
 
 function closeLogTodoCard(btn, recordId) {
+    var notes = prompt('Close log — brief notes on what was done (optional):');
+    if (notes === null) return;
+    notes = notes || '';
     btn.disabled = true;
+    btn.textContent = '…';
     fetch('/todo/close_log', {
         method: 'POST',
         credentials: 'same-origin',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ record_id: recordId })
+        body: JSON.stringify({ record_id: recordId, notes: notes })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-            btn.disabled = false;
             btn.textContent = '▶ Start';
-            btn.style.border = '1px solid #6c757d';
+            btn.style.border = '1px solid #0d6efd';
             btn.style.background = 'transparent';
-            btn.style.color = '#6c757d';
-            var startBtn = btn.previousElementSibling;
-            if (startBtn) {
-                startBtn.textContent = '▶ Start';
-                startBtn.style.background = 'transparent';
-                startBtn.style.color = '#0d6efd';
-                startBtn.style.borderColor = '#0d6efd';
-            }
+            btn.style.color = '#0d6efd';
+            btn.title = 'Start working — creates a log entry, marks todo active on all servers';
+            btn.onclick = function() { startWorkTodoCard(btn, recordId); };
+            btn.disabled = false;
         } else {
             btn.disabled = false;
+            btn.textContent = '⏸ Active';
             alert('Could not close log: ' + (d.error || 'unknown'));
         }
     }).catch(function(e) {
         btn.disabled = false;
+        btn.textContent = '⏸ Active';
         alert('Error: ' + e);
     });
 }
@@ -1971,6 +2025,17 @@ function closeLogTodoCard(btn, recordId) {
                     <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">SSH Password:</label>
                     <input type="password" id="deploy-ssh-password" placeholder="Saved password will be used" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
                 </div>
+            </div>
+            <div>
+                <label style="display:block; font-size:0.82em; font-weight:bold; margin-bottom:4px; color:var(--text-color, #333);">Deployment Mode / Action:</label>
+                <select id="deploy-mode-select" style="width:100%; padding:6px 10px; border:1px solid var(--border-color, #dee2e6); border-radius:4px; font-size:0.88em; background:var(--bg-color); color:var(--text-color); box-sizing: border-box;">
+                    <option value="full" selected>🚀 FULL DEPLOY (Build/push local, remote pull, force stop, restart container)</option>
+                    <option value="quick">⚡ QUICK DEPLOY (Skip build/push, restart existing container on server)</option>
+                    <option value="pull_only">📥 DOWNLOAD CONTAINER ONLY (Pull latest image from Hub)</option>
+                    <option value="stop_all">🛑 STOP ALL SERVICES (Stop container, force-kill manual Starman)</option>
+                    <option value="git_pull">🐙 GIT UPDATE (Run git pull on production host)</option>
+                    <option value="manual_server">⚠️ EMERGENCY MANUAL SERVER (Start host Starman on port 5000)</option>
+                </select>
             </div>
             <div style="font-size:0.75em; color:var(--text-muted-color, #6c757d);">
                 Saved credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> will be loaded automatically if present.
