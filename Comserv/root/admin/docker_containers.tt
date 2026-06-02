@@ -670,6 +670,34 @@
         </div>
     </div>
 
+    <!-- Host System Statistics Footer Status Bar -->
+    <div class="compact-card" style="margin-top: 20px; border-top: 3px solid #0066cc; background-color: #f8f9fa;">
+        <div class="compact-card-body" style="padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; font-size: 12px; color: #333;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-server" style="color: #0066cc; font-size: 14px;"></i>
+                <strong>Host System Stats:</strong>
+                <span id="footer-host-badge" class="badge-pill" style="background-color: #0066cc; color: white; padding: 1px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">WORKSTATION</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <div>
+                    <i class="fas fa-clock" style="color: #28a745;"></i> 
+                    <strong>Uptime:</strong> <span id="footer-uptime" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-hdd" style="color: #17a2b8;"></i> 
+                    <strong>Disk Usage:</strong> <span id="footer-disk" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-memory" style="color: #ffc107;"></i> 
+                    <strong>Memory:</strong> <span id="footer-mem" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+            </div>
+            <div style="font-size: 11px; color: #666; font-style: italic;">
+                Last Refreshed: <span id="footer-last-refresh">N/A</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Custom Results Modal Popup -->
     <div id="result-modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
         <div style="background-color: #fff; margin: auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; max-height: 85vh;">
@@ -932,6 +960,20 @@
                 if (memEl) memEl.textContent = d.memory || 'N/A';
                 const uptimeEl = document.getElementById('diag-uptime');
                 if (uptimeEl) uptimeEl.textContent = d.uptime || 'N/A';
+
+                // Update horizontal footer status bar
+                const footerHostBadge = document.getElementById('footer-host-badge');
+                if (footerHostBadge) {
+                    footerHostBadge.textContent = (target || 'workstation').toUpperCase();
+                }
+                const footerUptime = document.getElementById('footer-uptime');
+                if (footerUptime) footerUptime.textContent = d.uptime || 'N/A';
+                const footerDisk = document.getElementById('footer-disk');
+                if (footerDisk) footerDisk.textContent = d.disk || 'N/A';
+                const footerMem = document.getElementById('footer-mem');
+                if (footerMem) footerMem.textContent = d.memory || 'N/A';
+                const footerRefresh = document.getElementById('footer-last-refresh');
+                if (footerRefresh) footerRefresh.textContent = new Date().toLocaleTimeString();
             })
             .catch(err => {
                 if (loader) loader.style.display = 'none';
@@ -1191,7 +1233,17 @@
                                 &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
                             </div>
                             ${container.ports ? `<div style="font-size:12px;color: var(--text-muted-color, #666);margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
-                            <div style="font-size: 12px;">
+                            ${container.build_info ? `
+                                <div style="font-size: 12px; color: var(--text-muted-color, #555); margin-bottom: 5px; margin-top: 5px; background-color: #f1f3f5; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #007bff; display: inline-block;">
+                                    <i class="fas fa-code-branch" style="color: #007bff; margin-right: 4px;"></i>
+                                    <strong>Build:</strong> <span>${container.build_info.build_date || 'N/A'}</span>
+                                    &nbsp;|&nbsp;
+                                    <strong>Commit:</strong> <code style="font-weight: bold; color: #111;">${container.build_info.commit ? container.build_info.commit.substring(0, 8) : 'N/A'}</code>
+                                    ${container.build_info.branch ? `&nbsp;|&nbsp;<strong>Branch:</strong> <span style="color: #28a745;">${container.build_info.branch}</span>` : ''}
+                                    ${container.build_info.build_host ? `&nbsp;|&nbsp;<strong>Built On:</strong> <span style="color: #6c757d;">${container.build_info.build_host}</span>` : ''}
+                                </div>
+                            ` : ''}
+                            <div style="font-size: 12px; margin-top: 3px;">
                                 <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
                                     ${(container.state||'unknown').toUpperCase()}
                                 </span>
