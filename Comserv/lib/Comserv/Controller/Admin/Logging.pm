@@ -243,9 +243,15 @@ sub settings :Path('/admin/logging/settings') :Args(0) {
     my ($self, $c) = @_;
     
     if ($c->req->method eq 'POST') {
-        my $threshold = $c->req->param('email_threshold');
-        my $nfs_dir = $c->req->param('nfs_dir');
-        
+        my $threshold    = $c->req->param('email_threshold');
+        my $nfs_dir      = $c->req->param('nfs_dir');
+        my $file_logging = $c->req->param('file_logging');  # '1' = enabled, '0' = disabled
+
+        # Apply file-logging toggle immediately (runtime — no restart needed for writes)
+        if (defined $file_logging) {
+            Comserv::Util::Logging->set_file_logging($file_logging eq '1' ? 1 : 0);
+        }
+
         # Persist to DB
         eval {
             # Try to get site from SiteName or default to 'CSC'
@@ -275,6 +281,15 @@ sub settings :Path('/admin/logging/settings') :Args(0) {
                         config_value => $nfs_dir
                     }, { key => 'site_config_site_id_config_key' });
                 }
+
+                # Persist file logging preference
+                if (defined $file_logging) {
+                    $c->model('DBEncy')->resultset('SiteConfig')->update_or_create({
+                        site_id   => $site->id,
+                        config_key   => 'logging_file_enabled',
+                        config_value => ($file_logging eq '1' ? '1' : '0'),
+                    }, { key => 'site_config_site_id_config_key' });
+                }
                 
                 $self->logging->refresh_settings($c);
                 $c->flash->{success_msg} = "Logging settings updated and persisted for " . $site->name;
@@ -295,6 +310,7 @@ sub settings :Path('/admin/logging/settings') :Args(0) {
     
     # Get current NFS dir from DB if available
     my $db_nfs_dir = "";
+    my $db_file_logging = undef;
     eval {
         my $sitename = $c->stash->{SiteName} || 'CSC';
         my $site = $c->model('DBEncy')->resultset('Site')->find({ name => $sitename });
@@ -304,14 +320,25 @@ sub settings :Path('/admin/logging/settings') :Args(0) {
                 config_key => 'logging_nfs_dir'
             });
             $db_nfs_dir = $nfs_cfg->config_value if $nfs_cfg;
+
+            my $fl_cfg = $c->model('DBEncy')->resultset('SiteConfig')->find({
+                site_id   => $site->id,
+                config_key => 'logging_file_enabled',
+            });
+            $db_file_logging = $fl_cfg->config_value if $fl_cfg;
         }
     };
 
+    my $env_default = ($ENV{CATALYST_ENV} // '') eq 'production' ? 'off (production default)' : 'on (dev default)';
+
     $c->stash(
-        levels => [sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY],
-        current_threshold => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
-        current_nfs_dir => $db_nfs_dir,
-        env_nfs_dir => $ENV{COMSERV_NFS_LOG_DIR} || 'None',
+        levels              => [sort { $Comserv::Util::Logging::LEVEL_PRIORITY{$a} <=> $Comserv::Util::Logging::LEVEL_PRIORITY{$b} } keys %Comserv::Util::Logging::LEVEL_PRIORITY],
+        current_threshold   => $Comserv::Util::Logging::EMAIL_NOTIFY_THRESHOLD,
+        current_nfs_dir     => $db_nfs_dir,
+        env_nfs_dir         => $ENV{COMSERV_NFS_LOG_DIR} || 'None',
+        file_logging_enabled => Comserv::Util::Logging->file_logging_enabled,
+        db_file_logging     => $db_file_logging,
+        env_default         => $env_default,
         template => 'admin/Logging/AdminLoggingSettings.tt'
     );
 }

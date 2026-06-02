@@ -426,7 +426,7 @@ EMAIL
     }
 }
 
-_start_health_evaluator();
+_start_health_evaluator() unless ($ENV{DISABLE_HEALTH_MONITOR} // '') eq '1';
 
 Catalyst::ScriptRunner->run('Comserv', 'Server');
 
