@@ -13,7 +13,7 @@
         [% IF is_csc %]<a href="[% c.uri_for('/admin/docker-containers') %]"><i class="fas fa-docker"></i> Docker</a>[% END %]
         [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
-        [% IF has_accounting %]<a href="#section-inventory"><i class="fas fa-boxes"></i> Inventory</a>[% END %]
+        [% IF has_accounting %]<a href="#section-accounting"><i class="fas fa-book"></i> Accounting &amp; Inventory</a>[% END %]
         [% IF has_accounting %]<a href="#section-customers"><i class="fas fa-users"></i> Customers</a>[% END %]
         <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
         <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
@@ -109,36 +109,12 @@
         [% END %]
 
         [% IF has_accounting %]
-        <div id="section-inventory" class="admin-section theme-section">
+        <div id="section-accounting" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
+                <h3><i class="fas fa-book"></i> Accounting &amp; Inventory</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
-                        <i class="fas fa-warehouse"></i>
-                        <span>Inventory Dashboard</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
-                        <i class="fas fa-list"></i>
-                        <span>Items / SKUs</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
-                        <i class="fas fa-truck"></i>
-                        <span>Suppliers</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Locations</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
-                        <i class="fas fa-sitemap"></i>
-                        <span>Bill of Materials</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>Supplier Invoices</span>
-                    </a>
                     <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Accounting Dashboard</span>
@@ -151,13 +127,37 @@
                         <i class="fas fa-balance-scale"></i>
                         <span>General Ledger</span>
                     </a>
-                    <a href="[% c.uri_for('/CustomerOrder') %]" class="admin-link">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Customer Orders</span>
+                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
+                        <i class="fas fa-warehouse"></i>
+                        <span>Inventory Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
+                        <i class="fas fa-list"></i>
+                        <span>Items / SKUs</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
+                        <i class="fas fa-truck"></i>
+                        <span>Suppliers</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Supplier Invoices (AP)</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/sales') %]" class="admin-link">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>Sales Invoices (AR)</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Locations</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
+                        <i class="fas fa-sitemap"></i>
+                        <span>Bill of Materials</span>
                     </a>
                     <a href="[% c.uri_for('/Cart/orders') %]" class="admin-link">
                         <i class="fas fa-shopping-cart"></i>
-                        <span>Cart Orders</span>
+                        <span>Customer Orders</span>
                     </a>
                     <a href="[% c.uri_for('/shop') %]" class="admin-link">
                         <i class="fas fa-store"></i>

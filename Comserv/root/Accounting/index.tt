@@ -5,6 +5,7 @@
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 
 <div class="app-container">
+  [% INCLUDE 'Accounting/_acct_inv_nav.tt' current_page='accounting' %]
   <div class="page-header">
     <h1>&#128200; Accounting &amp; Inventory — [% sitename | html %]</h1>
   </div>
