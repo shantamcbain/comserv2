@@ -8,7 +8,7 @@
     <div class="main-content">
         <header class="page-header">
             <h1>Shaman Botanicals</h1>
-            <p class="page-subtitle">Natural Health Products &amp; Botanical Supplies</p>
+            <p class="page-subtitle">Natural Health Products & Botanical Supplies</p>
         </header>
 
         <section class="section">
@@ -44,13 +44,14 @@
             </div>
         </section>
 
-        [% IF c.session.group == 'admin' || c.session.site == 'SB' || c.session.group == 'csc_admin' %]
+        [% IF c.session.group == 'admin' or c.session.site == 'SB' or c.session.group == 'csc_admin' %]
         <section class="section admin-section">
             <h2 class="section-header">Administration</h2>
             <div class="admin-links">
-                <a href="/shamanbotanicals/documentation" target="_blank" class="btn-secondary">Visit Live Site</a>
+                <a href="/shamanbotanicals/documentation" class="btn-secondary">Controller Documentation</a>
+                <a href="https://shamanbotanicals.ca" target="_blank" class="btn-secondary">Visit Live Site</a>
             </div>
         </section>
         [% END %]
-        </div>
+    </div>
 </div>
