@@ -1184,5 +1184,101 @@ sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
     );
 }
 
+# -------------------------------------------------------------------------
+# Accounting Database Admin  /Accounting/admin/databases
+# Lists all sites, their PostgreSQL accounting DB status, and allows
+# provisioning. CSC global-admin only.
+# -------------------------------------------------------------------------
+
+sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{SiteName} eq 'CSC' || ($c->session->{roles} && grep { /^admin$/ } @{$c->session->{roles} // []})) {
+        $c->flash->{error_msg} = 'CSC admin access required.';
+        $c->response->redirect($c->uri_for('/Accounting'));
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+
+    # All known sites
+    my @sites;
+    eval { @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all };
+
+    # All registered accounting DBs keyed by sitename
+    my %reg;
+    eval {
+        my @rows = $schema->resultset('SiteAccountingDb')->search({})->all;
+        %reg = map { $_->sitename => $_ } @rows;
+    };
+
+    # Build status rows
+    my @rows;
+    for my $site (@sites) {
+        my $sn  = $site->name;
+        my $rec = $reg{$sn};
+        my $row = {
+            sitename    => $sn,
+            registered  => $rec ? 1 : 0,
+            db_name     => $rec ? $rec->db_name     : lc($sn) . '_accounting',
+            db_host     => $rec ? $rec->db_host     : '192.168.1.20',
+            db_port     => $rec ? $rec->db_port     : 5432,
+            jurisdiction=> $rec ? $rec->jurisdiction: 'CA',
+            currency    => $rec ? $rec->currency    : 'CAD',
+            status      => $rec ? $rec->status      : 'not_provisioned',
+            db_ok       => 0,
+            db_error    => '',
+        };
+
+        if ($rec && $rec->status eq 'active') {
+            eval {
+                my $acct_schema = $c->model('AccountingDB')->schema_for_site($c, $sn);
+                if ($acct_schema) {
+                    $acct_schema->storage->dbh->do('SELECT 1');
+                    $row->{db_ok} = 1;
+                } else {
+                    $row->{db_error} = 'Could not connect';
+                }
+            };
+            if ($@) {
+                $row->{db_error} = $@;
+                $row->{db_error} =~ s/ at .+//s;
+            }
+        }
+
+        push @rows, $row;
+    }
+
+    # Handle POST — provision a site's DB
+    if ($c->req->method eq 'POST') {
+        my $target = $c->req->body_parameters->{sitename} or do {
+            $c->flash->{error_msg} = 'No sitename specified.';
+            $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+            return;
+        };
+        my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
+        my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
+
+        my ($ok, $msg) = eval {
+            $c->model('AccountingDB')->provision_site($c, $target,
+                jurisdiction => $jurisdiction,
+                currency     => $currency,
+            );
+        };
+        if ($@ || !$ok) {
+            $c->flash->{error_msg} = "Provisioning failed for '$target': " . ($@ || $msg);
+        } else {
+            $c->flash->{success_msg} = $msg;
+        }
+        $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+        return;
+    }
+
+    $c->stash(
+        rows     => \@rows,
+        template => 'Accounting/admin/databases.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
