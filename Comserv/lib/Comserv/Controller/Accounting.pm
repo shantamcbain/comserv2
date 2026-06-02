@@ -22,9 +22,9 @@ sub auto :Private {
     my $roles = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
@@ -38,7 +38,7 @@ sub auto :Private {
         }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Accounting: access denied for user ' . ($c->session->{username} || 'guest'));
-        $c->flash->{error_msg} = 'Accounting is restricted to administrators.';
+        $c->flash->{error_msg} = 'Accounting requires admin, site_admin, or accounting role.';
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
@@ -597,9 +597,9 @@ sub _api_auth {
     my $roles    = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
 
