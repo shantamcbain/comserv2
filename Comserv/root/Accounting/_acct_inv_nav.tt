@@ -1,0 +1,23 @@
+[%# Shared navigation bar — included at top of Accounting and Inventory dashboards %]
+<nav style="background:var(--nav-bg,#1e293b);color:#fff;padding:0.4rem 0.8rem;border-radius:6px;margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:0.3rem;align-items:center;font-size:0.85rem;">
+  <span style="color:#94a3b8;margin-right:0.4rem;">&#128200; Accounting &amp; Inventory:</span>
+  <a href="/Accounting"        style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;" [% IF current_page == 'accounting' %]style="background:rgba(255,255,255,0.15);"[% END %]>Dashboard</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Accounting/coa"    style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Chart of Accounts</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Accounting/gl"     style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">General Ledger</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/invoice" style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">AP / Supplier Invoices</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/sales"   style="color:#93c5fd;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">AR / Sales</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory"         style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Inventory</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/items"   style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Items</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/suppliers" style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Suppliers</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/stock/levels" style="color:#a5b4fc;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">Stock</a>
+  <span style="color:#475569;">|</span>
+  <a href="/Inventory/timesheet" style="color:#6ee7b7;padding:0.25rem 0.6rem;border-radius:4px;text-decoration:none;">&#9200; Timesheets</a>
+</nav>

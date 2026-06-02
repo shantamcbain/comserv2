@@ -1765,7 +1765,7 @@ sub site_setup {
     my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url =~ /^https?:/i) {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);
@@ -1955,6 +1955,18 @@ sub begin :Private {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
         $c->stash->{nav_hosting_accounts} = [];
     }
+
+    eval {
+        my $dbh  = $c->model('DBEncy')->storage->dbh;
+        my $rows = $dbh->selectcol_arrayref(
+            "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+        );
+        my %at = map { $_ => 1 } @{ $rows || [] };
+        $c->stash->{active_todos} = \%at;
+    };
+    if ($@) {
+        $c->stash->{active_todos} = {};
+    }
 }
 
 sub _port_label {
@@ -2114,14 +2126,16 @@ sub end : ActionClass('RenderView') {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 
-        eval {
-            require Comserv::Util::HealthLogger;
-            Comserv::Util::HealthLogger->log_health_event(
-                undef, 'error', 'HTTP_ERROR',
-                "Unhandled 500: $err_text",
-                { sitename => ($c->stash->{SiteName} || '') }
-            );
-        };
+        unless ($ENV{COMSERV_NO_HEALTH_LOG}) {
+            eval {
+                require Comserv::Util::HealthLogger;
+                Comserv::Util::HealthLogger->log_health_event(
+                    undef, 'error', 'HTTP_ERROR',
+                    "Unhandled 500: $err_text",
+                    { sitename => ($c->stash->{SiteName} || '') }
+                );
+            };
+        }
 
         $c->clear_errors;
         $c->response->status(500);

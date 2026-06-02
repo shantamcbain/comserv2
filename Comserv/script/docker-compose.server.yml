@@ -8,11 +8,13 @@ services:
     environment:
       CATALYST_ENV: production
       CATALYST_DEBUG: 0
-      COMSERV_LOG_MIN_LEVEL: INFO
       WEB_PORT: 5000
       TZ: UTC
       NFS_DATA_PATH: /data/nfs
       COMSERV_LOG_DIR: /opt/comserv/root/log
+      DISABLE_FILE_LOGGING: "1"
+      COMSERV_LOG_MIN_LEVEL: "WARN"
+      DB_LOG_MIN_LEVEL: "WARN"
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session
       SYSTEM_IDENTIFIER: ${SYSTEM_IDENTIFIER:-production1}
@@ -31,8 +33,8 @@ services:
     logging:
       driver: "json-file"
       options:
-        max-size: "50m"
-        max-file: "10"
+        max-size: "20m"
+        max-file: "5"
 
 volumes:
   whisper-venv:

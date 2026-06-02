@@ -26,6 +26,30 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
+# Defaults to disabled when CATALYST_ENV=production (safe default for disk).
+# Admin can toggle at runtime via set_file_logging(). A restart is only needed
+# to affect the log file initialisation itself.
+my $FILE_LOGGING_DISABLED = do {
+    my $env_val = $ENV{DISABLE_FILE_LOGGING} // '';
+    if    ($env_val eq '1') { 1 }
+    elsif ($env_val eq '0') { 0 }
+    elsif (($ENV{CATALYST_ENV} // '') eq 'production') { 1 }
+    else  { 0 }
+};
+
+# Allow runtime toggle — called by admin UI actions.
+sub set_file_logging {
+    my ($class, $enabled) = @_;
+    $FILE_LOGGING_DISABLED = $enabled ? 0 : 1;
+    _print_log("File logging " . ($FILE_LOGGING_DISABLED ? "DISABLED" : "ENABLED") . " at runtime by admin");
+    return !$FILE_LOGGING_DISABLED;
+}
+
+sub file_logging_enabled {
+    return !$FILE_LOGGING_DISABLED;
+}
+
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
     qr/googlebot/i,
@@ -117,6 +141,7 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
+    return if $FILE_LOGGING_DISABLED;
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
@@ -332,9 +357,17 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
+    # Also honour the legacy env var COMSERV_DISABLE_FILE_LOG
+    $FILE_LOGGING_DISABLED = 1 if $ENV{COMSERV_DISABLE_FILE_LOG};
+
+    if ($FILE_LOGGING_DISABLED) {
+        print STDERR "=== FILE LOGGING DISABLED — STDERR + DB only ===\n";
+        __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+            "Logging system initialized (STDERR + DB only; file logging disabled)");
+        return;
+    }
+
     # Always write to the local log directory first — never NFS during startup.
-    # NFS is only used for archiving rotated logs (via rotate_log), not for live writes.
-    # This prevents the server from hanging in uninterruptible D-state when NFS is slow.
     my $log_file;
     my $log_dir;
 
@@ -344,47 +377,40 @@ sub init {
         my $base_dir = File::Spec->catdir($FindBin::Bin, '..');
         $log_dir = File::Spec->catdir($base_dir, "logs");
     }
-    $log_file = File::Spec->catfile($log_dir, "application.log");
-    _print_log("Using local log directory: $log_dir");
 
-    _print_log("Log file: $log_file");
+    $log_file = File::Spec->catfile($log_dir, "application.log");
+
+    print STDERR "Using local log directory: $log_dir\n";   # Safe fallback
+    print STDERR "Log file: $log_file\n";
 
     # Create the log directory if it doesn't exist
     unless (-d $log_dir) {
         eval { make_path($log_dir) };
         if ($@) {
-            _print_log("[ERROR] Failed to create log directory $log_dir: $@");
+            print STDERR "[ERROR] Failed to create log directory $log_dir: $@\n";
             die "Failed to create log directory $log_dir: $@\n";
         }
-        _print_log("Log directory created: $log_dir");
-    } else {
-        _print_log("Log directory exists: $log_dir");
     }
 
     # Open the log file for appending
     unless (sysopen($LOG_FH, $log_file, O_WRONLY | O_APPEND | O_CREAT, 0644)) {
         my $error_message = "Can't open log file $log_file: $!";
-        _print_log("[ERROR] $error_message");
+        print STDERR "[ERROR] $error_message\n";
         die $error_message;
     }
 
     # Ensure the file handle is auto-flushed
     select((select($LOG_FH), $| = 1)[0]);
-    _print_log("Log file opened: $log_file");
 
-    # Write a test entry to ensure the log file is created
     print $LOG_FH "Test log entry\n";
-    _print_log("Wrote test log entry to file");
-    
+
     # Set global log file path for rotation
     $LOG_FILE = $log_file;
-    _print_log("Global log file path set to: $LOG_FILE");
 
-    # Log initialization message
-    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init', "Logging system initialized with log file: $LOG_FILE");
+    # Now safe to use full logging
+    __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+        "Logging system initialized with log file: $LOG_FILE");
 }
-
-# Constructor for creating a new instance
 sub new {
     my ($class) = @_;
     return bless {}, $class;
@@ -703,7 +729,9 @@ sub send_error_notification {
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my ($message, $file_path, $level) = @_;
-    
+
+    return if $FILE_LOGGING_DISABLED;
+
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
     # This prevents creating files with the message as the filename

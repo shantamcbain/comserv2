@@ -56,6 +56,7 @@ services:
       TZ: UTC
       NFS_DATA_PATH: ${NFS_DATA_PATH:-/data/nfs}
       NFS_HOST_PATH: "${NFS_HOST_PATH:-/home/shanta/nfs}"
+      DISABLE_HEALTH_MONITOR: "1"
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session_dev
       PERL5LIB: /opt/comserv/lib:/opt/comserv/local/lib/perl5

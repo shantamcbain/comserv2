@@ -18,6 +18,13 @@ has '_schema_cache' => (
     default => sub { {} },
 );
 
+my $_instance;
+sub instance {
+    my $class = shift;
+    $_instance ||= $class->new(@_);
+    return $_instance;
+}
+
 my $DEFAULT_HOST = '192.168.1.20';
 my $DEFAULT_PORT = 5432;
 my $DEFAULT_USER = 'postgres';

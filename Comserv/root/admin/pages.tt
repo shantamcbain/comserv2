@@ -200,7 +200,7 @@
                             <select name="filter_site" id="filter_site" class="form-control">
                                 <option value="">-- All Sites --</option>
                                 [% FOREACH site IN site_names %]
-                                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site %]</option>
+                                    <option value="[% site %]" [% IF filter_site == site %]selected[% END %]>[% site_display_map.$site || site %]</option>
                                 [% END %]
                             </select>
                         </div>
@@ -246,7 +246,7 @@
                                 [% IF pages && pages.size > 0 %]
                                     [% FOREACH page IN pages %]
                                         <tr>
-                                            <td>[% page.sitename | html %]</td>
+                                            <td>[% site_display_map.${page.sitename} || page.sitename | html %]</td>
                                             <td>[% page.menu | html %]</td>
                                             <td><code>[% page.page_code | html %]</code></td>
                                             <td>[% page.title | html %]</td>
@@ -279,6 +279,9 @@
                                                     </a>
                                                 [% ELSE %]
                                                     <span class="label label-default" style="margin-left: 5px; padding: 4px 8px;">Shared (Read-Only)</span>
+                                                    <a href="[% c.uri_for('/admin/pages', { action => 'create', clone_id => page.id }) %]" class="btn btn-xs btn-success" title="Clone / Copy this page to My Site" style="margin-left: 5px;">
+                                                        <i class="fa fa-copy"></i> Clone to My Site
+                                                    </a>
                                                 [% END %]
                                             </td>
                                         </tr>
