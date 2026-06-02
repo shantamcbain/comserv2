@@ -195,7 +195,7 @@ sub hosting_signup :Local :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d);
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         my $monthly_cost = $plan_price{ $p->{plan_slug} } // 0;
         eval {
