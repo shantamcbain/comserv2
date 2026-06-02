@@ -614,19 +614,22 @@ This is an automated notification from the Comserv platform.
         }
     };
 
-    my $to_header = join(', ', @recipients);
-
-    my $email = Email::MIME->create(
-        header_str => [
-            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
-            To      => $to_header,
-            Subject => "[CSC] Hosting registration request: " . $account->sitename,
-        ],
-        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
-        body_str   => $body,
-    );
-
-    return $self->send_email($c, $email, $smtp_config);
+    my $from    = $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca';
+    my $subject = "[CSC] Hosting registration request: " . $account->sitename;
+    my $sent_ok = 0;
+    for my $recipient (@recipients) {
+        my $email = Email::MIME->create(
+            header_str => [
+                From    => $from,
+                To      => $recipient,
+                Subject => $subject,
+            ],
+            attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+            body_str   => $body,
+        );
+        $sent_ok = $self->send_email($c, $email, $smtp_config) || $sent_ok;
+    }
+    return $sent_ok;
 }
 
 sub send_hosting_signup_confirmation {
