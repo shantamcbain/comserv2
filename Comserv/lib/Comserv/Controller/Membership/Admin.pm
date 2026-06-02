@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use Comserv::Util::PointSystem;
 use Comserv::Util::EmailNotification;
 
@@ -1466,7 +1467,7 @@ sub hosting_account_edit :Local :Args(1) {
             $c->flash->{success_msg} = $acct->sitename . ' hosting account updated.';
             # Auto-provision accounting DB if 'accounting' was just added
             if ($addons_str =~ /\baccounting\b/ && $old_addons !~ /\baccounting\b/) {
-                my ($ok, $msg) = eval { $c->model('AccountingDB')->provision_site($c, $acct->sitename) };
+                my ($ok, $msg) = eval { Comserv::Model::AccountingDB->instance->provision_site($c, $acct->sitename) };
                 if ($@ || !$ok) {
                     $c->flash->{error_msg} = 'Accounting add-on saved but DB provisioning failed: ' . ($@ || $msg);
                 } else {
