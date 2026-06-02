@@ -2,6 +2,7 @@ package Comserv::Controller::Admin::SiteProvisioning;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::CloudflareManager;
 use Try::Tiny;
@@ -355,7 +356,7 @@ sub provision :Path('provision') :Args(0) {
         my $addons = $request->requested_addons || '';
         if ($addons =~ /\baccounting\b/) {
             my ($ok, $msg) = eval {
-                $c->model('AccountingDB')->provision_site($c, $site_name);
+                Comserv::Model::AccountingDB->instance->provision_site($c, $site_name);
             };
             if ($@) {
                 push @steps, "Accounting DB provisioning error: $@";

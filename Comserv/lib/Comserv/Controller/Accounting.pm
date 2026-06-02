@@ -2,6 +2,7 @@ package Comserv::Controller::Accounting;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use POSIX qw(strftime);
 use LWP::UserAgent;
 use JSON;
@@ -1232,7 +1233,7 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
 
         if ($rec && $rec->status eq 'active') {
             eval {
-                my $acct_schema = $c->model('AccountingDB')->schema_for_site($c, $sn);
+                my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sn);
                 if ($acct_schema) {
                     $acct_schema->storage->dbh->do('SELECT 1');
                     $row->{db_ok} = 1;
@@ -1260,7 +1261,7 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
         my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
 
         my ($ok, $msg) = eval {
-            $c->model('AccountingDB')->provision_site($c, $target,
+            Comserv::Model::AccountingDB->instance->provision_site($c, $target,
                 jurisdiction => $jurisdiction,
                 currency     => $currency,
             );
