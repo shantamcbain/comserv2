@@ -170,6 +170,7 @@
                 { key = 'ency',        label = '📖 ENCY',                    hint = 'Encyclopedia of biological life — herbs, animals, insects' },
                 { key = 'ecommerce',   label = '🛒 Shop / Price List',       hint = 'Inventory price list and cart' },
                 { key = 'membership',  label = '👥 Membership Plans',        hint = 'Paid membership tiers for your site' },
+                { key = 'accounting',  label = '💰 Accounting / Bookkeeping', hint = 'Double-entry ledger, invoicing, COA, and supplier management' },
             ] %]
             <label style="display:flex;gap:0.5rem;align-items:flex-start;border:1px solid var(--border-color, #ddd);border-radius:6px;padding:0.75rem;cursor:pointer;background: var(--bg-secondary, #fafafa);">
               <input type="checkbox" name="addon_[% addon.key %]" value="1"

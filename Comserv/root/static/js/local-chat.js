@@ -41,6 +41,7 @@
             large:  null,   // largest Ollama model
             grok:   null    // Grok model (premium users)
         },
+        ollamaHost: null,
         supportMode: false,         // true when user is in live support chat mode
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
@@ -728,7 +729,7 @@
             '<div style="display:flex;gap:3px;align-items:stretch;">' +
             '<textarea id="message-input" style="flex:1;" placeholder="Type your message… (Ctrl+V to paste image)"></textarea>' +
             '<div style="display:flex;flex-direction:column;gap:3px;">' +
-            '<label id="attach-image-btn" title="Attach image (or paste with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*" style="display:none;"></label>' +
+            '<label id="attach-image-btn" title="Attach image or upload audio file (or paste image with Ctrl+V)" style="display:none;cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.2em;user-select:none;text-align:center;">📎<input type="file" id="image-file-input" accept="image/*,audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
             '<label id="attach-audio-btn" title="Upload a saved audio file (.mp3, .m4a, .wav, .ogg, .webm) for transcription" style="cursor:pointer;padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;user-select:none;text-align:center;" aria-label="Upload audio file">📂<input type="file" id="audio-file-input" accept="audio/*,.m4a,.wav,.mp3,.ogg,.webm" style="display:none;"></label>' +
             '<button id="mic-record-btn" title="Record voice inspection — click to start, click again to stop. No time limit." style="padding:4px 8px;background:var(--button-bg,#f0f0f0);color:var(--button-text,#000);border:1px solid var(--button-border,#ccc);border-radius:4px;font-size:1.1em;cursor:pointer;" aria-label="Record audio">🎤</button>' +
             '<button id="send-message" style="flex:1;">Send</button>' +
@@ -796,6 +797,7 @@
                                 wst.title = 'Enable web search for Grok requests (uses API credits)';
                             }
                         } else if (p.service === 'ollama') {
+                            state.ollamaHost = p.active_host;
                             // Update the default "Ollama (Local)" option label
                             const defaultOpt = sel.querySelector('option[value="ollama"]');
                             if (defaultOpt) defaultOpt.textContent = p.name || 'Ollama (Local AI)';
@@ -1053,7 +1055,15 @@
         });
         document.getElementById('image-file-input').addEventListener('change', function(e) {
             if (e.target.files && e.target.files[0]) {
-                _setPendingImage(e.target.files[0]);
+                const file = e.target.files[0];
+                if (file.type && file.type.startsWith('audio/')) {
+                    _transcribeAudioFile(file);
+                } else if (file.name && /\.(mp3|m4a|wav|ogg|webm)$/i.test(file.name)) {
+                    _transcribeAudioFile(file);
+                } else {
+                    _setPendingImage(file);
+                }
+                e.target.value = '';
             }
         });
 
@@ -1477,7 +1487,9 @@
             if (isGrok) {
                 modelDisplay = 'Grok (xAI)' + (parts[1] ? ': ' + parts[1] : '');
             } else {
-                modelDisplay = 'Ollama (Local)' + (parts[1] ? ': ' + parts[1] : '');
+                const host = state.ollamaHost || '';
+                const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+                modelDisplay = (isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote)') + (parts[1] ? ': ' + parts[1] : '');
             }
             state.activeModel = modelDisplay;
             const statusEl = document.getElementById('chat-status');
@@ -1691,8 +1703,11 @@
 
             data.providers.forEach(function(p) {
                 if (p.service === 'ollama') {
+                    state.ollamaHost = p.active_host;
                     const grp = document.createElement('optgroup');
-                    grp.label = 'Ollama (Local)';
+                    const host = p.active_host || '';
+                    const isLocalHost = !host || host === 'localhost' || host === '127.0.0.1' || host === '0.0.0.0' || host === '::1';
+                    grp.label = isLocalHost ? 'Ollama (Local)' : 'Ollama (Remote: ' + host + ')';
                     if (p.models && p.models.length > 0) {
                         // Build model tiers from chat-capable models only, sorted by size.
                         // Exclude sub-2B toy models from auto-selection.
@@ -3301,6 +3316,38 @@
                 map.push({ label, url });
             }
         }
+
+        // 3. Extract all links (<a> elements with href) on the current page DOM (or window.opener if popup)
+        try {
+            const targetDoc = (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed)
+                ? window.opener.document
+                : document;
+            if (targetDoc) {
+                targetDoc.querySelectorAll('a[href]').forEach(function(el) {
+                    const href = el.getAttribute('href');
+                    if (!href) return;
+                    const trimmedHref = href.trim();
+                    if (!trimmedHref || trimmedHref.startsWith('#') || /^(javascript|mailto|tel|sms):/i.test(trimmedHref)) return;
+                    
+                    const label = (el.textContent || el.innerText || '').trim().replace(/\s+/g, ' ').toLowerCase();
+                    if (!label || label.length < 2 || label.length > 80) return;
+                    if (/^(step|pass|when|if|for|do|use|note|the|a |an |this|it |your|their|all|any|each|always|never|only|also)/.test(label)) return;
+                    
+                    try {
+                        const urlObj = new URL(trimmedHref, targetDoc.baseURI || window.location.href);
+                        const resolvedUrl = urlObj.href;
+                        if (!map.some(function(e) { return e.label === label; })) {
+                            map.push({ label: label, url: resolvedUrl });
+                        }
+                    } catch(urlErr) {
+                        // ignore malformed URLs
+                    }
+                });
+            }
+        } catch(docErr) {
+            // ignore security/permission issues when accessing window.opener
+        }
+
         return map;
     }
 

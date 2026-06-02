@@ -2,6 +2,7 @@ package Comserv::Controller::Accounting;
 use Moose;
 use namespace::autoclean;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use POSIX qw(strftime);
 use LWP::UserAgent;
 use JSON;
@@ -22,9 +23,9 @@ sub auto :Private {
     my $roles = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
     unless ($is_admin) {
@@ -38,7 +39,7 @@ sub auto :Private {
         }
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'auto',
             'Accounting: access denied for user ' . ($c->session->{username} || 'guest'));
-        $c->flash->{error_msg} = 'Accounting is restricted to administrators.';
+        $c->flash->{error_msg} = 'Accounting requires admin, site_admin, or accounting role.';
         $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
         return 0;
     }
@@ -597,9 +598,9 @@ sub _api_auth {
     my $roles    = $c->session->{roles} // [];
     my $is_admin = 0;
     if (ref($roles) eq 'ARRAY') {
-        $is_admin = grep { lc($_) eq 'admin' } @$roles;
+        $is_admin = grep { lc($_) =~ /^(admin|site_admin|accounting)$/ } @$roles;
     } elsif (!ref($roles) && $roles) {
-        $is_admin = ($roles =~ /\badmin\b/i) ? 1 : 0;
+        $is_admin = ($roles =~ /\b(admin|site_admin|accounting)\b/i) ? 1 : 0;
     }
     $is_admin ||= 1 if ($c->session->{username} // '') eq 'Shanta';
 
@@ -1181,6 +1182,102 @@ sub ai_usage :Path('/Accounting/ai_usage') :Args(0) {
         usage        => \@usage,
         grand_calls  => $grand_calls,
         grand_tokens => $grand_tokens,
+    );
+}
+
+# -------------------------------------------------------------------------
+# Accounting Database Admin  /Accounting/admin/databases
+# Lists all sites, their PostgreSQL accounting DB status, and allows
+# provisioning. CSC global-admin only.
+# -------------------------------------------------------------------------
+
+sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($c->session->{SiteName} eq 'CSC' || ($c->session->{roles} && grep { /^admin$/ } @{$c->session->{roles} // []})) {
+        $c->flash->{error_msg} = 'CSC admin access required.';
+        $c->response->redirect($c->uri_for('/Accounting'));
+        return;
+    }
+
+    my $schema = $self->_schema($c);
+
+    # All known sites
+    my @sites;
+    eval { @sites = $schema->resultset('Site')->search({}, { order_by => 'name' })->all };
+
+    # All registered accounting DBs keyed by sitename
+    my %reg;
+    eval {
+        my @rows = $schema->resultset('SiteAccountingDb')->search({})->all;
+        %reg = map { $_->sitename => $_ } @rows;
+    };
+
+    # Build status rows
+    my @rows;
+    for my $site (@sites) {
+        my $sn  = $site->name;
+        my $rec = $reg{$sn};
+        my $row = {
+            sitename    => $sn,
+            registered  => $rec ? 1 : 0,
+            db_name     => $rec ? $rec->db_name     : lc($sn) . '_accounting',
+            db_host     => $rec ? $rec->db_host     : '192.168.1.20',
+            db_port     => $rec ? $rec->db_port     : 5432,
+            jurisdiction=> $rec ? $rec->jurisdiction: 'CA',
+            currency    => $rec ? $rec->currency    : 'CAD',
+            status      => $rec ? $rec->status      : 'not_provisioned',
+            db_ok       => 0,
+            db_error    => '',
+        };
+
+        if ($rec && $rec->status eq 'active') {
+            eval {
+                my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sn);
+                if ($acct_schema) {
+                    $acct_schema->storage->dbh->do('SELECT 1');
+                    $row->{db_ok} = 1;
+                } else {
+                    $row->{db_error} = 'Could not connect';
+                }
+            };
+            if ($@) {
+                $row->{db_error} = $@;
+                $row->{db_error} =~ s/ at .+//s;
+            }
+        }
+
+        push @rows, $row;
+    }
+
+    # Handle POST — provision a site's DB
+    if ($c->req->method eq 'POST') {
+        my $target = $c->req->body_parameters->{sitename} or do {
+            $c->flash->{error_msg} = 'No sitename specified.';
+            $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+            return;
+        };
+        my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
+        my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
+
+        my ($ok, $msg) = eval {
+            Comserv::Model::AccountingDB->instance->provision_site($c, $target,
+                jurisdiction => $jurisdiction,
+                currency     => $currency,
+            );
+        };
+        if ($@ || !$ok) {
+            $c->flash->{error_msg} = "Provisioning failed for '$target': " . ($@ || $msg);
+        } else {
+            $c->flash->{success_msg} = $msg;
+        }
+        $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
+        return;
+    }
+
+    $c->stash(
+        rows     => \@rows,
+        template => 'Accounting/admin/databases.tt',
     );
 }
 

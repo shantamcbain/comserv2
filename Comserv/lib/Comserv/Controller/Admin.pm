@@ -186,6 +186,9 @@ sub index :Path :Args(0) {
     
     # Get system stats
     my $stats = $self->get_system_stats($c);
+
+    # Get remote server stats (db + prod catalyst servers)
+    my $remote_servers = $self->get_remote_server_stats($c);
     
     # Get recent user activity
     my $recent_activity = $self->get_recent_activity($c);
@@ -262,6 +265,7 @@ sub index :Path :Args(0) {
     $c->stash(
         template              => 'admin/index.tt',
         stats                 => $stats,
+        remote_servers        => $remote_servers,
         recent_activity       => $recent_activity,
         notifications         => $notifications,
         pending_hosting        => $pending_hosting,
@@ -368,15 +372,21 @@ sub get_system_stats {
     };
 
     eval {
-        my $nfs_root = $ENV{NFS_ROOT} // '/data/nfs';
+        my $nfs_root = $ENV{NFS_DATA_PATH} // $ENV{NFS_ROOT} // '/data/nfs';
         if (-d $nfs_root) {
-            my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
-            if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
-                my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
-                $stats->{nfs_pct}   = $pct;
-                $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
-                $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
-                $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+            my @app_dev = stat('.');
+            my @nfs_dev = stat($nfs_root);
+            if (@app_dev && @nfs_dev && $app_dev[0] != $nfs_dev[0]) {
+                my $df = `df -P -BM \Q$nfs_root\E 2>/dev/null | tail -1`;
+                if ($df =~ /\s+(\d+)M\s+(\d+)M\s+(\d+)M\s+(\d+)%/) {
+                    my ($total, $used, $avail, $pct) = ($1, $2, $3, $4);
+                    $stats->{nfs_pct}   = $pct;
+                    $stats->{nfs_used}  = $used  >= 1024 ? sprintf('%.1f GB', $used/1024)  : "${used} MB";
+                    $stats->{nfs_total} = $total >= 1024 ? sprintf('%.1f GB', $total/1024) : "${total} MB";
+                    $stats->{nfs_level} = $pct >= 90 ? 'critical' : $pct >= 80 ? 'warn' : 'ok';
+                }
+            } elsif (@app_dev && @nfs_dev && $app_dev[0] == $nfs_dev[0]) {
+                $stats->{nfs_same_device} = 1;
             }
         }
     };
@@ -391,6 +401,52 @@ sub get_system_stats {
     };
 
     return $stats;
+}
+
+my @MONITORED_SERVERS = (
+    { names => ['db-production', 'db-01', '192.168.1.20'], ip => '192.168.1.20', label => 'DB Server 1 (192.168.1.20)'   },
+    { names => ['db-02', '192.168.1.21'],                  ip => '192.168.1.21', label => 'DB Server 2 (192.168.1.21)'   },
+    { names => ['prod-01', 'prod1', '192.168.1.126'],      ip => '192.168.1.126', label => 'Prod Catalyst 1 (192.168.1.126)' },
+    { names => ['prod-02', 'prod2', '192.168.1.127'],      ip => '192.168.1.127', label => 'Prod Catalyst 2 (192.168.1.127)' },
+);
+
+sub get_remote_server_stats {
+    my ($self, $c) = @_;
+    my @servers;
+    eval {
+        my $rs = $c->model('DBEncy')->resultset('HardwareMetrics');
+        for my $srv (@MONITORED_SERVERS) {
+            my %latest;
+            my @rows = $rs->search(
+                { hostname  => { -in => $srv->{names} },
+                  timestamp => { '>=' => \"DATE_SUB(NOW(), INTERVAL 2 HOUR)" } },
+                { order_by => { -desc => 'timestamp' } }
+            )->all;
+            for my $row (@rows) {
+                my $mn = $row->metric_name;
+                next if exists $latest{$mn};
+                $latest{$mn} = {
+                    value => $row->metric_value,
+                    text  => $row->metric_text,
+                    unit  => $row->unit,
+                    level => $row->level,
+                    ts    => $row->timestamp,
+                };
+            }
+            my $reported_hostname = @rows ? $rows[0]->hostname : undef;
+            my $last_seen         = @rows ? $rows[0]->timestamp : undef;
+            push @servers, {
+                name      => $srv->{ip},
+                ip        => $srv->{ip},
+                label     => $srv->{label},
+                hostname  => $reported_hostname,
+                metrics   => \%latest,
+                last_seen => $last_seen,
+                online    => scalar(@rows) ? 1 : 0,
+            };
+        }
+    };
+    return \@servers;
 }
 
 # Get recent user activity for the admin dashboard
@@ -7650,12 +7706,32 @@ sub pages :Path('/admin/pages') :Args(0) {
     
     if ($action eq 'create') {
         $show_form = 'create';
-        $page_item = {
-            sitename => $current_sitename,
-            menu => 'Main',
-            status => 'active',
-            roles => 'public',
-        };
+        my $clone_id = $c->req->param('clone_id');
+        if ($clone_id) {
+            my $cloned = eval { $c->model('DBEncy')->resultset('Page')->find({ id => $clone_id }) };
+            if ($cloned) {
+                $page_item = {
+                    sitename    => $current_sitename,
+                    menu        => $cloned->menu || 'Main',
+                    page_code   => $cloned->page_code,
+                    title       => $cloned->title . ' (Copy)',
+                    body        => $cloned->body,
+                    description => $cloned->description,
+                    keywords    => $cloned->keywords,
+                    link_order  => $cloned->link_order || 0,
+                    status      => 'active',
+                    roles       => $cloned->roles || 'public',
+                };
+            }
+        }
+        unless (keys %$page_item) {
+            $page_item = {
+                sitename => $current_sitename,
+                menu => 'Main',
+                status => 'active',
+                roles => 'public',
+            };
+        }
     }
     elsif ($action eq 'edit') {
         my $id = $c->req->param('id');

@@ -30,9 +30,17 @@ sub view :Path('/page') :Args(1) {
         { rows => 1 }
     )->single;
 
-    if (!$page && $sitename eq 'CSC') {
+    if (!$page) {
+        # Fallback to shared pages or CSC pages
         $page = $c->model('DBEncy')->resultset('Page')->search(
-            { page_code => $page_code },
+            {
+                page_code => $page_code,
+                '-or' => [
+                    { sitename => 'CSC' },
+                    { share_with => 'all' },
+                    { share_with => { 'like' => "%$sitename%" } }
+                ]
+            },
             { rows => 1 }
         )->single;
     }
@@ -78,8 +86,33 @@ sub view :Path('/page') :Args(1) {
         return;
     }
     
+    my $body = $page->body || '';
+    my $title = $page->title;
+    
+    if ($body =~ m{<html}i) {
+        if ($body =~ m{<title>(.*?)</title>}is) {
+            my $extracted_title = $1;
+            $extracted_title =~ s/<[^>]*>//g;
+            $extracted_title =~ s/^\s+|\s+$//g;
+            if ($extracted_title && (!$title || $title eq $page->page_code)) {
+                $title = $extracted_title;
+            }
+        }
+        
+        if ($body =~ m{<body[^>]*>(.*?)</body>}is) {
+            $body = $1;
+        } else {
+            $body =~ s{<html[^>]*>}{}gi;
+            $body =~ s{</html>}{}gi;
+            $body =~ s{<head[^>]*>.*?</head>}{}gis;
+        }
+    }
+
     $c->stash(
         page => $page,
+        rendered_body => $body,
+        page_title => $title,
+        ScriptDisplayName => 'Page',
         template => 'pages/view.tt'
     );
 }
@@ -155,6 +188,8 @@ sub list :Path('/pages') :Args(0) {
         sitename => $sitename,
         menu => $menu,
         is_csc => ($sitename eq 'CSC'),
+        page_title => 'Pages List',
+        ScriptDisplayName => 'Pages',
         template => 'pages/list.tt'
     );
 }
@@ -559,7 +594,11 @@ sub migrate_pages :Path('/admin/migrate_pages') :Args(0) {
         }
     }
     
-    $c->stash(template => 'admin/migrate_pages.tt');
+    $c->stash(
+        template => 'admin/migrate_pages.tt',
+        page_title => 'Migrate Legacy Pages',
+        ScriptDisplayName => 'Admin',
+    );
 }
 
 # Import a single Forager page with optional field overrides (Edit & Import)
@@ -699,6 +738,16 @@ sub pages :Path('/admin/pages') :Args(0) {
     
     my $current_sitename = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
     
+    # Fetch site display names for mapping
+    my %site_display_map;
+    eval {
+        my @all_sites_db = $db_ency->resultset('Site')->all;
+        foreach my $s (@all_sites_db) {
+            $site_display_map{$s->name} = $s->site_display_name || $s->name;
+        }
+    };
+    $c->stash(site_display_map => \%site_display_map);
+    
     # Get available roles for the current site
     my @site_roles_db = ();
     eval {
@@ -740,6 +789,15 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
     }
     $c->stash(all_sites => \@site_names_all);
+    
+    # Determine available sites for this admin
+    my @available_sites_list;
+    if ($current_sitename eq 'CSC') {
+        @available_sites_list = @site_names_all;
+    } else {
+        @available_sites_list = ($current_sitename);
+    }
+    $c->stash(available_sites => \@available_sites_list);
     
     if ($action eq 'create') {
         $c->stash(
@@ -987,11 +1045,12 @@ sub pages :Path('/admin/pages') :Args(0) {
         }
         
         $c->stash(
-            pages         => \@pages,
-            site_names    => \@site_names,
-            search        => $search,
-            filter_site   => $current_sitename ne 'CSC' ? $current_sitename : $filter_site,
-            filter_status => $filter_status,
+            pages            => \@pages,
+            site_names       => \@site_names,
+            site_display_map => $c->stash->{site_display_map},
+            search           => $search,
+            filter_site      => $current_sitename ne 'CSC' ? $current_sitename : $filter_site,
+            filter_status    => $filter_status,
         );
     }
     
@@ -1000,6 +1059,8 @@ sub pages :Path('/admin/pages') :Args(0) {
         success_msg => $c->flash->{success_msg} || $c->stash->{success_msg},
         error_msg => $c->flash->{error_msg} || $c->stash->{error_msg},
         current_site  => $current_sitename,
+        page_title => 'Page Management',
+        ScriptDisplayName => 'Admin',
     );
 }
 

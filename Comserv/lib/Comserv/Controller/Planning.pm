@@ -522,7 +522,7 @@ sub daily :Path('/planning/daily') :Args {
             my $block_bonus      = $h{is_blocking} ? -0.4 : 0;
             my $cross_block_bonus = 0;
             if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
-                $cross_block_bonus    = -3;
+                $cross_block_bonus    = -1000;
                 $h{is_cross_blocker}  = 1;
                 $h{blocking_count}    = scalar @{ $cross_blocker_projects{$h{project_id}} };
                 $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
@@ -584,6 +584,9 @@ sub daily :Path('/planning/daily') :Args {
         }
 
         @active_priorities = @all_sorted;
+
+        my $cross_blocker_count = scalar grep { $_->{is_cross_blocker} } @active_priorities;
+        $c->stash->{cross_blocker_count} = $cross_blocker_count;
 
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
@@ -1774,6 +1777,22 @@ sub _schedule_day {
             { order_by => [{ -asc => 'priority' }, { -asc => 'sort_order' }] }
         )->all;
     };
+
+    if (@todos > 1) {
+        my %dep_rows;
+        eval {
+            my @drws = $schema->resultset('ProjectDependency')->search(
+                { status => 'active', dependency_type => 'blocks' },
+                { columns => [qw(depends_on_id)] }
+            )->all;
+            %dep_rows = map { $_->depends_on_id => 1 } @drws;
+        };
+        if (%dep_rows) {
+            my @cross = grep { $_->project_id && $dep_rows{$_->project_id} } @todos;
+            my @rest  = grep { !($_->project_id && $dep_rows{$_->project_id}) } @todos;
+            @todos = (@cross, @rest);
+        }
+    }
 
     my $count = 0;
     for my $todo (@todos) {

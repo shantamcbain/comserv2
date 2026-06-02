@@ -4,6 +4,7 @@ use namespace::autoclean;
 use Try::Tiny;
 use JSON;
 use Comserv::Util::Logging;
+use Comserv::Model::AccountingDB;
 use Comserv::Util::PointSystem;
 use Comserv::Util::EmailNotification;
 
@@ -1443,7 +1444,8 @@ sub hosting_account_edit :Local :Args(1) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d);
+        my $old_addons = $acct->requested_addons || '';
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {
             $acct->update({
@@ -1463,6 +1465,15 @@ sub hosting_account_edit :Local :Args(1) {
             $c->flash->{error_msg} = "Update failed: $@";
         } else {
             $c->flash->{success_msg} = $acct->sitename . ' hosting account updated.';
+            # Auto-provision accounting DB if 'accounting' was just added
+            if ($addons_str =~ /\baccounting\b/ && $old_addons !~ /\baccounting\b/) {
+                my ($ok, $msg) = eval { Comserv::Model::AccountingDB->instance->provision_site($c, $acct->sitename) };
+                if ($@ || !$ok) {
+                    $c->flash->{error_msg} = 'Accounting add-on saved but DB provisioning failed: ' . ($@ || $msg);
+                } else {
+                    $c->flash->{success_msg} .= " Accounting DB provisioned: $msg";
+                }
+            }
         }
         $c->response->redirect($c->uri_for('/membership/admin/hosting_accounts'));
         return;
