@@ -26,6 +26,30 @@ use POSIX qw(strftime); # For timestamp formatting
 my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
+# When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
+# Defaults to disabled when CATALYST_ENV=production (safe default for disk).
+# Admin can toggle at runtime via set_file_logging(). A restart is only needed
+# to affect the log file initialisation itself.
+my $FILE_LOGGING_DISABLED = do {
+    my $env_val = $ENV{DISABLE_FILE_LOGGING} // '';
+    if    ($env_val eq '1') { 1 }
+    elsif ($env_val eq '0') { 0 }
+    elsif (($ENV{CATALYST_ENV} // '') eq 'production') { 1 }
+    else  { 0 }
+};
+
+# Allow runtime toggle — called by admin UI actions.
+sub set_file_logging {
+    my ($class, $enabled) = @_;
+    $FILE_LOGGING_DISABLED = $enabled ? 0 : 1;
+    _print_log("File logging " . ($FILE_LOGGING_DISABLED ? "DISABLED" : "ENABLED") . " at runtime by admin");
+    return !$FILE_LOGGING_DISABLED;
+}
+
+sub file_logging_enabled {
+    return !$FILE_LOGGING_DISABLED;
+}
+
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
     qr/googlebot/i,
@@ -117,6 +141,7 @@ sub _print_log {
 # Log rotation method
 sub rotate_log {
     my ($class) = @_;
+    return if $FILE_LOGGING_DISABLED;
     return unless defined $LOG_FILE && -e $LOG_FILE;
 
     my $file_size = -s $LOG_FILE;
@@ -332,25 +357,15 @@ sub get_system_identifier {
 sub init {
     my ($class) = @_;
 
-    # ====================== TEMPORARY FILE LOG DISABLE ======================
-    # Disable file logging on Production server (or via environment variable)
-    my $system_id = __PACKAGE__->get_system_identifier();
+    # Also honour the legacy env var COMSERV_DISABLE_FILE_LOG
+    $FILE_LOGGING_DISABLED = 1 if $ENV{COMSERV_DISABLE_FILE_LOG};
 
-    if ($ENV{COMSERV_DISABLE_FILE_LOG} ||
-        $system_id =~ /production-host/i ||
-        $system_id =~ /192\.168\.1\.126/) {
-
-        $LOG_FH   = undef;
-        $LOG_FILE = undef;
-
-        # Only print to STDERR - do NOT call _print_log() here to avoid recursion
-        print STDERR "=== FILE LOGGING DISABLED on Production Server ===\n";
-        print STDERR "System ID: $system_id\n";
-        print STDERR "Logging to DB + STDERR only.\n";
-
-        return;   # Skip all file operations
+    if ($FILE_LOGGING_DISABLED) {
+        print STDERR "=== FILE LOGGING DISABLED — STDERR + DB only ===\n";
+        __PACKAGE__->log_with_details(undef, 'INFO', __FILE__, __LINE__, 'init',
+            "Logging system initialized (STDERR + DB only; file logging disabled)");
+        return;
     }
-    # ========================================================================
 
     # Always write to the local log directory first — never NFS during startup.
     my $log_file;
@@ -714,7 +729,9 @@ sub send_error_notification {
 # Log a message to a file (defaults to the global log file)
 sub log_to_file {
     my ($message, $file_path, $level) = @_;
-    
+
+    return if $FILE_LOGGING_DISABLED;
+
     # CRITICAL FIX: Ensure we always use a proper log file path
     # If no file_path is provided or it's undefined, use the global log file
     # This prevents creating files with the message as the filename
