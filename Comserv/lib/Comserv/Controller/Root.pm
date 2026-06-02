@@ -2125,14 +2125,16 @@ sub end : ActionClass('RenderView') {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 
-        eval {
-            require Comserv::Util::HealthLogger;
-            Comserv::Util::HealthLogger->log_health_event(
-                undef, 'error', 'HTTP_ERROR',
-                "Unhandled 500: $err_text",
-                { sitename => ($c->stash->{SiteName} || '') }
-            );
-        };
+        unless ($ENV{COMSERV_NO_HEALTH_LOG}) {
+            eval {
+                require Comserv::Util::HealthLogger;
+                Comserv::Util::HealthLogger->log_health_event(
+                    undef, 'error', 'HTTP_ERROR',
+                    "Unhandled 500: $err_text",
+                    { sitename => ($c->stash->{SiteName} || '') }
+                );
+            };
+        }
 
         $c->clear_errors;
         $c->response->status(500);
