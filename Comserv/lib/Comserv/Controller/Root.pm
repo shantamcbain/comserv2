@@ -326,6 +326,9 @@ sub auto :Private {
         $c->stash->{is_admin} = $is_admin;
         $c->stash->{user_logged_in} = $user_logged_in;
 
+        # Restore backward compatibility for c.stash.dbi
+        $c->stash->{dbi} = Comserv::Util::LegacyDBIWrapper->new($c);
+
         # Initialize navigation variables with defaults to prevent template crashes
         $c->stash->{main_pages} = [];
         $c->stash->{member_pages} = [];
@@ -860,7 +863,10 @@ sub health_detail :Path('/health/detail') :Args(0) {
     eval {
         my $sess_dir = $ENV{COMSERV_SESSION_DIR} || '/tmp/comserv/session';
         $info{session_dir_ok} = (-d $sess_dir && -w $sess_dir) ? 1 : 0;
-        $ok = 0 unless $info{session_dir_ok};
+        my $using_dbic = ($c->config->{'Plugin::Session'} && $c->config->{'Plugin::Session'}{dbic_class}) ? 1 : 0;
+        if (!$info{session_dir_ok} && !$using_dbic) {
+            $ok = 0;
+        }
     };
 
     # 5. Quick DB ping (non-blocking, 2s timeout)
@@ -1758,7 +1764,7 @@ sub site_setup {
     my $site_name         = $site->can('name')              ? ($site->name || $SiteName) : $SiteName;
 
     # If site has a document_root_url, use it for HostName
-    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url ne '') {
+    if ($site->can('document_root_url') && $site->document_root_url && $site->document_root_url =~ /^https?:/i) {
         $c->stash->{HostName} = $site->document_root_url;
         $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'site_setup',
             "Set HostName from document_root_url: " . $site->document_root_url);
@@ -1938,13 +1944,14 @@ sub begin :Private {
     }
 
     eval {
-        my @ha = $c->model('DBEncy')->resultset('HostingAccount')->search(
+        my @ha = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
             { status => 'active' },
             { order_by => 'sitename' }
         )->all;
         $c->stash->{nav_hosting_accounts} = \@ha;
     };
     if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'begin', "DB ERROR loading hosting accounts: $@");
         $c->stash->{nav_hosting_accounts} = [];
     }
 
@@ -2118,14 +2125,16 @@ sub end : ActionClass('RenderView') {
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'end',
             "Unhandled application error: $err_text");
 
-        eval {
-            require Comserv::Util::HealthLogger;
-            Comserv::Util::HealthLogger->log_health_event(
-                undef, 'error', 'HTTP_ERROR',
-                "Unhandled 500: $err_text",
-                { sitename => ($c->stash->{SiteName} || '') }
-            );
-        };
+        unless ($ENV{COMSERV_NO_HEALTH_LOG}) {
+            eval {
+                require Comserv::Util::HealthLogger;
+                Comserv::Util::HealthLogger->log_health_event(
+                    undef, 'error', 'HTTP_ERROR',
+                    "Unhandled 500: $err_text",
+                    { sitename => ($c->stash->{SiteName} || '') }
+                );
+            };
+        }
 
         $c->clear_errors;
         $c->response->status(500);
@@ -2250,5 +2259,37 @@ sub default :Path {
 }
 
 __PACKAGE__->meta->make_immutable;
+
+1;
+
+package Comserv::Util::LegacyDBIWrapper;
+
+sub new {
+    my ($class, $c) = @_;
+    return bless { c => $c }, $class;
+}
+
+sub query {
+    my ($self, $sql, @bind) = @_;
+    my $c = $self->{c};
+    return [] unless $c && $sql;
+    my $results = [];
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        if ($dbh) {
+            my $sth = $dbh->prepare($sql);
+            if ($sth) {
+                $sth->execute(@bind);
+                while (my $row = $sth->fetchrow_hashref) {
+                    push @$results, $row;
+                }
+            }
+        }
+    };
+    if ($@) {
+        $c->log->error("LegacyDBIWrapper error executing query [$sql]: $@");
+    }
+    return $results;
+}
 
 1;
