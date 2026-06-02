@@ -351,7 +351,22 @@ sub provision :Path('provision') :Args(0) {
             push @steps, "No user found for '$email' — admin role not auto-assigned (user must register first).";
         }
 
-        # 8. Create admin todo noting recompile needed
+        # 8. Provision accounting PostgreSQL DB if add-on was requested
+        my $addons = $request->requested_addons || '';
+        if ($addons =~ /\baccounting\b/) {
+            my ($ok, $msg) = eval {
+                $c->model('AccountingDB')->provision_site($c, $site_name);
+            };
+            if ($@) {
+                push @steps, "Accounting DB provisioning error: $@";
+            } elsif ($ok) {
+                push @steps, "Accounting DB provisioned: $msg";
+            } else {
+                push @steps, "Accounting DB provisioning failed: $msg";
+            }
+        }
+
+        # 9. Create admin todo noting recompile needed
         $self->_create_admin_todo($c, $site_name, \@steps);
 
         $c->stash(
