@@ -688,6 +688,11 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
                     echo "   [Emergency] Found host git repository at $HOST_APP_DIR"
                     cd "$HOST_APP_DIR"
                     
+                    if [ -f "script/comserv_server.psgi" ]; then
+                        rm -f comserv.psgi 2>/dev/null || true
+                        ln -sf script/comserv_server.psgi comserv.psgi || cp -f script/comserv_server.psgi comserv.psgi || true
+                    fi
+
                     # Start Host starman daemon using local git code
                     export CATALYST_HOME="$HOST_APP_DIR"
                     export CATALYST_ENV=production
