@@ -26,6 +26,38 @@
                 <form method="post" action="[% c.uri_for('/admin/logging/settings') %]" class="app-form">
                     
                     <div class="form-section">
+                        <h3>File Logging</h3>
+                        <p class="help-text">
+                            Write logs to <code>logs/application.log</code> on the app server disk.
+                            <strong>Disable in production</strong> to prevent disk fill-up — WARN/ERROR entries
+                            still go to the database and STDERR (Docker container logs) regardless.
+                        </p>
+                        [% SET fl_on = file_logging_enabled ? 1 : 0 %]
+                        <div class="form-row">
+                            <div class="form-field">
+                                <label>Current status:</label>
+                                <strong style="color:[% fl_on ? '#2e7d32' : '#c62828' %]">
+                                    [% fl_on ? '✓ Enabled — writing to disk' : '✗ Disabled — STDERR + DB only' %]
+                                </strong>
+                                <br><small>Environment default: <code>[% env_default | html %]</code>
+                                [% IF db_file_logging.defined %] · DB override: <code>[% db_file_logging == '1' ? 'enabled' : 'disabled' %]</code>[% END %]
+                                </small>
+                            </div>
+                        </div>
+                        <div class="form-row" style="margin-top:8px">
+                            <button type="submit" name="file_logging" value="[% fl_on ? '0' : '1' %]"
+                                    class="btn [% fl_on ? 'btn-danger' : 'btn-success' %]"
+                                    onclick="return confirm('[% fl_on ? 'Disable file logging? Log writes will go to DB + STDERR only.' : 'Enable file logging? A server restart is required for the log file to be created.' %]')">
+                                [% fl_on ? 'Disable File Logging' : 'Enable File Logging' %]
+                            </button>
+                            <small style="margin-left:8px;color:#888">
+                                Disabling takes effect immediately. Enabling takes effect on next restart
+                                (so the log file and directory are created).
+                            </small>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
                         <h3>Alert Threshold</h3>
                         <p class="help-text">Select the minimum log level that should trigger an email notification to administrators.</p>
                         
@@ -69,6 +101,8 @@
                     <li>These settings are stored in the database (<code>site_config</code> table) and persist across restarts.</li>
                     <li>NFS logging is optional for redundant history. If configured and writable, the application will maintain a physical log file there.</li>
                     <li>The Database is the primary source for the Logging Administration search and filter features.</li>
+                    <li><strong>File logging is automatically off in production</strong> (<code>CATALYST_ENV=production</code>) to prevent disk fill-up. You can override this here; disabling takes effect immediately, enabling requires a server restart to create the log file.</li>
+                    <li>Regardless of file logging, <strong>WARN and above always go to the database</strong> and to Docker container logs (STDERR).</li>
                 </ul>
             </div>
 

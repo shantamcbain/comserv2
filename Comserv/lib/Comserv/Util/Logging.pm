@@ -27,9 +27,28 @@ my $LOG_FH; # Global file handle for logging
 my $LOG_FILE; # Global log file path
 
 # When DISABLE_FILE_LOGGING=1, all log output goes to STDERR only (no log files written).
-# Set this in production docker-compose to prevent disk fill-up.
-# DB logging (WARN+) still works normally via log_with_details.
-my $FILE_LOGGING_DISABLED = ($ENV{DISABLE_FILE_LOGGING} // '') eq '1' ? 1 : 0;
+# Defaults to disabled when CATALYST_ENV=production (safe default for disk).
+# Admin can toggle at runtime via set_file_logging(). A restart is only needed
+# to affect the log file initialisation itself.
+my $FILE_LOGGING_DISABLED = do {
+    my $env_val = $ENV{DISABLE_FILE_LOGGING} // '';
+    if    ($env_val eq '1') { 1 }
+    elsif ($env_val eq '0') { 0 }
+    elsif (($ENV{CATALYST_ENV} // '') eq 'production') { 1 }
+    else  { 0 }
+};
+
+# Allow runtime toggle — called by admin UI actions.
+sub set_file_logging {
+    my ($class, $enabled) = @_;
+    $FILE_LOGGING_DISABLED = $enabled ? 0 : 1;
+    _print_log("File logging " . ($FILE_LOGGING_DISABLED ? "DISABLED" : "ENABLED") . " at runtime by admin");
+    return !$FILE_LOGGING_DISABLED;
+}
+
+sub file_logging_enabled {
+    return !$FILE_LOGGING_DISABLED;
+}
 
 # Known bot/spider user-agent patterns for request classification
 my @BOT_PATTERNS = (
