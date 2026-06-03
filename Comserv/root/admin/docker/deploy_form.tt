@@ -181,6 +181,7 @@ window.addEventListener('load', function() {
         var bodyParams = [];
         if (quickDeploy)  { bodyParams.push('quick_deploy=' + encodeURIComponent(quickDeploy)); }
         if (todoRecordId) { bodyParams.push('todo_record_id=' + encodeURIComponent(todoRecordId)); }
+        if (logId)        { bodyParams.push('deploy_log_id=' + encodeURIComponent(logId)); }
 
         return safeFetch('/admin/docker-deploy-to-production', {
             method: 'POST',

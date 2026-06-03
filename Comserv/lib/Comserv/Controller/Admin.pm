@@ -6867,16 +6867,22 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
+    my $current_deploy_log_id = $c->req->params->{deploy_log_id} || 0;
+
     my $active_deploy_log = eval {
         my $now = DateTime->now(time_zone => 'local');
         my $today = $now->ymd;
         my $threshold_time = $now->clone->subtract(minutes => 20)->hms;
-        $c->model('DBEncy')->resultset('Log')->search({
+        my %search_params = (
             status     => 2,
             abstract   => { -like => '%Docker%Deploy%' },
             start_date => $today,
             start_time => { '>=', $threshold_time },
-        }, {
+        );
+        if ($current_deploy_log_id) {
+            $search_params{record_id} = { '!=' => $current_deploy_log_id };
+        }
+        $c->model('DBEncy')->resultset('Log')->search(\%search_params, {
             rows => 1,
             order_by => { -desc => 'record_id' }
         })->first;
