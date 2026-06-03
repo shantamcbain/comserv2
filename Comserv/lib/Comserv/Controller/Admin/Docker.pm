@@ -22,7 +22,7 @@ sub begin :Private {
     }
 
     my $action = $c->action ? $c->action->name : '';
-    return if $action eq 'deploy';
+    return if $action eq 'deploy' || $action eq 'deploy_form' || $action eq 'init_log' || $action eq 'close_deploy_log';
 
     my $env = $ENV{CATALYST_ENV} || 'development';
     unless ($env eq 'development') {
@@ -243,12 +243,13 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
             $mins = 0 if $mins < 0;
             my $elapsed = sprintf('%02d:%02d:00', int($mins/60), $mins%60);
 
+            my $details_text = $notes || 'Docker Hub deployment executed.';
             $entry->update({
                 status      => 3,
                 end_time    => $end_time,
                 time        => $elapsed,
-                details     => $output,
-                comments    => $notes,
+                details     => $details_text,
+                comments    => $output,
                 last_mod_by => $c->session->{username} || 'system',
             });
 
