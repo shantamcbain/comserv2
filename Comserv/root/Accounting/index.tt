@@ -198,6 +198,10 @@
         </li>
         [% END %]
         <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
+          <a href="/Accounting/my_database">&#128452; My Accounting Database</a>
+          <div style="font-size:0.78rem;color:var(--text-muted-color,#666);">View your PostgreSQL accounting DB status &amp; schema</div>
+        </li>
+        <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
           <a href="/Inventory/timesheet">&#9200; Timesheet / Log Time</a>
         </li>
         <li style="padding:0.4rem 0;border-bottom:1px solid #e2e8f0;">
