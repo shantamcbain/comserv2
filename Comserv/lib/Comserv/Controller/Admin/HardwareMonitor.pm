@@ -608,7 +608,22 @@ sub ingest :Path('/admin/hardware_monitor/ingest') :Args(0) {
         return;
     }
 
-    my $body = eval { JSON::decode_json($c->req->body_data // $c->req->body // '{}') };
+    my $body;
+    if (ref($c->req->body_data) eq 'HASH') {
+        $body = $c->req->body_data;
+    } else {
+        my $raw_json = '{}';
+        if (my $body_fh = $c->req->body) {
+            if (ref($body_fh) && $body_fh->can('getline')) {
+                local $/;
+                $raw_json = <$body_fh>;
+                $body_fh->seek(0, 0) if $body_fh->can('seek');
+            } elsif (!ref($body_fh)) {
+                $raw_json = $body_fh;
+            }
+        }
+        $body = eval { JSON::decode_json($raw_json) };
+    }
     if ($@ || !ref $body) {
         $c->response->status(400);
         $c->response->content_type('application/json');
