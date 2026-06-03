@@ -246,7 +246,7 @@
                 [% END %]
                 <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
-                <button onclick="openDeployModal()" style="padding:4px 12px;border:1px solid #dc3545;border-radius:4px;background:transparent;font-size:0.82em;color:#dc3545;cursor:pointer;" title="Deploy system updates (Production or Local)">🚀 Deploy</button>
+                <button onclick="openDeployPopup()" style="padding:4px 12px;border:1px solid #dc3545;border-radius:4px;background:transparent;font-size:0.82em;color:#dc3545;cursor:pointer;" title="Deploy system updates (Production or Local)">🚀 Deploy</button>
                 [% END %]
             </div>
 

@@ -2097,112 +2097,27 @@
     }
 
     function deployToProduction(deployMode) {
-        const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
-        const sshPassword = document.getElementById('ssh-password').value;
-
-        if (deployMode === undefined || deployMode === null) {
-            deployMode = 'full';
-        } else if (deployMode === 1) {
-            deployMode = 'quick';
-        }
-
-        const isFullMode = deployMode === 'full';
-
-        const confirmMsg = `⚠️ EXECUTE PRODUCTION DEPLOYMENT\n\n` +
-            `Selected Action: ${deployMode.toUpperCase()}\n` +
-            `Target Server  : ${sshTarget}\n\n` +
-            `Are you sure you want to proceed?`;
-
-        if (!confirm(confirmMsg)) return;
-
-        appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 DEPLOYMENT ACTION: ${deployMode.toUpperCase()} STARTED\n`);
-        appendOutput(`${'='.repeat(80)}\n`);
-        appendOutput(`Target: ${sshTarget}\n`);
-        appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(`Action: ${deployMode}\n`);
-        appendOutput(`${'='.repeat(80)}\n\n`);
-        if (isFullMode) {
-            appendOutput(`⏳ Building & pushing... this may take several minutes. Output will stream below.\n\n`);
-        } else {
-            appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
-        }
-
-        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword, deploy_mode: deployMode };
-
-        safeFetch('/admin/docker-deploy-to-production', {
-            method: 'POST',
-            body: new URLSearchParams(bodyParams)
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    appendOutput(`✅ Background process started\n`);
-                    if (data.image) appendOutput(`   Image : ${data.image}\n`);
-                    if (data.log_file) {
-                        appendOutput(`   Log   : ${data.log_file}\n`);
-                        const fname = data.log_file.split('/').pop();
-                        document.getElementById('last-deploy-file').textContent = fname + ' (in progress)';
-                        document.getElementById('last-deploy-banner').style.display = 'block';
-                    }
-                    appendOutput(`\nStreaming output...\n\n`);
-                    startPollingDeploymentStatus();
-                } else {
-                    appendOutput(`\n${'='.repeat(80)}\n`);
-                    appendOutput(`❌ FAILED TO START\n`);
-                    appendOutput(`${'='.repeat(80)}\n`);
-                    appendOutput((data.error || 'Unknown error') + '\n');
-                    appendOutput(`${'='.repeat(80)}\n`);
-                }
-            })
-            .catch(error => {
-                appendOutput(`\n❌ REQUEST ERROR: ${error.message}\n`);
-            });
-    }
-
-    let deploymentPollingInterval = null;
-    let lastLogContent = '';
-
-    function startPollingDeploymentStatus() {
-        if (deploymentPollingInterval) clearInterval(deploymentPollingInterval);
-        lastLogContent = '';
+        var isQuick = (deployMode === 1 || deployMode === 'quick') ? '1' : '0';
+        var url = '/admin/docker/deploy_form?quick_deploy=' + isQuick;
         
-        deploymentPollingInterval = setInterval(() => {
-            safeFetch('/admin/docker-deploy-status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.output && data.output !== lastLogContent) {
-                            // Find only new content
-                            const newContent = data.output.substring(lastLogContent.length);
-                            if (newContent) {
-                                // Add to output box without timestamps (since they are in the log already)
-                                outputBox.textContent += newContent;
-                                outputBox.scrollTop = outputBox.scrollHeight;
-                                lastLogContent = data.output;
-                            }
-                        }
-                        
-                        if (!data.is_running) {
-                            clearInterval(deploymentPollingInterval);
-                            deploymentPollingInterval = null;
-                            appendOutput(`\n${'='.repeat(80)}\n`);
-                            appendOutput(`✅ DEPLOYMENT FINISHED\n`);
-                            appendOutput(`${'='.repeat(80)}\n`);
-                            if (data.log_file) {
-                                const fname = data.log_file.split('/').pop();
-                                _lastDeployContent = data.output || '';
-                                document.getElementById('last-deploy-file').textContent = fname;
-                                document.getElementById('last-deploy-banner').style.display = 'block';
-                            }
-                            setTimeout(refreshContainers, 2000);
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error polling deployment status:', error);
-                });
-        }, 1000);
+        var popup = window.open(
+            url,
+            'docker_deploy',
+            'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
+        );
+        if (popup) {
+            popup.focus();
+            window.addEventListener('message', function onMsg(e) {
+                if (e.data && e.data.type === 'deploy_done') {
+                    window.removeEventListener('message', onMsg);
+                    var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                    alert(msg);
+                    location.reload();
+                }
+            });
+        } else {
+            alert('⚠ Popup blocked — allow popups for this site and try again.');
+        }
     }
 
     function openSSHTerminal() {
