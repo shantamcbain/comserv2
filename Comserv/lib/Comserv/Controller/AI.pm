@@ -2983,6 +2983,10 @@ sub models :Local :Args(0) {
                 $ollama->port($config->{port});
                 $ollama->clear_endpoint;  # Force rebuild of endpoint URL
                 
+                # Set a short timeout for connection check and listing to prevent blocking
+                my $orig_timeout = $ollama->timeout;
+                $ollama->timeout(3);
+                
                 # Test connection first
                 if ($ollama->check_connection()) {
                     $server_info->{connected} = 1;
@@ -3026,6 +3030,9 @@ sub models :Local :Args(0) {
                     $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                         'models', "Connection test failed for $config->{host}:$config->{port}: " . ($ollama->last_error || 'unknown error'));
                 }
+                
+                # Restore original timeout
+                $ollama->timeout($orig_timeout);
             } else {
                 $server_info->{error} = "Failed to load Ollama model";
             }
@@ -6412,7 +6419,10 @@ sub get_user_providers :Local :Args(0) {
         if ($ollama) {
             $ollama->host($active_host);
             $ollama->port($cfg_port);
+            my $orig_timeout = $ollama->timeout;
+            $ollama->timeout(3);
             my $installed = $ollama->list_models() || [];
+            $ollama->timeout($orig_timeout);
             my @chat_models = grep {
                 my $n = $_->{name} || '';
                 $n && $n !~ /embed|rerank|bge|nomic|clip|whisper|tts/i;
