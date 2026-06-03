@@ -6873,6 +6873,17 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
+    my $pid_file_check = '/tmp/comserv-hub-deploy.pid';
+    if (-f $pid_file_check && open my $pf_fh, '<', $pid_file_check) {
+        my $chk_pid = <$pf_fh>;
+        close $pf_fh;
+        if ($chk_pid && $chk_pid =~ /^\d+$/ && kill(0, $chk_pid)) {
+            $c->response->body(encode_json({ success => 0, error => "A deployment is already in progress (PID $chk_pid)!" }));
+            $c->response->content_type('application/json');
+            return;
+        }
+    }
+
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
     my $form_password = $c->req->params->{ssh_password} || '';
     my $deploy_mode   = $c->req->params->{deploy_mode}   || 'full';
