@@ -122,7 +122,7 @@ sub schema {
 sub _generate_password {
     my ($self, $len) = @_;
     $len ||= 20;
-    my @chars = ('A'..'Z', 'a'..'z', '0'..'9', qw(! @ # $ % ^));
+    my @chars = ('A'..'Z', 'a'..'z', '0'..'9');
     return join '', map { $chars[int rand @chars] } 1..$len;
 }
 
@@ -170,22 +170,61 @@ sub provision_site {
         return (0, $err);
     }
 
-    # Check whether target DB already exists
+    # Check whether target DB already exists; if not, create it
     my ($db_exists) = $dbh->selectrow_array(
         "SELECT 1 FROM pg_database WHERE datname = ?", undef, $db_name);
-    if ($db_exists) {
-        $dbh->disconnect;
-        my $msg = "Database '$db_name' already exists — skipping CREATE, updating registry.";
-        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site', $msg);
-        # fall through to registry update below
-    } else {
+    if (!$db_exists) {
         my $ok = $dbh->do("CREATE DATABASE \"$db_name\" TEMPLATE accounting_template");
-        $dbh->disconnect;
         unless ($ok) {
-            $err = "CREATE DATABASE '$db_name' failed: " . ($dbh->errstr || $DBI::errstr || 'unknown error');
+            $err = "CREATE DATABASE '$db_name' failed: " . ($DBI::errstr || 'unknown error');
+            $dbh->disconnect;
             $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
             return (0, $err);
         }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Created database '$db_name'.");
+    } else {
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Database '$db_name' already exists — skipping CREATE.");
+    }
+
+    # Create PostgreSQL role (user) if it does not already exist
+    my ($role_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_roles WHERE rolname = ?", undef, $db_user);
+    if (!$role_exists) {
+        # Use dollar-quoting to safely embed password
+        my $safe_pass = $db_pass;
+        $safe_pass =~ s/'/''/g;
+        $dbh->do("CREATE ROLE \"$db_user\" WITH LOGIN PASSWORD '$safe_pass'");
+        if ($dbh->err) {
+            $err = "CREATE ROLE '$db_user' failed: " . ($dbh->errstr || $DBI::errstr || 'unknown');
+            $dbh->disconnect;
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+            return (0, $err);
+        }
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
+            "Created PostgreSQL role '$db_user'.");
+    } else {
+        # Role exists — update its password in case it changed
+        my $safe_pass = $db_pass;
+        $safe_pass =~ s/'/''/g;
+        $dbh->do("ALTER ROLE \"$db_user\" WITH PASSWORD '$safe_pass'");
+    }
+
+    # Grant the role connect + all privileges on the database
+    $dbh->do("GRANT CONNECT ON DATABASE \"$db_name\" TO \"$db_user\"");
+    $dbh->do("GRANT ALL PRIVILEGES ON DATABASE \"$db_name\" TO \"$db_user\"");
+    $dbh->disconnect;
+
+    # Connect to the target DB as admin to grant schema-level privileges
+    my $target_dbh = DBI->connect("dbi:Pg:dbname=$db_name;host=$host;port=$port",
+        $admin_user, $admin_pass, { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
+    if ($target_dbh) {
+        $target_dbh->do("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$db_user\"");
+        $target_dbh->do("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$db_user\"");
+        $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$db_user\"");
+        $target_dbh->do("ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$db_user\"");
+        $target_dbh->disconnect;
     }
 
     eval {
@@ -212,7 +251,7 @@ sub provision_site {
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site',
         "Provisioned accounting DB '$db_name' for site '$sitename' ($jurisdiction/$currency)");
 
-    return (1, "Accounting database '$db_name' provisioned successfully.");
+    return (1, "Accounting database '$db_name' provisioned for '$sitename'. DB user: $db_user");
 }
 
 __PACKAGE__->meta->make_immutable;
