@@ -81,17 +81,48 @@ sub _db_credentials {
 }
 
 sub _db_ping {
-    # Returns: 1=up, 0=down
-    # Uses TCP connect check — avoids credential/grant issues when the app
-    # itself connects successfully via its own K8s secret credentials.
+    my ($user, $pass) = _db_credentials();
     my $port = $ENV{DB_PORT} || 3306;
+    
+    if ($user) {
+        my $driver = 'MariaDB';
+        my $driver_available = 0;
+        eval { require DBD::MariaDB; $driver_available = 1; };
+        if (!$driver_available) {
+            eval { require DBD::mysql; $driver = 'mysql'; $driver_available = 1; };
+        }
+        
+        if ($driver_available) {
+            my $dsn = "dbi:$driver:database=$db_name;host=$db_host;port=$port";
+            my $dbh = eval {
+                local $SIG{ALRM} = sub { die "timeout\n" };
+                alarm(4);
+                my $h = DBI->connect($dsn, $user, $pass, {
+                    RaiseError => 1,
+                    PrintError => 0,
+                    AutoCommit => 1,
+                    ($driver eq 'MariaDB' ? (mariadb_connect_timeout => 2) : (mysql_connect_timeout => 2)),
+                });
+                alarm(0);
+                return $h;
+            };
+            alarm(0);
+            
+            if ($dbh) {
+                my $ping_ok = eval { $dbh->ping };
+                $dbh->disconnect();
+                return 1 if $ping_ok;
+            }
+        }
+    }
+    
     use IO::Socket::INET;
     my $sock = eval {
         IO::Socket::INET->new(
             PeerAddr => $db_host,
             PeerPort => $port,
             Proto    => 'tcp',
-            Timeout  => 5,
+            Timeout  => 3,
         );
     };
     if ($sock) {
