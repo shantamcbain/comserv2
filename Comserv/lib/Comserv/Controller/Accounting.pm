@@ -1213,22 +1213,39 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
         %reg = map { $_->sitename => $_ } @rows;
     };
 
+    # Hosting accounts keyed by sitename for owner lookup
+    my %hosting;
+    eval {
+        my @ha = $schema->resultset('Accounting::HostingAccount')->search({})->all;
+        %hosting = map { $_->sitename => $_ } @ha;
+    };
+
     # Build status rows
     my @rows;
     for my $site (@sites) {
         my $sn  = $site->name;
         my $rec = $reg{$sn};
+        my $ha  = $hosting{$sn};
+
+        # Resolve site owner username as default DB user
+        my $owner_username = lc($sn);
+        if ($ha && $ha->contact_email) {
+            my $owner = eval { $schema->resultset('User')->search({ email => $ha->contact_email })->first };
+            $owner_username = $owner->username if $owner && $owner->username;
+        }
+
         my $row = {
-            sitename    => $sn,
-            registered  => $rec ? 1 : 0,
-            db_name     => $rec ? $rec->db_name     : lc($sn) . '_accounting',
-            db_host     => $rec ? $rec->db_host     : '192.168.1.20',
-            db_port     => $rec ? $rec->db_port     : 5432,
-            jurisdiction=> $rec ? $rec->jurisdiction: 'CA',
-            currency    => $rec ? $rec->currency    : 'CAD',
-            status      => $rec ? $rec->status      : 'not_provisioned',
-            db_ok       => 0,
-            db_error    => '',
+            sitename       => $sn,
+            registered     => $rec ? 1 : 0,
+            db_name        => $rec ? $rec->db_name     : lc($sn) . '_accounting',
+            db_host        => $rec ? $rec->db_host     : '192.168.1.20',
+            db_port        => $rec ? $rec->db_port     : 5432,
+            jurisdiction   => $rec ? $rec->jurisdiction: 'CA',
+            currency       => $rec ? $rec->currency    : 'CAD',
+            status         => $rec ? $rec->status      : 'not_provisioned',
+            db_ok          => 0,
+            db_error       => '',
+            owner_username => $rec ? $rec->db_user : $owner_username,
         };
 
         if ($rec && $rec->status eq 'active') {
@@ -1257,17 +1274,21 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
             $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
             return;
         };
-        my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
-        my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
-        my $db_user      = $c->req->body_parameters->{db_user}      || 'postgres';
-        my $db_pass      = $c->req->body_parameters->{db_pass}      // '';
+        my $jurisdiction  = $c->req->body_parameters->{jurisdiction}  || 'CA';
+        my $currency      = $c->req->body_parameters->{currency}      || 'CAD';
+        my $admin_user    = $c->req->body_parameters->{admin_user}    || 'postgres';
+        my $admin_pass    = $c->req->body_parameters->{admin_pass}    // '';
+        my $site_db_user  = $c->req->body_parameters->{site_db_user} || lc($target);
+        my $site_db_pass  = $c->req->body_parameters->{site_db_pass} // '';
 
         my ($ok, $msg) = eval {
             Comserv::Model::AccountingDB->instance->provision_site($c, $target,
-                jurisdiction => $jurisdiction,
-                currency     => $currency,
-                db_user      => $db_user,
-                db_pass      => $db_pass,
+                jurisdiction  => $jurisdiction,
+                currency      => $currency,
+                admin_user    => $admin_user,
+                admin_pass    => $admin_pass,
+                db_user       => $site_db_user,
+                db_pass       => $site_db_pass,
             );
         };
         if ($@ || !$ok) {

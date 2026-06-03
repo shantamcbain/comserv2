@@ -95,21 +95,23 @@ sub provision_site {
     my $db_name    = lc($sitename) . '_accounting';
     my $host       = $opts{host}        || $DEFAULT_HOST;
     my $port       = $opts{port}        || $DEFAULT_PORT;
-    my $db_user    = $opts{db_user}     || $DEFAULT_USER;
-    my $db_pass    = $opts{db_pass}     // $DEFAULT_PASS;
+    my $admin_user = $opts{admin_user}  || $DEFAULT_USER;
+    my $admin_pass = $opts{admin_pass}  // $DEFAULT_PASS;
+    my $db_user    = $opts{db_user}     || lc($sitename);
+    my $db_pass    = $opts{db_pass}     // '';
     my $jurisdiction = $opts{jurisdiction} || 'CA';
     my $currency   = $opts{currency}    || 'CAD';
 
     require DBI;
     my $err = '';
 
-    # Connect to the 'postgres' maintenance DB — you cannot CREATE DATABASE
-    # while connected to the template or the target database itself.
+    # Connect using the PostgreSQL ADMIN account to run CREATE DATABASE.
+    # Must use a maintenance DB (postgres), not the template or target DB.
     my $admin_dsn = "dbi:Pg:dbname=postgres;host=$host;port=$port";
-    my $dbh = DBI->connect($admin_dsn, $db_user, $db_pass,
+    my $dbh = DBI->connect($admin_dsn, $admin_user, $admin_pass,
         { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
     unless ($dbh) {
-        $err = "Cannot connect to PostgreSQL at $host:$port as '$db_user': " . ($DBI::errstr || 'unknown error');
+        $err = "Step 1 (admin connect as '$admin_user'): " . ($DBI::errstr || 'unknown error');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
         return (0, $err);
     }
