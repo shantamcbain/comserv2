@@ -1299,6 +1299,188 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
 }
 
 # -------------------------------------------------------------------------
+# Migrate MariaDB accounting data → per-site PostgreSQL  /Accounting/migrate_to_pg
+# -------------------------------------------------------------------------
+
+sub migrate_to_pg :Path('/Accounting/migrate_to_pg') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename  = $self->_sitename($c);
+    my $maria     = $self->_schema($c);
+    my @log;
+    my $errors    = 0;
+
+    # ── 1. Connect to PostgreSQL accounting DB ─────────────────────────
+    my $acct_schema = eval { Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename) };
+    unless ($acct_schema) {
+        $c->flash->{error_msg} = "Cannot connect to PostgreSQL accounting DB for '$sitename'. Run provisioning first.";
+        $c->response->redirect($c->uri_for('/Accounting/my_database'));
+        return;
+    }
+    my $pg = $acct_schema->storage->dbh;
+
+    # ── 2. Migrate COA (coa_accounts → chart) ─────────────────────────
+    push @log, "=== Chart of Accounts ===";
+    my @coa_rows;
+    eval {
+        @coa_rows = $maria->resultset('Accounting::CoaAccount')->search(
+            [ { sitename => $sitename }, { sitename => undef } ],
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@coa_rows) . " COA accounts in MariaDB for '$sitename'.";
+
+    my $coa_ok = 0; my $coa_skip = 0; my $coa_fail = 0;
+    my %accno_to_pg_id;  # map accno → new PG chart.id
+
+    # First pass: insert without heading (to get PG IDs)
+    for my $row (@coa_rows) {
+        my ($exists) = $pg->selectrow_array("SELECT id FROM chart WHERE accno = ?", undef, $row->accno);
+        if ($exists) {
+            $accno_to_pg_id{ $row->accno } = $exists;
+            $coa_skip++;
+            next;
+        }
+        my $sth = $pg->prepare(
+            "INSERT INTO chart (accno, description, charttype, category, link,
+                                contra, tax, obsolete, notes, created_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, now()) RETURNING id");
+        $sth->execute(
+            $row->accno,
+            $row->description,
+            'A',
+            $row->category // 'A',
+            '',
+            $row->is_contra  ? 1 : 0,
+            $row->is_tax     ? 1 : 0,
+            $row->obsolete   ? 1 : 0,
+            $row->notes // '',
+        );
+        my ($new_id) = $sth->fetchrow_array;
+        if ($new_id) {
+            $accno_to_pg_id{ $row->accno } = $new_id;
+            $coa_ok++;
+        } else {
+            push @log, "  FAIL chart insert: accno=" . $row->accno . " err=" . ($pg->errstr//'?');
+            $coa_fail++; $errors++;
+        }
+    }
+
+    # Second pass: set heading FK now that all chart rows exist
+    for my $row (@coa_rows) {
+        next unless defined $row->heading_id;
+        # Find the accno of the heading row
+        my $heading_row = eval { $maria->resultset('Accounting::CoaAccount')->find($row->heading_id) };
+        next unless $heading_row;
+        my $pg_heading_id = $accno_to_pg_id{ $heading_row->accno };
+        next unless $pg_heading_id;
+        my $pg_self_id    = $accno_to_pg_id{ $row->accno };
+        next unless $pg_self_id;
+        $pg->do("UPDATE chart SET heading = ? WHERE id = ?", undef, $pg_heading_id, $pg_self_id);
+    }
+
+    push @log, "  COA: $coa_ok inserted, $coa_skip already existed, $coa_fail failed.";
+
+    # ── 3. Migrate GL entries (gl_entries + gl_entry_lines → gl + acc_trans) ──
+    push @log, "=== General Ledger ===";
+    my @gl_rows;
+    eval {
+        @gl_rows = $maria->resultset('Accounting::GlEntry')->search(
+            { sitename => $sitename },
+            { prefetch => 'gl_lines', order_by => 'me.id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@gl_rows) . " GL entries in MariaDB.";
+
+    my $gl_ok = 0; my $gl_skip = 0; my $gl_fail = 0;
+    for my $entry (@gl_rows) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM gl WHERE reference = ?", undef, $entry->reference);
+        if ($exists) { $gl_skip++; next; }
+
+        my $sth = $pg->prepare(
+            "INSERT INTO gl (reference, description, transdate, notes, approved)
+             VALUES (?, ?, ?, ?, ?) RETURNING id");
+        $sth->execute(
+            $entry->reference,
+            $entry->description // '',
+            $entry->post_date,
+            $entry->notes // '',
+            $entry->approved ? 1 : 0,
+        );
+        my ($gl_id) = $sth->fetchrow_array;
+        unless ($gl_id) {
+            push @log, "  FAIL gl insert ref=" . $entry->reference . " err=" . ($pg->errstr//'?');
+            $gl_fail++; $errors++; next;
+        }
+
+        # Insert acc_trans lines
+        my @lines = eval { $entry->lines->all };
+        for my $line (@lines) {
+            my $coa_row = eval { $line->account };
+            next unless $coa_row;
+            my $chart_id = $accno_to_pg_id{ $coa_row->accno };
+            next unless $chart_id;
+            $pg->do(
+                "INSERT INTO acc_trans (trans_id, chart_id, amount, transdate, memo)
+                 VALUES (?, ?, ?, ?, ?)",
+                undef,
+                $gl_id,
+                $chart_id,
+                $line->amount,
+                $entry->post_date,
+                $line->memo // '',
+            );
+        }
+        $gl_ok++;
+    }
+    push @log, "  GL: $gl_ok inserted, $gl_skip already existed, $gl_fail failed.";
+
+    # ── 4. Migrate Vendors (inventory_suppliers → vendor) ─────────────
+    push @log, "=== Vendors / Suppliers ===";
+    my @suppliers;
+    eval {
+        @suppliers = $maria->resultset('Accounting::InventorySupplier')->search(
+            { sitename => $sitename },
+            { order_by => 'id' }
+        )->all;
+    };
+    push @log, "  Found " . scalar(@suppliers) . " suppliers in MariaDB.";
+
+    my $v_ok = 0; my $v_skip = 0; my $v_fail = 0;
+    for my $s (@suppliers) {
+        my ($exists) = $pg->selectrow_array(
+            "SELECT id FROM vendor WHERE name = ?", undef, $s->name);
+        if ($exists) { $v_skip++; next; }
+        $pg->do(
+            "INSERT INTO vendor (name, contact, email, phone, notes, curr)
+             VALUES (?, ?, ?, ?, ?, 'CAD')",
+            undef,
+            $s->name,
+            $s->contact_name // '',
+            $s->email // '',
+            $s->phone // '',
+            $s->notes // '',
+        );
+        $pg->err ? do { $v_fail++; $errors++ } : $v_ok++;
+    }
+    push @log, "  Vendors: $v_ok inserted, $v_skip already existed, $v_fail failed.";
+
+    # ── Summary ────────────────────────────────────────────────────────
+    push @log, "=== Done — " . ($errors ? "$errors error(s)" : "No errors") . " ===";
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'migrate_to_pg',
+        "Migration for '$sitename': " . join('; ', @log));
+
+    $c->stash(
+        sitename => $sitename,
+        log      => \@log,
+        errors   => $errors,
+        template => 'Accounting/migrate_result.tt',
+    );
+}
+
+# -------------------------------------------------------------------------
 # My Accounting Database  /Accounting/my_database
 # Shows the current site's PostgreSQL accounting DB status and schema.
 # Accessible to any site admin/accounting role.

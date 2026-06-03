@@ -9,6 +9,15 @@
     <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">← Accounting Dashboard</a>
   </div>
 
+  [% IF db_ok %]
+  <div style="margin-bottom:1.2rem;">
+    <form method="post" action="/Accounting/migrate_to_pg" onsubmit="return confirm('Migrate MariaDB accounting data for [% sitename | html %] to PostgreSQL? Already-migrated records will be skipped.');">
+      <button type="submit" class="btn btn-primary">🔄 Migrate MariaDB Data → PostgreSQL</button>
+      <span style="font-size:0.82rem;color:var(--text-muted-color,#666);margin-left:0.75rem;">Migrates COA, GL entries, and Suppliers. Safe to re-run — duplicates are skipped.</span>
+    </form>
+  </div>
+  [% END %]
+
   [% IF !reg %]
   <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:1.2rem 1.5rem;">
     <strong style="color:#991b1b;">❌ No accounting database provisioned for [% sitename | html %].</strong>
