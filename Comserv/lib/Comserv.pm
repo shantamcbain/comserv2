@@ -494,22 +494,34 @@ sub _serialize_session {
 }
 
 sub _deserialize_session {
-    my ($serialized) = @_;
+    my ($serialized, $key) = @_;
     return undef unless defined $serialized;
-    return $serialized if ref $serialized; # Already deserialized reference
+    return $serialized if ref $serialized;
     
-    # Reject legacy stringified hash references from previous versions (forces safe session recreate)
-    return undef if $serialized =~ /^HASH\(0x[0-9a-fA-F]+\)/;
+    if ($serialized =~ /^HASH\(0x[0-9a-fA-F]+\)/) {
+        return undef;
+    }
     
     my $decoded = eval { decode_base64($serialized) };
     if ($@ || !defined $decoded || $decoded eq '') {
+        if (defined $key && $key =~ /^session:/) {
+            return undef;
+        }
         return $serialized;
     }
     
     my $data = eval { thaw($decoded) };
     if ($@ || !defined $data) {
+        if (defined $key && $key =~ /^session:/) {
+            return undef;
+        }
         return $serialized;
     }
+    
+    if (defined $key && $key =~ /^session:/ && !ref($data)) {
+        return undef;
+    }
+    
     return $data;
 }
 
@@ -543,7 +555,7 @@ sub _is_db_session_operational {
 }
 
 sub _get_file_session_fallback_dir {
-    my $dir = $ENV{COMSERV_SESSION_FALLBACK_DIR} || '/tmp/comserv_sessions';
+    my $dir = $ENV{COMSERV_SESSION_DIR} || $ENV{COMSERV_SESSION_FALLBACK_DIR} || '/tmp/comserv_sessions';
     eval {
         use File::Path qw(make_path);
         make_path($dir) unless -d $dir;
@@ -662,7 +674,7 @@ sub get_session_data {
             return undef;
         };
         if (!$@ && defined $serialized) {
-            return _deserialize_session($serialized);
+            return _deserialize_session($serialized, $key);
         }
         if ($@) {
             warn "Database session retrieval failed for key '$key': $@. Falling back to file storage.\n";
@@ -670,11 +682,16 @@ sub get_session_data {
     }
     
     my $serialized = _get_file_session_data($key);
-    return _deserialize_session($serialized);
+    return _deserialize_session($serialized, $key);
 }
 
 sub store_session_data {
     my ($c, $key, $data) = @_;
+    
+    if ($key =~ /^session:/ && !ref($data)) {
+        warn "CRITICAL WARNING: Attempted to store non-reference data for session key '$key': '$data'. Ignoring to prevent corruption.\n";
+        return;
+    }
     
     my $serialized = _serialize_session($data);
     return unless defined $serialized;

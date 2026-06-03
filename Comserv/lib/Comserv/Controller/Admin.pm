@@ -7,6 +7,7 @@ use namespace::autoclean;
 use Comserv::Util::Logging;
 use Comserv::Util::AdminAuth;
 use Comserv::Util::UserVerification;
+use Comserv::Util::BackupManager;
 use DateTime;
 use Data::Dumper;
 use JSON qw(decode_json encode_json);
@@ -6579,6 +6580,69 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     $c->response->content_type('application/json');
 }
 
+sub emergency_restore :Path('/admin/emergency-restore') :Args(0) {
+    my ($self, $c) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+        "Emergency restore page requested by " . ($c->user ? $c->user->username : 'unknown'));
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+    unless ($admin_auth->check_admin_access($c, 'emergency_restore')) {
+        $c->flash->{error_msg} = "You need to be an administrator to access this area.";
+        $c->response->redirect($c->uri_for('/user/login', { destination => $c->req->uri }));
+        return;
+    }
+
+    my $backup_manager = Comserv::Util::BackupManager->new(app_dir => $c->config->{home});
+    
+    if ($c->req->method eq 'POST') {
+        my $action = $c->req->param('action') || '';
+        
+        if ($action eq 'restore_psgi') {
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+                "Emergency restore of comserv.psgi file triggered");
+                
+            my $res = $backup_manager->restore_psgi_file();
+            if ($res->{success}) {
+                $c->stash->{success_msg} = "comserv.psgi restored successfully.";
+            } else {
+                $c->stash->{error_msg} = "Failed to restore comserv.psgi: " . $res->{message};
+            }
+            $c->stash->{output} = $res->{output};
+        }
+        elsif ($action eq 'restore_file') {
+            my $backup_path = $c->req->param('backup_path');
+            my $target_file = $c->req->param('target_file');
+            
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'emergency_restore',
+                "Emergency restore of file '$target_file' from '$backup_path'");
+                
+            if ($backup_path && $target_file) {
+                my $res = $backup_manager->restore_file_from_backup($backup_path, $target_file);
+                if ($res->{success}) {
+                    $c->stash->{success_msg} = "File '$target_file' restored successfully.";
+                } else {
+                    $c->stash->{error_msg} = "Failed to restore file: " . $res->{message};
+                }
+                $c->stash->{output} = $res->{output};
+            } else {
+                $c->stash->{error_msg} = "Backup path and target file are required.";
+            }
+        }
+    }
+
+    my $backup_contents = $backup_manager->get_backup_directory_contents();
+    my $app_dir = $backup_manager->app_dir;
+    my $psgi_path = $app_dir =~ m{/Comserv$} ? "$app_dir/comserv.psgi" : "$app_dir/Comserv/comserv.psgi";
+    my $psgi_exists = -f $psgi_path;
+
+    $c->stash(
+        template => 'admin/emergency_restore.tt',
+        backup_contents => $backup_contents,
+        psgi_exists => $psgi_exists,
+    );
+}
+
 sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
     my ($self, $c) = @_;
     
@@ -6595,8 +6659,29 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
     
     my $target = $c->req->params->{target} || 'production1';
     
+    # Load SSH password to support remote sudo authentication
+    my $ssh_password = '';
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = <$cf>;
+        close $cf;
+        my $creds = eval { decode_json($json) };
+        if ($creds) {
+            $ssh_password = $creds->{ssh_password} || '';
+        }
+    }
+    
+    my $escaped_password = $ssh_password;
+    $escaped_password =~ s/'/'\\''/g;
+    
     # Construct shell command to locate host code, stop failing container, and run daemonized Starman
     my $start_cmd = q(
+        sudo() {
+            echo '__SSH_PASSWORD__' | /usr/bin/sudo -S "$@"
+        }
+
         HOST_APP_DIR=""
         for DIR in /opt/comserv/Comserv /home/ubuntu/comserv /home/shanta/PycharmProjects/comserv2; do
             if [ -d "$DIR" ]; then
@@ -6688,6 +6773,8 @@ sub docker_start_starman :Path('/admin/docker-start-starman') :Args(0) {
             echo "ERROR: Host application directory not found."
         fi
     );
+    
+    $start_cmd =~ s/__SSH_PASSWORD__/$escaped_password/g;
     
     my ($output, $exit_code) = $self->_run_host_cmd_on_target($c, $start_cmd, $target);
     
