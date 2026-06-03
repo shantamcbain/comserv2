@@ -1298,5 +1298,74 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
     );
 }
 
+# -------------------------------------------------------------------------
+# My Accounting Database  /Accounting/my_database
+# Shows the current site's PostgreSQL accounting DB status and schema.
+# Accessible to any site admin/accounting role.
+# -------------------------------------------------------------------------
+
+sub my_database :Path('/Accounting/my_database') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $sitename = $self->_sitename($c);
+
+    # Look up registry entry
+    my $reg;
+    eval {
+        $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                   ->find({ sitename => $sitename });
+    };
+
+    my $db_ok    = 0;
+    my $db_error = '';
+    my @tables;
+
+    if ($reg && $reg->status eq 'active') {
+        eval {
+            my $acct_schema = Comserv::Model::AccountingDB->instance->schema_for_site($c, $sitename);
+            if ($acct_schema) {
+                $acct_schema->storage->dbh->do('SELECT 1');
+                $db_ok = 1;
+
+                # Fetch table list with column details via DBI
+                my $dbh = $acct_schema->storage->dbh;
+                my $tsth = $dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename ORDER BY t.tablename");
+                $tsth->execute();
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    my $csth = $dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) { push @cols, $col }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+            } else {
+                $db_error = 'Could not connect to accounting database.';
+            }
+        };
+        $db_error = $@ if $@;
+        $db_error =~ s/ at .+//s if $db_error;
+    }
+
+    $c->stash(
+        sitename  => $sitename,
+        reg       => $reg,
+        db_ok     => $db_ok,
+        db_error  => $db_error,
+        tables    => \@tables,
+        template  => 'Accounting/my_database.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
