@@ -7645,12 +7645,52 @@ sub get_migration_postgres_info {
 
         my $sth = $dbh->prepare("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname");
         $sth->execute();
-        my @databases;
+        my @db_names;
         while (my ($db_name) = $sth->fetchrow_array()) {
             next if $db_name eq 'postgres';
-            push @databases, { name => $db_name, table_count => undef };
+            push @db_names, $db_name;
         }
         $dbh->disconnect();
+
+        # Now connect to each database and fetch its schema
+        my @databases;
+        for my $db_name (@db_names) {
+            my $db_entry = { name => $db_name, tables => [], table_count => 0, error => undef };
+            eval {
+                my $db_dbh = DBI->connect("DBI:Pg:dbname=$db_name;host=$host;port=$port",
+                    $user, $password, { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
+                my $tsth = $db_dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename
+                     ORDER BY t.tablename");
+                $tsth->execute();
+                my @tables;
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    # Fetch column details
+                    my $csth = $db_dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) {
+                        push @cols, $col;
+                    }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+                $db_dbh->disconnect();
+                $db_entry->{tables}      = \@tables;
+                $db_entry->{table_count} = scalar @tables;
+            };
+            $db_entry->{error} = $@ if $@;
+            push @databases, $db_entry;
+        }
 
         $result->{connection_status} = 'connected';
         $result->{databases} = \@databases;
