@@ -1259,11 +1259,15 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
         };
         my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
         my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
+        my $db_user      = $c->req->body_parameters->{db_user}      || 'postgres';
+        my $db_pass      = $c->req->body_parameters->{db_pass}      // '';
 
         my ($ok, $msg) = eval {
             Comserv::Model::AccountingDB->instance->provision_site($c, $target,
                 jurisdiction => $jurisdiction,
                 currency     => $currency,
+                db_user      => $db_user,
+                db_pass      => $db_pass,
             );
         };
         if ($@ || !$ok) {
