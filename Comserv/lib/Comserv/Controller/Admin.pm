@@ -5826,6 +5826,18 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
+    # Get image IDs to tags mapping on the server
+    my %image_id_to_tags;
+    my ($tags_out, $tags_exit) = $self->_run_docker_on_target($c, 'images --format "{{.ID}} {{.Tag}}"', $target);
+    if ($tags_exit == 0) {
+        foreach my $line (split /\n/, $tags_out) {
+            if ($line =~ /^(\S+)\s+(.+)$/) {
+                my ($id, $tag) = ($1, $2);
+                push @{$image_id_to_tags{$id}}, $tag;
+            }
+        }
+    }
+
     # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
@@ -5852,9 +5864,20 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
                 state   => $state,
                 status  => $container->{Status} || '',
                 ports   => \@ports,
-                image   => $container->{Image} || ''
+                image   => $container->{Image} || '',
+                image_tags => [],
             };
             if (lc($state) eq 'running' || lc($state) eq 'up' || ($container->{Status} && $container->{Status} =~ /Up/i)) {
+                # Get the running container's image ID
+                my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "inspect --format '{{.Image}}' $name", $target);
+                if ($inspect_exit == 0) {
+                    chomp $inspect_out;
+                    $inspect_out =~ s/^'|'$//g; # Clean quotes
+                    if ($image_id_to_tags{$inspect_out}) {
+                        $container_info->{image_tags} = $image_id_to_tags{$inspect_out};
+                    }
+                }
+
                 my ($version_out, $version_exit) = $self->_run_docker_on_target($c, "exec $name cat /opt/comserv/version.json", $target);
                 if ($version_exit == 0 && $version_out =~ /^\{/) {
                     my $ver_data = eval { decode_json($version_out) };
@@ -6505,6 +6528,8 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $save_credentials = $c->req->params->{save_credentials} || '';
+    my $docker_hub_username = $c->req->params->{docker_hub_username} || '';
+    my $docker_hub_password = $c->req->params->{docker_hub_password} || '';
 
     # Validate ssh_target: must be user@hostname format with safe characters only
     unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
@@ -6558,13 +6583,26 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
             system("chmod 700 $secrets_dir");
         }
         
-        my $credentials = {
-            ssh_target => $ssh_target,
-            ssh_port => $ssh_port,
-            ssh_password => $ssh_password,
-            last_updated => time(),
-            last_test_success => time()
-        };
+        my $credentials = {};
+        if (-f $credentials_file && open my $rf, '<', $credentials_file) {
+            local $/;
+            my $json = <$rf>;
+            close $rf;
+            $credentials = eval { decode_json($json) } || {};
+        }
+        
+        $credentials->{ssh_target} = $ssh_target;
+        $credentials->{ssh_port} = $ssh_port;
+        $credentials->{ssh_password} = $ssh_password;
+        $credentials->{last_updated} = time();
+        $credentials->{last_test_success} = time();
+        
+        if ($docker_hub_username) {
+            $credentials->{docker_hub_username} = $docker_hub_username;
+        }
+        if ($docker_hub_password) {
+            $credentials->{docker_hub_password} = $docker_hub_password;
+        }
         
         if (open my $fh, '>', $credentials_file) {
             print $fh encode_json($credentials);

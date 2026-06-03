@@ -107,7 +107,7 @@ sub details :Path('/log/details') :Args(0) {
         $c->detach();
     }
 
-    my $record_id = $c->request->body_parameters->{record_id};
+    my $record_id = $c->request->params->{record_id};
     my $log = $c->model('DBEncy')->resultset('Log')->find($record_id);
 
     if ($log) {
