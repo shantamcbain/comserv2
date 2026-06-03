@@ -10001,17 +10001,32 @@ sub transcribe :Local :Args(0) {
 
     my $audio_file_id = undef;
     eval {
+        require POSIX;
+        my $user_id     = $c->session->{user_id} // 0;
+        my $site_id     = $c->session->{SiteID} // 0;
+        my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
         my $schema  = $c->model('DBEncy');
         my $audio_row = $schema->resultset('File')->create({
-            file_name   => $orig_name,
-            nfs_path    => $nfs_audio_file_early,
-            file_type   => 'audio',
-            file_format => 'audio/' . $ext,
-            file_size   => $upload_size_early,
-            source_type => $source_type,
-            sitename    => $sitename_early,
-            description => "Hive inspection audio recorded by " . ($username || ''),
-            user_id     => undef,
+            file_name    => $orig_name,
+            file_type    => 'audio',
+            file_data    => '',
+            site_id      => $site_id,
+            reference_id => 0,
+            category_id  => 0,
+            share_id     => 0,
+            description  => "Hive inspection audio recorded by " . ($username || ''),
+            upload_date  => $upload_date,
+            file_size    => $upload_size_early,
+            file_path    => $nfs_audio_file_early,
+            file_url     => '',
+            file_status  => 'active',
+            file_format  => 'audio/' . $ext,
+            user_id      => $user_id,
+            nfs_path     => $nfs_audio_file_early,
+            external_url => '',
+            access_level => 'site_only',
+            source_type  => $source_type,
+            sitename     => $sitename_early,
         });
         $audio_file_id = $audio_row->id + 0;
     };
@@ -10289,16 +10304,31 @@ sub transcribe_status :Local :Args(0) {
                 my $sitename = $result->{sitename} || $c->session->{SiteName} || 'BMaster';
                 my $audio_row = $schema->resultset('File')->find({ nfs_path => $result->{audio_nfs_path} });
                 unless ($audio_row) {
+                    require POSIX;
+                    my $user_id     = $c->session->{user_id} // 0;
+                    my $site_id     = $c->session->{SiteID} // 0;
+                    my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
                     $audio_row = $schema->resultset('File')->create({
-                        file_name   => $result->{orig_name},
-                        nfs_path    => $result->{audio_nfs_path},
-                        file_type   => 'audio',
-                        file_format => 'audio/' . ($result->{ext} || 'wav'),
-                        file_size   => $result->{file_size} || 0,
-                        source_type => $result->{source_type} || 'nfs',
-                        sitename    => $sitename,
-                        description => "Hive inspection audio recorded by " . ($result->{username} || ''),
-                        user_id     => undef,
+                        file_name    => $result->{orig_name},
+                        file_type    => 'audio',
+                        file_data    => '',
+                        site_id      => $site_id,
+                        reference_id => 0,
+                        category_id  => 0,
+                        share_id     => 0,
+                        description  => "Hive inspection audio recorded by " . ($result->{username} || ''),
+                        upload_date  => $upload_date,
+                        file_size    => $result->{file_size} || 0,
+                        file_path    => $result->{audio_nfs_path},
+                        file_url     => '',
+                        file_status  => 'active',
+                        file_format  => 'audio/' . ($result->{ext} || 'wav'),
+                        user_id      => $user_id,
+                        nfs_path     => $result->{audio_nfs_path},
+                        external_url => '',
+                        access_level => 'site_only',
+                        source_type  => $result->{source_type} || 'nfs',
+                        sitename     => $sitename,
                     });
                 }
                 $result->{audio_file_id} = $audio_row->id + 0;
@@ -10306,14 +10336,31 @@ sub transcribe_status :Local :Args(0) {
                 if ($result->{transcript_nfs_path}) {
                     my $trans_row = $schema->resultset('File')->find({ nfs_path => $result->{transcript_nfs_path} });
                     unless ($trans_row) {
+                        require POSIX;
+                        my $user_id     = $c->session->{user_id} // 0;
+                        my $site_id     = $c->session->{SiteID} // 0;
+                        my $upload_date = POSIX::strftime('%Y-%m-%d %H:%M:%S', localtime);
                         $trans_row = $schema->resultset('File')->create({
-                            file_name   => ($result->{orig_name} || 'transcript') . '.json',
-                            nfs_path    => $result->{transcript_nfs_path},
-                            file_format => 'application/json',
-                            source_type => $result->{source_type} || 'nfs',
-                            sitename    => $sitename,
-                            description => "Whisper transcript for " . ($result->{orig_name} || ''),
-                            user_id     => undef,
+                            file_name    => ($result->{orig_name} || 'transcript') . '.json',
+                            file_type    => 'transcript',
+                            file_data    => '',
+                            site_id      => $site_id,
+                            reference_id => 0,
+                            category_id  => 0,
+                            share_id     => 0,
+                            description  => "Whisper transcript for " . ($result->{orig_name} || ''),
+                            upload_date  => $upload_date,
+                            file_size    => length($result->{transcript} || ''),
+                            file_path    => $result->{transcript_nfs_path},
+                            file_url     => '',
+                            file_status  => 'active',
+                            file_format  => 'application/json',
+                            user_id      => $user_id,
+                            nfs_path     => $result->{transcript_nfs_path},
+                            external_url => '',
+                            access_level => 'site_only',
+                            source_type  => $result->{source_type} || 'nfs',
+                            sitename     => $sitename,
                         });
                     }
                     $result->{transcript_file_id} = $trans_row->id + 0;
