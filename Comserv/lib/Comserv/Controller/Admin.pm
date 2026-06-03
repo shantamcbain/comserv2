@@ -6528,6 +6528,8 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
     my $ssh_port = $c->req->params->{ssh_port} || 22;
     my $ssh_password = $c->req->params->{ssh_password} || '';
     my $save_credentials = $c->req->params->{save_credentials} || '';
+    my $docker_hub_username = $c->req->params->{docker_hub_username} || '';
+    my $docker_hub_password = $c->req->params->{docker_hub_password} || '';
 
     # Validate ssh_target: must be user@hostname format with safe characters only
     unless ($ssh_target =~ /^[a-zA-Z0-9_\-]+\@[a-zA-Z0-9_\-\.]+$/) {
@@ -6581,13 +6583,26 @@ sub docker_test_ssh :Path('/admin/docker-test-ssh') :Args(0) {
             system("chmod 700 $secrets_dir");
         }
         
-        my $credentials = {
-            ssh_target => $ssh_target,
-            ssh_port => $ssh_port,
-            ssh_password => $ssh_password,
-            last_updated => time(),
-            last_test_success => time()
-        };
+        my $credentials = {};
+        if (-f $credentials_file && open my $rf, '<', $credentials_file) {
+            local $/;
+            my $json = <$rf>;
+            close $rf;
+            $credentials = eval { decode_json($json) } || {};
+        }
+        
+        $credentials->{ssh_target} = $ssh_target;
+        $credentials->{ssh_port} = $ssh_port;
+        $credentials->{ssh_password} = $ssh_password;
+        $credentials->{last_updated} = time();
+        $credentials->{last_test_success} = time();
+        
+        if ($docker_hub_username) {
+            $credentials->{docker_hub_username} = $docker_hub_username;
+        }
+        if ($docker_hub_password) {
+            $credentials->{docker_hub_password} = $docker_hub_password;
+        }
         
         if (open my $fh, '>', $credentials_file) {
             print $fh encode_json($credentials);
