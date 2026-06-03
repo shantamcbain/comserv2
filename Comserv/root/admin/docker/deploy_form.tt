@@ -119,7 +119,7 @@ function startPolling() {
                         setStatus('success', '✅ Done');
                         document.getElementById('btn-close').disabled = false;
                         if (logId) {
-                            document.getElementById('btn-view').href = '/log/' + logId;
+                            document.getElementById('btn-view').href = '/log/details?record_id=' + logId;
                         }
                         if (window.opener && window.opener.postMessage) {
                             window.opener.postMessage({ type: 'deploy_done', success: 1 }, '*');
@@ -149,7 +149,7 @@ window.addEventListener('load', function() {
         } else {
             logId = d.log_id;
             if (logId) {
-                document.getElementById('btn-view').href = '/log/' + logId;
+                document.getElementById('btn-view').href = '/log/details?record_id=' + logId;
             }
         }
         appendLine('[' + new Date().toLocaleTimeString() + '] Log created — starting Hub deploy…', 'info');
