@@ -46,8 +46,13 @@
         supportConvId: null,        // conversation_id for current support chat
         supportLastMsgId: 0,        // last message id seen in support chat
         supportPollTimer: null,     // setInterval handle for support chat polling
-        siteName: ''                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
+        siteName: '',                // SiteName from session (e.g. 'BMaster', 'CSC', 'Shanta')
+        isUnloading: false
     };
+    
+    window.addEventListener('beforeunload', function() {
+        state.isUnloading = true;
+    });
     
     // Per-tab nonce: generated fresh each time the script runs in a new JS context.
     // sessionStorage is tab-isolated, but tab duplication copies it.  We detect
@@ -1999,6 +2004,10 @@
         chatPanel.style.display = 'flex';
         chatButton.style.display = 'none';
         state.isOpen = true;
+        
+        try {
+            sessionStorage.setItem('ai_chat_open', '1');
+        } catch(e) {}
 
         // Update chat header with selected agent info and current page
         const chatHeader = document.querySelector('.chat-header h3');
@@ -2082,10 +2091,22 @@
         chatPanel.style.display = 'none';
         chatButton.style.display = 'flex';
         state.isOpen = false;
+        
+        try {
+            sessionStorage.removeItem('ai_chat_open');
+        } catch(e) {}
     }
     
     // Function to query AI and get response
     function queryAI(prompt, imageData) {
+        try {
+            sessionStorage.setItem('ai_pending_query', JSON.stringify({
+                prompt: prompt,
+                imageData: imageData || null,
+                timestamp: Date.now()
+            }));
+        } catch(e) {}
+
         const _siQ = document.getElementById('chat-status');
         const statusIndicator = _siQ || { textContent: '', className: '' };
         statusIndicator.textContent = 'AI is thinking...';
@@ -2746,6 +2767,10 @@
             });
         })
         .then(data => {
+            try {
+                sessionStorage.removeItem('ai_pending_query');
+            } catch(e) {}
+
             // Remove loading message and live pre-send thinking block
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
@@ -2995,6 +3020,17 @@
             if (_progressPoller) { clearInterval(_progressPoller); _progressPoller = null; }
             const loading = document.getElementById('ai-loading');
             if (loading) loading.remove();
+
+            // Suppress error reporting if the page is currently unloading/navigating away
+            if (state.isUnloading) {
+                console.debug('[AI] Fetch aborted due to page unload/navigation — suppressing error reporting');
+                return;
+            }
+
+            // Clear the pending query if it's a real failure, not an unload/navigation
+            try {
+                sessionStorage.removeItem('ai_pending_query');
+            } catch(e) {}
 
             console.error('Error querying AI:', error);
             statusIndicator.textContent = 'AI Error';
@@ -5632,9 +5668,8 @@
                 }
             });
 
-            // In popup window mode: auto-open the chat panel immediately so the
-            // user sees the chat right away without having to click the bubble.
-            if (window.AI_WIDGET_POPUP) {
+            // In popup window mode or when previously open: auto-open the chat panel
+            if (window.AI_WIDGET_POPUP || sessionStorage.getItem('ai_chat_open') === '1') {
                 openChat();
             }
         }
@@ -5726,6 +5761,30 @@
         _cleanupOldAudioBackups().then(_renderLocalAudioBackups).catch(function(e) {
             console.error('Failed to init local audio backups:', e);
         });
+
+        // Check if there is a pending query that needs to be resumed due to navigation
+        try {
+            const pendingQueryStr = sessionStorage.getItem('ai_pending_query');
+            if (pendingQueryStr) {
+                const pending = JSON.parse(pendingQueryStr);
+                if (pending && pending.prompt && (Date.now() - (pending.timestamp || 0) < 60000)) {
+                    console.debug('[AI] Resuming pending query after navigation:', pending.prompt);
+                    // Clear it first to prevent infinite loop if it fails repeatedly
+                    sessionStorage.removeItem('ai_pending_query');
+                    // Automatically open chat panel so the user sees it thinking
+                    if (!PAGE_MODE) {
+                        openChat();
+                    }
+                    // Run the query!
+                    queryAI(pending.prompt, pending.imageData);
+                } else {
+                    sessionStorage.removeItem('ai_pending_query');
+                }
+            }
+        } catch(e) {
+            console.warn('[AI] Failed to resume pending query:', e);
+            sessionStorage.removeItem('ai_pending_query');
+        }
     });
 
     // Global API: open the chat widget pre-loaded with a task context.
