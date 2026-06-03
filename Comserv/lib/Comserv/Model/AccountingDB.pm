@@ -100,19 +100,46 @@ sub provision_site {
     my $jurisdiction = $opts{jurisdiction} || 'CA';
     my $currency   = $opts{currency}    || 'CAD';
 
-    my $admin_dsn = "dbi:Pg:dbname=accounting_template;host=$host;port=$port";
-    my $dbh;
-    eval {
-        require DBI;
-        $dbh = DBI->connect($admin_dsn, $db_user, $db_pass,
-            { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
-        $dbh->do("CREATE DATABASE $db_name TEMPLATE accounting_template");
+    require DBI;
+    my $err = '';
+
+    # Connect to the 'postgres' maintenance DB — you cannot CREATE DATABASE
+    # while connected to the template or the target database itself.
+    my $admin_dsn = "dbi:Pg:dbname=postgres;host=$host;port=$port";
+    my $dbh = DBI->connect($admin_dsn, $db_user, $db_pass,
+        { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
+    unless ($dbh) {
+        $err = "Cannot connect to PostgreSQL at $host:$port as '$db_user': " . ($DBI::errstr || 'unknown error');
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
+    # Check whether accounting_template exists
+    my ($tmpl_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_database WHERE datname = 'accounting_template'");
+    unless ($tmpl_exists) {
+        $err = "Template database 'accounting_template' does not exist on $host:$port — run sql/accounting_template.sql first.";
         $dbh->disconnect;
-    };
-    if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site',
-            "Failed to CREATE DATABASE $db_name: $@");
-        return (0, "Database creation failed: $@");
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
+    # Check whether target DB already exists
+    my ($db_exists) = $dbh->selectrow_array(
+        "SELECT 1 FROM pg_database WHERE datname = ?", undef, $db_name);
+    if ($db_exists) {
+        $dbh->disconnect;
+        my $msg = "Database '$db_name' already exists — skipping CREATE, updating registry.";
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'provision_site', $msg);
+        # fall through to registry update below
+    } else {
+        my $ok = $dbh->do("CREATE DATABASE \"$db_name\" TEMPLATE accounting_template");
+        $dbh->disconnect;
+        unless ($ok) {
+            $err = "CREATE DATABASE '$db_name' failed: " . ($dbh->errstr || $DBI::errstr || 'unknown error');
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+            return (0, $err);
+        }
     }
 
     eval {
