@@ -5826,6 +5826,18 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         return;
     }
     
+    # Get image IDs to tags mapping on the server
+    my %image_id_to_tags;
+    my ($tags_out, $tags_exit) = $self->_run_docker_on_target($c, 'images --format "{{.ID}} {{.Tag}}"', $target);
+    if ($tags_exit == 0) {
+        foreach my $line (split /\n/, $tags_out) {
+            if ($line =~ /^(\S+)\s+(.+)$/) {
+                my ($id, $tag) = ($1, $2);
+                push @{$image_id_to_tags{$id}}, $tag;
+            }
+        }
+    }
+
     # Parse JSON output (one JSON object per line from docker ps --format json)
     my @containers;
     foreach my $line (split /\n/, $output) {
@@ -5852,9 +5864,20 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
                 state   => $state,
                 status  => $container->{Status} || '',
                 ports   => \@ports,
-                image   => $container->{Image} || ''
+                image   => $container->{Image} || '',
+                image_tags => [],
             };
             if (lc($state) eq 'running' || lc($state) eq 'up' || ($container->{Status} && $container->{Status} =~ /Up/i)) {
+                # Get the running container's image ID
+                my ($inspect_out, $inspect_exit) = $self->_run_docker_on_target($c, "inspect --format '{{.Image}}' $name", $target);
+                if ($inspect_exit == 0) {
+                    chomp $inspect_out;
+                    $inspect_out =~ s/^'|'$//g; # Clean quotes
+                    if ($image_id_to_tags{$inspect_out}) {
+                        $container_info->{image_tags} = $image_id_to_tags{$inspect_out};
+                    }
+                }
+
                 my ($version_out, $version_exit) = $self->_run_docker_on_target($c, "exec $name cat /opt/comserv/version.json", $target);
                 if ($version_exit == 0 && $version_out =~ /^\{/) {
                     my $ver_data = eval { decode_json($version_out) };
