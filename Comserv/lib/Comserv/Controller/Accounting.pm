@@ -1274,21 +1274,13 @@ sub accounting_dbs :Path('/Accounting/admin/databases') :Args(0) {
             $c->response->redirect($c->uri_for('/Accounting/admin/databases'));
             return;
         };
-        my $jurisdiction  = $c->req->body_parameters->{jurisdiction}  || 'CA';
-        my $currency      = $c->req->body_parameters->{currency}      || 'CAD';
-        my $admin_user    = $c->req->body_parameters->{admin_user}    || 'postgres';
-        my $admin_pass    = $c->req->body_parameters->{admin_pass}    // '';
-        my $site_db_user  = $c->req->body_parameters->{site_db_user} || lc($target);
-        my $site_db_pass  = $c->req->body_parameters->{site_db_pass} // '';
+        my $jurisdiction = $c->req->body_parameters->{jurisdiction} || 'CA';
+        my $currency     = $c->req->body_parameters->{currency}     || 'CAD';
 
         my ($ok, $msg) = eval {
             Comserv::Model::AccountingDB->instance->provision_site($c, $target,
-                jurisdiction  => $jurisdiction,
-                currency      => $currency,
-                admin_user    => $admin_user,
-                admin_pass    => $admin_pass,
-                db_user       => $site_db_user,
-                db_pass       => $site_db_pass,
+                jurisdiction => $jurisdiction,
+                currency     => $currency,
             );
         };
         if ($@ || !$ok) {

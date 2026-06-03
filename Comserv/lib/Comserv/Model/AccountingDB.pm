@@ -26,9 +26,39 @@ sub instance {
 }
 
 my $DEFAULT_HOST = '192.168.1.20';
-my $DEFAULT_PORT = 5432;
+my $DEFAULT_PORT = 5433;
 my $DEFAULT_USER = 'postgres';
 my $DEFAULT_PASS = '';
+
+sub _pg_admin_credentials {
+    my ($self) = @_;
+    my $host = $ENV{MIGRATION_POSTGRES_HOST} || $DEFAULT_HOST;
+    my $port = $ENV{MIGRATION_POSTGRES_PORT} || $DEFAULT_PORT;
+    my $user = $ENV{MIGRATION_POSTGRES_USER} || $DEFAULT_USER;
+    my $pass = $ENV{MIGRATION_POSTGRES_PASSWORD} // $DEFAULT_PASS;
+
+    unless ($pass) {
+        my $home     = $ENV{HOME} || '';
+        my $dbi_file = "$home/.comserv/secrets/dbi/db_production_postgres.json";
+        if (-f $dbi_file) {
+            eval {
+                require JSON;
+                local $/;
+                open my $fh, '<', $dbi_file or die $!;
+                my $data = JSON::decode_json(<$fh>);
+                close $fh;
+                my ($cfg) = values %$data;
+                if (ref $cfg eq 'HASH') {
+                    $pass = $cfg->{password} // '';
+                    $host = $cfg->{host}     if $cfg->{host};
+                    $port = $cfg->{port}     if $cfg->{port};
+                    $user = $cfg->{username} if $cfg->{username};
+                }
+            };
+        }
+    }
+    return ($host, $port, $user, $pass);
+}
 
 sub schema_for_site {
     my ($self, $c, $sitename) = @_;
@@ -89,29 +119,43 @@ sub schema {
     return $self->schema_for_site($c, $sitename);
 }
 
+sub _generate_password {
+    my ($self, $len) = @_;
+    $len ||= 20;
+    my @chars = ('A'..'Z', 'a'..'z', '0'..'9', qw(! @ # $ % ^));
+    return join '', map { $chars[int rand @chars] } 1..$len;
+}
+
 sub provision_site {
     my ($self, $c, $sitename, %opts) = @_;
 
-    my $db_name    = lc($sitename) . '_accounting';
-    my $host       = $opts{host}        || $DEFAULT_HOST;
-    my $port       = $opts{port}        || $DEFAULT_PORT;
-    my $admin_user = $opts{admin_user}  || $DEFAULT_USER;
-    my $admin_pass = $opts{admin_pass}  // $DEFAULT_PASS;
-    my $db_user    = $opts{db_user}     || lc($sitename);
-    my $db_pass    = $opts{db_pass}     // '';
+    my $db_name      = lc($sitename) . '_accounting';
     my $jurisdiction = $opts{jurisdiction} || 'CA';
-    my $currency   = $opts{currency}    || 'CAD';
+    my $currency     = $opts{currency}     || 'CAD';
+
+    # Read PostgreSQL admin credentials from secrets file / env vars (never from form input)
+    my ($host, $port, $admin_user, $admin_pass) = $self->_pg_admin_credentials;
+
+    # Site DB user/pass: caller may supply; otherwise auto-generate and store
+    my $db_user = $opts{db_user} || lc($sitename) . '_acct';
+    my $db_pass = $opts{db_pass} // $self->_generate_password;
 
     require DBI;
     my $err = '';
 
+    unless ($admin_pass) {
+        $err = "PostgreSQL admin password not found — set MIGRATION_POSTGRES_PASSWORD env var or add to ~/.comserv/secrets/dbi/db_production_postgres.json";
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
+        return (0, $err);
+    }
+
     # Connect using the PostgreSQL ADMIN account to run CREATE DATABASE.
-    # Must use a maintenance DB (postgres), not the template or target DB.
+    # Must use the 'postgres' maintenance DB (not the template or target DB).
     my $admin_dsn = "dbi:Pg:dbname=postgres;host=$host;port=$port";
     my $dbh = DBI->connect($admin_dsn, $admin_user, $admin_pass,
         { RaiseError => 0, PrintError => 0, AutoCommit => 1 });
     unless ($dbh) {
-        $err = "Step 1 (admin connect as '$admin_user'): " . ($DBI::errstr || 'unknown error');
+        $err = "Cannot connect to PostgreSQL at $host:$port as '$admin_user': " . ($DBI::errstr || 'unknown error');
         $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'provision_site', $err);
         return (0, $err);
     }
