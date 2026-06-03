@@ -6867,10 +6867,47 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         return;
     }
 
+    my $active_deploy_log = eval {
+        my $now = DateTime->now(time_zone => 'local');
+        my $today = $now->ymd;
+        my $threshold_time = $now->clone->subtract(minutes => 20)->hms;
+        $c->model('DBEncy')->resultset('Log')->search({
+            status     => 2,
+            abstract   => { -like => '%Docker%Deploy%' },
+            start_date => $today,
+            start_time => { '>=', $threshold_time },
+        }, {
+            rows => 1,
+            order_by => { -desc => 'record_id' }
+        })->first;
+    };
+
+    if ($active_deploy_log) {
+        my $act_user = $active_deploy_log->username || 'unknown';
+        my $act_time = $active_deploy_log->start_time || 'unknown';
+        $c->response->body(encode_json({
+            success => 0,
+            error   => "A deployment is already in progress by $act_user (started at $act_time today)!"
+        }));
+        $c->response->content_type('application/json');
+        return;
+    }
+
     if (-f '/.dockerenv') {
         $c->response->body('{"success": false, "error": "Cannot manage Docker from inside a container"}');
         $c->response->content_type('application/json');
         return;
+    }
+
+    my $pid_file_check = '/tmp/comserv-hub-deploy.pid';
+    if (-f $pid_file_check && open my $pf_fh, '<', $pid_file_check) {
+        my $chk_pid = <$pf_fh>;
+        close $pf_fh;
+        if ($chk_pid && $chk_pid =~ /^\d+$/ && kill(0, $chk_pid)) {
+            $c->response->body(encode_json({ success => 0, error => "A deployment is already in progress (PID $chk_pid)!" }));
+            $c->response->content_type('application/json');
+            return;
+        }
     }
 
     my $ssh_target    = $c->req->params->{ssh_target}   || 'ubuntu@192.168.1.126';
@@ -6882,6 +6919,8 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
     my $quick_deploy  = ($deploy_mode ne 'full') ? 1 : 0;
 
     my $ssh_password = '';
+    my $docker_hub_username = '';
+    my $docker_hub_password = '';
     my $home     = $ENV{HOME} || '/home/shanta';
     my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
     if (-f $creds_file && open my $cf, '<', $creds_file) {
@@ -6889,9 +6928,11 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         my $json = <$cf>;
         close $cf;
         my $creds = eval { decode_json($json) };
-        if ($creds && $creds->{ssh_password}) {
-            $ssh_password = $creds->{ssh_password};
-            $ssh_target   = $creds->{ssh_target} if $creds->{ssh_target};
+        if ($creds) {
+            $ssh_password        = $creds->{ssh_password} if $creds->{ssh_password};
+            $ssh_target          = $creds->{ssh_target} if $creds->{ssh_target};
+            $docker_hub_username = $creds->{docker_hub_username} if $creds->{docker_hub_username};
+            $docker_hub_password = $creds->{docker_hub_password} if $creds->{docker_hub_password};
         }
     }
     $ssh_password ||= $form_password;
@@ -7060,6 +7101,19 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             }
 
             print "--- Step 2: Pushing to Docker Hub ($hub_image) ---\n";
+            if ($docker_hub_username && $docker_hub_password) {
+                print "🔐 Attempting automatic Docker Hub login for $docker_hub_username...\n";
+                my $login_cmd = sprintf("echo %s | docker login -u %s --password-stdin 2>&1",
+                    quotemeta($docker_hub_password), quotemeta($docker_hub_username));
+                my $login_out = `$login_cmd`;
+                my $login_exit = $? >> 8;
+                if ($login_exit == 0) {
+                    print "✅ Automatic Docker Hub login successful!\n\n";
+                } else {
+                    print "⚠️  Automatic Docker Hub login failed (exit $login_exit):\n$login_out\n\n";
+                }
+            }
+
             my $push_exit = system('docker', 'compose',
                 '-f', "$comserv_dir/$prod_compose",
                 '--project-directory', $comserv_dir,
