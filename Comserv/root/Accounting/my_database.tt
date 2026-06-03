@@ -1,0 +1,69 @@
+[% INCLUDE Accounting/_acct_inv_nav.tt %]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+[% IF c.flash.error_msg %]<div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:6px;padding:0.75rem 1rem;margin-bottom:1rem;">[% c.flash.error_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:0.5rem;margin-bottom:1.2rem;">
+    <h1 style="margin:0;">🗄️ My Accounting Database — [% sitename | html %]</h1>
+    <a href="/Accounting" class="btn btn-secondary" style="font-size:0.88rem;">← Accounting Dashboard</a>
+  </div>
+
+  [% IF !reg %]
+  <div style="background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;padding:1.2rem 1.5rem;">
+    <strong style="color:#991b1b;">❌ No accounting database provisioned for [% sitename | html %].</strong>
+    <p style="margin:0.5rem 0 0;font-size:0.9rem;">
+      Contact your CSC administrator to enable the Accounting add-on for your site.
+    </p>
+  </div>
+
+  [% ELSIF db_ok %]
+  <div style="background:#f0fdf4;border:1px solid #86efac;border-radius:8px;padding:1rem 1.5rem;margin-bottom:1.2rem;display:flex;flex-wrap:wrap;gap:0.75rem;align-items:center;">
+    <span style="font-size:1.1rem;color:#065f46;font-weight:bold;">✅ Connected</span>
+    <code style="font-size:0.85rem;color:#374151;">[% reg.db_user | html %]@[% reg.db_host | html %]:[% reg.db_port %]/[% reg.db_name | html %]</code>
+    <span style="background:#e0e7ff;color:#3730a3;border-radius:4px;padding:2px 8px;font-size:0.8rem;">[% reg.jurisdiction | html %] / [% reg.currency | html %]</span>
+    <span style="font-size:0.85rem;color:#6b7280;">[% tables.size %] tables</span>
+  </div>
+
+  <h2 style="font-size:1rem;margin-bottom:0.75rem;">Database Schema</h2>
+  [% FOREACH tbl IN tables %]
+  <div style="margin-bottom:0.3rem;border:1px solid #dee2e6;border-radius:4px;overflow:hidden;">
+    <div onclick="var n=this.nextElementSibling;n.style.display=n.style.display=='none'?'':'none';"
+         style="background:#f8f9fa;padding:0.35rem 0.7rem;cursor:pointer;display:flex;justify-content:space-between;align-items:center;">
+      <span style="font-family:monospace;font-size:0.88rem;font-weight:bold;">[% tbl.name | html %]</span>
+      <span style="font-size:0.75rem;color:#6c757d;">[% tbl.col_count %] columns ▾</span>
+    </div>
+    <div style="display:none;padding:0.4rem 0.7rem;">
+      <table style="width:100%;border-collapse:collapse;font-size:0.8rem;">
+        <thead><tr style="background:#e9ecef;">
+          <th style="text-align:left;padding:2px 6px;">Column</th>
+          <th style="text-align:left;padding:2px 6px;">Type</th>
+          <th style="text-align:left;padding:2px 6px;">Nullable</th>
+          <th style="text-align:left;padding:2px 6px;">Default</th>
+        </tr></thead>
+        <tbody>
+        [% FOREACH col IN tbl.columns %]
+        <tr style="border-top:1px solid #dee2e6;">
+          <td style="padding:2px 6px;font-family:monospace;">[% col.column_name | html %]</td>
+          <td style="padding:2px 6px;color:#0d6efd;">
+            [% col.data_type | html %][% IF col.character_maximum_length %]([% col.character_maximum_length %])[% END %]
+          </td>
+          <td style="padding:2px 6px;">[% col.is_nullable | html %]</td>
+          <td style="padding:2px 6px;color:#6c757d;font-size:0.75rem;">[% col.column_default | html %]</td>
+        </tr>
+        [% END %]
+        </tbody>
+      </table>
+    </div>
+  </div>
+  [% END %]
+
+  [% ELSE %]
+  <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:1.2rem 1.5rem;">
+    <strong style="color:#92400e;">⚠️ Database registered but not reachable.</strong>
+    [% IF db_error %]<p style="margin:0.5rem 0 0;font-size:0.85rem;color:#b45309;">[% db_error | html %]</p>[% END %]
+    <p style="margin:0.5rem 0 0;font-size:0.9rem;">Contact your CSC administrator to re-provision the database.</p>
+  </div>
+  [% END %]
+
+</div>
