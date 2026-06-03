@@ -600,17 +600,24 @@ This is an automated notification from the Comserv platform.
     my %seen_emails = ($csc_email => 1);
     my @recipients  = ($csc_email);
     eval {
-        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
-            [
-                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
-                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
-            ],
-            { columns => ['email'] }
-        )->all;
-        for my $u (@admin_users) {
-            next unless $u->email;
-            next if $seen_emails{ $u->email }++;
-            push @recipients, $u->email;
+        my $schema = $c->model('DBEncy');
+        my $csc_site = $schema->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @site_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id  => $csc_site->id,
+                    role     => { -in => ['admin', 'accounting'] },
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+            for my $sr (@site_roles) {
+                my $u = eval { $sr->user } or next;
+                next unless $u && $u->email && ($u->status // '') eq 'active'
+                         && ($u->email_notifications // 0);
+                next if $seen_emails{ $u->email }++;
+                push @recipients, $u->email;
+            }
         }
     };
 
