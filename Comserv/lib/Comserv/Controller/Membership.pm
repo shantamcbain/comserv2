@@ -429,7 +429,59 @@ sub hosting_signup :Local :Args(0) {
         my $p = $c->req->body_parameters;
         my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d);
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
-        my $monthly_cost = $plan_price{ $p->{plan_slug} } // 0;
+        
+        my $base_price = $plan_price{ $p->{plan_slug} } // 0;
+        
+        my $plan_row = undef;
+        eval {
+            my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+            if ($csc_site) {
+                $plan_row = $c->model('DBEncy')->resultset('MembershipPlan')->search({
+                    site_id => $csc_site->id,
+                    slug    => $p->{plan_slug},
+                })->single;
+            }
+        };
+
+        my %included_modules;
+        if ($plan_row) {
+            $included_modules{beekeeping} = $plan_row->has_beekeeping ? 1 : 0;
+            $included_modules{planning}   = $plan_row->has_planning ? 1 : 0;
+            $included_modules{membership} = 1;
+        }
+
+        my %module_cost = (
+            beekeeping => 10.00,
+            planning   => 15.00,
+            accounting => 20.00,
+            ency       => 5.00,
+            ecommerce  => 15.00,
+            helpdesk   => 10.00,
+            foraging   => 5.00,
+            membership => 0.00,
+            '3d'       => 10.00,
+        );
+
+        eval {
+            my @db_mods = $c->model('DBEncy')->resultset('SystemModule')->search({ is_active => 1 })->all;
+            for my $db_mod (@db_mods) {
+                $module_cost{$db_mod->key} = $db_mod->monthly_cost if defined $db_mod->monthly_cost;
+            }
+        };
+
+        my $addons_extra = 0;
+        foreach my $addon (grep { $p->{"addon_$_"} } @addon_keys) {
+            my $key = lc($addon);
+            $key = '3d' if $key eq 'printing_3d';
+            $key = 'planning' if $key eq 'ai';
+            
+            unless ($included_modules{$key}) {
+                $addons_extra += $module_cost{$key} || 0;
+            }
+        }
+
+        my $monthly_cost = $base_price + $addons_extra;
+
         eval {
             if ($hosting_account) {
                 $hosting_account->update({
@@ -897,6 +949,85 @@ sub csc_account :Local :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub _calculate_hosting_total_cost {
+    my ($self, $c, $hosting) = @_;
+    return 0 unless $hosting;
+
+    my $plan_slug = $hosting->plan_slug;
+    return 0 unless $plan_slug;
+
+    # 1. Get base plan price
+    my $base_price = 0;
+    my $plan_row = undef;
+    eval {
+        my $csc_site = $c->model('DBEncy')->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            $plan_row = $c->model('DBEncy')->resultset('MembershipPlan')->search({
+                site_id => $csc_site->id,
+                slug    => $plan_slug,
+            })->single;
+            if ($plan_row) {
+                $base_price = $plan_row->price_monthly || 0;
+            }
+        }
+    };
+
+    # 2. Get all system modules/addons and their pricing
+    my %module_cost;
+    my %included_modules;
+
+    # Check what is included in the plan row
+    if ($plan_row) {
+        $included_modules{beekeeping} = $plan_row->has_beekeeping ? 1 : 0;
+        $included_modules{planning}   = $plan_row->has_planning ? 1 : 0;
+        $included_modules{membership} = 1; # Core membership is always included
+    }
+
+    # Fetch default/DB costs for all modules
+    my @defaults = (
+        { key => 'beekeeping', name => 'Beekeeping & Apiary Management', owner => 'BMaster', route => '/apiary', cost => 10.00 },
+        { key => 'planning', name => 'AI Planning & Project System', owner => 'CSC', route => '/todo', cost => 15.00 },
+        { key => 'accounting', name => 'Accounting & Ledger System', owner => 'CSC', route => '/Accounting', cost => 20.00 },
+        { key => 'ency', name => 'Encyclopedia & Herbal Database', owner => 'ENCY', route => '/ency', cost => 5.00 },
+        { key => 'ecommerce', name => 'E-Commerce & Store', owner => 'CSC', route => '/shop', cost => 15.00 },
+        { key => 'helpdesk', name => 'HelpDesk Support & Guide system', owner => 'CSC', route => '/helpdesk', cost => 10.00 },
+        { key => 'foraging', name => 'Foraging & Wild Harvesting Log', owner => 'Forager', route => '/foraging', cost => 5.00 },
+        { key => 'membership', name => 'Multi-Site Membership System', owner => 'CSC', route => '/membership', cost => 0.00 },
+        { key => '3d', name => '3D Printing & Custom Fabrication', owner => '3D', route => '/3d', cost => 10.00 },
+    );
+
+    for my $d (@defaults) {
+        $module_cost{$d->{key}} = $d->{cost};
+    }
+
+    # Override costs with values from system_modules database table
+    eval {
+        my @db_mods = $c->model('DBEncy')->resultset('SystemModule')->search({ is_active => 1 })->all;
+        for my $db_mod (@db_mods) {
+            $module_cost{$db_mod->key} = $db_mod->monthly_cost if defined $db_mod->monthly_cost;
+        }
+    };
+
+    # 3. Calculate cost of requested addons that are NOT included in the plan
+    my $addons_cost = 0;
+    if ($hosting->requested_addons) {
+        my @requested = split(/\s*,\s*/, $hosting->requested_addons);
+        for my $addon (@requested) {
+            my $key = lc($addon);
+            # Map aliases
+            $key = '3d' if $key eq 'printing_3d';
+            $key = 'planning' if $key eq 'ai';
+
+            # If requested addon is not included in the plan, charge its cost
+            unless ($included_modules{$key}) {
+                $addons_cost += $module_cost{$key} || 0;
+            }
+        }
+    }
+
+    return $base_price + $addons_cost;
+}
+
 sub _get_patreon_config {
     my ($self, $c, $site_name) = @_;
     $site_name = lc($site_name || 'csc');
@@ -988,7 +1119,7 @@ sub _get_user_site_memberships {
             if ($hosting) {
                 $site_info->{hosting_plan}   = $hosting->plan_slug;
                 $site_info->{hosting_status} = $hosting->status;
-                $site_info->{hosting_cost}   = $hosting->monthly_cost;
+                $site_info->{hosting_cost}   = $self->_calculate_hosting_total_cost($c, $hosting);
             }
         }
 
