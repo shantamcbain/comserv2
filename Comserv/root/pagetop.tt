@@ -346,6 +346,14 @@ document.addEventListener('DOMContentLoaded', function() {
 [% SET _mem_rs = c.model('DBEncy').resultset('UserMembership') %]
 [% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
 [% IF NOT _active_mem %][% SET _active_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _sid, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
+[% SET _csc_mem = undef %]
+[% TRY %]
+  [% SET _csc_site = c.model('DBEncy').resultset('Site').search({name => 'CSC'}, {rows => 1}).single %]
+  [% IF _csc_site AND _csc_site.id != _sid %]
+    [% _csc_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _csc_site.id, 'me.status' => 'active'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %]
+    [% IF NOT _csc_mem %][% _csc_mem = _mem_rs.search({'me.user_id' => _uid, 'me.site_id' => _csc_site.id, 'me.status' => 'grace'}, {prefetch => 'plan', rows => 1, order_by => {'me.started_at' => 'DESC'}}).first %][% END %]
+  [% END %]
+[% CATCH %][% END %]
 [% SET _coin_acct = c.model('DBEncy').resultset('Accounting::InternalCurrencyAccount').find({user_id => _uid}) %]
 <div class="membership-status-bar">
     [% IF _active_mem AND _active_mem.plan %]
@@ -353,11 +361,14 @@ document.addEventListener('DOMContentLoaded', function() {
     [% ELSE %]
         <a href="/membership/plans" class="membership-tier-badge membership-tier-free" title="Upgrade your membership for more features">Free &mdash; Upgrade</a>
     [% END %]
+    [% IF _csc_mem AND _csc_mem.plan %]
+        <a href="/membership" class="membership-tier-badge" style="background:#5c6bc0;" title="Your CSC Hosting Plan">CSC: [% _csc_mem.plan.name | html %]</a>
+    [% END %]
     [% IF _coin_acct AND _coin_acct.balance > 0 %]
         <a href="/currency/balance" class="coin-balance" title="Your coin balance">&#9679; [% _coin_acct.balance | format('%.2f') %]</a>
     [% END %]
     <a href="/mail/my_subscriptions" title="Manage your email subscriptions"
-       style="font-size:0.9em;font-weight:bold;background:#e65c00;color:#fff;text-decoration:none;padding:4px 14px;border-radius:12px;margin-left:10px;white-space:nowrap;border:2px solid #c75000;box-shadow:0 1px 3px rgba(0,0,0,0.25);">
+       style="font-size:1.05em;font-weight:900;background:linear-gradient(135deg,#e65c00,#ff8c00);color:#fff;text-decoration:none;padding:6px 18px;border-radius:16px;margin-left:12px;white-space:nowrap;border:2px solid #fff;box-shadow:0 0 10px rgba(230,92,0,0.6), 0 2px 4px rgba(0,0,0,0.2);display:inline-block;vertical-align:middle;text-shadow:0 1px 2px rgba(0,0,0,0.3);">
         &#9993; My Subscriptions
     </a>
 </div>
