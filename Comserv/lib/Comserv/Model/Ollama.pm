@@ -863,7 +863,7 @@ sub list_models {
                 "HTTP API failed: $_, attempting shell fallback");
             return $self->list_models_shell();
         } else {
-            my $level = ($_ =~ /Can't connect|Connection timed out|Network is unreachable/i) ? 'warn' : 'error';
+            my $level = ($_ =~ /Can\'t connect|Connection timed out|timed\.out|timeout|Network is unreachable|Connection refused/i) ? 'warn' : 'error';
             $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models',
                 "HTTP API failed: $_ (shell fallback disabled for remote host)");
             $self->last_error("HTTP API failed: $_");
@@ -877,7 +877,7 @@ sub list_models {
                 "HTTP API returned " . $response->status_line . ", attempting shell fallback");
             return $self->list_models_shell();
         } else {
-            my $level = ($response->status_line =~ /Can't connect|Connection timed out|Network is unreachable/i) ? 'warn' : 'error';
+            my $level = ($response->status_line =~ /Can\'t connect|Connection timed out|timed\.out|timeout|Network is unreachable|Connection refused/i) ? 'warn' : 'error';
             $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models',
                 "HTTP API returned " . $response->status_line . " (shell fallback disabled for remote host)");
             $self->last_error("HTTP API returned: " . $response->status_line);
