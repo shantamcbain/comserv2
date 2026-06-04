@@ -134,6 +134,7 @@
                         <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => site_name }) %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">Register with CSC</a>
                       [% END %]
                     [% END %]
+                    <a href="[% c.uri_for('/admin/site_modules/edit_addon', { key => module.key }) %]" class="btn btn-sm" style="background:#ffc107;color:#212529;text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;font-weight:bold;">&#9998; Edit Metadata</a>
                   [% ELSIF !module.user_access %]
                     <a href="[% c.uri_for('/membership') %]" class="btn btn-sm btn-secondary" style="text-decoration:none;display:inline-block;padding:4px 10px;border-radius:3px;">View Plans</a>
                   [% END %]

@@ -54,6 +54,25 @@ sub _is_admin {
 sub _get_modules_data {
     my ($self, $c, $site_name) = @_;
 
+    # Ensure system_modules table exists
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        $dbh->do(q{
+            CREATE TABLE IF NOT EXISTS `system_modules` (
+                `key` VARCHAR(100) NOT NULL,
+                `name` VARCHAR(255) NOT NULL,
+                `owner` VARCHAR(100) NOT NULL,
+                `description` TEXT,
+                `route` VARCHAR(255) NOT NULL,
+                `monthly_cost` DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+                `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        });
+    };
+
     my @modules = (
         {
             key         => 'beekeeping',
@@ -72,7 +91,7 @@ sub _get_modules_data {
         {
             key         => 'accounting',
             name        => 'Accounting & Ledger System',
-            owner       => 'ENCY',
+            owner       => 'CSC',
             description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.',
             route       => '/Accounting',
         },
@@ -165,6 +184,19 @@ sub _get_modules_data {
 
     for my $mod (@modules) {
         my $key = $mod->{key};
+
+        # Override with DB data if exists in system_modules
+        eval {
+            my $db_mod = $c->model('DBEncy')->resultset('SystemModule')->find($key);
+            if ($db_mod) {
+                $mod->{name}         = $db_mod->name if $db_mod->name;
+                $mod->{owner}        = $db_mod->owner if $db_mod->owner;
+                $mod->{description}  = $db_mod->description if $db_mod->description;
+                $mod->{route}        = $db_mod->route if $db_mod->route;
+                $mod->{monthly_cost} = $db_mod->monthly_cost;
+            }
+        };
+
         my $default_val = $subscribed{$key} ? 1 : 0;
         $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : $default_val;
         $mod->{subscribed}   = $subscribed{$key} ? 1 : 0;
