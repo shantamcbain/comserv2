@@ -10,6 +10,19 @@
     <h1>&#128200; Accounting &amp; Inventory — [% sitename | html %]</h1>
   </div>
 
+  [%# ── Live DB indicator ──────────────────────────────────────────── %]
+  <div style="font-size:0.8rem;color:var(--text-muted-color,#555);margin-bottom:1rem;display:flex;align-items:center;gap:0.5rem;">
+    <span>🗃️ Live accounting DB:</span>
+    <span style="font-family:monospace;background:#dbeafe;color:#1e40af;border-radius:4px;padding:1px 8px;">MariaDB</span>
+    [% IF pg_db_name %]
+    <span style="color:#6b7280;">·</span>
+    <a href="/Accounting/my_database" style="font-size:0.8rem;color:#065f46;">📦 PostgreSQL migration target: [% pg_db_name | html %]</a>
+    [% ELSE %]
+    <span style="color:#6b7280;">·</span>
+    <a href="/Accounting/my_database" style="font-size:0.8rem;color:#9ca3af;">PostgreSQL: not provisioned</a>
+    [% END %]
+  </div>
+
   [%# ── Summary stat bar ──────────────────────────────────────────── %]
   <div style="display:flex;flex-wrap:wrap;gap:0.75rem;margin-bottom:1.5rem;">
 
