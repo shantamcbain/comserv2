@@ -107,5 +107,8 @@ __PACKAGE__->register_class('HostingAccount', 'Comserv::Model::Schema::Ency::Res
 # Register Session store class
 __PACKAGE__->register_class('Session', 'Comserv::Model::Schema::Ency::Result::Session');
 
+# Register SystemModule metadata class
+__PACKAGE__->register_class('SystemModule', 'Comserv::Model::Schema::Ency::Result::SystemModule');
+
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;
