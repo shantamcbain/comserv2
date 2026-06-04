@@ -153,6 +153,152 @@ sub index :Path :Args(0) {
     $c->forward($c->view('TT'));
 }
 
+sub addons :Local :Args(0) {
+    my ($self, $c) = @_;
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'addons',
+        "Membership addons action called");
+
+    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || 'CSC';
+    my $is_admin  = $self->_is_admin($c);
+    my $user_id   = $c->session->{user_id};
+
+    # Define all available modules with metadata
+    my @modules = (
+        {
+            key         => 'beekeeping',
+            name        => 'Beekeeping & Apiary Management',
+            owner       => 'BMaster',
+            description => 'Track bee hives, apiaries, queen logs, and inspections.',
+            route       => '/apiary',
+        },
+        {
+            key         => 'planning',
+            name        => 'AI Planning & Project System',
+            owner       => 'CSC',
+            description => 'Advanced project planning, todo tracking, and AI-assisted workflows.',
+            route       => '/todo',
+        },
+        {
+            key         => 'accounting',
+            name        => 'Accounting & Ledger System',
+            owner       => 'ENCY',
+            description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.',
+            route       => '/Accounting',
+        },
+        {
+            key         => 'ency',
+            name        => 'Encyclopedia & Herbal Database',
+            owner       => 'ENCY',
+            description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.',
+            route       => '/ency',
+        },
+        {
+            key         => 'ecommerce',
+            name        => 'E-Commerce & Store',
+            owner       => 'CSC',
+            description => 'Sell products, list items, handle currency checkout, and manage shipping.',
+            route       => '/shop',
+        },
+        {
+            key         => 'helpdesk',
+            name        => 'HelpDesk Support & Guide system',
+            owner       => 'CSC',
+            description => 'Issue ticket tracking, linux guides, and support desk system.',
+            route       => '/helpdesk',
+        },
+        {
+            key         => 'foraging',
+            name        => 'Foraging & Wild Harvesting Log',
+            owner       => 'Forager',
+            description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.',
+            route       => '/foraging',
+        },
+        {
+            key         => 'membership',
+            name        => 'Multi-Site Membership System',
+            owner       => 'CSC',
+            description => 'Set up recurring billing, regional pricing, payment gateways, and coins.',
+            route       => '/membership',
+        },
+        {
+            key         => '3d',
+            name        => '3D Printing & Custom Fabrication',
+            owner       => '3D',
+            description => 'Order 3D prints, upload design models, and track build queues.',
+            route       => '/3d',
+        },
+    );
+
+    # If post and admin, handle site module updates
+    if ($c->req->method eq 'POST' && $is_admin) {
+        my $params = $c->req->body_parameters;
+        eval {
+            foreach my $mod (@modules) {
+                my $key = $mod->{key};
+                my $enabled = $params->{"enabled_$key"} ? 1 : 0;
+                $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
+                    {
+                        sitename    => $site_name,
+                        module_name => $key,
+                    },
+                    {
+                        key     => 'site_module_unique',
+                        values  => { enabled => $enabled },
+                    }
+                );
+            }
+            $c->flash->{success_msg} = "Add-on configurations for site '$site_name' updated successfully!";
+        };
+        if ($@) {
+            $c->stash->{error_msg} = "Failed to update add-ons: $@";
+        } else {
+            return $c->response->redirect($c->uri_for($self->action_for('addons')));
+        }
+    }
+
+    # Fetch current site-level enablement
+    my %site_status;
+    eval {
+        my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename => $site_name,
+        })->all;
+        for my $sm (@site_mods) {
+            $site_status{$sm->module_name} = $sm->enabled ? 1 : 0;
+        }
+    };
+
+    # Populate module statuses
+    for my $mod (@modules) {
+        my $key = $mod->{key};
+        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : 0;
+        # Check if user has access (either site-level, user-override, or membership-granted)
+        $mod->{user_access}  = $c->stash->{enabled_modules}{$key} ? 1 : 0;
+    }
+
+    my $hosting_account = undef;
+    eval {
+        $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+            {
+                -or => [
+                    sitename => $site_name,
+                    sitename => lc($site_name),
+                    sitename => uc($site_name),
+                ]
+            },
+            { rows => 1 }
+        )->single;
+    };
+
+    $c->stash(
+        template        => 'membership/Addons.tt',
+        modules         => \@modules,
+        site_name       => $site_name,
+        is_admin        => $is_admin,
+        hosting_account => $hosting_account,
+    );
+    $c->forward($c->view('TT'));
+}
+
 sub hosting_signup :Local :Args(0) {
     my ($self, $c) = @_;
 
@@ -743,7 +889,13 @@ sub _get_user_site_memberships {
             my $site_info = $sites_seen{$sname};
             
             my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
-                { sitename => $sname },
+                {
+                    -or => [
+                        sitename => $sname,
+                        sitename => lc($sname),
+                        sitename => uc($sname),
+                    ]
+                },
                 { rows => 1 }
             )->single;
 
