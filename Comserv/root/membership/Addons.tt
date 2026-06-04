@@ -123,6 +123,7 @@
     </div>
     [% END %]
 
+[% IF !is_embedded %]
   </div>
 </div>
 [% END %]
