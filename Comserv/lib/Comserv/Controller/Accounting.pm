@@ -103,6 +103,13 @@ sub index :Path('/Accounting') :Args(0) {
         }
     };
 
+    my $pg_db_name = '';
+    eval {
+        my $reg = $self->_schema($c)->resultset('SiteAccountingDb')
+                      ->find({ sitename => $sitename, status => 'active' });
+        $pg_db_name = $reg->db_name if $reg;
+    };
+
     $c->stash(
         acct_count      => $acct_count,
         entry_count     => $entry_count,
@@ -113,6 +120,7 @@ sub index :Path('/Accounting') :Args(0) {
         location_count  => $location_count,
         low_stock       => $low_stock,
         sitename        => $sitename,
+        pg_db_name      => $pg_db_name,
         template        => 'Accounting/index.tt',
     );
 }
