@@ -208,6 +208,13 @@
       </div>
       [% END %]
 
+      [%# ── Embedded Site Add-ons & Modules ────────────────────────────────── %]
+      [% IF is_admin AND modules.size %]
+      <div class="content-section" style="margin-top: 2rem;">
+        [% INCLUDE 'membership/Addons.tt' %]
+      </div>
+      [% END %]
+
       [%# ── CSC Site Registration (admin only, non-CSC SiteNames) ──────────── %]
       [% IF is_admin AND !site_is_csc %]
       <div class="content-section">

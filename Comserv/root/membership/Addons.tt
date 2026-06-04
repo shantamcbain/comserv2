@@ -12,6 +12,7 @@
 [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
 [% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
 
+[% IF !is_embedded %]
 <div class="app-container">
   <div class="page-header">
     <h1>Site Add-ons &amp; Modules</h1>
@@ -25,6 +26,7 @@
   </div>
 
   <div class="content-container" style="display: block;">
+[% END %]
     
     <div class="content-section">
       <h2>Available System Add-ons</h2>
@@ -111,7 +113,7 @@
 
     </div>
 
-    [% IF !hosting_account AND !site_is_csc AND is_admin %]
+    [% IF !hosting_account AND !site_is_csc AND is_admin AND !is_embedded %]
     <div class="alert alert-warning" style="margin-top:2rem;background:#fff3cd;border:1px solid #ffeeba;padding:1.5rem;border-radius:8px;">
       <h3 style="margin-top:0;">&#9888; [% site_name | html %] is not registered with CSC Hosting</h3>
       <p>To enable full managed add-ons, cPanel databases, and secure subdomains, register this site's hosting relationship with CSC today.</p>
@@ -123,3 +125,4 @@
 
   </div>
 </div>
+[% END %]
