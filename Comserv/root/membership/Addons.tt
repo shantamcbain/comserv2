@@ -1,0 +1,125 @@
+[% META
+   title = "Site Add-ons & Modules"
+   description = "Manage and view available modules and add-ons for this site"
+   roles = "guest,user,admin"
+   TemplateType = "Application"
+   category = "Membership"
+   page_version = "0.01"
+   last_updated = "2026-06-04"
+%]
+
+[% IF error_msg %]<div class="error">[% error_msg | html %]</div>[% END %]
+[% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
+[% IF c.flash.success_msg %]<div class="success">[% c.flash.success_msg | html %]</div>[% END %]
+
+<div class="app-container">
+  <div class="page-header">
+    <h1>Site Add-ons &amp; Modules</h1>
+    <p>Manage integrations and feature sets available on <strong>[% site_name | html %]</strong>.</p>
+    <div class="admin-actions">
+      <a href="[% c.uri_for('/membership') %]" class="btn btn-secondary">&larr; Back to Memberships</a>
+      [% IF is_admin %]
+      <a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Admin Dashboard</a>
+      [% END %]
+    </div>
+  </div>
+
+  <div class="content-container" style="display: block;">
+    
+    <div class="content-section">
+      <h2>Available System Add-ons</h2>
+      <p class="text-muted">These modules are offered by the parent network and individual partner sites (e.g. beekeeping is owned by BMaster, ENCY by ENCY, 3D printing by 3D).</p>
+      
+      [% IF is_admin %]
+      <form action="[% c.uri_for('/membership/addons') %]" method="POST">
+      [% END %]
+
+      <div class="table-container">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Add-on / Module</th>
+              <th>Owner</th>
+              <th>Description</th>
+              <th>Site-Level Status</th>
+              <th>My Access Status</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            [% FOREACH mod IN modules %]
+            <tr>
+              <td>
+                <strong>[% mod.name | html %]</strong><br>
+                <code style="font-size:0.85em;color:#666;">[% mod.key | html %]</code>
+              </td>
+              <td>
+                <span class="badge" style="background-color:#5c6bc0;color:white;font-weight:bold;padding:2px 8px;border-radius:12px;">[% mod.owner | html %]</span>
+              </td>
+              <td>[% mod.description | html %]</td>
+              <td>
+                [% IF is_admin %]
+                  [% IF mod.key == 'membership' %]
+                    <span class="text-success" style="font-weight:bold;">Required Core</span>
+                    <input type="hidden" name="enabled_[% mod.key %]" value="1" />
+                  [% ELSE %]
+                    <label class="switch" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;">
+                      <input type="checkbox" name="enabled_[% mod.key %]" value="1" [% IF mod.site_enabled %]checked[% END %] style="cursor:pointer;" />
+                      [% IF mod.site_enabled %]Enabled[% ELSE %]<span style="color:#aaa;">Disabled</span>[% END %]
+                    </label>
+                  [% END %]
+                [% ELSE %]
+                  [% IF mod.site_enabled OR mod.key == 'membership' %]
+                    <span class="text-success" style="font-weight:bold;">&#10004; Enabled</span>
+                  [% ELSE %]
+                    <span class="text-muted">Disabled</span>
+                  [% END %]
+                [% END %]
+              </td>
+              <td>
+                [% IF mod.user_access %]
+                  <span class="badge badge-success" style="background-color:#28a745;color:white;padding:2px 8px;border-radius:12px;font-weight:bold;">Active Access</span>
+                [% ELSE %]
+                  <span class="badge badge-secondary" style="background-color:#6c757d;color:white;padding:2px 8px;border-radius:12px;">Locked</span>
+                [% END %]
+              </td>
+              <td>
+                [% IF mod.user_access %]
+                  <a href="[% c.uri_for(mod.route) %]" class="btn btn-sm btn-primary">Open &rarr;</a>
+                [% ELSIF is_admin %]
+                  [% IF hosting_account %]
+                    <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-sm" style="background:#e65c00;color:white;">Request Addon</a>
+                  [% ELSE %]
+                    <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain' }) %]" class="btn btn-sm btn-secondary">Register with CSC</a>
+                  [% END %]
+                [% ELSE %]
+                  <a href="[% c.uri_for('/membership') %]" class="btn btn-sm btn-secondary">View Plans</a>
+                [% END %]
+              </td>
+            </tr>
+            [% END %]
+          </tbody>
+        </table>
+      </div>
+
+      [% IF is_admin %]
+      <div class="form-actions" style="margin-top:1.5rem; text-align:right;">
+        <button type="submit" class="btn btn-primary" style="padding:10px 24px;font-size:1rem;font-weight:bold;">Save Add-on Configurations</button>
+      </div>
+      </form>
+      [% END %]
+
+    </div>
+
+    [% IF !hosting_account AND !site_is_csc AND is_admin %]
+    <div class="alert alert-warning" style="margin-top:2rem;background:#fff3cd;border:1px solid #ffeeba;padding:1.5rem;border-radius:8px;">
+      <h3 style="margin-top:0;">&#9888; [% site_name | html %] is not registered with CSC Hosting</h3>
+      <p>To enable full managed add-ons, cPanel databases, and secure subdomains, register this site's hosting relationship with CSC today.</p>
+      <div style="margin-top:1rem;">
+        <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain' }) %]" class="btn btn-primary">Register Site with CSC &rarr;</a>
+      </div>
+    </div>
+    [% END %]
+
+  </div>
+</div>

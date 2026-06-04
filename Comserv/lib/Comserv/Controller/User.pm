@@ -1159,6 +1159,13 @@ sub do_create_account :Local {
                     }, { rows => 1 })->single;
                     if ($hosting && $hosting->contact_email && lc($hosting->contact_email) eq lc($email)) {
                         $role_to_grant = 'admin';
+                    } else {
+                        my $user_count = $c->model('DBEncy::UserSiteRole')->search({
+                            site_id => $site->id,
+                        })->count;
+                        if ($user_count == 0) {
+                            $role_to_grant = 'admin';
+                        }
                     }
                 }
                 $c->model('DBEncy::UserSiteRole')->create({

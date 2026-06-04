@@ -279,11 +279,24 @@ sub auto :Private {
                             })->count;
                             unless ($site_admin_count) {
                                 my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
-                                    sitename => $site_name_check,
+                                    -or => [
+                                        sitename => $site_name_check,
+                                        sitename => lc($site_name_check),
+                                        sitename => uc($site_name_check),
+                                    ]
                                 }, { rows => 1 })->single;
-                                if ($hosting && $hosting->contact_email) {
+                                if ($hosting) {
                                     my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
-                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                    my $is_owner = 0;
+                                    if ($user_obj) {
+                                        if ($hosting->contact_email && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                            $is_owner = 1;
+                                        }
+                                        if ($hosting->created_by && lc($user_obj->username) eq lc($hosting->created_by)) {
+                                            $is_owner = 1;
+                                        }
+                                    }
+                                    if ($is_owner) {
                                         $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
                                             user_id   => $user_id,
                                             site_id   => $site_obj->id,
