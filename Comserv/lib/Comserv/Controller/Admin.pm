@@ -5833,7 +5833,10 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
         foreach my $line (split /\n/, $tags_out) {
             if ($line =~ /^(\S+)\s+(.+)$/) {
                 my ($id, $tag) = ($1, $2);
+                $id =~ s/^sha256://g;
+                my $short_id = substr($id, 0, 12);
                 push @{$image_id_to_tags{$id}}, $tag;
+                push @{$image_id_to_tags{$short_id}}, $tag unless $short_id eq $id;
             }
         }
     }
@@ -5873,8 +5876,12 @@ sub docker_list :Path('/admin/docker-list') :Args(0) {
                 if ($inspect_exit == 0) {
                     chomp $inspect_out;
                     $inspect_out =~ s/^'|'$//g; # Clean quotes
+                    $inspect_out =~ s/^sha256://g;
+                    my $short_id = substr($inspect_out, 0, 12);
                     if ($image_id_to_tags{$inspect_out}) {
                         $container_info->{image_tags} = $image_id_to_tags{$inspect_out};
+                    } elsif ($image_id_to_tags{$short_id}) {
+                        $container_info->{image_tags} = $image_id_to_tags{$short_id};
                     }
                 }
 
