@@ -289,12 +289,15 @@ sub addons :Local :Args(0) {
         )->single;
     };
 
+    my $site_is_csc = (lc($site_name) eq 'csc');
+
     $c->stash(
         template        => 'membership/Addons.tt',
         modules         => \@modules,
         site_name       => $site_name,
         is_admin        => $is_admin,
         hosting_account => $hosting_account,
+        site_is_csc     => $site_is_csc,
     );
     $c->forward($c->view('TT'));
 }
