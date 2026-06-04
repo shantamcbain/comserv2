@@ -51,6 +51,94 @@ sub _is_admin {
     return 0;
 }
 
+sub _get_modules_data {
+    my ($self, $c, $site_name) = @_;
+
+    my @modules = (
+        {
+            key         => 'beekeeping',
+            name        => 'Beekeeping & Apiary Management',
+            owner       => 'BMaster',
+            description => 'Track bee hives, apiaries, queen logs, and inspections.',
+            route       => '/apiary',
+        },
+        {
+            key         => 'planning',
+            name        => 'AI Planning & Project System',
+            owner       => 'CSC',
+            description => 'Advanced project planning, todo tracking, and AI-assisted workflows.',
+            route       => '/todo',
+        },
+        {
+            key         => 'accounting',
+            name        => 'Accounting & Ledger System',
+            owner       => 'ENCY',
+            description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.',
+            route       => '/Accounting',
+        },
+        {
+            key         => 'ency',
+            name        => 'Encyclopedia & Herbal Database',
+            owner       => 'ENCY',
+            description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.',
+            route       => '/ency',
+        },
+        {
+            key         => 'ecommerce',
+            name        => 'E-Commerce & Store',
+            owner       => 'CSC',
+            description => 'Sell products, list items, handle currency checkout, and manage shipping.',
+            route       => '/shop',
+        },
+        {
+            key         => 'helpdesk',
+            name        => 'HelpDesk Support & Guide system',
+            owner       => 'CSC',
+            description => 'Issue ticket tracking, linux guides, and support desk system.',
+            route       => '/helpdesk',
+        },
+        {
+            key         => 'foraging',
+            name        => 'Foraging & Wild Harvesting Log',
+            owner       => 'Forager',
+            description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.',
+            route       => '/foraging',
+        },
+        {
+            key         => 'membership',
+            name        => 'Multi-Site Membership System',
+            owner       => 'CSC',
+            description => 'Set up recurring billing, regional pricing, payment gateways, and coins.',
+            route       => '/membership',
+        },
+        {
+            key         => '3d',
+            name        => '3D Printing & Custom Fabrication',
+            owner       => '3D',
+            description => 'Order 3D prints, upload design models, and track build queues.',
+            route       => '/3d',
+        },
+    );
+
+    my %site_status;
+    eval {
+        my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search({
+            sitename => $site_name,
+        })->all;
+        for my $sm (@site_mods) {
+            $site_status{$sm->module_name} = $sm->enabled ? 1 : 0;
+        }
+    };
+
+    for my $mod (@modules) {
+        my $key = $mod->{key};
+        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : 0;
+        $mod->{user_access}  = $c->stash->{enabled_modules}{$key} ? 1 : 0;
+    }
+
+    return \@modules;
+}
+
 sub index :Path :Args(0) {
     my ($self, $c) = @_;
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'index',
@@ -65,6 +153,11 @@ sub index :Path :Args(0) {
     my $csc_hosting_plans = [];
     my $hosting_account   = undef;
     my $csc_not_registered = 0;
+
+    my $modules = [];
+    if ($is_admin) {
+        $modules = $self->_get_modules_data($c, $site_name);
+    }
 
     eval {
         my $site = $c->model('DBEncy')->resultset('Site')->search({ name => $site_name })->single;
@@ -149,6 +242,8 @@ sub index :Path :Args(0) {
         hosting_account    => $hosting_account,
         csc_not_registered => $csc_not_registered,
         user_site_memberships => $user_site_memberships,
+        modules            => $modules,
+        is_embedded        => 1,
     );
     $c->forward($c->view('TT'));
 }
@@ -162,78 +257,12 @@ sub addons :Local :Args(0) {
     my $is_admin  = $self->_is_admin($c);
     my $user_id   = $c->session->{user_id};
 
-    # Define all available modules with metadata
-    my @modules = (
-        {
-            key         => 'beekeeping',
-            name        => 'Beekeeping & Apiary Management',
-            owner       => 'BMaster',
-            description => 'Track bee hives, apiaries, queen logs, and inspections.',
-            route       => '/apiary',
-        },
-        {
-            key         => 'planning',
-            name        => 'AI Planning & Project System',
-            owner       => 'CSC',
-            description => 'Advanced project planning, todo tracking, and AI-assisted workflows.',
-            route       => '/todo',
-        },
-        {
-            key         => 'accounting',
-            name        => 'Accounting & Ledger System',
-            owner       => 'ENCY',
-            description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.',
-            route       => '/Accounting',
-        },
-        {
-            key         => 'ency',
-            name        => 'Encyclopedia & Herbal Database',
-            owner       => 'ENCY',
-            description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.',
-            route       => '/ency',
-        },
-        {
-            key         => 'ecommerce',
-            name        => 'E-Commerce & Store',
-            owner       => 'CSC',
-            description => 'Sell products, list items, handle currency checkout, and manage shipping.',
-            route       => '/shop',
-        },
-        {
-            key         => 'helpdesk',
-            name        => 'HelpDesk Support & Guide system',
-            owner       => 'CSC',
-            description => 'Issue ticket tracking, linux guides, and support desk system.',
-            route       => '/helpdesk',
-        },
-        {
-            key         => 'foraging',
-            name        => 'Foraging & Wild Harvesting Log',
-            owner       => 'Forager',
-            description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.',
-            route       => '/foraging',
-        },
-        {
-            key         => 'membership',
-            name        => 'Multi-Site Membership System',
-            owner       => 'CSC',
-            description => 'Set up recurring billing, regional pricing, payment gateways, and coins.',
-            route       => '/membership',
-        },
-        {
-            key         => '3d',
-            name        => '3D Printing & Custom Fabrication',
-            owner       => '3D',
-            description => 'Order 3D prints, upload design models, and track build queues.',
-            route       => '/3d',
-        },
-    );
-
     # If post and admin, handle site module updates
     if ($c->req->method eq 'POST' && $is_admin) {
         my $params = $c->req->body_parameters;
         eval {
-            foreach my $mod (@modules) {
+            my $modules_ref = $self->_get_modules_data($c, $site_name);
+            foreach my $mod (@$modules_ref) {
                 my $key = $mod->{key};
                 my $enabled = $params->{"enabled_$key"} ? 1 : 0;
                 $c->model('DBEncy')->resultset('SiteModule')->update_or_create(
@@ -252,28 +281,15 @@ sub addons :Local :Args(0) {
         if ($@) {
             $c->stash->{error_msg} = "Failed to update add-ons: $@";
         } else {
+            my $referer = $c->req->referer || '';
+            if ($referer =~ /membership$/ || $referer =~ /membership\?/) {
+                return $c->response->redirect($c->uri_for('/membership'));
+            }
             return $c->response->redirect($c->uri_for($self->action_for('addons')));
         }
     }
 
-    # Fetch current site-level enablement
-    my %site_status;
-    eval {
-        my @site_mods = $c->model('DBEncy')->resultset('SiteModule')->search({
-            sitename => $site_name,
-        })->all;
-        for my $sm (@site_mods) {
-            $site_status{$sm->module_name} = $sm->enabled ? 1 : 0;
-        }
-    };
-
-    # Populate module statuses
-    for my $mod (@modules) {
-        my $key = $mod->{key};
-        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : 0;
-        # Check if user has access (either site-level, user-override, or membership-granted)
-        $mod->{user_access}  = $c->stash->{enabled_modules}{$key} ? 1 : 0;
-    }
+    my $modules = $self->_get_modules_data($c, $site_name);
 
     my $hosting_account = undef;
     eval {
@@ -293,7 +309,7 @@ sub addons :Local :Args(0) {
 
     $c->stash(
         template        => 'membership/Addons.tt',
-        modules         => \@modules,
+        modules         => $modules,
         site_name       => $site_name,
         is_admin        => $is_admin,
         hosting_account => $hosting_account,
