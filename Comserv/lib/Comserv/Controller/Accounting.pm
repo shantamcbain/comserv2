@@ -1452,17 +1452,28 @@ sub migrate_to_pg :Path('/Accounting/migrate_to_pg') :Args(0) {
         my ($exists) = $pg->selectrow_array(
             "SELECT id FROM vendor WHERE name = ?", undef, $s->name);
         if ($exists) { $v_skip++; next; }
-        $pg->do(
-            "INSERT INTO vendor (name, contact, email, phone, notes, curr)
-             VALUES (?, ?, ?, ?, ?, 'CAD')",
-            undef,
-            $s->name,
-            $s->contact_name // '',
-            $s->email // '',
-            $s->phone // '',
-            $s->notes // '',
-        );
-        $pg->err ? do { $v_fail++; $errors++ } : $v_ok++;
+        my $phone = substr($s->phone // '', 0, 50);
+        if (($s->phone // '') ne $phone) {
+            push @log, "  WARN vendor '" . $s->name . "': phone truncated to 50 chars.";
+        }
+        eval {
+            $pg->do(
+                "INSERT INTO vendor (name, contact, email, phone, notes, curr)
+                 VALUES (?, ?, ?, ?, ?, 'CAD')",
+                undef,
+                substr($s->name // '', 0, 255),
+                substr($s->contact_name // '', 0, 255),
+                $s->email // '',
+                $phone,
+                $s->notes // '',
+            );
+        };
+        if ($@) {
+            push @log, "  FAIL vendor '" . $s->name . "': $@";
+            $v_fail++; $errors++;
+        } else {
+            $v_ok++;
+        }
     }
     push @log, "  Vendors: $v_ok inserted, $v_skip already existed, $v_fail failed.";
 
