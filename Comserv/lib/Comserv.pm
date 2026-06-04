@@ -674,7 +674,19 @@ sub get_session_data {
             return undef;
         };
         if (!$@ && defined $serialized) {
-            return _deserialize_session($serialized, $key);
+            if ($key =~ /^session:/ && $serialized =~ /^HASH\(0x[0-9a-fA-F]+\)/) {
+                eval {
+                    my $model = $c->model('DBEncy');
+                    my $rs = $model ? $model->resultset('Session') : undef;
+                    $rs->find($key)->delete() if $rs;
+                };
+                return undef;
+            }
+            my $data = _deserialize_session($serialized, $key);
+            if ($key =~ /^session:/ && defined $data && !ref($data)) {
+                return undef;
+            }
+            return $data;
         }
         if ($@) {
             warn "Database session retrieval failed for key '$key': $@. Falling back to file storage.\n";
@@ -682,7 +694,19 @@ sub get_session_data {
     }
     
     my $serialized = _get_file_session_data($key);
-    return _deserialize_session($serialized, $key);
+    if (defined $serialized) {
+        if ($key =~ /^session:/ && $serialized =~ /^HASH\(0x[0-9a-fA-F]+\)/) {
+            _delete_file_session_data($key);
+            return undef;
+        }
+        my $data = _deserialize_session($serialized, $key);
+        if ($key =~ /^session:/ && defined $data && !ref($data)) {
+            _delete_file_session_data($key);
+            return undef;
+        }
+        return $data;
+    }
+    return undef;
 }
 
 sub store_session_data {
