@@ -492,7 +492,17 @@ sub auto :Private {
             if ($hosting && $hosting->requested_addons) {
                 my @addons = split(/\s*,\s*/, $hosting->requested_addons);
                 for my $a (@addons) {
-                    $enabled{lc($a)} = 1 unless exists $enabled{lc($a)};
+                    my $lc_addon = lc($a);
+                    $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
+                    # Normalize alias keys (e.g., printing_3d and 3d) to ensure they match all check locations
+                    if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                        $enabled{'3d'} = 1 unless exists $enabled{'3d'};
+                        $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
+                    }
+                    if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                        $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
+                        $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
+                    }
                 }
             }
 

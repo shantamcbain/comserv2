@@ -149,7 +149,17 @@ sub _get_modules_data {
     if ($hosting_account && $hosting_account->requested_addons) {
         my @addons = split(/\s*,\s*/, $hosting_account->requested_addons);
         for my $a (@addons) {
-            $subscribed{lc($a)} = 1;
+            my $lc_addon = lc($a);
+            $subscribed{$lc_addon} = 1;
+            # Map aliases to ensure unified matching (e.g. 3d vs printing_3d)
+            if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                $subscribed{'3d'} = 1;
+                $subscribed{'printing_3d'} = 1;
+            }
+            if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                $subscribed{'workshop'} = 1;
+                $subscribed{'workshops'} = 1;
+            }
         }
     }
 
@@ -346,7 +356,7 @@ sub addons :Local :Args(0) {
 sub hosting_signup :Local :Args(0) {
     my ($self, $c) = @_;
 
-    my $site_name = $c->stash->{SiteName} || $c->session->{SiteName} || '';
+    my $site_name = $c->req->param('site_name') || $c->req->param('sitename') || $c->stash->{SiteName} || $c->session->{SiteName} || '';
     return $c->response->redirect($c->uri_for('/user/login', { return_to => $c->req->uri }))
         unless $c->session->{username};
     return $c->response->redirect($c->uri_for('/membership'))

@@ -133,13 +133,18 @@
                   [% IF s.hosting_plan %]
                     <span style="font-weight:bold;">[% s.hosting_plan | html %]</span><br>
                     <small>Status: <strong>[% s.hosting_status | html %]</strong></small>
-                    [% IF s.hosting_cost %]<small> &bull; CAD [% s.hosting_cost %]/mo</small>[% END %]
+                    [% IF s.hosting_cost %]<small> &bull; CAD [% s.hosting_cost %]/mo</small>[% END %]<br>
+                    [% IF s.is_admin %]
+                      <a href="[% c.uri_for('/membership/hosting_signup', { site_name => s.site_name }) %]" class="btn btn-sm" style="background:#e65c00;color:white;font-size:0.8em;padding:2px 6px;margin-top:2px;font-weight:bold;text-decoration:none;display:inline-block;border-radius:3px;">
+                        &#9998; Edit
+                      </a>
+                    [% END %]
                   [% ELSIF s.is_admin %]
                     [% IF s.site_name == 'CSC' %]
                       <span class="text-muted">Parent Platform</span>
                     [% ELSE %]
                       <span class="text-warning" style="font-weight:bold;">Not Registered</span><br>
-                      <a href="/membership/hosting_signup?plan=hosting-subdomain" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;">
+                      <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => s.site_name }) %]" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;text-decoration:none;display:inline-block;border-radius:3px;">
                         Register with CSC &rarr;
                       </a>
                     [% END %]
