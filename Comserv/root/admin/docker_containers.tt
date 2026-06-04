@@ -1235,9 +1235,9 @@
                                         const backupTags = activeTags.filter(t => t.startsWith('backup-'));
                                         if (backupTags.length > 0) {
                                             if (activeTags.includes('latest')) {
-                                                return `<div style="font-size: 12px; margin-bottom: 3px;"><span style="background-color: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 11px;"><i class="fas fa-check-circle"></i> Running LATEST image (matches ${backupTags.join(', ')})</span></div>`;
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #ff922b; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-exclamation-triangle" style="color: #ff922b;"></i> ACTIVE FAILOVER: Running ${backupTags.join(', ')} (tagged as latest)</span></div>`;
                                             } else {
-                                                return `<div style="font-size: 12px; margin-bottom: 3px;"><span style="background-color: #fff3cd; color: #856404; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 11px;"><i class="fas fa-history"></i> ROLLED BACK (Running ${backupTags.join(', ')})</span></div>`;
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #dc3545; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-history" style="color: #dc3545;"></i> ROLLED BACK: Running ${backupTags.join(', ')}</span></div>`;
                                             }
                                         } else {
                                             return `<div style="font-size: 12px; margin-bottom: 3px;"><span style="background-color: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 11px;"><i class="fas fa-check-circle"></i> Running LATEST image</span></div>`;
