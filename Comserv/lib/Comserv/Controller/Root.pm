@@ -481,6 +481,21 @@ sub auto :Private {
                 $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
             }
 
+            # Check hosting account for subscribed addons to enable them by default
+            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                -or => [
+                    sitename => $mod_site,
+                    sitename => lc($mod_site),
+                    sitename => uc($mod_site),
+                ]
+            }, { rows => 1 })->single;
+            if ($hosting && $hosting->requested_addons) {
+                my @addons = split(/\s*,\s*/, $hosting->requested_addons);
+                for my $a (@addons) {
+                    $enabled{lc($a)} = 1 unless exists $enabled{lc($a)};
+                }
+            }
+
             # Apply per-user overrides from user_module_access
             if ($c->session->{username}) {
                 my @overrides = $c->model('DBEncy')->resultset('UserModuleAccess')->search({

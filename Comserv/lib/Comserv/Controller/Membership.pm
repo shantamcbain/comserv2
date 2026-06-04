@@ -130,9 +130,34 @@ sub _get_modules_data {
         }
     };
 
+    # Load hosting account subscribed addons
+    my $hosting_account = undef;
+    eval {
+        $hosting_account = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search(
+            {
+                -or => [
+                    sitename => $site_name,
+                    sitename => lc($site_name),
+                    sitename => uc($site_name),
+                ]
+            },
+            { rows => 1 }
+        )->single;
+    };
+
+    my %subscribed;
+    if ($hosting_account && $hosting_account->requested_addons) {
+        my @addons = split(/\s*,\s*/, $hosting_account->requested_addons);
+        for my $a (@addons) {
+            $subscribed{lc($a)} = 1;
+        }
+    }
+
     for my $mod (@modules) {
         my $key = $mod->{key};
-        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : 0;
+        my $default_val = $subscribed{$key} ? 1 : 0;
+        $mod->{site_enabled} = exists $site_status{$key} ? $site_status{$key} : $default_val;
+        $mod->{subscribed}   = $subscribed{$key} ? 1 : 0;
         $mod->{user_access}  = $c->stash->{enabled_modules}{$key} ? 1 : 0;
     }
 
