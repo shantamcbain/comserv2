@@ -34,6 +34,8 @@
                 <a href="#after-login" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">After Login</a>
                 <a href="#multi-site" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Multiple Sites</a>
                 <a href="#troubleshooting" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Troubleshooting</a>
+                <a href="#security" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Security &amp; Bot Prevention</a>
+                <a href="#admin-purging" style="color: var(--link-color); text-decoration: none; padding: 4px 8px; border-radius: 3px; background-color: rgba(255,255,255,0.12); display: inline-block;">Admin: Spambot Purging</a>
             </div>
         </div>
     </div>
@@ -286,6 +288,80 @@
                     — your previous username and email are still available to reuse.
                 </p>
             </div>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- SECURITY & BOT PREVENTION -->
+    <div id="security" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--secondary-color); font-family: var(--header-font); font-size: var(--font-size-xxlarge); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">
+                Security &amp; Bot Prevention
+            </h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-size: var(--font-size-large); line-height: 1.6;">
+                To safeguard our registration infrastructure and prevent automated bots/spammers from flooding the database with fake accounts, Comserv employs a robust, server-side anti-bot verification challenge.
+            </p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-medium);">
+                Arithmetic Bot-Challenge
+            </h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                When submitting the registration form (Step 1), a dynamic math problem is generated. This is a purely server-side, math-based security challenge. Unlike commercial solutions like Google reCAPTCHA, it has zero external dependencies, loads instantly, and does not track users.
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+                <li><strong>Dynamic Challenge:</strong> Two random numbers between 2 and 9 are generated and stored securely in your temporary session.</li>
+                <li><strong>No Hardcoding:</strong> The solution is never sent to the browser or stored in hidden input fields, making it impossible for basic form-submitting bots to guess.</li>
+                <li><strong>Immediate Failure:</strong> An incorrect answer immediately rejects the form submission, generates a brand new set of random numbers, and displays a user-friendly error.</li>
+            </ul>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-medium);">
+                Step-by-Step Onboarding Monitoring
+            </h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                For administrative transparency, the onboarding process notifies site administrators at every stage:
+            </p>
+            <ul style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+                <li><strong>Step 1:</strong> An alert is dispatched when a registration form is initially submitted.</li>
+                <li><strong>Step 2:</strong> A notification is sent when the user successfully verifies their email address.</li>
+                <li><strong>Step 3:</strong> A completion notification is generated when the user has filled out their profile and is fully active.</li>
+            </ul>
+
+            <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
+        </div>
+    </div>
+
+    <!-- ADMIN PURGING -->
+    <div id="admin-purging" class="row">
+        <div class="col-100">
+            <h2 style="color: var(--secondary-color); font-family: var(--header-font); font-size: var(--font-size-xxlarge); border-bottom: 2px solid var(--border-color); padding-bottom: var(--spacing-small);">
+                Admin: Spambot Cleanup &amp; Purging
+            </h2>
+            <p style="color: var(--text-color); font-family: var(--body-font); font-size: var(--font-size-large); line-height: 1.6;">
+                Despite preventative checks, stale/unverified records from previous registration attempts (or legacy spambots prior to the arithmetic challenge) can clutter the database. Core system administrators (CSC site administrators) can prune these safely.
+            </p>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-medium);">
+                How to Access and Purge Accounts
+            </h3>
+            <ol style="color: var(--text-color); font-family: var(--body-font); line-height: 1.6;">
+                <li>Navigate to the <strong>Admin Dashboard</strong> and choose <strong>Manage Users</strong>.</li>
+                <li>At the top of the user management console, look for the <strong>"Purge Pending Registrations"</strong> control panel.</li>
+                <li>Configure your cleanup criteria:
+                    <ul style="margin-top: var(--spacing-small);">
+                        <li><strong>Cutoff Age (Hours):</strong> Specify how old the unverified account must be (e.g., purge accounts older than 24 hours). The default is 48 hours.</li>
+                        <li><strong>Email Filter (Optional Pattern):</strong> Restrict the purge to matching email patterns/domains (e.g., enter <code>%@spamdomain.com</code> or <code>%@botmail%</code>).</li>
+                    </ul>
+                </li>
+                <li>Click <strong>"Purge Pending Accounts"</strong>. You will be prompted with a confirmation dialog box to ensure you don't delete records by accident.</li>
+            </ol>
+
+            <h3 style="color: var(--text-color); font-family: var(--header-font); font-size: var(--font-size-large); margin-top: var(--spacing-medium);">
+                Transactional Safety Features
+            </h3>
+            <p style="color: var(--text-color); font-family: var(--body-font);">
+                The purging tool runs within strict database transactions. If any database exception is raised during deletion, the entire block is rolled back automatically, preventing partial deletions and corrupted data states.
+            </p>
 
             <p style="text-align: right;"><a href="#toc" style="color: var(--link-color); font-size: var(--font-size-small);">↑ Back to Top</a></p>
         </div>

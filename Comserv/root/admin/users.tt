@@ -67,6 +67,31 @@
                     [% END %]
                 </div>
             </div>
+
+            <!-- Purge Unverified Accounts Section -->
+            [% IF is_csc_admin %]
+            <div class="content-section" style="border: 1px solid var(--border-color); background-color: rgba(220, 53, 69, 0.05); padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+                <h3 style="color: #dc3545; margin-top: 0;">Purge Unverified Spambots</h3>
+                <p style="font-size: var(--font-size-small); margin-bottom: 12px; color: var(--text-color);">Delete pending_verification accounts that have failed to complete the setup process. Safely clean up database spam.</p>
+                <div class="form-container">
+                    <form method="POST" action="[% c.uri_for('/admin/purge_users') %]" class="app-form" onsubmit="return confirm('Are you sure you want to permanently delete these unverified spambot accounts? This action cannot be undone.');">
+                        <div class="form-section" style="display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap;">
+                            <div class="form-field" style="flex: 1; min-width: 150px; margin-bottom: 0;">
+                                <label for="purge_hours">Age Cutoff (Hours Old)</label>
+                                <input type="number" id="purge_hours" name="purge_hours" class="form-input" value="24" min="1" required style="width: 100%;">
+                            </div>
+                            <div class="form-field" style="flex: 2; min-width: 250px; margin-bottom: 0;">
+                                <label for="email_pattern">Email Domain/Pattern Filter (Optional, e.g. %qq.com)</label>
+                                <input type="text" id="email_pattern" name="email_pattern" class="form-input" placeholder="e.g. %qq.com or empty for all" style="width: 100%;">
+                            </div>
+                            <div class="form-field" style="margin-bottom: 0;">
+                                <button type="submit" class="btn btn-delete" style="background-color: #dc3545; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer;">Purge Accounts</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            [% END %]
             
             <!-- Search and Filters Section -->
             <div class="content-section">
