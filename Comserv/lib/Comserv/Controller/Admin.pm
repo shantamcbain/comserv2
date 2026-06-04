@@ -792,6 +792,88 @@ sub users :Path('/admin/users') :Args(0) {
     );
 }
 
+# Admin purge unverified/bogus users
+sub purge_users :Path('/admin/purge_users') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'purge_users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    unless ($is_csc_admin) {
+        $c->flash->{error_msg} = "Only global CSC administrators can purge users.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $hours = $c->req->param('purge_hours') // 24;
+    if ($hours !~ /^\d+$/ || $hours <= 0) {
+        $hours = 24;
+    }
+
+    my $email_pattern = $c->req->param('email_pattern') // '';
+    $email_pattern =~ s/^\s+|\s+$//g;
+
+    my $schema = $c->model('DBEncy');
+    my $purged_count = 0;
+
+    eval {
+        my $cutoff = DateTime->now->subtract(hours => $hours)->strftime('%Y-%m-%d %H:%M:%S');
+
+        my %search_cond = (
+            status => 'pending_verification',
+            created_at => { '<' => $cutoff },
+        );
+
+        if ($email_pattern ne '') {
+            $search_cond{email} = { like => "%$email_pattern%" };
+        }
+
+        my @users_to_purge = $schema->resultset('User')->search(\%search_cond)->all;
+
+        for my $user (@users_to_purge) {
+            my $user_id = $user->id;
+
+            $schema->txn_do(sub {
+                $schema->resultset('EmailVerificationCode')->search({ user_id => $user_id })->delete;
+                $schema->resultset('PasswordResetToken')->search({ user_id => $user_id })->delete;
+                $schema->resultset('UserSiteRole')->search({ user_id => $user_id })->delete;
+                $schema->resultset('Accounting::PointAccount')->search({ user_id => $user_id })->delete;
+
+                eval {
+                    $schema->resultset('System::SiteUser')->search({ user_id => $user_id })->delete;
+                };
+
+                $schema->resultset('User')->search({ id => $user_id })->delete;
+                $purged_count++;
+            });
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'purge_users',
+            "Admin purged $purged_count unverified users older than $hours hours (email pattern: '$email_pattern')");
+
+        $c->flash->{success_msg} = "Successfully purged $purged_count unverified accounts.";
+    };
+
+    if ($@) {
+        my $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'purge_users',
+            "Error purging unverified users: $err");
+        $c->flash->{error_msg} = "Error purging unverified users: $err";
+    }
+
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
 # Admin create user
 sub create_user :Path('/admin/create_user') :Args(0) {
     my ($self, $c) = @_;
