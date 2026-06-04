@@ -29,7 +29,14 @@
 [% END %]
     
     <div class="content-section">
-      <h2>Available System Add-ons</h2>
+      <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 0.5rem;">
+        <h2 style="margin: 0;">Available System Add-ons</h2>
+        [% IF is_admin AND hosting_account %]
+          <a href="[% c.uri_for('/membership/hosting_signup') %]" class="btn btn-sm" style="background: #e65c00; color: white; font-weight: bold; padding: 6px 14px; border-radius: 4px; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;">
+            &#9998; Edit Subscribed Add-ons
+          </a>
+        [% END %]
+      </div>
       <p class="text-muted">These modules are offered by the parent network and individual partner sites (e.g. beekeeping is owned by BMaster, ENCY by ENCY, 3D printing by 3D).</p>
       
       [% IF is_admin %]
@@ -52,7 +59,10 @@
             [% FOREACH module IN modules %]
             <tr>
               <td>
-                <strong>[% module.name | html %]</strong><br>
+                <strong>[% module.name | html %]</strong>
+                [% IF module.subscribed %]
+                  <span class="badge" style="background-color:#e65c00;color:white;font-size:0.8em;padding:2px 6px;border-radius:10px;margin-left:4px;font-weight:bold;white-space:nowrap;display:inline-block;vertical-align:middle;">Subscribed</span>
+                [% END %]<br>
                 <code style="font-size:0.85em;color:#666;">[% module.key | html %]</code>
               </td>
               <td>
