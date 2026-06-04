@@ -2,7 +2,24 @@
 use strict;
 use warnings;
 use FindBin;
-use lib "$FindBin::Bin/../lib";
+
+# Set up local::lib and local paths for running under Starman/PSGI
+use lib "$FindBin::Bin/../local/lib/perl5";
+use Config;
+BEGIN {
+    my $archname = $Config{archname};
+    my $version = $Config{version};
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$archname" if $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version/$archname" if $version && $archname;
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/$version" if $version;
+    
+    # Also add architecture specific multi-thread directories
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/x86_64-linux-gnu-thread-multi";
+    unshift @INC, "$FindBin::Bin/../local/lib/perl5/site_perl";
+}
+
+use lib $ENV{CATALYST_HOME} ? "$ENV{CATALYST_HOME}/lib" : "$FindBin::Bin/../lib";
+use lib $ENV{CATALYST_HOME} ? $ENV{CATALYST_HOME} : "$FindBin::Bin/..";
 
 use Comserv;
 use Plack::Builder;

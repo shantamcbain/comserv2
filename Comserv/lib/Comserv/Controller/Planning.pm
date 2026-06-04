@@ -505,7 +505,7 @@ sub daily :Path('/planning/daily') :Args {
             next if ($h{is_recurring} // 0);
 
             my $st          = $h{status} // '';
-            my $in_progress = ($st == 2 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
+            my $in_progress = ($st == 2 || $st == 5 || $st =~ /^(in.progress|in.process|IN PROGRESS)$/i) ? 1 : 0;
             my $status_tier = $in_progress ? 0 : 1;
 
             my $activity_str = $h{last_mod_date} || $h{date_time_posted} || '';
@@ -522,7 +522,7 @@ sub daily :Path('/planning/daily') :Args {
             my $block_bonus      = $h{is_blocking} ? -0.4 : 0;
             my $cross_block_bonus = 0;
             if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
-                $cross_block_bonus    = -3;
+                $cross_block_bonus    = -1000;
                 $h{is_cross_blocker}  = 1;
                 $h{blocking_count}    = scalar @{ $cross_blocker_projects{$h{project_id}} };
                 $h{blocking_names}    = join(', ', @{ $cross_blocker_names{$h{project_id}} || [] });
@@ -585,6 +585,9 @@ sub daily :Path('/planning/daily') :Args {
 
         @active_priorities = @all_sorted;
 
+        my $cross_blocker_count = scalar grep { $_->{is_cross_blocker} } @active_priorities;
+        $c->stash->{cross_blocker_count} = $cross_blocker_count;
+
         my @ap_projects_list = sort { ($a->{project_name}||'zzz') cmp ($b->{project_name}||'zzz') }
                                values %ap_projects_seen;
         my @ap_role_cats_list = sort keys %ap_role_cats_seen;
@@ -595,7 +598,20 @@ sub daily :Path('/planning/daily') :Args {
                 my @site_rows = $c->model('DBEncy')->resultset('Site')->search(
                     {}, { order_by => 'name' }
                 )->all;
-                @ap_all_sitenames = sort map { $_->name } @site_rows;
+                my %seen;
+                for my $s (@site_rows) {
+                    my $n = eval { $s->name } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                my @todo_sites = $c->model('DBEncy')->resultset('Todo')->search(
+                    { sitename => { '!=' => undef } },
+                    { columns => ['sitename'], distinct => 1 }
+                )->all;
+                for my $r (@todo_sites) {
+                    my $n = eval { $r->get_column('sitename') } // '';
+                    push @ap_all_sitenames, $n if $n && !$seen{$n}++;
+                }
+                @ap_all_sitenames = sort @ap_all_sitenames;
             };
         } else {
             eval {
@@ -622,8 +638,8 @@ sub daily :Path('/planning/daily') :Args {
         eval {
             if ($is_csc) {
                 my @urows = $c->model('DBEncy')->resultset('Users')->search(
-                    {},
-                    { columns => ['username'], order_by => 'username', rows => 200 }
+                    { roles => { '!=' => '', -not => undef } },
+                    { columns => ['username'], order_by => 'username' }
                 )->all;
                 my %seen;
                 for my $r (@urows) {
@@ -853,7 +869,7 @@ sub daily :Path('/planning/daily') :Args {
                         { subject => { -like => '%Morning Audit%' } },
                         { subject => { -like => '[Error]%' } },
                     ],
-                    status  => { -in => [1, 2] },
+                    status  => { -in => [1, 2, 5] },
                 };
                 $audit_cond->{sitename} = $sitename unless $is_csc;
                 my %audit_cond = %$audit_cond;
@@ -939,6 +955,18 @@ sub daily :Path('/planning/daily') :Args {
                 }
             };
             \@st;
+        },
+
+        active_todos => do {
+            my %at;
+            eval {
+                my $dbh = $c->model('DBEncy')->storage->dbh;
+                my $rows = $dbh->selectcol_arrayref(
+                    "SELECT DISTINCT todo_record_id FROM log WHERE end_time='00:00:00' AND status!=3"
+                );
+                %at = map { $_ => 1 } @$rows if $rows;
+            };
+            \%at;
         },
 
         template => 'admin/planning/DailyPlan.tt',
@@ -1749,6 +1777,22 @@ sub _schedule_day {
             { order_by => [{ -asc => 'priority' }, { -asc => 'sort_order' }] }
         )->all;
     };
+
+    if (@todos > 1) {
+        my %dep_rows;
+        eval {
+            my @drws = $schema->resultset('ProjectDependency')->search(
+                { status => 'active', dependency_type => 'blocks' },
+                { columns => [qw(depends_on_id)] }
+            )->all;
+            %dep_rows = map { $_->depends_on_id => 1 } @drws;
+        };
+        if (%dep_rows) {
+            my @cross = grep { $_->project_id && $dep_rows{$_->project_id} } @todos;
+            my @rest  = grep { !($_->project_id && $dep_rows{$_->project_id}) } @todos;
+            @todos = (@cross, @rest);
+        }
+    }
 
     my $count = 0;
     for my $todo (@todos) {
