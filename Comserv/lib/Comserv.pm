@@ -128,6 +128,8 @@ sub psgi_app {
     my $last_alert_mb  = 0;   # track last alerted RSS level (in MB)
     my $alert_threshold_mb  = 1024;  # first alert at 1 GB
     my $alert_step_mb       = 256;   # re-alert every additional 256 MB
+    # Only production1 Docker host (SYSTEM_IDENTIFIER in docker-compose.server.yml)
+    my $memory_monitor_enabled = ($ENV{SYSTEM_IDENTIFIER} // '') eq 'production1';
 
     return sub {
         my $env = shift;
@@ -135,9 +137,9 @@ sub psgi_app {
         $self->config->{enable_catalyst_header} = $ENV{CATALYST_HEADER} // 1;
         $self->config->{debug} = $ENV{CATALYST_DEBUG} // 0;
 
-        # Periodic memory monitoring (every 500 requests)
+        # Periodic memory monitoring (every 500 requests) — production1 only
         $request_count++;
-        if ($request_count % 500 == 0) {
+        if ($memory_monitor_enabled && $request_count % 500 == 0) {
             eval {
                 if (-f "/proc/self/status") {
                     open my $fh, '<', "/proc/self/status";
