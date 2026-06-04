@@ -8,6 +8,7 @@
     <li><a href="#summary">Summary of Changes</a></li>
     <li><a href="#web_dev_rebuild">web-dev Container - Rebuild Steps</a></li>
     <li><a href="#web_prod_rebuild">web-prod Container - Rebuild Steps</a></li>
+    <li><a href="#manual_production_deploy">Manual Production Deploy</a></li>
     <li><a href="#verification">Verification & Testing</a></li>
     <li><a href="#troubleshooting">Troubleshooting</a></li>
 </ul>
@@ -242,6 +243,74 @@ docker exec comserv-web-prod ls -la /opt/comserv/root/
 
 # Check if log directory is writable
 docker exec comserv-web-prod touch /opt/comserv/root/log/test.log && echo "Writable" || echo "Read-only"</code></pre>
+        </div>
+    </div>
+</div>
+
+<div class="container" id="manual_production_deploy">
+    <div class="container-header">Manual Production Server Deployment (Paralleling deploy.sh)</div>
+    <div class="container-content">
+        <div class="container-content-inner">
+            <p>If you need to perform the production deployment manually instead of using the automated script, use these step-by-step commands to perfectly mirror the automated pipeline:</p>
+            
+            <h3>Step 1: Clean Up Storage Before Pulling</h3>
+            <p>To prevent the host server partition from reaching 100% usage, prune unused resources:</p>
+            <pre><code># Clean up unused/dangling resources (runs safely without affecting running containers)
+docker container prune -f --filter "until=1h"
+docker image prune -f
+docker volume prune -f
+docker builder prune -a -f</code></pre>
+
+            <h3>Step 2: Rotate Rollback/Backup Images</h3>
+            <p>We preserve the last two stable deployments as <code>backup-1</code> and <code>backup-2</code> to allow instant rollback if the new container fails:</p>
+            <pre><code># 1. Delete the oldest backup (backup-2) if it exists
+docker rmi shantamcsbain/comserv-web-prod:backup-2 2>/dev/null || true
+
+# 2. Tag current backup-1 as backup-2, then delete backup-1
+if docker image inspect shantamcsbain/comserv-web-prod:backup-1 >/dev/null 2>&1; then
+    docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:backup-2
+    docker rmi shantamcsbain/comserv-web-prod:backup-1 2>/dev/null || true
+fi
+
+# 3. Tag current active (latest) image as backup-1
+if docker image inspect shantamcsbain/comserv-web-prod:latest >/dev/null 2>&1; then
+    docker tag shantamcsbain/comserv-web-prod:latest shantamcsbain/comserv-web-prod:backup-1
+fi</code></pre>
+
+            <h3>Step 3: Pull the Latest Image</h3>
+            <pre><code># Pull the new image from Docker Hub
+docker compose -f /opt/comserv/Comserv/docker-compose.server.yml pull</code></pre>
+
+            <h3>Step 4: Stop and Remove the Old Container</h3>
+            <pre><code># Gracefully stop and remove the active container
+docker stop comserv2-web-prod 2>/dev/null || true
+docker rm -f comserv2-web-prod 2>/dev/null || true
+docker compose -f /opt/comserv/Comserv/docker-compose.server.yml down --remove-orphans 2>/dev/null || true</code></pre>
+
+            <h3>Step 5: Run the New Container with Dynamic NFS and Logs</h3>
+            <p>Ensure that <code>COMSERV_LOGS_DIR</code> points to your NFS mount (e.g. <code>/home/ubuntu/nfs/comserv-logs</code>) and <code>WORKSHOP_LOCAL_DIR</code> points to the workshop folder (e.g. <code>/home/ubuntu/nfs</code>):</p>
+            <pre><code># Start the new container with NFS paths passed through
+COMSERV_LOGS_DIR="/home/ubuntu/nfs/comserv-logs" \
+WORKSHOP_LOCAL_DIR="/home/ubuntu/nfs" \
+docker compose -f /opt/comserv/Comserv/docker-compose.server.yml up -d --force-recreate</code></pre>
+
+            <h3>Step 6: Wait and Verify Health Check</h3>
+            <p>Wait up to 90 seconds and check if the health check status becomes "healthy":</p>
+            <pre><code># Monitor the health status
+docker inspect --format='{{.State.Health.Status}}' comserv2-web-prod</code></pre>
+
+            <h3>Step 7: Manual Rollback if Health Check Fails</h3>
+            <p>If the new container remains unhealthy, immediately restore the previous stable version (<code>backup-1</code>) to prevent downtime:</p>
+            <pre><code># 1. Stop and remove the failed container
+docker stop comserv2-web-prod && docker rm comserv2-web-prod
+
+# 2. Re-tag backup-1 to latest
+docker tag shantamcsbain/comserv-web-prod:backup-1 shantamcsbain/comserv-web-prod:latest
+
+# 3. Restart container with the reverted image
+COMSERV_LOGS_DIR="/home/ubuntu/nfs/comserv-logs" \
+WORKSHOP_LOCAL_DIR="/home/ubuntu/nfs" \
+docker compose -f /opt/comserv/Comserv/docker-compose.server.yml up -d --force-recreate</code></pre>
         </div>
     </div>
 </div>

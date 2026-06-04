@@ -312,20 +312,6 @@ sub test_connection {
         my $port = $conn_config->{port} // 3306;
         my $database = $conn_config->{database} // '';
 
-        # Fast TCP pre-flight: fail in 1s if host is unreachable, before attempting DBI connect.
-        my $sock = IO::Socket::INET->new(
-            PeerAddr => $host,
-            PeerPort => $port,
-            Proto    => 'tcp',
-            Timeout  => 1,
-        );
-        unless ($sock) {
-            $self->logging->log_with_details(undef, 'debug', __FILE__, __LINE__, 'test_connection',
-                "TCP pre-flight failed for '$conn_name' ($host:$port): $!");
-            return 0;
-        }
-        $sock->close();
-
         $dsn = "dbi:MariaDB:database=$database;host=$host;port=$port;mariadb_connect_timeout=2";
     }
     

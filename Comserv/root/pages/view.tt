@@ -4,16 +4,34 @@
 [% END %]
 
 <div class="page-content">
-    <h1>[% page.title %]</h1>
-    
-    [% IF c.session.roles.match('admin') %]
-    <div class="admin-controls">
-        <a href="/pages/edit/[% page.page_code %]" class="btn btn-primary">Edit Page</a>
-    </div>
+    [% IF !page.body.match('(?i)<h1') %]
+        <h1>[% page.title %]
+            [% IF c.stash.is_admin || c.session.is_admin || c.session.roles.grep('admin').size || c.session.roles.grep('editor').size %]
+                [% SET current_site = SiteName || c.stash.SiteName || c.session.SiteName || 'CSC' %]
+                [% IF current_site == 'CSC' || page.sitename == current_site %]
+                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="margin-left: 10px; vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
+                [% ELSE %]
+                    <span class="badge bg-secondary text-dark" style="margin-left: 10px; font-size: 0.75rem; vertical-align: middle; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
+                [% END %]
+            [% END %]
+        </h1>
+    [% ELSE %]
+        [% IF c.stash.is_admin || c.session.is_admin || c.session.roles.grep('admin').size || c.session.roles.grep('editor').size %]
+            [% SET current_site = SiteName || c.stash.SiteName || c.session.SiteName || 'CSC' %]
+            [% IF current_site == 'CSC' || page.sitename == current_site %]
+                <div style="float: right; margin-top: 10px; margin-bottom: 10px;">
+                    <a href="[% c.uri_for('/admin/pages', { action => 'edit', id => page.id }) %]" class="btn btn-xs btn-default" style="vertical-align: middle;"><i class="fa fa-edit"></i> Edit</a>
+                </div>
+            [% ELSE %]
+                <div style="float: right; margin-top: 10px; margin-bottom: 10px;">
+                    <span class="badge bg-secondary text-dark" style="font-size: 0.75rem; vertical-align: middle; font-weight: normal;" title="This page is shared from [% page.sitename %] and is read-only on this site."><i class="fa fa-lock"></i> Shared (Read-Only)</span>
+                </div>
+            [% END %]
+        [% END %]
     [% END %]
     
     <div class="page-body">
-        [% page.body %]
+        [% rendered_body || page.body %]
     </div>
     
     [% IF page.description %]

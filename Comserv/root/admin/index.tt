@@ -13,7 +13,7 @@
         [% IF is_csc %]<a href="[% c.uri_for('/admin/docker-containers') %]"><i class="fas fa-docker"></i> Docker</a>[% END %]
         [% IF is_csc %]<a href="#section-software"><i class="fas fa-cogs"></i> Software</a>[% END %]
         <a href="#section-helpdesk"><i class="fas fa-life-ring"></i> HelpDesk</a>
-        [% IF has_accounting %]<a href="#section-inventory"><i class="fas fa-boxes"></i> Inventory</a>[% END %]
+        [% IF has_accounting %]<a href="#section-accounting"><i class="fas fa-book"></i> Accounting &amp; Inventory</a>[% END %]
         [% IF has_accounting %]<a href="#section-customers"><i class="fas fa-users"></i> Customers</a>[% END %]
         <a href="#section-membership"><i class="fas fa-id-card"></i> Membership</a>
         <a href="#section-shop"><i class="fas fa-shopping-bag"></i> Shop</a>
@@ -109,36 +109,12 @@
         [% END %]
 
         [% IF has_accounting %]
-        <div id="section-inventory" class="admin-section theme-section">
+        <div id="section-accounting" class="admin-section theme-section">
             <div class="section-header">
-                <h3><i class="fas fa-boxes"></i> Inventory &amp; Accounting</h3>
+                <h3><i class="fas fa-book"></i> Accounting &amp; Inventory</h3>
             </div>
             <div class="section-content">
                 <div class="admin-links">
-                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
-                        <i class="fas fa-warehouse"></i>
-                        <span>Inventory Dashboard</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
-                        <i class="fas fa-list"></i>
-                        <span>Items / SKUs</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
-                        <i class="fas fa-truck"></i>
-                        <span>Suppliers</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
-                        <i class="fas fa-map-marker-alt"></i>
-                        <span>Locations</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
-                        <i class="fas fa-sitemap"></i>
-                        <span>Bill of Materials</span>
-                    </a>
-                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
-                        <i class="fas fa-file-invoice-dollar"></i>
-                        <span>Supplier Invoices</span>
-                    </a>
                     <a href="[% c.uri_for('/Accounting') %]" class="admin-link">
                         <i class="fas fa-book"></i>
                         <span>Accounting Dashboard</span>
@@ -151,13 +127,37 @@
                         <i class="fas fa-balance-scale"></i>
                         <span>General Ledger</span>
                     </a>
-                    <a href="[% c.uri_for('/CustomerOrder') %]" class="admin-link">
-                        <i class="fas fa-shopping-cart"></i>
-                        <span>Customer Orders</span>
+                    <a href="[% c.uri_for('/Inventory') %]" class="admin-link">
+                        <i class="fas fa-warehouse"></i>
+                        <span>Inventory Dashboard</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/items') %]" class="admin-link">
+                        <i class="fas fa-list"></i>
+                        <span>Items / SKUs</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/suppliers') %]" class="admin-link">
+                        <i class="fas fa-truck"></i>
+                        <span>Suppliers</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/invoice') %]" class="admin-link">
+                        <i class="fas fa-file-invoice-dollar"></i>
+                        <span>Supplier Invoices (AP)</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/sales') %]" class="admin-link">
+                        <i class="fas fa-file-invoice"></i>
+                        <span>Sales Invoices (AR)</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/locations') %]" class="admin-link">
+                        <i class="fas fa-map-marker-alt"></i>
+                        <span>Locations</span>
+                    </a>
+                    <a href="[% c.uri_for('/Inventory/bom/list') %]" class="admin-link">
+                        <i class="fas fa-sitemap"></i>
+                        <span>Bill of Materials</span>
                     </a>
                     <a href="[% c.uri_for('/Cart/orders') %]" class="admin-link">
                         <i class="fas fa-shopping-cart"></i>
-                        <span>Cart Orders</span>
+                        <span>Customer Orders</span>
                     </a>
                     <a href="[% c.uri_for('/shop') %]" class="admin-link">
                         <i class="fas fa-store"></i>
@@ -336,10 +336,6 @@
                         <i class="fas fa-exchange-alt"></i>
                         <span>Migrate Schema</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
-                        <i class="fas fa-file-export"></i>
-                        <span>Migrate Pages (Forager → Ency)</span>
-                    </a>
                     <a href="[% c.uri_for('/admin/environment_variables') %]" class="admin-link">
                         <i class="fas fa-key"></i>
                         <span>DB Connection Passwords</span>
@@ -402,6 +398,14 @@
                     <a href="[% c.uri_for('/admin/theme') %]" class="admin-link">
                         <i class="fas fa-palette"></i>
                         <span>Theme Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/pages') %]" class="admin-link">
+                        <i class="fas fa-file-alt"></i>
+                        <span>Page Management</span>
+                    </a>
+                    <a href="[% c.uri_for('/admin/migrate_pages') %]" class="admin-link">
+                        <i class="fas fa-file-export"></i>
+                        <span>Migrate Legacy Pages</span>
                     </a>
                     <a href="[% c.uri_for('/admin/view_log') %]" class="admin-link">
                         <i class="fas fa-file-alt"></i>
@@ -683,6 +687,8 @@
                     <div class="stat-bar stat-bar-[% nlevel %]" style="width:[% stats.nfs_pct %]%"></div>
                 </div>
                 <div class="stat-sub-detail">[% stats.nfs_used %] / [% stats.nfs_total %]</div>
+                [% ELSIF stats.nfs_same_device %]
+                <div class="stat-value" style="font-size:.8rem;color:#888">same as<br>app disk</div>
                 [% ELSE %]
                 <div class="stat-value">—</div>
                 [% END %]
@@ -698,6 +704,55 @@
 
         </div>
     </div>
+
+    [%# ── Remote Server Stats ── %]
+    [% IF remote_servers.size %]
+    <div class="stat-panel" style="margin-top:12px">
+        <h3 style="margin:0 0 8px;font-size:.95rem;color:var(--text-muted-color,#666)">Infrastructure Servers</h3>
+        <div class="stat-grid">
+        [% FOR srv IN remote_servers %]
+            <div class="stat-item" style="min-width:160px">
+                [% IF srv.online %]
+                    <div style="font-size:.7rem;font-weight:600;color:var(--primary-color,#1976d2);text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">[% srv.label %]</div>
+                    [%# Disk %]
+                    [% SET dp = srv.metrics.disk_used_pct_root || srv.metrics.disk_used_pct %]
+                    [% IF dp %]
+                        [% SET dlvl = dp.level || 'ok' %]
+                        <div style="font-size:.75rem">Disk: <span class="stat-disk-[% dlvl %]"><strong>[% dp.value %]%</strong></span>
+                        [% IF dp.text %]<span style="color:#888;font-size:.7em"> ([% dp.text %])</span>[% END %]</div>
+                    [% END %]
+                    [%# Memory %]
+                    [% SET mp = srv.metrics.mem_used_pct %]
+                    [% IF mp %]
+                        [% SET mlvl = mp.level || 'ok' %]
+                        <div style="font-size:.75rem">Mem: <span class="stat-disk-[% mlvl %]"><strong>[% mp.value %]%</strong></span></div>
+                    [% END %]
+                    [%# CPU load %]
+                    [% SET lp = srv.metrics.cpu_load_pct %]
+                    [% IF lp %]
+                        [% SET llvl = lp.level || 'ok' %]
+                        <div style="font-size:.75rem">CPU: <span class="stat-disk-[% llvl %]"><strong>[% lp.value %]%</strong></span></div>
+                    [% END %]
+                    [% IF srv.last_seen %]
+                    <div style="font-size:.65rem;color:#999;margin-top:3px">[% srv.last_seen %]</div>
+                    [% END %]
+                [% ELSE %]
+                    <div style="font-size:.7rem;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px">[% srv.label %]</div>
+                    <div style="font-size:.8rem;color:#bbb">No data (&gt;2h)</div>
+                    <div style="font-size:.65rem;color:#aaa;margin-top:3px">Install agent on [% srv.ip %]:<br>
+                      <code style="font-size:.6rem">sudo crontab -e</code><br>
+                      <code style="font-size:.55rem;word-break:break-all">*/5 * * * * INGEST_TOKEN=xxx /usr/local/bin/device_agent.sh</code>
+                    </div>
+                [% END %]
+            </div>
+        [% END %]
+        </div>
+        <div style="font-size:.7rem;color:#aaa;margin-top:6px">
+            Servers report via <a href="[% c.uri_for('/admin/hardware_monitor') %]">Hardware Monitor</a> ingest agent — data stale if &gt;30 min old.
+        </div>
+    </div>
+    [% END %]
+
     <style>
     .stat-item-link { text-decoration:none; color:inherit; display:block; transition:box-shadow .15s, border-color .15s; }
     .stat-item-link:hover { box-shadow:0 0 0 2px var(--primary-color,#1976d2); border-color:var(--primary-color,#1976d2); }

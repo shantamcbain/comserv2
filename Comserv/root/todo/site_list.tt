@@ -1,7 +1,7 @@
 <label for="sitename">[% label_text || 'Site Name' %]:</label>
     <select id="sitename" name="sitename" required>
-        [% SET _sel = selected_sitename || todo_sitename || form_data.sitename || project.sitename || SiteName %]
+        [% SET sn_sel = selected_sitename || todo_sitename || form_data.sitename || project.sitename || SiteName %]
         [% FOREACH site IN sites %]
-            <option value="[% site.name %]" [% IF site.name == _sel %]selected[% END %]>[% site.name %]</option>
+            <option value="[% site.name %]" [% IF site.name == sn_sel %]selected[% END %]>[% site.name %]</option>
         [% END %]
     </select>

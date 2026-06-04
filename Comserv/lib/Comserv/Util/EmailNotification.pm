@@ -600,33 +600,43 @@ This is an automated notification from the Comserv platform.
     my %seen_emails = ($csc_email => 1);
     my @recipients  = ($csc_email);
     eval {
-        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
-            [
-                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
-                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
-            ],
-            { columns => ['email'] }
-        )->all;
-        for my $u (@admin_users) {
-            next unless $u->email;
-            next if $seen_emails{ $u->email }++;
-            push @recipients, $u->email;
+        my $schema = $c->model('DBEncy');
+        my $csc_site = $schema->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @site_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id  => $csc_site->id,
+                    role     => { -in => ['admin', 'accounting'] },
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+            for my $sr (@site_roles) {
+                my $u = eval { $sr->user } or next;
+                next unless $u && $u->email && ($u->status // '') eq 'active'
+                         && ($u->email_notifications // 0);
+                next if $seen_emails{ $u->email }++;
+                push @recipients, $u->email;
+            }
         }
     };
 
-    my $to_header = join(', ', @recipients);
-
-    my $email = Email::MIME->create(
-        header_str => [
-            From    => $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca',
-            To      => $to_header,
-            Subject => "[CSC] Hosting registration request: " . $account->sitename,
-        ],
-        attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
-        body_str   => $body,
-    );
-
-    return $self->send_email($c, $email, $smtp_config);
+    my $from    = $smtp_config->{smtp_from} || 'noreply@computersystemconsulting.ca';
+    my $subject = "[CSC] Hosting registration request: " . $account->sitename;
+    my $sent_ok = 0;
+    for my $recipient (@recipients) {
+        my $email = Email::MIME->create(
+            header_str => [
+                From    => $from,
+                To      => $recipient,
+                Subject => $subject,
+            ],
+            attributes => { encoding => 'quoted-printable', charset => 'UTF-8' },
+            body_str   => $body,
+        );
+        $sent_ok = $self->send_email($c, $email, $smtp_config) || $sent_ok;
+    }
+    return $sent_ok;
 }
 
 sub send_hosting_signup_confirmation {
