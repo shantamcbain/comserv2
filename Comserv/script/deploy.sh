@@ -584,6 +584,12 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             echo "   ❌ [Recovery] All 3 restart attempts failed! Falling back to backup images..."
             FALLBACK_HEALTHY=0
             
+            # Capture failure reason and container logs before stopping/deleting
+            FAILED_STATE_HEALTH=$(docker inspect --format='{{json .State.Health}}' "$CONTAINER" 2>/dev/null || echo "N/A")
+            FAILED_STATE_RUNNING=$(docker inspect --format='{{.State.Running}}' "$CONTAINER" 2>/dev/null || echo "false")
+            FAIL_REASON="Container failed viability checks. State: Running=$FAILED_STATE_RUNNING, Health=$FAILED_STATE_HEALTH"
+            CONTAINER_LOGS=$(docker logs --tail 100 "$CONTAINER" 2>&1 || echo "No logs available.")
+            
             # Get the image ID of the currently running unhealthy container
             CURRENT_IMAGE_ID=$(docker inspect --format='{{.Image}}' "$CONTAINER" 2>/dev/null || true)
             
@@ -642,13 +648,56 @@ if [ -z "${DEPLOY_MODE:-}" ] || [ "$DEPLOY_MODE" = "monitor" ]; then
             done
             
             if [ $FALLBACK_HEALTHY -eq 1 ]; then
+                # Construct detailed email body with exact reasons and logs
+                EMAIL_BODY="⚠️ CRITICAL ALERT: Container rollback/rotation occurred on $HOSTNAME_VAL!\n\n"
+                EMAIL_BODY="${EMAIL_BODY}Details:\n"
+                EMAIL_BODY="${EMAIL_BODY}- Failed Container: $CONTAINER\n"
+                EMAIL_BODY="${EMAIL_BODY}- Reason: $FAIL_REASON\n"
+                EMAIL_BODY="${EMAIL_BODY}- Recovered/Rotated Image: $ACTIVE_BACKUP\n"
+                EMAIL_BODY="${EMAIL_BODY}- Time of Event: $(date)\n\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}LAST 100 LINES OF LOGS FOR FAILED CONTAINER:\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}$CONTAINER_LOGS\n"
+
                 if command -v mail >/dev/null 2>&1; then
-                    echo -e "Container health recovery succeeded via fallback to $ACTIVE_BACKUP image.\n\nServer : $HOSTNAME_VAL\nTime   : $(date)" \
-                        | mail -s "⚠️  Container Recovered via $ACTIVE_BACKUP on $HOSTNAME_VAL" "$EMAIL"
+                    echo -e "$EMAIL_BODY" | mail -s "⚠️ Container Failover to $ACTIVE_BACKUP on $HOSTNAME_VAL" "$EMAIL"
+                fi
+                
+                # Log critical system alert in DB
+                if [ -d "$GLOBAL_HOST_APP_DIR" ]; then
+                    perl -I"$GLOBAL_HOST_APP_DIR/lib" -MComserv::Util::Logging -MComserv::Util::HealthLogger -e '
+                        my ($b_tag, $reason) = @ARGV;
+                        eval { Comserv::Util::HealthLogger->log_event(undef, level => "CRITICAL", category => "HEALTH", message => "Container failover to $b_tag. Reason: $reason") };
+                    ' "$ACTIVE_BACKUP" "$FAIL_REASON"
                 fi
             else
                 echo "   ❌ [Fallback] All backup images failed or no backups available."
                 echo "   [Emergency] Starting host-level Starman so service is not interrupted..."
+                
+                # Construct detailed email body for complete failover failure
+                EMAIL_BODY="🚨 EMERGENCY CRITICAL ALERT: Container failover completely failed on $HOSTNAME_VAL!\n\n"
+                EMAIL_BODY="${EMAIL_BODY}Details:\n"
+                EMAIL_BODY="${EMAIL_BODY}- Failed Container: $CONTAINER\n"
+                EMAIL_BODY="${EMAIL_BODY}- Reason: $FAIL_REASON\n"
+                EMAIL_BODY="${EMAIL_BODY}- Recovery Action: All backup images failed. Starting host-level Starman.\n"
+                EMAIL_BODY="${EMAIL_BODY}- Time of Event: $(date)\n\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}LAST 100 LINES OF LOGS FOR FAILED CONTAINER:\n"
+                EMAIL_BODY="${EMAIL_BODY}------------------------------------------------------------\n"
+                EMAIL_BODY="${EMAIL_BODY}$CONTAINER_LOGS\n"
+
+                if command -v mail >/dev/null 2>&1; then
+                    echo -e "$EMAIL_BODY" | mail -s "🚨 Container Failover FAILED - Host Starman Started on $HOSTNAME_VAL" "$EMAIL"
+                fi
+
+                # Log critical system alert in DB
+                if [ -d "$GLOBAL_HOST_APP_DIR" ]; then
+                    perl -I"$GLOBAL_HOST_APP_DIR/lib" -MComserv::Util::Logging -MComserv::Util::HealthLogger -e '
+                        my ($reason) = @ARGV;
+                        eval { Comserv::Util::HealthLogger->log_event(undef, level => "CRITICAL", category => "HEALTH", message => "Container failover completely FAILED! Switched to host Starman. Reason: $reason") };
+                    ' "$FAIL_REASON"
+                fi
                 
                 # Stop any failed docker container first to free port 5000
                 docker stop "$CONTAINER" 2>/dev/null || true
