@@ -327,7 +327,18 @@ sub query {
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $error_detail = '';
+        if ($response->content) {
+            try {
+                my $err_data = decode_json($response->content);
+                if (ref($err_data) eq 'HASH' && $err_data->{error}) {
+                    $error_detail = " - Detail: " . $err_data->{error};
+                }
+            } catch {
+                $error_detail = " - Content: " . substr($response->content, 0, 150);
+            }
+        }
+        my $error = "HTTP request failed: " . $response->status_line . $error_detail;
         $self->last_error($error);
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'query',
             $error);
@@ -462,7 +473,18 @@ sub chat {
     
     # Check response status
     unless ($response->is_success) {
-        my $error = "HTTP request failed: " . $response->status_line;
+        my $error_detail = '';
+        if ($response->content) {
+            try {
+                my $err_data = decode_json($response->content);
+                if (ref($err_data) eq 'HASH' && $err_data->{error}) {
+                    $error_detail = " - Detail: " . $err_data->{error};
+                }
+            } catch {
+                $error_detail = " - Content: " . substr($response->content, 0, 150);
+            }
+        }
+        my $error = "HTTP request failed: " . $response->status_line . $error_detail;
         $self->last_error($error);
         $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'chat',
             $error);
