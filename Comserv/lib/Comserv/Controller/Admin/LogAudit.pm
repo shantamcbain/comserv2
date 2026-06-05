@@ -35,7 +35,8 @@ sub index :Path('/admin/logging/audit') :Args(0) {
 
     my $filter_system = $c->req->param('system') // '';
     my $filter_level  = $c->req->param('level')  // '';
-    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_system =~ s/[^\w\.\-:\s\(\)]//g;
+    $filter_system =~ s/^\s+|\s+$//g;
     $filter_level  =~ s/[^A-Z]//g;
 
     # Local Docker containers (fast — direct docker ps)
@@ -64,8 +65,8 @@ sub index :Path('/admin/logging/audit') :Args(0) {
                     $cond{level} = $filter_level;
                 }
             }
-            # Match the same 10-minute window used by the health badge count
-            my $cutoff = DateTime->now->subtract(minutes => 10)->strftime('%Y-%m-%d %H:%M:%S');
+            # Show alerts from the last 60 minutes when arriving via a health-alert link
+            my $cutoff = DateTime->now->subtract(minutes => 60)->strftime('%Y-%m-%d %H:%M:%S');
             $cond{timestamp} = { '>=' => $cutoff };
 
             $recent_alerts = [
@@ -98,7 +99,8 @@ sub stats :Path('/admin/logging/audit/stats') :Args(0) {
 
     my $filter_system = $c->req->param('system') // '';
     my $filter_level  = $c->req->param('level')  // '';
-    $filter_system =~ s/[^\w\.\-:]//g;
+    $filter_system =~ s/[^\w\.\-:\s\(\)]//g;
+    $filter_system =~ s/^\s+|\s+$//g;
     $filter_level  =~ s/[^A-Z]//g;
 
     my $audit      = {};
