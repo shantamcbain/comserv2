@@ -336,7 +336,7 @@ eval {
         . " -e COMSERV_SESSION_DIR=/tmp/comserv/session"
         . " -e COMSERV_SESSION_COOKIE=comserv_session"
         . " -v /home/ubuntu/.comserv/secrets:/home/comserv/.comserv/secrets:ro"
-        . " -v comserv2_comserv-logs:/opt/comserv/root/log"
+        . " -v comserv2_comserv-logs:/opt/comserv/applogs"
         . " -v comserv2_workshop_files_nfs:/data/nfs"
         . " ${image_name}:latest";
     ssh_exec($start_cmd);
