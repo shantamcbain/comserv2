@@ -175,7 +175,7 @@
 </div>
 
 <!-- SECTION 3: Prune old records -->
-<div class="content-section">
+<div id="section-prune" class="content-section">
     <h2>Prune Old Records</h2>
     <p>Remove records from <code>system_log</code> older than the retention period for each level.
        Records will also be capped at <em>max total rows</em> by deleting the oldest first.</p>
