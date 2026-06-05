@@ -55,7 +55,17 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
 <div class="app-container">
     <div class="page-header page-header-actions">
         <h1>Log Audit &amp; Health Dashboard</h1>
-        <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary">&larr; Back to Logging</a>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <a href="[% c.uri_for('/admin') %]" class="btn btn-secondary" style="font-size:0.85em;">&larr; Admin</a>
+            <a href="[% c.uri_for('/admin/logging') %]" class="btn btn-secondary" style="font-size:0.85em;">&larr; Logging</a>
+            <a href="[% c.uri_for('/admin/logging/audit') %]" class="btn btn-secondary" style="font-size:0.85em;">&#x21BA; Clear Filter</a>
+            <a href="[% c.uri_for('/planning/daily') %]" class="btn btn-secondary" style="font-size:0.85em;">&#x1F4C5; Daily Plan</a>
+        </div>
+    </div>
+
+    <div style="background:#e8f4f8;border:1px solid #bee5eb;border-radius:4px;padding:8px 14px;margin-bottom:12px;font-size:0.88em;color:#004085;">
+        <strong>This page shows:</strong>
+        <span style="margin-left:6px;">&#x1F40B; Docker container health &nbsp;|&nbsp; &#x1F6A8; Recent alert entries (when arriving from a health-alert link) &nbsp;|&nbsp; &#x1F4CA; Audit statistics &amp; error summary &nbsp;|&nbsp; &#x1F5D1; Log pruning tools</span>
     </div>
 
     [% IF c.flash.error_msg %]<div class="error">[% c.flash.error_msg | html %]</div>[% END %]
@@ -70,7 +80,7 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
          ALERT ENTRIES — shown when arriving via a health-alert link
          ================================================================ -->
     [% IF recent_alerts && recent_alerts.size %]
-    <div class="content-section" style="background:#f8d7da;border:2px solid #dc3545;border-radius:6px;padding:14px 18px;margin-bottom:16px;">
+    <div id="alert-section" class="content-section" style="background:#f8d7da;border:2px solid #dc3545;border-radius:6px;padding:14px 18px;margin-bottom:16px;">
         <h2 style="color:#721c24;margin-top:0;">&#x1F6A8; Recent Alert Entries
             [% IF filter_system %]&nbsp;&mdash; <code>[% filter_system | html %]</code>[% END %]
             [% IF filter_level %]&nbsp;&mdash; Level: <code>[% filter_level | html %]</code>[% END %]
@@ -206,6 +216,12 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
     var url   = '[% c.uri_for('/admin/logging/audit/stats') %]?hours=' + hours
         [% IF filter_system %] + '&system=' + encodeURIComponent('[% filter_system | html %]')[% END %]
         [% IF filter_level  %] + '&level='  + encodeURIComponent('[% filter_level  | html %]')[% END %];
+
+    // Auto-scroll to alert section when arriving via health-alert link
+    [% IF recent_alerts && recent_alerts.size %]
+    var alertSection = document.getElementById('alert-section');
+    if (alertSection) { setTimeout(function() { alertSection.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, 200); }
+    [% END %]
     fetch(url, { credentials: 'same-origin', redirect: 'manual' })
         .then(function(r) {
             if (r.type === 'opaqueredirect' || r.status === 0 || (r.status >= 300 && r.status < 400)) {
