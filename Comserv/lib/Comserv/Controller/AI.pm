@@ -2190,7 +2190,8 @@ sub generate :Local :Args(0) {
         
     } catch {
         my $error = $_;
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 
+        my $log_level = ($error =~ /not reachable|unreachable|connection refused|timed? ?out/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $log_level, __FILE__, __LINE__, 
             'generate', "AI query failed for user '$username' (provider: $provider): $error");
         
         my $user_error = "$error";
