@@ -151,7 +151,27 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
                 <div class="docker-name">[% ct.name | html %]
                     <span class="docker-badge [% bclass %]">[% ct.health | html %]</span>
                 </div>
-                <div class="docker-detail">Status: [% ct.status_str | html %]</div>
+                [% IF ct.image %]
+                <div class="docker-detail"><strong>Image:</strong> <code style="font-size:0.88em;">[% ct.image | html %]</code></div>
+                [% END %]
+                [% IF ct.build_info %]
+                <div class="docker-detail" style="color:#28a745;font-size:0.82em;font-weight:bold;">&#x2714; Running LATEST image</div>
+                [% END %]
+                <div class="docker-detail">
+                    [% IF ct.short_id %]<span style="color:#888;font-size:0.82em;font-family:monospace;">[% ct.short_id | html %]</span> | [% END %]
+                    <strong>Status:</strong> [% ct.status_str | html %]
+                </div>
+                [% IF ct.ports %]
+                <div class="docker-detail" style="font-size:0.82em;"><strong>Ports:</strong> [% ct.ports | html %]</div>
+                [% END %]
+                [% IF ct.build_info %]
+                <div class="docker-detail" style="font-size:0.82em;color:#555;">
+                    <strong>Build:</strong> [% ct.build_info.build_date | html %]
+                    [% IF ct.build_info.commit %] | <strong>Commit:</strong> <code>[% ct.build_info.commit | html %]</code>[% END %]
+                    [% IF ct.build_info.branch %] | <strong>Branch:</strong> [% ct.build_info.branch | html %][% END %]
+                    [% IF ct.build_info.build_host %] | <strong>Built On:</strong> [% ct.build_info.build_host | html %][% END %]
+                </div>
+                [% END %]
                 [% IF ct.last_output %]
                 <div class="docker-lastcheck">Last check: [% ct.last_output | html %]</div>
                 [% END %]
