@@ -538,6 +538,12 @@ if [ -d "$COMSERV_LOGS_DIR" ]; then
     # Also delete any rotated logs older than 7 days on the host
     echo "Pruning rotated application logs older than 7 days..."
     find "$COMSERV_LOGS_DIR" \( -name "*.log.*" -o -name "*.gz" \) -mtime +7 -type f -delete 2>/dev/null || true
+    
+    # Prune session files older than 7 days inside the active container to prevent filesystem bloat
+    if docker ps --format '{{.Names}}' | grep -q "^${CONTAINER}$"; then
+        echo "Pruning expired session files older than 7 days inside $CONTAINER..."
+        docker exec "$CONTAINER" find /tmp/comserv/session -type f -mtime +7 -delete 2>/dev/null || true
+    fi
 fi
 
 # ── Check for compose file ─���───────────────────────────────────────────���─────

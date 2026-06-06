@@ -148,10 +148,17 @@ sub COMPONENT {
         $logger->log_with_details(undef, 'info', __FILE__, __LINE__, 'COMPONENT',
             "DBEncy: Using database driver: $driver (available: $driver_available)");
         
+        my %driver_attrs = $driver eq 'MariaDB'
+            ? (mariadb_connect_timeout => 10, mariadb_read_timeout => 30, mariadb_write_timeout => 30)
+            : (); # mysql fallback: timeouts go in DSN to avoid attribute-rejection by older DBIx::Class
+        my $dsn = "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port};
+        $dsn .= ";mysql_connect_timeout=10;mysql_read_timeout=30;mysql_write_timeout=30" if $driver eq 'mysql';
+
         $connect_info = {
-            dsn => "dbi:$driver:database=" . $conn->{database} . ";host=" . $conn->{host} . ";port=" . $conn->{port},
+            dsn => $dsn,
             user => $conn->{username},
             password => $conn->{password},
+            %driver_attrs,
             RaiseError => 1,
             PrintError => 0,
             AutoCommit => 1,
