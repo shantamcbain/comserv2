@@ -7223,28 +7223,57 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
         }
 
-        print "--- Step 3: Triggering deploy on $ssh_target ---\n";
-        print "    Updating remote deploy.sh script with latest code...\n";
+        print "--- Step 3: Publishing production deploy files to $ssh_target ---\n";
         my $escaped_password = $ssh_password;
         $escaped_password =~ s/'/'\\''/g;
 
         local $ENV{SSHPASS} = $ssh_password;
-        system('sshpass', '-e', 'scp',
+
+        # Copy to /tmp first to bypass write permission restrictions on /opt/comserv/Comserv/
+        print "    Copying deploy.sh to remote /tmp...\n";
+        my $scp1 = system('sshpass', '-e', 'scp',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             "$comserv_dir/script/deploy.sh",
             "$ssh_target:/tmp/deploy.sh");
+        $scp1 >>= 8;
+        if ($scp1 != 0) {
+            print "\n❌ FAILED TO COPY DEPLOY SCRIPT (exit $scp1)\n";
+            _exit(1);
+        }
 
-        # Move to /opt/comserv/Comserv/deploy.sh with sudo to bypass write permission restrictions
-        system('sshpass', '-e', 'ssh',
+        print "    Copying docker-compose.server.yml to remote /tmp...\n";
+        my $scp2 = system('sshpass', '-e', 'scp',
+            '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null',
+            "$comserv_dir/script/docker-compose.server.yml",
+            "$ssh_target:/tmp/docker-compose.prod.yml");
+        $scp2 >>= 8;
+        if ($scp2 != 0) {
+            print "\n❌ FAILED TO COPY DOCKER COMPOSE CONFIG (exit $scp2)\n";
+            _exit(1);
+        }
+
+        # Move to /opt/comserv/Comserv/ with sudo
+        print "    Moving files to final remote destinations with sudo...\n";
+        my $move_cmd = "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && " .
+                       "echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh && " .
+                       "echo '$escaped_password' | sudo -S cp /tmp/docker-compose.prod.yml /opt/comserv/Comserv/docker-compose.prod.yml";
+        my $move_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
             $ssh_target,
-            "echo '$escaped_password' | sudo -S cp /tmp/deploy.sh /opt/comserv/Comserv/deploy.sh && echo '$escaped_password' | sudo -S chmod +x /opt/comserv/Comserv/deploy.sh");
+            $move_cmd);
+        $move_exit >>= 8;
+        if ($move_exit != 0) {
+            print "\n❌ MOVING REMOTE FILES FAILED (exit $move_exit)\n";
+            _exit(1);
+        }
+        print "✅ Production deploy files published\n\n";
 
+        print "--- Step 4: Triggering deploy on $ssh_target ---\n";
         print "    Running: /opt/comserv/Comserv/deploy.sh\n";
         my $ssh_cmd = "echo '$escaped_password' | sudo -S DEPLOY_MODE='$deploy_mode' /opt/comserv/Comserv/deploy.sh";
-
         my $ssh_exit = system('sshpass', '-e', 'ssh',
             '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null',
