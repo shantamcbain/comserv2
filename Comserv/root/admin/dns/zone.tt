@@ -73,8 +73,16 @@
 <div class="form-section">
     <h3>Existing Records</h3>
     [% IF records.size %]
-    <div class="table-container">
-    <table class="data-table">
+    <div class="table-container" style="overflow-x:auto">
+    <table class="data-table" style="table-layout:fixed;width:100%;min-width:700px">
+        <colgroup>
+            <col style="width:60px">
+            <col style="width:35%">
+            <col style="width:20%">
+            <col style="width:60px">
+            <col style="width:90px">
+            <col style="width:120px">
+        </colgroup>
         <thead>
             <tr>
                 <th>Type</th>
@@ -89,8 +97,8 @@
         [% FOREACH r IN records %]
             <tr id="row-[% r.id | html %]">
                 <td><strong>[% r.type | html %]</strong></td>
-                <td><code>[% r.name | html %]</code></td>
-                <td>[% r.content | html %]</td>
+                <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.name | html %]"><code>[% r.name | html %]</code></td>
+                <td style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:0" title="[% r.content | html %]">[% r.content | html %]</td>
                 <td>[% r.ttl == 1 ? 'Auto' : r.ttl %]</td>
                 <td>[% r.proxied ? '&#9728; Yes' : '&#9679; DNS only' %]</td>
                 <td class="action-cell">
