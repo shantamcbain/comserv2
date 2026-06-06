@@ -42,9 +42,14 @@
             <div class="submenu">
                 <a href="/ai"><i class="icon-chat"></i>AI Chat Interface</a>
                 <a href="/ai/conversations"><i class="icon-history"></i>Chat History</a>
+                <a href="/ai/usage"><i class="icon-stats"></i>Usage &amp; Billing Monitor</a>
                 <a href="/ai/manage_api_keys"><i class="icon-key"></i>Manage API Keys</a>
                 <a href="/ai/check_status"><i class="icon-status"></i>Check AI Status</a>
                 <a href="/ai/models"><i class="icon-model"></i>Model Management</a>
+                [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+                <a href="#" id="nav-aew-open" onclick="if(window.AEW){AEW.openPopup();return false;}window.open('/ai/editing_widget_popup','aew-grok-editor','width=920,height=640,resizable=yes');return false;"><i class="icon-edit"></i>AI Code Editor (Grok CLI)</a>
+                <a href="/ai/template_editor"><i class="icon-ttml"></i>Template Editor</a>
+                [% END %]
                 [% IF c.session.roles.grep('admin').size %]
                     <div class="submenu-section">
                         <span class="submenu-section-title">Admin</span>
@@ -292,7 +297,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">System Configuration</span>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
-                    <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                    <a href="/admin/dns"><i class="icon-cloud"></i>Cloudflare DNS</a>
                     <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
                     <a href="/admin/compare_schema"><i class="icon-schema"></i>Database Schema Compare</a>
                     <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
