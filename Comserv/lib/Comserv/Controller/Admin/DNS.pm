@@ -224,7 +224,7 @@ sub edit_record :Path('edit_record') :Args(2) {
 
         my $type    = uc($p->{type}    || 'A');
         my $proxied = $p->{proxied} ? \1 : \0;
-        $cf->_api_request('PUT', "/zones/$zone_id/dns_records/$record_id", {
+        $cf->_api_request('PATCH', "/zones/$zone_id/dns_records/$record_id", {
             type    => $type,
             name    => $p->{name}    || '',
             content => $p->{content} || '',
