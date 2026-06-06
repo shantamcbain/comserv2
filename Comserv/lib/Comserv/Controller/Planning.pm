@@ -1367,7 +1367,7 @@ sub _build_error_todo {
     my $default_priority = ($top_level eq 'WARN') ? 3
                          : $is_editor_area         ? 3
                          :                           2;
-    my ($ai_subject, $ai_desc, $ai_priority) = ("$sub — $count $top_level(s) ($today)", $raw_err, $default_priority);
+    my ($ai_subject, $ai_desc, $ai_priority) = ("$sub - $count $top_level(s) ($today)", $raw_err, $default_priority);
 
     if ($ollama) {
         eval {
