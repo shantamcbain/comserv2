@@ -308,6 +308,566 @@ sub widget :Local :Args(0) {
     $c->detach;
 }
 
+=head2 editing_widget
+
+Shanta / CSC admin code editor with integrated AI chat (Cursor-like workspace).
+Development machines only.  Renders layout-free HTML (same pattern as widget).
+
+=cut
+
+sub editing_widget :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_require_shanta_editor($c, 'editing_widget')) {
+        return;
+    }
+
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    if (($c->request->param('mode') || '') eq 'full') {
+        my $template_path = $c->path_to('root')->stringify;
+        my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
+        my $output = '';
+        unless ($tt->process('ai/editing_widget_full.tt', {
+            username => $c->session->{username} || 'admin',
+        }, \$output)) {
+            $c->response->status(500);
+            $c->response->body('Template error: ' . $tt->error());
+            $c->detach;
+            return;
+        }
+        $c->response->content_type('text/html; charset=UTF-8');
+        $c->response->body($output);
+        $c->detach;
+        return;
+    }
+
+    my $dest = $c->request->param('dest') || $c->req->referer || '/admin';
+    $dest =~ s/[?&]open_aew=\d//g;
+    $dest .= ($dest =~ /\?/ ? '&' : '?') . 'open_aew=popup';
+    $c->response->redirect($dest);
+}
+
+=head2 editing_widget_popup
+
+Detached popup window — no site layout, no floating chat widget. Same as /ai/widget for chat.
+
+=cut
+
+sub editing_widget_popup :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    unless ($self->_require_shanta_editor($c, 'editing_widget_popup')) {
+        return;
+    }
+
+    unless ($self->_is_dev_mode($c)) {
+        $c->flash->{error_msg} = 'The AI Code Editor is only available on development workstations.';
+        $c->response->redirect($c->uri_for('/admin'));
+        return;
+    }
+
+    my $template_path = $c->path_to('root')->stringify;
+    my $tt = Template->new({ INCLUDE_PATH => $template_path, ENCODING => 'UTF-8' });
+    my $output = '';
+    unless ($tt->process('ai/editing_widget_popup.tt', {
+        username => $c->session->{username} || 'admin',
+    }, \$output)) {
+        $c->response->status(500);
+        $c->response->content_type('text/plain');
+        $c->response->body('Template error: ' . $tt->error());
+        $c->detach;
+        return;
+    }
+
+    $c->response->content_type('text/html; charset=UTF-8');
+    $c->response->body($output);
+    $c->detach;
+}
+
+=head2 editor_config
+
+JSON config for the floating code editor (enabled flag, grok CLI path).
+
+=cut
+
+sub editor_config :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+    my $enabled = $self->_editor_enabled($c) ? 1 : 0;
+    my $has_key = $enabled && $self->_grok_cli_api_key($c) ? 1 : 0;
+
+    my $ssh_host = $c->config->{aew_ssh_host}     || '172.30.131.126';
+    my $zt_host  = $c->config->{aew_zerotier_host} || $ssh_host;
+    my $browser_host = $c->config->{aew_browser_host} || 'workstation.local';
+    my $ssh_user = $c->config->{aew_ssh_user}     || 'shanta';
+    my $ssh_port = $c->config->{aew_ssh_port}     || 22;
+    my $app_port = $c->config->{aew_app_port}     || 3001;
+    my $ssh_alias = $c->config->{aew_ssh_config_host} || 'comserv-aew';
+    my $ssh_line = "ssh -N -L ${app_port}:127.0.0.1:${app_port} -p $ssh_port ${ssh_user}\@${ssh_host}";
+    my $ssh_line_named = "ssh -N $ssh_alias";
+    my $editor_popup = "/ai/editing_widget_popup";
+
+    $c->response->body(encode_json({
+        success     => JSON::true,
+        enabled     => $enabled,
+        grok_cli     => $enabled ? $self->_find_grok_binary() : undef,
+        grok_home    => $enabled ? $self->_grok_home() : undef,
+        project_root => $self->_project_root_path($c),
+        backends    => $enabled ? ['grok_cli', 'comserv'] : [],
+        grok_auth   => $enabled ? ($has_key ? 'api_key' : (-r $self->_grok_home() . '/.grok/auth.json' ? 'session' : 'unavailable')) : undef,
+        grok_mode   => $has_key ? 'xai_api' : 'local_cli',
+        remote_ok   => $enabled ? JSON::true : JSON::false,
+        ssh_host    => $ssh_host,
+        ssh_user    => $ssh_user,
+        ssh_port    => $ssh_port,
+        app_port    => $app_port,
+        ssh_config_host => $ssh_alias,
+        ssh_tunnel_cmd => $ssh_line,
+        ssh_tunnel_cmd_named => $ssh_line_named,
+        ssh_config_snippet_url => '/static/config/aew-ssh.config',
+        browser_host    => $browser_host,
+        zerotier_host   => $zt_host,
+        editor_url_lan  => "http://${browser_host}:${app_port}${editor_popup}",
+        editor_url_zerotier => "http://${zt_host}:${app_port}${editor_popup}",
+        editor_url_workstation_zero => "http://workstation.zero:${app_port}${editor_popup}",
+        editor_url_tunnel => "http://${browser_host}:${app_port}${editor_popup}",
+        tunnel_hosts_hint => "On tablet: add '127.0.0.1 ${browser_host}' to /etc/hosts, run SSH tunnel, open editor_url_tunnel",
+        zerotier_dns_note => 'zero.computersystemconsulting.ca is production1 (:5000). Dev :3001 use workstation.zero or 172.30.131.126',
+    }));
+}
+
+=head2 grok_cli
+
+Run the local `grok` CLI (same auth as Cursor/Grok Build), not Comserv's xAI API layer.
+POST JSON: { prompt, cwd (optional) }
+
+=cut
+
+sub grok_cli :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->status(403);
+        $c->response->body(encode_json({ success => JSON::false, error => 'Code editor requires CSC admin + dev or remote_code_editor' }));
+        return;
+    }
+
+    unless ($c->request->method eq 'POST') {
+        $c->response->status(405);
+        $c->response->body(encode_json({ success => JSON::false, error => 'POST required' }));
+        return;
+    }
+
+    my $json = {};
+    my $raw_body = '';
+    try {
+        if ($c->req->can('content')) {
+            $raw_body = $c->req->content;
+        }
+        if ((!defined $raw_body || $raw_body eq '') && $c->request->body) {
+            my $body = $c->request->body;
+            if (ref($body) && $body->can('seek')) {
+                seek($body, 0, 0);
+                $raw_body = do { local $/; <$body> };
+                seek($body, 0, 0);
+            } else {
+                $raw_body = $body;
+            }
+        }
+    } catch {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'grok_cli', "Failed to read request body: $_");
+    };
+
+    my $ct = $c->request->content_type || '';
+    if ($raw_body && length($raw_body) && $ct =~ /application\/json/i) {
+        try {
+            $json = decode_json($raw_body);
+        } catch {
+            $c->response->status(400);
+            $c->response->body(encode_json({ success => JSON::false, error => 'Invalid JSON' }));
+            return;
+        };
+    }
+
+    my $prompt = $json->{prompt}
+              || $c->request->body_parameters->{prompt}
+              || $c->request->params->{prompt}
+              || '';
+    $prompt =~ s/\r\n/\n/g;
+    unless ($prompt =~ /\S/) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt is required' }));
+        return;
+    }
+    if (length($prompt) > 200_000) {
+        $c->response->status(400);
+        $c->response->body(encode_json({ success => JSON::false, error => 'prompt too large (max 200k)' }));
+        return;
+    }
+
+    my $grok = $self->_find_grok_binary();
+    unless ($grok && -x $grok) {
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'grok CLI not found (install Grok Build CLI or set GROK_BIN)',
+        }));
+        return;
+    }
+
+    my $auth_err = $self->_grok_cli_auth_error($c);
+    if ($auth_err) {
+        $c->response->status(503);
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $auth_err,
+            hint    => 'Switch backend to "Comserv AI" in the dropdown, or add an xAI API key under Admin → API Keys.',
+        }));
+        return;
+    }
+
+    my $page_path  = $json->{page_path}  || '';
+    my $page_title = $json->{page_title} || '';
+    if ($page_path || $page_title) {
+        $prompt = "Context: user is viewing Comserv page $page_path ($page_title)\n\n$prompt";
+    }
+
+    $prompt = $self->_inject_read_file_tags($c, $prompt);
+
+    if ($self->_grok_cli_api_key($c)) {
+        my $api_resp = $self->_grok_cli_via_api($c, $prompt);
+        if ($api_resp && $api_resp->{response} && $api_resp->{response} =~ /\S/) {
+            my $reply = $api_resp->{response};
+            if ($reply =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
+                my ($snippet, $err) = $self->_editor_read_file_snippet($c, $1, 500);
+                if ($snippet) {
+                    $reply .= "\n\n[Loaded for you: $1]\n```\n$snippet\n```";
+                } elsif ($err) {
+                    $reply .= "\n\n[Could not load $1: $err]";
+                }
+            }
+            $c->response->body(encode_json({
+                success  => JSON::true,
+                response => $reply,
+                backend  => 'grok_api',
+                model    => $api_resp->{model},
+            }));
+            return;
+        }
+        my $api_err = $api_resp->{error} || 'Grok xAI API returned no content';
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $api_err,
+            hint    => 'Check Admin → API Keys (grok/xAI), or switch to Comserv AI in the dropdown.',
+            backend => 'grok_api',
+        }));
+        return;
+    }
+
+    my $cwd = $json->{cwd} || $self->_project_root_path($c);
+    $cwd = $self->_project_root_path($c) unless -d $cwd;
+
+    require File::Temp;
+    my ($fh, $path) = File::Temp::tempfile('grok_prompt_XXXXX', DIR => '/tmp', UNLINK => 1);
+    print $fh $prompt;
+    close $fh;
+
+    my ($stdout, $stderr, $exit) = $self->_run_grok_cli($c, $grok, $path, $cwd);
+
+    chomp $stdout if defined $stdout;
+    chomp $stderr if defined $stderr;
+
+    ($stdout, $stderr) = $self->_grok_cli_normalize_output($stdout, $stderr);
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'grok_cli', "grok CLI exit=$exit home=" . $self->_grok_home() . " cwd=$cwd len=" . length($stdout || '')
+            . ' stderr_len=' . length($stderr || '') . ' api_key=' . ($self->_grok_cli_api_key($c) ? 'yes' : 'no'));
+
+    $stdout =~ s/\A\s+|\s+\z//g if defined $stdout;
+    if (!$stdout || $stdout !~ /\S/) {
+        my $err = $self->_grok_cli_stderr_message($stderr)
+               || "grok exited with code " . (defined $exit ? $exit : 'unknown')
+               . " but produced no output (try a shorter prompt or Comserv AI backend)";
+        if (defined $exit && $exit == -1 && $err !~ /\S/) {
+            $err = 'grok CLI failed to start (exit -1). The web server user cannot read '
+                 . $self->_grok_home() . '/.grok/auth.json — use Comserv AI backend or configure an xAI API key.';
+        }
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => $err,
+            exit    => $exit,
+            grok    => $grok,
+            home    => $self->_grok_home(),
+            cwd     => $cwd,
+        }));
+        return;
+    }
+
+    $c->response->body(encode_json({
+        success  => JSON::true,
+        response => $stdout,
+        backend  => 'grok_cli',
+        exit     => $exit,
+        stderr   => ($stderr ? $stderr : undef),
+    }));
+}
+
+sub _grok_home {
+    my ($self) = @_;
+    if ($ENV{GROK_CLI_HOME} && -d $ENV{GROK_CLI_HOME}) {
+        return $ENV{GROK_CLI_HOME};
+    }
+    if ($ENV{GROK_HOME} && -d $ENV{GROK_HOME}) {
+        my $gh = $ENV{GROK_HOME};
+        $gh =~ s{/.grok/?\z}{};
+        return $gh;
+    }
+    if (-d '/home/shanta/.grok') {
+        return '/home/shanta';
+    }
+    my $home = $ENV{HOME} || '';
+    return $home if $home && -d "$home/.grok";
+    return $home || '/home/shanta';
+}
+
+sub _grok_cli_api_key {
+    my ($self, $c) = @_;
+    return $ENV{XAI_API_KEY} if $ENV{XAI_API_KEY} && $ENV{XAI_API_KEY} =~ /\S/;
+    my $cfg_key = $c->config->{grok_cli_xai_api_key} || $c->config->{xai_api_key};
+    return $cfg_key if $cfg_key && $cfg_key =~ /\S/;
+
+    my $user_id = $c->session->{user_id} || 0;
+    return '' unless $user_id;
+
+    try {
+        my $schema = $c->model('DBEncy')->schema;
+        my $key_obj = $schema->resultset('UserApiKeys')->search(
+            { user_id => $user_id, service => 'grok', is_active => '1' },
+            { rows => 1 }
+        )->first;
+        $key_obj ||= $schema->resultset('UserApiKeys')->search(
+            { service => 'grok', is_active => '1' },
+            { rows => 1 }
+        )->first;
+        return $key_obj ? ($key_obj->get_api_key() || '') : '';
+    } catch {
+        return '';
+    };
+}
+
+sub _grok_cli_auth_error {
+    my ($self, $c) = @_;
+    return undef if $self->_grok_cli_api_key($c);
+    my $home = $self->_grok_home();
+    my $auth = "$home/.grok/auth.json";
+    return undef if -r $auth;
+    my $run_as = $ENV{USER} || $>;
+    return "Grok CLI auth not available to server process ($run_as). "
+         . "Cannot read $auth (browser login is only for your user account).";
+}
+
+sub _grok_cli_timeout_sec {
+    my ($self, $c) = @_;
+    my $t = $c->config->{grok_cli_timeout} || $ENV{GROK_CLI_TIMEOUT} || 180;
+    $t = 180 if $t < 30 || $t > 600;
+    return int($t);
+}
+
+sub _grok_cli_via_api {
+    my ($self, $c, $prompt) = @_;
+    my $api_key = $self->_grok_cli_api_key($c);
+    return { error => 'No xAI API key configured' } unless $api_key;
+
+    my $grok = $c->model('Grok');
+    unless ($grok) {
+        return { error => 'Grok model not available' };
+    }
+
+    $grok->api_key($api_key);
+    my $model = $c->config->{grok_cli_model} || 'grok-4-fast-non-reasoning';
+    $grok->model($model);
+
+    my $system = $self->_build_coding_system_prompt($c);
+    my $resp = $grok->chat(messages => [
+        { role => 'system', content => $system },
+        { role => 'user',   content => $prompt },
+    ]);
+
+    unless ($resp && ref $resp eq 'HASH' && $resp->{success}) {
+        my $err = $grok->last_error || 'Grok API request failed';
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+            'grok_cli', "xAI API fallback error: $err");
+        return { error => $err };
+    }
+
+    my $text = $resp->{response} || '';
+    unless ($text =~ /\S/) {
+        return { error => 'Grok API returned an empty response' };
+    }
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
+        'grok_cli', "xAI API ok model=$model len=" . length($text));
+
+    return {
+        success  => 1,
+        response => $text,
+        model    => $resp->{model} || $model,
+    };
+}
+
+sub _run_grok_cli {
+    my ($self, $c, $grok, $prompt_path, $cwd) = @_;
+    my $home = $self->_grok_home();
+    my $stdout = '';
+    my $stderr = '';
+    my $exit;
+    my $api_key = $self->_grok_cli_api_key($c);
+    my $timeout = $self->_grok_cli_timeout_sec($c);
+
+    my @grok_args = ('--output-format', 'plain', '--prompt-file', $prompt_path);
+    my @cmd = ($grok, @grok_args);
+    if (-x '/usr/bin/stdbuf') {
+        unshift @cmd, '/usr/bin/stdbuf', '-oL';
+    }
+    if (-x '/usr/bin/timeout') {
+        unshift @cmd, '/usr/bin/timeout', '-k', '5', "$timeout";
+    } elsif (-x '/bin/timeout') {
+        unshift @cmd, '/bin/timeout', '-k', '5', "$timeout";
+    }
+
+    my $run_in_child = sub {
+        $ENV{HOME}        = $home;
+        $ENV{USER}        = 'shanta';
+        $ENV{LOGNAME}     = 'shanta';
+        $ENV{XAI_API_KEY} = $api_key if $api_key;
+        $ENV{PATH}        = join ':', grep { $_ && -d $_ }
+            ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+        $ENV{LANG}        = $ENV{LANG} || 'en_US.UTF-8';
+        $ENV{LC_ALL}      = $ENV{LC_ALL} || 'en_US.UTF-8';
+        chdir $cwd or die "chdir $cwd failed: $!";
+        exec { $cmd[0] } @cmd;
+        die "exec grok failed: $!";
+    };
+
+    try {
+        require IPC::Run3;
+        my %env = (
+            HOME    => $home,
+            USER    => 'shanta',
+            LOGNAME => 'shanta',
+            PATH    => join(':', grep { $_ }
+                ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin')),
+            LANG    => 'en_US.UTF-8',
+            LC_ALL  => 'en_US.UTF-8',
+        );
+        $env{XAI_API_KEY} = $api_key if $api_key;
+        $exit = run3(
+            \@cmd,
+            \undef,
+            \$stdout,
+            \$stderr,
+            { chdir => $cwd, env => \%env }
+        );
+    } catch {
+        my $pid = fork();
+        if (!defined $pid) {
+            return ('', "fork failed: $!", -1);
+        }
+        if ($pid == 0) {
+            $run_in_child->();
+        }
+        waitpid($pid, 0);
+        $exit = $? >> 8;
+        if ($? == -1) {
+            $stderr ||= "waitpid failed: $!";
+            $exit = -1;
+        }
+    };
+
+    if (defined $exit && $exit == 124) {
+        $stderr ||= "grok CLI timed out after ${timeout}s";
+    }
+
+    if ((!defined $stdout || $stdout !~ /\S/) && defined $exit && $exit == 0) {
+        my ($fb_out, $fb_err, $fb_exit) = $self->_run_grok_cli_capture_qx($c, $grok, $prompt_path, $cwd, $timeout);
+        if ($fb_out && $fb_out =~ /\S/) {
+            return ($fb_out, $fb_err || $stderr, $fb_exit);
+        }
+    }
+
+    return ($stdout, $stderr, $exit);
+}
+
+sub _run_grok_cli_capture_qx {
+    my ($self, $c, $grok, $prompt_path, $cwd, $timeout) = @_;
+    $timeout //= $self->_grok_cli_timeout_sec($c);
+    my $home    = $self->_grok_home();
+    my $api_key = $self->_grok_cli_api_key($c);
+    my $path    = join ':', grep { $_ }
+        ("$home/.local/bin", "$home/.grok/bin", '/usr/local/bin', '/usr/bin', '/bin');
+    my $grok_q = quotemeta($grok);
+    my $file_q = quotemeta($prompt_path);
+    my $cwd_q  = quotemeta($cwd);
+    my $env    = "HOME=" . quotemeta($home) . " USER=shanta PATH=" . quotemeta($path);
+    $env .= ' XAI_API_KEY=' . quotemeta($api_key) if $api_key;
+    my $inner = "$grok_q --output-format plain --prompt-file $file_q";
+    my $cmd   = "cd $cwd_q && $env $inner 2>&1";
+    $cmd = "timeout -k 5 $timeout $cmd" if -x '/usr/bin/timeout';
+    my $combined = `$cmd`;
+    my $exit = $? >> 8;
+    return $self->_grok_cli_normalize_output($combined, '');
+}
+
+sub _grok_cli_stderr_message {
+    my ($self, $stderr) = @_;
+    return '' unless defined $stderr && $stderr =~ /\S/;
+    my @lines = grep { /\S/ && !/failed to watch root recursively/i } split /\n/, $stderr;
+    return join "\n", @lines;
+}
+
+sub _grok_cli_normalize_output {
+    my ($self, $stdout, $stderr) = @_;
+    $stdout //= '';
+    $stderr //= '';
+    if ($stdout =~ /\S/) {
+        if ($stdout =~ /^\s*\{/ && eval { require JSON::MaybeXS; 1 }) {
+            try {
+                my $data = decode_json($stdout);
+                if (ref $data eq 'HASH') {
+                    $stdout = $data->{response} // $data->{content} // $data->{text} // $stdout;
+                }
+            } catch { };
+        }
+        $stderr = join "\n", grep { !/failed to watch root recursively/i } split /\n/, $stderr;
+        return ($stdout, $stderr);
+    }
+    my $useful = $self->_grok_cli_stderr_message($stderr);
+    return ($useful, $stderr) if $useful;
+    return ($stdout, $stderr);
+}
+
+sub _find_grok_binary {
+    my ($self) = @_;
+    return $ENV{GROK_BIN} if $ENV{GROK_BIN} && -x $ENV{GROK_BIN};
+    my $home = $self->_grok_home();
+    my $home_grok = "$home/.local/bin/grok";
+    return $home_grok if -x $home_grok;
+    my $alt = "$home/.grok/bin/grok";
+    return $alt if -x $alt;
+    for my $dir (split /:/, $ENV{PATH} || '') {
+        my $bin = "$dir/grok";
+        return $bin if -x $bin;
+    }
+    return undef;
+}
+
 =head2 generate
 
 API endpoint for AI query processing. Returns JSON responses.
@@ -1556,6 +2116,29 @@ sub generate :Local :Args(0) {
                 'generate', "Failed to save conversation to database: $db_error (Conversation ID: $conversation_id, User ID: $user_id)");
         };
         
+        # === AI USAGE LOGGING for billing + capacity monitoring ===
+        my $gen_elapsed_ms = int( (time() - $trace_start) * 1000 );
+        my $usage_info = $response->{usage} || {};
+        my $pt = $usage_info->{prompt_tokens} // $response->{prompt_eval_count} // 0;
+        my $ct = $usage_info->{completion_tokens} // $response->{eval_count} // ($tokens_used // 0);
+        my $tt = $usage_info->{total_tokens} // ($pt + $ct) // ($tokens_used // 0);
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $provider,
+            model             => $model_used || $provider,
+            prompt_tokens     => $pt,
+            completion_tokens => $ct,
+            total_tokens      => $tt,
+            duration_ms       => $gen_elapsed_ms,
+            request_type      => 'generate',
+            conversation_id   => $conversation_id,
+            status            => 'success',
+            ollama_host       => ($provider eq 'ollama' ? $active_ollama_host : undef),
+            metadata          => { agent_id => $agent_id, response_chars => $response_length },
+        );
+        
         # Build JSON response
         push @trace, sprintf("⏱️ Total elapsed: %ds", time() - $trace_start);
         # Flush final trace so JS poller sees all steps including elapsed time
@@ -1667,6 +2250,26 @@ sub generate :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'generate', "catch: DB save result = " . ($save_ok ? "OK" : "FAILED"));
         }
+
+        # === AI USAGE LOG (error path) for monitoring failures and partial billing ===
+        my $gen_err_elapsed_ms = int( (time() - $trace_start) * 1000 );
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $provider,
+            model             => $model_used || $provider,
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $gen_err_elapsed_ms,
+            request_type      => 'generate',
+            conversation_id   => $conversation_id,
+            status            => 'error',
+            error_message     => $user_error,
+            ollama_host       => ($provider eq 'ollama' ? $active_ollama_host : undef),
+            metadata          => { agent_id => $agent_id, phase => 'generate_error' },
+        );
 
         push @trace, sprintf("❌ Error after %ds: %s", time() - $trace_start, $user_error || 'Unknown error')
             unless grep { /❌ Error after/ } @trace;
@@ -2235,12 +2838,14 @@ sub chat :Local :Args(0) {
     }
 
     my $model_used = 'unknown';  # declared before try so catch block can read it
+    my $final_conversation_id = undef;  # declared before try so catch block can read it
 
     try {
         my $ai_response = '';
         my $response_created_at = '';
         my $response_total_duration = 0;
         my $response_eval_count = 0;
+        my $response = undef;
 
         if ($is_grok_model) {
             # Route to Grok API using user's stored API key
@@ -2308,7 +2913,7 @@ sub chat :Local :Args(0) {
                 unshift @final_messages, { role => 'system', content => $combined_system_prompt };
             }
 
-            my $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
+            $response = $grok->chat(messages => \@final_messages, use_search => $use_search_chat);
 
             unless ($response) {
                 my $error = $grok->last_error || 'Unknown error';
@@ -2560,7 +3165,7 @@ sub chat :Local :Args(0) {
             $self->_flush_progress($progress_file, \@chat_trace, 0);
 
             my $chat_start = time();
-            my $response   = $ollama->chat(messages => \@ollama_messages);
+            $response   = $ollama->chat(messages => \@ollama_messages);
             my $chat_elapsed = time() - $chat_start;
 
             unless ($response) {
@@ -2657,7 +3262,7 @@ sub chat :Local :Args(0) {
         }
 
         # Save conversation to database
-        my $final_conversation_id = $conversation_id;
+        $final_conversation_id = $conversation_id;
         try {
             # user_id was already set above (either from session or as guest)
             $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, 
@@ -2789,6 +3394,29 @@ sub chat :Local :Args(0) {
                 'chat', "Failed to save conversation to database: $db_error (Final Conv ID: $final_conversation_id, User ID: $user_id)");
         };
 
+        # === AI USAGE LOGGING (chat endpoint) ===
+        my $chat_elapsed_ms = int( (time() - $chat_trace_start) * 1000 );
+        my $chat_pt = $response->{prompt_eval_count} // 0;
+        my $chat_ct = $response_eval_count // $response->{eval_count} // 0;
+        my $chat_tt = $response->{usage} && $response->{usage}{total_tokens} ? $response->{usage}{total_tokens} : ($chat_pt + $chat_ct);
+        my $chat_provider = $is_grok_model ? 'grok' : 'ollama';
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $chat_provider,
+            model             => $model_used || $chat_provider,
+            prompt_tokens     => $chat_pt,
+            completion_tokens => $chat_ct,
+            total_tokens      => $chat_tt,
+            duration_ms       => $chat_elapsed_ms,
+            request_type      => 'chat',
+            conversation_id   => $final_conversation_id,
+            status            => 'success',
+            ollama_host       => ($chat_provider eq 'ollama' ? ($c->session->{ollama_host} || '') : undef),
+            metadata          => { agent => 'chat_endpoint' },
+        );
+
         # Mark progress as done so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
 
@@ -2888,6 +3516,27 @@ sub chat :Local :Args(0) {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__,
                 'chat', "catch: DB save result = " . ($chat_save_ok ? "OK" : "FAILED"));
         }
+
+        # === AI USAGE LOG (chat error path) ===
+        my $chat_err_ms = int( (time() - $chat_trace_start) * 1000 );
+        my $chat_err_provider = $is_grok_model ? 'grok' : 'ollama';
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $c->session->{SiteID},
+            guest_session_id  => $guest_session_id,
+            provider          => $chat_err_provider,
+            model             => $model_used || $model || $chat_err_provider,
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $chat_err_ms,
+            request_type      => 'chat',
+            conversation_id   => $final_conversation_id || $conversation_id,
+            status            => 'error',
+            error_message     => $user_error,
+            ollama_host       => ($chat_err_provider eq 'ollama' ? ($c->session->{ollama_host} || '') : undef),
+            metadata          => { phase => 'chat_error' },
+        );
 
         # Mark progress as done (with error trace) so poller stops
         $self->_flush_progress($progress_file, \@chat_trace, 1);
@@ -9593,6 +10242,138 @@ The current user is: $username
 END_PROMPT
 }
 
+# ── _is_shanta_editor ─────────────────────────────────────────────────────────
+sub _is_shanta_editor {
+    my ($self, $c) = @_;
+    my $auth = Comserv::Util::AdminAuth->new();
+    return 1 if $auth->is_csc_admin($c);
+    my $username = $c->session->{username} || ($c->user ? $c->user->username : '') || '';
+    return 1 if lc($username) eq 'shanta';
+    # On dev workstations, any logged-in admin may use the code editor
+    if ($self->_is_dev_mode($c)) {
+        return 1 if $c->stash->{is_admin};
+        return 1 if $auth->check_admin_access($c, 'shanta_editor');
+    }
+    return 0;
+}
+
+sub _require_shanta_editor {
+    my ($self, $c, $action_name) = @_;
+    if ($self->_is_shanta_editor($c)) {
+        return 1;
+    }
+    $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__,
+        '_require_shanta_editor', "Access denied for $action_name");
+    $c->flash->{error_msg} = 'The AI Code Editor is restricted to CSC administrators.';
+    $c->response->redirect($c->uri_for('/user/login', {
+        destination => $c->req->uri,
+    }));
+    return 0;
+}
+
+sub _project_root_path {
+    my ($self, $c) = @_;
+    return $c->config->{home}
+        || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+}
+
+my @_EDITOR_ROOTS = qw(lib root sql script t);
+
+sub _list_dir_param {
+    my ($self, $c) = @_;
+    my $raw = $c->request->param('rel');
+    $raw = $c->request->param('dir') if !defined $raw || $raw eq '';
+    return '' if ref $raw;
+    $raw = '' unless defined $raw;
+    $raw = "$raw";
+    return '' if $raw =~ /HASH\s*\(\s*0x/i || $raw =~ /::/;
+    return $self->_sanitize_editor_rel_path($raw);
+}
+
+sub _sanitize_editor_rel_path {
+    my ($rel) = @_;
+    return '' unless defined $rel;
+    return '' if ref $rel;
+    $rel = "$rel";
+    return '' if $rel =~ /HASH\s*\(\s*0x/i;
+    $rel =~ s/^\s+|\s+$//g;
+    $rel =~ s{^/+}{};
+    $rel =~ s{\.\.}{}g;
+    $rel =~ s{//+}{/}g;
+    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+    $rel =~ s{^Comserv/}{}i;
+    return $rel;
+}
+
+sub _editor_path_allowed {
+    my ($self, $rel) = @_;
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    return 0 unless $rel;
+    my ($top) = split m{/}, $rel, 2;
+    return 0 unless grep { $_ eq $top } @_EDITOR_ROOTS;
+    return $rel;
+}
+
+sub _editor_read_file_snippet {
+    my ($self, $c, $rel, $limit) = @_;
+    $limit //= 400;
+    $limit = 800 if $limit > 800;
+
+    unless ($self->_editor_enabled($c)) {
+        return (undef, 'Editor access required');
+    }
+
+    $rel = $self->_sanitize_editor_rel_path($rel);
+    unless ($self->_editor_path_allowed($rel)) {
+        return (undef, "Path not allowed: $rel (use lib/, root/, sql/, script/, or t/ under the project root)");
+    }
+
+    my $root = $self->_project_root_path($c);
+    my $full = "$root/$rel";
+    unless (-f $full) {
+        return (undef, "File not found: $rel (project root: $root)");
+    }
+
+    open(my $fh, '<:utf8', $full) or return (undef, "Cannot read $rel: $!");
+    my @lines = <$fh>;
+    close $fh;
+    my $total = scalar @lines;
+    my $end   = $limit - 1;
+    $end = $total - 1 if $end >= $total;
+    my $chunk = join '', @lines[0..$end];
+
+    return ($chunk, undef);
+}
+
+sub _inject_read_file_tags {
+    my ($self, $c, $prompt) = @_;
+    return $prompt unless defined $prompt && $prompt =~ /\[READ_FILE:/i;
+
+    my $out = $prompt;
+    while ($out =~ /\[READ_FILE:\s*([^\]]+)\]/i) {
+        my $path = $1;
+        $path =~ s/^\s+|\s+$//g;
+        my ($content, $err) = $self->_editor_read_file_snippet($c, $path, 500);
+        my $block = $content
+            ? "[FILE: $path]\n```\n$content\n```\n[/FILE]"
+            : "[FILE: $path] (load failed: $err)";
+        $out =~ s/\[READ_FILE:\s*\Q$path\E\s*\]/$block/i;
+    }
+    return $out;
+}
+
+# ── _editor_enabled ───────────────────────────────────────────────────────────
+# Shanta/CSC admin code editor: dev workstation, or remote_code_editor in config.
+# Clients (tablet, laptop) hit the server over HTTPS; code stays on the dev host.
+# ──────────────────────────────────────────────────────────────────────────────
+sub _editor_enabled {
+    my ($self, $c) = @_;
+    return 0 unless $self->_is_shanta_editor($c);
+    return 1 if $self->_is_dev_mode($c);
+    return 1 if $c->config->{remote_code_editor};
+    return 0;
+}
+
 # ── _is_dev_mode ──────────────────────────────────────────────────────────────
 # Returns true when running on a developer/local machine.
 # Checks (in order):
@@ -9608,6 +10389,7 @@ sub _is_dev_mode {
     my $hostname = eval { require Comserv::Util::SystemInfo;
                           Comserv::Util::SystemInfo::get_server_hostname() } || '';
     return 1 if $hostname =~ /workstation|localhost/i;
+    return 1 if ($ENV{SYSTEM_IDENTIFIER} || '') =~ /^(dev|development|workstation)/i;
     return 0;
 }
 
@@ -9761,8 +10543,86 @@ Rules for fixes:
 - Only propose a fix when you are confident it is correct.
 - Do not add code comments unless the user asks.
 
+DEDICATED WORKSPACE:
+- Shanta admin opens /ai/editing_widget for a Cursor-like UI: file tree, editor, and this chat side-by-side.
+- When a file is open in that editor, the user message will include a [FILE: path] block automatically.
+
 RESTRICTION: This agent is DEVELOPMENT ONLY. Never available on production.
 END_PROMPT
+}
+
+sub _build_ai_editor_section {
+    my ($self, $c) = @_;
+    return '' unless $self->_is_shanta_editor($c);
+    return <<'END_SECTION';
+
+## AI CODE EDITOR (Shanta admin)
+Open /ai/editing_widget on a development workstation for a Cursor-like workspace:
+file browser (lib/, root/, sql/, script/, t/), in-browser editor, and integrated coding chat.
+Use [READ_FILE: path] to load files; use ## FIX: blocks so the Apply button appears.
+END_SECTION
+}
+
+# ── list_dir ───────────────────────────────────────────────────────────────────
+sub list_dir :Local :Args(0) {
+    my ($self, $c) = @_;
+    $c->response->content_type('application/json');
+
+    unless ($self->_editor_enabled($c)) {
+        $c->response->body(encode_json({ success => JSON::false, error => 'Shanta editor access required' }));
+        return;
+    }
+
+    my $dir = $self->_list_dir_param($c);
+    if ($dir ne '' && !$self->_editor_path_allowed($dir)) {
+        $c->response->body(encode_json({
+            success      => JSON::false,
+            error        => "Directory not allowed: $dir",
+            hint         => 'Open folders under lib/, root/, sql/, script/, or t/ only.',
+            project_root => $self->_project_root_path($c),
+        }));
+        return;
+    }
+
+    my $root = $self->_project_root_path($c);
+    my @entries;
+
+    if ($dir eq '') {
+        for my $top (@_EDITOR_ROOTS) {
+            my $full = "$root/$top";
+            push @entries, { name => $top, path => $top, type => 'dir' } if -d $full;
+        }
+    } else {
+        my $full = "$root/$dir";
+        unless (-d $full) {
+            $c->response->body(encode_json({ success => JSON::false, error => "Not a directory: $dir" }));
+            return;
+        }
+        opendir(my $dh, $full) or do {
+            $c->response->body(encode_json({ success => JSON::false, error => "Cannot read directory: $!" }));
+            return;
+        };
+        my @names = sort grep { $_ !~ /^\./ } readdir($dh);
+        closedir $dh;
+        for my $name (@names) {
+            my $child_rel = "$dir/$name";
+            $child_rel =~ s{//+}{/}g;
+            next unless $self->_editor_path_allowed($child_rel);
+            my $child_full = "$root/$child_rel";
+            push @entries, {
+                name => $name,
+                path => $child_rel,
+                type => (-d $child_full ? 'dir' : 'file'),
+            };
+        }
+    }
+
+    $c->response->body(encode_json({
+        success      => JSON::true,
+        dir          => $dir,
+        entries      => \@entries,
+        project_root => $root,
+    }));
 }
 
 # ── read_file ──────────────────────────────────────────────────────────────────
@@ -9783,10 +10643,32 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $rel = $c->request->params->{path} || '';
-    $rel =~ s{^/+}{};
-    $rel =~ s{\.\.}{}g;
-    $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
+    my $rel = $self->_sanitize_editor_rel_path($c->request->params->{path} || '');
+
+    my $shanta_editor = $self->_editor_enabled($c);
+
+    if ($shanta_editor) {
+        unless ($self->_editor_path_allowed($rel)) {
+            $c->response->body(encode_json({
+                success      => JSON::false,
+                error        => "Path not allowed: $rel",
+                hint         => 'Use paths under lib/, root/, sql/, script/, or t/ (e.g. lib/Comserv/Controller/AI.pm).',
+                project_root => $self->_project_root_path($c),
+            }));
+            return;
+        }
+        my ($content, $err) = $self->_editor_read_file_snippet($c, $rel, int($c->request->params->{limit} || 800));
+        if ($err) {
+            $c->response->body(encode_json({ success => JSON::false, error => $err }));
+            return;
+        }
+        $c->response->body(encode_json({
+            success => JSON::true,
+            path    => $rel,
+            content => $content,
+        }));
+        return;
+    }
 
     # Non-dev admins may only read template files
     if (!$is_dev && $rel !~ /\.tt$/) {
@@ -9794,8 +10676,7 @@ sub read_file :Local :Args(0) {
         return;
     }
 
-    my $root = $c->config->{home}
-            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $root = $self->_project_root_path($c);
     my $full = "$root/$rel";
 
     unless (-f $full) {
@@ -9805,7 +10686,7 @@ sub read_file :Local :Args(0) {
 
     my $offset = int($c->request->params->{offset} || 0);
     my $limit  = int($c->request->params->{limit}  || 300);
-    $limit = 500 if $limit > 500;
+    $limit = 500 if $limit > 800;
 
     open(my $fh, '<:utf8', $full) or do {
         $c->response->body(encode_json({ success => JSON::false, error => "Cannot read: $!" }));
@@ -9853,14 +10734,15 @@ sub apply_fix :Local :Args(0) {
     $rel =~ s{\.\.}{}g;
     $rel =~ s{[^a-zA-Z0-9/_.\-]}{}g;
 
-    # Non-dev admins may only write template files
-    if (!$is_dev_fix && $rel !~ /\.tt$/) {
+    my $shanta_editor_fix = $self->_editor_enabled($c);
+
+    # Non-dev admins may only write template files (Shanta editor on dev may write all)
+    if (!$is_dev_fix && !$shanta_editor_fix && $rel !~ /\.tt$/) {
         $c->response->body(encode_json({ success => JSON::false, error => 'Non-dev admins may only edit .tt files' }));
         return;
     }
 
-    my $root = $c->config->{home}
-            || do { (my $p = __FILE__) =~ s{/lib/Comserv.*}{}; $p };
+    my $root = $self->_project_root_path($c);
     my $full = "$root/$rel";
 
     unless (-f $full) {
@@ -10388,6 +11270,203 @@ sub transcribe_status :Local :Args(0) {
         $c->response->body(encode_json({ success => JSON::false, error => $status->{error} || 'Transcription failed' }));
     } else {
         $c->response->body(encode_json({ success => JSON::true, status => 'processing' }));
+    }
+}
+
+=head2 usage
+
+Admin / operator usage monitor for AI chat.
+Shows calls by provider, model, customer (site), tokens, estimated costs.
+Supports basic filtering for billing reports and capacity planning (anticipate ollama load vs paid spend).
+Access: any authenticated user sees their site's usage; admins see more.
+=cut
+
+sub usage :Local :Args(0) {
+    my ($self, $c) = @_;
+
+    my $username = $c->session->{username} || 'Guest';
+    my $user_id  = $c->session->{user_id};
+    my $site_id  = $c->session->{SiteID};
+    my $roles    = $c->session->{roles} || [];
+    $roles = [split /,/, $roles] unless ref $roles eq 'ARRAY';
+
+    my $is_admin = grep { /^admin$/i } @$roles;
+
+    # Filters from query
+    my $days       = $c->req->param('days') || 30;
+    my $prov_f     = $c->req->param('provider') || '';
+    my $site_f     = $c->req->param('site_id')  || ($is_admin ? '' : $site_id);
+    my $model_f    = $c->req->param('model') || '';
+
+    my $schema = eval { $c->model('DBEncy')->schema };
+    my @logs;
+    my %summary = ( total_calls => 0, total_tokens => 0, total_cost => 0, by_provider => {}, by_site => {} );
+
+    if ($schema) {
+        my $rs = $schema->resultset('AiUsageLog');
+        my $since = DateTime->now->subtract(days => $days)->ymd . ' 00:00:00';
+
+        my $cond = { created_at => { '>=' => $since } };
+        $cond->{provider} = $prov_f if $prov_f;
+        $cond->{site_id}  = $site_f if $site_f;
+        $cond->{model}    = { 'like' => "%$model_f%" } if $model_f;
+
+        # Limit rows for UI
+        @logs = $rs->search($cond, { order_by => { -desc => 'created_at' }, rows => 200 })->all;
+
+        # Compute aggregates (simple, in-mem for now; for high volume add SQL GROUP BY)
+        foreach my $log (@logs) {
+            $summary{total_calls}++;
+            $summary{total_tokens} += $log->total_tokens || 0;
+            $summary{total_cost}   += $log->estimated_cost_usd || 0;
+
+            my $p = $log->provider || 'unknown';
+            $summary{by_provider}{$p}{calls}  += 1;
+            $summary{by_provider}{$p}{tokens} += $log->total_tokens || 0;
+            $summary{by_provider}{$p}{cost}   += $log->estimated_cost_usd || 0;
+
+            my $s = $log->site_id || 0;
+            $summary{by_site}{$s}{calls}  += 1;
+            $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
+            $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
+        }
+        $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
+    }
+
+    # For filter dropdowns: recent distinct providers/sites (lightweight)
+    my @providers = qw(ollama grok openai anthropic);
+    my @sites;
+    if ($is_admin && $schema) {
+        eval {
+            @sites = map { { id => $_->id, name => $_->name || $_->site_display_name || 'Site '.$_->id } }
+                     $schema->resultset('Site')->search({}, { rows => 50, order_by => 'name' })->all;
+        };
+    }
+
+    $c->stash(
+        template    => 'ai/usage.tt',
+        page_title  => 'AI Usage & Billing Monitor',
+        logs        => \@logs,
+        summary     => \%summary,
+        filters     => { days => $days, provider => $prov_f, site_id => $site_f, model => $model_f },
+        providers   => \@providers,
+        sites       => \@sites,
+        is_admin    => $is_admin ? 1 : 0,
+        current_site=> $site_id,
+        username    => $username,
+    );
+}
+
+=head2 _estimate_ai_cost_usd
+
+Rough cost estimator for paid providers. Returns 0 for local (ollama).
+Prices are approximate and for monitoring/billing estimates only; update as provider pricing changes.
+=cut
+
+sub _estimate_ai_cost_usd {
+    my ($self, $provider, $model, $prompt_tokens, $completion_tokens) = @_;
+    $provider //= 'ollama';
+    $model    //= '';
+    $prompt_tokens //= 0;
+    $completion_tokens //= 0;
+
+    my $p = lc($provider);
+    return 0 if $p eq 'ollama' || $p eq 'local';
+
+    # xAI / Grok (approximate as of 2026; check current https://x.ai/api )
+    if ($p eq 'grok' || $p eq 'xai') {
+        # Rough tiers: grok-3 / grok-4 variants cheaper for fast, more for reasoning.
+        # Using ballpark $0.20 / M input, $0.80 / M output for common; adjust for real billing.
+        my $rate_in  = 0.00000020;  # per token
+        my $rate_out = 0.00000080;
+        if ($model =~ /mini|fast|non-reason/i) {
+            $rate_in  = 0.00000010;
+            $rate_out = 0.00000040;
+        } elsif ($model =~ /reason|large|4/i) {
+            $rate_in  = 0.00000050;
+            $rate_out = 0.00000150;
+        }
+        return sprintf('%.6f', ($prompt_tokens * $rate_in) + ($completion_tokens * $rate_out));
+    }
+
+    # OpenAI example (if used via api keys)
+    if ($p eq 'openai') {
+        my $rate_in = 0.00000050; # placeholder
+        my $rate_out = 0.00000150;
+        return sprintf('%.6f', ($prompt_tokens * $rate_in) + ($completion_tokens * $rate_out));
+    }
+
+    # Anthropic etc. placeholder 0 for now
+    return 0;
+}
+
+=head2 _log_ai_usage
+
+Centralized logger for every AI inference call (success or error).
+Records provider, model, tokens, cost estimate, site/user for customer billing,
+and timing/host for capacity planning / system usage anticipation.
+Safe: never throws; logs errors to system log only.
+=cut
+
+sub _log_ai_usage {
+    my ($self, $c, %args) = @_;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return unless $schema;
+
+        my $user_id     = $args{user_id}     // $c->session->{user_id};
+        my $site_id     = $args{site_id}     // $c->session->{SiteID};
+        my $guest_id    = $args{guest_session_id} // $c->session->{guest_session_id};
+        my $provider    = $args{provider}    // 'ollama';
+        my $model       = $args{model}       // 'unknown';
+        my $pt          = $args{prompt_tokens}     // 0;
+        my $ct          = $args{completion_tokens} // 0;
+        my $tot         = $args{total_tokens}      // ($pt + $ct);
+        my $dur_ms      = $args{duration_ms};
+        my $req_type    = $args{request_type} // 'chat';
+        my $conv_id     = $args{conversation_id};
+        my $status      = $args{status} // 'success';
+        my $err_msg     = $args{error_message};
+        my $ollama_host = $args{ollama_host};
+        my $ip          = $c->request ? $c->request->address : undef;
+        my $meta        = $args{metadata} || {};
+
+        # Ensure numeric
+        $pt  += 0; $ct += 0; $tot += 0;
+
+        my $cost = $args{estimated_cost_usd};
+        unless (defined $cost) {
+            $cost = $self->_estimate_ai_cost_usd($provider, $model, $pt, $ct);
+        }
+
+        $schema->resultset('AiUsageLog')->create({
+            user_id           => $user_id,
+            site_id           => $site_id,
+            guest_session_id  => $guest_id,
+            provider          => $provider,
+            model             => $model,
+            prompt_tokens     => $pt,
+            completion_tokens => $ct,
+            total_tokens      => $tot,
+            estimated_cost_usd=> $cost,
+            duration_ms       => $dur_ms,
+            request_type      => $req_type,
+            conversation_id   => $conv_id,
+            status            => $status,
+            error_message     => $err_msg,
+            ip_address        => $ip,
+            ollama_host       => $ollama_host,
+            metadata          => (ref($meta) ? encode_json($meta) : $meta),
+        });
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_log_ai_usage',
+            sprintf("Logged AI usage: provider=%s model=%s tokens=%s/%s cost=%.6f site=%s user=%s status=%s",
+                $provider, $model, $pt, $ct, $cost, $site_id//'-', $user_id//'-', $status));
+    };
+    if ($@) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_log_ai_usage',
+            "Failed to write ai_usage_logs: $@");
     }
 }
 
