@@ -2974,9 +2974,9 @@ sub models :Local :Args(0) {
         };
         
         # Try to connect to each server and get model information
+        my $ollama = $c->model('Ollama');
+        my $orig_timeout;
         try {
-            # Create Ollama instance for this specific server
-            my $ollama = $c->model('Ollama');
             if ($ollama) {
                 # Configure for this specific server
                 $ollama->host($config->{host});
@@ -2984,7 +2984,7 @@ sub models :Local :Args(0) {
                 $ollama->clear_endpoint;  # Force rebuild of endpoint URL
                 
                 # Set a short timeout for connection check and listing to prevent blocking
-                my $orig_timeout = $ollama->timeout;
+                $orig_timeout = $ollama->timeout;
                 $ollama->timeout(3);
                 
                 # Test connection first
@@ -3032,11 +3032,14 @@ sub models :Local :Args(0) {
                 }
                 
                 # Restore original timeout
-                $ollama->timeout($orig_timeout);
+                $ollama->timeout($orig_timeout) if defined $orig_timeout;
             } else {
                 $server_info->{error} = "Failed to load Ollama model";
             }
         } catch {
+            if ($ollama && defined $orig_timeout) {
+                $ollama->timeout($orig_timeout);
+            }
             $server_info->{error} = "Connection failed: $_";
             $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 
                 'models', "Failed to connect to server $config->{host}:$config->{port}: $_");
