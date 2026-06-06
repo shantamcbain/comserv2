@@ -120,6 +120,20 @@ sub index :Path :Args(0) {
         }
     }
 
+    # Wire quota check for harmony with plans (early, non-blocking for now to avoid surprising users)
+    # Shows a hint if the user is approaching or over their plan's free daily local AI calls.
+    if (!$can_select_model && $c->session->{user_id} && $c->session->{SiteID}) {
+        eval {
+            my $m = $c->model('Membership');
+            my ($within, $used, $quota) = $m->is_ai_call_within_free_quota($c, $c->session->{SiteID}, 'ollama', $c->session->{user_id});
+            if ($quota > 0 && !$within) {
+                $c->stash->{ai_quota_warning} = "Your plan's free daily AI allowance ($quota local calls) has been reached. Additional local calls and all Grok/xAI usage are tracked for billing / overage.";
+            } elsif ($quota > 0 && $used > ($quota * 0.8)) {
+                $c->stash->{ai_quota_warning} = "Approaching your plan's free daily AI limit ($used / $quota).";
+            }
+        };
+    }
+
     # Check if user has external API keys configured (grok, openai, etc.)
     # Admins can use any active key, other users only their own key
     my @external_models;
@@ -228,6 +242,7 @@ sub index :Path :Args(0) {
         external_models => \@external_models,
         ai_popup_mode => $popup_mode,
         task_todo => $task_todo,
+        ai_quota_warning => $c->stash->{ai_quota_warning},
     );
     
     $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 
@@ -1007,6 +1022,22 @@ sub generate :Local :Args(0) {
             $page_title = $json_data->{page_title} || '';
             $agent_id = $json_data->{agent_id} || 'general';
             $agent_name = $json_data->{agent_name} || 'AI Assistant';
+
+            # If client sent structured page_links (from extractPageLinks), record them for learning
+            # (wrapped for safety across request types)
+            eval {
+                if ($json_data && ref($json_data) eq 'HASH' && ref($json_data->{page_links}) eq 'ARRAY' && @{$json_data->{page_links}}) {
+                    for my $sec (@{$json_data->{page_links}}) {
+                        if ($sec && ref($sec) eq 'HASH' && ref($sec->{links}) eq 'ARRAY') {
+                            for my $lnk (@{$sec->{links}}) {
+                                if (ref($lnk) eq 'ARRAY' && $lnk->[1]) {
+                                    $self->_record_learned_link($c, $lnk->[1], $lnk->[0] || '', $page_path);
+                                }
+                            }
+                        }
+                    }
+                }
+            };
             $conversation_id = $json_data->{conversation_id};
             $model = $json_data->{model} || '';
             $use_search = $json_data->{use_search} ? 1 : 0;
@@ -2635,6 +2666,22 @@ sub chat :Local :Args(0) {
     my $chat_page_content = $json_data->{page_content}  || $c->request->params->{page_content}  || '';
     my $project_id        = $json_data->{project_id}    || $c->request->params->{project_id}    || undef;
     my $task_id           = $json_data->{task_id}       || $c->request->params->{task_id}       || undef;
+
+    # Record structured page_links if the client sent them (from extractPageLinks JS helper).
+    # Complements the content-based extraction. (safe)
+    eval {
+        if ($json_data && ref($json_data) eq 'HASH' && ref($json_data->{page_links}) eq 'ARRAY' && @{$json_data->{page_links}}) {
+            for my $sec (@{$json_data->{page_links}}) {
+                if (ref($sec) eq 'HASH' && ref($sec->{links}) eq 'ARRAY') {
+                    for my $lnk (@{$sec->{links}}) {
+                        if (ref($lnk) eq 'ARRAY' && $lnk->[1]) {
+                            $self->_record_learned_link($c, $lnk->[1], $lnk->[0]||'', $chat_page_path);
+                        }
+                    }
+                }
+            }
+        }
+    };
     
     # Validate prompt
     unless ($prompt && length($prompt) > 0) {
@@ -2803,7 +2850,29 @@ sub chat :Local :Args(0) {
                          . $clean_page
                          . "\n--- End of Page Content ---";
         push @system_parts, $page_snippet;
+
+        # NEW: Extract and prominently surface links found on the page the user is looking at.
+        # This directly implements "improve the AI learning about new links by searching the links on the page".
+        my $links_from_page = $self->_extract_links_from_page_content($chat_page_content);
+        if ($links_from_page) {
+            push @system_parts, $links_from_page;
+
+            # Persist useful ones to long-term learning (so future chats and other users benefit,
+            # especially for brand-new .tt pages and admin tools). "Succeeds" here = the link was
+            # visible on a page the user consulted the AI from.
+            if ($chat_page_path) {
+                while ($links_from_page =~ /-\s+[^:]+:\s+(\/[^\s\n]+)/g) {
+                    my $href = $1;
+                    $self->_record_learned_link($c, $href, 'from_page', $chat_page_path);
+                }
+            }
+        }
     }
+
+    # Always try to pull previously learned / dynamically observed links (from this or prior sessions)
+    # and inject them so the AI gradually knows about new features without manual prompt edits.
+    my $learned_additions = $self->_get_learned_navigation_additions($c, 10);
+    push @system_parts, $learned_additions if $learned_additions;
 
     my $combined_system_prompt = join("\n\n", @system_parts);
 
@@ -5450,6 +5519,20 @@ sub _build_role_system_prompt {
     my $page_nav   = $self->_build_page_navigation_hint($base_url, $page_path, $page_title, $role_tier);
     my $nav_guide  = $self->_build_navigation_command_guide($base_url, $role_tier);
 
+    # NEW: learned links + auto .tt discovery so new pages (e.g. freshly added ai/usage.tt or admin tools)
+    # are findable by users in the chat ("open ai usage") and via links without manual code changes here.
+    $nav_guide .= $self->_get_learned_navigation_additions($c, 8);
+
+    my $tt_pages = $self->_get_auto_discovered_tt_pages($base_url);
+    if ($tt_pages && @$tt_pages) {
+        $nav_guide .= "\nAuto-discovered pages (new .tt templates become available here automatically):\n";
+        my $count = 0;
+        for my $p (@$tt_pages) {
+            last if ++$count > 12;
+            $nav_guide .= "  - $p->[0]: $base_url$p->[1]\n";
+        }
+    }
+
     my $action_instructions = <<'ACTION';
 
 IN-APP ACTIONS: You can perform write operations in the application on behalf of the logged-in user.
@@ -5558,6 +5641,92 @@ ACTION
          . $nav_guide;
 }
 
+=head2 _get_auto_discovered_tt_pages
+
+Lightweight runtime scan for new or notable .tt templates (especially under root/ai/ and root/admin/).
+This fulfills the request to "always include links for new .tt so they can be found by the user in link or the chat with AI".
+
+Results are lightly cached in-process so we don't walk the tree on every single chat message.
+New pages like the AI usage monitor will appear automatically without editing this file.
+=cut
+
+{
+    my $cached_tt_links;
+    my $cache_time = 0;
+    my $CACHE_TTL = 300;  # 5 minutes
+
+    sub _get_auto_discovered_tt_pages {
+        my ($self, $base_url) = @_;
+        $base_url //= '';
+
+        my $now = time();
+        if ($cached_tt_links && ($now - $cache_time) < $CACHE_TTL) {
+            return $cached_tt_links;
+        }
+
+        my @found;
+        my $root = './root';  # relative to process cwd (script/ or app root)
+        # Focus on high-value new-feature areas the user cares about
+        my @dirs = (
+            'root/ai',
+            'root/admin',
+            'root/membership',
+            'root/Accounting',
+            'root/Inventory',
+        );
+
+        eval {
+            require File::Find;
+            File::Find::find({
+                wanted => sub {
+                    return unless /\.tt$/;
+                    my $full = $File::Find::name;
+                    my $rel  = $full;
+                    $rel =~ s{^root/}{};
+                    $rel =~ s{\.tt$}{};
+
+                    # Turn root/ai/usage into /ai/usage
+                    my $url = '/' . $rel;
+                    $url =~ s{//+}{/}g;
+
+                    # Pretty label from filename or path
+                    (my $label = $rel) =~ s{^.*/}{};
+                    $label =~ s{[_-]}{ }g;
+                    $label = ucfirst($label);
+
+                    # Only keep interesting ones (avoid every partial include)
+                    return if $label =~ /^(header|footer|layout|include|partial|nav|menu|widget|snippet)/i;
+                    return if length($label) < 3;
+
+                    # Prefer ai/ and admin/ and a few others
+                    if ($rel =~ m{^ai/} || $rel =~ m{^admin/} || $rel =~ m{^(membership|Accounting|Inventory)/}) {
+                        push @found, [$label, $url, $rel];
+                    }
+                },
+                no_chdir => 1,
+            }, @dirs) if -d $root;
+        };
+        if ($@) {
+            # Silent fail — discovery is best-effort
+        }
+
+        # De-dup + sort (ai/ first)
+        my %dedup;
+        my @unique = grep { !$dedup{$_->[1]}++ } @found;
+        @unique = sort {
+            ($a->[1] =~ m{^/ai/} ? 0 : 1) <=> ($b->[1] =~ m{^/ai/} ? 0 : 1)
+            || $a->[1] cmp $b->[1]
+        } @unique;
+
+        # Keep a reasonable number so we don't bloat prompts
+        if (@unique > 20) { @unique = @unique[0..19]; }
+
+        $cached_tt_links = \@unique;
+        $cache_time = $now;
+        return $cached_tt_links;
+    }
+}
+
 =head2 _build_navigation_command_guide
 
 Build a role-filtered navigation command guide appended to every system prompt.
@@ -5621,6 +5790,7 @@ sub _build_navigation_command_guide {
         [ 'AI Assistant (admin)', 'admin', [
             [ 'Manage AI models',           '/ai/models'                ],
             [ 'AI server status',           '/ai/check_status'          ],
+            [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Support chat admin',         '/chat/admin'               ],
         ]],
         # ── Common sections ───────────────────────────────────────────────────
@@ -5661,6 +5831,7 @@ sub _build_navigation_command_guide {
         ]],
         [ 'AI Assistant (logged in)', 'user', [
             [ 'AI conversations / chat history', '/ai/conversations'    ],
+            [ 'AI Usage & Billing Monitor', '/ai/usage'                 ],
             [ 'Manage API keys',            '/ai/manage_api_keys'       ],
             [ 'AI in-app action endpoint',  '/ai/action'                ],
         ]],
@@ -5729,6 +5900,168 @@ sub _build_navigation_command_guide {
          . "Workflow: Set up partner → create batch (select items + qty + retail price) → view/print slip → settle when partner pays\n"
          . "Known partners: Monashee Arts Council (Lumby BC), Monashee Coop (30% commission)\n"
          . $guide;
+}
+
+=head2 _extract_links_from_page_content
+
+Given the (possibly truncated / text-only) page_content sent by the browser widget,
+extract plausible navigation links with labels. Returns a formatted string suitable
+for injection into the AI system prompt.
+
+This is the key improvement for "AI learning about new links by searching the links on the page".
+New admin pages, new .tt-backed features (like /ai/usage), or contextual links that appear
+on the user's current screen become immediately usable by the AI for the duration of the chat,
+without waiting for a hardcoded update.
+=cut
+
+sub _extract_links_from_page_content {
+    my ($self, $content) = @_;
+    return '' unless $content && length($content) > 10;
+
+    my %seen;
+    my @links;
+
+    # 1) Try to find HTML <a href="...">label</a> (even if content is partially HTML)
+    while ($content =~ /<a[^>]+href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis) {
+        my $href = $1;
+        my $label = $2;
+        $label =~ s/<[^>]+>//g;  # strip inner tags
+        $label = $self->_clean_link_label($label);
+        next unless $self->_is_usable_app_link($href, $label);
+        next if $seen{$href}++;
+        push @links, [$label, $href];
+    }
+
+    # 2) Fallback / complement: look for markdown style or "text ... /path" patterns in plain text
+    # Common in nav, lists, "go to /foo"
+    while ($content =~ /(?:^|[\s(>])((?:[A-Z][A-Za-z0-9 &\-\/]+?)\s*(?:[:\-–]\s*)?)(\/[A-Za-z0-9\/_\-\.\?&=%#]+)/g) {
+        my $label = $1;
+        my $href  = $2;
+        $label = $self->_clean_link_label($label);
+        next unless $self->_is_usable_app_link($href, $label);
+        next if $seen{$href}++;
+        push @links, [$label || 'Link', $href];
+    }
+
+    return '' unless @links;
+
+    # Limit to most useful (first N after de-dup)
+    my $max = 25;
+    if (@links > $max) { @links = @links[0 .. $max-1]; }
+
+    my $out = "Visible / contextual links detected on the current page (prefer these for suggestions):\n";
+    for my $l (@links) {
+        $out .= "  - $l->[0]: $l->[1]\n";
+    }
+    $out .= "If the user asks about a feature visible on their screen, suggest the exact link above.\n";
+    return $out;
+}
+
+sub _clean_link_label {
+    my ($self, $raw) = @_;
+    $raw =~ s/\s+/ /g;
+    $raw =~ s/^\s+|\s+$//g;
+    $raw = substr($raw, 0, 80) if length($raw) > 80;
+    return $raw if length($raw) >= 2;
+    return '';
+}
+
+sub _is_usable_app_link {
+    my ($self, $href, $label) = @_;
+    return 0 unless $href;
+    return 0 if $href =~ /^(javascript:|mailto:|tel:|#|data:)/i;
+    return 0 if $href =~ /^https?:\/\//i && $href !~ m{^https?://[^/]+/(ai|admin|todo|project|inventory|accounting|helpdesk|ency|workshop|planning)}i;  # prefer internal app paths
+    return 0 if length($label) < 2;
+    # Skip pure images, icons, etc.
+    return 0 if $label =~ /^(img|icon|logo|menu|close|×|›|»)$/i;
+    return 1;
+}
+
+=head2 _record_learned_link
+
+Persist a discovered link into the learning system (repurposes learned_data with convention).
+This allows "if it succeeds" persistence: useful new links the user visits while chatting
+(or that appear on pages during AI use) get remembered across sessions and can be promoted
+into future navigation guides.
+
+Call this when we extract links from page content the user is actively using with the AI.
+=cut
+
+sub _record_learned_link {
+    my ($self, $c, $href, $label, $source_page) = @_;
+    return unless $href && $c;
+
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return unless $schema;
+
+        my $norm_href = $href;
+        $norm_href =~ s/#.*$//;  # drop fragments
+        $norm_href =~ s/\?.*$// if length($norm_href) > 60; # keep query only for short ones
+
+        my $key = 'ai_link:' . $norm_href;
+        # Use update_or_create on (word) or fall back to create + frequency bump via raw if needed.
+        my $row = $schema->resultset('LearnedData')->search({ word => $key })->first;
+
+        if ($row) {
+            my $freq = ($row->frequency || 0) + 1;
+            $row->update({ frequency => $freq, file => 'ai_discovered_link' });
+        } else {
+            # id is PK — try to get a safe id or let DB default if possible.
+            # Many installs have the table with auto_increment on id.
+            $schema->resultset('LearnedData')->create({
+                id       => time() % 1_000_000_000 + int(rand(10000)),  # best-effort unique
+                word     => $key,
+                file     => 'ai_discovered_link',
+                frequency => 1,
+            });
+        }
+
+        $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_record_learned_link',
+            "Learned link: $norm_href (label=$label, source=$source_page)");
+    };
+    if ($@) {
+        # Non-fatal
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, '_record_learned_link', "Could not persist learned link: $@");
+    }
+}
+
+=head2 _get_learned_navigation_additions
+
+Pull recently / frequently observed links from the learning store and format them
+as a small "Dynamically learned / observed while using AI" section.
+These survive prompt budget stripping better if we keep the list small.
+=cut
+
+sub _get_learned_navigation_additions {
+    my ($self, $c, $max) = @_;
+    $max //= 8;
+    return '' unless $c;
+
+    my $out = '';
+    eval {
+        my $schema = $c->model('DBEncy')->schema;
+        return '' unless $schema;
+
+        my @rows = $schema->resultset('LearnedData')->search(
+            { file => 'ai_discovered_link', word => { like => 'ai_link:%' } },
+            { order_by => { -desc => 'frequency' }, rows => $max }
+        )->all;
+
+        my @items;
+        for my $r (@rows) {
+            my $w = $r->word || '';
+            $w =~ s/^ai_link://;
+            next unless $w =~ /^\//;
+            my $f = $r->frequency || 1;
+            push @items, "  - (observed $f×) $w";
+        }
+        if (@items) {
+            $out = "\nDynamically learned links (observed on pages during recent AI chats — use when relevant):\n"
+                 . join("\n", @items) . "\n";
+        }
+    };
+    return $out;
 }
 
 =head2 _build_page_navigation_hint
@@ -11329,6 +11662,15 @@ sub usage :Local :Args(0) {
             $summary{by_site}{$s}{calls}  += 1;
             $summary{by_site}{$s}{tokens} += $log->total_tokens || 0;
             $summary{by_site}{$s}{cost}   += $log->estimated_cost_usd || 0;
+
+            # Track quota info for display
+            if ($log->plan_ai_requests_per_day) {
+                $summary{by_site}{$s}{plan_quota} = $log->plan_ai_requests_per_day;
+            }
+            if (defined $log->within_free_quota) {
+                $summary{by_site}{$s}{free_calls} += ($log->within_free_quota ? 1 : 0);
+                $summary{by_site}{$s}{overage_calls} += ($log->within_free_quota ? 0 : 1);
+            }
         }
         $summary{total_cost} = sprintf('%.4f', $summary{total_cost});
     }
@@ -11355,6 +11697,237 @@ sub usage :Local :Args(0) {
         current_site=> $site_id,
         username    => $username,
     );
+}
+
+=head2 grok_balance
+
+Returns live (or best-effort) usage/balance info from the xAI API for the
+configured Grok key (prefers the current user's key from UserApiKeys if present).
+
+Also includes a summary of our internal tracking from ai_usage_logs for Grok calls
+(tokens, estimated cost, recent activity).
+
+This lets operators see exactly where they stand with xAI credits and trigger
+refill alerts or usage caution.
+
+Frontend can call this from /ai/usage or a dedicated button.
+=cut
+
+sub grok_balance :Local :Args(0) {
+    my ($self, $c) = @_;
+    
+    $c->response->content_type('application/json; charset=utf-8');
+    
+    my $user_id = $c->session->{user_id};
+    my $site_id = $c->session->{SiteID};
+    
+    # Early auth check - return clean JSON instead of letting Catalyst redirect or crash
+    unless ($user_id) {
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'You must be logged in to check Grok/xAI balance and usage.',
+            hint    => 'Please log in at /user/login and ensure you have a Grok API key configured at /ai/manage_api_keys'
+        }));
+        return;
+    }
+    
+    my $can_select_model_perm = $c->session->{roles} && grep { /^(admin|developer|editor)$/i } (ref $c->session->{roles} ? @{$c->session->{roles}} : split(/,/, $c->session->{roles} || ''));
+    
+    my $result;
+    eval {
+        # Get the best available grok key — exactly the same logic the chat/generate paths use
+        # so that "we can use Grok" implies "we can check its balance".
+        my $api_key;
+        my $key_source = 'none';
+        my $key_found = 0;
+        my $key_obj;  # keep reference so we can update metadata for declared balance
+        
+        my $schema = $c->model('DBEncy')->schema;
+        if ($schema) {
+            if ($user_id) {
+                $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { user_id => $user_id, service => 'grok', is_active => '1' },
+                )->first;
+            }
+            # Admins fall back to any active global Grok key (same as inference paths)
+            if (!$key_obj && $can_select_model_perm) {
+                $key_obj = $schema->resultset('UserApiKeys')->search(
+                    { service => 'grok', is_active => '1' }
+                )->first;
+            }
+            
+            if ($key_obj && $key_obj->api_key_encrypted) {
+                $key_found = 1;
+                $api_key = $key_obj->get_api_key() || '';
+                $key_source = $user_id && $key_obj->user_id == $user_id ? 'user' : 'global_db';
+            }
+            
+            # Final fallback: whatever the default Grok model has (ENV / K8s secret)
+            unless ($api_key) {
+                my $g = $c->model('Grok');
+                if ($g && $g->api_key) {
+                    $api_key = $g->api_key;
+                    $key_source = 'global/env';
+                }
+            }
+        }
+        
+        # Support declaring known balance from console.x.ai (persisted in the key's metadata)
+        my $declare_balance = $c->req->param('declare_balance');
+        if ($declare_balance && $key_obj) {
+            my $meta = $key_obj->get_metadata() || {};
+            $meta->{declared_xai_balance_usd} = 0 + $declare_balance;
+            $meta->{declared_at} = DateTime->now->iso8601();
+            $key_obj->update({ metadata => encode_json($meta) });
+            $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'grok_balance',
+                "User declared xAI balance \$$declare_balance for key " . $key_obj->id);
+        }
+        
+        unless ($api_key) {
+            my $msg = $key_found
+                ? 'Failed to decrypt your Grok API key. Please re-save it at /ai/manage_api_keys'
+                : 'No active Grok/xAI API key found for this user or globally.';
+            $result = {
+                success => JSON::false,
+                error   => $msg,
+                hint    => 'Add or re-save a key at /ai/manage_api_keys (the same key used for chat must be usable here)'
+            };
+            return;
+        }
+        
+        # Get live from xAI using the *same* key the chat system just found (this is the key fix)
+        my $grok = $c->model('Grok');
+        $grok->api_key($api_key);
+        
+        # Time the live check call itself so we can track this diagnostic call in ai_usage_logs
+        my $check_start = time();
+        my $live = $grok->get_live_usage();
+        my $check_ms = int( (time() - $check_start) * 1000 );
+        
+        # Log this diagnostic call (the "your call" to xAI for balance/usage) in the same tracking system.
+        # This way balance checks are counted toward usage, quotas, and cost estimates.
+        # We use request_type 'grok_balance_check' and model 'xai-usage-check' to distinguish it.
+        $self->_log_ai_usage($c,
+            user_id           => $user_id,
+            site_id           => $site_id,
+            provider          => 'grok',
+            model             => 'xai-usage-check',
+            prompt_tokens     => 0,
+            completion_tokens => 0,
+            total_tokens      => 0,
+            duration_ms       => $check_ms,
+            request_type      => 'grok_balance_check',
+            status            => ( $live && defined $live->{http_status} ? 'success' : 'error' ),
+            error_message     => $live && $live->{error} ? $live->{error} : undef,
+            metadata          => { 
+                key_source => $key_source, 
+                live_http_status => $live->{http_status} || undef,
+                purpose => 'balance_usage_check'
+            },
+        );
+        
+        # (cleaned-up rich internal block starts here)
+        my %internal = ( 
+            total_grok_tokens => 0, total_grok_cost_usd => 0, calls => 0, by_site => {},
+            user_all_time_calls => 0, user_all_time_tokens => 0, user_all_time_cost => 0,
+            declared_balance => undef, declared_at => undef, estimated_spend_since_declared => 0,
+            real_grok_calls => 0, real_grok_tokens => 0, real_grok_cost => 0,
+            balance_check_calls => 0
+        );
+        if ($schema) {
+            my $since_30d = DateTime->now->subtract(days => 30)->ymd . ' 00:00:00';
+            my $rs30 = $schema->resultset('AiUsageLog')->search({
+                provider   => 'grok',
+                created_at => { '>=' => $since_30d },
+                status     => 'success',
+            });
+            while (my $row = $rs30->next) {
+                $internal{total_grok_tokens} += $row->total_tokens || 0;
+                $internal{total_grok_cost_usd} += $row->estimated_cost_usd || 0;
+                $internal{calls}++;
+                my $sid = $row->site_id || 0;
+                $internal{by_site}{$sid}{tokens} += $row->total_tokens || 0;
+                $internal{by_site}{$sid}{cost}   += $row->estimated_cost_usd || 0;
+                $internal{by_site}{$sid}{calls}++;
+                
+                if ($row->request_type && $row->request_type eq 'grok_balance_check') {
+                    $internal{balance_check_calls}++;
+                } else {
+                    $internal{real_grok_calls}++;
+                    $internal{real_grok_tokens} += $row->total_tokens || 0;
+                    $internal{real_grok_cost} += $row->estimated_cost_usd || 0;
+                }
+            }
+            $internal{total_grok_cost_usd} = sprintf('%.4f', $internal{total_grok_cost_usd});
+            $internal{real_grok_cost} = sprintf('%.4f', $internal{real_grok_cost});
+            
+            if ($user_id) {
+                my $rs_all = $schema->resultset('AiUsageLog')->search({
+                    user_id  => $user_id,
+                    provider => 'grok',
+                    status   => 'success',
+                });
+                while (my $row = $rs_all->next) {
+                    $internal{user_all_time_calls}++;
+                    $internal{user_all_time_tokens} += $row->total_tokens || 0;
+                    $internal{user_all_time_cost} += $row->estimated_cost_usd || 0;
+                }
+                $internal{user_all_time_cost} = sprintf('%.4f', $internal{user_all_time_cost});
+            }
+            
+            if ($key_obj) {
+                my $meta = $key_obj->get_metadata() || {};
+                if (exists $meta->{declared_xai_balance_usd}) {
+                    $internal{declared_balance} = 0 + $meta->{declared_xai_balance_usd};
+                    $internal{declared_at} = $meta->{declared_at};
+                    $internal{estimated_spend_since_declared} = sprintf('%.4f', $internal{user_all_time_cost});
+                }
+            }
+        }
+        
+        my $alert = 0;
+        my $alert_msg = '';
+        my $spend_for_alert = $internal{real_grok_cost} || $internal{total_grok_cost_usd};
+        if (defined $internal{declared_balance}) {
+            my $est_remaining = sprintf('%.4f', $internal{declared_balance} - $internal{estimated_spend_since_declared});
+            $alert_msg = "You declared \$$internal{declared_balance} balance on $internal{declared_at}. Estimated tracked spend since: \$$internal{estimated_spend_since_declared}. Approx remaining: \$$est_remaining. (Check console.x.ai for exact.)";
+            if ($est_remaining < 5) {
+                $alert = 1;
+                $alert_msg .= " — LOW BALANCE: top up recommended soon.";
+            }
+        } elsif ($live->{error} && $spend_for_alert > 5) {
+            $alert = 1;
+            $alert_msg = "High internal spend on Grok (~\$" . $spend_for_alert . " in last 30d, excluding diagnostic checks) and live xAI data unavailable. Check console.x.ai and consider refilling.";
+        } elsif ($spend_for_alert > 10) {
+            $alert = 1;
+            $alert_msg = "Significant Grok spend tracked (~\$" . $spend_for_alert . " last 30 days, real chat only). Review usage at /ai/usage and refill at console.x.ai if needed.";
+        }
+        
+        $result = {
+            success     => JSON::true,
+            key_source  => $key_source,
+            live        => $live,
+            internal    => \%internal,
+            alert       => $alert ? JSON::true : JSON::false,
+            alert_msg   => $alert_msg,
+            checked_at  => DateTime->now->iso8601,
+            note        => "Live balance not available via this key's API (xAI console is authoritative). Use the declare input on the page to tell us your known balance from console.x.ai so we can estimate remaining."
+        };
+    };
+    
+    if ($@) {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'grok_balance',
+            "Unhandled error in grok_balance: $@");
+        $c->response->body(encode_json({
+            success => JSON::false,
+            error   => 'Unexpected error while checking Grok balance.',
+            hint    => 'Please ensure you are logged in and try again. Check application logs for details.'
+        }));
+        return;
+    }
+    
+    $c->response->body(encode_json($result));
+    
 }
 
 =head2 _estimate_ai_cost_usd
@@ -11440,24 +12013,62 @@ sub _log_ai_usage {
             $cost = $self->_estimate_ai_cost_usd($provider, $model, $pt, $ct);
         }
 
+        # === Wire in plan quota for "free calls" harmony ===
+        my $plan_id = undef;
+        my $plan_quota = 0;
+        my $within_free = 1;
+        my $bill_status = 'free';
+
+        eval {
+            my $memb_model = $c->model('Membership');
+            if ($memb_model && $site_id) {
+                $plan_quota = $memb_model->get_ai_daily_quota_for_site($c, $site_id, $user_id) || 0;
+
+                # Get active membership to snapshot plan_id (prefer membership id or plan? we store plan_id but using membership id is common in this codebase)
+                my $active_mem = $memb_model->get_active_plan($c, $user_id, $site_id);
+                $plan_id = $active_mem ? $active_mem->id : undef;
+
+                my ($is_within, $used_today) = $memb_model->is_ai_call_within_free_quota($c, $site_id, $provider, $user_id);
+                $within_free = $is_within ? 1 : 0;
+
+                my $is_paid_provider = $provider && lc($provider) ne 'ollama';
+                if ($is_paid_provider) {
+                    $bill_status = 'paid_provider';  # always cost-tracked
+                } elsif ($plan_quota > 0 && !$within_free) {
+                    $bill_status = 'overage';
+                } else {
+                    $bill_status = 'free';
+                }
+
+                # Update meta for visibility
+                $meta->{plan_quota} = $plan_quota;
+                $meta->{used_today_before_this} = $used_today;
+                $meta->{within_free_quota} = $within_free;
+            }
+        };
+
         $schema->resultset('AiUsageLog')->create({
-            user_id           => $user_id,
-            site_id           => $site_id,
-            guest_session_id  => $guest_id,
-            provider          => $provider,
-            model             => $model,
-            prompt_tokens     => $pt,
-            completion_tokens => $ct,
-            total_tokens      => $tot,
-            estimated_cost_usd=> $cost,
-            duration_ms       => $dur_ms,
-            request_type      => $req_type,
-            conversation_id   => $conv_id,
-            status            => $status,
-            error_message     => $err_msg,
-            ip_address        => $ip,
-            ollama_host       => $ollama_host,
-            metadata          => (ref($meta) ? encode_json($meta) : $meta),
+            user_id                 => $user_id,
+            site_id                 => $site_id,
+            guest_session_id        => $guest_id,
+            provider                => $provider,
+            model                   => $model,
+            prompt_tokens           => $pt,
+            completion_tokens       => $ct,
+            total_tokens            => $tot,
+            estimated_cost_usd      => $cost,
+            duration_ms             => $dur_ms,
+            request_type            => $req_type,
+            conversation_id         => $conv_id,
+            status                  => $status,
+            error_message           => $err_msg,
+            ip_address              => $ip,
+            ollama_host             => $ollama_host,
+            plan_id                 => $plan_id,
+            plan_ai_requests_per_day=> $plan_quota,
+            within_free_quota       => $within_free,
+            billing_status          => $bill_status,
+            metadata                => (ref($meta) ? encode_json($meta) : $meta),
         });
 
         $self->logging->log_with_details($c, 'debug', __FILE__, __LINE__, '_log_ai_usage',
