@@ -101,7 +101,7 @@ sub schema_for_site {
         );
     };
     if ($@) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'schema_for_site',
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'schema_for_site',
             "Cannot connect to accounting DB '$db_name' at $host:$port — $@");
         return undef;
     }
