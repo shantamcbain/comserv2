@@ -3471,7 +3471,13 @@
         if (matches.length === 1) {
             addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
             persistMessages();
-            setTimeout(function() { window.location.href = matches[0].url; }, 600);
+            setTimeout(function() {
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = matches[0].url;
+                } else {
+                    window.location.href = matches[0].url;
+                }
+            }, 600);
         } else {
             const listMsg = 'Multiple pages match — which one did you mean?\n'
                 + matches.slice(0, 8).map(function(m) { return '- [' + m.label + '](' + m.url + ')'; }).join('\n');
@@ -3657,7 +3663,12 @@
         var subject = 'Support request — ' + (document.title || window.location.pathname);
         var description = 'Chat transcript from AI widget:\n\n' + msgs.slice(-10).join('\n\n').slice(0, 1000);
         var params = new URLSearchParams({ subject: subject, description: description, category: 'support', priority: 'normal', from_chat: '1' });
-        window.location.href = '/HelpDesk/ticket/new?' + params.toString();
+        const ticketUrl = '/HelpDesk/ticket/new?' + params.toString();
+        if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+            window.opener.location.href = ticketUrl;
+        } else {
+            window.location.href = ticketUrl;
+        }
     }
 
     window.__aiChatSupportFns = {
@@ -4739,7 +4750,11 @@
                         ts:      Date.now()
                     }));
                 } catch(e) { console.warn('localStorage write failed', e); }
-                window.location.href = abs;
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = abs;
+                } else {
+                    window.location.href = abs;
+                }
                 const wrapper = document.createElement('div');
                 wrapper.className = 'msg-wrapper msg-wrapper-ai';
                 const lbl = document.createElement('div');
@@ -4989,7 +5004,13 @@
                     persistMessages();
                     addMessage('Navigating to [' + matches[0].label + '](' + matches[0].url + ')', 'ai-message');
                     persistMessages();
-                    setTimeout(function() { window.location.href = matches[0].url; }, 600);
+                    setTimeout(function() {
+                        if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                            window.opener.location.href = matches[0].url;
+                        } else {
+                            window.location.href = matches[0].url;
+                        }
+                    }, 600);
                     return;
                 } else if (matches && matches.length > 1) {
                     addMessage(prompt, 'user-message');
@@ -5593,7 +5614,11 @@
             toast.innerHTML = '💬 ' + n + ' support chat request' + (n > 1 ? 's' : '') + ' awaiting reply'
                 + '<br><small style="font-weight:normal;opacity:.85;">Click to open Support Chat Admin</small>';
             toast.onclick = function() {
-                window.location.href = '/chat/admin';
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    window.opener.location.href = '/chat/admin';
+                } else {
+                    window.location.href = '/chat/admin';
+                }
             };
             document.body.appendChild(toast);
             setTimeout(function() {
