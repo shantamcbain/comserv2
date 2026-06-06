@@ -781,6 +781,7 @@ sub create_ai_chat_tables_from_results {
     my @result_files = (
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiConversation.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiMessage.pm",
+        "$app_root/lib/Comserv/Model/Schema/Ency/Result/AiUsageLog.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/DocumentationMetadataIndex.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/CodeSearchIndex.pm",
         "$app_root/lib/Comserv/Model/Schema/Ency/Result/WebSearchResult.pm",

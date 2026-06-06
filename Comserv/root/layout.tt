@@ -57,6 +57,10 @@
     };
     </script>
     <script src="/static/js/local-chat.js?v=[% cv %]"></script>
+    [% IF c.stash.is_admin || c.session.username == 'Shanta' %]
+    <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css?v=[% cv %]">
+    <script src="/static/js/ai-editing-widget-float.js?v=20260605j"></script>
+    [% END %]
 
     <!-- AI Widget postMessage receiver — lets the popup widget fill forms on this page -->
     <script>

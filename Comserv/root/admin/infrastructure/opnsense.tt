@@ -39,6 +39,55 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
                 border-radius: 4px; margin-bottom: 16px; color: #c62828; }
 .success-banner { background: #e8f5e9; border: 1px solid #a5d6a7; padding: 12px 16px;
                   border-radius: 4px; margin-bottom: 16px; color: #1b5e20; }
+.setup-guide { background: #e3f2fd; border: 1px solid #90caf9; border-radius: 6px;
+               padding: 14px 18px; margin-bottom: 16px; font-size: 0.92em; line-height: 1.5; }
+.setup-guide h4 { margin: 0 0 8px; font-size: 1.05em; }
+.setup-guide ol { margin: 8px 0 0 18px; padding: 0; }
+.setup-guide li { margin-bottom: 6px; }
+.setup-guide table { width: 100%; margin-top: 10px; font-size: 0.9em; }
+.setup-guide th, .setup-guide td { text-align: left; padding: 6px 8px; border: 1px solid #90caf9; }
+.setup-guide th { background: rgba(255,255,255,0.5); }
+.setup-guide .warn { color: #b71c1c; font-weight: bold; }
+.field-hint { font-size: 0.82em; color: #666; font-weight: normal; display: block; margin-top: 2px; }
+.opn-top-nav {
+    position: sticky; top: 0; z-index: 50;
+    background: var(--card-bg, #fff);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 8px; padding: 10px 14px; margin-bottom: 16px;
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.opn-nav-label { font-size: 0.88em; font-weight: bold; color: var(--text-muted-color, #666); margin-right: 4px; }
+.opn-top-nav a, .opn-top-nav .opn-nav-btn {
+    padding: 6px 12px; border-radius: 4px; font-size: 0.88em;
+    text-decoration: none; color: var(--text-color, #333);
+    background: var(--header-bg, #f0f0f0);
+    border: 1px solid var(--border-color, #ddd);
+    cursor: pointer;
+}
+.opn-top-nav a:hover, .opn-top-nav a.opn-nav-active {
+    background: #2196f3; color: #fff; border-color: #1976d2;
+}
+.opn-top-nav a.opn-nav-dns {
+    background: #e8f5e9; border-color: #81c784; font-weight: bold;
+}
+.opn-top-nav a.opn-nav-dns:hover {
+    background: #2e7d32; color: #fff; border-color: #1b5e20;
+}
+.opn-dns-callout {
+    background: #fff8e1; border: 1px solid #ffcc80; border-radius: 6px;
+    padding: 12px 14px; margin: 12px 0; font-size: 0.92em; line-height: 1.5;
+}
+.opn-dns-callout .btn { margin-top: 8px; margin-right: 8px; }
+.opn-nav-btn { margin-left: auto; }
+.collapsible-header { cursor: pointer; user-select: none; }
+.collapsible-header:hover { filter: brightness(0.97); }
+.collapsible-content { display: none; }
+.collapsible-content.expanded { display: block; }
+.opn-chevron { transition: transform 0.2s ease; margin-left: 8px; font-size: 0.85em; color: #666; }
+.opn-chevron.expanded { transform: rotate(90deg); }
+.panel-header .opn-header-meta { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.panel.collapsed-only-header .panel-header { border-radius: 8px; border-bottom: none; }
 </style>
 
 <div class="opnsense-dashboard">
@@ -53,84 +102,306 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
     <div class="error-banner"><strong>Notice:</strong> [% opnsense_error | html %]</div>
     [% END %]
 
-    [%# ── Configuration Panel ──────────────────────────────────────── %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-cog"></i> Connection Configuration</h3>
-            <button class="btn btn-secondary" onclick="toggleConfig()">
-                [% IF opnsense_config.host %]Edit[% ELSE %]Configure[% END %]
-            </button>
+    <nav class="opn-top-nav" aria-label="OPNsense page sections">
+        <span class="opn-nav-label"><i class="fas fa-bars"></i> Jump to:</span>
+        [% IF dev_access %]
+        <a href="#opn-section-dev" data-opn="opn-section-dev">Dev / Prod</a>
+        [% END %]
+        <a href="#opn-section-guide" data-opn="opn-section-guide">API setup</a>
+        <a href="#opn-section-config" data-opn="opn-section-config">Connection</a>
+        [% IF dev_access && dev_access.dns_zero_edit_url %]
+        <a href="[% dev_access.dns_zero_edit_url %]" class="opn-nav-dns" title="Edit zero.computersystemconsulting.ca in Application DNS (Cloudflare)">
+            <i class="fas fa-cloud"></i> App DNS (zero)
+        </a>
+        [% END %]
+        [% IF opnsense_status %]
+        <a href="#opn-section-system" data-opn="opn-section-system">System</a>
+        <a href="#opn-section-interfaces" data-opn="opn-section-interfaces">Interfaces</a>
+        <a href="#opn-section-dhcp" data-opn="opn-section-dhcp">DHCP</a>
+        <a href="#opn-section-nat" data-opn="opn-section-nat">NAT</a>
+        <a href="#opn-section-dns-hosts" data-opn="opn-section-dns-hosts">DNS overrides</a>
+        <a href="#opn-section-firewall" data-opn="opn-section-firewall">Firewall</a>
+        <a href="#opn-section-unbound" data-opn="opn-section-unbound">Unbound</a>
+        [% END %]
+        <button type="button" class="btn btn-secondary opn-nav-btn" onclick="refreshStatus()">Refresh all</button>
+    </nav>
+
+    [% IF dev_access %]
+    <div class="panel opn-section" id="opn-wrap-dev">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-dev')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-dev"></i>
+                <i class="fas fa-laptop-code"></i> Dev vs Production (ZeroTier DNS)
+            </h3>
         </div>
-        <div class="panel-body" id="config-panel" style="[% IF opnsense_config.host %]display:none[% END %]">
+        <div id="opn-section-dev" class="panel-body collapsible-content">
+            <p>[% dev_access.note | html %]</p>
+            <div class="opn-dns-callout">
+                <strong><i class="fas fa-cloud"></i> Wrong server for <code>[% dev_access.prod_zero_host | html %]</code>?</strong>
+                <p style="margin:6px 0 0;">
+                    That hostname is resolved by <strong>Cloudflare</strong> (Application DNS), not OPNsense Unbound.
+                    To point <code>zero</code> at the <strong>workstation</strong> instead of production1, edit the
+                    <strong>A record</strong> and set content to
+                    <code>[% dev_access.dev_zt_ip | html %]</code> (ZeroTier) or your workstation’s public IP.
+                </p>
+                <a href="[% dev_access.dns_zero_edit_url %]" class="btn btn-primary">
+                    <i class="fas fa-edit"></i> Edit <code>zero</code> in Application DNS
+                </a>
+                <a href="[% dev_access.dns_dashboard_url %]" class="btn btn-secondary">All DNS zones</a>
+                <a href="[% dev_access.dns_zone_url %]" class="btn btn-secondary">Zone [% dev_access.cf_zone | html %]</a>
+            </div>
+            <table class="data-table">
+                <thead><tr><th>Target</th><th>Hostname</th><th>ZeroTier IP</th><th>Port</th><th>Use for</th></tr></thead>
+                <tbody>
+                <tr>
+                    <td><strong>Production</strong></td>
+                    <td>
+                        <code>[% dev_access.prod_zero_host | html %]</code>
+                        <a href="[% dev_access.dns_zero_edit_url %]" class="btn btn-secondary"
+                           style="padding:2px 8px;font-size:0.75em;margin-left:6px;"
+                           title="Change Cloudflare A record IP">Edit DNS</a>
+                    </td>
+                    <td><code>[% dev_access.prod_zero_ip | html %]</code></td>
+                    <td>[% dev_access.prod_port %]</td>
+                    <td>Docker Comserv (live stack) — Cloudflare A record today</td>
+                </tr>
+                <tr>
+                    <td><strong>Dev workstation</strong></td>
+                    <td><code>[% dev_access.dev_hostname | html %]</code></td>
+                    <td><code>[% dev_access.dev_zt_ip | html %]</code></td>
+                    <td>[% dev_access.dev_port %]</td>
+                    <td>Starman dev + AI Code Editor</td>
+                </tr>
+                </tbody>
+            </table>
+            <p>AI editor: <a href="[% dev_access.dev_url %]" target="_blank"><code>[% dev_access.dev_url | html %]</code></a></p>
+        </div>
+    </div>
+    [% END %]
+
+    [%# ── API setup guide (not web login password) ─────────────────── %]
+    <div class="panel opn-section" id="opn-wrap-guide">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-guide')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-guide"></i>
+                <i class="fas fa-key"></i> API credentials setup guide
+            </h3>
+            <span class="opn-header-meta"><span class="badge badge-warn">read first</span></span>
+        </div>
+        <div id="opn-section-guide" class="panel-body collapsible-content">
+    <div class="setup-guide" style="margin:0;border:none;background:transparent;padding:0;">
+        <h4>OPNsense API credentials — not your web login password</h4>
+        <p>
+            Comserv talks to OPNsense over the <strong>REST API</strong>. That uses a one-time
+            <strong>API key + API secret</strong> pair. It is <span class="warn">not</span> the same as
+            the username/password on the OPNsense login page, and <span class="warn">not</span> the password
+            fields on “Add user”.
+        </p>
+
+        <h4 style="margin-top:14px;">OPNsense 25.x — your “Edit User” popup is not the API key screen</h4>
+        <p class="warn">
+            If you see only <strong>OTP Seed</strong> (QR code) and <strong>Authorized Keys</strong> (big empty box),
+            that is normal for the Edit User dialog. Comserv does <em>not</em> use those fields.
+        </p>
+        <table>
+            <thead><tr><th>What you see</th><th>Purpose</th><th>Use in Comserv?</th></tr></thead>
+            <tbody>
+                <tr>
+                    <td><strong>OTP Seed</strong> (QR code)</td>
+                    <td>Two-factor login (Google Authenticator, etc.)</td>
+                    <td><span class="warn">No</span></td>
+                </tr>
+                <tr>
+                    <td><strong>Authorized Keys</strong> (textarea)</td>
+                    <td>SSH public key for console/SSH login to the firewall</td>
+                    <td><span class="warn">No</span> — not the REST API</td>
+                </tr>
+                <tr>
+                    <td><strong>ApiKeys</strong> tab or key button on the <em>Users list</em> page</td>
+                    <td>REST API key + secret for automation (Comserv)</td>
+                    <td><strong>Yes</strong></td>
+                </tr>
+            </tbody>
+        </table>
+
+        <h4 style="margin-top:12px;">Where to create the REST API key (OPNsense 25+)</h4>
+        <p>
+            The <strong>ApiKeys</strong> tab only <em>lists</em> keys already created (your “0 entries” is normal before the first key).
+            You create a key from the <strong>Users</strong> tab.
+        </p>
+        <ol>
+            <li>On <strong>System → Access → Users</strong>, click the <strong>Users</strong> tab (left tab — not ApiKeys).</li>
+            <li>
+                In the table row for <code>root</code> (or your API user), look in the <strong>Commands</strong> column on the right.
+                There should be icons: edit (pencil), delete, and a <strong>key / download</strong> button
+                (often looks like a key or downward arrow — official doc: “button in the grid, which downloads a new key/secret file”).
+            </li>
+            <li>Click that <strong>key/download</strong> button on the <code>root</code> row — not the pencil (Edit User popup).</li>
+            <li>
+                OPNsense downloads a file immediately. Switch to the <strong>ApiKeys</strong> tab — you should then see one row for <code>root</code>.
+            </li>
+            <li>
+                Click that control — OPNsense downloads a <strong>one-time</strong> text file with:
+                <pre style="margin:6px 0;background:#fff;padding:8px;border-radius:4px;">key=longRandomString...
+secret=anotherLongRandomString...</pre>
+                Paste into Comserv below: value after <code>key=</code> → <strong>API Key</strong>;
+                value after <code>secret=</code> → <strong>API Secret</strong>.
+            </li>
+            <li>
+                Recommended: use user <code>root</code> or a dedicated user in group <code>admins</code>.
+                The API user needs privileges for firewall/NAT/DNS (admins group is simplest).
+            </li>
+            <li>
+                <strong>Host / IP</strong> = firewall LAN IP (e.g. <code>192.168.1.1</code>), reachable from the Comserv server.
+            </li>
+            <li>Uncheck <strong>Verify SSL</strong> if using the default self-signed HTTPS cert.</li>
+            <li>Save below, then Refresh Status on this page.</li>
+        </ol>
+
+        <h4 style="margin-top:14px;">ApiKeys tab empty / no + button?</h4>
+        <ul style="margin:6px 0 0 18px;">
+            <li><strong>Expected</strong> — ApiKeys lists keys <em>after</em> you create them from the <strong>Users</strong> tab row action.</li>
+            <li>Click <strong>Users</strong> tab → <code>root</code> row → <strong>Commands</strong> column → key/download icon (not pencil).</li>
+            <li>Try the <strong>⋮</strong> (three dots) menu on the Users table toolbar if no key icon on the row.</li>
+            <li>Doc: <a href="https://docs.opnsense.org/manual/how-tos/user-local.html#creating-and-maintaining-api-keys" target="_blank" rel="noopener">Creating and maintaining API keys</a></li>
+        </ul>
+        <table>
+            <thead>
+                <tr><th>OPNsense (when you create the API key)</th><th>Comserv field below</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><strong>Key</strong> (long string, often starts with letters/numbers)</td>
+                    <td><strong>API Key</strong> — paste into “API Key”</td>
+                </tr>
+                <tr>
+                    <td><strong>Secret</strong> (shown only at creation time)</td>
+                    <td><strong>API Secret</strong> — paste into “API Secret”</td>
+                </tr>
+                <tr>
+                    <td>User <strong>Username</strong> + <strong>Password</strong> (web login)</td>
+                    <td><span class="warn">Do not use here</span> — GUI login only</td>
+                </tr>
+                <tr>
+                    <td>Firewall LAN IP (e.g. <code>192.168.1.1</code>)</td>
+                    <td><strong>OPNsense Host / IP</strong></td>
+                </tr>
+            </tbody>
+        </table>
+        <p style="margin:10px 0 0;">
+            Stored in: <code>config/infrastructure/opnsense.json</code> on the Comserv server (admin access only).
+            The API user needs permission to read/write firewall, NAT, and Unbound — typically membership in <code>admins</code>.
+        </p>
+    </div>
+        </div>
+    </div>
+
+    [%# ── Configuration Panel ──────────────────────────────────────── %]
+    <div class="panel opn-section" id="opn-wrap-config">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-config')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-config"></i>
+                <i class="fas fa-cog"></i> Connection Configuration
+            </h3>
+            <span class="opn-header-meta">
+                [% IF opnsense_config.host %]
+                <span class="badge badge-ok">[% opnsense_config.host | html %]:[% opnsense_config.port || 8443 %]</span>
+                [% ELSE %]
+                <span class="badge badge-warn">not configured</span>
+                [% END %]
+            </span>
+        </div>
+        <div id="opn-section-config" class="panel-body collapsible-content">
             <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/save') %]" class="config-form">
                 <div style="display:grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                     <div>
-                        <label for="host">OPNsense Host / IP</label>
+                        <label for="host">OPNsense Host / IP
+                            <span class="field-hint">LAN IP of the firewall (not a domain name unless it resolves on the server)</span>
+                        </label>
                         <input type="text" id="host" name="host" required
                                value="[% opnsense_config.host | html %]" placeholder="192.168.1.1">
-                        <label for="port">Port (default 443)</label>
+                        <label for="port">HTTPS API port
+                            <span class="field-hint">Often <strong>8443</strong> on OPNsense — not 443. Wrong port shows “301 Moved Permanently”.</span>
+                        </label>
                         <input type="number" id="port" name="port"
-                               value="[% opnsense_config.port || 443 %]">
+                               value="[% opnsense_config.port || 8443 %]">
                     </div>
                     <div>
-                        <label for="key">API Key</label>
-                        <input type="text" id="key" name="key"
-                               value="[% opnsense_config.key | html %]" placeholder="API key from OPNsense System &gt; Access &gt; Users">
-                        <label for="secret">API Secret</label>
-                        <input type="password" id="secret" name="secret"
-                               value="[% opnsense_config.secret | html %]" placeholder="API secret">
-                        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;">
+                        <label for="key">API Key
+                            <span class="field-hint">From OPNsense: user → API keys → Key (not username)</span>
+                        </label>
+                        <input type="text" id="key" name="key" autocomplete="off"
+                               value="[% opnsense_config.key | html %]" placeholder="Paste the API Key string">
+                        <label for="secret">API Secret
+                            <span class="field-hint">From the same dialog — Secret (not your login password)</span>
+                        </label>
+                        <input type="password" id="secret" name="secret" autocomplete="new-password"
+                               value="[% opnsense_config.secret | html %]" placeholder="Paste the API Secret string">
+                        <label style="display:flex;align-items:center;gap:8px;font-weight:normal;margin-top:8px;">
                             <input type="checkbox" name="verify_ssl" value="1"
                                    [% IF opnsense_config.verify_ssl %]checked[% END %]>
-                            Verify SSL certificate
+                            Verify SSL certificate (uncheck for default self-signed cert)
                         </label>
                     </div>
                 </div>
                 <button type="submit" class="btn btn-primary" style="margin-top:10px;">Save Configuration</button>
             </form>
+            [% IF opnsense_config.host %]
+            <p style="margin-top:12px;color:var(--text-muted-color,#666);font-size:0.9em;">
+                Connected to <strong>[% opnsense_config.host | html %]:[% opnsense_config.port || 8443 %]</strong>.
+                Use port <strong>8443</strong> (not 443) to avoid 301 errors.
+            </p>
+            [% END %]
         </div>
-        [% IF opnsense_config.host %]
-        <div class="panel-body" style="padding-top:0;">
-            <small style="color:var(--text-muted-color,#666);">
-                Connected to: <strong>[% opnsense_config.host | html %]:[% opnsense_config.port || 443 %]</strong>
-                &nbsp;&nbsp;
-                <button class="btn btn-secondary" style="padding:3px 10px;font-size:0.85em;"
-                        onclick="refreshStatus()">Refresh Status</button>
-            </small>
-        </div>
-        [% END %]
     </div>
 
     [% IF opnsense_status %]
 
     [%# ── Firmware / System ────────────────────────────────────── %]
     [% fw = opnsense_status.firmware %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-info-circle"></i> System Information</h3>
+    <div class="panel opn-section" id="opn-wrap-system">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-system')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-system"></i>
+                <i class="fas fa-info-circle"></i> System Information
+            </h3>
+            <span class="opn-header-meta">
             [% IF fw.error %]
                 <span class="badge badge-err">unavailable</span>
             [% ELSE %]
-                <span class="badge badge-ok">online</span>
+                <span class="badge badge-ok">[% fw.product_version || 'online' | html %]</span>
             [% END %]
+            </span>
         </div>
-        <div class="panel-body">
+        <div id="opn-section-system" class="panel-body collapsible-content">
             [% IF fw.error %]
                 <p style="color:#c62828;">[% fw.error | html %]</p>
             [% ELSE %]
+                [% IF fw.product_version %]
+                <p>OPNsense <strong>[% fw.product_version | html %]</strong>
+                   [% IF fw.product_id %]([% fw.product_id | html %])[% END %]</p>
+                [% ELSE %]
                 <p>Firmware status retrieved successfully.</p>
-                <pre style="font-size:0.82em;overflow-x:auto;">[% fw | json %]</pre>
+                [% END %]
             [% END %]
         </div>
     </div>
 
     [%# ── Interfaces ───────────────────────────────────────────── %]
     [% ifaces = opnsense_status.interfaces %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-network-wired"></i> Interfaces</h3>
+    <div class="panel opn-section" id="opn-wrap-interfaces">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-interfaces')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-interfaces"></i>
+                <i class="fas fa-network-wired"></i> Interfaces
+            </h3>
+            <span class="opn-header-meta">
+                [% IF ifaces.error %]<span class="badge badge-err">error</span>
+                [% ELSIF ifaces.rows.size %]<span class="badge badge-ok">[% ifaces.rows.size %]</span>
+                [% END %]
+            </span>
         </div>
-        <div class="panel-body">
+        <div id="opn-section-interfaces" class="panel-body collapsible-content">
             [% IF ifaces.error %]
                 <p style="color:#c62828;">[% ifaces.error | html %]</p>
             [% ELSIF ifaces.rows.size %]
@@ -157,12 +428,19 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
 
     [%# ── DHCP Leases ──────────────────────────────────────────── %]
     [% dhcp = opnsense_status.dhcp %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-list-alt"></i> Active DHCP Leases</h3>
-            [% IF dhcp.total %]<span class="badge badge-ok">[% dhcp.total %] leases</span>[% END %]
+    <div class="panel opn-section" id="opn-wrap-dhcp">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-dhcp')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-dhcp"></i>
+                <i class="fas fa-list-alt"></i> Active DHCP Leases
+            </h3>
+            <span class="opn-header-meta">
+                [% IF dhcp.error %]<span class="badge badge-err">error</span>
+                [% ELSIF dhcp.total %]<span class="badge badge-ok">[% dhcp.total %] leases</span>
+                [% END %]
+            </span>
         </div>
-        <div class="panel-body">
+        <div id="opn-section-dhcp" class="panel-body collapsible-content">
             [% IF dhcp.error %]
                 <p style="color:#c62828;">[% dhcp.error | html %]</p>
             [% ELSIF dhcp.rows.size %]
@@ -185,16 +463,138 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
         </div>
     </div>
 
+    [%# ── NAT / Port forwards ──────────────────────────────────── %]
+    [% nat = opnsense_status.nat %]
+    <div class="panel opn-section" id="opn-wrap-nat">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-nat')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-nat"></i>
+                <i class="fas fa-exchange-alt"></i> NAT Port Forwards
+            </h3>
+            <span class="opn-header-meta">
+                [% IF nat.error %]<span class="badge badge-err">error</span>
+                [% ELSIF nat.total %]<span class="badge badge-ok">[% nat.total %]</span>
+                [% END %]
+            </span>
+        </div>
+        <div id="opn-section-nat" class="panel-body collapsible-content">
+            [% IF nat.error %]
+                <p style="color:#c62828;">[% nat.error | html %]</p>
+            [% ELSIF nat.rows.size %]
+            <table class="data-table">
+                <thead><tr><th>Description</th><th>Interface</th><th>Proto</th><th>Dest port</th><th>Target</th><th>Local port</th><th>On</th><th></th></tr></thead>
+                <tbody>
+                [% FOREACH r IN nat.rows %]
+                <tr>
+                    <td>[% r.descr | html %]</td>
+                    <td>[% r.interface | html %]</td>
+                    <td>[% r.protocol | html %]</td>
+                    <td>[% r.destinationport | html %]</td>
+                    <td>[% r.target | html %]</td>
+                    <td>[% r.local_port | html %]</td>
+                    <td>[% r.enabled == '1' ? 'yes' : 'no' %]</td>
+                    <td>
+                        [% IF r.uuid %]
+                        <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="display:inline;">
+                            <input type="hidden" name="action" value="toggle_nat">
+                            <input type="hidden" name="uuid" value="[% r.uuid | html %]">
+                            <input type="hidden" name="enabled" value="[% r.enabled == '1' ? '0' : '1' %]">
+                            <button type="submit" class="btn btn-secondary" style="padding:2px 8px;font-size:0.8em;">
+                                [% r.enabled == '1' ? 'Disable' : 'Enable' %]
+                            </button>
+                        </form>
+                        [% END %]
+                    </td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% ELSE %]
+                <p style="color:#888;">No NAT rules returned.</p>
+            [% END %]
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" class="config-form" style="margin-top:16px;border-top:1px solid #ddd;padding-top:12px;">
+                <input type="hidden" name="action" value="add_nat">
+                <h4 style="margin:0 0 10px;">Add port forward (writes to OPNsense)</h4>
+                <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:10px;">
+                    <div><label>Description</label><input name="description" value="Comserv dev 3001"></div>
+                    <div><label>Interface</label><input name="interface" value="wan" placeholder="wan / opt1"></div>
+                    <div><label>External port</label><input name="external_port" value="3001"></div>
+                    <div><label>Local port</label><input name="local_port" value="3001"></div>
+                    <div><label>Target IP</label><input name="target_ip" value="192.168.1.199"></div>
+                    <div><label>Destination</label><input name="destination" value="wan:ip" title="wan:ip or interface"></div>
+                </div>
+                <button type="submit" class="btn btn-primary" style="margin-top:10px;">Add NAT rule + Apply</button>
+            </form>
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="margin-top:8px;">
+                <input type="hidden" name="action" value="apply_nat">
+                <button type="submit" class="btn btn-secondary">Re-apply NAT only</button>
+            </form>
+        </div>
+    </div>
+
+    [%# ── Unbound host overrides ───────────────────────────────── %]
+    [% dns_hosts = opnsense_status.dns_hosts %]
+    <div class="panel opn-section" id="opn-wrap-dns-hosts">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-dns-hosts')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-dns-hosts"></i>
+                <i class="fas fa-globe"></i> Unbound DNS Host Overrides
+            </h3>
+            <span class="opn-header-meta">
+                [% IF dns_hosts.error %]<span class="badge badge-err">error</span>
+                [% ELSIF dns_hosts.rows.size %]<span class="badge badge-ok">[% dns_hosts.rows.size %]</span>
+                [% END %]
+            </span>
+        </div>
+        <div id="opn-section-dns-hosts" class="panel-body collapsible-content">
+            [% IF dns_hosts.error %]
+                <p style="color:#c62828;">[% dns_hosts.error | html %]</p>
+            [% ELSIF dns_hosts.rows.size %]
+            <table class="data-table">
+                <thead><tr><th>Host</th><th>Domain</th><th>IP</th><th>Description</th></tr></thead>
+                <tbody>
+                [% FOREACH h IN dns_hosts.rows %]
+                <tr>
+                    <td>[% h.hostname | html %]</td>
+                    <td>[% h.domain | html %]</td>
+                    <td><code>[% h.server | html %]</code></td>
+                    <td>[% h.descr | html %]</td>
+                </tr>
+                [% END %]
+                </tbody>
+            </table>
+            [% END %]
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" class="config-form" style="margin-top:12px;">
+                <input type="hidden" name="action" value="add_dns">
+                <h4 style="margin:0 0 10px;">Add host override (e.g. dev.zero → workstation)</h4>
+                <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;">
+                    <div><label>Hostname</label><input name="hostname" value="dev" placeholder="dev"></div>
+                    <div><label>Domain</label><input name="domain" value="computersystemconsulting.ca"></div>
+                    <div><label>IP</label><input name="ip" value="172.30.131.126"></div>
+                </div>
+                <label>Description</label>
+                <input name="description" value="Comserv dev workstation ZT">
+                <button type="submit" class="btn btn-primary" style="margin-top:10px;">Add DNS override + Reconfigure Unbound</button>
+            </form>
+        </div>
+    </div>
+
     [%# ── Firewall Rules (summary) ─────────────────────────────── %]
     [% fw_rules = opnsense_status.firewall %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-fire-alt"></i> Firewall Rules</h3>
-            [% IF fw_rules.total_rows %]
-            <span class="badge badge-ok">[% fw_rules.total_rows %] rules</span>
-            [% END %]
+    <div class="panel opn-section" id="opn-wrap-firewall">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-firewall')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-firewall"></i>
+                <i class="fas fa-fire-alt"></i> Firewall Rules
+            </h3>
+            <span class="opn-header-meta">
+                [% IF fw_rules.error %]<span class="badge badge-err">error</span>
+                [% ELSIF fw_rules.total_rows %]<span class="badge badge-ok">[% fw_rules.total_rows %] rules</span>
+                [% ELSIF fw_rules.rows.size %]<span class="badge badge-ok">[% fw_rules.rows.size %]</span>
+                [% END %]
+            </span>
         </div>
-        <div class="panel-body">
+        <div id="opn-section-firewall" class="panel-body collapsible-content">
             [% IF fw_rules.error %]
                 <p style="color:#c62828;">[% fw_rules.error | html %]</p>
             [% ELSIF fw_rules.rows.size %]
@@ -217,20 +617,31 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
             [% ELSE %]
                 <p style="color:#888;">No firewall rules returned.</p>
             [% END %]
+            <form method="POST" action="[% c.uri_for('/admin/infrastructure/opnsense/action') %]" style="margin-top:10px;">
+                <input type="hidden" name="action" value="apply_filter">
+                <button type="submit" class="btn btn-secondary">Re-apply firewall filter</button>
+            </form>
         </div>
     </div>
 
     [%# ── DNS / Unbound ────────────────────────────────────────── %]
     [% unbound = opnsense_status.unbound %]
-    <div class="panel">
-        <div class="panel-header">
-            <h3><i class="fas fa-search"></i> Unbound DNS Resolver</h3>
-            [% IF unbound.status %]
+    <div class="panel opn-section" id="opn-wrap-unbound">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-unbound')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-unbound"></i>
+                <i class="fas fa-search"></i> Unbound DNS Resolver
+            </h3>
+            <span class="opn-header-meta">
+            [% IF unbound.error %]
+            <span class="badge badge-err">error</span>
+            [% ELSIF unbound.status %]
             <span class="badge [% unbound.status == 'running' ? 'badge-ok' : 'badge-warn' %]">
                 [% unbound.status | html %]</span>
             [% END %]
+            </span>
         </div>
-        <div class="panel-body">
+        <div id="opn-section-unbound" class="panel-body collapsible-content">
             [% IF unbound.error %]
                 <p style="color:#c62828;">[% unbound.error | html %]</p>
             [% ELSE %]
@@ -242,21 +653,68 @@ table.data-table td { padding: 7px 10px; border-bottom: 1px solid var(--border-c
     [% END %][%# /IF opnsense_status %]
 
     [% UNLESS opnsense_config.host %]
-    <div class="panel">
-        <div class="panel-body">
-            <p>Configure the OPNsense connection above to start managing your gateway.</p>
-            <p>To generate an API key in OPNsense: <em>System &rarr; Access &rarr; Users &rarr; edit user &rarr; API keys &rarr; Add key</em></p>
+    <div class="panel opn-section" id="opn-wrap-getstarted">
+        <div class="panel-header collapsible-header" onclick="toggleOpnSection('opn-section-getstarted')">
+            <h3>
+                <i class="fas fa-chevron-right opn-chevron" id="chevron-opn-section-getstarted"></i>
+                <i class="fas fa-play-circle"></i> Get started
+            </h3>
+        </div>
+        <div id="opn-section-getstarted" class="panel-body collapsible-content">
+            <p>Enter <strong>Host</strong>, <strong>API Key</strong>, and <strong>API Secret</strong> in <strong>Connection</strong>, then Save.
+               See <strong>API setup</strong> for the difference between API credentials and web login password.</p>
         </div>
     </div>
     [% END %]
 </div>
 
 <script>
-function toggleConfig() {
-    var panel = document.getElementById('config-panel');
-    panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+function toggleOpnSection(sectionId, forceOpen) {
+    var content = document.getElementById(sectionId);
+    var chevron = document.getElementById('chevron-' + sectionId);
+    if (!content || !chevron) return;
+    var open = forceOpen === true ? true : (forceOpen === false ? false : !content.classList.contains('expanded'));
+    if (open) {
+        content.classList.add('expanded');
+        chevron.classList.add('expanded');
+        document.querySelectorAll('.opn-top-nav a[data-opn]').forEach(function(a) {
+            a.classList.toggle('opn-nav-active', a.getAttribute('data-opn') === sectionId);
+        });
+        if (forceOpen === true) {
+            var section = chevron.closest('.opn-section');
+            if (section) {
+                section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        }
+    } else {
+        content.classList.remove('expanded');
+        chevron.classList.remove('expanded');
+    }
 }
+
 function refreshStatus() {
     window.location.reload();
 }
+
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.opn-top-nav a[data-opn]').forEach(function(link) {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            var id = link.getAttribute('data-opn');
+            if (location.hash !== '#' + id) {
+                history.replaceState(null, '', '#' + id);
+            }
+            toggleOpnSection(id, true);
+        });
+    });
+
+    [% UNLESS opnsense_config.host %]
+    toggleOpnSection('opn-section-config', true);
+    [% END %]
+
+    var hash = (location.hash || '').replace(/^#/, '');
+    if (hash && document.getElementById(hash)) {
+        toggleOpnSection(hash, true);
+    }
+});
 </script>

@@ -1,0 +1,11 @@
+[% META
+  title = 'Brew — Calendar'
+  description = 'Brewhouse schedule via Planning — guest overview and admin migration map'
+  roles = 'guest,user,admin'
+  TemplateType = 'Application'
+  category = 'brew,addon,planning'
+  page_version = '0.01'
+  last_updated = '2026/06/05'
+%]
+[% PageVersion = 'Brew/calendar.tt,v 0.01 2026/06/05 Brew calendar → Planning' %]
+[% INCLUDE 'Brew/_feature_shell.tt' %]

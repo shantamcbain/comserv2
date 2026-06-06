@@ -670,6 +670,7 @@
                 '<a id="conversations-link" class="chat-header-icon-btn" href="/ai/conversations" title="View all conversations" target="_self">📋 History</a>' +
                 '<button id="new-chat" class="chat-header-icon-btn" title="New conversation">✏️</button>' +
                 '<button id="voice-mode-btn" class="chat-header-icon-btn" title="Voice conversation mode — speak to AI, AI speaks back" style="display:none;">🔊</button>' +
+                '<button id="dock-chat-inline" class="chat-header-icon-btn" title="Dock chat on this page">⊞</button>' +
                 '<button id="detach-chat" class="chat-header-icon-btn" title="Open in separate window (move to another monitor)">⤢</button>' +
                 '<button id="close-chat" class="chat-header-icon-btn" title="Close">✕</button>' +
             '</div>';
@@ -1016,23 +1017,42 @@
         window._handleReadFileRequest = _handleReadFileRequest;
 
         // ── Other events ──────────────────────────────────────────────────────
-        // Chat bubble click:
-        // - Mobile devices: open the inline panel (popup windows don't work on mobile)
-        // - Inside the popup window (AI_WIDGET_POPUP): open the inline panel normally
-        // - Desktop: open a moveable browser popup window (draggable across screens/monitors)
-        //   Falls back to the inline panel if the browser blocks popups.
+        // Chat bubble: desktop → popup window; mobile → inline panel
         var _isMobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
         chatButton.addEventListener('click', function() {
-            openChat();
+            if (state._popupWindow && !state._popupWindow.closed) {
+                state._popupWindow.focus();
+            } else {
+                openChatPreferred();
+            }
         });
         document.getElementById('close-chat').addEventListener('click', function() { closeChat(); });
         document.getElementById('new-chat').addEventListener('click', function() { resetConversation(); });
-        // ⤢ button: focus / re-open the popup window if it was closed or hidden (desktop only)
+        var dockBtn = document.getElementById('dock-chat-inline');
+        if (dockBtn) {
+            dockBtn.addEventListener('click', function() {
+                if (window.AI_WIDGET_POPUP && window.opener && !window.opener.closed) {
+                    if (window.opener.ComservAIChat && window.opener.ComservAIChat.openInline) {
+                        window.opener.ComservAIChat.openInline();
+                    } else if (window.opener.openChat) {
+                        window.opener.openChat();
+                    }
+                    window.close();
+                    return;
+                }
+                if (state._popupWindow && !state._popupWindow.closed) {
+                    state._popupWindow.close();
+                    state._popupWindow = null;
+                }
+                openChat();
+            });
+        }
         var detachBtn = document.getElementById('detach-chat');
         if (detachBtn) {
             if (_isMobile) {
                 detachBtn.style.display = 'none';
+                if (dockBtn) dockBtn.style.display = 'none';
             } else {
                 detachBtn.addEventListener('click', function() {
                     if (state._popupWindow && !state._popupWindow.closed) {
@@ -1834,6 +1854,8 @@
 
         if (popup) {
             state._popupWindow = popup;
+            closeChat();
+            try { sessionStorage.setItem('ai_chat_open', 'popup'); } catch (e) {}
             // Mark the chat button as "popup active" so the user knows where the chat is
             const chatButton = document.getElementById('chat-button');
             if (chatButton) {
@@ -1996,7 +2018,22 @@
         });
     }
 
-    // Open chat panel
+    // Prefer detached popup on desktop (same as code editor); inline dock on mobile or when popups blocked.
+    function openChatPreferred() {
+        if (window.AI_WIDGET_POPUP) {
+            openChat();
+            return;
+        }
+        var _mobile = /Mobi|Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
+            || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && window.innerWidth < 1024);
+        if (_mobile) {
+            openChat();
+        } else {
+            detachToPopup();
+        }
+    }
+
+    // Open chat panel (inline dock on the current page)
     function openChat() {
         const chatPanel = document.getElementById('chat-panel');
         const chatButton = document.getElementById('chat-button');
@@ -2006,7 +2043,7 @@
         state.isOpen = true;
         
         try {
-            sessionStorage.setItem('ai_chat_open', '1');
+            sessionStorage.setItem('ai_chat_open', 'inline');
         } catch(e) {}
 
         // Update chat header with selected agent info and current page
@@ -2519,7 +2556,11 @@
             system: state.pageContext.system_prompt,
             agent_id: state.pageContext.agent_id,
             agent_name: state.pageContext.agent_name,
-            page_content: extractPageContent()
+            page_content: extractPageContent(),
+            // Send pre-extracted links too (in addition to raw content). Server will also parse content
+            // as a fallback. This helps the AI immediately learn about new links / new .tt-backed pages
+            // visible to the user ("searching the links on the page").
+            page_links: (typeof extractPageLinks === 'function' ? extractPageLinks() : [])
         };
 
         // Include image data if present (for Grok vision models)
@@ -5666,6 +5707,15 @@
         });
     })();
 
+    if (!PAGE_MODE) {
+        window.ComservAIChat = {
+            open: openChatPreferred,
+            openInline: openChat,
+            openPopup: detachToPopup,
+        };
+        window.openChat = openChat;
+    }
+
     document.addEventListener('DOMContentLoaded', function() {
         addChatStyles();
 
@@ -5693,9 +5743,14 @@
                 }
             });
 
-            // In popup window mode or when previously open: auto-open the chat panel
-            if (window.AI_WIDGET_POPUP || sessionStorage.getItem('ai_chat_open') === '1') {
+            // Restore last mode: popup window (default on desktop) or inline dock
+            if (window.AI_WIDGET_POPUP) {
                 openChat();
+            } else if (sessionStorage.getItem('ai_chat_open') === 'inline') {
+                openChat();
+            } else if (sessionStorage.getItem('ai_chat_open') === 'popup'
+                    || sessionStorage.getItem('ai_chat_open') === '1') {
+                openChatPreferred();
             }
         }
 

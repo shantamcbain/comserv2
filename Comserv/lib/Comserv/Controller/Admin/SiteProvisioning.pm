@@ -367,6 +367,12 @@ sub provision :Path('provision') :Args(0) {
             }
         }
 
+        # Brew addon: the accounting + BOMs + ingredient catalog with sample prices is the reusable template.
+        # Recipes (real data including Gambrinus etc.) are optional — new users browse and import what they want.
+        if ($addons =~ /\bbrew\b/) {
+            push @steps, "Brew addon enabled. After login as admin on the new site, visit /brew/ingredients (or run script/seed_brew_catalog.pl --sitename $site_name) to load the starter ingredient catalog + prices + example BOM. This is the 'accounting part which includes boms' applied as a template.";
+        }
+
         # 9. Create admin todo noting recompile needed
         $self->_create_admin_todo($c, $site_name, \@steps);
 

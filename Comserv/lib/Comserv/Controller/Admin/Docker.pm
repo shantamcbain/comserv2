@@ -25,11 +25,62 @@ sub begin :Private {
     return if $action eq 'deploy' || $action eq 'deploy_form' || $action eq 'init_log' || $action eq 'close_deploy_log';
 
     my $env = $ENV{CATALYST_ENV} || 'development';
-    unless ($env eq 'development') {
-        $c->stash->{error_msg} = "Docker management is only available in development environment.";
-        $c->res->redirect($c->uri_for('/admin/infrastructure'));
-        $c->detach;
+    my $server_role = $self->_get_current_server_role($c);
+
+    # Strict triple-check for full Docker widget access:
+    # 1. Server must NOT be production1 (widget only on safe servers like workstation)
+    # 2. Username must be 'Shanta'
+    # 3. Must be CSC admin
+    if ($action =~ /list|containers|restart|stop|start|up|down|logs|deploy_form|docker/) {
+        unless ($self->_can_access_docker_widget($c)) {
+            $c->stash->{error_msg} = "Docker container management widget is restricted. " .
+                "Available only to Shanta (CSC admin) on non-production servers. " .
+                "Use Daily Priorities deploy option instead.";
+            $c->res->redirect($c->uri_for('/admin/planning/DailyPlan'));
+            $c->detach;
+        }
     }
+
+    unless ($env eq 'development' || $server_role eq 'workstation') {
+        # Still allow limited actions from DailyPlan even on prod, but widget is blocked above
+    }
+}
+
+sub _get_current_server_role {
+    my ($self, $c) = @_;
+
+    my $hostname = `hostname 2>/dev/null` || $ENV{HOSTNAME} || '';
+    chomp $hostname;
+
+    my $ip = '';
+    if (open my $fh, '-|', 'hostname -I 2>/dev/null') {
+        $ip = <$fh> || '';
+        chomp $ip;
+        $ip =~ s/\s.*//;
+        close $fh;
+    }
+
+    return 'production1' if $hostname =~ /production1|prod1/i || $ip =~ /192\.168\.1\.126/i || $ENV{PRODUCTION1};
+    return 'production2' if $hostname =~ /production2|prod2/i || $ip =~ /192\.168\.1\.127/i;
+    return 'workstation' if $hostname =~ /workstation|dev/i || $ip =~ /192\.168\.1\.199/i;
+    return 'unknown';
+}
+
+sub _can_access_docker_widget {
+    my ($self, $c) = @_;
+
+    my $server_role = $self->_get_current_server_role($c);
+    my $username    = $c->session->{username} || '';
+    my $roles       = $c->session->{roles} || [];
+
+    my $on_safe_server = $server_role ne 'production1';
+    my $is_shanta      = $username eq 'Shanta';
+    my $is_csc_admin   = $c->stash->{is_admin} &&
+                         (grep { lc($_) =~ /admin|csc/ } @$roles) &&
+                         (($c->stash->{SiteName} || $c->session->{SiteName} || '') eq 'CSC');
+
+    # ALL THREE must match before the widget is shown
+    return $on_safe_server && $is_shanta && $is_csc_admin;
 }
 
 sub _csc_admin_check {
@@ -74,6 +125,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
     my $title     = "\x{1F433} Docker Deploy $today ${\$now->hms('.')}";
 
     my $todo_record_id = $c->req->body_params->{todo_record_id} || 0;
+    my $trigger_source = $c->req->body_params->{trigger_source} || $c->req->body_params->{source} || 'manual';
 
     my $log_id;
     eval {
@@ -92,7 +144,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
             last_mod_by     => $username,
             last_mod_date   => $today,
             project_code    => 'PLANNING',
-            details         => 'Deploy in progress…',
+            details         => "Deploy in progress… (trigger: $trigger_source)",
             comments        => '',
             points_processed => 0,
         );
@@ -101,31 +153,50 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         $log_id = $entry->id;
     };
 
-    my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
-    my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
+    my $server_role = $self->_get_current_server_role($c);
     my @lines;
     my $success = 1;
 
     my $t0 = time();
-    push @lines, "[${\scalar localtime}] === git pull ===";
-    my $git_out  = `cd '$repo_path' && git pull 2>&1`;
-    my $git_exit = $? >> 8;
-    push @lines, $git_out;
-    push @lines, "git pull exited with code $git_exit" if $git_exit;
-    $success = 0 if $git_exit;
 
-    push @lines, "[${\scalar localtime}] === docker compose down + up (new container) ===";
-    my $docker_result = $c->model('Docker')->restart_containers(
-        services     => ['web-prod'],
-        force        => 1,
-        compose_file => $compose_file,
-    );
-    push @lines, $docker_result->{stdout} if $docker_result->{stdout};
-    push @lines, $docker_result->{stderr} if $docker_result->{stderr};
-    push @lines, "command: " . ($docker_result->{command} || 'n/a');
-    unless ($docker_result->{success}) {
-        $success = 0;
-        push @lines, "docker compose exited with errors";
+    if ($server_role eq 'production1') {
+        # Running on production1: delegate to workstation (build/edit/execute must happen there)
+        push @lines, "[${\scalar localtime}] Detected production1 — SSHing to workstation to perform deploy (source: $trigger_source)...";
+        # The workstation has the full source, docker build context, and rights.
+        # We trigger the main deploy script on workstation (which will then push to prod if needed).
+        my $workstation_host = 'workstation.local';  # or 192.168.1.199
+        my $cmd = "cd /home/shanta/PycharmProjects/comserv2/Comserv && TRIGGER_SOURCE='$trigger_source' script/deploy_docker_to_production.pl --target=production1 2>&1";
+        my $ssh_cmd = "ssh -o StrictHostKeyChecking=no -o ConnectTimeout=10 shanta\@$workstation_host \"$cmd\"";
+        my $remote_output = `$ssh_cmd`;
+        my $exit_code = $? >> 8;
+        push @lines, $remote_output;
+        push @lines, "Remote deploy on workstation exited with code $exit_code";
+        $success = ($exit_code == 0);
+    } else {
+        # Safe server (workstation etc.): run locally
+        my $repo_path    = '/home/shanta/PycharmProjects/comserv2';
+        my $compose_file = "$repo_path/Comserv/docker-compose.prod.yml";
+
+        push @lines, "[${\scalar localtime}] === git pull ===";
+        my $git_out  = `cd '$repo_path' && git pull 2>&1`;
+        my $git_exit = $? >> 8;
+        push @lines, $git_out;
+        push @lines, "git pull exited with code $git_exit" if $git_exit;
+        $success = 0 if $git_exit;
+
+        push @lines, "[${\scalar localtime}] === docker compose down + up (new container) ===";
+        my $docker_result = $c->model('Docker')->restart_containers(
+            services     => ['web-prod'],
+            force        => 1,
+            compose_file => $compose_file,
+        );
+        push @lines, $docker_result->{stdout} if $docker_result->{stdout};
+        push @lines, $docker_result->{stderr} if $docker_result->{stderr};
+        push @lines, "command: " . ($docker_result->{command} || 'n/a');
+        unless ($docker_result->{success}) {
+            $success = 0;
+            push @lines, "docker compose exited with errors";
+        }
     }
 
     my $elapsed = time() - $t0;
@@ -134,7 +205,7 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
     my $output = join("\n", @lines);
 
     $self->logging->log_with_details($c, $success ? 'info' : 'error', __FILE__, __LINE__, 'deploy',
-        "Docker deploy: success=$success elapsed=${elapsed}s log_id=" . ($log_id // 'n/a'));
+        "Docker deploy: success=$success elapsed=${elapsed}s server=$server_role trigger=$trigger_source log_id=" . ($log_id // 'n/a'));
 
     $c->response->body(encode_json({
         success => $success ? 1 : 0,
@@ -142,6 +213,8 @@ sub deploy :Path('/admin/docker/deploy') :Args(0) {
         log_id  => $log_id,
         output  => $output,
         title   => $title,
+        server_role => $server_role,
+        trigger_source => $trigger_source,
     }));
 }
 
@@ -276,6 +349,12 @@ sub close_deploy_log :Path('/admin/docker/close_deploy_log') :Args(0) {
 
 sub list :Path('/admin/docker/list') :Args(0) {
     my ($self, $c) = @_;
+    
+    unless ($self->_can_access_docker_widget($c)) {
+        $c->stash->{json} = { success => 0, error => 'Docker widget restricted to Shanta (CSC admin) on non-production1 servers. Use Daily Priorities.' };
+        $c->forward('View::JSON');
+        return;
+    }
     
     my $result = $c->model('Docker')->list_containers();
     

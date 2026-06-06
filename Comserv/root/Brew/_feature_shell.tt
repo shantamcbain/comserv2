@@ -1,0 +1,51 @@
+[%# Shared ApplicationTtTemplate shell for Brew feature pages. %]
+<div class="app-container">
+    <div class="page-header">
+        <h1>[% brew_feature.title | html %]</h1>
+        [% IF brew_feature.subtitle %]
+        <h2 class="page-subtitle">[% brew_feature.subtitle | html %]</h2>
+        [% END %]
+    </div>
+
+    [% IF breadcrumbs %]
+    <div class="breadcrumb-container">
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+            [% FOREACH crumb IN breadcrumbs %]
+                [% IF crumb.url %]
+                    <a href="[% crumb.url %]">[% crumb.title | html %]</a>
+                [% ELSE %]
+                    <span>[% crumb.title | html %]</span>
+                [% END %]
+                [% UNLESS loop.last %] &gt; [% END %]
+            [% END %]
+        </nav>
+    </div>
+    [% END %]
+
+    <div class="content-container">
+        <div class="content-primary">
+            [% IF brew_show_guest %]
+                [% INCLUDE 'Brew/_guest_promo.tt' %]
+            [% END %]
+            [% IF brew_show_admin %]
+                [% INCLUDE 'Brew/_admin_migration.tt' %]
+            [% END %]
+            [% IF brew_feature_body %]
+            <div class="content-section">
+                [% brew_feature_body %]
+            </div>
+            [% END %]
+        </div>
+    </div>
+
+    [% IF show_footer %]
+    <div class="page-footer">
+        <div class="footer-actions">
+            <a href="[% back_url %]" class="btn btn-secondary">Back to Brew home</a>
+            [% IF brew_feature.key == 'calendar' && c.stash.can_plan %]
+            <a href="[% c.uri_for('/planning/daily') %]#month-view" class="btn btn-primary">Planning calendar</a>
+            [% END %]
+        </div>
+    </div>
+    [% END %]
+</div>

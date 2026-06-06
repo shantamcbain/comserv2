@@ -1,0 +1,112 @@
+[%# Admin + migration guide — table layout, forager counts, ENCY targets. %]
+<div class="admin-only content-section">
+    <h3><i class="fas fa-database"></i> Migration &amp; schema (admin)</h3>
+    <p>Forager brewhouse tables are <strong>read-only</strong> via <code>DBForager</code>.
+       Production ENCY stores migrated data in the targets below — never copy legacy tables into ENCY.</p>
+
+    <div class="content-section">
+        <h4>ENCY / Planning targets</h4>
+        <ul class="sidebar-list">
+            [% FOREACH t IN brew_feature.ency_targets %]
+            <li><code>[% t | html %]</code></li>
+            [% END %]
+        </ul>
+    </div>
+
+    <div class="content-section">
+        <h4>Legacy forager tables &amp; Result classes</h4>
+        <div class="table-container">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Legacy table</th>
+                        <th>Result class</th>
+                        <th>Rows (all)</th>
+                        <th>Rows ([% brew_sitename | html %])</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    [% FOREACH table IN brew_feature.legacy_tables %]
+                    [% SET cnt = forager_counts.$table %]
+                    <tr>
+                        <td><code>[% table | html %]</code></td>
+                        <td><code>[% (brew_legacy_result_map.$table || '—') | html %]</code></td>
+                        <td>[% IF cnt.error %]<span class="error">[% cnt.error | html %]</span>[% ELSIF forager_connected %][% cnt.total | html %][% ELSE %]—[% END %]</td>
+                        <td>[% IF cnt.error %]—[% ELSIF forager_connected %][% cnt.sitename | html %][% ELSE %]—[% END %]</td>
+                    </tr>
+                    [% END %]
+                </tbody>
+            </table>
+        </div>
+        [% IF forager_error %]
+        <p class="error">Forager DB: [% forager_error | html %]</p>
+        [% ELSIF !forager_connected %]
+        <p class="text-muted">Connect <code>DBForager</code> to preview live row counts during migration.</p>
+        [% END %]
+    </div>
+
+    [% IF brew_feature.legacy_results %]
+    <div class="content-section">
+        <h4>DBIx::Class Result files</h4>
+        <ul class="sidebar-list">
+            [% FOREACH r IN brew_feature.legacy_results %]
+            <li><code>[% r | html %]</code></li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+
+    [% IF brew_feature.relationships %]
+    <div class="content-section">
+        <h4>Relationships</h4>
+        <ul class="sidebar-list">
+            [% FOREACH rel IN brew_feature.relationships %]
+            <li>[% rel | html %]</li>
+            [% END %]
+        </ul>
+    </div>
+    [% END %]
+
+    [% IF brew_feature.migration_steps %]
+    <div class="content-section">
+        <h4>Migration steps (AI / admin checklist)</h4>
+        <ol>
+            [% FOREACH step IN brew_feature.migration_steps %]
+            <li>[% step | html %]</li>
+            [% END %]
+        </ol>
+    </div>
+    [% END %]
+
+    [% IF brew_import_preview %]
+        [% INCLUDE 'Brew/_import_preview.tt' %]
+    [% ELSE %]
+    <p class="text-muted">Sign in as admin to see field maps and legacy record previews.</p>
+    [% END %]
+</div>
+
+[%# Brew accounting + BOM + ingredient catalog seed (the reusable template) %]
+<div class="admin-only content-section" style="border:1px solid #d97706;background:#fffbeb;padding:12px;border-radius:6px;margin-top:12px;">
+    <h3 style="margin-top:0;"><i class="fas fa-boxes"></i> Brew Accounting + BOM Starter Catalog</h3>
+    <p>
+        The <strong>accounting part (including BOMs)</strong> is provided as a reusable template.
+        When a user/site enables the Brew addon, provisioning creates the accounting DB from the template,
+        then this catalog seeds standard brewing ingredients with sample costs/prices plus an example BOM kit.
+    </p>
+    <p>
+        <strong>Recipes are real data</strong> (including Gambrinus-style and other authentic formulas) but are
+        <em>not</em> auto-included for new users. Admins can browse them here / on the import page and
+        selectively import the ones a new brewer actually wants.
+    </p>
+    <p>
+        <a href="[% c.uri_for('/Inventory/seed_brew_ingredients', { sitename => brew_sitename }) %]"
+           class="btn btn-primary" style="background:#92400e;border-color:#92400e;">
+            Seed Brew Ingredients + Prices + Example BOM for [% brew_sitename | html %]
+        </a>
+        <span style="font-size:0.85em;margin-left:8px;color:#78350f;">(idempotent — safe to re-run; adjusts missing prices)</span>
+    </p>
+    <p style="font-size:0.8em;color:#854d0e;">
+        After seeding, go to <a href="[% c.uri_for('/Inventory/items', { sitename => brew_sitename }) %]">Inventory → Items</a>
+        to review/adjust the Gambrinus and other ingredient prices, then build your own recipe BOMs or kits.
+    </p>
+</div>
