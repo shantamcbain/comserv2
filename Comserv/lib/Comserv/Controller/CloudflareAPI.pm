@@ -131,7 +131,7 @@ sub index :Path :Args(0) {
         # Get user email for API calls
         my $user_email;
         if ($c->user_exists && $c->user) {
-            $user_email = $c->user->email;
+            $user_email = eval { $c->user->email } // $c->session->{email} // "";
         } elsif ($c->session->{email}) {
             $user_email = $c->session->{email};
         } else {
@@ -253,7 +253,7 @@ sub index :Path :Args(0) {
     # Get user email for role checking
     my $current_user_email;
     if ($c->user_exists) {
-        $current_user_email = $c->user->email;
+        $current_user_email = eval { $c->user->email } // $c->session->{email} // '';
     } elsif ($c->session->{email}) {
         $current_user_email = $c->session->{email};
     } else {
@@ -311,7 +311,7 @@ sub dns_records :Path('dns') :Args(1) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -513,7 +513,7 @@ sub ajax_dns_records :Path('dns_records') :Args(0) {
     # Get user email
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -629,7 +629,7 @@ sub create_dns_record :Path('dns/create') :Args(0) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -730,7 +730,7 @@ sub update_dns_record :Path('dns/update') :Args(0) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -833,7 +833,7 @@ sub delete_dns_record :Path('dns/delete') :Args(0) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -917,7 +917,7 @@ sub purge_cache :Path('cache/purge') :Args(0) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -1032,7 +1032,7 @@ sub _get_cloudflare_domains {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists && $c->user) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -1266,7 +1266,7 @@ sub update_domains :Path('update_domains') :Args(0) {
     # Get user email - from Catalyst user object or session
     my $user_email;
     if ($c->user_exists) {
-        $user_email = $c->user->email;
+        $user_email = eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         $user_email = $c->session->{email};
     } else {
@@ -1360,7 +1360,7 @@ sub _get_cloudflare_user_email {
             "Using Cloudflare email from config: $config_email");
         return $config_email;
     } elsif ($c->user_exists) {
-        return $c->user->email;
+        return eval { $c->user->email } // $c->session->{email} // "";
     } elsif ($c->session->{email}) {
         return $c->session->{email};
     } else {
