@@ -71,6 +71,7 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
         [% ELSE %]
         <a href="#alert-section"    style="padding:3px 10px;background:#fff;border:1px solid #aac;border-radius:3px;text-decoration:none;color:#004085;white-space:nowrap;">&#x1F6A8; Alerts</a>
         [% END %]
+        <a href="#section-servers"  style="padding:3px 10px;background:#fff;border:1px solid #aac;border-radius:3px;text-decoration:none;color:#004085;white-space:nowrap;">&#x1F5A5; Active Servers</a>
         <a href="#section-stats"    style="padding:3px 10px;background:#fff;border:1px solid #aac;border-radius:3px;text-decoration:none;color:#004085;white-space:nowrap;">&#x1F4CA; Audit Stats</a>
         <a href="#section-prune"    style="padding:3px 10px;background:#fff;border:1px solid #aac;border-radius:3px;text-decoration:none;color:#004085;white-space:nowrap;">&#x1F5D1; Prune Logs</a>
         <span style="color:#999;margin:0 4px;">|</span>
@@ -170,9 +171,22 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
         <p class="docker-detail">No comserv containers running locally on this server.</p>
         [% END %]
 
-        <!-- Cross-server Docker health from shared DB (written by each server's comserv_server.pl) -->
+        <!-- Cross-server Docker health from shared system_log -->
+        [% IF docker_sync_report && docker_sync_report.size %]
+        <div style="margin:10px 0;padding:8px 12px;background:#f8f9fa;border:1px solid #dee2e6;border-radius:4px;font-size:0.88em;">
+            <strong>Server-room sync (this page load):</strong>
+            [% FOR r IN docker_sync_report %]
+            <span style="margin-right:12px;">
+                [% r.target | html %]:
+                [% IF r.ok %][% r.containers %] container(s) recorded[% ELSE %]failed — [% r.error | html %][% END %]
+            </span>
+            [% END %]
+            <span style="color:#666;">Requires SSH credentials in <code>~/.comserv/secrets/ssh_credentials.json</code> (same as Docker admin).</span>
+        </div>
+        [% END %]
+
         [% IF docker_health_db && docker_health_db.size %]
-        <h3>All Servers — from system_log (updated every eval cycle)</h3>
+        <h3>All Servers — from system_log (last 2 hours)</h3>
         [% FOR srv IN docker_health_db %]
         <h4 style="margin:10px 0 4px">[% srv.system_identifier | html %]</h4>
         <div class="docker-grid">
@@ -181,10 +195,77 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
         [% END %]
         [% ELSE %]
         <p class="docker-detail"><em>No cross-server Docker data in system_log yet.
-            Production will appear here once its comserv_server.pl eval cycle runs.</em></p>
+            Reload this page to sync from this host and production servers (192.168.1.126 / .127).
+            Long-running dev servers also write every 5 min via <code>comserv_server.pl</code> health evaluator.</em></p>
         [% END %]
 
+        <div style="margin-top:16px;padding:12px;background:#eef6ff;border:1px solid #b8daff;border-radius:4px;font-size:0.9em;">
+            <strong>Admin code &amp; AI tools</strong> (CSC / developer):
+            <a href="/ai/template_editor">Template / code editor</a> ·
+            <a href="/admin/docker-containers">Docker containers</a> ·
+            <a href="/ai">AI chat</a> (add Grok API key at <a href="/ai/manage_api_keys">manage API keys</a>).
+            In-app AI and external agents (e.g. Grok CLI) can edit the repo when run on the workstation with git access.
+        </div>
+
     </div>
+
+    <!-- ================================================================
+         ACTIVE SERVERS — derived from system_log activity, no daemon needed
+         ================================================================ -->
+    [% IF active_servers && active_servers.size %]
+    <div id="section-servers" class="content-section">
+        <h2>Active Servers <small style="font-size:0.6em;font-weight:normal;color:#666;">(last 2 hours of system_log activity)</small></h2>
+        <table style="width:100%;border-collapse:collapse;font-size:0.9em;">
+            <thead>
+                <tr style="background:#f5f5f5;text-align:left;">
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Server</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Status</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Last Seen</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Log Entries</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Errors</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Warnings</th>
+                    <th style="padding:6px 10px;border:1px solid #ddd;">Filter</th>
+                </tr>
+            </thead>
+            <tbody>
+            [% FOR srv IN active_servers %]
+                [% SET st = srv.status %]
+                [% SET row_bg = (st == 'active') ? '#f0fff4'
+                              : (st == 'recent') ? '#fff8e1'
+                              : (st == 'idle')   ? '#f8f9fa'
+                              :                    '#fff5f5' %]
+                [% SET badge_col = (st == 'active') ? '#28a745'
+                                 : (st == 'recent') ? '#fd7e14'
+                                 : (st == 'idle')   ? '#6c757d'
+                                 :                    '#dc3545' %]
+                <tr style="background:[% row_bg %];border-bottom:1px solid #eee;">
+                    <td style="padding:6px 10px;border:1px solid #ddd;font-family:monospace;font-size:0.88em;">[% srv.system_identifier | html %]</td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;">
+                        <span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:0.8em;font-weight:bold;background:[% badge_col %];color:#fff;">[% st | html %]</span>
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;white-space:nowrap;font-size:0.88em;">
+                        [% srv.last_seen | html %]
+                        [% IF srv.minutes_ago == 0 %]<br><small style="color:#28a745;">just now</small>
+                        [% ELSIF srv.minutes_ago < 60 %]<br><small style="color:#666;">[% srv.minutes_ago %] min ago</small>
+                        [% ELSE %]<br><small style="color:#888;">[% srv.minutes_ago %] min ago</small>
+                        [% END %]
+                    </td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;text-align:right;">[% srv.total | html %]</td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;text-align:right;[% IF srv.errors > 0 %]color:#dc3545;font-weight:bold;[% END %]">[% srv.errors | html %]</td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;text-align:right;[% IF srv.warns > 0 %]color:#856404;[% END %]">[% srv.warns | html %]</td>
+                    <td style="padding:6px 10px;border:1px solid #ddd;">
+                        [% IF srv.errors > 0 %]
+                        <a href="[% c.uri_for('/admin/logging/audit') %]?system=[% srv.system_identifier | uri %]&amp;level=ERROR" style="font-size:0.82em;color:#dc3545;">View errors</a>
+                        [% ELSE %]
+                        <a href="[% c.uri_for('/admin/logging/audit') %]?system=[% srv.system_identifier | uri %]" style="font-size:0.82em;color:#0d6efd;">View logs</a>
+                        [% END %]
+                    </td>
+                </tr>
+            [% END %]
+            </tbody>
+        </table>
+    </div>
+    [% END %]
 
     <!-- Active filter notice -->
     [% IF filter_system || filter_level %]
