@@ -462,7 +462,7 @@
                         <i class="fas fa-shield-alt"></i>
                         <span>OPNsense Gateway</span>
                     </a>
-                    <a href="[% c.uri_for('/admin/dns') %]" class="admin-link">
+                    <a href="[% c.uri_for('/cloudflareapi') %]" class="admin-link">
                         <i class="fas fa-cloud"></i>
                         <span>Cloudflare DNS</span>
                     </a>
