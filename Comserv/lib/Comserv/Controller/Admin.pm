@@ -7101,6 +7101,12 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         open(STDERR, '>&STDOUT')     or _exit(1);
         $| = 1;
 
+        my $child_exit = sub {
+            my $code = shift;
+            unlink $pid_file if -f $pid_file;
+            _exit($code);
+        };
+
         print "=== Comserv Production Deploy via Docker Hub ===\n";
         print "Started   : " . scalar(localtime) . "\n";
         print "Commit    : $git_commit ($git_branch)\n";
@@ -7173,7 +7179,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
             $build_exit >>= 8;
             if ($build_exit != 0) {
                 print "\n❌ BUILD FAILED (exit $build_exit)\n";
-                _exit(1);
+                $child_exit->(1);
             }
             print "\n✅ Build complete\n\n";
 
@@ -7218,7 +7224,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
                 print "\n❌ PUSH FAILED (exit $push_exit)\n";
                 print "Fix: run 'docker login -u shantamcsbain' on the workstation terminal\n";
                 print "     then click Auto Deploy again\n";
-                _exit(1);
+                $child_exit->(1);
             }
             print "\n✅ Push to Docker Hub complete — $hub_image updated\n\n";
         }
@@ -7239,7 +7245,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $scp1 >>= 8;
         if ($scp1 != 0) {
             print "\n❌ FAILED TO COPY DEPLOY SCRIPT (exit $scp1)\n";
-            _exit(1);
+            $child_exit->(1);
         }
 
         print "    Copying docker-compose.server.yml to remote /tmp...\n";
@@ -7251,7 +7257,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $scp2 >>= 8;
         if ($scp2 != 0) {
             print "\n❌ FAILED TO COPY DOCKER COMPOSE CONFIG (exit $scp2)\n";
-            _exit(1);
+            $child_exit->(1);
         }
 
         # Move to /opt/comserv/Comserv/ with sudo
@@ -7267,7 +7273,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         $move_exit >>= 8;
         if ($move_exit != 0) {
             print "\n❌ MOVING REMOTE FILES FAILED (exit $move_exit)\n";
-            _exit(1);
+            $child_exit->(1);
         }
         print "✅ Production deploy files published\n\n";
 
@@ -7295,7 +7301,7 @@ sub docker_deploy_to_production :Path('/admin/docker-deploy-to-production') :Arg
         unlink $latest_link if -l $latest_link;
         symlink $log_file, $latest_link;
 
-        _exit($ssh_exit != 0 ? 2 : 0);
+        $child_exit->($ssh_exit != 0 ? 2 : 0);
     }
 
     if (open my $fh, '>', $pid_file) { print $fh $pid; close $fh; }
