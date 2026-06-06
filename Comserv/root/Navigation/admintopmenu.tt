@@ -292,7 +292,7 @@
                 <div class="submenu-section">
                     <span class="submenu-section-title">System Configuration</span>
                     <a href="/ApiCredentials"><i class="icon-key"></i>API Credentials</a>
-                    <a href="/admin/dns"><i class="icon-cloud"></i>Cloudflare DNS</a>
+                    <a href="/cloudflareapi"><i class="icon-cloud"></i>Cloudflare DNS</a>
                     <a href="/css_form"><i class="icon-css"></i>CSS Settings</a>
                     <a href="/admin/compare_schema"><i class="icon-schema"></i>Database Schema Compare</a>
                     <a href="/mail/add_mail_config_form"><i class="icon-mail-config"></i>Mail Configuration</a>
