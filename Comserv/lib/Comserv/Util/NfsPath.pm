@@ -70,6 +70,7 @@ sub to_container_path {
 
     my @prefixes;
     push @prefixes, $self->host_nfs_path if $self->host_nfs_path;
+    push @prefixes, '/data/nfs';
     push @prefixes, '/opt/comserv/workshop_resources';
 
     for my $prefix (@prefixes) {
