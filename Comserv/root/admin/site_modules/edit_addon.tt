@@ -1,0 +1,64 @@
+[%
+   title = "Edit Add-on Module"
+   roles = "admin"
+   PageVersion = 'admin/site_modules/edit_addon.tt v1.0 2026/06/04'
+%]
+[% IF c.session.debug_mode == 1 %][% PageVersion %][% END %]
+
+<style>
+.sm-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; padding-bottom:10px; border-bottom:2px solid var(--primary-color); }
+.sm-header h1 { margin:0; font-size:1.4em; }
+.add-form { background:var(--bg-secondary); border:1px solid var(--border-color); border-radius:6px; padding:20px; margin-top:24px; }
+.add-form h2 { margin-top:0; font-size:1.1em; }
+.add-form label { display:inline-block; width:150px; font-weight: bold; font-size:0.9em; margin-bottom: 8px; }
+.add-form input[type="text"], .add-form select, .add-form textarea { width: 100%; max-width: 400px; padding:6px 12px; border:1px solid var(--border-color); border-radius:3px; background:var(--bg-color); color:var(--text-color); margin-bottom: 12px; font-family: inherit; }
+.add-form textarea { height: 100px; resize: vertical; }
+.btn-sm { padding:6px 16px; font-size:0.9em; border:none; border-radius:3px; cursor:pointer; text-decoration:none; display: inline-block; }
+.btn-primary   { background:var(--primary-color); color:#fff; }
+.btn-secondary { background:var(--bg-secondary); color:var(--text-color); border:1px solid var(--border-color); }
+</style>
+
+<div class="container">
+<div class="sm-header">
+    <h1>Edit Add-on Module Metadata</h1>
+    <span style="font-size:0.85em; color:var(--text-muted-color);">Module: [% addon.key %]</span>
+</div>
+
+[% IF error_msg %]
+<div style="background:#fee; border:1px solid #f88; padding:10px; border-radius:4px; margin-bottom:16px; color:#c00;">[% error_msg %]</div>
+[% END %]
+
+<div class="add-form">
+    <h2>Update [% addon.name || addon.key %] ([% addon.key %])</h2>
+    <form method="post">
+        <p>
+            <label for="name">Module Name:</label><br>
+            <input type="text" id="name" name="name" value="[% addon.name %]" required>
+        </p>
+        <p>
+            <label for="owner">Default Owner / Site:</label><br>
+            <input type="text" id="owner" name="owner" value="[% addon.owner %]" required>
+            <small style="display:block; margin-top:-8px; margin-bottom: 12px; color:var(--text-muted-color);">
+                e.g., CSC, BMaster, ENCY, Forager, etc.
+            </small>
+        </p>
+        <p>
+            <label for="route">Module Route / URL:</label><br>
+            <input type="text" id="route" name="route" value="[% addon.route %]" required>
+        </p>
+        <p>
+            <label for="monthly_cost">Monthly Cost (CAD):</label><br>
+            <input type="text" id="monthly_cost" name="monthly_cost" value="[% addon.monthly_cost || '0.00' %]" required>
+        </p>
+        <p>
+            <label for="description">Description:</label><br>
+            <textarea id="description" name="description">[% addon.description %]</textarea>
+        </p>
+        <div style="margin-top: 20px;">
+            <button type="submit" class="btn-sm btn-primary">Save Changes</button>
+            <a href="/membership/addons" class="btn-sm btn-secondary" style="margin-left: 10px;">Cancel</a>
+        </div>
+    </form>
+</div>
+
+</div>

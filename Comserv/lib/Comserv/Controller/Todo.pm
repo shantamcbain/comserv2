@@ -3316,7 +3316,9 @@ sub done_with_log :Path('done_with_log') :Args(0) {
             } // $today;
             my $priority_val = eval { $todo->priority } // 5;
             my $group_val    = $c->session->{group} || '';
-            my $est_mins     = eval { $todo->estimated_time } // 15;
+            my $est_mins     = $data->{duration_mins}
+                               // eval { $todo->estimated_man_hours * 60 } // 15;
+            $est_mins = 15 if $est_mins < 1;
             my $dur_hms      = sprintf('%02d:%02d:00', int($est_mins / 60), $est_mins % 60);
 
             $dbh->do(
