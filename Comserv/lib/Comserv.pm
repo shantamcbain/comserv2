@@ -38,6 +38,16 @@ __PACKAGE__->config(
     enable_catalyst_header => $ENV{CATALYST_HEADER} // 1,
     encoding => 'UTF-8',
     debug => $ENV{CATALYST_DEBUG} // 0,
+    # Allow Shanta code editor from any browser (tablet/VPN) when server is the dev workstation
+    remote_code_editor => ($ENV{SYSTEM_IDENTIFIER} || '') =~ /workstation/i ? 1 : 0,
+    # SSH tunnel target for tablet → workstation (see script/aew_ssh_tunnel.sh)
+    aew_ssh_host     => $ENV{AEW_SSH_HOST}     || '172.30.131.126',
+    aew_browser_host => $ENV{AEW_BROWSER_HOST} || 'workstation.local',
+    aew_zerotier_host => $ENV{AEW_ZEROTIER_HOST} || '172.30.131.126',
+    aew_ssh_user     => $ENV{AEW_SSH_USER}     || 'shanta',
+    aew_ssh_port     => $ENV{AEW_SSH_PORT}     || 22,
+    aew_app_port     => $ENV{AEW_APP_PORT}     || 3001,
+    aew_ssh_config_host => $ENV{AEW_SSH_CONFIG_HOST} || 'comserv-aew',
     default_view => 'TT',
     'Plugin::Log::Dispatch' => {
         dispatchers => [
@@ -396,7 +406,8 @@ sub _initialize_ai_chat_schema {
             'code_search_index',
             'web_search_results',
             'ai_model_config',
-            'documentation_role_access'
+            'documentation_role_access',
+            'ai_usage_logs'
         );
         
         foreach my $table (@ai_chat_tables) {
@@ -428,6 +439,111 @@ sub _initialize_ai_chat_schema {
         warn "Warning during AI Chat schema initialization: $@\n";
     }
     
+    # Ensure AI usage logging table for customer billing + capacity monitoring
+    eval { $class->_ensure_ai_usage_log_table(); };
+    if ($@) {
+        warn "Warning: Could not ensure ai_usage_logs table: $@\n";
+    }
+    
+    return 1;
+}
+
+=head2 _ensure_ai_usage_log_table
+
+Creates the ai_usage_logs table (if missing) used for per-customer AI usage tracking,
+provider breakdown, token counts, and cost estimates for billing and system load anticipation.
+=cut
+
+sub _ensure_ai_usage_log_table {
+    my $class = shift;
+    
+    eval {
+        use Comserv::Util::Logging;
+        my $log = Comserv::Util::Logging->instance;
+        
+        my $schema = $class->model('DBEncy');
+        return unless $schema && $schema->storage && $schema->storage->dbh;
+        
+        my $dbh = $schema->storage->dbh;
+        my $sth = $dbh->prepare("SHOW TABLES LIKE 'ai_usage_logs'");
+        $sth->execute();
+        my $exists = $sth->fetchrow_arrayref();
+        
+        if (!$exists) {
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_usage_log_table',
+                "Creating ai_usage_logs table for AI billing/monitoring...");
+            
+            my $sql = q{
+                CREATE TABLE `ai_usage_logs` (
+                    `id` INT(11) NOT NULL AUTO_INCREMENT,
+                    `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    `user_id` INT(11) DEFAULT NULL,
+                    `site_id` INT(11) DEFAULT NULL,
+                    `guest_session_id` VARCHAR(64) DEFAULT NULL,
+                    `provider` VARCHAR(50) NOT NULL DEFAULT 'ollama',
+                    `model` VARCHAR(100) NOT NULL DEFAULT 'unknown',
+                    `prompt_tokens` INT(11) DEFAULT 0,
+                    `completion_tokens` INT(11) DEFAULT 0,
+                    `total_tokens` INT(11) DEFAULT 0,
+                    `estimated_cost_usd` DECIMAL(10,6) DEFAULT 0.000000,
+                    `currency` VARCHAR(10) DEFAULT 'USD',
+                    `duration_ms` INT(11) DEFAULT NULL,
+                    `request_type` VARCHAR(50) DEFAULT 'chat',
+                    `conversation_id` INT(11) DEFAULT NULL,
+                    `status` VARCHAR(20) NOT NULL DEFAULT 'success',
+                    `error_message` TEXT DEFAULT NULL,
+                    `ip_address` VARCHAR(45) DEFAULT NULL,
+                    `ollama_host` VARCHAR(128) DEFAULT NULL,
+                    `metadata` JSON DEFAULT NULL,
+                    `plan_id` INT(11) DEFAULT NULL,
+                    `plan_ai_requests_per_day` INT(11) DEFAULT NULL,
+                    `within_free_quota` TINYINT(1) DEFAULT 1,
+                    `billing_status` VARCHAR(20) DEFAULT NULL,
+                    PRIMARY KEY (`id`),
+                    KEY `idx_created` (`created_at`),
+                    KEY `idx_user` (`user_id`),
+                    KEY `idx_site` (`site_id`),
+                    KEY `idx_provider_model` (`provider`, `model`),
+                    KEY `idx_status` (`status`),
+                    KEY `idx_conversation` (`conversation_id`)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            };
+            
+            $dbh->do($sql);
+            $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_usage_log_table',
+                "ai_usage_logs table created successfully.");
+            return 1;
+        }
+        
+        # Table exists — ensure new columns for quota/billing tracking are present (for upgrades)
+        my @new_columns = (
+            { name => 'plan_id',                  type => 'INT(11) DEFAULT NULL' },
+            { name => 'plan_ai_requests_per_day', type => 'INT(11) DEFAULT NULL' },
+            { name => 'within_free_quota',        type => 'TINYINT(1) DEFAULT 1' },
+            { name => 'billing_status',           type => 'VARCHAR(20) DEFAULT NULL' },
+        );
+        
+        foreach my $col (@new_columns) {
+            my $col_sth = $dbh->prepare("SHOW COLUMNS FROM `ai_usage_logs` LIKE ?");
+            $col_sth->execute($col->{name});
+            my $col_exists = $col_sth->fetchrow_arrayref();
+            
+            unless ($col_exists) {
+                my $alter = "ALTER TABLE `ai_usage_logs` ADD COLUMN `$col->{name}` $col->{type}";
+                eval { $dbh->do($alter); };
+                if ($@) {
+                    $log->log_with_details(undef, 'warn', __FILE__, __LINE__, '_ensure_ai_usage_log_table',
+                        "Could not add column $col->{name}: $@");
+                } else {
+                    $log->log_with_details(undef, 'info', __FILE__, __LINE__, '_ensure_ai_usage_log_table',
+                        "Added missing column $col->{name} to ai_usage_logs");
+                }
+            }
+        }
+    };
+    if ($@) {
+        warn "Failed to ensure ai_usage_logs schema: $@\n";
+    }
     return 1;
 }
 

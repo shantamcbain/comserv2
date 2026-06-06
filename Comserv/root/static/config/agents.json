@@ -36,6 +36,7 @@
             "description": "Comserv2 application coding assistant \u2014 Perl/Catalyst, DBIx::Class, TT2, JS (dev only)",
             "url_patterns": [
                 "/ai",
+                "/ai/editing_widget",
                 "/admin"
             ],
             "capabilities": {

@@ -123,6 +123,7 @@
                     <option value="helpdesk">helpdesk — HelpDesk ticket system</option>
                     <option value="workshop">workshop — Workshop management</option>
                     <option value="apiary">apiary — Apiary / beekeeping</option>
+                    <option value="brew">brew — Brew / brewhouse management</option>
                     <option value="filemanager">filemanager — File Manager</option>
                     <option value="marketplace">marketplace — Marketplace listings</option>
                 </optgroup>

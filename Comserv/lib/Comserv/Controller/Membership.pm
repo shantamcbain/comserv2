@@ -124,6 +124,13 @@ sub _get_modules_data {
             route       => '/foraging',
         },
         {
+            key         => 'brew',
+            name        => 'Brew — Brewhouse Management',
+            owner       => 'Brew',
+            description => 'Brewhouse and brewery operations (legacy forager Brew app). Use brew.yourdomain.com.',
+            route       => '/brew',
+        },
+        {
             key         => 'membership',
             name        => 'Multi-Site Membership System',
             owner       => 'CSC',
@@ -427,7 +434,7 @@ sub hosting_signup :Local :Args(0) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d brew);
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         
         my $base_price = $plan_price{ $p->{plan_slug} } // 0;

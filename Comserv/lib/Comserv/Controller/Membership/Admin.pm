@@ -1089,7 +1089,7 @@ sub seed_hosting_plans :Local :Args(0) {
             price_annual     => '60.00',
             price_currency   => 'CAD',
             ai_models_allowed   => '["llama3.2","mistral"]',
-            ai_requests_per_day => 20,
+            ai_requests_per_day => 50,  # free local AI calls/day included with this tier + AI addon. Local is generous (our compute). Grok etc. metered separately.
             has_email        => 0, email_addresses => 0,
             has_hosting      => 1, hosting_tier => 'app-subdomain',
             has_subdomain    => 1, has_custom_domain => 0,
@@ -1106,7 +1106,7 @@ sub seed_hosting_plans :Local :Args(0) {
             price_annual     => '150.00',
             price_currency   => 'CAD',
             ai_models_allowed   => '["llama3.2","mistral","codellama"]',
-            ai_requests_per_day => 30,
+            ai_requests_per_day => 300,  # generous free local daily calls for practical chat use without nickel-and-dime billing. Paid external providers tracked for cost.
             has_email        => 0, email_addresses => 0,
             has_hosting      => 1, hosting_tier => 'app-only',
             has_subdomain    => 0, has_custom_domain => 1,
@@ -1444,7 +1444,7 @@ sub hosting_account_edit :Local :Args(1) {
 
     if ($c->req->method eq 'POST') {
         my $p = $c->req->body_parameters;
-        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d);
+        my @addon_keys = qw(beekeeping planning ai workshops helpdesk foraging ency ecommerce membership accounting printing_3d brew);
         my $old_addons = $acct->requested_addons || '';
         my $addons_str = join(',', grep { $p->{"addon_$_"} } @addon_keys);
         eval {

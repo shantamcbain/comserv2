@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AI Code Editor</title>
+    <link rel="stylesheet" href="/static/css/ai-editing-widget-float.css">
+</head>
+<body style="margin:1rem;font-family:sans-serif;">
+    <p>Opening the <strong>floating</strong> AI Code Editor (Grok CLI)…</p>
+    <p>If nothing appears, use the <strong>💻 Code + Grok</strong> button at the bottom-left of any admin page.</p>
+    <script src="/static/js/ai-editing-widget-float.js"></script>
+    <script>
+        (function() {
+            function go() {
+                if (window.opener && window.opener.AEW) {
+                    window.opener.AEW.open();
+                    window.close();
+                    return;
+                }
+                window.location.replace('/admin?open_aew=1');
+            }
+            if (window.AEW) go();
+            else setTimeout(go, 500);
+        })();
+    </script>
+</body>
+</html>
