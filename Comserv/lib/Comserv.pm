@@ -19,7 +19,6 @@ use Catalyst qw/
     Static::Simple
     Session
     Session::State::Cookie
-    Session::Store::File
     Authentication
 /;
 
