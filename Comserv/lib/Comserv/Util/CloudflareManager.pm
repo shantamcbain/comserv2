@@ -331,11 +331,10 @@ sub _api_request {
         # Trim any whitespace from the token
         $token =~ s/^\s+|\s+$//g;
         
-        # Verify token format
-        if ($token !~ /^[a-zA-Z0-9_-]{40}$/) {
-            $self->logger->warn("API token format appears invalid - expected 40 characters of letters, numbers, underscores, or hyphens");
+        # Verify token format (Cloudflare tokens vary: 40-char alphanumeric, or cfut_... ~53 chars, etc.)
+        if (length($token) < 30 || $token !~ /^[a-zA-Z0-9_-]+$/) {
+            $self->logger->warn("API token format may be invalid — expected 30+ alphanumeric/underscore/hyphen characters");
             $self->logger->warn("Token length: " . length($token));
-            $self->logger->warn("Token might contain invisible characters or line breaks");
         }
         
         $req->header('Authorization' => 'Bearer ' . $token);
