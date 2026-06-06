@@ -38,7 +38,7 @@ sub view :Path('/page') :Args(1) {
     }
     
     unless ($page) {
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'view', "Page not found: $page_code");
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'view', "Page not found: $page_code");
         $c->response->status(404);
         $c->stash(
             error_msg => "Page not found: $page_code",
