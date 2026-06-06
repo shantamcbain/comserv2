@@ -207,15 +207,15 @@
         [% IF tc_show_done && is_admin && !tci_is_done %]
           [% IF tci_is_active %]
           <button onclick="closeLogTodoCard(this,[% tc.record_id %])"
-              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Session active — click to close log with notes (todo stays in-progress)">⏸ Active</button>
+              style="font-size:0.68em;padding:2px 6px;border:1px solid #fd7e14;border-radius:3px;background:#fd7e14;color:#fff;cursor:pointer;white-space:nowrap;" title="Session active — click to close log with notes (todo stays in-progress for next session)">⏸ Active</button>
           [% ELSE %]
           <button onclick="startWorkTodoCard(this,[% tc.record_id %])"
               style="font-size:0.68em;padding:2px 6px;border:1px solid #0d6efd;border-radius:3px;background:transparent;color:#0d6efd;cursor:pointer;white-space:nowrap;" title="Start working — creates a log entry, marks todo active on all servers">▶ Start</button>
           [% END %]
-        <button onclick="[% tc_done_fn %]([% tc.record_id %])"
-            style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
+        <button onclick="doneWithLogTodoCard(this,[% tc.record_id %],[% tci_is_active ? 1 : 0 %])"
+            style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="[% tci_is_active ? 'Close log and mark todo done' : 'Mark done — will ask for duration if no active session' %]">Done</button>
         [% ELSIF tc_show_done && is_admin %]
-        <button onclick="[% tc_done_fn %]([% tc.record_id %])"
+        <button onclick="doneWithLogTodoCard(this,[% tc.record_id %],0)"
             style="font-size:0.68em;padding:2px 6px;border:1px solid #28a745;border-radius:3px;background:transparent;color:#28a745;cursor:pointer;white-space:nowrap;" title="Mark done">Done</button>
         [% END %]
       </div>

@@ -806,6 +806,9 @@ sub check_connection {
     my $endpoint = $self->endpoint;
     $endpoint =~ s/\/api\/generate$/\/api\/tags/;
     
+    # Sync timeout to the user agent
+    $self->ua->timeout($self->timeout);
+    
     my $req = HTTP::Request->new(GET => $endpoint);
     
     my $response;
@@ -845,6 +848,9 @@ sub list_models {
     my $endpoint = $self->endpoint;
     $endpoint =~ s/\/api\/generate$/\/api\/tags/;
     
+    # Sync timeout to the user agent
+    $self->ua->timeout($self->timeout);
+    
     my $req = HTTP::Request->new(GET => $endpoint);
     
     my $should_fallback = $self->_should_use_shell();
@@ -857,7 +863,8 @@ sub list_models {
                 "HTTP API failed: $_, attempting shell fallback");
             return $self->list_models_shell();
         } else {
-            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            my $level = ($_ =~ /Can\'t connect|Connection timed out|timed\.out|timeout|Network is unreachable|Connection refused/i) ? 'warn' : 'error';
+            $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models',
                 "HTTP API failed: $_ (shell fallback disabled for remote host)");
             $self->last_error("HTTP API failed: $_");
             return undef;
@@ -870,7 +877,8 @@ sub list_models {
                 "HTTP API returned " . $response->status_line . ", attempting shell fallback");
             return $self->list_models_shell();
         } else {
-            $self->logging->log_with_details(undef, 'error', __FILE__, __LINE__, 'list_models',
+            my $level = ($response->status_line =~ /Can\'t connect|Connection timed out|timed\.out|timeout|Network is unreachable|Connection refused/i) ? 'warn' : 'error';
+            $self->logging->log_with_details(undef, $level, __FILE__, __LINE__, 'list_models',
                 "HTTP API returned " . $response->status_line . " (shell fallback disabled for remote host)");
             $self->last_error("HTTP API returned: " . $response->status_line);
             return undef;

@@ -758,6 +758,7 @@ sub mail_admin_dashboard :Local {
     eval {
         my $dbh = $c->model('DBEncy')->schema->storage->dbh;
         my $site_id = $self->_get_site_id($c);
+        $self->_sync_default_lists($c, $site_id) if $site_id;
         my $sth = $dbh->prepare("
             SELECT ml.id, ml.name, ml.description, ml.is_public,
                    ml.list_backend, ml.is_active,

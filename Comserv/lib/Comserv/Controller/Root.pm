@@ -279,11 +279,24 @@ sub auto :Private {
                             })->count;
                             unless ($site_admin_count) {
                                 my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
-                                    sitename => $site_name_check,
+                                    -or => [
+                                        sitename => $site_name_check,
+                                        sitename => lc($site_name_check),
+                                        sitename => uc($site_name_check),
+                                    ]
                                 }, { rows => 1 })->single;
-                                if ($hosting && $hosting->contact_email) {
+                                if ($hosting) {
                                     my $user_obj = $c->model('DBEncy')->resultset('User')->find($user_id);
-                                    if ($user_obj && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                    my $is_owner = 0;
+                                    if ($user_obj) {
+                                        if ($hosting->contact_email && lc($user_obj->email) eq lc($hosting->contact_email)) {
+                                            $is_owner = 1;
+                                        }
+                                        if ($hosting->created_by && lc($user_obj->username) eq lc($hosting->created_by)) {
+                                            $is_owner = 1;
+                                        }
+                                    }
+                                    if ($is_owner) {
                                         $c->model('DBEncy')->resultset('UserSiteRole')->find_or_create({
                                             user_id   => $user_id,
                                             site_id   => $site_obj->id,
@@ -466,6 +479,31 @@ sub auto :Private {
             )->all;
             for my $row (@site_mods) {
                 $enabled{ $row->module_name } = $row->enabled ? 1 : 0;
+            }
+
+            # Check hosting account for subscribed addons to enable them by default
+            my $hosting = $c->model('DBEncy')->resultset('Accounting::HostingAccount')->search({
+                -or => [
+                    sitename => $mod_site,
+                    sitename => lc($mod_site),
+                    sitename => uc($mod_site),
+                ]
+            }, { rows => 1 })->single;
+            if ($hosting && $hosting->requested_addons) {
+                my @addons = split(/\s*,\s*/, $hosting->requested_addons);
+                for my $a (@addons) {
+                    my $lc_addon = lc($a);
+                    $enabled{$lc_addon} = 1 unless exists $enabled{$lc_addon};
+                    # Normalize alias keys (e.g., printing_3d and 3d) to ensure they match all check locations
+                    if ($lc_addon eq 'printing_3d' || $lc_addon eq '3d') {
+                        $enabled{'3d'} = 1 unless exists $enabled{'3d'};
+                        $enabled{'printing_3d'} = 1 unless exists $enabled{'printing_3d'};
+                    }
+                    if ($lc_addon eq 'workshops' || $lc_addon eq 'workshop') {
+                        $enabled{'workshop'} = 1 unless exists $enabled{'workshop'};
+                        $enabled{'workshops'} = 1 unless exists $enabled{'workshops'};
+                    }
+                }
             }
 
             # Apply per-user overrides from user_module_access

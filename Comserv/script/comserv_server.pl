@@ -301,15 +301,24 @@ sub _start_health_evaluator {
                     # Log Docker container health to system_log so all servers are visible
                     eval {
                         my $containers = Comserv::Util::HealthLogger->get_docker_health();
-                        for my $ct (@$containers) {
-                            my $lvl = ($ct->{health} eq 'healthy') ? 'info'
-                                    : ($ct->{health} eq 'unhealthy') ? 'warn'
-                                    : 'debug';
-                            $logger->log_with_details(undef, $lvl, __FILE__, __LINE__,
+                        if (@$containers) {
+                            for my $ct (@$containers) {
+                                my $lvl = ($ct->{health} eq 'healthy') ? 'info'
+                                        : ($ct->{health} eq 'unhealthy') ? 'warn'
+                                        : 'debug';
+                                $logger->log_with_details(undef, $lvl, __FILE__, __LINE__,
+                                    'docker_health',
+                                    sprintf('[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
+                                        $ct->{name}, $ct->{health}, $ct->{status_str},
+                                        $ct->{last_output} || 'ok')
+                                );
+                            }
+                        } else {
+                            # No docker socket — write a server heartbeat so this server
+                            # still appears in the cross-server dashboard.
+                            $logger->log_with_details(undef, 'info', __FILE__, __LINE__,
                                 'docker_health',
-                                sprintf('[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
-                                    $ct->{name}, $ct->{health}, $ct->{status_str},
-                                    $ct->{last_output} || 'ok')
+                                sprintf('[HEALTH][DOCKER_STATUS] container=app-server health=healthy status=running(no-docker-sock) last_check=score:%d', $score)
                             );
                         }
                     };

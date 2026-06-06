@@ -792,6 +792,88 @@ sub users :Path('/admin/users') :Args(0) {
     );
 }
 
+# Admin purge unverified/bogus users
+sub purge_users :Path('/admin/purge_users') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $admin_auth = Comserv::Util::AdminAuth->new();
+
+    unless ($admin_auth->check_admin_access($c, 'admin_users')) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'purge_users',
+            "Access denied for admin_users - username: " . ($c->session->{username} || 'none'));
+        $c->flash->{error_msg} = "Access denied. Admin access required.";
+        $c->response->redirect($c->uri_for('/user/login'));
+        return;
+    }
+
+    my $admin_type = $admin_auth->get_admin_type($c);
+    my $is_csc_admin = ($admin_type eq 'csc' || $admin_type eq 'special');
+
+    unless ($is_csc_admin) {
+        $c->flash->{error_msg} = "Only global CSC administrators can purge users.";
+        $c->response->redirect($c->uri_for('/admin/users'));
+        return;
+    }
+
+    my $hours = $c->req->param('purge_hours') // 24;
+    if ($hours !~ /^\d+$/ || $hours <= 0) {
+        $hours = 24;
+    }
+
+    my $email_pattern = $c->req->param('email_pattern') // '';
+    $email_pattern =~ s/^\s+|\s+$//g;
+
+    my $schema = $c->model('DBEncy');
+    my $purged_count = 0;
+
+    eval {
+        my $cutoff = DateTime->now->subtract(hours => $hours)->strftime('%Y-%m-%d %H:%M:%S');
+
+        my %search_cond = (
+            status => 'pending_verification',
+            created_at => { '<' => $cutoff },
+        );
+
+        if ($email_pattern ne '') {
+            $search_cond{email} = { like => "%$email_pattern%" };
+        }
+
+        my @users_to_purge = $schema->resultset('User')->search(\%search_cond)->all;
+
+        for my $user (@users_to_purge) {
+            my $user_id = $user->id;
+
+            $schema->txn_do(sub {
+                $schema->resultset('EmailVerificationCode')->search({ user_id => $user_id })->delete;
+                $schema->resultset('PasswordResetToken')->search({ user_id => $user_id })->delete;
+                $schema->resultset('UserSiteRole')->search({ user_id => $user_id })->delete;
+                $schema->resultset('Accounting::PointAccount')->search({ user_id => $user_id })->delete;
+
+                eval {
+                    $schema->resultset('System::SiteUser')->search({ user_id => $user_id })->delete;
+                };
+
+                $schema->resultset('User')->search({ id => $user_id })->delete;
+                $purged_count++;
+            });
+        }
+
+        $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'purge_users',
+            "Admin purged $purged_count unverified users older than $hours hours (email pattern: '$email_pattern')");
+
+        $c->flash->{success_msg} = "Successfully purged $purged_count unverified accounts.";
+    };
+
+    if ($@) {
+        my $err = $@;
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'purge_users',
+            "Error purging unverified users: $err");
+        $c->flash->{error_msg} = "Error purging unverified users: $err";
+    }
+
+    $c->response->redirect($c->uri_for('/admin/users'));
+}
+
 # Admin create user
 sub create_user :Path('/admin/create_user') :Args(0) {
     my ($self, $c) = @_;
@@ -7652,12 +7734,52 @@ sub get_migration_postgres_info {
 
         my $sth = $dbh->prepare("SELECT datname FROM pg_database WHERE datistemplate = false ORDER BY datname");
         $sth->execute();
-        my @databases;
+        my @db_names;
         while (my ($db_name) = $sth->fetchrow_array()) {
             next if $db_name eq 'postgres';
-            push @databases, { name => $db_name, table_count => undef };
+            push @db_names, $db_name;
         }
         $dbh->disconnect();
+
+        # Now connect to each database and fetch its schema
+        my @databases;
+        for my $db_name (@db_names) {
+            my $db_entry = { name => $db_name, tables => [], table_count => 0, error => undef };
+            eval {
+                my $db_dbh = DBI->connect("DBI:Pg:dbname=$db_name;host=$host;port=$port",
+                    $user, $password, { RaiseError => 1, PrintError => 0, AutoCommit => 1 });
+                my $tsth = $db_dbh->prepare(
+                    "SELECT t.tablename, COUNT(c.column_name)::int AS col_count
+                     FROM pg_tables t
+                     LEFT JOIN information_schema.columns c
+                       ON c.table_schema = 'public' AND c.table_name = t.tablename
+                     WHERE t.schemaname = 'public'
+                     GROUP BY t.tablename
+                     ORDER BY t.tablename");
+                $tsth->execute();
+                my @tables;
+                while (my ($tname, $col_count) = $tsth->fetchrow_array()) {
+                    # Fetch column details
+                    my $csth = $db_dbh->prepare(
+                        "SELECT column_name, data_type, character_maximum_length,
+                                is_nullable, column_default
+                         FROM information_schema.columns
+                         WHERE table_schema = 'public' AND table_name = ?
+                         ORDER BY ordinal_position");
+                    $csth->execute($tname);
+                    my @cols;
+                    while (my $col = $csth->fetchrow_hashref()) {
+                        push @cols, $col;
+                    }
+                    push @tables, { name => $tname, col_count => $col_count, columns => \@cols };
+                }
+                $db_dbh->disconnect();
+                $db_entry->{tables}      = \@tables;
+                $db_entry->{table_count} = scalar @tables;
+            };
+            $db_entry->{error} = $@ if $@;
+            push @databases, $db_entry;
+        }
 
         $result->{connection_status} = 'connected';
         $result->{databases} = \@databases;

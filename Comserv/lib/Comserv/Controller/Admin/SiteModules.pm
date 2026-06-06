@@ -236,5 +236,102 @@ sub revoke_user :Path('/admin/site_modules/revoke_user') :Args(1) {
     $c->detach;
 }
 
+sub edit_addon :Path('/admin/site_modules/edit_addon') :Args(0) {
+    my ($self, $c) = @_;
+
+    my $key = $c->req->param('key') || '';
+    unless ($key) {
+        $c->flash->{error_msg} = "No module key specified.";
+        return $c->res->redirect($c->uri_for('/membership/addons'));
+    }
+
+    # Ensure system_modules table exists
+    eval {
+        my $dbh = $c->model('DBEncy')->schema->storage->dbh;
+        $dbh->do(q{
+            CREATE TABLE IF NOT EXISTS `system_modules` (
+                `key` VARCHAR(100) NOT NULL,
+                `name` VARCHAR(255) NOT NULL,
+                `owner` VARCHAR(100) NOT NULL,
+                `description` TEXT,
+                `route` VARCHAR(255) NOT NULL,
+                `monthly_cost` DECIMAL(10,2) NOT NULL DEFAULT '0.00',
+                `is_active` TINYINT(1) NOT NULL DEFAULT '1',
+                `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                PRIMARY KEY (`key`)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        });
+    };
+
+    my $addon = undef;
+    try {
+        $addon = $c->model('DBEncy')->resultset('SystemModule')->find($key);
+    } catch {
+        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_addon',
+            "Failed to load SystemModule: $_");
+    };
+
+    # Default values fallback
+    unless ($addon) {
+        my @defaults = (
+            { key => 'beekeeping', name => 'Beekeeping & Apiary Management', owner => 'BMaster', description => 'Track bee hives, apiaries, queen logs, and inspections.', route => '/apiary' },
+            { key => 'planning', name => 'AI Planning & Project System', owner => 'CSC', description => 'Advanced project planning, todo tracking, and AI-assisted workflows.', route => '/todo' },
+            { key => 'accounting', name => 'Accounting & Ledger System', owner => 'CSC', description => 'Chart of accounts, general ledger entries, inventory items, and suppliers.', route => '/Accounting' },
+            { key => 'ency', name => 'Encyclopedia & Herbal Database', owner => 'ENCY', description => 'Share scientific crop data, botanical encyclopedia, and medicinal herb logs.', route => '/ency' },
+            { key => 'ecommerce', name => 'E-Commerce & Store', owner => 'CSC', description => 'Sell products, list items, handle currency checkout, and manage shipping.', route => '/shop' },
+            { key => 'helpdesk', name => 'HelpDesk Support & Guide system', owner => 'CSC', description => 'Issue ticket tracking, linux guides, and support desk system.', route => '/helpdesk' },
+            { key => 'foraging', name => 'Foraging & Wild Harvesting Log', owner => 'Forager', description => 'Map and log foraging spots, wild harvest logs, and seasonal wild botany.', route => '/foraging' },
+            { key => 'membership', name => 'Multi-Site Membership System', owner => 'CSC', description => 'Set up recurring billing, regional pricing, payment gateways, and coins.', route => '/membership' },
+            { key => '3d', name => '3D Printing & Custom Fabrication', owner => '3D', description => 'Order 3D prints, upload design models, and track build queues.', route => '/3d' },
+        );
+        my ($found) = grep { $_->{key} eq $key } @defaults;
+        if ($found) {
+            $addon = {
+                key          => $found->{key},
+                name         => $found->{name},
+                owner        => $found->{owner},
+                description  => $found->{description},
+                route        => $found->{route},
+                monthly_cost => 0,
+            };
+        }
+    }
+
+    if ($c->req->method eq 'POST') {
+        my $name         = $c->req->param('name') || '';
+        my $owner        = $c->req->param('owner') || '';
+        my $description  = $c->req->param('description') || '';
+        my $route        = $c->req->param('route') || '';
+        my $monthly_cost = $c->req->param('monthly_cost') || 0;
+
+        try {
+            $c->model('DBEncy')->resultset('SystemModule')->update_or_create(
+                {
+                    key          => $key,
+                    name         => $name,
+                    owner        => $owner,
+                    description  => $description,
+                    route        => $route,
+                    monthly_cost => $monthly_cost,
+                    is_active    => 1,
+                },
+                { key => 'primary' }
+            );
+            $c->flash->{success_msg} = "Add-on '$key' updated successfully!";
+            return $c->res->redirect($c->uri_for('/membership/addons'));
+        } catch {
+            $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'edit_addon',
+                "Failed to save SystemModule: $_");
+            $c->stash->{error_msg} = "Failed to save addon: $_";
+        };
+    }
+
+    $c->stash(
+        addon    => $addon,
+        template => 'admin/site_modules/edit_addon.tt',
+    );
+}
+
 __PACKAGE__->meta->make_immutable;
 1;
