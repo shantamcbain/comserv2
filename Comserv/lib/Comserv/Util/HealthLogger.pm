@@ -710,7 +710,7 @@ sub _parse_docker_ps_lines {
     for my $line (@$lines_ref) {
         chomp $line;
         next unless $line;
-        my ($name, $image, $status_str, $running_for) = split /\t/, $line, 4;
+        my ($name, $image, $status_str, $running_for, $ports, $short_id) = split /\t/, $line, 6;
         next unless $name;
         next if !$all_containers && $name !~ /^comserv/i;
 
@@ -722,6 +722,8 @@ sub _parse_docker_ps_lines {
             image       => $image // '',
             status_str  => $status_str // '',
             uptime      => $running_for // '',
+            ports       => $ports // '',
+            short_id    => $short_id ? substr($short_id, 0, 12) : '',
             health      => $health,
             last_output => '',
         };
@@ -755,12 +757,28 @@ sub get_docker_health {
         {
             local $SIG{CHLD} = 'DEFAULT';
             open(my $fh, '-|', qw(timeout 8 docker ps --all --no-trunc
-                --format), '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}')
+                --format), '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}\t{{.Ports}}\t{{.ID}}')
                 or die "docker ps: $!";
             @ps_lines = <$fh>;
             close $fh;
         }
         @containers = @{ $class->_parse_docker_ps_lines(\@ps_lines, %opts) };
+
+        for my $ct (@containers) {
+            next unless $ct->{health} eq 'healthy' || $ct->{status_str} =~ /Up/i;
+            eval {
+                local $SIG{CHLD} = 'DEFAULT';
+                open(my $vfh, '-|', 'timeout', '4', 'docker', 'exec',
+                    $ct->{name}, 'cat', '/opt/comserv/version.json') or die;
+                my $raw = do { local $/; <$vfh> };
+                close $vfh;
+                if ($raw && $raw =~ /^\{/) {
+                    require JSON;
+                    my $ver = eval { JSON::decode_json($raw) };
+                    $ct->{build_info} = $ver if $ver && ref $ver eq 'HASH';
+                }
+            };
+        }
     };
     return \@containers;
 }
@@ -912,12 +930,18 @@ sub get_active_servers_from_db {
                 SUM(CASE WHEN level = 'WARN' THEN 1 ELSE 0 END) AS warns
              FROM system_log
              WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                OR timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? HOUR)
              GROUP BY COALESCE(system_identifier, '(unknown)')
              ORDER BY last_seen DESC"
         );
-        $sth->execute($hours);
+        $sth->execute($hours, $hours);
         while (my $row = $sth->fetchrow_hashref) {
             my $min = $row->{minutes_ago} // 9999;
+            my $tz_offset = 0;
+            if ($min < 0) {
+                $tz_offset = -int($min);
+                $min = 0;
+            }
             my $status = ($min <= 5)   ? 'active'
                        : ($min <= 30)  ? 'recent'
                        : ($min <= 120) ? 'idle'
@@ -926,6 +950,7 @@ sub get_active_servers_from_db {
                 system_identifier => $row->{sys},
                 last_seen         => $row->{last_seen},
                 minutes_ago       => int($min),
+                tz_offset         => $tz_offset,
                 status            => $status,
                 total             => int($row->{total}   || 0),
                 errors            => int($row->{errors}  || 0),

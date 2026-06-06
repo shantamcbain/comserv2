@@ -151,7 +151,27 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
                 <div class="docker-name">[% ct.name | html %]
                     <span class="docker-badge [% bclass %]">[% ct.health | html %]</span>
                 </div>
-                <div class="docker-detail">Status: [% ct.status_str | html %]</div>
+                [% IF ct.image %]
+                <div class="docker-detail"><strong>Image:</strong> <code style="font-size:0.88em;">[% ct.image | html %]</code></div>
+                [% END %]
+                [% IF ct.build_info %]
+                <div class="docker-detail" style="color:#28a745;font-size:0.82em;font-weight:bold;">&#x2714; Running LATEST image</div>
+                [% END %]
+                <div class="docker-detail">
+                    [% IF ct.short_id %]<span style="color:#888;font-size:0.82em;font-family:monospace;">[% ct.short_id | html %]</span> | [% END %]
+                    <strong>Status:</strong> [% ct.status_str | html %]
+                </div>
+                [% IF ct.ports %]
+                <div class="docker-detail" style="font-size:0.82em;"><strong>Ports:</strong> [% ct.ports | html %]</div>
+                [% END %]
+                [% IF ct.build_info %]
+                <div class="docker-detail" style="font-size:0.82em;color:#555;">
+                    <strong>Build:</strong> [% ct.build_info.build_date | html %]
+                    [% IF ct.build_info.commit %] | <strong>Commit:</strong> <code>[% ct.build_info.commit | html %]</code>[% END %]
+                    [% IF ct.build_info.branch %] | <strong>Branch:</strong> [% ct.build_info.branch | html %][% END %]
+                    [% IF ct.build_info.build_host %] | <strong>Built On:</strong> [% ct.build_info.build_host | html %][% END %]
+                </div>
+                [% END %]
                 [% IF ct.last_output %]
                 <div class="docker-lastcheck">Last check: [% ct.last_output | html %]</div>
                 [% END %]
@@ -245,7 +265,8 @@ tr.level-critical     { background:#f8d7da; font-weight:bold; }
                     </td>
                     <td style="padding:6px 10px;border:1px solid #ddd;white-space:nowrap;font-size:0.88em;">
                         [% srv.last_seen | html %]
-                        [% IF srv.minutes_ago == 0 %]<br><small style="color:#28a745;">just now</small>
+                        [% IF srv.tz_offset %]<br><small style="color:#6c757d;" title="Timestamp is [% srv.tz_offset %] min ahead — server timezone differs from DB (likely UTC vs local)">⏱ UTC offset ~[% (srv.tz_offset / 60).int %]h</small>
+                        [% ELSIF srv.minutes_ago == 0 %]<br><small style="color:#28a745;">just now</small>
                         [% ELSIF srv.minutes_ago < 60 %]<br><small style="color:#666;">[% srv.minutes_ago %] min ago</small>
                         [% ELSE %]<br><small style="color:#888;">[% srv.minutes_ago %] min ago</small>
                         [% END %]

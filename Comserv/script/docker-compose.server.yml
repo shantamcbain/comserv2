@@ -10,6 +10,7 @@ services:
       CATALYST_DEBUG: 0
       WEB_PORT: 5000
       TZ: UTC
+      COMSERV_NO_HEALTH_LOG: 1
       NFS_DATA_PATH: /data/nfs
       COMSERV_LOG_DIR: /opt/comserv/applogs
       DISABLE_FILE_LOGGING: "1"

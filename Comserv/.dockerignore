@@ -28,9 +28,14 @@ __pycache__
 venv
 db/
 tmp/
-log/
 logs/
 *.log
+root/log/*.log
+root/log/*.log.*
+root/log/*.gz
+root/log/*.backup
+root/log/archive/
+root/log/security_scans/
 whisper_venv/
 blib/
 local/
