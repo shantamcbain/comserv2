@@ -24,6 +24,7 @@ use strict;
 use warnings;
 use POSIX qw(strftime);
 use Sys::Hostname;
+use JSON qw(decode_json);
 use Comserv::Util::Logging;
 
 my $logging = Comserv::Util::Logging->instance;
@@ -699,11 +700,57 @@ sub get_docker_health_from_db {
     return \@results;
 }
 
+# Parse `docker ps --format` tab-separated lines into container hashes.
+sub _parse_docker_ps_lines {
+    my ($class, $lines_ref, %opts) = @_;
+    my $all_containers = $opts{all_containers};
+    my $inspect        = $opts{inspect} // 1;
+    my @containers;
+
+    for my $line (@$lines_ref) {
+        chomp $line;
+        next unless $line;
+        my ($name, $image, $status_str, $running_for) = split /\t/, $line, 4;
+        next unless $name;
+        next if !$all_containers && $name !~ /^comserv/i;
+
+        my $health = 'none';
+        $health = $1 if $status_str && $status_str =~ /\((\w+)\)/;
+
+        my $container = {
+            name        => $name,
+            image       => $image // '',
+            status_str  => $status_str // '',
+            uptime      => $running_for // '',
+            health      => $health,
+            last_output => '',
+        };
+
+        if ($inspect && ($health eq 'unhealthy' || $health eq 'starting')) {
+            eval {
+                local $SIG{CHLD} = 'DEFAULT';
+                open(my $ifh, '-|', 'timeout', '5', 'docker', 'inspect',
+                    '--format', '{{range .State.Health.Log}}{{.ExitCode}}:{{.Output}}|{{end}}',
+                    $name) or die;
+                my $raw = do { local $/; <$ifh> };
+                close $ifh;
+                if ($raw && $raw =~ /^(-?\d+):(.+?)\|/s) {
+                    my ($exit, $out) = ($1, $2);
+                    $out =~ s/\s+/ /g;
+                    $container->{last_output} = 'exit=' . $exit . ': ' . substr($out, 0, 200);
+                }
+            };
+        }
+
+        push @containers, $container;
+    }
+    return \@containers;
+}
+
 sub get_docker_health {
-    my ($class) = @_;
+    my ($class, %opts) = @_;
     my @containers;
     eval {
-        # docker ps — one line per container, tab-separated; timeout prevents hangs
         my @ps_lines;
         {
             local $SIG{CHLD} = 'DEFAULT';
@@ -713,48 +760,180 @@ sub get_docker_health {
             @ps_lines = <$fh>;
             close $fh;
         }
-
-        for my $line (@ps_lines) {
-            chomp $line;
-            my ($name, $image, $status_str, $running_for) = split /\t/, $line;
-            next unless $name && $name =~ /^comserv/i;
-
-            # Parse health from status string: "Up 2 hours (unhealthy)" / "(healthy)"
-            my $health = 'none';
-            $health = $1 if $status_str =~ /\((\w+)\)/;
-
-            my $container = {
-                name        => $name,
-                image       => $image,
-                status_str  => $status_str,
-                uptime      => $running_for,
-                health      => $health,
-                last_output => '',
-            };
-
-            # Get last healthcheck output for unhealthy/starting containers
-            if ($health eq 'unhealthy' || $health eq 'starting') {
-                eval {
-                    local $SIG{CHLD} = 'DEFAULT';
-                    open(my $ifh, '-|', 'timeout', '5', 'docker', 'inspect',
-                        '--format', '{{range .State.Health.Log}}{{.ExitCode}}:{{.Output}}|{{end}}',
-                        $name) or die;
-                    my $raw = do { local $/; <$ifh> };
-                    close $ifh;
-                    # Take only the most recent check (first segment before |)
-                    if ($raw && $raw =~ /^(-?\d+):(.+?)\|/s) {
-                        my ($exit, $out) = ($1, $2);
-                        $out =~ s/\s+/ /g;
-                        $out = substr($out, 0, 200);
-                        $container->{last_output} = "exit=$exit: $out";
-                    }
-                };
-            }
-
-            push @containers, $container;
-        }
+        @containers = @{ $class->_parse_docker_ps_lines(\@ps_lines, %opts) };
     };
     return \@containers;
+}
+
+# Write [HEALTH][DOCKER_STATUS] rows to system_log (shared DB). Works without Catalyst.
+sub log_docker_status_batch_to_schema {
+    my ($class, $schema, $containers, %opts) = @_;
+    return 0 unless $schema && $containers && ref $containers eq 'ARRAY';
+
+    my $system_id = $opts{system_identifier}
+        || $ENV{SYSTEM_IDENTIFIER}
+        || Comserv::Util::Logging->get_system_identifier();
+    my $now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+    my $written = 0;
+
+    for my $ct (@$containers) {
+        my $health = $ct->{health} // 'unknown';
+        my $level  = ($health eq 'unhealthy') ? 'WARN'
+                   : ($health eq 'healthy')  ? 'INFO'
+                   :                           'DEBUG';
+        my $msg = sprintf(
+            '[HEALTH][DOCKER_STATUS] container=%s health=%s status=%s last_check=%s',
+            $ct->{name},
+            $health,
+            $ct->{status_str} // '',
+            $ct->{last_output} || 'ok',
+        );
+        eval {
+            $schema->resultset('SystemLog')->create({
+                timestamp         => $now,
+                level             => $level,
+                file              => __FILE__,
+                line              => __LINE__,
+                subroutine        => 'log_docker_status_batch_to_schema',
+                message           => $msg,
+                sitename          => 'CSC',
+                username          => undef,
+                system_identifier => $system_id,
+            });
+            $written++;
+        };
+        if ($@) {
+            $logging->log_with_details(undef, 'error', __FILE__, __LINE__,
+                'log_docker_status_batch_to_schema',
+                "Failed to write DOCKER_STATUS for $ct->{name}: $@");
+        }
+    }
+    return $written;
+}
+
+# Snapshot local docker ps into system_log for the cross-server audit dashboard.
+sub record_docker_health_snapshot {
+    my ($class, $schema, %opts) = @_;
+    return 0 unless $schema;
+    my $containers = $class->get_docker_health(%opts);
+    if (!@$containers && !$opts{skip_heartbeat}) {
+        my $system_id = $opts{system_identifier}
+            || $ENV{SYSTEM_IDENTIFIER}
+            || Comserv::Util::Logging->get_system_identifier();
+        my $now = strftime('%Y-%m-%d %H:%M:%S', localtime);
+        eval {
+            $schema->resultset('SystemLog')->create({
+                timestamp         => $now,
+                level             => 'INFO',
+                file              => __FILE__,
+                line              => __LINE__,
+                subroutine        => 'record_docker_health_snapshot',
+                message           => '[HEALTH][DOCKER_STATUS] container=app-server health=healthy status=running(no-docker-containers) last_check=ok',
+                sitename          => 'CSC',
+                system_identifier => $system_id,
+            });
+        };
+        return 1;
+    }
+    return $class->log_docker_status_batch_to_schema($schema, $containers, %opts);
+}
+
+# Pull docker ps from remote hosts via SSH (server room) and store in system_log.
+sub sync_remote_docker_hosts {
+    my ($class, $schema) = @_;
+    return [] unless $schema;
+
+    my $home = $ENV{HOME} || '/home/shanta';
+    my $creds_file = "$home/.comserv/secrets/ssh_credentials.json";
+    my $ssh_password = '';
+    my $ssh_port     = 22;
+    if (-f $creds_file && open my $cf, '<', $creds_file) {
+        local $/;
+        my $json = eval { decode_json(<$cf>) };
+        close $cf;
+        if ($json) {
+            $ssh_password = $json->{ssh_password} // '';
+            $ssh_port     = $json->{ssh_port}     // 22;
+        }
+    }
+
+    my @hosts = (
+        { target => 'production1', host => '192.168.1.126', system_identifier => 'production1 (Docker):5000' },
+        { target => 'production2', host => '192.168.1.127', system_identifier => 'production2 (Docker):5000' },
+    );
+
+    my @report;
+    for my $h (@hosts) {
+        my $entry = { %$h, ok => 0, containers => 0, error => '' };
+        unless ($ssh_password) {
+            $entry->{error} = 'SSH credentials missing (~/.comserv/secrets/ssh_credentials.json)';
+            push @report, $entry;
+            next;
+        }
+
+        my $docker_cmd = q(docker ps --all --no-trunc --format '{{.Names}}\t{{.Image}}\t{{.Status}}\t{{.RunningFor}}');
+        $docker_cmd =~ s/'/'\\''/g;
+        local $ENV{SSHPASS} = $ssh_password;
+        my $ssh = qq(sshpass -e ssh -p $ssh_port -o ConnectTimeout=8 -o StrictHostKeyChecking=no ubuntu\@$h->{host} '$docker_cmd' 2>&1);
+        my @lines = `$ssh`;
+        my $exit  = $? >> 8;
+        if ($exit != 0) {
+            $entry->{error} = join('', @lines) || "ssh exit $exit";
+            push @report, $entry;
+            next;
+        }
+
+        my $containers = $class->_parse_docker_ps_lines(\@lines, all_containers => 1, inspect => 0);
+        $entry->{containers} = scalar @$containers;
+        $entry->{ok}         = $class->log_docker_status_batch_to_schema(
+            $schema, $containers, system_identifier => $h->{system_identifier}
+        ) ? 1 : 0;
+        push @report, $entry;
+    }
+    return \@report;
+}
+
+# Query system_log for all servers that have had recent activity.
+# Works for ANY server writing to the shared DB — no comserv_server.pl needed.
+# Returns [ { system_identifier, last_seen, minutes_ago, status, total, errors, warns } ]
+sub get_active_servers_from_db {
+    my ($class, $schema, %opts) = @_;
+    my $hours   = $opts{hours} || 2;
+    my @results;
+    eval {
+        my $dbh = $schema->storage->dbh;
+        my $sth = $dbh->prepare(
+            "SELECT
+                COALESCE(system_identifier, '(unknown)') AS sys,
+                MAX(timestamp)                            AS last_seen,
+                TIMESTAMPDIFF(MINUTE, MAX(timestamp), NOW()) AS minutes_ago,
+                COUNT(*)                                  AS total,
+                SUM(CASE WHEN level IN ('ERROR','CRITICAL') THEN 1 ELSE 0 END) AS errors,
+                SUM(CASE WHEN level = 'WARN' THEN 1 ELSE 0 END) AS warns
+             FROM system_log
+             WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+             GROUP BY COALESCE(system_identifier, '(unknown)')
+             ORDER BY last_seen DESC"
+        );
+        $sth->execute($hours);
+        while (my $row = $sth->fetchrow_hashref) {
+            my $min = $row->{minutes_ago} // 9999;
+            my $status = ($min <= 5)   ? 'active'
+                       : ($min <= 30)  ? 'recent'
+                       : ($min <= 120) ? 'idle'
+                       :                'stale';
+            push @results, {
+                system_identifier => $row->{sys},
+                last_seen         => $row->{last_seen},
+                minutes_ago       => int($min),
+                status            => $status,
+                total             => int($row->{total}   || 0),
+                errors            => int($row->{errors}  || 0),
+                warns             => int($row->{warns}   || 0),
+            };
+        }
+    };
+    return \@results;
 }
 
 1;

@@ -10,6 +10,16 @@ use File::Slurp;
 
 extends 'Catalyst::Model';
 
+# First DNS label → Site.name (addon / themed app hosts: brew.any.domain → Brew)
+our %SUBDOMAIN_SITE_PREFIX = (
+    brew => 'Brew',
+);
+
+# Negative cache: domains confirmed not in SiteDomain table.
+# Expires entries after 5 minutes to allow DB updates to take effect.
+my %_domain_miss_cache;   # domain => epoch_time_of_miss
+my $_domain_miss_ttl = 300; # seconds
+
 # Attributes
 has 'logging' => (
     is => 'ro',
@@ -157,10 +167,25 @@ sub get_site_domain {
 
     return unless defined $domain;
 
+    # Dev workstation: LAN + ZeroTier IPs map to workstation.local (same sitedomain row).
+    if ($domain =~ /^(?:192\.168\.1\.199|172\.30\.131\.126)$/) {
+        my $alias = $self->schema->resultset('SiteDomain')->find({ domain => 'workstation.local' });
+        return $alias if $alias;
+    }
+
     # Short-circuit for loopback/internal addresses — these are never in the SiteDomain
     # table and hitting the DB for every Docker health check causes 15s timeout errors.
     if ($domain =~ /^(localhost|127\.\d+\.\d+\.\d+|::1)(?::\d+)?$/) {
         return;
+    }
+
+    # Negative cache: skip DB lookup for domains we already know are not in the table.
+    my $now = time();
+    if (exists $_domain_miss_cache{$domain}) {
+        if ($now - $_domain_miss_cache{$domain} < $_domain_miss_ttl) {
+            return;  # cached miss — avoid repeated slow DB queries for unknown domains
+        }
+        delete $_domain_miss_cache{$domain};  # expired, retry
     }
 
     $self->logging->log_with_details(
@@ -235,7 +260,12 @@ sub get_site_domain {
 
         return $site_domain if $site_domain;
 
-        # If we get here, the domain wasn't found
+        # brew.example.com → Brew site (legacy forager app; avoids domain-not-found spam)
+        $site_domain = $self->_site_domain_from_subdomain_prefix($c, $domain);
+        return $site_domain if $site_domain;
+
+        # If we get here, the domain wasn't found — cache the miss
+        $_domain_miss_cache{$domain} = time();
         $self->logging->log_with_details(
             $c, 'warn', __FILE__, __LINE__, 'get_site_domain',
             "Domain not found: $domain"
@@ -250,6 +280,32 @@ sub get_site_domain {
         );
         return;
     };
+}
+
+sub _site_domain_from_subdomain_prefix {
+    my ($self, $c, $domain) = @_;
+    return unless defined $domain && $domain ne '';
+
+    my $host = lc($domain);
+    $host =~ s/^www\.//;
+    my ($prefix) = $host =~ /^([a-z0-9][a-z0-9-]*)\.(.+)$/;
+    return unless defined $prefix;
+
+    my $site_name = $SUBDOMAIN_SITE_PREFIX{$prefix};
+    return unless $site_name;
+
+    my $site = $self->get_site_details_by_name($c, $site_name);
+    return unless $site;
+
+    $self->logging->log_with_details(
+        $c, 'info', __FILE__, __LINE__, '_site_domain_from_subdomain_prefix',
+        "Mapped host $domain → site $site_name (prefix $prefix)"
+    );
+
+    return $self->schema->resultset('SiteDomain')->new_result({
+        site_id => $site->id,
+        domain  => $domain,
+    });
 }
 
 sub add_site {
