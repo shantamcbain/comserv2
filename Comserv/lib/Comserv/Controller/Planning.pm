@@ -521,7 +521,7 @@ sub daily :Path('/planning/daily') :Args {
             my $priority         = ($h{priority} || 5);
             my $block_bonus      = $h{is_blocking} ? -0.4 : 0;
             my $cross_block_bonus = 0;
-            if ($h{project_id} && $cross_blocker_projects{$h{project_id}}) {
+            if ($h{project_id} && $cross_blocker_projects{$h{project_id}} && $h{is_blocking}) {
                 $cross_block_bonus    = -1000;
                 $h{is_cross_blocker}  = 1;
                 $h{blocking_count}    = scalar @{ $cross_blocker_projects{$h{project_id}} };
@@ -726,12 +726,12 @@ sub daily :Path('/planning/daily') :Args {
 
         my %proj_name_cache;
         for my $dep (@dep_rows) {
-            my $open_count = eval {
-                $tdrs->search({
-                    project_id => $dep->depends_on_id,
-                    status     => { -not_in => \@done_statuses_dep },
-                })->count
-            } // 1;
+            my %open_cond = (
+                project_id => $dep->depends_on_id,
+                status     => { -not_in => \@done_statuses_dep },
+            );
+            $open_cond{is_blocking} = 1 if ($dep->created_by // '') eq 'auto-detect';
+            my $open_count = eval { $tdrs->search(\%open_cond)->count } // 1;
 
             if (defined $open_count && $open_count == 0) {
                 eval { $dep->update({ status => 'resolved', resolved_at => \'NOW()' }) };
