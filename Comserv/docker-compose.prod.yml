@@ -11,6 +11,7 @@ services:
       CATALYST_DEBUG: 0
       WEB_PORT: 3000
       TZ: UTC
+      COMSERV_NO_HEALTH_LOG: 1
       WORKSHOP_RESOURCES_PATH: /data/nfs
       COMSERV_SESSION_DIR: /tmp/comserv/session
       COMSERV_SESSION_COOKIE: comserv_session

@@ -912,12 +912,18 @@ sub get_active_servers_from_db {
                 SUM(CASE WHEN level = 'WARN' THEN 1 ELSE 0 END) AS warns
              FROM system_log
              WHERE timestamp >= DATE_SUB(NOW(), INTERVAL ? HOUR)
+                OR timestamp >= DATE_SUB(UTC_TIMESTAMP(), INTERVAL ? HOUR)
              GROUP BY COALESCE(system_identifier, '(unknown)')
              ORDER BY last_seen DESC"
         );
-        $sth->execute($hours);
+        $sth->execute($hours, $hours);
         while (my $row = $sth->fetchrow_hashref) {
             my $min = $row->{minutes_ago} // 9999;
+            my $tz_offset = 0;
+            if ($min < 0) {
+                $tz_offset = -int($min);
+                $min = 0;
+            }
             my $status = ($min <= 5)   ? 'active'
                        : ($min <= 30)  ? 'recent'
                        : ($min <= 120) ? 'idle'
@@ -926,6 +932,7 @@ sub get_active_servers_from_db {
                 system_identifier => $row->{sys},
                 last_seen         => $row->{last_seen},
                 minutes_ago       => int($min),
+                tz_offset         => $tz_offset,
                 status            => $status,
                 total             => int($row->{total}   || 0),
                 errors            => int($row->{errors}  || 0),
