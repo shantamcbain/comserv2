@@ -45,7 +45,7 @@ sub get_theme_definitions {
         return $defs->{themes} ? $defs->{themes} : $defs;
     }
     catch {
-        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'get_theme_definitions', "Error loading theme definitions: $_");
+        $self->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_theme_definitions', "Error loading theme definitions: $_");
         return {};
     };
 }
@@ -98,7 +98,7 @@ sub get_site_theme {
         $theme_config = decode_json($json);
     }
     catch {
-        $self->log_with_details($c, 'error', __FILE__, __LINE__, 'get_site_theme', "Error loading theme config: $_");
+        $self->log_with_details($c, 'warn', __FILE__, __LINE__, 'get_site_theme', "Error loading theme config: $_");
         return 'default';
     };
     
