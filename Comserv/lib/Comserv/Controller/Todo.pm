@@ -2761,6 +2761,21 @@ sub _estimate_mins_heuristic {
     return 30;
 }
 
+sub _sched_work_end {
+    my ($start_min, $est_mins, $blocked_ref) = @_;
+    my @sorted    = sort { $a->[0] <=> $b->[0] } @$blocked_ref;
+    my $cursor    = $start_min;
+    my $remaining = $est_mins;
+    for my $b (@sorted) {
+        my ($bs, $be) = @$b;
+        next if $be  <= $cursor;
+        last if $bs  >= $cursor + $remaining;
+        $remaining -= ($bs - $cursor) if $bs > $cursor;
+        $cursor = $be;
+    }
+    return $cursor + $remaining;
+}
+
 sub _do_reschedule {
     my ($self, $c) = @_;
 
@@ -2888,9 +2903,15 @@ sub _do_reschedule {
             }
         }
 
-        # Sort: blocking > project sort_order > priority > due_date
+        # Deduplicate by record_id (OR queries can return same row twice)
+        { my %seen; @rows = grep { !$seen{$_->record_id}++ } @rows; }
+
+        # Sort order: error-fixing first, then blocking, then project priority,
+        # then user-assigned priority, then due date.
         @rows = sort {
-            ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
+            (($b->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
+                <=> (($a->subject // '') =~ /^\[Error\]|Morning Audit/i ? 1 : 0)
+            || ($b->is_blocking || 0) <=> ($a->is_blocking || 0)
             || ($proj_sort{ $a->project_id || 0 } // 9999) <=> ($proj_sort{ $b->project_id || 0 } // 9999)
             || (($a->priority || 9) <=> ($b->priority || 9))
             || (($a->due_date || '9999-12-31') cmp ($b->due_date || '9999-12-31'))
@@ -2965,7 +2986,7 @@ sub _do_reschedule {
             my $cur_slot_min = $init_slot_min;
 
             for my $todo (@{ $todos_by_site{$site} }) {
-                # Estimate duration in minutes: prefer log avg > stored > heuristic, min 5
+                # Duration: prefer log avg > stored > heuristic, min 5 min
                 my $stored_mins    = $todo->estimated_man_hours // 0;
                 my $heuristic_mins = exists $log_duration_mins{ $todo->record_id }
                     ? int($log_duration_mins{ $todo->record_id } + 0.5)
@@ -2973,53 +2994,58 @@ sub _do_reschedule {
                 my $est_mins = ($stored_mins > $heuristic_mins) ? $stored_mins : $heuristic_mins;
                 $est_mins = 5 if $est_mins < 5;
 
-                # Roll to next work day when current day is full
-                if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
+                # Roll to next work day if cursor is at or past end of work day
+                if ($cur_slot_min >= $WORK_DAY_MINS) {
                     $cur_dt->add(days => 1);
                     $cur_slot_min = 0;
                 }
 
                 my $new_start = $cur_dt->ymd;
+                my $blocked   = $get_blocked->($new_start);
 
-                # Advance past fixed/recurring blocked slots for this day
-                {
-                    my $blocked = $get_blocked->($new_start);
-                    my $changed = 1;
-                    while ($changed) {
-                        $changed = 0;
-                        for my $b (@$blocked) {
-                            my ($bs, $be) = @$b;
-                            my $slot_abs = $WORK_START_MIN + $cur_slot_min;
-                            if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
-                                $cur_slot_min = $be - $WORK_START_MIN;
-                                $changed = 1;
-                            }
-                        }
-                    }
-                    if ($cur_slot_min + $est_mins > $WORK_DAY_MINS) {
-                        $cur_dt->add(days => 1);
-                        $cur_slot_min = 0;
-                        $new_start    = $cur_dt->ymd;
-                        my $blocked2 = $get_blocked->($new_start);
-                        my $c2 = 1;
-                        while ($c2) {
-                            $c2 = 0;
-                            for my $b (@$blocked2) {
-                                my ($bs, $be) = @$b;
-                                my $slot_abs = $WORK_START_MIN + $cur_slot_min;
-                                if ($slot_abs < $be && $slot_abs + $est_mins > $bs) {
-                                    $cur_slot_min = $be - $WORK_START_MIN;
-                                    $c2 = 1;
-                                }
-                            }
+                # If cursor lands inside a fixed event (e.g. midway through lunch),
+                # advance to after that event. Repeat in case of back-to-back events.
+                my $slot_abs = $WORK_START_MIN + $cur_slot_min;
+                my $advanced = 1;
+                while ($advanced) {
+                    $advanced = 0;
+                    for my $b (sort { $a->[0] <=> $b->[0] } @$blocked) {
+                        my ($bs, $be) = @$b;
+                        if ($slot_abs >= $bs && $slot_abs < $be) {
+                            $slot_abs = $be;
+                            $advanced = 1;
                         }
                     }
                 }
 
-                my $slot_abs_min = $WORK_START_MIN + $cur_slot_min;
+                # If advancing pushed us past end of day, roll to next day
+                if ($slot_abs >= $WORK_END_MIN) {
+                    $cur_dt->add(days => 1);
+                    $cur_slot_min = 0;
+                    $new_start = $cur_dt->ymd;
+                    $blocked   = $get_blocked->($new_start);
+                    $slot_abs  = $WORK_START_MIN;
+                } else {
+                    $cur_slot_min = $slot_abs - $WORK_START_MIN;
+                }
+
                 my $new_time_str = sprintf('%02d:%02d:00',
-                                       int($slot_abs_min / 60), $slot_abs_min % 60);
-                $cur_slot_min += $est_mins;
+                    int($slot_abs / 60), $slot_abs % 60);
+
+                # scheduled_end: work through any fixed events that fall within
+                # the work period (e.g. todo wrapping lunch gets +60 min gap).
+                my $end_abs_min  = _sched_work_end($slot_abs, $est_mins, $blocked);
+                my $end_capped   = $end_abs_min > $WORK_END_MIN ? $WORK_END_MIN : $end_abs_min;
+                my $end_time_str = sprintf('%02d:%02d:00',
+                    int($end_capped / 60), $end_capped % 60);
+
+                # Next todo starts 1 min after this one's scheduled_end
+                if ($end_abs_min >= $WORK_END_MIN) {
+                    $cur_dt->add(days => 1);
+                    $cur_slot_min = 0;
+                } else {
+                    $cur_slot_min = $end_abs_min - $WORK_START_MIN + 1;
+                }
 
                 # Priority adjustments based on staleness and due date
                 my $new_priority = $todo->priority || 5;
@@ -3041,11 +3067,6 @@ sub _do_reschedule {
                 }
                 $new_priority = ($new_priority - 1 >= 1) ? $new_priority - 1 : 1
                     if $todo->is_blocking;
-
-                my $end_abs_min = $slot_abs_min + $est_mins;
-                my ($end_h, $end_m) = (int($end_abs_min / 60), $end_abs_min % 60);
-                ($end_h, $end_m) = (23, 59) if $end_h >= 24;
-                my $end_time_str = sprintf('%02d:%02d:00', $end_h, $end_m);
 
                 my $est_mins_int = int($est_mins + 0.5) || 5;
 
