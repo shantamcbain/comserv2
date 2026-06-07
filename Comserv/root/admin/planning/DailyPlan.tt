@@ -1906,6 +1906,39 @@ function pollDeploymentProgress() {
     }, 2000);
 }
 
+function _todoCardSetActive(btn, recordId) {
+    btn.textContent = '⏸ Active';
+    btn.style.background = '#fd7e14';
+    btn.style.color = '#fff';
+    btn.style.border = '1px solid #fd7e14';
+    btn.style.borderColor = '#fd7e14';
+    btn.title = 'Session active — click to close (todo stays in-progress; another agent can Start it)';
+    btn.disabled = false;
+    btn.onclick = function() { closeLogTodoCard(btn, recordId); };
+    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+    if (card) {
+        card.style.background = 'color-mix(in srgb,#fd7e14 8%,var(--bg-color,#fff))';
+        var doneBtn = card.querySelector('button[data-done-btn]');
+        if (doneBtn) doneBtn.setAttribute('data-is-active', '1');
+    }
+}
+
+function _todoCardSetStart(btn, recordId) {
+    btn.textContent = '▶ Start';
+    btn.style.border = '1px solid #0d6efd';
+    btn.style.background = 'transparent';
+    btn.style.color = '#0d6efd';
+    btn.title = 'Start working — creates a log entry, marks todo active';
+    btn.disabled = false;
+    btn.onclick = function() { startWorkTodoCard(btn, recordId); };
+    var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
+    if (card) {
+        card.style.background = '';
+        var doneBtn = card.querySelector('button[data-done-btn]');
+        if (doneBtn) doneBtn.setAttribute('data-is-active', '0');
+    }
+}
+
 function startWorkTodoCard(btn, recordId) {
     btn.disabled = true;
     btn.textContent = '…';
@@ -1916,21 +1949,7 @@ function startWorkTodoCard(btn, recordId) {
         body: JSON.stringify({ record_id: recordId })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-            btn.textContent = '▶ Active';
-            btn.style.background = '#fd7e14';
-            btn.style.color = '#fff';
-            btn.style.borderColor = '#fd7e14';
-            btn.disabled = false;
-            btn.title = 'Log started — click Done when finished';
-            var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]');
-            if (card) card.style.background = 'color-mix(in srgb,#0d6efd 8%,var(--bg-color,#fff))';
-        } else if (d.error && d.error.indexOf('already open') !== -1) {
-            btn.textContent = '▶ Active';
-            btn.style.background = '#fd7e14';
-            btn.style.color = '#fff';
-            btn.style.borderColor = '#fd7e14';
-            btn.disabled = false;
-            btn.title = 'Log already open — click Done when finished';
+            _todoCardSetActive(btn, recordId);
         } else {
             btn.disabled = false;
             btn.textContent = '▶ Start';
@@ -1944,7 +1963,7 @@ function startWorkTodoCard(btn, recordId) {
 }
 
 function closeLogTodoCard(btn, recordId) {
-    var notes = prompt('Close session — brief notes on what was done (optional):\n(todo stays in-progress; click Start again for next session)');
+    var notes = prompt('Close session — notes on progress (optional):\nTodo stays in-progress; click Start to begin a new session.');
     if (notes === null) return;
     notes = notes || '';
     btn.disabled = true;
@@ -1956,13 +1975,7 @@ function closeLogTodoCard(btn, recordId) {
         body: JSON.stringify({ record_id: recordId, notes: notes })
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
-            btn.textContent = '▶ Start';
-            btn.style.border = '1px solid #0d6efd';
-            btn.style.background = 'transparent';
-            btn.style.color = '#0d6efd';
-            btn.title = 'Start working — creates a log entry, marks todo active on all servers';
-            btn.onclick = function() { startWorkTodoCard(btn, recordId); };
-            btn.disabled = false;
+            _todoCardSetStart(btn, recordId);
         } else {
             btn.disabled = false;
             btn.textContent = '⏸ Active';
@@ -1975,13 +1988,14 @@ function closeLogTodoCard(btn, recordId) {
     });
 }
 
-function doneWithLogTodoCard(btn, recordId, isActive) {
-    var notes = prompt('Mark todo DONE — what was done / resolution notes (optional):');
+function doneWithLogTodoCard(btn, recordId) {
+    var isActive = btn.getAttribute('data-is-active') === '1';
+    var notes = prompt('Mark todo DONE — resolution / notes (optional):');
     if (notes === null) return;
     notes = notes || '';
     var payload = { record_id: recordId, notes: notes };
     if (!isActive) {
-        var durStr = prompt('No active log session.\nHow many minutes did this take? (leave blank to skip log)');
+        var durStr = prompt('No active log session.\nHow many minutes did this take? (leave blank for default)');
         if (durStr === null) return;
         var durMins = parseInt(durStr, 10);
         if (!isNaN(durMins) && durMins > 0) { payload.duration_mins = durMins; }
@@ -1996,7 +2010,11 @@ function doneWithLogTodoCard(btn, recordId, isActive) {
     }).then(function(r) { return r.json(); }).then(function(d) {
         if (d.ok) {
             var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
-            if (card) { card.style.opacity = '0.4'; card.style.textDecoration = 'line-through'; }
+            if (card) {
+                card.style.opacity = '0.4';
+                card.style.textDecoration = 'line-through';
+                card.querySelectorAll('button').forEach(function(b) { b.disabled = true; });
+            }
             btn.textContent = '✓ Done';
             btn.disabled = true;
         } else {
