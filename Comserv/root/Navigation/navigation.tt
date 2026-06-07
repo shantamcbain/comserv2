@@ -58,6 +58,9 @@
 
         <!-- Beekeeping Menu (beekeeping/apiary module or BMaster site) -->
         [% INCLUDE 'Navigation/TopDropListBeekeeping.tt' %]
+
+        <!-- Brew / brewhouse addon (brew.* hostnames or brew module) -->
+        [% INCLUDE 'Navigation/TopDropListBrew.tt' %]
         
         <!-- Manager Menu (role-specific) -->
         [% IF user_roles.grep('manager').size || cached_nav.manager_menu.defined %]

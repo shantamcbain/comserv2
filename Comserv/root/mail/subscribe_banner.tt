@@ -5,9 +5,8 @@
   Dismissible via localStorage once per browser per site.
   Guests see "Join Our Mailing List", members see "Manage My Subscriptions".
 %]
-[% SET _cur_action = c.action.name %]
 [% SET _cur_path   = c.req.path %]
-[% IF _cur_action.match('^index$') OR _cur_path.match('^/?$') %]
+[% IF _cur_path == '' OR _cur_path == '/' %]
 <div id="ml-subscribe-banner"
      style="display:none;background:linear-gradient(90deg,var(--primary-color,#1565c0),#1976d2);color:#fff;
             padding:10px 20px;text-align:center;font-size:0.95em;position:relative;z-index:100;">

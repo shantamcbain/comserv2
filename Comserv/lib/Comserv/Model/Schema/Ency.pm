@@ -24,6 +24,7 @@ __PACKAGE__->register_class('User', 'Comserv::Model::Schema::Ency::Result::User'
 # Register AI conversation system classes
 __PACKAGE__->register_class('AiConversation', 'Comserv::Model::Schema::Ency::Result::AiConversation');
 __PACKAGE__->register_class('AiMessage', 'Comserv::Model::Schema::Ency::Result::AiMessage');
+__PACKAGE__->register_class('AiUsageLog', 'Comserv::Model::Schema::Ency::Result::AiUsageLog');
 __PACKAGE__->register_class('ProjectDocumentationMapping', 'Comserv::Model::Schema::Ency::Result::ProjectDocumentationMapping');
 __PACKAGE__->register_class('ApiToken', 'Comserv::Model::Schema::Ency::Result::ApiToken');
 __PACKAGE__->register_class('UserApiKeys', 'Comserv::Model::Schema::Ency::Result::UserApiKeys');
@@ -73,6 +74,16 @@ __PACKAGE__->register_class('HiveFrame',            'Comserv::Model::Schema::Enc
 __PACKAGE__->register_class('HoneyHarvest',         'Comserv::Model::Schema::Ency::Result::Beekeeping::HoneyHarvest');
 __PACKAGE__->register_class('Treatment',            'Comserv::Model::Schema::Ency::Result::Ency::Treatment');
 
+# Unified recipes (herbal / food / brew) — create tables from Result via Admin schema compare
+__PACKAGE__->register_class('Ency::Recipe',         'Comserv::Model::Schema::Ency::Result::Ency::Recipe');
+__PACKAGE__->register_class('Ency::RecipeLine',     'Comserv::Model::Schema::Ency::Result::Ency::RecipeLine');
+__PACKAGE__->register_class('Recipe',               'Comserv::Model::Schema::Ency::Result::Ency::Recipe');
+__PACKAGE__->register_class('RecipeLine',           'Comserv::Model::Schema::Ency::Result::Ency::RecipeLine');
+__PACKAGE__->register_class('Brew::RecipeProfile',  'Comserv::Model::Schema::Ency::Result::Brew::RecipeProfile');
+__PACKAGE__->register_class('Brew::Batch',          'Comserv::Model::Schema::Ency::Result::Brew::Batch');
+__PACKAGE__->register_class('BrewRecipeProfile',    'Comserv::Model::Schema::Ency::Result::Brew::RecipeProfile');
+__PACKAGE__->register_class('BrewBatch',            'Comserv::Model::Schema::Ency::Result::Brew::Batch');
+
 # Register Chart of Accounts and General Ledger classes
 # (modeled on SQL-Ledger / LedgerSMB account + journal_entry + journal_line)
 __PACKAGE__->register_class('CoaAccountHeading', 'Comserv::Model::Schema::Ency::Result::Accounting::CoaAccountHeading');
@@ -106,6 +117,9 @@ __PACKAGE__->register_class('HostingAccount', 'Comserv::Model::Schema::Ency::Res
 
 # Register Session store class
 __PACKAGE__->register_class('Session', 'Comserv::Model::Schema::Ency::Result::Session');
+
+# Register SystemModule metadata class
+__PACKAGE__->register_class('SystemModule', 'Comserv::Model::Schema::Ency::Result::SystemModule');
 
 __PACKAGE__->meta->make_immutable(inline_constructor => 0);
 1;

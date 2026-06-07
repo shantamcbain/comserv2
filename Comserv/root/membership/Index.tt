@@ -29,11 +29,103 @@
     [% END %]
   </div>
 
+  <nav class="membership-page-nav" aria-label="On this page">
+    <span class="membership-page-nav-label">On this page</span>
+    [% IF is_admin AND all_members.size %]
+    <a href="#membership-members">Members</a>
+    [% END %]
+    [% IF user_membership %]
+    <a href="#membership-my-plan">Your plan</a>
+    [% END %]
+    [% IF user_site_memberships.size %]
+    <a href="#membership-my-sites">My sites</a>
+    [% END %]
+    <a href="#membership-plans">[% site_name | html %] plans</a>
+    [% IF is_admin AND modules.size %]
+    <a href="#membership-addons">Add-ons</a>
+    [% END %]
+    [% IF is_admin AND !site_is_csc %]
+    <a href="#membership-csc-registration">CSC registration</a>
+    [% END %]
+    [% IF !site_is_csc AND c.session.username AND hosting_account AND hosting_account.status == 'active' %]
+    <a href="#membership-csc-account">My CSC account</a>
+    [% END %]
+    [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
+    <a href="#membership-csc-hosting-plans">CSC hosting plans</a>
+    [% END %]
+    <a href="#membership-payment">Payment</a>
+    [% IF c.session.username %]
+    <a href="#membership-account">Account</a>
+    [% END %]
+    [% IF is_admin %]
+    <span class="membership-page-nav-divider">|</span>
+    <a href="[% c.uri_for('/membership/admin') %]" class="membership-page-nav-admin">Admin</a>
+    [% IF is_admin AND modules.size %]
+    <a href="[% c.uri_for('/membership/addons') %]" class="membership-page-nav-admin">Add-ons (full page)</a>
+    [% END %]
+    [% END %]
+  </nav>
+
+  <style>
+  .membership-page-nav {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: 10px 14px;
+    margin: 0 0 1.25rem;
+    background: var(--bg-secondary, #f0f4f8);
+    border: 1px solid var(--border-color, #ddd);
+    border-radius: 6px;
+    font-size: 0.9em;
+    position: sticky;
+    top: 52px;
+    z-index: 100;
+  }
+  .membership-page-nav-label {
+    font-weight: bold;
+    color: var(--text-muted-color, #666);
+    margin-right: 4px;
+    white-space: nowrap;
+  }
+  .membership-page-nav a {
+    color: var(--primary-color, #1565c0);
+    text-decoration: none;
+    padding: 4px 10px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+  .membership-page-nav a:hover,
+  .membership-page-nav a:focus {
+    background: var(--bg-color, #fff);
+    text-decoration: underline;
+  }
+  .membership-page-nav a.membership-page-nav-admin {
+    color: var(--text-color, #333);
+    font-size: 0.88em;
+  }
+  .membership-page-nav-divider {
+    color: var(--border-color, #ccc);
+    user-select: none;
+  }
+  .content-section:target {
+    scroll-margin-top: 7rem;
+  }
+  @media (max-width: 768px) {
+    .membership-page-nav {
+      top: 0;
+      overflow-x: auto;
+      flex-wrap: nowrap;
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  </style>
+
   <div class="content-container">
     <div class="content-primary">
 
       [% IF is_admin AND all_members.size %]
-      <div class="content-section">
+      <div class="content-section" id="membership-members">
         <h2>Current Members — [% site_name | html %]</h2>
         <div class="table-container">
           <table class="data-table">
@@ -61,13 +153,13 @@
         </div>
       </div>
       [% ELSIF is_admin %]
-      <div class="content-section">
+      <div class="content-section" id="membership-members">
         <p class="empty-state">No members yet for [% site_name | html %].</p>
       </div>
       [% END %]
 
       [% IF user_membership %]
-      <div class="content-section">
+      <div class="content-section" id="membership-my-plan">
         <h2>Your Current Plan</h2>
         <div class="table-container">
           <table class="data-table">
@@ -98,7 +190,7 @@
       [% END %]
 
       [% IF user_site_memberships.size %]
-      <div class="content-section">
+      <div class="content-section" id="membership-my-sites">
         <h2>My Sites &amp; Memberships</h2>
         <p class="text-muted">A list of all sites you belong to, your roles, your personal memberships, and each site's hosting status with CSC.</p>
         <div class="table-container">
@@ -133,13 +225,18 @@
                   [% IF s.hosting_plan %]
                     <span style="font-weight:bold;">[% s.hosting_plan | html %]</span><br>
                     <small>Status: <strong>[% s.hosting_status | html %]</strong></small>
-                    [% IF s.hosting_cost %]<small> &bull; CAD [% s.hosting_cost %]/mo</small>[% END %]
+                    [% IF s.hosting_cost %]<small> &bull; CAD [% s.hosting_cost %]/mo</small>[% END %]<br>
+                    [% IF s.is_admin %]
+                      <a href="[% c.uri_for('/membership/hosting_signup', { site_name => s.site_name }) %]" class="btn btn-sm" style="background:#e65c00;color:white;font-size:0.8em;padding:2px 6px;margin-top:2px;font-weight:bold;text-decoration:none;display:inline-block;border-radius:3px;">
+                        &#9998; Edit
+                      </a>
+                    [% END %]
                   [% ELSIF s.is_admin %]
                     [% IF s.site_name == 'CSC' %]
                       <span class="text-muted">Parent Platform</span>
                     [% ELSE %]
                       <span class="text-warning" style="font-weight:bold;">Not Registered</span><br>
-                      <a href="/membership/hosting_signup?plan=hosting-subdomain" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;">
+                      <a href="[% c.uri_for('/membership/hosting_signup', { plan => 'hosting-subdomain', site_name => s.site_name }) %]" class="btn btn-sm btn-primary" style="font-size:0.8em;padding:2px 6px;margin-top:2px;text-decoration:none;display:inline-block;border-radius:3px;">
                         Register with CSC &rarr;
                       </a>
                     [% END %]
@@ -157,7 +254,7 @@
 
       [%# ── SiteName Plans ──────────────────────────────────────────────────── %]
       [% IF plans.size %]
-      <div class="content-section">
+      <div class="content-section" id="membership-plans">
         <h2>[% site_name | html %] Plans</h2>
         <p class="text-muted">Choose the plan that fits your needs. Click <strong>Learn More</strong> to see full details and sign up.</p>
         <div class="plan-cards-grid">
@@ -200,7 +297,7 @@
         </div>
       </div>
       [% ELSE %]
-      <div class="content-section">
+      <div class="content-section" id="membership-plans">
         <p class="empty-state">No membership plans have been configured for this site yet.</p>
         [% IF is_admin %]
         <p><a href="[% c.uri_for('/membership/admin') %]" class="btn btn-primary">Configure Plans</a></p>
@@ -208,9 +305,16 @@
       </div>
       [% END %]
 
+      [%# ── Embedded Site Add-ons & Modules ────────────────────────────────── %]
+      [% IF is_admin AND modules.size %]
+      <div class="content-section" id="membership-addons" style="margin-top: 2rem;">
+        [% INCLUDE 'membership/Addons.tt' %]
+      </div>
+      [% END %]
+
       [%# ── CSC Site Registration (admin only, non-CSC SiteNames) ──────────── %]
       [% IF is_admin AND !site_is_csc %]
-      <div class="content-section">
+      <div class="content-section" id="membership-csc-registration">
         <h2>&#127760; [% site_name | html %] — CSC Hosting Registration</h2>
 
         [% IF hosting_account AND hosting_account.status == 'active' AND !hosting_account.alert_dismissed %]
@@ -267,7 +371,7 @@
 
       [%# CSC account management link for logged-in members on non-CSC sites %]
       [% IF !site_is_csc AND c.session.username AND hosting_account AND hosting_account.status == 'active' %]
-      <div class="content-section">
+      <div class="content-section" id="membership-csc-account">
         <h3>&#127760; My CSC Account</h3>
         <p class="text-muted">View your CSC hosting subscription, point balance, and renewal options.</p>
         <div class="form-actions">
@@ -279,7 +383,7 @@
 
       [%# CSC hosting plan cards — visible to all users when site is an active hosting partner %]
       [% IF !site_is_csc AND hosting_account AND hosting_account.status == 'active' AND csc_hosting_plans.size %]
-      <div class="content-section">
+      <div class="content-section" id="membership-csc-hosting-plans">
         <h2>&#127760; CSC Hosting Plans</h2>
         <p class="text-muted">
           [% site_name | html %] is a CSC hosting partner. Members can add managed cloud hosting with domain support.
@@ -310,7 +414,7 @@
       </div>
       [% END %]
 
-      <div class="content-section">
+      <div class="content-section" id="membership-payment">
         <h2>Payment Options</h2>
         <div class="form-row">
           <div class="form-field">
@@ -331,7 +435,7 @@
       </div>
 
       [% IF c.session.username %]
-      <div class="content-section">
+      <div class="content-section" id="membership-account">
         <div class="form-actions">
           <a href="[% c.uri_for('/membership/account') %]" class="btn btn-primary">My Account</a>
         </div>

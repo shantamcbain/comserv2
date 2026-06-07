@@ -367,6 +367,12 @@ sub provision :Path('provision') :Args(0) {
             }
         }
 
+        # Brew addon: the accounting + BOMs + ingredient catalog with sample prices is the reusable template.
+        # Recipes (real data including Gambrinus etc.) are optional — new users browse and import what they want.
+        if ($addons =~ /\bbrew\b/) {
+            push @steps, "Brew addon enabled. After login as admin on the new site, visit /brew/ingredients (or run script/seed_brew_catalog.pl --sitename $site_name) to load the starter ingredient catalog + prices + example BOM. This is the 'accounting part which includes boms' applied as a template.";
+        }
+
         # 9. Create admin todo noting recompile needed
         $self->_create_admin_todo($c, $site_name, \@steps);
 
@@ -396,27 +402,42 @@ sub _create_cloudflare_dns {
     my ($self, $c, $domain, $domain_type, $server_ip, $steps) = @_;
     $server_ip ||= $ENV{SERVER_PUBLIC_IP} || '';
     unless ($server_ip) {
-        push @$steps, "Cloudflare DNS: no SERVER_PUBLIC_IP configured — skipping DNS creation. Set it in .env to automate.";
+        push @$steps, "Cloudflare DNS: no server IP configured — skipping DNS creation.";
         return;
     }
     try {
         my $dbh = eval { $c->model('DBEncy')->storage->dbh };
         my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
-        my ($parent_zone, $record_name);
-        if ($domain_type eq 'subdomain') {
-            ($record_name, $parent_zone) = ($domain =~ /^([^.]+)\.(.+)$/);
-            $parent_zone ||= $domain;
-            $record_name ||= '@';
+
+        # Extract zone root (TLD+1) always — e.g. 'beemaster.ca' from 'icehorse.beemaster.ca'
+        my ($parent_zone) = ($domain =~ /([^.]+\.[^.]+)$/);
+        $parent_zone ||= $domain;
+
+        my $record_name;
+        if ($domain_type eq 'subdomain' && $domain ne $parent_zone) {
+            # icehorse.beemaster.ca → record_name=icehorse, zone=beemaster.ca
+            ($record_name = $domain) =~ s/\.\Q$parent_zone\E$//;
+        } elsif ($domain_type eq 'subdomain' && $domain eq $parent_zone) {
+            push @$steps, "Cloudflare DNS: stored domain '$domain' is the zone root — cannot create subdomain record. "
+                        . "Update the domain field to the full subdomain (e.g. sitename.$domain) and retry.";
+            return;
         } else {
-            $parent_zone = $domain;
-            $record_name = '@';
+            $record_name = $parent_zone;
         }
+
         my $zones_resp = $cf->_api_request('GET', "/zones?name=" . URI::Escape::uri_escape($parent_zone) . "&per_page=5");
         my @zones = ref $zones_resp eq 'HASH'  ? @{ $zones_resp->{result} || [] }
                   : ref $zones_resp eq 'ARRAY' ? @$zones_resp
                   : ();
-        my $zone_id = @zones ? $zones[0]{id} : '';
-        die "Zone '$parent_zone' not found in Cloudflare" unless $zone_id;
+
+        unless (@zones) {
+            push @$steps, "Cloudflare DNS: zone '$parent_zone' not found (API returned no results). "
+                        . "Verify your token has Zone:Read permission and '$parent_zone' is in your Cloudflare account. "
+                        . "Create the DNS A record manually.";
+            return;
+        }
+
+        my $zone_id = $zones[0]{id};
         $cf->_api_request('POST', "/zones/$zone_id/dns_records", {
             type    => 'A',
             name    => $record_name,
@@ -424,7 +445,7 @@ sub _create_cloudflare_dns {
             ttl     => 1,
             proxied => \1,
         });
-        push @$steps, "Cloudflare DNS: created A record '$record_name.$parent_zone' → $server_ip.";
+        push @$steps, "Cloudflare DNS: created A record '$record_name' in zone '$parent_zone' → $server_ip.";
     } catch {
         push @$steps, "Cloudflare DNS: skipped (error: $_). Create the DNS record manually.";
     };
@@ -593,6 +614,43 @@ sub cf_settings :Path('cf_settings') :Args(0) {
         cf_email  => $db_email,
         token_set => $token_set,
     );
+}
+
+sub test_api :Path('test_api') :Args(0) {
+    my ($self, $c) = @_;
+    my @lines;
+    my $dbh = eval { $c->model('DBEncy')->storage->dbh };
+    eval {
+        my $cf = Comserv::Util::CloudflareManager->new(dbh => $dbh);
+
+        my $verify = eval { $cf->_api_request('GET', '/user/tokens/verify') };
+        if ($@) {
+            push @lines, "Token verify FAILED: $@";
+        } else {
+            my $status = ref($verify) eq 'HASH' ? ($verify->{status} || 'active') : 'active';
+            push @lines, "Token verify: $status";
+        }
+
+        my $zones_resp = eval { $cf->_api_request('GET', '/zones?per_page=20') };
+        if ($@) {
+            push @lines, "Zone list FAILED: $@";
+        } else {
+            my @zones = ref $zones_resp eq 'HASH' ? @{ $zones_resp->{result} || [] }
+                      : ref $zones_resp eq 'ARRAY' ? @$zones_resp : ();
+            if (@zones) {
+                push @lines, scalar(@zones) . " zone(s) accessible:";
+                for my $z (@zones) {
+                    my $name = ref $z eq 'HASH' ? $z->{name} : "$z";
+                    push @lines, "  • $name";
+                }
+            } else {
+                push @lines, "Zone list returned 0 zones — token may need Zone:Read permission.";
+            }
+        }
+    };
+    push @lines, "Error: $@" if $@;
+    $c->flash->{info_msg} = join("\n", @lines);
+    $c->response->redirect($c->uri_for($self->action_for('cf_settings')));
 }
 
 __PACKAGE__->meta->make_immutable;

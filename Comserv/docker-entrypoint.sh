@@ -89,9 +89,10 @@ fi
 rm -f /var/run/supervisor.sock /var/run/supervisord.pid
 
 # Ensure log, session, and backup directories exist and are writable by comserv user
-mkdir -p ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chmod 755 ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
-chown -R comserv:comserv ${CATALYST_HOME}/root/log ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
+# NOTE: /opt/comserv/applogs is the persistent log dir (volume-mounted), separate from root/log/ (templates)
+mkdir -p /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
+chmod 755 /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups /var/log/supervisor
+chown -R comserv:comserv /opt/comserv/applogs ${CATALYST_HOME}/root/session ${CATALYST_HOME}/backups
 
 # Ensure comserv_server.psgi is accessible in both script/ and the root directory
 mkdir -p "${CATALYST_HOME}/script"
@@ -103,15 +104,16 @@ elif [ -f "${CATALYST_HOME}/comserv_server.psgi" ]; then
     chown comserv:comserv "${CATALYST_HOME}/script/comserv_server.psgi" 2>/dev/null || true
 fi
 
-# Symlink ${CATALYST_HOME}/logs to ${CATALYST_HOME}/root/log so logs write to persistent volume
+# Symlink ${CATALYST_HOME}/logs → /opt/comserv/applogs (persistent volume, NOT inside root/)
+# root/log/ is reserved for Template Toolkit templates only.
 if [ ! -L "${CATALYST_HOME}/logs" ]; then
     if [ -d "${CATALYST_HOME}/logs" ]; then
         echo "Moving existing logs to persistent volume directory..."
-        cp -a ${CATALYST_HOME}/logs/. "${CATALYST_HOME}/root/log/" 2>/dev/null || true
+        cp -a ${CATALYST_HOME}/logs/. /opt/comserv/applogs/ 2>/dev/null || true
         rm -rf "${CATALYST_HOME}/logs"
     fi
-    ln -s "${CATALYST_HOME}/root/log" "${CATALYST_HOME}/logs"
-    echo "✓ Symlinked ${CATALYST_HOME}/logs to ${CATALYST_HOME}/root/log"
+    ln -s /opt/comserv/applogs "${CATALYST_HOME}/logs"
+    echo "✓ Symlinked ${CATALYST_HOME}/logs to /opt/comserv/applogs"
 fi
 
 # Ensure Catalyst Session::Store::File directory exists and is writable by comserv user.
@@ -209,7 +211,7 @@ fi
 # Configure log rotation to prevent disk space issues
 echo "Configuring log rotation..."
 cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
-/opt/comserv/root/log/*.log {
+/opt/comserv/applogs/*.log {
     su comserv comserv
     daily
     dateext
@@ -226,7 +228,7 @@ cat > /etc/logrotate.d/catalyst <<'LOGROTATE_EOF'
         NFS_ARCHIVE=/data/nfs/logs/archive
         [ -d "/data/nfs" ] || NFS_ARCHIVE=/home/shanta/nfs/logs/archive
         [ -d "$NFS_ARCHIVE" ] || mkdir -p "$NFS_ARCHIVE" 2>/dev/null || true
-        find /opt/comserv/root/log -name "*.log-*.gz" -mmin -5 \
+        find /opt/comserv/applogs -name "*.log-*.gz" -mmin -5 \
             -exec cp -p {} "$NFS_ARCHIVE/" \; 2>/dev/null || true
     endscript
 }

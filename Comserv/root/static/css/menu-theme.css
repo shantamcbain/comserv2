@@ -11,6 +11,7 @@ nav {
 .horizontal-menu {
     display: flex;
     flex-direction: row;
+    flex-wrap: wrap;
     list-style-type: none;
     margin: 0;
     padding: 0;
@@ -27,9 +28,10 @@ nav {
     display: inline-block;
     color: var(--nav-text);
     text-align: center;
-    padding: 14px 16px;
+    padding: 10px 12px;
     text-decoration: none;
     white-space: nowrap;
+    font-size: clamp(0.75rem, 1.5vw, 0.95rem);
 }
 
 .dropdown-content {
@@ -45,7 +47,7 @@ nav {
 
 .dropdown-content a {
     color: var(--nav-link-color, var(--text-color, #000000));
-    padding: 12px 16px;
+    padding: 10px 16px;
     text-decoration: none;
     display: block;
     text-align: left;
@@ -59,6 +61,59 @@ nav {
 /* This is the critical rule for dropdown functionality */
 .horizontal-dropdown:hover .dropdown-content {
     display: block;
+}
+
+/* ── Responsive / Mobile ─────────────────────────────────────── */
+@media (max-width: 768px) {
+    /* Hide full menu by default; JS adds nav-open to show it */
+    .horizontal-menu {
+        display: none;
+        flex-direction: column;
+        flex-wrap: nowrap;
+        width: 100%;
+    }
+
+    .horizontal-menu.nav-open {
+        display: flex;
+    }
+
+    .horizontal-dropdown {
+        display: block;
+        width: 100%;
+        margin-right: 0;
+    }
+
+    .dropbtn {
+        display: block;
+        width: 100%;
+        text-align: left;
+        padding: 12px 16px;
+        font-size: 1rem;
+        box-sizing: border-box;
+    }
+
+    /* Dropdowns are static on mobile (no absolute positioning) */
+    .dropdown-content {
+        position: static;
+        box-shadow: none;
+        min-width: 100%;
+        background-color: var(--dropdown-bg, var(--secondary-color, #f9f9f9));
+        border-left: 3px solid var(--accent-color, #4a90d9);
+        display: none;
+    }
+
+    /* Hover should NOT open on mobile; only touch-open class does */
+    .horizontal-dropdown:hover .dropdown-content {
+        display: none;
+    }
+
+    .horizontal-dropdown.touch-open .dropdown-content {
+        display: block;
+    }
+
+    .dropdown-content a {
+        padding: 10px 24px;
+    }
 }
 
 /* Submenu Styles */
@@ -103,6 +158,24 @@ a.submenu-header {
 /* This is the critical rule for submenu functionality */
 .submenu-item:hover .submenu {
     display: block;
+}
+
+@media (max-width: 768px) {
+    .submenu {
+        position: static;
+        box-shadow: none;
+        min-width: 100%;
+        border-left: 3px solid var(--accent-color, #4a90d9);
+        margin-left: 12px;
+    }
+
+    .submenu-item:hover .submenu {
+        display: none;
+    }
+
+    .submenu-item.touch-open .submenu {
+        display: block;
+    }
 }
 
 /* Remove all theme-specific overrides - they're not needed with the new approach */

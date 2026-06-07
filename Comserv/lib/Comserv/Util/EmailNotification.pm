@@ -556,6 +556,60 @@ This is an automated notification.
     return $self->send_email($c, $email, $smtp_config);
 }
 
+sub send_admin_email_verified_notification {
+    my ($self, $c, $user) = @_;
+
+    $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'send_admin_email_verified_notification',
+        "Sending Step 2 completion notification for user: " . $user->username);
+
+    my $sitename    = $c->stash->{SiteName} || 'CSC';
+    my $smtp_config = $self->get_smtp_config($c, $sitename);
+
+    unless ($smtp_config->{smtp_host}) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'send_admin_email_verified_notification',
+            "No SMTP configuration — notification not sent");
+        return 0;
+    }
+
+    my $site        = $c->model('DBEncy')->resultset('Site')->search({ name => $sitename })->single;
+    my $admin_email = ($site && $site->mail_to_admin)
+        ? $site->mail_to_admin
+        : 'helpdesk@computersystemconsulting.ca';
+
+    my $timestamp   = scalar localtime;
+
+    my $body = qq{
+Email Verified (Step 2 of 3) — $sitename
+Time: $timestamp
+
+The user has successfully verified their email address and proceeded to profile completion:
+
+  Username  : } . $user->username . qq{
+  Email     : } . $user->email . qq{
+  User ID   : } . $user->id . qq{
+  Status    : } . ($user->status || 'pending_verification') . qq{
+
+The user is now filling out their profile to complete the setup.
+
+This is an automated notification.
+};
+
+    my $email = Email::MIME->create(
+        header_str => [
+            From    => $smtp_config->{smtp_from} || 'noreply@' . $smtp_config->{smtp_host},
+            To      => $admin_email,
+            Subject => "[$sitename] Email verified: " . $user->username,
+        ],
+        attributes => {
+            encoding => 'quoted-printable',
+            charset  => 'UTF-8',
+        },
+        body_str => $body,
+    );
+
+    return $self->send_email($c, $email, $smtp_config);
+}
+
 sub send_hosting_signup_notification {
     my ($self, $c, $account) = @_;
 
@@ -600,17 +654,24 @@ This is an automated notification from the Comserv platform.
     my %seen_emails = ($csc_email => 1);
     my @recipients  = ($csc_email);
     eval {
-        my @admin_users = $c->model('DBEncy')->resultset('User')->search(
-            [
-                { roles => { -like => '%admin%'      }, status => 'active', email_notifications => 1 },
-                { roles => { -like => '%accounting%' }, status => 'active', email_notifications => 1 },
-            ],
-            { columns => ['email'] }
-        )->all;
-        for my $u (@admin_users) {
-            next unless $u->email;
-            next if $seen_emails{ $u->email }++;
-            push @recipients, $u->email;
+        my $schema = $c->model('DBEncy');
+        my $csc_site = $schema->resultset('Site')->search({ name => 'CSC' })->single;
+        if ($csc_site) {
+            my @site_roles = $schema->resultset('UserSiteRole')->search(
+                {
+                    site_id  => $csc_site->id,
+                    role     => { -in => ['admin', 'accounting'] },
+                    is_active => 1,
+                },
+                { prefetch => 'user' }
+            )->all;
+            for my $sr (@site_roles) {
+                my $u = eval { $sr->user } or next;
+                next unless $u && $u->email && ($u->status // '') eq 'active'
+                         && ($u->email_notifications // 0);
+                next if $seen_emails{ $u->email }++;
+                push @recipients, $u->email;
+            }
         }
     };
 

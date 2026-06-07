@@ -12,6 +12,9 @@
 [% IF c.flash.success_msg %]
 <div class="success-message">[% c.flash.success_msg | html %]</div>
 [% END %]
+[% IF c.flash.info_msg %]
+<div class="info-message" style="white-space:pre-wrap;font-family:monospace;font-size:.85rem;padding:10px 14px;background:#e8f4fd;border:1px solid #90caf9;border-radius:4px;margin-bottom:12px">[% c.flash.info_msg | html %]</div>
+[% END %]
 
 <div class="content-container">
 <div class="content-primary">
@@ -57,6 +60,7 @@
 
     <div class="form-actions">
         <button type="submit" class="btn btn-primary">&#10003; Save Credentials</button>
+        <a href="[% c.uri_for('/admin/site_provisioning/test_api') %]" class="btn btn-secondary">&#128268; Test API &amp; List Zones</a>
         <a href="[% c.uri_for('/admin/site_provisioning') %]" class="btn btn-secondary">Cancel</a>
     </div>
 

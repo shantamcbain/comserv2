@@ -1079,6 +1079,34 @@ sub do_create_account :Local {
         return;
     }
 
+    my $math_challenge_ans = $c->request->params->{math_challenge_ans} // '';
+    my $expected_sum       = $c->session->{math_challenge_sum} // '';
+
+    if ($expected_sum ne '' && $math_challenge_ans ne $expected_sum) {
+        $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
+            "Bot detected (math challenge failed: submitted '$math_challenge_ans', expected '$expected_sum') from ip=$reg_ip");
+            
+        my $num1 = int(rand(8)) + 2;
+        my $num2 = int(rand(8)) + 2;
+        $c->session->{math_challenge_sum} = $num1 + $num2;
+        
+        my $csrf_token = sha256_hex(time() . rand() . ($c->sessionid || ''));
+        $c->session->{csrf_token} = $csrf_token;
+        
+        $c->stash(
+            csrf_token => $csrf_token,
+            num1       => $num1,
+            num2       => $num2,
+            username   => $c->request->params->{username} // '',
+            email      => $c->request->params->{email} // '',
+            error_msg  => 'Security check failed. Please solve the arithmetic question correctly.',
+            template   => 'user/register.tt'
+        );
+        return;
+    }
+
+    delete $c->session->{math_challenge_sum};
+
     if (!$submitted_token || !$session_token || $submitted_token ne $session_token) {
         $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'do_create_account',
             "CSRF token mismatch from ip=$reg_ip");
@@ -1159,6 +1187,13 @@ sub do_create_account :Local {
                     }, { rows => 1 })->single;
                     if ($hosting && $hosting->contact_email && lc($hosting->contact_email) eq lc($email)) {
                         $role_to_grant = 'admin';
+                    } else {
+                        my $user_count = $c->model('DBEncy::UserSiteRole')->search({
+                            site_id => $site->id,
+                        })->count;
+                        if ($user_count == 0) {
+                            $role_to_grant = 'admin';
+                        }
                     }
                 }
                 $c->model('DBEncy::UserSiteRole')->create({
@@ -1282,6 +1317,17 @@ sub verify_email :Local {
             $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
                 "AUDIT: Email verified user_id=$user_id ip=$verify_ip");
             
+            # Send Step 2 completion notification to admin
+            eval {
+                $self->email_notification->send_admin_email_verified_notification($c, $user);
+                $self->logging->log_with_details($c, 'info', __FILE__, __LINE__, 'verify_email',
+                    "Admin Step 2 notification sent for user: " . $user->username);
+            };
+            if ($@) {
+                $self->logging->log_with_details($c, 'warn', __FILE__, __LINE__, 'verify_email',
+                    "Failed to send admin Step 2 notification: $@");
+            }
+
             delete $c->session->{verification_code_display};
             delete $c->session->{verify_fail_count};
             $c->response->redirect($c->uri_for('/user/complete_profile'));
@@ -3165,7 +3211,17 @@ sub register :Local {
 
     my $csrf_token = sha256_hex(time() . rand() . ($c->sessionid || ''));
     $c->session->{csrf_token} = $csrf_token;
-    $c->stash(csrf_token => $csrf_token, template => 'user/register.tt');
+
+    my $num1 = int(rand(8)) + 2; # 2 to 9
+    my $num2 = int(rand(8)) + 2; # 2 to 9
+    $c->session->{math_challenge_sum} = $num1 + $num2;
+
+    $c->stash(
+        csrf_token => $csrf_token,
+        num1       => $num1,
+        num2       => $num2,
+        template   => 'user/register.tt'
+    );
 }
 sub welcome :Local {
     my ($self, $c) = @_;

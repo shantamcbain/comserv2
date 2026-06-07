@@ -670,6 +670,34 @@
         </div>
     </div>
 
+    <!-- Host System Statistics Footer Status Bar -->
+    <div class="compact-card" style="margin-top: 20px; border-top: 3px solid #0066cc; background-color: #f8f9fa;">
+        <div class="compact-card-body" style="padding: 10px 15px; display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; font-size: 12px; color: #333;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <i class="fas fa-server" style="color: #0066cc; font-size: 14px;"></i>
+                <strong>Host System Stats:</strong>
+                <span id="footer-host-badge" class="badge-pill" style="background-color: #0066cc; color: white; padding: 1px 6px; border-radius: 3px; font-weight: bold; font-size: 10px;">WORKSTATION</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 20px; flex-wrap: wrap;">
+                <div>
+                    <i class="fas fa-clock" style="color: #28a745;"></i> 
+                    <strong>Uptime:</strong> <span id="footer-uptime" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-hdd" style="color: #17a2b8;"></i> 
+                    <strong>Disk Usage:</strong> <span id="footer-disk" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+                <div>
+                    <i class="fas fa-memory" style="color: #ffc107;"></i> 
+                    <strong>Memory:</strong> <span id="footer-mem" style="font-family: monospace; background: #e9ecef; padding: 2px 6px; border-radius: 3px;">Loading...</span>
+                </div>
+            </div>
+            <div style="font-size: 11px; color: #666; font-style: italic;">
+                Last Refreshed: <span id="footer-last-refresh">N/A</span>
+            </div>
+        </div>
+    </div>
+
     <!-- Custom Results Modal Popup -->
     <div id="result-modal" style="display: none; position: fixed; z-index: 10000; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.5); align-items: center; justify-content: center;">
         <div style="background-color: #fff; margin: auto; padding: 20px; border: 1px solid #888; width: 80%; max-width: 650px; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); display: flex; flex-direction: column; gap: 15px; max-height: 85vh;">
@@ -932,6 +960,20 @@
                 if (memEl) memEl.textContent = d.memory || 'N/A';
                 const uptimeEl = document.getElementById('diag-uptime');
                 if (uptimeEl) uptimeEl.textContent = d.uptime || 'N/A';
+
+                // Update horizontal footer status bar
+                const footerHostBadge = document.getElementById('footer-host-badge');
+                if (footerHostBadge) {
+                    footerHostBadge.textContent = (target || 'workstation').toUpperCase();
+                }
+                const footerUptime = document.getElementById('footer-uptime');
+                if (footerUptime) footerUptime.textContent = d.uptime || 'N/A';
+                const footerDisk = document.getElementById('footer-disk');
+                if (footerDisk) footerDisk.textContent = d.disk || 'N/A';
+                const footerMem = document.getElementById('footer-mem');
+                if (footerMem) footerMem.textContent = d.memory || 'N/A';
+                const footerRefresh = document.getElementById('footer-last-refresh');
+                if (footerRefresh) footerRefresh.textContent = new Date().toLocaleTimeString();
             })
             .catch(err => {
                 if (loader) loader.style.display = 'none';
@@ -1186,12 +1228,40 @@
                             <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
                                 <strong>Image:</strong> ${container.image || ''}
                             </div>
+                            ${(function() {
+                                if (container.image_tags && container.image_tags.length > 0) {
+                                    const activeTags = container.image_tags.filter(t => t !== '<none>');
+                                    if (activeTags.length > 0) {
+                                        const backupTags = activeTags.filter(t => t.startsWith('backup-'));
+                                        if (backupTags.length > 0) {
+                                            if (activeTags.includes('latest')) {
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #fff3cd; color: #856404; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #ff922b; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-exclamation-triangle" style="color: #ff922b;"></i> ACTIVE FAILOVER: Running ${backupTags.join(', ')} (tagged as latest)</span></div>`;
+                                            } else {
+                                                return `<div style="font-size: 12px; margin-bottom: 6px;"><span style="background-color: #f8d7da; color: #721c24; padding: 4px 10px; border-radius: 4px; font-weight: bold; font-size: 11px; border-left: 4px solid #dc3545; display: inline-flex; align-items: center; gap: 6px;"><i class="fas fa-history" style="color: #dc3545;"></i> ROLLED BACK: Running ${backupTags.join(', ')}</span></div>`;
+                                            }
+                                        } else {
+                                            return `<div style="font-size: 12px; margin-bottom: 3px;"><span style="background-color: #d4edda; color: #155724; padding: 2px 6px; border-radius: 3px; font-weight: bold; font-size: 11px;"><i class="fas fa-check-circle"></i> Running LATEST image</span></div>`;
+                                        }
+                                    }
+                                }
+                                return '';
+                            })()}
                             <div style="font-size: 12px; color: var(--text-muted-color, #666); margin-bottom: 3px;">
                                 <strong>ID:</strong> <code>${container.id || ''}</code>
                                 &nbsp;|&nbsp;<strong>Status:</strong> ${container.status || container.state || ''}
                             </div>
                             ${container.ports ? `<div style="font-size:12px;color: var(--text-muted-color, #666);margin-bottom:3px;"><strong>Ports:</strong> ${container.ports}</div>` : ''}
-                            <div style="font-size: 12px;">
+                            ${container.build_info ? `
+                                <div style="font-size: 12px; color: var(--text-muted-color, #555); margin-bottom: 5px; margin-top: 5px; background-color: #f1f3f5; padding: 4px 8px; border-radius: 4px; border-left: 3px solid #007bff; display: inline-block;">
+                                    <i class="fas fa-code-branch" style="color: #007bff; margin-right: 4px;"></i>
+                                    <strong>Build:</strong> <span>${container.build_info.build_date || 'N/A'}</span>
+                                    &nbsp;|&nbsp;
+                                    <strong>Commit:</strong> <code style="font-weight: bold; color: #111;">${container.build_info.commit ? container.build_info.commit.substring(0, 8) : 'N/A'}</code>
+                                    ${container.build_info.branch ? `&nbsp;|&nbsp;<strong>Branch:</strong> <span style="color: #28a745;">${container.build_info.branch}</span>` : ''}
+                                    ${container.build_info.build_host ? `&nbsp;|&nbsp;<strong>Built On:</strong> <span style="color: #6c757d;">${container.build_info.build_host}</span>` : ''}
+                                </div>
+                            ` : ''}
+                            <div style="font-size: 12px; margin-top: 3px;">
                                 <span style="background-color: ${stateColor}; color: white; padding: 2px 8px; border-radius: 3px; font-weight: bold;">
                                     ${(container.state||'unknown').toUpperCase()}
                                 </span>
@@ -2045,112 +2115,27 @@
     }
 
     function deployToProduction(deployMode) {
-        const sshTarget   = document.getElementById('production-host').value.trim() || 'ubuntu@192.168.1.126';
-        const sshPassword = document.getElementById('ssh-password').value;
-
-        if (deployMode === undefined || deployMode === null) {
-            deployMode = 'full';
-        } else if (deployMode === 1) {
-            deployMode = 'quick';
-        }
-
-        const isFullMode = deployMode === 'full';
-
-        const confirmMsg = `⚠️ EXECUTE PRODUCTION DEPLOYMENT\n\n` +
-            `Selected Action: ${deployMode.toUpperCase()}\n` +
-            `Target Server  : ${sshTarget}\n\n` +
-            `Are you sure you want to proceed?`;
-
-        if (!confirm(confirmMsg)) return;
-
-        appendOutput(`\n${'='.repeat(80)}\n`);
-        appendOutput(`🚀 DEPLOYMENT ACTION: ${deployMode.toUpperCase()} STARTED\n`);
-        appendOutput(`${'='.repeat(80)}\n`);
-        appendOutput(`Target: ${sshTarget}\n`);
-        appendOutput(`Time: ${new Date().toLocaleString()}\n`);
-        appendOutput(`Action: ${deployMode}\n`);
-        appendOutput(`${'='.repeat(80)}\n\n`);
-        if (isFullMode) {
-            appendOutput(`⏳ Building & pushing... this may take several minutes. Output will stream below.\n\n`);
-        } else {
-            appendOutput(`⏳ Triggering remote deploy script... Output will stream below.\n\n`);
-        }
-
-        const bodyParams = { ssh_target: sshTarget, ssh_password: sshPassword, deploy_mode: deployMode };
-
-        safeFetch('/admin/docker-deploy-to-production', {
-            method: 'POST',
-            body: new URLSearchParams(bodyParams)
-        })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    appendOutput(`✅ Background process started\n`);
-                    if (data.image) appendOutput(`   Image : ${data.image}\n`);
-                    if (data.log_file) {
-                        appendOutput(`   Log   : ${data.log_file}\n`);
-                        const fname = data.log_file.split('/').pop();
-                        document.getElementById('last-deploy-file').textContent = fname + ' (in progress)';
-                        document.getElementById('last-deploy-banner').style.display = 'block';
-                    }
-                    appendOutput(`\nStreaming output...\n\n`);
-                    startPollingDeploymentStatus();
-                } else {
-                    appendOutput(`\n${'='.repeat(80)}\n`);
-                    appendOutput(`❌ FAILED TO START\n`);
-                    appendOutput(`${'='.repeat(80)}\n`);
-                    appendOutput((data.error || 'Unknown error') + '\n');
-                    appendOutput(`${'='.repeat(80)}\n`);
-                }
-            })
-            .catch(error => {
-                appendOutput(`\n❌ REQUEST ERROR: ${error.message}\n`);
-            });
-    }
-
-    let deploymentPollingInterval = null;
-    let lastLogContent = '';
-
-    function startPollingDeploymentStatus() {
-        if (deploymentPollingInterval) clearInterval(deploymentPollingInterval);
-        lastLogContent = '';
+        var isQuick = (deployMode === 1 || deployMode === 'quick') ? '1' : '0';
+        var url = '/admin/docker/deploy_form?quick_deploy=' + isQuick;
         
-        deploymentPollingInterval = setInterval(() => {
-            safeFetch('/admin/docker-deploy-status')
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success) {
-                        if (data.output && data.output !== lastLogContent) {
-                            // Find only new content
-                            const newContent = data.output.substring(lastLogContent.length);
-                            if (newContent) {
-                                // Add to output box without timestamps (since they are in the log already)
-                                outputBox.textContent += newContent;
-                                outputBox.scrollTop = outputBox.scrollHeight;
-                                lastLogContent = data.output;
-                            }
-                        }
-                        
-                        if (!data.is_running) {
-                            clearInterval(deploymentPollingInterval);
-                            deploymentPollingInterval = null;
-                            appendOutput(`\n${'='.repeat(80)}\n`);
-                            appendOutput(`✅ DEPLOYMENT FINISHED\n`);
-                            appendOutput(`${'='.repeat(80)}\n`);
-                            if (data.log_file) {
-                                const fname = data.log_file.split('/').pop();
-                                _lastDeployContent = data.output || '';
-                                document.getElementById('last-deploy-file').textContent = fname;
-                                document.getElementById('last-deploy-banner').style.display = 'block';
-                            }
-                            setTimeout(refreshContainers, 2000);
-                        }
-                    }
-                })
-                .catch(error => {
-                    console.error('Error polling deployment status:', error);
-                });
-        }, 1000);
+        var popup = window.open(
+            url,
+            'docker_deploy',
+            'width=720,height=540,resizable=yes,scrollbars=yes,toolbar=no,menubar=no,location=no,status=no'
+        );
+        if (popup) {
+            popup.focus();
+            window.addEventListener('message', function onMsg(e) {
+                if (e.data && e.data.type === 'deploy_done') {
+                    window.removeEventListener('message', onMsg);
+                    var msg = e.data.success ? '✅ Deploy complete — check the log for details.' : '⚠️ Deploy had errors — review the popup log before closing.';
+                    alert(msg);
+                    location.reload();
+                }
+            });
+        } else {
+            alert('⚠ Popup blocked — allow popups for this site and try again.');
+        }
     }
 
     function openSSHTerminal() {

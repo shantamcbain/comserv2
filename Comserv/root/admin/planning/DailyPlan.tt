@@ -246,7 +246,6 @@
                 [% END %]
                 <button onclick="triageStale()" style="padding:4px 12px;border:1px solid #fd7e14;border-radius:4px;background:transparent;font-size:0.82em;color:#fd7e14;cursor:pointer;" title="Reduce priority of todos inactive for 180+ days">⚠ Triage Stale</button>
                 <button onclick="rescheduleTodos(this)" style="padding:4px 12px;border:1px solid #6f42c1;border-radius:4px;background:transparent;font-size:0.82em;color:#6f42c1;cursor:pointer;" title="Re-score all todos: staleness, due dates, blocking status — then reload">♻ Reschedule</button>
-                <button onclick="openDeployModal()" style="padding:4px 12px;border:1px solid #dc3545;border-radius:4px;background:transparent;font-size:0.82em;color:#dc3545;cursor:pointer;" title="Deploy system updates (Production or Local)">🚀 Deploy</button>
                 [% END %]
             </div>
 
@@ -1813,7 +1812,7 @@ function startDeploymentAction() {
         fetch('/admin/docker-deploy-to-production', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword) + '&deploy_mode=' + encodeURIComponent(deployMode)
+            body: 'ssh_target=' + encodeURIComponent(sshTarget) + '&ssh_password=' + encodeURIComponent(sshPassword) + '&deploy_mode=' + encodeURIComponent(deployMode) + '&trigger_source=DailyPlan'
         })
         .then(r => r.json())
         .then(data => {
@@ -1844,7 +1843,8 @@ function startDeploymentAction() {
         
         fetch('/admin/docker/deploy', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: 'todo_record_id=' + encodeURIComponent(todoId || 0) + '&trigger_source=DailyPlan-local'
         })
         .then(r => r.json())
         .then(data => {
@@ -1944,7 +1944,7 @@ function startWorkTodoCard(btn, recordId) {
 }
 
 function closeLogTodoCard(btn, recordId) {
-    var notes = prompt('Close log — brief notes on what was done (optional):');
+    var notes = prompt('Close session — brief notes on what was done (optional):\n(todo stays in-progress; click Start again for next session)');
     if (notes === null) return;
     notes = notes || '';
     btn.disabled = true;
@@ -1971,6 +1971,42 @@ function closeLogTodoCard(btn, recordId) {
     }).catch(function(e) {
         btn.disabled = false;
         btn.textContent = '⏸ Active';
+        alert('Error: ' + e);
+    });
+}
+
+function doneWithLogTodoCard(btn, recordId, isActive) {
+    var notes = prompt('Mark todo DONE — what was done / resolution notes (optional):');
+    if (notes === null) return;
+    notes = notes || '';
+    var payload = { record_id: recordId, notes: notes };
+    if (!isActive) {
+        var durStr = prompt('No active log session.\nHow many minutes did this take? (leave blank to skip log)');
+        if (durStr === null) return;
+        var durMins = parseInt(durStr, 10);
+        if (!isNaN(durMins) && durMins > 0) { payload.duration_mins = durMins; }
+    }
+    btn.disabled = true;
+    btn.textContent = '…';
+    fetch('/todo/done_with_log', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).then(function(r) { return r.json(); }).then(function(d) {
+        if (d.ok) {
+            var card = btn.closest('[id^="ap-row-"]') || btn.closest('[id^="pr-row-"]') || btn.closest('[data-todo-id]');
+            if (card) { card.style.opacity = '0.4'; card.style.textDecoration = 'line-through'; }
+            btn.textContent = '✓ Done';
+            btn.disabled = true;
+        } else {
+            btn.disabled = false;
+            btn.textContent = 'Done';
+            alert('Could not mark done: ' + (d.error || 'unknown'));
+        }
+    }).catch(function(e) {
+        btn.disabled = false;
+        btn.textContent = 'Done';
         alert('Error: ' + e);
     });
 }
