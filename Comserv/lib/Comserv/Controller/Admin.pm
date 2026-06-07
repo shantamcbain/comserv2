@@ -7822,8 +7822,10 @@ sub get_migration_postgres_info {
 
     } catch {
         $result->{connection_status} = 'error';
-        $result->{error} = "PostgreSQL connection failed: $_";
-        $self->logging->log_with_details($c, 'error', __FILE__, __LINE__, 'get_migration_postgres_info', $result->{error});
+        my $err = "$_";
+        $result->{error} = "PostgreSQL connection failed: $err";
+        my $level = ($err =~ /No route to host|Connection refused|timeout/i) ? 'warn' : 'error';
+        $self->logging->log_with_details($c, $level, __FILE__, __LINE__, 'get_migration_postgres_info', $result->{error});
     };
 
     return $result;
